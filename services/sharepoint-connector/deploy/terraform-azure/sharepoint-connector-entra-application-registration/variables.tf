@@ -1,6 +1,7 @@
 variable "display_name" {
   description = "The display name for the Azure AD application registration."
   type        = string
+  default     = "Unique AI SharePoint Connector"
 }
 
 variable "sign_in_audience" {
