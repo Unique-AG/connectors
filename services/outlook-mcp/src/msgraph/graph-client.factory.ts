@@ -11,12 +11,12 @@ import {
   RetryHandlerOptions,
   TelemetryHandler,
 } from '@microsoft/microsoft-graph-client';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MetricService } from 'nestjs-otel';
 import { AppConfig, AppSettings } from '../app-settings.enum';
 import { SCOPES } from '../auth/microsoft.provider';
-import { PrismaService } from '../prisma/prisma.service';
+import { DRIZZLE, DrizzleDatabase } from '../drizzle/drizzle.module';
 import { MetricsMiddleware } from './metrics.middleware';
 import { TokenProvider } from './token.provider';
 import { TokenRefreshMiddleware } from './token-refresh.middleware';
@@ -29,7 +29,7 @@ export class GraphClientFactory {
 
   public constructor(
     private readonly configService: ConfigService<AppConfig, true>,
-    private readonly prisma: PrismaService,
+    @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
     private readonly encryptionService: AesGcmEncryptionService,
     private readonly metricService: MetricService,
   ) {
@@ -47,7 +47,7 @@ export class GraphClientFactory {
         scopes: this.scopes,
       },
       {
-        prisma: this.prisma,
+        drizzle: this.drizzle,
         encryptionService: this.encryptionService,
       },
     );

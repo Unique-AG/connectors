@@ -20,6 +20,7 @@
       "dependsOn": ["^build"]
     },
     "db:migrate": {},
+    "db:push": {},
     "test": {
       "cache": false
     },

@@ -1,12 +1,12 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { describe, expect, it } from 'vitest';
 import {
-  convertAuthCodeToPrisma,
-  convertOAuthClientToPrisma,
-  convertPrismaToAuthCode,
-  convertPrismaToOAuthClient,
-  convertPrismaToSession,
-  convertSessionToPrisma,
+  fromDrizzleAuthCodeRow,
+  fromDrizzleOAuthClientRow,
+  fromDrizzleSessionRow,
+  toDrizzleAuthCodeInsert,
+  toDrizzleOAuthClientInsert,
+  toDrizzleSessionInsert,
 } from './case-converter';
 
 describe('case-converter', () => {
@@ -28,7 +28,7 @@ describe('case-converter', () => {
       updated_at: new Date('2023-01-02'),
     };
 
-    const mockPrismaClient = {
+    const mockDrizzleClient = {
       clientId: 'test-client-id',
       clientSecret: 'test-secret',
       clientName: 'Test Client',
@@ -45,21 +45,21 @@ describe('case-converter', () => {
       updatedAt: new Date('2023-01-02'),
     };
 
-    it('converts OAuthClient to Prisma format', () => {
-      const result = convertOAuthClientToPrisma(mockOAuthClient);
+    it('converts OAuthClient to Drizzle format', () => {
+      const result = toDrizzleOAuthClientInsert(mockOAuthClient);
 
-      expect(result).toEqual(mockPrismaClient);
+      expect(result).toEqual(mockDrizzleClient);
     });
 
-    it('converts Prisma client to OAuthClient format', () => {
-      const result = convertPrismaToOAuthClient(mockPrismaClient as any);
+    it('converts Drizzle client to OAuthClient format', () => {
+      const result = fromDrizzleOAuthClientRow(mockDrizzleClient as any);
 
       expect(result).toEqual(mockOAuthClient);
     });
 
-    it('handles null values in Prisma to OAuth conversion', () => {
-      const prismaClientWithNulls = {
-        ...mockPrismaClient,
+    it('handles null values in Drizzle to OAuth conversion', () => {
+      const drizzleClientWithNulls = {
+        ...mockDrizzleClient,
         clientSecret: null,
         clientDescription: null,
         logoUri: null,
@@ -68,7 +68,7 @@ describe('case-converter', () => {
         developerEmail: null,
       };
 
-      const result = convertPrismaToOAuthClient(prismaClientWithNulls as any);
+      const result = fromDrizzleOAuthClientRow(drizzleClientWithNulls as any);
 
       expect(result).toEqual({
         ...mockOAuthClient,
@@ -96,7 +96,7 @@ describe('case-converter', () => {
       user_profile_id: 'profile-123',
     };
 
-    const mockPrismaAuthCode = {
+    const mockDrizzleAuthCode = {
       code: 'test-auth-code',
       userId: 'user-123',
       clientId: 'client-123',
@@ -109,26 +109,26 @@ describe('case-converter', () => {
       userProfileId: 'profile-123',
     };
 
-    it('converts AuthorizationCode to Prisma format', () => {
-      const result = convertAuthCodeToPrisma(mockAuthCode);
+    it('converts AuthorizationCode to Drizzle format', () => {
+      const result = toDrizzleAuthCodeInsert(mockAuthCode);
 
-      expect(result).toEqual(mockPrismaAuthCode);
+      expect(result).toEqual(mockDrizzleAuthCode);
     });
 
-    it('converts Prisma auth code to AuthorizationCode format', () => {
-      const result = convertPrismaToAuthCode(mockPrismaAuthCode as any);
+    it('converts Drizzle auth code to AuthorizationCode format', () => {
+      const result = fromDrizzleAuthCodeRow(mockDrizzleAuthCode as any);
 
       expect(result).toEqual(mockAuthCode);
     });
 
-    it('handles null resource and scope in Prisma to AuthCode conversion', () => {
-      const prismaAuthCodeWithNulls = {
-        ...mockPrismaAuthCode,
+    it('handles null resource and scope in Drizzle to AuthCode conversion', () => {
+      const drizzleAuthCodeWithNulls = {
+        ...mockDrizzleAuthCode,
         resource: null,
         scope: null,
       };
 
-      const result = convertPrismaToAuthCode(prismaAuthCodeWithNulls as any);
+      const result = fromDrizzleAuthCodeRow(drizzleAuthCodeWithNulls as any);
 
       expect(result).toEqual({
         ...mockAuthCode,
@@ -152,7 +152,7 @@ describe('case-converter', () => {
       expiresAt: 1672531200000,
     };
 
-    const mockPrismaSession = {
+    const mockDrizzleSession = {
       sessionId: 'session-123',
       state: 'state-value',
       clientId: 'client-123',
@@ -165,21 +165,21 @@ describe('case-converter', () => {
       expiresAt: new Date(1672531200000),
     };
 
-    it('converts OAuthSession to Prisma format', () => {
-      const result = convertSessionToPrisma(mockOAuthSession);
+    it('converts OAuthSession to Drizzle format', () => {
+      const result = toDrizzleSessionInsert(mockOAuthSession);
 
-      expect(result).toEqual(mockPrismaSession);
+      expect(result).toEqual(mockDrizzleSession);
     });
 
-    it('converts Prisma session to OAuthSession format', () => {
-      const result = convertPrismaToSession(mockPrismaSession as any);
+    it('converts Drizzle session to OAuthSession format', () => {
+      const result = fromDrizzleSessionRow(mockDrizzleSession as any);
 
       expect(result).toEqual(mockOAuthSession);
     });
 
-    it('handles null values in Prisma to Session conversion', () => {
-      const prismaSessionWithNulls = {
-        ...mockPrismaSession,
+    it('handles null values in Drizzle to Session conversion', () => {
+      const drizzleSessionWithNulls = {
+        ...mockDrizzleSession,
         clientId: null,
         redirectUri: null,
         codeChallenge: null,
@@ -189,7 +189,7 @@ describe('case-converter', () => {
         resource: null,
       };
 
-      const result = convertPrismaToSession(prismaSessionWithNulls as any);
+      const result = fromDrizzleSessionRow(drizzleSessionWithNulls as any);
 
       expect(result).toEqual({
         ...mockOAuthSession,

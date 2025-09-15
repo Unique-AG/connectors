@@ -5,6 +5,7 @@
     "build": "turbo build",
     "dev": "concurrently --kill-others -P \"turbo watch build --filter='./packages/*'\" \"turbo dev {@}\"",
     "db:migrate": "turbo db:migrate",
+    "db:push": "turbo db:push",
     "codegen": "turbo codegen",
     "test": "turbo test",
     "test:watch": "turbo test:watch",
@@ -32,5 +33,5 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@10.15.1"
+  "packageManager": "pnpm@10.16.1"
 }
