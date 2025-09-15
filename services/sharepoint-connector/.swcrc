@@ -1,0 +1,17 @@
+{
+  "$schema": "https://swc.rs/schema.json",
+  "sourceMaps": true,
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "decorators": true,
+      "dynamicImport": true
+    },
+    "target": "es2024",
+    "keepClassNames": true
+  },
+  "module": {
+    "type": "commonjs"
+  },
+  "minify": false
+}

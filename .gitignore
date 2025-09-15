@@ -43,3 +43,5 @@ factset-auth.json
 
 .terraform
 .terraform.lock.hcl
+
+.idea
