@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
+import { GraphQLClient } from 'graphql-request';
 import { Client } from 'undici';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
 import {
@@ -28,22 +29,64 @@ export class UniqueApiService {
     return await this.limiter.schedule(async () => await requestFn());
   }
 
+  private createGraphqlClient(uniqueToken: string): GraphQLClient {
+    const graphqlUrl = this.configService.get<string>('uniqueApi.ingestionGraphQLUrl') ?? '';
+    return new GraphQLClient(graphqlUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${uniqueToken}`,
+      },
+    });
+  }
+
+  private getContentUpsertMutation(): string {
+    return `mutation ContentUpsert(
+  $input: ContentCreateInput!
+  $fileUrl: String
+  $chatId: String
+  $scopeId: String
+  $sourceOwnerType: String
+  $sourceName: String
+  $sourceKind: String
+  $storeInternally: Boolean
+) {
+  contentUpsert(
+    input: $input
+    fileUrl: $fileUrl
+    chatId: $chatId
+    scopeId: $scopeId
+    sourceOwnerType: $sourceOwnerType
+    sourceName: $sourceName
+    sourceKind: $sourceKind
+    storeInternally: $storeInternally
+  ) {
+    id
+    key
+    byteSize
+    mimeType
+    ownerType
+    ownerId
+    writeUrl
+    readUrl
+    createdAt
+    internallyStoredAt
+    source { kind name }
+  }
+}`;
+  }
+
   public async registerContent(
     request: ContentRegistrationRequest,
     uniqueToken: string,
   ): Promise<IngestionApiResponse> {
     return await this.makeRateLimitedRequest(async () => {
       try {
-        // GraphQL call without codegen - build request manually
-        const graphqlUrl = this.configService.get<string>('uniqueApi.ingestionGraphQLUrl') ?? '';
-        const url = new URL(graphqlUrl);
-        const path = url.pathname + url.search;
-        const query = `mutation ContentUpsert($input: ContentCreateInput!, $fileUrl: String, $chatId: String, $scopeId: String, $sourceOwnerType: String, $sourceName: String, $sourceKind: String, $storeInternally: Boolean) {\n  contentUpsert(input: $input, fileUrl: $fileUrl, chatId: $chatId, scopeId: $scopeId, sourceOwnerType: $sourceOwnerType, sourceName: $sourceName, sourceKind: $sourceKind, storeInternally: $storeInternally) {\n    id\n    key\n    byteSize\n    mimeType\n    ownerType\n    ownerId\n    writeUrl\n    readUrl\n    createdAt\n    internallyStoredAt\n    source {\n      kind\n      name\n    }\n  }\n}`;
+        const client = this.createGraphqlClient(uniqueToken);
         const variables = {
           input: {
             key: request.key,
             mimeType: request.mimeType,
-            ownerType: request.ownerType,
+            ownerType: this.mapOwnerType(request.ownerType),
           },
           scopeId: request.scopeId,
           sourceOwnerType: request.sourceOwnerType,
@@ -51,27 +94,14 @@ export class UniqueApiService {
           sourceName: request.sourceName,
           storeInternally: true,
         };
-
-        const { body } = await this.httpClient.request({
-          method: 'POST',
-          path,
-          headers: {
-            'content-type': 'application/json',
-            Authorization: `Bearer ${uniqueToken}`,
-          },
-          body: JSON.stringify({ query, variables }),
-          throwOnError: true,
-        });
-
-        const responseData = (await body.json()) as {
-          data?: { contentUpsert?: IngestionApiResponse };
-          errors?: unknown;
-        };
-        const result = responseData?.data?.contentUpsert;
-        if (!result) {
+        const result = await client.request<{ contentUpsert?: IngestionApiResponse }>(
+          this.getContentUpsertMutation(),
+          variables,
+        );
+        if (!result || !result.contentUpsert) {
           throw new Error('Invalid response from Unique API content registration');
         }
-        return result;
+        return result.contentUpsert;
       } catch (error) {
         this.logger.error(
           'Content registration failed:',
@@ -137,15 +167,12 @@ export class UniqueApiService {
   ): Promise<{ id: string }> {
     return await this.makeRateLimitedRequest(async () => {
       try {
-        const graphqlUrl = this.configService.get<string>('uniqueApi.ingestionGraphQLUrl') ?? '';
-        const url = new URL(graphqlUrl);
-        const path = url.pathname + url.search;
-        const query = `mutation ContentUpsert($input: ContentCreateInput!, $fileUrl: String, $chatId: String, $scopeId: String, $sourceOwnerType: String, $sourceName: String, $sourceKind: String, $storeInternally: Boolean) {\n  contentUpsert(input: $input, fileUrl: $fileUrl, chatId: $chatId, scopeId: $scopeId, sourceOwnerType: $sourceOwnerType, sourceName: $sourceName, sourceKind: $sourceKind, storeInternally: $storeInternally) {\n    id\n    key\n    byteSize\n    mimeType\n    ownerType\n    ownerId\n    writeUrl\n    readUrl\n    createdAt\n    internallyStoredAt\n    source {\n      kind\n      name\n    }\n  }\n}`;
+        const client = this.createGraphqlClient(uniqueToken);
         const variables = {
           input: {
             key: request.key,
             mimeType: request.mimeType,
-            ownerType: request.ownerType,
+            ownerType: this.mapOwnerType(request.ownerType),
             byteSize: request.byteSize,
           },
           scopeId: request.scopeId,
@@ -155,20 +182,11 @@ export class UniqueApiService {
           fileUrl: request.fileUrl,
           storeInternally: true,
         };
-
-        const { body } = await this.httpClient.request({
-          method: 'POST',
-          path,
-          headers: {
-            'content-type': 'application/json',
-            Authorization: `Bearer ${uniqueToken}`,
-          },
-          body: JSON.stringify({ query, variables }),
-          throwOnError: true,
-        });
-
-        const responseData = (await body.json()) as { data?: { contentUpsert?: { id: string } } };
-        const id = responseData?.data?.contentUpsert?.id;
+        const result = await client.request<{ contentUpsert?: { id?: string } }>(
+          this.getContentUpsertMutation(),
+          variables,
+        );
+        const id = result?.contentUpsert?.id;
         if (!id) {
           throw new Error('Invalid response from Unique API ingestion finalization');
         }
@@ -181,5 +199,20 @@ export class UniqueApiService {
         throw error;
       }
     });
+  }
+
+  private mapOwnerType(value: string): string {
+    switch (value) {
+      case 'SCOPE':
+        return 'SCOPE';
+      case 'COMPANY':
+        return 'COMPANY';
+      case 'USER':
+        return 'USER';
+      case 'CHAT':
+        return 'CHAT';
+      default:
+        return 'SCOPE';
+    }
   }
 }

@@ -1,3 +1,5 @@
+import type { ProcessingMetadata } from './processing-metadata';
+
 export interface ProcessingContext {
   correlationId: string;
   fileId: string;
@@ -14,7 +16,7 @@ export interface ProcessingContext {
 
   startTime: Date;
 
-  metadata: Record<string, unknown>;
+  metadata: ProcessingMetadata;
 }
 
 export interface PipelineResult {

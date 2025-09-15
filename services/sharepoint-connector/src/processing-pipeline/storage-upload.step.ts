@@ -53,10 +53,7 @@ export class StorageUploadStep implements IPipelineStep {
     try {
       const response = await request(uploadUrl, {
         method: 'PUT',
-        headers: {
-          'Content-Type': mimeType,
-          'x-ms-blob-type': 'BlockBlob',
-        },
+        headers: { 'Content-Type': mimeType, 'x-ms-blob-type': 'BlockBlob' },
         body: contentBuffer,
         throwOnError: true,
       });

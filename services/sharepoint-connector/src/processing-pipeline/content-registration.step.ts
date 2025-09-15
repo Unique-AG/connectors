@@ -43,7 +43,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       );
       context.uploadUrl = registrationResponse.writeUrl;
       context.uniqueContentId = registrationResponse.id ?? '';
-      context.metadata.registrationResponse = registrationResponse;
+      context.metadata.registration = registrationResponse;
       const _stepDuration = Date.now() - stepStartTime;
       return context;
     } catch (error) {
@@ -54,8 +54,9 @@ export class ContentRegistrationStep implements IPipelineStep {
   }
 
   private generateFileKey(context: ProcessingContext): string {
-    const siteId: string = context.metadata.siteId ?? 'unknown-site';
-    const driveId: string = context.metadata.driveId ?? 'unknown-drive';
+    const meta = context.metadata as Record<string, unknown>;
+    const siteId = (meta.siteId as string | undefined) ?? 'unknown-site';
+    const driveId = (meta.driveId as string | undefined) ?? 'unknown-drive';
     return `sharepoint_${siteId}_${driveId}_${context.fileId}`;
   }
 

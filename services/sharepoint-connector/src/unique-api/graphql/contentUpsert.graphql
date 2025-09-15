@@ -1,0 +1,36 @@
+mutation ContentUpsert(
+  $input: ContentCreateInput!
+  $fileUrl: String
+  $chatId: String
+  $scopeId: String
+  $sourceOwnerType: String
+  $sourceName: String
+  $sourceKind: String
+  $storeInternally: Boolean
+) {
+  contentUpsert(
+    input: $input
+    fileUrl: $fileUrl
+    chatId: $chatId
+    scopeId: $scopeId
+    sourceOwnerType: $sourceOwnerType
+    sourceName: $sourceName
+    sourceKind: $sourceKind
+    storeInternally: $storeInternally
+  ) {
+    id
+    key
+    byteSize
+    mimeType
+    ownerType
+    ownerId
+    writeUrl
+    readUrl
+    createdAt
+    internallyStoredAt
+    source {
+      kind
+      name
+    }
+  }
+}

@@ -26,7 +26,10 @@ export class ContentFetchingStep implements IPipelineStep {
       if (!driveId) {
         throw new Error('Drive ID not found in file metadata');
       }
-      this.validateMimeType(context.metadata.mimeType, context.correlationId);
+      this.validateMimeType(
+        (context.metadata as Record<string, unknown>).mimeType as string | undefined,
+        context.correlationId,
+      );
       const contentBuffer = await this.sharepointApiService.downloadFileContent(driveId, itemId);
       context.contentBuffer = contentBuffer;
       context.fileSize = contentBuffer.length;
@@ -45,19 +48,29 @@ export class ContentFetchingStep implements IPipelineStep {
   }
 
   private extractDriveId(context: ProcessingContext): string | null {
-    const metadata = context.metadata;
-    if (metadata.driveId) return metadata.driveId;
-    if (metadata.parentReference?.driveId) return metadata.parentReference.driveId;
-    if (metadata.listItem?.fields?.driveId) return metadata.listItem.fields.driveId;
+    type ParentRef = { driveId?: string };
+    type MetaShape = {
+      driveId?: string;
+      parentReference?: ParentRef;
+      listItem?: { fields?: { driveId?: string } };
+    };
+    const metadata = context.metadata as MetaShape;
+    if (typeof metadata.driveId === 'string' && metadata.driveId) return metadata.driveId;
+    if (metadata.parentReference && typeof metadata.parentReference.driveId === 'string') {
+      return metadata.parentReference.driveId;
+    }
+    if (metadata.listItem?.fields && typeof metadata.listItem.fields.driveId === 'string') {
+      return metadata.listItem.fields.driveId;
+    }
     this.logger.warn(
       `[${context.correlationId}] Drive ID not found in metadata. Available keys: ${Object.keys(
-        metadata,
+        metadata as Record<string, unknown>,
       ).join(', ')}`,
     );
     return null;
   }
 
-  private validateMimeType(mimeType: string, correlationId: string): void {
+  private validateMimeType(mimeType: string | undefined, correlationId: string): void {
     const allowedMimeTypes = this.configService.get<string[]>('sharepoint.allowedMimeTypes') ?? [];
     if (!mimeType) {
       throw new Error(`MIME type is missing for this item. Skipping download. [${correlationId}]`);

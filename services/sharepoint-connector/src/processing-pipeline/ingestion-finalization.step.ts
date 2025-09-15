@@ -24,7 +24,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
         `[${context.correlationId}] Starting ingestion finalization for file: ${context.fileName}`,
       );
       const uniqueToken = await this.uniqueAuthService.getToken();
-      const registrationResponse = context.metadata.registrationResponse;
+      const registrationResponse = context.metadata.registration;
       if (!registrationResponse) {
         throw new Error(
           'Registration response not found in context - content registration may have failed',
@@ -51,7 +51,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
         finalizationRequest,
         uniqueToken,
       );
-      context.metadata.finalizationResponse = finalizationResponse;
+      context.metadata.finalization = finalizationResponse;
       context.metadata.finalContentId = finalizationResponse.id ?? '';
       const _stepDuration = Date.now() - stepStartTime;
       return context;
