@@ -1,0 +1,2 @@
+export const UNIQUE_HTTP_CLIENT = Symbol.for('UNIQUE_HTTP_CLIENT');
+export const SHAREPOINT_HTTP_CLIENT = Symbol.for('SHAREPOINT_HTTP_CLIENT');

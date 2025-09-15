@@ -26,10 +26,12 @@
     "test:coverage": "vitest run --config vitest.coverage.config.ts && istanbul-badges-readme --style='square-flat'"
   },
   "dependencies": {
+    "@azure/msal-node": "^3.7.3",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/schedule": "^6.0.0",
     "@nestjs/terminus": "^11.0.0",
     "@opentelemetry/api": "^1.9.0",
     "@proventuslabs/nestjs-zod": "^1.2.0",
@@ -39,6 +41,8 @@
     "nestjs-otel": "^7.0.1",
     "nestjs-pino": "^4.4.0",
     "nestjs-zod": "^5.0.1",
+    "bottleneck": "^2.19.5",
+    "undici": "^7.15.0",
     "pino-http": "^10.5.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
