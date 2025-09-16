@@ -43,6 +43,7 @@
     "@unique-ag/logger": "workspace:*",
     "@unique-ag/probe": "workspace:*",
     "bottleneck": "^2.19.5",
+    "p-limit": "^2.3.0",
     "graphql": "^16.11.0",
     "graphql-request": "^7.2.0",
     "nestjs-otel": "^7.0.1",
@@ -55,6 +56,7 @@
     "zod": "^4.1.5"
   },
   "devDependencies": {
+    "@types/p-limit": "^2.0.0",
     "@nestjs/cli": "^11.0.10",
     "@nestjs/schematics": "^11.0.7",
     "@nestjs/testing": "^11.1.6",

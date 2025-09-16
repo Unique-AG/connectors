@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import pLimit from 'p-limit';
 import { DEFAULT_PROCESSING_CONCURRENCY } from '../constants/defaults.constants';
 import type { DriveItem } from '../types/sharepoint.types';
 import type { FileDiffResponse } from '../unique-api/types/unique-api.types';
@@ -26,7 +27,7 @@ export class FileProcessingOrchestratorService {
 
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);
     const siteFiles = files.filter(
-      (f) => f.parentReference?.siteId === siteId && newFileKeys.has(`sharepoint_file_${f.id}`),
+      (file) => file.parentReference?.siteId === siteId && newFileKeys.has(`sharepoint_file_${file.id}`),
     );
     if (siteFiles.length === 0) {
       this.logger.debug(`No files to process for site ${siteId}`);
@@ -37,13 +38,20 @@ export class FileProcessingOrchestratorService {
       `Processing ${siteFiles.length} files for site ${siteId} with concurrency=${concurrency}`,
     );
 
-    const tasks = siteFiles.map((file) => async () => {
-      await this.processingPipelineService.processFile(file);
-    });
+    const limit = pLimit(concurrency);
+    const results = await Promise.allSettled(
+      siteFiles.map((file) =>
+        limit(async () => {
+          await this.processingPipelineService.processFile(file);
+        }),
+      ),
+    );
 
-    for (let i = 0; i < tasks.length; i += concurrency) {
-      const batch = tasks.slice(i, i + concurrency);
-      await Promise.allSettled(batch.map((fn) => fn()));
+    const rejected = results.filter((r) => r.status === 'rejected');
+    if (rejected.length > 0) {
+      this.logger.warn(
+        `Completed processing with ${rejected.length} failures for site ${siteId}`,
+      );
     }
   }
 }
