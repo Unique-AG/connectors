@@ -5,9 +5,9 @@ server:
         reloader.stakater.com/auto: "true"
   hooks:
     migration:
-      enabled: false
+      enabled: true
       command: |
-        pnpm run db:migrate:deploy
+        pnpm run db:migrate
   extraObjects:
     - apiVersion: networking.k8s.io/v1
       kind: Ingress

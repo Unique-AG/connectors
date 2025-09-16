@@ -11,3 +11,4 @@ jobs:
     with:
       service-name: outlook
       service-path: services/outlook-mcp
+      dockerfile: services/outlook-mcp/deploy/Dockerfile

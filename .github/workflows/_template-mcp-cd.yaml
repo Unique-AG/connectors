@@ -11,6 +11,10 @@ on:
         description: "Path to the service directory (e.g., services/factset-mcp)"
         required: true
         type: string
+      dockerfile:
+        description: "Path to a specific Dockerfile (e.g., services/factset-mcp/deploy/Dockerfile)"
+        default: "./Dockerfile"
+        type: string
 
 jobs:
   release:
@@ -47,7 +51,7 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          file: ./Dockerfile
+          file: ${{ inputs.dockerfile }}
           context: .
           platforms: linux/amd64
           push: true
