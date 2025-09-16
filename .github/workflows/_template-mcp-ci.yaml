@@ -13,7 +13,6 @@ on:
         type: string
       orm:
         description: "ORM in use (e.g., prisma, drizzle)"
-        required: true
         type: string
         default: "prisma"
 
