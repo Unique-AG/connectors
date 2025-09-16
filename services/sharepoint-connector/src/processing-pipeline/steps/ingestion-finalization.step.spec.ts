@@ -1,8 +1,8 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { UniqueAuthService } from '../auth/unique-auth.service';
-import { UniqueApiService } from '../unique-api/unique-api.service';
+import { UniqueAuthService } from '../../auth/unique-auth.service';
+import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { IngestionFinalizationStep } from './ingestion-finalization.step';
 
 describe('IngestionFinalizationStep', () => {

@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SharepointApiService } from '../sharepoint-api/sharepoint-api.service';
-import type { IPipelineStep } from './steps/pipeline-step.interface';
-import type { ProcessingContext } from './types/processing-context';
-import { PipelineStep } from './types/processing-context';
+import { SharepointApiService } from '../../sharepoint-api/sharepoint-api.service';
+import type { IPipelineStep } from './pipeline-step.interface';
+import type { ProcessingContext } from '../types/processing-context';
+import { PipelineStep } from '../types/processing-context';
 
 @Injectable()
 export class ContentFetchingStep implements IPipelineStep {
@@ -26,10 +26,7 @@ export class ContentFetchingStep implements IPipelineStep {
       if (!driveId) {
         throw new Error('Drive ID not found in file metadata');
       }
-      this.validateMimeType(
-        (context.metadata as Record<string, unknown>).mimeType as string | undefined,
-        context.correlationId,
-      );
+      this.validateMimeType(context.metadata.mimeType, context.correlationId);
       const contentBuffer = await this.sharepointApiService.downloadFileContent(driveId, itemId);
       context.contentBuffer = contentBuffer;
       context.fileSize = contentBuffer.length;
@@ -48,25 +45,8 @@ export class ContentFetchingStep implements IPipelineStep {
   }
 
   private extractDriveId(context: ProcessingContext): string | null {
-    type ParentRef = { driveId?: string };
-    type MetaShape = {
-      driveId?: string;
-      parentReference?: ParentRef;
-      listItem?: { fields?: { driveId?: string } };
-    };
-    const metadata = context.metadata as MetaShape;
-    if (typeof metadata.driveId === 'string' && metadata.driveId) return metadata.driveId;
-    if (metadata.parentReference && typeof metadata.parentReference.driveId === 'string') {
-      return metadata.parentReference.driveId;
-    }
-    if (metadata.listItem?.fields && typeof metadata.listItem.fields.driveId === 'string') {
-      return metadata.listItem.fields.driveId;
-    }
-    this.logger.warn(
-      `[${context.correlationId}] Drive ID not found in metadata. Available keys: ${Object.keys(
-        metadata as Record<string, unknown>,
-      ).join(', ')}`,
-    );
+    if (context.metadata.driveId) return context.metadata.driveId;
+    this.logger.warn(`[${context.correlationId}] Drive ID not found in metadata.`);
     return null;
   }
 

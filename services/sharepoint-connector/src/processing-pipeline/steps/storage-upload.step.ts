@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { request } from 'undici';
-import { DEFAULT_MIME_TYPE, HTTP_STATUS_OK_MAX } from '../constants/defaults.constants';
-import type { IPipelineStep } from './steps/pipeline-step.interface';
-import type { ProcessingContext } from './types/processing-context';
-import { PipelineStep } from './types/processing-context';
+import { DEFAULT_MIME_TYPE, HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
+import type { IPipelineStep } from './pipeline-step.interface';
+import type { ProcessingContext } from '../types/processing-context';
+import { PipelineStep } from '../types/processing-context';
 
 @Injectable()
 export class StorageUploadStep implements IPipelineStep {

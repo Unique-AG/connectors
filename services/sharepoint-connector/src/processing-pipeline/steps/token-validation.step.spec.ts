@@ -1,7 +1,7 @@
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SharepointAuthService } from '../auth/sharepoint-auth.service';
-import { UniqueAuthService } from '../auth/unique-auth.service';
+import { SharepointAuthService } from '../../auth/sharepoint-auth.service';
+import { UniqueAuthService } from '../../auth/unique-auth.service';
 import { TokenValidationStep } from './token-validation.step';
 
 describe('TokenValidationStep', () => {

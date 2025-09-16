@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UniqueAuthService } from '../auth/unique-auth.service';
-import { UniqueApiService } from '../unique-api/unique-api.service';
-import type { IPipelineStep } from './steps/pipeline-step.interface';
-import type { ProcessingContext } from './types/processing-context';
-import { PipelineStep } from './types/processing-context';
+import { UniqueAuthService } from '../../auth/unique-auth.service';
+import { UniqueApiService } from '../../unique-api/unique-api.service';
+import type { IPipelineStep } from './pipeline-step.interface';
+import type { ProcessingContext } from '../types/processing-context';
+import { PipelineStep } from '../types/processing-context';
 
 @Injectable()
 export class IngestionFinalizationStep implements IPipelineStep {

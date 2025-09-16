@@ -3,12 +3,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DEFAULT_STEP_TIMEOUT_SECONDS } from '../constants/defaults.constants';
 import type { DriveItem } from '../types/sharepoint.types';
-import { ContentFetchingStep } from './content-fetching.step';
-import { ContentRegistrationStep } from './content-registration.step';
-import { IngestionFinalizationStep } from './ingestion-finalization.step';
+import { ContentFetchingStep } from './steps/content-fetching.step';
+import { ContentRegistrationStep } from './steps/content-registration.step';
+import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
 import type { IPipelineStep } from './steps/pipeline-step.interface';
-import { StorageUploadStep } from './storage-upload.step';
-import { TokenValidationStep } from './token-validation.step';
+import { StorageUploadStep } from './steps/storage-upload.step';
+import { TokenValidationStep } from './steps/token-validation.step';
 import type { PipelineResult, ProcessingContext } from './types/processing-context';
 
 @Injectable()
@@ -56,7 +56,6 @@ export class ProcessingPipelineService {
         driveId: file.parentReference?.driveId,
         siteId: file.parentReference?.siteId,
         lastModifiedDateTime: file.lastModifiedDateTime,
-        ...file,
       },
     };
 
@@ -142,7 +141,7 @@ export class ProcessingPipelineService {
         context.contentBuffer = undefined;
         this.logger.log(`[${context.correlationId}] Released remaining content buffer memory`);
       }
-      context.metadata = {};
+      context.metadata = {} as never;
     } catch (cleanupError) {
       this.logger.error(`[${context.correlationId}] Final cleanup failed:`, cleanupError as Error);
     }

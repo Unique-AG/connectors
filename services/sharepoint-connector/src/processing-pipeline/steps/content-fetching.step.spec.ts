@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SharepointApiService } from '../sharepoint-api/sharepoint-api.service';
+import { SharepointApiService } from '../../sharepoint-api/sharepoint-api.service';
 import { ContentFetchingStep } from './content-fetching.step';
 
 describe('ContentFetchingStep', () => {

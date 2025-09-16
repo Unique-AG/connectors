@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SharepointAuthService } from '../auth/sharepoint-auth.service';
-import { UniqueAuthService } from '../auth/unique-auth.service';
-import type { IPipelineStep } from './steps/pipeline-step.interface';
-import type { ProcessingContext } from './types/processing-context';
-import { PipelineStep } from './types/processing-context';
+import { SharepointAuthService } from '../../auth/sharepoint-auth.service';
+import { UniqueAuthService } from '../../auth/unique-auth.service';
+import type { IPipelineStep } from './pipeline-step.interface';
+import type { ProcessingContext } from '../types/processing-context';
+import { PipelineStep } from '../types/processing-context';
 
 @Injectable()
 export class TokenValidationStep implements IPipelineStep {
