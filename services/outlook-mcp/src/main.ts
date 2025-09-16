@@ -32,5 +32,6 @@ async function bootstrap() {
 initOpenTelemetry({
   defaultServiceName: 'outlook-mcp',
   defaultServiceVersion: packageJson.version,
+  includePgInstrumentation: true,
 });
 void runWithInstrumentation(bootstrap, 'outlook-mcp');

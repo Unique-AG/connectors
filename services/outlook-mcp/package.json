@@ -34,6 +34,7 @@
     "@nestjs/platform-express": "^11.1.6",
     "@nestjs/swagger": "^11.2.0",
     "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/instrumentation-pg": "^0.58.0",
     "@proventuslabs/nestjs-zod": "^1.2.0",
     "@unique-ag/aes-gcm-encryption": "workspace:*",
     "@unique-ag/instrumentation": "workspace:*",

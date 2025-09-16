@@ -18,7 +18,7 @@ import { createSpanProcessor } from './exporters/traces.js';
 export interface InstrumentationOptions {
   defaultServiceName?: string;
   defaultServiceVersion?: string;
-  includePrismaInstrumentation?: boolean;
+  includePgInstrumentation?: boolean;
   additionalInstrumentations?: Instrumentation[];
   configOverrides?: Partial<OtelConfig>;
 }
@@ -30,7 +30,7 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
   const {
     defaultServiceName = 'unknown-service',
     defaultServiceVersion = '0.0.0',
-    includePrismaInstrumentation = false,
+    includePgInstrumentation = false,
     additionalInstrumentations = [],
     configOverrides = {},
   } = options;
@@ -61,14 +61,14 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
     ...additionalInstrumentations,
   ];
 
-  // Add Prisma instrumentation if requested
-  if (includePrismaInstrumentation) {
+  // Add PG instrumentation if requested
+  if (includePgInstrumentation) {
     try {
-      const { PrismaInstrumentation } = require('@prisma/instrumentation');
-      instrumentations.push(new PrismaInstrumentation());
+      const { PgInstrumentation } = require('@opentelemetry/instrumentation-pg');
+      instrumentations.push(new PgInstrumentation());
     } catch (error) {
       console.warn(
-        'Prisma instrumentation requested but @prisma/instrumentation not available:',
+        'PG instrumentation requested but @opentelemetry/instrumentation-pg not available:',
         error,
       );
     }
