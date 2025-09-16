@@ -1,14 +1,15 @@
+import { ProbeModule } from '@unique-ag/probe';
 import { Module, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { context, trace } from '@opentelemetry/api';
 import { LoggerModule } from 'nestjs-pino';
 import { Client } from 'undici';
+import * as packageJson from '../package.json';
 import { AppConfig, appConfig } from './app.config';
 import { AuthModule } from './auth/auth.module';
 import { pipelineConfig } from './config/pipeline.config';
 import { sharepointConfig } from './config/sharepoint.config';
 import { uniqueApiConfig } from './config/unique-api.config';
-import { HealthModule } from './health/health.module';
 import { SHAREPOINT_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.tokens';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { SharepointApiModule } from './sharepoint-api/sharepoint-api.module';
@@ -53,7 +54,7 @@ import { Redacted } from './utils/redacted';
           exclude: [
             {
               method: RequestMethod.GET,
-              path: 'health',
+              path: 'probe',
             },
             {
               method: RequestMethod.GET,
@@ -64,7 +65,9 @@ import { Redacted } from './utils/redacted';
       },
       inject: [appConfig.KEY],
     }),
-    HealthModule,
+    ProbeModule.forRoot({
+      VERSION: packageJson.version,
+    }),
     SchedulerModule,
     SharepointScannerModule,
     AuthModule,
