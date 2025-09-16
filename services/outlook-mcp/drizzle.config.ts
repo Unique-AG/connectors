@@ -1,15 +1,12 @@
-import 'dotenv/config';
 import { defineConfig } from 'drizzle-kit';
-import { validateConfig } from './src/app-settings.enum';
-
-const config = validateConfig(process.env);
 
 export default defineConfig({
   out: './drizzle',
   schema: './src/drizzle/schema/*',
   dialect: 'postgresql',
   dbCredentials: {
-    url: config.DATABASE_URL,
+    // biome-ignore lint/style/noNonNullAssertion: It will fail if the database url is not set
+    url: process.env.DATABASE_URL!,
   },
   casing: 'snake_case',
 });

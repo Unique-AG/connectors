@@ -12,7 +12,6 @@
     "codegen": "echo \"No codegen for this server\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
     "db:check": "drizzle-kit check",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",

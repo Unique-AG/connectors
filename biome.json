@@ -8,7 +8,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/dist", "!**/.turbo", "!**/@generated", "!**/coverage"]
+    "includes": ["**", "!**/dist", "!**/.turbo", "!**/@generated", "!**/coverage", "!**/drizzle"]
   },
   "formatter": {
     "enabled": true,

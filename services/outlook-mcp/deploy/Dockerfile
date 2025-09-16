@@ -60,10 +60,12 @@ RUN mkdir -p /tmp/.cache/corepack && chown -R nestjs:nodejs /tmp/.cache/corepack
 ENV NODE_ENV=production
 
 COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/@generated ./@generated
 COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/public ./public
 COPY --from=builder --chown=nestjs:nodejs /app/out/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/out/package.json ./package.json
+# Copy Drizzle migrations and config file for drizzle-kit
+COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/drizzle ./drizzle
+COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/drizzle.config.ts ./drizzle.config.ts
 
 USER nestjs
 EXPOSE 3000
