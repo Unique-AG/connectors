@@ -13,12 +13,11 @@ export type DrizzleDatabase = NodePgDatabase<typeof schema>;
   providers: [
     {
       provide: DRIZZLE,
-      useFactory: (configService: ConfigService<AppConfig, true>) => {
+      useFactory: (configService: ConfigService<AppConfig, true>): DrizzleDatabase => {
         const pool = new Pool({
           connectionString: configService.get(AppSettings.DATABASE_URL),
         });
-        const db = drizzle({ client: pool, casing: 'snake_case', schema });
-        return db;
+        return drizzle({ client: pool, casing: 'snake_case', schema });
       },
       inject: [ConfigService],
     },
