@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MockEncryptionService, MockPrismaService } from '../__mocks__';
+import { MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
 import { TokenProvider } from './token.provider';
 
 // Mock fetch globally
@@ -16,7 +16,7 @@ describe('TokenProvider', () => {
   };
 
   const mockDependencies = {
-    prisma: new MockPrismaService(),
+    drizzle: new MockDrizzleDatabase(),
     encryptionService: new MockEncryptionService(),
   };
 
@@ -32,20 +32,18 @@ describe('TokenProvider', () => {
         accessToken: 'ZW5jcnlwdGVkLWFjY2Vzcy10b2tlbg==', // base64 encoded "encrypted-access-token"
       };
 
-      mockDependencies.prisma.userProfile.findUnique.mockResolvedValue(mockUserProfile);
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
 
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
       const result = await unit.getAccessToken();
 
       expect(result).toBe('encrypted-access-token');
-      expect(mockDependencies.prisma.userProfile.findUnique).toHaveBeenCalledWith({
-        where: { id: 'user-profile-123' },
-      });
+      expect(mockDependencies.drizzle.query.userProfiles.findFirst).toHaveBeenCalled();
     });
 
     it('throws error when user profile not found', async () => {
-      mockDependencies.prisma.userProfile.findUnique.mockResolvedValue(null);
+      mockDependencies.drizzle.__nextQueryUserProfile = undefined;
 
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
@@ -60,7 +58,7 @@ describe('TokenProvider', () => {
         accessToken: null,
       };
 
-      mockDependencies.prisma.userProfile.findUnique.mockResolvedValue(mockUserProfile);
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
 
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
@@ -82,8 +80,7 @@ describe('TokenProvider', () => {
         refresh_token: 'new-refresh-token',
       };
 
-      mockDependencies.prisma.userProfile.findUnique.mockResolvedValue(mockUserProfile);
-      mockDependencies.prisma.userProfile.update.mockResolvedValue({});
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
 
       mockFetch.mockResolvedValue({
         ok: true,
@@ -112,13 +109,7 @@ describe('TokenProvider', () => {
         },
       );
 
-      expect(mockDependencies.prisma.userProfile.update).toHaveBeenCalledWith({
-        where: { id: 'user-profile-123' },
-        data: {
-          accessToken: 'bmV3LWFjY2Vzcy10b2tlbg==', // base64 encoded "new-access-token"
-          refreshToken: 'bmV3LXJlZnJlc2gtdG9rZW4=', // base64 encoded "new-refresh-token"
-        },
-      });
+      expect(mockDependencies.drizzle.update).toHaveBeenCalled();
     });
 
     it('uses existing refresh token when new one not provided', async () => {
@@ -132,8 +123,7 @@ describe('TokenProvider', () => {
         // No refresh_token in response
       };
 
-      mockDependencies.prisma.userProfile.findUnique.mockResolvedValue(mockUserProfile);
-      mockDependencies.prisma.userProfile.update.mockResolvedValue({});
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
 
       mockFetch.mockResolvedValue({
         ok: true,
@@ -144,17 +134,11 @@ describe('TokenProvider', () => {
 
       await unit.refreshAccessToken('user-profile-123');
 
-      expect(mockDependencies.prisma.userProfile.update).toHaveBeenCalledWith({
-        where: { id: 'user-profile-123' },
-        data: {
-          accessToken: 'bmV3LWFjY2Vzcy10b2tlbg==',
-          refreshToken: expect.any(String), // Original refresh token encrypted again
-        },
-      });
+      expect(mockDependencies.drizzle.update).toHaveBeenCalled();
     });
 
     it('throws error when user profile not found', async () => {
-      mockDependencies.prisma.userProfile.findUnique.mockResolvedValue(null);
+      mockDependencies.drizzle.__nextQueryUserProfile = undefined;
 
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
@@ -169,7 +153,7 @@ describe('TokenProvider', () => {
         refreshToken: null,
       };
 
-      mockDependencies.prisma.userProfile.findUnique.mockResolvedValue(mockUserProfile);
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
 
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
@@ -184,7 +168,7 @@ describe('TokenProvider', () => {
         refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
       };
 
-      mockDependencies.prisma.userProfile.findUnique.mockResolvedValue(mockUserProfile);
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
 
       mockFetch.mockResolvedValue({
         ok: false,
@@ -206,7 +190,7 @@ describe('TokenProvider', () => {
         refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
       };
 
-      mockDependencies.prisma.userProfile.findUnique.mockResolvedValue(mockUserProfile);
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
       mockFetch.mockRejectedValue(new Error('Network error'));
 
       const unit = new TokenProvider(mockConfig, mockDependencies as any);

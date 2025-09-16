@@ -5,7 +5,7 @@ services:
     # image: ghcr.io/unique-ag/connectors/services/outlook-mcp:0.3.4
     build:
       context: ../..  # Build from monorepo root
-      dockerfile: ./Dockerfile
+      dockerfile: ./services/outlook-mcp/deploy/Dockerfile
       args:
         - MAX_HEAP_MB=1024
         - APP_NAME=outlook-mcp
@@ -13,7 +13,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/outlook_mcp?schema=public
-    command: ["pnpm", "run", "db:migrate:deploy"]
+    command: ["pnpm", "run", "db:migrate"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,7 +25,7 @@ services:
     # image: ghcr.io/unique-ag/connectors/services/outlook-mcp:0.3.4
     build:
       context: ../..  # Build from monorepo root
-      dockerfile: ./Dockerfile
+      dockerfile: ./services/outlook-mcp/deploy/Dockerfile
       args:
         - MAX_HEAP_MB=1024
         - APP_NAME=outlook-mcp

@@ -32,6 +32,5 @@ async function bootstrap() {
 initOpenTelemetry({
   defaultServiceName: 'sharepoint-connector',
   defaultServiceVersion: packageJson.version,
-  includePrismaInstrumentation: false,
 });
 void runWithInstrumentation(bootstrap, 'sharepoint-connector');

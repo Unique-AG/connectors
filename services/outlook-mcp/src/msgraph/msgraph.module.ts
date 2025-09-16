@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
+import { DrizzleModule } from '../drizzle/drizzle.module';
 import { GraphClientFactory } from './graph-client.factory';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [DrizzleModule],
   providers: [GraphClientFactory],
   exports: [GraphClientFactory],
 })

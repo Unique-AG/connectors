@@ -11,6 +11,10 @@ on:
         description: "Path to the services directory (e.g., services/factset-mcp)"
         required: true
         type: string
+      dockerfile:
+        description: "Path to a specific Dockerfile (e.g., services/factset-mcp/deploy/Dockerfile)"
+        default: "./Dockerfile"
+        type: string
 
 permissions:
   contents: read
@@ -53,7 +57,7 @@ jobs:
       - name: Pre-warm GHA cache (no push)
         uses: docker/build-push-action@v6
         with:
-          file: ./Dockerfile
+          file: ${{ inputs.dockerfile }}
           context: .
           platforms: linux/amd64
           push: false
