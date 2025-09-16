@@ -36,7 +36,7 @@ server:
                         number: 80
   image:
     repository: ghcr.io/unique-ag/connectors/services/outlook-mcp # FIXME: Naming is not consistent, must be fixed before BETA (mcp is mentioned twice, mcp/servers/xxx-mcp)
-    tag: 0.4.1 # TODO: Tag must be auto-injected via release process from package.json
+    tag: 0.5.0 # TODO: Tag must be auto-injected via release process from package.json
   networkPolicy:
     enabled: false # TODO: Policies must be defined as good practice, living documentation and as enterprise software and standard (ingress- and egress-policies)
   ports:
