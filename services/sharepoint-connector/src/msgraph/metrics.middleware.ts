@@ -62,6 +62,41 @@ export class MetricsMiddleware implements Middleware {
     return 'unknown';
   }
 
+  private extractGraphErrorDetails(error: unknown): Record<string, unknown> {
+    const details: Record<string, unknown> = {};
+  
+    if (error instanceof Error) {
+      details.message = error.message;
+      details.name = error.name;
+      details.stack = error.stack;
+    }
+  
+    const graphError = error as Record<string, any>;
+  
+    const fields = ['statusCode', 'code', 'body', 'requestId', 'innerError'];
+    fields.forEach((field) => {
+      if (graphError[field] !== undefined) {
+        details[field] = graphError[field];
+      }
+    });
+  
+    const response = graphError?.response;
+    if (response) {
+      details.httpStatus = response.status;
+      try {
+        if (response.headers?.entries) {
+          details.headers = Object.fromEntries(response.headers.entries());
+        } else if (response.headers) {
+          details.headers = response.headers;
+        }
+      } catch {
+        details.headers = response.headers;
+      }
+    }
+  
+    return details;
+  }
+
   public async execute(context: Context): Promise<void> {
     if (!this.nextMiddleware) throw new Error('Next middleware not set');
 
@@ -110,12 +145,15 @@ export class MetricsMiddleware implements Middleware {
     } catch (error) {
       const duration = Date.now() - startTime;
 
+      // Extract detailed Graph API error information
+      const errorDetails = this.extractGraphErrorDetails(error);
+
       this.logger.error({
         msg: 'SharePoint Graph API request failed',
         endpoint,
         method,
         duration,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorDetails,
       });
 
       throw error;

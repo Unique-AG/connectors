@@ -33,7 +33,7 @@ export class UniqueAuthService implements IAuthProvider {
       const url = new URL(oAuthTokenUrl);
       const path = url.pathname + url.search;
 
-      const { body } = await this.httpClient.request({
+      const { statusCode, body } = await this.httpClient.request({
         method: 'POST',
         path,
         headers: {
@@ -41,8 +41,15 @@ export class UniqueAuthService implements IAuthProvider {
           Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
         },
         body: params.toString(),
-        throwOnError: true,
       });
+
+      if (statusCode < 200 || statusCode >= 300) {
+        const errorText = await body.text().catch(() => 'No response body');
+        throw new Error(
+          `Zitadel token request failed with status ${statusCode}. ` +
+            `URL: ${oAuthTokenUrl}, Response: ${errorText}`,
+        );
+      }
 
       const tokenData = (await body.json()) as {
         access_token: string;

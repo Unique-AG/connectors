@@ -60,7 +60,7 @@ export class ProcessingPipelineService {
     let currentStepIndex = 0;
 
     try {
-      this.logger.debug(`[${correlationId}] Starting pipeline for file: ${file.name} (${file.id})`);
+      this.logger.log(`[${correlationId}] Starting pipeline for file: ${file.name} (${file.id})`);
       for (let i = 0; i < this.steps.length; i++) {
         currentStepIndex = i;
         const step = this.steps[i];
@@ -70,7 +70,7 @@ export class ProcessingPipelineService {
         );
         await this.executeStepWithTimeout(step, context);
         completedSteps.push(step.stepName);
-        this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
+        this.logger.log(`[${correlationId}] Completed step: ${step.stepName}`);
         await this.cleanupStep(step, context);
       }
       const totalDuration = Date.now() - startTime.getTime();

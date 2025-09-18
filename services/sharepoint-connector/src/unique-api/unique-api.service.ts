@@ -138,7 +138,7 @@ export class UniqueApiService {
       try {
         const url = new URL(fileDiffUrl);
         const path = url.pathname + url.search;
-        const { body } = await this.httpClient.request({
+        const { statusCode, body } = await this.httpClient.request({
           method: 'POST',
           path,
           headers: {
@@ -146,8 +146,17 @@ export class UniqueApiService {
             Authorization: `Bearer ${uniqueToken}`,
           },
           body: JSON.stringify(diffRequest),
-          throwOnError: true,
         });
+
+        // Check for HTTP error status codes
+        if (statusCode < 200 || statusCode >= 300) {
+          const errorText = await body.text().catch(() => 'No response body');
+          throw new Error(
+            `File diff request failed with status ${statusCode}. ` +
+              `URL: ${fileDiffUrl}, Response: ${errorText}`,
+          );
+        }
+
         const responseData = await body.json();
         if (!responseData) {
           throw new Error('Invalid response from Unique API file diff');

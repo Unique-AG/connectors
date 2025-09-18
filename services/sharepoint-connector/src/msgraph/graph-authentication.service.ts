@@ -54,7 +54,7 @@ export class GraphAuthenticationProvider implements AuthenticationProvider, OnMo
   public async onModuleInit(): Promise<void> {
     // Eagerly acquire token on startup to catch configuration issues early
     try {
-      await this.getAccessToken();
+      // await this.getAccessToken();
       this.logger.log('Microsoft Graph authentication initialized successfully');
     } catch (error) {
       this.logger.error({
@@ -73,11 +73,10 @@ export class GraphAuthenticationProvider implements AuthenticationProvider, OnMo
   ): Promise<string> {
     // Check if we have a valid cached token
     if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
-      this.logger.debug('Using cached Microsoft Graph API token');
       return this.cachedToken.accessToken;
     }
 
-    this.logger.debug('Acquiring new Microsoft Graph API token...');
+    this.logger.log('Acquiring new Microsoft Graph API token...');
     return await this.acquireNewToken();
   }
 

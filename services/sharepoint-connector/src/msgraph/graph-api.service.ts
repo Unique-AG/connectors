@@ -19,7 +19,7 @@ export class GraphApiService {
   }
 
   public async findAllSyncableFilesForSite(siteId: string): Promise<DriveItem[]> {
-    this.logger.debug(`Starting recursive file scan for site: ${siteId}`);
+    this.logger.log(`Starting recursive file scan for site: ${siteId}`);
 
     const drives = await this.getDrivesForSite(siteId);
     const allSyncableFiles: DriveItem[] = [];
@@ -35,7 +35,7 @@ export class GraphApiService {
       allSyncableFiles.push(...filesInDrive);
     }
 
-    this.logger.debug(
+    this.logger.log(
       `Completed scan for site ${siteId}. Found ${allSyncableFiles.length} syncable files.`,
     );
     return allSyncableFiles;
@@ -49,7 +49,7 @@ export class GraphApiService {
       const drives = await this.graphClient.api(`/sites/${siteId}/drives`).get();
 
       const allDrives = drives?.value || [];
-      this.logger.debug(`Found ${allDrives.length} drives for site ${siteId}`);
+      this.logger.log(`Found ${allDrives.length} drives for site ${siteId}`);
       return allDrives;
     } catch (error) {
       this.logger.error(`Failed to fetch drives for site ${siteId}:`, error);
@@ -73,7 +73,7 @@ export class GraphApiService {
       'listItem',
       'parentReference',
     ];
-    const expandFields = 'listItem($expand=fields,parentReference)';
+    const expandFields = 'listItem($expand=fields)';
 
     try {
       this.logger.debug(`Fetching items for drive ${driveId}, item ${itemId}`);
@@ -112,15 +112,13 @@ export class GraphApiService {
             }
           }
         }
-
         // Handle pagination - check for @odata.nextLink
         url = response['@odata.nextLink']
-          ? new URL(response['@odata.nextLink']).pathname +
-            new URL(response['@odata.nextLink']).search
+          ? response['@odata.nextLink']
           : '';
       }
 
-      this.logger.debug(
+      this.logger.log(
         `Found ${syncableFiles.length} syncable files in drive ${driveId}, item ${itemId}`,
       );
       return syncableFiles;
@@ -147,7 +145,8 @@ export class GraphApiService {
     const isApproved = moderation === ModerationStatus.Approved;
     const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
 
-    const syncable = Boolean(hasSyncFlag && isApproved && isAllowedMimeType);
+    // && isApproved
+    const syncable = Boolean(hasSyncFlag && isAllowedMimeType);
 
     if (!syncable) {
       this.logger.debug(
@@ -159,7 +158,7 @@ export class GraphApiService {
   }
 
   public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
-    this.logger.debug(`Downloading file content for item ${itemId} from drive ${driveId}`);
+    this.logger.log(`Downloading file content for item ${itemId} from drive ${driveId}`);
     const maxFileSizeBytes =
       this.configService.get<number>('pipeline.maxFileSizeBytes') ?? DEFAULT_MAX_FILE_SIZE_BYTES;
 

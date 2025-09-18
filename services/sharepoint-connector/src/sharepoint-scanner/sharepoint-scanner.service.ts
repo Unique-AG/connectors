@@ -35,7 +35,7 @@ export class SharepointScannerService {
         try {
           const files = await this.apiService.findAllSyncableFilesForSite(siteId);
 
-          this.logger.debug(`Found ${files.length} syncable files in site ${siteId}`);
+          this.logger.log(`Found ${files.length} syncable files in site ${siteId}`);
 
           if (!files.length) {
             continue;

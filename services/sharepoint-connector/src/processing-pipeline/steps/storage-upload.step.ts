@@ -55,7 +55,6 @@ export class StorageUploadStep implements IPipelineStep {
         method: 'PUT',
         headers: { 'Content-Type': mimeType, 'x-ms-blob-type': 'BlockBlob' },
         body: contentBuffer,
-        throwOnError: true,
       });
       if (response.statusCode < 200 || response.statusCode >= HTTP_STATUS_OK_MAX) {
         throw new Error(`Upload failed with status ${response.statusCode}`);
