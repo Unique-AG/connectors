@@ -3,9 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { UniqueAuthService } from '../../auth/unique-auth.service';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
-import type { IPipelineStep } from './pipeline-step.interface';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
+import type { IPipelineStep } from './pipeline-step.interface';
 
 @Injectable()
 export class ContentRegistrationStep implements IPipelineStep {

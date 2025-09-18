@@ -33,7 +33,7 @@ describe('IngestionFinalizationStep', () => {
       libraryName: 'lib',
       startTime: new Date(),
       metadata: {
-        registrationResponse: {
+        registration: {
           key: 'k',
           mimeType: 'application/pdf',
           ownerType: 'SCOPE',

@@ -4,7 +4,7 @@ export enum ModerationStatus {
   Pending = 2,
   Draft = 3,
 }
-
+/*
 export interface Drive {
   id: string;
   name: string;
@@ -51,3 +51,5 @@ export interface SharePointApiResponseData<T> {
   '@odata.nextLink'?: string;
   value: T[];
 }
+
+*/

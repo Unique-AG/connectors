@@ -1,9 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, MockedFunction, vi } from 'vitest';
 import { UniqueAuthService } from '../auth/unique-auth.service';
+import { GraphApiService } from '../msgraph/graph-api.service';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import { SharepointApiService } from '../sharepoint-api/sharepoint-api.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import { SharepointScannerService } from './sharepoint-scanner.service';
 
@@ -31,7 +31,7 @@ describe('SharepointScannerService', () => {
       }))
       .mock(UniqueAuthService)
       .impl(() => ({ getToken: vi.fn().mockResolvedValue('unique-token') }))
-      .mock(SharepointApiService)
+      .mock(GraphApiService)
       .impl(() => ({ findAllSyncableFilesForSite: vi.fn().mockResolvedValue(files) }))
       .mock(UniqueApiService)
       .impl(() => ({
@@ -46,11 +46,16 @@ describe('SharepointScannerService', () => {
       .compile();
 
     service = unit;
-    orchestrator = unitRef.get(FileProcessingOrchestratorService) as unknown as FileProcessingOrchestratorService;
+    orchestrator = unitRef.get(
+      FileProcessingOrchestratorService,
+    ) as unknown as FileProcessingOrchestratorService;
   });
 
   it('scans and triggers processing', async () => {
     await service.scanForWork();
-    expect((orchestrator.processFilesForSite as any).mock.calls.length).toBe(1);
+    expect(
+      (orchestrator.processFilesForSite as MockedFunction<typeof orchestrator.processFilesForSite>)
+        .mock.calls.length,
+    ).toBe(1);
   });
 });

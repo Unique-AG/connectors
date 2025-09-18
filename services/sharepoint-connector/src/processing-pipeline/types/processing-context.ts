@@ -38,7 +38,6 @@ export interface JobResult {
 }
 
 export enum PipelineStep {
-  TOKEN_VALIDATION = 'token-validation',
   CONTENT_FETCHING = 'content-fetching',
   CONTENT_REGISTRATION = 'content-registration',
   STORAGE_UPLOAD = 'storage-upload',

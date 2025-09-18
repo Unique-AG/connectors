@@ -10,8 +10,8 @@ import { pipelineConfig } from './config/pipeline.config';
 import { sharepointConfig } from './config/sharepoint.config';
 import { uniqueApiConfig } from './config/unique-api.config';
 import { HttpClientModule } from './http-client.module';
+import { MsGraphModule } from './msgraph/msgraph.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
-import { SharepointApiModule } from './sharepoint-api/sharepoint-api.module';
 import { SharepointScannerModule } from './sharepoint-scanner/sharepoint-scanner.module';
 import { UniqueApiModule } from './unique-api/unique-api.module';
 import { Redacted } from './utils/redacted';
@@ -71,7 +71,7 @@ import { Redacted } from './utils/redacted';
     SchedulerModule,
     SharepointScannerModule,
     AuthModule,
-    SharepointApiModule,
+    MsGraphModule,
     UniqueApiModule,
   ],
   controllers: [],

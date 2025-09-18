@@ -33,8 +33,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.logger.log('Scheduler triggered');
     try {
+      this.logger.log('Scheduler triggered');
       await this.sharepointScanner.scanForWork();
       this.logger.log('SharePoint scan completed successfully.');
     } catch (error) {
@@ -53,7 +53,10 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
         job.stop();
       });
     } catch (error) {
-      this.logger.error('Error stopping cron jobs:', error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        'Error stopping cron jobs:',
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 }

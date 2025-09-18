@@ -1,8 +1,8 @@
+import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
 import { DEFAULT_PROCESSING_CONCURRENCY } from '../constants/defaults.constants';
-import type { DriveItem } from '../types/sharepoint.types';
 import type { FileDiffResponse } from '../unique-api/types/unique-api.types';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
@@ -27,7 +27,8 @@ export class FileProcessingOrchestratorService {
 
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);
     const siteFiles = files.filter(
-      (file) => file.parentReference?.siteId === siteId && newFileKeys.has(`sharepoint_file_${file.id}`),
+      (file) =>
+        file.parentReference?.siteId === siteId && newFileKeys.has(`sharepoint_file_${file.id}`),
     );
     if (siteFiles.length === 0) {
       this.logger.debug(`No files to process for site ${siteId}`);
@@ -49,9 +50,7 @@ export class FileProcessingOrchestratorService {
 
     const rejected = results.filter((r) => r.status === 'rejected');
     if (rejected.length > 0) {
-      this.logger.warn(
-        `Completed processing with ${rejected.length} failures for site ${siteId}`,
-      );
+      this.logger.warn(`Completed processing with ${rejected.length} failures for site ${siteId}`);
     }
   }
 }

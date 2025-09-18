@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SharepointApiService } from '../../sharepoint-api/sharepoint-api.service';
-import type { IPipelineStep } from './pipeline-step.interface';
+import { GraphApiService } from '../../msgraph/graph-api.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
+import type { IPipelineStep } from './pipeline-step.interface';
 
 @Injectable()
 export class ContentFetchingStep implements IPipelineStep {
@@ -11,7 +11,7 @@ export class ContentFetchingStep implements IPipelineStep {
   public readonly stepName = PipelineStep.CONTENT_FETCHING;
 
   public constructor(
-    private readonly sharepointApiService: SharepointApiService,
+    private readonly apiService: GraphApiService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -27,7 +27,7 @@ export class ContentFetchingStep implements IPipelineStep {
         throw new Error('Drive ID not found in file metadata');
       }
       this.validateMimeType(context.metadata.mimeType, context.correlationId);
-      const contentBuffer = await this.sharepointApiService.downloadFileContent(driveId, itemId);
+      const contentBuffer = await this.apiService.downloadFileContent(driveId, itemId);
       context.contentBuffer = contentBuffer;
       context.fileSize = contentBuffer.length;
       this.logger.debug(

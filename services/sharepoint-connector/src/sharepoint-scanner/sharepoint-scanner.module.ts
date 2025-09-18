@@ -1,19 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from '../auth/auth.module';
+import { MsGraphModule } from '../msgraph/msgraph.module';
 import { ProcessingPipelineModule } from '../processing-pipeline/processing-pipeline.module';
-import { SharepointApiModule } from '../sharepoint-api/sharepoint-api.module';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { SharepointScannerService } from './sharepoint-scanner.service';
 
 @Module({
-  imports: [
-    ConfigModule,
-    AuthModule,
-    SharepointApiModule,
-    UniqueApiModule,
-    ProcessingPipelineModule,
-  ],
+  imports: [ConfigModule, AuthModule, MsGraphModule, UniqueApiModule, ProcessingPipelineModule],
   providers: [SharepointScannerService],
   exports: [SharepointScannerService],
 })

@@ -1,14 +1,13 @@
 import { randomUUID } from 'node:crypto';
+import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DEFAULT_STEP_TIMEOUT_SECONDS } from '../constants/defaults.constants';
-import type { DriveItem } from '../types/sharepoint.types';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
 import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
 import type { IPipelineStep } from './steps/pipeline-step.interface';
 import { StorageUploadStep } from './steps/storage-upload.step';
-import { TokenValidationStep } from './steps/token-validation.step';
 import type { PipelineResult, ProcessingContext } from './types/processing-context';
 
 @Injectable()
@@ -19,14 +18,12 @@ export class ProcessingPipelineService {
 
   public constructor(
     private readonly configService: ConfigService,
-    private readonly tokenValidationStep: TokenValidationStep,
     private readonly contentFetchingStep: ContentFetchingStep,
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly storageUploadStep: StorageUploadStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
   ) {
     this.steps = [
-      this.tokenValidationStep,
       this.contentFetchingStep,
       this.contentRegistrationStep,
       this.storageUploadStep,
@@ -42,20 +39,20 @@ export class ProcessingPipelineService {
     const startTime = new Date();
     const context: ProcessingContext = {
       correlationId,
-      fileId: file.id,
-      fileName: file.name,
+      fileId: file.id ?? '',
+      fileName: file.name ?? '',
       fileSize: file.size ?? 0,
       siteUrl: file.parentReference?.siteId ?? '',
       libraryName: file.parentReference?.driveId ?? '',
-      downloadUrl: file.webUrl,
+      downloadUrl: file.webUrl ?? '',
       startTime,
       metadata: {
-        mimeType: file.file?.mimeType,
+        mimeType: file.file?.mimeType ?? undefined,
         isFolder: Boolean(file.folder),
-        listItemFields: file.listItem?.fields,
-        driveId: file.parentReference?.driveId,
-        siteId: file.parentReference?.siteId,
-        lastModifiedDateTime: file.lastModifiedDateTime,
+        listItemFields: (file.listItem?.fields as Record<string, unknown>) ?? undefined,
+        driveId: file.parentReference?.driveId ?? undefined,
+        siteId: file.parentReference?.siteId ?? undefined,
+        lastModifiedDateTime: file.lastModifiedDateTime ?? undefined,
       },
     };
 

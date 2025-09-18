@@ -1,3 +1,5 @@
+import { NullableOption } from '@microsoft/microsoft-graph-types';
+
 export interface ContentRegistrationRequest {
   key: string;
   mimeType: string;
@@ -37,11 +39,11 @@ export interface IngestionFinalizationRequest {
 }
 
 export interface FileDiffItem {
-  id: string;
-  name: string;
-  url: string;
-  updatedAt: string;
-  key: string;
+  id: string | undefined;
+  name: NullableOption<string> | undefined;
+  url: NullableOption<string> | undefined;
+  updatedAt: NullableOption<string> | undefined;
+  key: NullableOption<string> | undefined;
 }
 
 export interface FileDiffRequest {

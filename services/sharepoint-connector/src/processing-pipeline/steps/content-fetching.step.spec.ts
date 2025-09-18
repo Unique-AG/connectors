@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SharepointApiService } from '../../sharepoint-api/sharepoint-api.service';
+import { GraphApiService } from '../../msgraph/graph-api.service';
 import { ContentFetchingStep } from './content-fetching.step';
 
 describe('ContentFetchingStep', () => {
@@ -12,7 +12,7 @@ describe('ContentFetchingStep', () => {
     const { unit } = await TestBed.solitary(ContentFetchingStep)
       .mock(ConfigService)
       .impl(() => mockConfig)
-      .mock(SharepointApiService)
+      .mock(GraphApiService)
       .impl(() => ({ downloadFileContent: vi.fn().mockResolvedValue(Buffer.from('abc')) }))
       .compile();
     step = unit;

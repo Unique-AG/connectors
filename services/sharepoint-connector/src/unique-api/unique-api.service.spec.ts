@@ -28,7 +28,8 @@ describe('UniqueApiService', () => {
         ...stub(),
         get: vi.fn((key: string) => {
           if (key === 'uniqueApi.ingestionUrl') return 'https://ingestion.example.com';
-          if (key === 'uniqueApi.ingestionGraphQLUrl') return 'https://ingestion.example.com/graphql';
+          if (key === 'uniqueApi.ingestionGraphQLUrl')
+            return 'https://ingestion.example.com/graphql';
           if (key === 'uniqueApi.scopeId') return 'scope-1';
           if (key === 'uniqueApi.fileDiffBasePath') return 'https://app.example.com/';
           if (key === 'uniqueApi.fileDiffPartialKey') return 'sharepoint/default';

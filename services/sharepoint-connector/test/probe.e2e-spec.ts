@@ -25,5 +25,3 @@ describe('Probe endpoint (e2e)', () => {
     expect(res.body).toEqual({ version: expect.any(String) });
   });
 });
-
-
