@@ -8,7 +8,7 @@ if (process.env.NODE_ENV !== 'production') {
   }
 }
 
-export const TracesExporterType = z.enum(['otlp', 'console', 'none']).prefault('otlp');
+export const TracesExporterType = z.enum(['otlp', 'langfuse', 'console', 'none']).prefault('otlp');
 export const MetricsExporterType = z
   .enum(['otlp', 'prometheus', 'console', 'none'])
   .prefault('otlp');
