@@ -8,6 +8,7 @@
   "scripts": {
     "build": "nest build",
     "dev": "nodemon",
+    "dev:clean": "pkill -f \"nest start\" || true && sleep 1 && nodemon",
     "debug": "nest start --debug --watch",
     "codegen": "graphql-codegen --config codegen.ts",
     "db:generate": "echo \"No database for this server\"",
@@ -31,6 +32,7 @@
     "@graphql-codegen/typed-document-node": "^5.0.13",
     "@graphql-codegen/typescript": "^4.0.0",
     "@graphql-codegen/typescript-operations": "^4.0.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.6",
@@ -42,12 +44,12 @@
     "@unique-ag/logger": "workspace:*",
     "@unique-ag/probe": "workspace:*",
     "bottleneck": "^2.19.5",
-    "p-limit": "^2.3.0",
     "graphql": "^16.11.0",
     "graphql-request": "^7.2.0",
     "nestjs-otel": "^7.0.1",
     "nestjs-pino": "^4.4.0",
     "nestjs-zod": "^5.0.1",
+    "p-limit": "^2.3.0",
     "pino-http": "^10.5.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
@@ -55,7 +57,6 @@
     "zod": "^4.1.5"
   },
   "devDependencies": {
-    "@types/p-limit": "^2.0.0",
     "@nestjs/cli": "^11.0.10",
     "@nestjs/schematics": "^11.0.7",
     "@nestjs/testing": "^11.1.6",
@@ -66,6 +67,7 @@
     "@swc/core": "^1.13.5",
     "@types/express": "^5.0.3",
     "@types/node": "^22.13.14",
+    "@types/p-limit": "^2.0.0",
     "@types/supertest": "^6.0.3",
     "@vitest/coverage-istanbul": "^3.2.4",
     "globals": "^16.3.0",
@@ -86,6 +88,12 @@
       "../../packages/**/node_modules/**",
       "../../packages/**/.turbo/**"
     ],
-    "exec": "nest start --watch"
+    "exec": "nest start --watch",
+    "signal": "SIGTERM",
+    "env": {
+      "NODE_ENV": "development"
+    },
+    "verbose": false,
+    "delay": 2500
   }
 }

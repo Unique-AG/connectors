@@ -53,6 +53,8 @@ export class SharepointApiService {
       const urlObj = new URL(url);
       const path = urlObj.pathname + urlObj.search;
 
+      try {
+
       const { body } = await this.httpClient.request({
         method: 'GET',
         path,
@@ -63,6 +65,9 @@ export class SharepointApiService {
       const responseData = (await body.json()) as SharePointApiResponseData<Drive>;
       allDrives.push(...(responseData.value || []));
       url = responseData['@odata.nextLink'] || '';
+      } catch(error) {
+          this.logger.error(`Failed to fetch drive for site ${siteId}. ${error}`);
+      }
     }
     return allDrives;
   }

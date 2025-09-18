@@ -1,16 +1,15 @@
 import { ProbeModule } from '@unique-ag/probe';
 import { Module, RequestMethod } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { context, trace } from '@opentelemetry/api';
 import { LoggerModule } from 'nestjs-pino';
-import { Client } from 'undici';
 import * as packageJson from '../package.json';
 import { AppConfig, appConfig } from './app.config';
 import { AuthModule } from './auth/auth.module';
 import { pipelineConfig } from './config/pipeline.config';
 import { sharepointConfig } from './config/sharepoint.config';
 import { uniqueApiConfig } from './config/unique-api.config';
-import { SHAREPOINT_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.tokens';
+import { HttpClientModule } from './http-client.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { SharepointApiModule } from './sharepoint-api/sharepoint-api.module';
 import { SharepointScannerModule } from './sharepoint-scanner/sharepoint-scanner.module';
@@ -68,6 +67,7 @@ import { Redacted } from './utils/redacted';
     ProbeModule.forRoot({
       VERSION: packageJson.version,
     }),
+    HttpClientModule,
     SchedulerModule,
     SharepointScannerModule,
     AuthModule,
@@ -75,33 +75,5 @@ import { Redacted } from './utils/redacted';
     UniqueApiModule,
   ],
   controllers: [],
-  providers: [
-    {
-      provide: UNIQUE_HTTP_CLIENT,
-      useFactory: (configService: ConfigService) => {
-        const baseUrl = configService.get<string>('uniqueApi.ingestionUrl', '');
-        const url = new URL(baseUrl);
-        return new Client(`${url.protocol}//${url.host}`, {
-          bodyTimeout: 30000,
-          headersTimeout: 5000,
-        });
-      },
-      inject: [ConfigService],
-    },
-    {
-      provide: SHAREPOINT_HTTP_CLIENT,
-      useFactory: (configService: ConfigService) => {
-        const apiUrl = configService.get<string>(
-          'sharepoint.apiUrl',
-          'https://graph.microsoft.com',
-        );
-        return new Client(apiUrl, {
-          bodyTimeout: 30000,
-          headersTimeout: 5000,
-        });
-      },
-      inject: [ConfigService],
-    },
-  ],
 })
 export class AppModule {}

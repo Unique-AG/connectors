@@ -1,13 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 import { CRON_EVERY_15_MINUTES } from '../constants/defaults.constants';
 import { SharepointScannerService } from '../sharepoint-scanner/sharepoint-scanner.service';
 
 @Injectable()
-export class SchedulerService {
+export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
+  private isShuttingDown = false;
 
-  public constructor(private readonly sharepointScanner: SharepointScannerService) {
+  public constructor(
+    private readonly sharepointScanner: SharepointScannerService,
+    private readonly schedulerRegistry: SchedulerRegistry,
+  ) {
     this.logger.log('SchedulerService initialized with distributed locking');
   }
 
@@ -16,8 +20,19 @@ export class SchedulerService {
     void this.runScheduledScan();
   }
 
+  public onModuleDestroy() {
+    this.logger.log('SchedulerService is shutting down...');
+    this.isShuttingDown = true;
+    this.destroyCronJobs();
+  }
+
   @Cron(CRON_EVERY_15_MINUTES)
   public async runScheduledScan(): Promise<void> {
+    if (this.isShuttingDown) {
+      this.logger.log('Skipping scheduled scan due to shutdown');
+      return;
+    }
+
     this.logger.log('Scheduler triggered');
     try {
       await this.sharepointScanner.scanForWork();
@@ -27,6 +42,18 @@ export class SchedulerService {
         'An unexpected error occurred during the scheduled scan.',
         error instanceof Error ? error.stack : String(error),
       );
+    }
+  }
+
+  private destroyCronJobs() {
+    try {
+      const jobs = this.schedulerRegistry.getCronJobs();
+      jobs.forEach((job, jobName) => {
+        this.logger.log(`Stopping cron job: ${jobName}`);
+        job.stop();
+      });
+    } catch (error) {
+      this.logger.error('Error stopping cron jobs:', error instanceof Error ? error.stack : String(error));
     }
   }
 }
