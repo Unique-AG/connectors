@@ -1,3 +1,4 @@
+import { LangfuseSpanProcessor } from '@langfuse/otel';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import {
   BatchSpanProcessor,
@@ -35,6 +36,9 @@ export function createSpanProcessor(config: OtelConfig): SpanProcessor | undefin
         },
       );
     }
+    case 'langfuse':
+      return new LangfuseSpanProcessor();
+
     case 'console':
       console.log('  Using console traces exporter');
       return new BatchSpanProcessor(new ConsoleSpanExporter());
