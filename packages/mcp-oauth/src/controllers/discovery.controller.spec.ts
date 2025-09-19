@@ -22,6 +22,8 @@ describe('DiscoveryController', () => {
       resource: 'https://mcp.example.com',
       clientId: 'test-client',
       clientSecret: 'test-secret',
+      jwtSigningAlgorithm: 'HS256',
+      idTokenExpiresIn: 3600,
       protectedResourceMetadata: {
         scopesSupported: ['offline_access', 'mcp:read', 'mcp:write'],
         bearerMethodsSupported: ['header', 'body'],
@@ -48,6 +50,8 @@ describe('DiscoveryController', () => {
         opTosUri: 'https://example.com/oauth-tos',
         tokenEndpointAuthSigningAlgValuesSupported: ['HS256'],
         dpopSigningAlgValuesSupported: ['RS256', 'ES256'],
+        idTokenSigningAlgValuesSupported: ['HS256'],
+        subjectTypesSupported: ['public'],
       },
       // biome-ignore lint/suspicious/noExplicitAny: Mock for testing
       encryptionService: {} as any,
@@ -154,6 +158,8 @@ describe('DiscoveryController', () => {
           opPolicyUri: undefined,
           opTosUri: undefined,
           dpopSigningAlgValuesSupported: undefined,
+          idTokenSigningAlgValuesSupported: ['HS256'],
+          subjectTypesSupported: ['public'],
         },
       };
 

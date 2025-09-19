@@ -35,6 +35,20 @@ export const mcpOAuthModuleOptionsSchema = z.object({
   // Required JWT Configuration
   hmacSecret: z.string().describe('The secret key for the MCP Server to sign HMAC tokens.'),
 
+  // OIDC JWT Configuration
+  jwtSigningKey: z
+    .string()
+    .describe('The key for signing JWT ID tokens (RS256 or HS256)')
+    .optional(),
+  jwtSigningAlgorithm: z
+    .enum(['RS256', 'HS256'])
+    .prefault('HS256')
+    .describe('Algorithm for signing JWT ID tokens'),
+  idTokenExpiresIn: z
+    .number()
+    .prefault(3600)
+    .describe('The expiration time of the JWT ID token in seconds. Default is 1 hour.'),
+
   // Server Configuration
   serverUrl: z.url(),
   resource: z
@@ -66,7 +80,7 @@ export const mcpOAuthModuleOptionsSchema = z.object({
   protectedResourceMetadata: z
     .object({
       // Required fields
-      scopesSupported: z.array(z.string()).prefault(['offline_access']),
+      scopesSupported: z.array(z.string()).prefault(['openid', 'offline_access']),
       bearerMethodsSupported: z.array(z.string()).prefault(['header']),
       mcpVersionsSupported: z.array(z.string()).prefault(['2025-06-18']),
 
@@ -93,7 +107,7 @@ export const mcpOAuthModuleOptionsSchema = z.object({
       tokenEndpointAuthMethodsSupported: z
         .array(z.string())
         .prefault(['client_secret_basic', 'client_secret_post', 'none']),
-      scopesSupported: z.array(z.string()).prefault(['offline_access']),
+      scopesSupported: z.array(z.string()).prefault(['openid', 'offline_access']),
       codeChallengeMethodsSupported: z.array(z.string()).prefault(['plain', 'S256']),
 
       // Token endpoint authentication
@@ -110,6 +124,11 @@ export const mcpOAuthModuleOptionsSchema = z.object({
 
       // DPoP support
       dpopSigningAlgValuesSupported: z.array(z.string()).optional(),
+
+      // OIDC specific metadata
+      idTokenSigningAlgValuesSupported: z.array(z.string()).prefault(['HS256', 'RS256']),
+      subjectTypesSupported: z.array(z.string()).prefault(['public']),
+      userInfoEndpoint: z.url().optional(),
     })
     .prefault({}),
 

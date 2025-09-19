@@ -28,6 +28,8 @@ describe('OAuthStrategyService', () => {
       resource: 'http://localhost:3000/mcp',
       clientId: 'test-client',
       clientSecret: 'test-secret',
+      jwtSigningAlgorithm: 'HS256',
+      idTokenExpiresIn: 3600,
       protectedResourceMetadata: {
         scopesSupported: ['offline_access'],
         bearerMethodsSupported: ['header'],
@@ -40,6 +42,8 @@ describe('OAuthStrategyService', () => {
         tokenEndpointAuthMethodsSupported: ['client_secret_basic', 'client_secret_post', 'none'],
         scopesSupported: ['offline_access'],
         codeChallengeMethodsSupported: ['plain', 'S256'],
+        idTokenSigningAlgValuesSupported: ['HS256'],
+        subjectTypesSupported: ['public'],
       },
       encryptionService: vi.fn(),
       oauthStore: vi.fn(),

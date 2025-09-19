@@ -35,6 +35,7 @@ export {
   OAUTH_STORE_TOKEN,
 } from './mcp-oauth.module-definition';
 export * from './services/client.service';
+export * from './services/id-token.service';
 export * from './services/mcp-oauth.service';
 export { OAuthStrategyService, type PassportUser } from './services/oauth-strategy.service';
 export * from './services/opaque-token.service';
