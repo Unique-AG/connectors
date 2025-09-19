@@ -21,6 +21,7 @@ import {
   OAUTH_STORE_TOKEN,
 } from './mcp-oauth.module-definition';
 import { ClientService } from './services/client.service';
+import { IDTokenService } from './services/id-token.service';
 import { McpOAuthService } from './services/mcp-oauth.service';
 import { MetricService } from './services/metric.service';
 import { OAuthStrategyService } from './services/oauth-strategy.service';
@@ -73,6 +74,7 @@ export class McpOAuthModule extends ConfigurableModuleClass {
       },
       McpOAuthService,
       ClientService,
+      IDTokenService,
       OpaqueTokenService,
       OAuthStrategyService,
       MetricService,
