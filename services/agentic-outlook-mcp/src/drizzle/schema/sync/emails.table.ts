@@ -1,10 +1,9 @@
-import { sql } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
   index,
   integer,
   jsonb,
-  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -13,9 +12,7 @@ import {
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../auth';
-
-// provider enum
-export const providerEnum = pgEnum('email_provider', ['gmail', 'outlook']);
+import { folders } from './folders.table';
 
 export const emails = pgTable(
   'emails',
@@ -23,10 +20,10 @@ export const emails = pgTable(
     id: varchar()
       .primaryKey()
       .$default(() => typeid('email').toString()),
-    provider: providerEnum().notNull(),
-    providerMessageId: varchar().notNull().unique(),
+    messageId: varchar().notNull().unique(),
     conversationId: varchar(),
     internetMessageId: varchar(),
+    webLink: varchar(),
 
     from: jsonb().$type<{ name: string | null; address: string } | null>(),
     sender: jsonb().$type<{ name: string | null; address: string } | null>(),
@@ -74,16 +71,31 @@ export const emails = pgTable(
     attachmentCount: integer().notNull().default(0),
     headers: jsonb().$type<Record<string, string> | null>(),
 
+    // References
     userProfileId: varchar()
       .notNull()
       .references(() => userProfiles.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    folderId: varchar()
+      .notNull()
+      .references(() => folders.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
 
     ...timestamps,
   },
   (table) => [
-    index().on(table.provider, table.providerMessageId),
+    index().on(table.messageId),
     index().on(table.conversationId),
     index().on(table.internetMessageId),
     index().on(table.isRead, table.isDraft),
   ],
 );
+
+export const emailRelations = relations(emails, ({ one }) => ({
+  userProfile: one(userProfiles, {
+    fields: [emails.userProfileId],
+    references: [userProfiles.id],
+  }),
+  folder: one(folders, {
+    fields: [emails.folderId],
+    references: [folders.id],
+  }),
+}));

@@ -3,6 +3,7 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import { UnauthorizedException } from '@nestjs/common';
 import type { Counter, Span } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
+import { TypeID } from 'typeid-js';
 import { OTEL_ATTRIBUTES } from '../utils/otel-attributes';
 import { GraphClientFactory } from './graph-client.factory';
 
@@ -32,7 +33,9 @@ export abstract class BaseMsGraphTool {
 
     if (span) span.setAttribute(OTEL_ATTRIBUTES.USER_ID, userProfileId);
 
-    return this.graphClientFactory.createClientForUser(userProfileId);
+    return this.graphClientFactory.createClientForUser(
+      TypeID.fromString(userProfileId, 'user_profile'),
+    );
   }
 
   protected incrementActionCounter(action: string) {

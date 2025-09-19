@@ -1,2 +1,3 @@
 export * from './emails.table';
-export * from './sync-orders.table';
+export * from './folders.table';
+export * from './sync-jobs.table';

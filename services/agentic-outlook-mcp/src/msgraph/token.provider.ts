@@ -6,6 +6,7 @@ import {
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
+import { TypeID } from 'typeid-js';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import { userProfiles } from '../drizzle/schema';
 import { normalizeError } from '../utils/normalize-error';
@@ -26,7 +27,7 @@ export class TokenProvider implements AuthenticationProvider {
       clientSecret,
       scopes,
     }: {
-      userProfileId: string;
+      userProfileId: TypeID<'user_profile'>;
       clientId: string;
       clientSecret: string;
       scopes: string[];
@@ -39,7 +40,7 @@ export class TokenProvider implements AuthenticationProvider {
       encryptionService: AesGcmEncryptionService;
     },
   ) {
-    this.userProfileId = userProfileId;
+    this.userProfileId = userProfileId.toString();
     this.clientId = clientId;
     this.clientSecret = clientSecret;
     this.scopes = scopes;

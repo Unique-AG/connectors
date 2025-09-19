@@ -14,6 +14,7 @@ import {
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MetricService } from 'nestjs-otel';
+import { TypeID } from 'typeid-js';
 import { AppConfig, AppSettings } from '../app-settings.enum';
 import { SCOPES } from '../auth/microsoft.provider';
 import { DRIZZLE, DrizzleDatabase } from '../drizzle/drizzle.module';
@@ -38,7 +39,7 @@ export class GraphClientFactory {
     this.scopes = SCOPES;
   }
 
-  public createClientForUser(userProfileId: string): Client {
+  public createClientForUser(userProfileId: TypeID<'user_profile'>): Client {
     const tokenProvider = new TokenProvider(
       {
         userProfileId,

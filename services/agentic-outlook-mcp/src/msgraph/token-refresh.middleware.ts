@@ -1,5 +1,6 @@
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
+import { TypeID } from 'typeid-js';
 import { TokenProvider } from './token.provider';
 
 export class TokenRefreshMiddleware implements Middleware {
@@ -10,9 +11,9 @@ export class TokenRefreshMiddleware implements Middleware {
 
   public constructor(
     private readonly tokenProvider: TokenProvider,
-    userProfileId: string,
+    userProfileId: TypeID<'user_profile'>,
   ) {
-    this.userProfileId = userProfileId;
+    this.userProfileId = userProfileId.toString();
   }
 
   private async isTokenExpiredError(response: Response | undefined): Promise<boolean> {

@@ -7,6 +7,7 @@ import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { context, trace } from '@opentelemetry/api';
 import { Cache } from 'cache-manager';
 import { MetricService, OpenTelemetryModule } from 'nestjs-otel';
@@ -21,6 +22,7 @@ import { MailModule } from './mail/mail.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
+import { SyncModule } from './sync/sync.module';
 
 @Module({
   imports: [
@@ -68,6 +70,7 @@ import { serverInstructions } from './server.instructions';
         },
       },
     }),
+    ScheduleModule.forRoot(),
     McpOAuthModule.forRootAsync({
       imports: [ConfigModule, DrizzleModule],
       useFactory: async (
@@ -108,6 +111,7 @@ import { serverInstructions } from './server.instructions';
     }),
     MsGraphModule,
     MailModule,
+    SyncModule,
   ],
   controllers: [ManifestController],
   providers: [
