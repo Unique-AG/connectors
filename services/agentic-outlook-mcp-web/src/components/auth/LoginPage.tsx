@@ -1,17 +1,35 @@
-import { Lock, Mail, Waves } from 'lucide-react';
-import { useState } from 'react';
+import { Waves } from 'lucide-react';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 export const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, isAuthenticated, error } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: 'Authentication Error',
+        description: error.message || 'Failed to authenticate. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [error, toast]);
+
+  const handleLogin = () => {
+    login();
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted to-primary/5 p-4">
@@ -29,16 +47,16 @@ export const LoginPage = () => {
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent>  
+        <CardContent>
           <Button
-            type="submit"
+            onClick={handleLogin}
             className="w-full bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-medium"
             disabled={isLoading}
           >
             {isLoading ? (
               <div className="flex items-center gap-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
-                Signing in...
+                Redirecting to Microsoft...
               </div>
             ) : (
               'Sign in with Microsoft'
