@@ -22,7 +22,9 @@ export class FoldersController {
     @Param('userProfileId') userProfileId: string,
     @Param('syncJobId') syncJobId: string,
   ) {
-    return this.foldersService.syncFolders(TypeID.fromString(userProfileId, 'user_profile'), TypeID.fromString(syncJobId, 'sync_job'),
+    return this.foldersService.syncFolders(
+      TypeID.fromString(userProfileId, 'user_profile'),
+      TypeID.fromString(syncJobId, 'sync_job'),
     );
   }
 }
