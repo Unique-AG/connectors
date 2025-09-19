@@ -1,16 +1,22 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { createContext, ReactNode, useContext, useMemo } from 'react';
+import { AuthProvider as OidcAuthProvider, useAuth as useOidcAuth } from 'react-oidc-context';
+import getOidcConfig, { mapOidcUserToAppUser } from '../config/oidc.config';
 
 interface User {
   id: string;
   email: string;
   name: string;
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: () => void;
   logout: () => void;
   isLoading: boolean;
+  isAuthenticated: boolean;
+  error: Error | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,47 +33,41 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+const AuthContextProvider = ({ children }: { children: ReactNode }) => {
+  const oidcAuth = useOidcAuth();
 
-  useEffect(() => {
-    // Check for stored auth on mount
-    const storedUser = localStorage.getItem('auth_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
+  const user = useMemo(() => {
+    return mapOidcUserToAppUser(oidcAuth.user);
+  }, [oidcAuth.user]);
 
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
-
-    // Mock OAuth authentication - replace with your OAuth backend
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
-
-    const mockUser: User = {
-      id: '1',
-      email,
-      name: email.split('@')[0],
-    };
-
-    setUser(mockUser);
-    localStorage.setItem('auth_user', JSON.stringify(mockUser));
-    setIsLoading(false);
+  const login = () => {
+    // Trigger OIDC sign in redirect
+    void oidcAuth.signinRedirect();
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem('auth_user');
+    // Sign out and clear tokens
+    void oidcAuth.signoutRedirect();
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     login,
     logout,
-    isLoading,
+    isLoading: oidcAuth.isLoading,
+    isAuthenticated: oidcAuth.isAuthenticated,
+    error: oidcAuth.error,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const oidcConfig = getOidcConfig();
+
+  return (
+    <OidcAuthProvider {...oidcConfig}>
+      <AuthContextProvider>{children}</AuthContextProvider>
+    </OidcAuthProvider>
+  );
 };
