@@ -15,6 +15,7 @@ export interface TokenPair {
   token_type: 'Bearer';
   expires_in: number;
   scope?: string;
+  id_token?: string; // OIDC ID token when openid scope is present
 }
 
 export interface TokenValidationResult {
