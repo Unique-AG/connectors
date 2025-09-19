@@ -54,8 +54,62 @@ export class DiscoveryController {
   }
 
   /**
+   * OpenID Connect Discovery endpoint as defined in OpenID Connect Discovery 1.0
+   * This endpoint describes the OpenID Provider configuration.
+   */
+  @Get('openid-configuration')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('X-Frame-Options', 'DENY')
+  public getOpenIDConfiguration() {
+    const metadata = {
+      // Required fields per OpenID Connect Discovery 1.0
+      issuer: this.options.serverUrl,
+      authorization_endpoint: `${this.options.serverUrl}${OAUTH_ENDPOINTS.authorize}`,
+      token_endpoint: `${this.options.serverUrl}${OAUTH_ENDPOINTS.token}`,
+      jwks_uri: `${this.options.serverUrl}/.well-known/jwks.json`,
+      
+      // Optional endpoints
+      registration_endpoint: `${this.options.serverUrl}${OAUTH_ENDPOINTS.register}`,
+      revocation_endpoint: `${this.options.serverUrl}${OAUTH_ENDPOINTS.revoke}`,
+      introspection_endpoint: `${this.options.serverUrl}${OAUTH_ENDPOINTS.introspect}`,
+      userinfo_endpoint: this.options.authorizationServerMetadata.userInfoEndpoint,
+
+      // Supported capabilities
+      response_types_supported: this.options.authorizationServerMetadata.responseTypesSupported,
+      response_modes_supported: this.options.authorizationServerMetadata.responseModesSupported,
+      grant_types_supported: this.options.authorizationServerMetadata.grantTypesSupported,
+      subject_types_supported: this.options.authorizationServerMetadata.subjectTypesSupported || ['public'],
+      id_token_signing_alg_values_supported: 
+        this.options.authorizationServerMetadata.idTokenSigningAlgValuesSupported || ['HS256', 'RS256'],
+      scopes_supported: this.options.authorizationServerMetadata.scopesSupported,
+      token_endpoint_auth_methods_supported:
+        this.options.authorizationServerMetadata.tokenEndpointAuthMethodsSupported,
+      claims_supported: this.options.authorizationServerMetadata.claimsSupported || [
+        'sub', 'iss', 'aud', 'exp', 'iat', 'auth_time', 'nonce',
+        'name', 'preferred_username', 'email', 'email_verified', 'picture',
+      ],
+      code_challenge_methods_supported:
+        this.options.authorizationServerMetadata.codeChallengeMethodsSupported,
+      
+      // Service documentation
+      service_documentation: this.options.authorizationServerMetadata.serviceDocumentation,
+      op_policy_uri: this.options.authorizationServerMetadata.opPolicyUri,
+      op_tos_uri: this.options.authorizationServerMetadata.opTosUri,
+
+      // UI and localization
+      ui_locales_supported: this.options.authorizationServerMetadata.uiLocalesSupported,
+      
+      // Token characteristics
+      access_token_issuer: this.options.serverUrl,
+    };
+
+    return Object.fromEntries(Object.entries(metadata).filter(([_, value]) => value !== undefined));
+  }
+
+  /**
    * Authorization Server Metadata endpoint as defined in RFC8414.
    * This endpoint describes the OAuth 2.0 authorization server capabilities.
+   * This is an alias for the OIDC discovery endpoint for OAuth 2.0 compatibility.
    */
   @Get('oauth-authorization-server')
   @Header('X-Content-Type-Options', 'nosniff')
