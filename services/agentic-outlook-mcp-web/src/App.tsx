@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { CallbackPage } from '@/components/auth/CallbackPage';
 import { LoginPage } from '@/components/auth/LoginPage';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Toaster as Sonner } from '@/components/ui/sonner';
@@ -15,7 +16,7 @@ import Users from './pages/Users';
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
 
   if (isLoading) {
     return (
@@ -25,7 +26,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (!user) return <LoginPage />;
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
+  }
 
   return <DashboardLayout>{children}</DashboardLayout>;
 };
@@ -38,8 +41,16 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/callback" element={<CallbackPage />} />
             <Route
               path="/"
+              element={
+                <Navigate to="/dashboard" replace />
+              }
+            />
+            <Route
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <FolderManagement />
