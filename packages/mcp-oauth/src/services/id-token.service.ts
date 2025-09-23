@@ -58,6 +58,7 @@ export interface IDTokenGenerationOptions {
     email?: string;
     displayName?: string;
     avatarUrl?: string;
+    emailVerified?: boolean;
   };
 }
 
@@ -88,50 +89,32 @@ export class IDTokenService {
       azp: options.clientId,
     };
 
-    // Add nonce if provided (required for implicit flow, optional for authorization code flow)
-    if (options.nonce) {
-      claims.nonce = options.nonce;
-    }
+    if (options.nonce) claims.nonce = options.nonce;
+    if (options.authTime) claims.auth_time = Math.floor(options.authTime / 1000);
 
-    // Add auth_time if provided
-    if (options.authTime) {
-      claims.auth_time = Math.floor(options.authTime / 1000);
-    }
-
-    // Parse requested scopes
     const scopes = options.scope?.split(' ') || [];
 
-    // Add profile claims if profile scope is requested
     if (scopes.includes('profile') && options.userProfile) {
-      if (options.userProfile.displayName) {
-        claims.name = options.userProfile.displayName;
-      }
-      if (options.userProfile.username) {
-        claims.preferred_username = options.userProfile.username;
-      }
-      if (options.userProfile.avatarUrl) {
-        claims.picture = options.userProfile.avatarUrl;
-      }
+      if (options.userProfile.displayName) claims.name = options.userProfile.displayName;
+      if (options.userProfile.username) claims.preferred_username = options.userProfile.username;
+      if (options.userProfile.avatarUrl) claims.picture = options.userProfile.avatarUrl;
     }
 
-    // Add email claim if email scope is requested
     if (scopes.includes('email') && options.userProfile?.email) {
       claims.email = options.userProfile.email;
-      // In a real implementation, you would check if the email is verified
-      claims.email_verified = false;
+      if (options.userProfile.emailVerified) claims.email_verified = options.userProfile.emailVerified ?? false;
     }
 
-    // Sign the token
     const signingKey = this.options.jwtSigningKey || this.options.hmacSecret;
     const algorithm = this.options.jwtSigningAlgorithm || 'HS256';
 
     try {
       const idToken = jwt.sign(claims, signingKey, {
-        algorithm: algorithm as jwt.Algorithm,
+        algorithm,
         header: {
           typ: 'JWT',
           alg: algorithm,
-          kid: 'default', // In production, this should be a key identifier
+          kid: 'default',
         },
       });
 
