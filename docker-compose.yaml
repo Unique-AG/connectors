@@ -7,6 +7,7 @@
 # 9006 - minio console
 # 9007 - langfuse-worker
 # 9008 - langfuse-web
+# 9009 - powersync
 
 name: connectors-monorepo
 services:
@@ -20,6 +21,7 @@ services:
     environment:
       PSQL_HISTFILE: /root/log/.psql_history
       POSTGRES_PASSWORD: postgres
+    command: ["postgres", "-c", "wal_level=logical"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: '10s'
@@ -36,6 +38,22 @@ services:
       interval: 3s
       timeout: 10s
       retries: 10
+
+  powersync:
+    profiles: ["agentic-outlook-mcp"] # To run this profile `docker-compose --profile agentic-outlook-mcp up -d`
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    image: journeyapps/powersync-service:1.15.7
+    command: ["start", "-r", "unified"]
+    volumes:
+      - ./services/agentic-outlook-mcp/powersync/config.yaml:/config/config.yaml
+      - ./services/agentic-outlook-mcp/powersync/sync_rules.yaml:/config/sync_rules.yaml
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/config.yaml
+    ports:
+      - 9009:8080
 
   otel-lgtm:
     image: grafana/otel-lgtm
