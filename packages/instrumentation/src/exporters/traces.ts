@@ -37,6 +37,7 @@ export function createSpanProcessor(config: OtelConfig): SpanProcessor | undefin
       );
     }
     case 'langfuse':
+      console.log('  Using langfuse traces exporter');
       return new LangfuseSpanProcessor();
 
     case 'console':
