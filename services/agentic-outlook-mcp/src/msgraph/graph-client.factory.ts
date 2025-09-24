@@ -15,7 +15,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MetricService } from 'nestjs-otel';
 import { TypeID } from 'typeid-js';
-import { AppConfig, AppSettings } from '../app-settings.enum';
+import { AppConfig, AppSettings } from '../app-settings';
 import { SCOPES } from '../auth/microsoft.provider';
 import { DRIZZLE, DrizzleDatabase } from '../drizzle/drizzle.module';
 import { MetricsMiddleware } from './metrics.middleware';
