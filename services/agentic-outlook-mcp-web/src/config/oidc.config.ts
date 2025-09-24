@@ -6,7 +6,7 @@ const getOidcConfig = (): AuthProviderProps => {
   const clientId = import.meta.env.VITE_OAUTH_CLIENT_ID || 'agentic-outlook-mcp-web';
   const redirectUri = `${window.location.origin}/callback`;
   const postLogoutRedirectUri = `${window.location.origin}/`;
-  
+
   return {
     authority: backendUrl,
     client_id: clientId,
@@ -14,14 +14,14 @@ const getOidcConfig = (): AuthProviderProps => {
     post_logout_redirect_uri: postLogoutRedirectUri,
     response_type: 'code',
     scope: 'openid profile email offline_access',
-    
+
     // PKCE is required by the backend (OAuth 2.1)
     automaticSilentRenew: true,
     loadUserInfo: false, // Backend may not provide userinfo endpoint
-    
+
     // Store tokens in localStorage for persistence
     userStore: new WebStorageStateStore({ store: window.localStorage }),
-    
+
     metadata: {
       // Override metadata endpoints since backend uses custom paths
       issuer: backendUrl,
@@ -31,12 +31,12 @@ const getOidcConfig = (): AuthProviderProps => {
       introspection_endpoint: `${backendUrl}/auth/introspect`,
       end_session_endpoint: `${backendUrl}/auth/logout`,
     },
-    
+
     // Resource parameter for RFC 8707 compliance
     extraQueryParams: {
       resource: `${backendUrl}/mcp`,
     },
-    
+
     onSigninCallback: () => {
       // Remove OIDC params from URL after successful login
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -48,7 +48,7 @@ export default getOidcConfig;
 
 export const mapOidcUserToAppUser = (user: User | null) => {
   if (!user) return null;
-  
+
   return {
     id: user.profile.sub || '',
     email: user.profile.email || '',

@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
+    "generate-jwks": "node scripts/generate-jwks.js",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "format": "biome format .",
