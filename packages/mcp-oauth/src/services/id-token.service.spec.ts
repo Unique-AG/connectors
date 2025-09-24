@@ -14,8 +14,8 @@ describe('IDTokenService', () => {
   beforeEach(async () => {
     options = {
       hmacSecret: 'test-hmac-secret',
-      jwtSigningKey: 'test-jwt-signing-key',
-      jwtSigningAlgorithm: 'HS256',
+      accessTokenFormat: 'opaque',
+      jwtSigningKeyProvider: vi.fn(),
       idTokenExpiresIn: 3600,
       serverUrl: 'https://auth.example.com',
       resource: 'https://mcp.example.com',
@@ -31,7 +31,7 @@ describe('IDTokenService', () => {
       oauthStore: {},
       metricService: {},
       provider: {},
-    } as McpOAuthModuleOptions;
+    } as unknown as McpOAuthModuleOptions;
 
     const { unit } = await TestBed.solitary(IDTokenService)
       .mock<McpOAuthModuleOptions>(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
@@ -42,21 +42,23 @@ describe('IDTokenService', () => {
   });
 
   describe('generateIDToken', () => {
-    it('generates a valid JWT ID token with required claims', () => {
+    it('generates a valid JWT ID token with required claims', async () => {
       const idToken = service.generateIDToken({
         userId: 'user-123',
         clientId: 'client-456',
+        issuer: 'https://auth.example.com',
+        expiresIn: 3600,
       });
 
       expect(idToken).toBeDefined();
       expect(typeof idToken).toBe('string');
 
       // Verify the token structure
-      const parts = idToken.split('.');
+      const parts = (await idToken).split('.');
       expect(parts).toHaveLength(3); // Header, Payload, Signature
 
       // Decode and verify claims
-      const decoded = jwt.decode(idToken) as jwt.JwtPayload;
+      const decoded = jwt.decode(await idToken) as jwt.JwtPayload;
       expect(decoded.iss).toBe('https://auth.example.com');
       expect(decoded.sub).toBe('user-123');
       expect(decoded.aud).toBe('client-456');
@@ -65,30 +67,34 @@ describe('IDTokenService', () => {
       expect(decoded.iat).toBeDefined();
     });
 
-    it('includes nonce when provided', () => {
+    it('includes nonce when provided', async () => {
       const idToken = service.generateIDToken({
         userId: 'user-123',
         clientId: 'client-456',
         nonce: 'random-nonce-123',
+        issuer: 'https://auth.example.com',
+        expiresIn: 3600,
       });
 
-      const decoded = jwt.decode(idToken) as jwt.JwtPayload;
+      const decoded = jwt.decode(await idToken) as jwt.JwtPayload;
       expect(decoded.nonce).toBe('random-nonce-123');
     });
 
-    it('includes auth_time when provided', () => {
+    it('includes auth_time when provided', async () => {
       const authTime = Date.now() - 5000; // 5 seconds ago
       const idToken = service.generateIDToken({
         userId: 'user-123',
         clientId: 'client-456',
         authTime,
+        issuer: 'https://auth.example.com',
+        expiresIn: 3600,
       });
 
-      const decoded = jwt.decode(idToken) as jwt.JwtPayload;
+      const decoded = jwt.decode(await idToken) as jwt.JwtPayload;
       expect(decoded.auth_time).toBe(Math.floor(authTime / 1000));
     });
 
-    it('includes profile claims when profile scope is requested', () => {
+    it('includes profile claims when profile scope is requested', async () => {
       const idToken = service.generateIDToken({
         userId: 'user-123',
         clientId: 'client-456',
@@ -98,15 +104,17 @@ describe('IDTokenService', () => {
           displayName: 'John Doe',
           avatarUrl: 'https://example.com/avatar.jpg',
         },
+        issuer: 'https://auth.example.com',
+        expiresIn: 3600,
       });
 
-      const decoded = jwt.decode(idToken) as jwt.JwtPayload;
+      const decoded = jwt.decode(await idToken) as jwt.JwtPayload;
       expect(decoded.name).toBe('John Doe');
       expect(decoded.preferred_username).toBe('johndoe');
       expect(decoded.picture).toBe('https://example.com/avatar.jpg');
     });
 
-    it('includes email claims when email scope is requested', () => {
+    it('includes email claims when email scope is requested', async () => {
       const idToken = service.generateIDToken({
         userId: 'user-123',
         clientId: 'client-456',
@@ -114,14 +122,16 @@ describe('IDTokenService', () => {
         userProfile: {
           email: 'john@example.com',
         },
+        issuer: 'https://auth.example.com',
+        expiresIn: 3600,
       });
 
-      const decoded = jwt.decode(idToken) as jwt.JwtPayload;
+      const decoded = jwt.decode(await idToken) as jwt.JwtPayload;
       expect(decoded.email).toBe('john@example.com');
       expect(decoded.email_verified).toBe(false);
     });
 
-    it('includes all relevant claims when multiple scopes are requested', () => {
+    it('includes all relevant claims when multiple scopes are requested', async () => {
       const idToken = service.generateIDToken({
         userId: 'user-123',
         clientId: 'client-456',
@@ -132,9 +142,11 @@ describe('IDTokenService', () => {
           displayName: 'John Doe',
           avatarUrl: 'https://example.com/avatar.jpg',
         },
+        issuer: 'https://auth.example.com',
+        expiresIn: 3600,
       });
 
-      const decoded = jwt.decode(idToken) as jwt.JwtPayload;
+      const decoded = jwt.decode(await idToken) as jwt.JwtPayload;
       expect(decoded.name).toBe('John Doe');
       expect(decoded.preferred_username).toBe('johndoe');
       expect(decoded.picture).toBe('https://example.com/avatar.jpg');
@@ -142,7 +154,7 @@ describe('IDTokenService', () => {
       expect(decoded.email_verified).toBe(false);
     });
 
-    it('does not include profile claims without profile scope', () => {
+    it('does not include profile claims without profile scope', async () => {
       const idToken = service.generateIDToken({
         userId: 'user-123',
         clientId: 'client-456',
@@ -151,33 +163,39 @@ describe('IDTokenService', () => {
           username: 'johndoe',
           displayName: 'John Doe',
         },
+        issuer: 'https://auth.example.com',
+        expiresIn: 3600,
       });
 
-      const decoded = jwt.decode(idToken) as jwt.JwtPayload;
+      const decoded = jwt.decode(await idToken) as jwt.JwtPayload;
       expect(decoded.name).toBeUndefined();
       expect(decoded.preferred_username).toBeUndefined();
     });
 
-    it('uses HS256 algorithm by default', () => {
+    it('uses HS256 algorithm by default', async () => {
       const idToken = service.generateIDToken({
         userId: 'user-123',
         clientId: 'client-456',
+        issuer: 'https://auth.example.com',
+        expiresIn: 3600,
       });
 
-      const decoded = jwt.decode(idToken, { complete: true }) as jwt.Jwt;
+      const decoded = jwt.decode(await idToken, { complete: true }) as jwt.Jwt;
       expect(decoded.header.alg).toBe('HS256');
       expect(decoded.header.typ).toBe('JWT');
       expect(decoded.header.kid).toBe('default');
     });
 
-    it('uses configured JWT signing key when available', () => {
+    it('uses configured JWT signing key when available', async () => {
       const idToken = service.generateIDToken({
         userId: 'user-123',
         clientId: 'client-456',
+        issuer: 'https://auth.example.com',
+        expiresIn: 3600,
       });
 
       // Verify token can be validated with the configured key
-      const verified = jwt.verify(idToken, 'test-jwt-signing-key', {
+      const verified = jwt.verify(await idToken, 'test-jwt-signing-key', {
         algorithms: ['HS256'],
       }) as jwt.JwtPayload;
 
@@ -199,17 +217,19 @@ describe('IDTokenService', () => {
       const idToken = serviceWithoutKey.generateIDToken({
         userId: 'user-123',
         clientId: 'client-456',
+        issuer: 'https://auth.example.com',
+        expiresIn: 3600,
       });
 
       // Verify token can be validated with HMAC secret
-      const verified = jwt.verify(idToken, 'test-hmac-secret', {
+      const verified = jwt.verify(await idToken, 'test-hmac-secret', {
         algorithms: ['HS256'],
       }) as jwt.JwtPayload;
 
       expect(verified.sub).toBe('user-123');
     });
 
-    it('handles errors during token generation gracefully', () => {
+    it('handles errors during token generation gracefully', async () => {
       // Mock jwt.sign to throw an error
       const originalSign = jwt.sign;
       vi.spyOn(jwt, 'sign').mockImplementation(() => {
@@ -220,12 +240,14 @@ describe('IDTokenService', () => {
         service.generateIDToken({
           userId: 'user-123',
           clientId: 'client-456',
+          issuer: 'https://auth.example.com',
+          expiresIn: 3600,
         }),
       ).toThrow('Failed to generate ID token');
 
       // Restore original implementation
       // biome-ignore lint/suspicious/noExplicitAny: need to restore original implementation
-            (jwt as any).sign = originalSign;
+      (jwt as any).sign = originalSign;
     });
   });
 
@@ -247,8 +269,8 @@ describe('IDTokenService', () => {
       );
     });
 
-    it('validates a valid ID token successfully', () => {
-      const claims = service.validateIDToken(validToken);
+    it('validates a valid ID token successfully', async () => {
+      const claims = await service.validateIDToken(validToken, 'https://auth.example.com');
 
       expect(claims).toBeDefined();
       expect(claims?.sub).toBe('user-123');
@@ -267,7 +289,7 @@ describe('IDTokenService', () => {
         { algorithm: 'HS256' },
       );
 
-      const claims = service.validateIDToken(invalidToken);
+      const claims = service.validateIDToken(invalidToken, 'https://auth.example.com');
       expect(claims).toBeNull();
     });
 
@@ -284,7 +306,7 @@ describe('IDTokenService', () => {
         { algorithm: 'HS256' },
       );
 
-      const claims = service.validateIDToken(expiredToken);
+      const claims = service.validateIDToken(expiredToken, 'https://auth.example.com');
       expect(claims).toBeNull();
     });
 
@@ -301,16 +323,16 @@ describe('IDTokenService', () => {
         { algorithm: 'HS256' },
       );
 
-      const claims = service.validateIDToken(wrongIssuerToken);
+      const claims = service.validateIDToken(wrongIssuerToken, 'https://auth.example.com');
       expect(claims).toBeNull();
     });
 
     it('returns null for malformed token', () => {
-      const claims = service.validateIDToken('not.a.valid.token');
+      const claims = service.validateIDToken('not.a.valid.token', 'https://auth.example.com');
       expect(claims).toBeNull();
     });
 
-    it('validates token with all optional claims', () => {
+    it('validates token with all optional claims', async () => {
       const fullToken = jwt.sign(
         {
           iss: 'https://auth.example.com',
@@ -328,7 +350,7 @@ describe('IDTokenService', () => {
         { algorithm: 'HS256' },
       );
 
-      const claims = service.validateIDToken(fullToken);
+      const claims = await service.validateIDToken(fullToken, 'https://auth.example.com');
 
       expect(claims).toBeDefined();
       expect(claims?.nonce).toBe('nonce-123');

@@ -6,7 +6,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { AppModule } from './app.module';
-import { AppConfig, AppSettings } from './app-settings.enum';
+import { AppConfig, AppSettings } from './app-settings';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
