@@ -1,9 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import * as jwt from 'jsonwebtoken';
-import {
-  MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN,
-  type McpOAuthModuleOptions,
-} from '../mcp-oauth.module-definition';
+import { Injectable, Logger } from '@nestjs/common';
+import { importPKCS8, importSPKI, jwtVerify, SignJWT } from 'jose';
+import { JWKSService } from './jwks.service';
 
 export interface IDTokenClaims {
   // Standard OIDC claims
@@ -17,7 +14,7 @@ export interface IDTokenClaims {
   acr?: string; // Authentication Context Class Reference
   amr?: string[]; // Authentication Methods References
   azp?: string; // Authorized party (client ID)
-  
+
   // User claims (when profile scope is requested)
   name?: string;
   given_name?: string;
@@ -53,6 +50,8 @@ export interface IDTokenGenerationOptions {
   nonce?: string;
   authTime?: number;
   scope?: string;
+  issuer: string;
+  expiresIn: number;
   userProfile?: {
     username?: string;
     email?: string;
@@ -66,63 +65,67 @@ export interface IDTokenGenerationOptions {
 export class IDTokenService {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(
-    @Inject(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
-    private readonly options: McpOAuthModuleOptions,
-  ) {}
+  public constructor(private readonly jwksService: JWKSService) {}
 
   /**
-   * Generates a JWT ID token for OIDC compliance
+   * Generates a JWT ID token for OIDC compliance using ECDSA
    * @param options Token generation options
    * @returns Signed JWT ID token
    */
-  public generateIDToken(options: IDTokenGenerationOptions): string {
-    const now = Math.floor(Date.now() / 1000);
-    const expiresIn = this.options.idTokenExpiresIn || 3600;
-
-    const claims: IDTokenClaims = {
-      iss: this.options.serverUrl,
-      sub: options.userId,
-      aud: options.clientId,
-      exp: now + expiresIn,
-      iat: now,
-      azp: options.clientId,
-    };
-
-    if (options.nonce) claims.nonce = options.nonce;
-    if (options.authTime) claims.auth_time = Math.floor(options.authTime / 1000);
-
-    const scopes = options.scope?.split(' ') || [];
-
-    if (scopes.includes('profile') && options.userProfile) {
-      if (options.userProfile.displayName) claims.name = options.userProfile.displayName;
-      if (options.userProfile.username) claims.preferred_username = options.userProfile.username;
-      if (options.userProfile.avatarUrl) claims.picture = options.userProfile.avatarUrl;
+  public async generateIDToken(options: IDTokenGenerationOptions): Promise<string> {
+    if (!this.jwksService.isJWTEnabled()) {
+      throw new Error('JWT signing is not configured');
     }
 
-    if (scopes.includes('email') && options.userProfile?.email) {
-      claims.email = options.userProfile.email;
-      if (options.userProfile.emailVerified) claims.email_verified = options.userProfile.emailVerified ?? false;
-    }
-
-    const signingKey = this.options.jwtSigningKey || this.options.hmacSecret;
-    const algorithm = this.options.jwtSigningAlgorithm || 'HS256';
+    const keys = await this.jwksService.getSigningKeys();
 
     try {
-      const idToken = jwt.sign(claims, signingKey, {
-        algorithm,
-        header: {
+      const privateKey = await importPKCS8(keys.privateKey, keys.algorithm);
+
+      // Build the payload with all custom claims
+      const payload: Record<string, unknown> = {
+        azp: options.clientId,
+      };
+
+      if (options.nonce) payload.nonce = options.nonce;
+      if (options.authTime) payload.auth_time = Math.floor(options.authTime / 1000);
+
+      const scopes = options.scope?.split(' ') || [];
+
+      if (scopes.includes('profile') && options.userProfile) {
+        if (options.userProfile.displayName) payload.name = options.userProfile.displayName;
+        if (options.userProfile.username) payload.preferred_username = options.userProfile.username;
+        if (options.userProfile.avatarUrl) payload.picture = options.userProfile.avatarUrl;
+      }
+
+      if (scopes.includes('email') && options.userProfile?.email) {
+        payload.email = options.userProfile.email;
+        payload.email_verified = options.userProfile.emailVerified ?? false;
+      }
+
+      const jwtBuilder = new SignJWT(payload);
+
+      // Add standard claims
+      jwtBuilder
+        .setProtectedHeader({
+          alg: keys.algorithm,
           typ: 'JWT',
-          alg: algorithm,
-          kid: 'default',
-        },
-      });
+          kid: keys.keyId,
+        })
+        .setIssuer(options.issuer)
+        .setSubject(options.userId)
+        .setAudience(options.clientId)
+        .setExpirationTime(`${options.expiresIn}s`)
+        .setIssuedAt();
+
+      const idToken = await jwtBuilder.sign(privateKey);
 
       this.logger.debug({
         msg: 'Generated ID token',
         userId: options.userId,
         clientId: options.clientId,
         scopes: scopes.join(' '),
+        algorithm: keys.algorithm,
       });
 
       return idToken;
@@ -136,21 +139,33 @@ export class IDTokenService {
   }
 
   /**
-   * Validates a JWT ID token
+   * Validates a JWT ID token using ECDSA and jose
    * @param token The JWT ID token to validate
+   * @param expectedIssuer The expected issuer for validation
    * @returns The decoded token claims or null if invalid
    */
-  public validateIDToken(token: string): IDTokenClaims | null {
+  public async validateIDToken(
+    token: string,
+    expectedIssuer: string,
+  ): Promise<IDTokenClaims | null> {
+    if (!this.jwksService.isJWTEnabled()) {
+      return null;
+    }
+
     try {
-      const signingKey = this.options.jwtSigningKey || this.options.hmacSecret;
-      const algorithm = this.options.jwtSigningAlgorithm || 'HS256';
+      const keys = await this.jwksService.getSigningKeys();
 
-      const decoded = jwt.verify(token, signingKey, {
-        algorithms: [algorithm as jwt.Algorithm],
-        issuer: this.options.serverUrl,
-      }) as IDTokenClaims;
+      // Import the public key using jose
+      const publicKey = await importSPKI(keys.publicKey, keys.algorithm);
 
-      return decoded;
+      // Verify the JWT using jose
+      const { payload } = await jwtVerify(token, publicKey, {
+        algorithms: [keys.algorithm],
+        issuer: expectedIssuer,
+      });
+
+      // Map payload to our claims interface
+      return payload as unknown as IDTokenClaims;
     } catch (error) {
       this.logger.debug({
         msg: 'ID token validation failed',
