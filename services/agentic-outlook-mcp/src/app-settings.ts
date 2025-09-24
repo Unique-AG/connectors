@@ -60,6 +60,18 @@ const appSettingsSchema = z.object({
     .describe(
       'The secret key for the MCP Server to encrypt and decrypt data. Needs to be a 32-byte (256-bit) secret.',
     ),
+  JWT_PRIVATE_KEY: z
+    .base64()
+    .describe('The private key for the MCP Server to sign JWT tokens, base64 encoded.')
+    .transform((val) => Buffer.from(val, 'base64').toString('utf-8')),
+  JWT_PUBLIC_KEY: z
+    .base64()
+    .describe('The public key for the MCP Server to verify JWT tokens, base64 encoded.')
+    .transform((val) => Buffer.from(val, 'base64').toString('utf-8')),
+  JWT_KEY_ID: z.string().describe('The key ID for the MCP Server to sign JWT tokens.'),
+  JWT_ALGORITHM: z
+    .enum(['ES256', 'ES384', 'ES512'])
+    .describe('The algorithm for the MCP Server to sign JWT tokens.'),
 });
 
 export const AppSettings = appSettingsSchema.keyof().enum;
