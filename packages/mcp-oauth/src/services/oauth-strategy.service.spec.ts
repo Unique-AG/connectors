@@ -82,7 +82,7 @@ describe('OAuthStrategyService', () => {
         serverUrl: 'http://localhost:3000',
         clientId: 'test-client',
         clientSecret: 'test-secret',
-        callbackPath: '/auth/callback',
+        callbackPath: '/oauth/callback',
       });
       expect(mockStrategy).toHaveBeenCalled();
       expect(passport.use).toHaveBeenCalledWith(STRATEGY_NAME, expect.any(Object));
