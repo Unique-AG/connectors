@@ -260,9 +260,9 @@ describe('OAuth Authorization Code Flow (E2E)', () => {
 
       expect(response.body).toMatchObject({
         issuer: 'http://localhost:3000',
-        authorization_endpoint: 'http://localhost:3000/auth/authorize',
-        token_endpoint: 'http://localhost:3000/auth/token',
-        registration_endpoint: 'http://localhost:3000/auth/register',
+        authorization_endpoint: 'http://localhost:3000/oauth/authorize',
+        token_endpoint: 'http://localhost:3000/oauth/token',
+        registration_endpoint: 'http://localhost:3000/oauth/register',
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code', 'refresh_token'],
         code_challenge_methods_supported: ['plain', 'S256'],

@@ -78,12 +78,12 @@ describe('OAuth OIDC Flow (E2E)', () => {
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
         issuer: 'http://localhost:3000',
-        authorization_endpoint: 'http://localhost:3000/auth/authorize',
-        token_endpoint: 'http://localhost:3000/auth/token',
+        authorization_endpoint: 'http://localhost:3000/oauth/authorize',
+        token_endpoint: 'http://localhost:3000/oauth/token',
         jwks_uri: 'http://localhost:3000/.well-known/jwks.json',
-        registration_endpoint: 'http://localhost:3000/auth/register',
-        revocation_endpoint: 'http://localhost:3000/auth/revoke',
-        introspection_endpoint: 'http://localhost:3000/auth/introspect',
+        registration_endpoint: 'http://localhost:3000/oauth/register',
+        revocation_endpoint: 'http://localhost:3000/oauth/revoke',
+        introspection_endpoint: 'http://localhost:3000/oauth/introspect',
         response_types_supported: ['code'],
         response_modes_supported: ['query'],
         grant_types_supported: ['authorization_code', 'refresh_token'],
