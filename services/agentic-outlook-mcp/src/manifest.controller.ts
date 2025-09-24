@@ -15,7 +15,7 @@ export class ManifestController {
       type: 'mcp-server',
       endpoints: {
         mcp: '/mcp',
-        auth: '/auth',
+        auth: '/oauth',
         favicon: '/favicon.ico',
         manifest: '/site.webmanifest',
         icons: '/icons/',

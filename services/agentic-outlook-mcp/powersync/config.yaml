@@ -20,8 +20,8 @@ sync_rules:
   path: sync_rules.yaml
 
 client_auth:
-  jwks_uri: http://host.docker.internal:3000/auth/jwks
-  audience: ["powersync"]
+  jwks_uri: http://host.docker.internal:3000/.well-known/jwks.json
+  audience: ["http://localhost:3000/mcp"]
 
 api:
   tokens:
