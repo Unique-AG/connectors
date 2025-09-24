@@ -21,9 +21,19 @@ describe('OAuth OIDC Flow (E2E)', () => {
     mockConfig.jwtSigningKey = 'test-jwt-signing-key';
     mockConfig.jwtSigningAlgorithm = 'HS256';
     mockConfig.idTokenExpiresIn = 3600;
-    mockConfig.authorizationServerMetadata.scopesSupported = ['openid', 'offline_access', 'profile', 'email'];
-    mockConfig.protectedResourceMetadata.scopesSupported = ['openid', 'offline_access', 'profile', 'email'];
-    
+    mockConfig.authorizationServerMetadata.scopesSupported = [
+      'openid',
+      'offline_access',
+      'profile',
+      'email',
+    ];
+    mockConfig.protectedResourceMetadata.scopesSupported = [
+      'openid',
+      'offline_access',
+      'profile',
+      'email',
+    ];
+
     oauthStore = mockConfig.oauthStore as MockOAuthStore;
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -80,7 +90,11 @@ describe('OAuth OIDC Flow (E2E)', () => {
         subject_types_supported: ['public'],
         id_token_signing_alg_values_supported: ['HS256', 'RS256'],
         scopes_supported: ['openid', 'offline_access', 'profile', 'email'],
-        token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
+        token_endpoint_auth_methods_supported: [
+          'client_secret_basic',
+          'client_secret_post',
+          'none',
+        ],
         code_challenge_methods_supported: ['plain', 'S256'],
       });
     });
@@ -105,7 +119,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
       // Create an authorization code with openid scope
       const authCode = 'oidc-auth-code-123';
       const userProfileId = 'profile-123';
-      
+
       // Store user profile
       await oauthStore.upsertUserProfile({
         profile: {
@@ -153,7 +167,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
       // Verify ID token structure and claims
       const idToken = response.body.id_token;
       const decoded = jwt.decode(idToken) as jwt.JwtPayload;
-      
+
       expect(decoded).toBeDefined();
       expect(decoded.iss).toBe('http://localhost:3000');
       expect(decoded.sub).toBe('testuser');
@@ -166,7 +180,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
     it('includes profile claims in ID token when profile scope is requested', async () => {
       const authCode = 'profile-auth-code-123';
       const userProfileId = 'profile-456';
-      
+
       // Store user profile with detailed information
       await (oauthStore as any).userProfiles.set(userProfileId, {
         profile_id: userProfileId,
@@ -213,7 +227,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
     it('includes email claims in ID token when email scope is requested', async () => {
       const authCode = 'email-auth-code-123';
       const userProfileId = 'profile-789';
-      
+
       await (oauthStore as any).userProfiles.set(userProfileId, {
         profile_id: userProfileId,
         provider: 'test',
@@ -256,7 +270,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
 
     it('does not return ID token when openid scope is not requested', async () => {
       const authCode = 'no-openid-code-123';
-      
+
       await oauthStore.storeAuthCode({
         code: authCode,
         client_id: registeredClient.client_id,
@@ -292,7 +306,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
       // Store a refresh token with openid scope
       const refreshToken = 'oidc-refresh-token-123';
       const userProfileId = 'profile-refresh-123';
-      
+
       await (oauthStore as any).userProfiles.set(userProfileId, {
         profile_id: userProfileId,
         provider: 'test',
@@ -335,7 +349,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
     it('maintains ID token when refreshing with reduced scope that still includes openid', async () => {
       const refreshToken = 'reduced-scope-refresh-123';
       const userProfileId = 'profile-reduced-123';
-      
+
       await (oauthStore as any).userProfiles.set(userProfileId, {
         profile_id: userProfileId,
         provider: 'test',
@@ -367,7 +381,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('id_token');
-      
+
       // ID token should not have profile claims since profile scope was not requested
       const decoded = jwt.decode(response.body.id_token) as jwt.JwtPayload;
       expect(decoded.sub).toBe('reduceduser');
@@ -377,7 +391,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
 
     it('does not return ID token when refreshing without openid scope', async () => {
       const refreshToken = 'no-openid-refresh-123';
-      
+
       await oauthStore.storeRefreshToken(refreshToken, {
         userId: 'nooidcuser',
         clientId: registeredClient.client_id,
@@ -405,7 +419,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
   describe('ID Token Security', () => {
     it('signs ID token with configured algorithm', async () => {
       const authCode = 'security-auth-code-123';
-      
+
       await oauthStore.storeAuthCode({
         code: authCode,
         client_id: registeredClient.client_id,
@@ -429,27 +443,27 @@ describe('OAuth OIDC Flow (E2E)', () => {
       });
 
       expect(response.status).toBe(200);
-      
+
       // Verify token signature
       const idToken = response.body.id_token;
       const decoded = jwt.decode(idToken, { complete: true }) as jwt.Jwt;
-      
+
       expect(decoded.header.alg).toBe('HS256');
       expect(decoded.header.typ).toBe('JWT');
       expect(decoded.header.kid).toBe('default');
-      
+
       // Verify token can be validated with the signing key
       const verified = jwt.verify(idToken, mockConfig.jwtSigningKey || mockConfig.hmacSecret, {
         algorithms: ['HS256'],
         issuer: 'http://localhost:3000',
       });
-      
+
       expect(verified).toBeDefined();
     });
 
     it('includes correct expiration time in ID token', async () => {
       const authCode = 'exp-auth-code-123';
-      
+
       await oauthStore.storeAuthCode({
         code: authCode,
         client_id: registeredClient.client_id,
@@ -464,7 +478,7 @@ describe('OAuth OIDC Flow (E2E)', () => {
       });
 
       const beforeRequest = Math.floor(Date.now() / 1000);
-      
+
       const response = await request(app.getHttpServer()).post(OAUTH_ENDPOINTS.token).send({
         grant_type: 'authorization_code',
         code: authCode,
@@ -475,13 +489,13 @@ describe('OAuth OIDC Flow (E2E)', () => {
       });
 
       const afterRequest = Math.floor(Date.now() / 1000);
-      
+
       const decoded = jwt.decode(response.body.id_token) as jwt.JwtPayload;
-      
+
       // Check that exp is approximately 1 hour from now
       expect(decoded.exp).toBeGreaterThanOrEqual(beforeRequest + 3600);
       expect(decoded.exp).toBeLessThanOrEqual(afterRequest + 3600);
-      
+
       // Check that iat is approximately now
       expect(decoded.iat).toBeGreaterThanOrEqual(beforeRequest);
       expect(decoded.iat).toBeLessThanOrEqual(afterRequest);

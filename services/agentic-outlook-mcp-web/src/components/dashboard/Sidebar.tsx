@@ -68,11 +68,7 @@ export const AppSidebar = () => {
       : 'hover:bg-muted transition-all duration-200';
 
   return (
-    <Sidebar
-      variant="inset"
-      collapsible="icon"
-      className="border-r shadow-soft"
-    >
+    <Sidebar variant="inset" collapsible="icon" className="border-r shadow-soft">
       <SidebarHeader className="p-6 border-b">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center shadow-medium">
@@ -87,9 +83,7 @@ export const AppSidebar = () => {
 
       <SidebarContent className="flex-1 p-4">
         <SidebarGroup>
-          <SidebarGroupLabel>
-            Main Navigation
-          </SidebarGroupLabel>
+          <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-2">
               {navigationItems.map((item) => (

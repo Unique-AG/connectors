@@ -8,6 +8,8 @@ import {
   type McpOAuthModuleOptions,
   OAUTH_STORE_TOKEN,
 } from '../mcp-oauth.module-definition';
+import { JWKSService } from './jwks.service';
+import { JWTAccessTokenService } from './jwt-access-token.service';
 
 export interface TokenPair {
   access_token: string;
@@ -38,6 +40,8 @@ export class OpaqueTokenService {
     @Inject(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
     private readonly options: McpOAuthModuleOptions,
     @Inject(OAUTH_STORE_TOKEN) private readonly store: IOAuthStore,
+    private readonly jwtAccessTokenService: JWTAccessTokenService,
+    private readonly jwksService: JWKSService,
   ) {}
 
   private generateSecureToken(bytes: number): string {
@@ -82,7 +86,7 @@ export class OpaqueTokenService {
     familyId?: string | null,
     generation = 0,
   ): Promise<TokenPair> {
-    const accessToken = this.generateSecureToken(this.ACCESS_TOKEN_BYTES);
+    let accessToken: string;
     const refreshToken = this.generateSecureToken(this.REFRESH_TOKEN_BYTES);
 
     const now = Date.now();
@@ -91,15 +95,45 @@ export class OpaqueTokenService {
 
     const tokenFamilyId = familyId || typeid('tkfam').toString();
 
-    await this.store.storeAccessToken(accessToken, {
-      userId,
-      clientId,
-      scope,
-      resource,
-      expiresAt: accessExpiresAt,
-      userProfileId,
-    });
+    // Generate access token based on configured format
+    if (this.options.accessTokenFormat === 'jwt' && this.jwksService.isJWTEnabled()) {
+      // Generate JWT access token
+      const tokenId = typeid('jti').toString();
+      accessToken = await this.jwtAccessTokenService.generateAccessToken({
+        userId,
+        clientId,
+        scope,
+        resource,
+        userProfileId,
+        expiresIn: this.options.accessTokenExpiresIn,
+        tokenId,
+        issuer: this.options.serverUrl,
+      });
 
+      // Store JWT metadata for revocation tracking
+      await this.store.storeAccessToken(tokenId, {
+        userId,
+        clientId,
+        scope,
+        resource,
+        expiresAt: accessExpiresAt,
+        userProfileId,
+      });
+    } else {
+      // Generate opaque access token
+      accessToken = this.generateSecureToken(this.ACCESS_TOKEN_BYTES);
+
+      await this.store.storeAccessToken(accessToken, {
+        userId,
+        clientId,
+        scope,
+        resource,
+        expiresAt: accessExpiresAt,
+        userProfileId,
+      });
+    }
+
+    // Refresh token is always opaque
     await this.store.storeRefreshToken(refreshToken, {
       userId,
       clientId,
@@ -112,9 +146,10 @@ export class OpaqueTokenService {
     });
 
     this.logger.debug({
-      msg: 'Generated opaque token pair',
+      msg: `Generated ${this.options.accessTokenFormat || 'opaque'} access token and refresh token`,
       userId,
       clientId,
+      tokenFormat: this.options.accessTokenFormat || 'opaque',
     });
 
     return {
@@ -127,31 +162,62 @@ export class OpaqueTokenService {
   }
 
   public async validateAccessToken(token: string): Promise<TokenValidationResult | null> {
-    const metadata = await this.store.getAccessToken(token);
+    // Check if token is a JWT
+    if (this.options.accessTokenFormat === 'jwt' && this.jwksService.isJWTEnabled()) {
+      // Validate JWT access token
+      const claims = await this.jwtAccessTokenService.validateAccessToken(
+        token,
+        this.options.resource,
+      );
 
-    if (!metadata) {
-      this.logger.debug({ msg: 'Access token not found', tokenPrefix: token.substring(0, 8) });
-      return null;
+      if (!claims) {
+        this.logger.debug({ msg: 'JWT access token validation failed' });
+        return null;
+      }
+
+      // Check if token has been revoked (by JTI)
+      const metadata = await this.store.getAccessToken(claims.jti);
+      if (!metadata) {
+        this.logger.debug({ msg: 'JWT access token revoked', jti: claims.jti });
+        return null;
+      }
+
+      return {
+        userId: claims.sub,
+        clientId: claims.client_id,
+        scope: claims.scope || '',
+        resource: claims.resource || this.options.resource,
+        userProfileId: claims.user_profile_id || '',
+        userData: undefined,
+      };
+    } else {
+      // Validate opaque access token
+      const metadata = await this.store.getAccessToken(token);
+
+      if (!metadata) {
+        this.logger.debug({ msg: 'Access token not found', tokenPrefix: token.substring(0, 8) });
+        return null;
+      }
+
+      if (metadata.expiresAt < new Date()) {
+        this.logger.debug({
+          msg: 'Access token expired',
+          tokenPrefix: token.substring(0, 8),
+          expiredAt: metadata.expiresAt,
+        });
+        await this.store.removeAccessToken(token);
+        return null;
+      }
+
+      return {
+        userId: metadata.userId,
+        clientId: metadata.clientId,
+        scope: metadata.scope,
+        resource: metadata.resource,
+        userProfileId: metadata.userProfileId,
+        userData: metadata.userData,
+      };
     }
-
-    if (metadata.expiresAt < new Date()) {
-      this.logger.debug({
-        msg: 'Access token expired',
-        tokenPrefix: token.substring(0, 8),
-        expiredAt: metadata.expiresAt,
-      });
-      await this.store.removeAccessToken(token);
-      return null;
-    }
-
-    return {
-      userId: metadata.userId,
-      clientId: metadata.clientId,
-      scope: metadata.scope,
-      resource: metadata.resource,
-      userProfileId: metadata.userProfileId,
-      userData: metadata.userData,
-    };
   }
 
   public async validateRefreshToken(token: string): Promise<RefreshTokenMetadata | null> {

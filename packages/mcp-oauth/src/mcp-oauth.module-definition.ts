@@ -35,15 +35,28 @@ export const mcpOAuthModuleOptionsSchema = z.object({
   // Required JWT Configuration
   hmacSecret: z.string().describe('The secret key for the MCP Server to sign HMAC tokens.'),
 
-  // OIDC JWT Configuration
-  jwtSigningKey: z
-    .string()
-    .describe('The key for signing JWT ID tokens (RS256 or HS256)')
+  // Token Format Configuration
+  accessTokenFormat: z
+    .enum(['opaque', 'jwt'])
+    .prefault('opaque')
+    .describe('Format for access tokens: opaque (default) or JWT'),
+
+  // ECDSA JWT Configuration
+  jwtSigningKeyProvider: z
+    .function({
+      input: [],
+      output: z.promise(
+        z.object({
+          privateKey: z.string().describe('PEM-encoded ECDSA private key'),
+          publicKey: z.string().describe('PEM-encoded ECDSA public key'),
+          keyId: z.string().describe('Unique key identifier for JWKS'),
+          algorithm: z.enum(['ES256', 'ES384', 'ES512']).describe('ECDSA algorithm'),
+        }),
+      ),
+    })
+    .describe('Async function to retrieve ECDSA signing keys for JWT tokens')
     .optional(),
-  jwtSigningAlgorithm: z
-    .enum(['RS256', 'HS256'])
-    .prefault('HS256')
-    .describe('Algorithm for signing JWT ID tokens'),
+
   idTokenExpiresIn: z
     .number()
     .prefault(3600)
@@ -126,7 +139,7 @@ export const mcpOAuthModuleOptionsSchema = z.object({
       dpopSigningAlgValuesSupported: z.array(z.string()).optional(),
 
       // OIDC specific metadata
-      idTokenSigningAlgValuesSupported: z.array(z.string()).prefault(['HS256', 'RS256']),
+      idTokenSigningAlgValuesSupported: z.array(z.string()).prefault(['ES256', 'ES384', 'ES512']),
       subjectTypesSupported: z.array(z.string()).prefault(['public']),
       userInfoEndpoint: z.url().optional(),
     })

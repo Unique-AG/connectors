@@ -43,12 +43,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/callback" element={<CallbackPage />} />
-            <Route
-              path="/"
-              element={
-                <Navigate to="/dashboard" replace />
-              }
-            />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route
               path="/dashboard"
               element={

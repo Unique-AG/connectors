@@ -35,7 +35,8 @@ describe('McpAuthJwtGuard', () => {
       resource: 'http://localhost:3000/mcp',
       clientId: 'test-client',
       clientSecret: 'test-secret',
-      jwtSigningAlgorithm: 'HS256',
+      accessTokenFormat: 'opaque',
+      jwtSigningKeyProvider: vi.fn(),
       idTokenExpiresIn: 3600,
       protectedResourceMetadata: {
         scopesSupported: ['offline_access'],

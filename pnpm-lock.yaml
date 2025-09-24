@@ -150,6 +150,9 @@ importers:
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
+      jose:
+        specifier: ^6.1.0
+        version: 6.1.0
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.2
@@ -326,7 +329,7 @@ importers:
         version: link:../../packages/logger
       '@unique-ag/mcp-oauth':
         specifier: workspace:*
-        version: link:../../packages/mcp-oauth
+        version: file:packages/mcp-oauth(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/swagger@11.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(reflect-metadata@0.2.2))(@opentelemetry/api@1.9.0)(nestjs-otel@7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6))(passport@0.7.0)(rxjs@7.8.2)
       '@unique-ag/mcp-server-module':
         specifier: workspace:*
         version: link:../../packages/mcp-server-module
