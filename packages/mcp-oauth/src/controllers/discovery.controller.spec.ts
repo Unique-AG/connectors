@@ -1,5 +1,5 @@
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OAUTH_ENDPOINTS } from '../constants/oauth.constants';
 import {
   MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN,
@@ -22,7 +22,8 @@ describe('DiscoveryController', () => {
       resource: 'https://mcp.example.com',
       clientId: 'test-client',
       clientSecret: 'test-secret',
-      jwtSigningAlgorithm: 'HS256',
+      accessTokenFormat: 'opaque',
+      jwtSigningKeyProvider: vi.fn(),
       idTokenExpiresIn: 3600,
       protectedResourceMetadata: {
         scopesSupported: ['offline_access', 'mcp:read', 'mcp:write'],

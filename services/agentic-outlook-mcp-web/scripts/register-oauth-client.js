@@ -37,7 +37,7 @@ async function registerClient() {
     }
 
     const result = await response.json();
-    
+
     console.log('✅ Client registered successfully!');
     console.log('');
     console.log('Client details:');
@@ -54,7 +54,6 @@ async function registerClient() {
     console.log('');
     console.log('3. Start the development server:');
     console.log('   pnpm dev');
-    
   } catch (error) {
     console.error('❌ Failed to register client:', error.message);
     process.exit(1);

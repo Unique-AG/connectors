@@ -20,6 +20,7 @@ import {
 } from '../mcp-oauth.module-definition';
 import { ClientService } from './client.service';
 import { IDTokenService } from './id-token.service';
+import { JWKSService } from './jwks.service';
 import { PassportUser } from './oauth-strategy.service';
 import { OpaqueTokenService } from './opaque-token.service';
 
@@ -34,6 +35,7 @@ export class McpOAuthService {
     private readonly tokenService: OpaqueTokenService,
     private readonly clientService: ClientService,
     private readonly idTokenService: IDTokenService,
+    private readonly jwksService: JWKSService,
   ) {}
 
   public async processAuthenticationSuccess({
@@ -269,24 +271,28 @@ export class McpOAuthService {
 
     // 5. Generate ID token if openid scope is present (OIDC compliance)
     const scopes = authCode.scope?.split(' ') || [];
-    if (scopes.includes('openid')) {
+    if (scopes.includes('openid') && this.jwksService.isJWTEnabled()) {
       // Fetch user profile for claims if needed
       const userProfile = await this.store.getUserProfileById(authCode.user_profile_id);
-      
-      const idToken = this.idTokenService.generateIDToken({
+
+      const idToken = await this.idTokenService.generateIDToken({
         userId: authCode.user_id,
         clientId: client_id,
         scope: authCode.scope,
-        userProfile: userProfile ? {
-          username: userProfile.username,
-          email: userProfile.email,
-          displayName: userProfile.displayName,
-          avatarUrl: userProfile.avatarUrl,
-        } : undefined,
+        issuer: this.options.serverUrl,
+        expiresIn: this.options.idTokenExpiresIn || 3600,
+        userProfile: userProfile
+          ? {
+              username: userProfile.username,
+              email: userProfile.email,
+              displayName: userProfile.displayName,
+              avatarUrl: userProfile.avatarUrl,
+            }
+          : undefined,
       });
 
       tokenPair.id_token = idToken;
-      
+
       this.logger.debug({
         msg: 'ID token generated for OIDC',
         userId: authCode.user_id,
@@ -343,24 +349,28 @@ export class McpOAuthService {
     // Generate ID token if openid scope is present (OIDC compliance)
     const finalScope = scope || refreshTokenMetadata.scope;
     const scopes = finalScope?.split(' ') || [];
-    if (scopes.includes('openid')) {
+    if (scopes.includes('openid') && this.jwksService.isJWTEnabled()) {
       // Fetch user profile for claims
       const userProfile = await this.store.getUserProfileById(refreshTokenMetadata.userProfileId);
-      
-      const idToken = this.idTokenService.generateIDToken({
+
+      const idToken = await this.idTokenService.generateIDToken({
         userId: refreshTokenMetadata.userId,
         clientId: client_id,
         scope: finalScope,
-        userProfile: userProfile ? {
-          username: userProfile.username,
-          email: userProfile.email,
-          displayName: userProfile.displayName,
-          avatarUrl: userProfile.avatarUrl,
-        } : undefined,
+        issuer: this.options.serverUrl,
+        expiresIn: this.options.idTokenExpiresIn || 3600,
+        userProfile: userProfile
+          ? {
+              username: userProfile.username,
+              email: userProfile.email,
+              displayName: userProfile.displayName,
+              avatarUrl: userProfile.avatarUrl,
+            }
+          : undefined,
       });
 
       tokenPair.id_token = idToken;
-      
+
       this.logger.debug({
         msg: 'ID token generated for refresh request',
         userId: refreshTokenMetadata.userId,
