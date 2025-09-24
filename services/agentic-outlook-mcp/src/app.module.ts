@@ -14,7 +14,7 @@ import { MetricService, OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
-import { AppConfig, AppSettings, validateConfig } from './app-settings.enum';
+import { AppConfig, AppSettings, validateConfig } from './app-settings';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { MicrosoftOAuthProvider } from './auth/microsoft.provider';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
@@ -85,6 +85,16 @@ import { SyncModule } from './sync/sync.module';
         clientId: configService.get(AppSettings.MICROSOFT_CLIENT_ID),
         clientSecret: configService.get(AppSettings.MICROSOFT_CLIENT_SECRET),
         hmacSecret: configService.get(AppSettings.HMAC_SECRET),
+
+        accessTokenFormat: 'jwt',
+        jwtSigningKeyProvider: async () => {
+          return {
+            privateKey: configService.get(AppSettings.JWT_PRIVATE_KEY),
+            publicKey: configService.get(AppSettings.JWT_PUBLIC_KEY),
+            keyId: configService.get(AppSettings.JWT_KEY_ID),
+            algorithm: configService.get(AppSettings.JWT_ALGORITHM),
+          };
+        },
 
         serverUrl: configService.get(AppSettings.SELF_URL),
         resource: `${configService.get(AppSettings.SELF_URL)}/mcp`,
