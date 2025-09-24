@@ -36,11 +36,11 @@ export class MockPassportStrategy {
     (this as any).res = req.res;
 
     // Check if this is the initial authorization request or the callback
-    const isCallback = req.url?.includes('/auth/callback') || req.query?.code;
+    const isCallback = req.url?.includes('/oauth/callback') || req.query?.code;
 
     if (!isCallback) {
       // This is the initial authorization - redirect to callback with state
-      const callbackUrl = new URL('/auth/callback', 'http://mock-idp-server.example');
+      const callbackUrl = new URL('/oauth/callback', 'http://mock-idp-server.example');
       if (options.state) callbackUrl.searchParams.set('state', options.state);
       callbackUrl.searchParams.set('code', 'mock-provider-code');
 
