@@ -3,7 +3,7 @@ import type { Drive, DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DEFAULT_MAX_FILE_SIZE_BYTES } from '../constants/defaults.constants';
-import { ModerationStatus } from '../types/sharepoint.types';
+import { ModerationStatus } from './sharepoint.types';
 import { GraphClientFactory } from './graph-client.factory';
 
 @Injectable()

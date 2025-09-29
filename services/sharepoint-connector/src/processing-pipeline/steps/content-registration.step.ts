@@ -6,7 +6,7 @@ import { UniqueApiService } from '../../unique-api/unique-api.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
-import {ContentRegistrationRequest} from "../../unique-api/types/unique-api.types";
+import {ContentRegistrationRequest} from "../../unique-api/unique-api.types";
 
 @Injectable()
 export class ContentRegistrationStep implements IPipelineStep {

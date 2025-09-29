@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { UniqueAuthService } from '../auth/unique-auth.service';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import type { FileDiffItem } from '../unique-api/types/unique-api.types';
+import type { FileDiffItem } from '../unique-api/unique-api.types';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 
 @Injectable()

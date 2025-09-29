@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
 import { DEFAULT_PROCESSING_CONCURRENCY } from '../constants/defaults.constants';
-import type { FileDiffResponse } from '../unique-api/types/unique-api.types';
+import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
 @Injectable()

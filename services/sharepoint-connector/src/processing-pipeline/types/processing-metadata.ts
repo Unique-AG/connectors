@@ -1,4 +1,4 @@
-import type { IngestionApiResponse } from '../../unique-api/types/unique-api.types';
+import type { IngestionApiResponse } from '../../unique-api/unique-api.types';
 
 export interface ProcessingMetadata {
   mimeType?: string;
