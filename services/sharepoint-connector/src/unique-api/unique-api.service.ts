@@ -1,9 +1,9 @@
-import {Inject, Injectable, Logger} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
-import {GraphQLClient} from 'graphql-request';
-import {Client} from 'undici';
-import {UNIQUE_HTTP_CLIENT} from '../http-client.tokens';
+import { GraphQLClient } from 'graphql-request';
+import { Client } from 'undici';
+import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
 import {
   type ContentRegistrationRequest,
   type FileDiffItem,
@@ -68,7 +68,7 @@ export class UniqueApiService {
   ): Promise<FileDiffResponse> {
     return await this.makeRateLimitedRequest(async () => {
       const ingestionUrl = this.configService.get<string>('uniqueApi.ingestionUrl') ?? '';
-      const fileDiffUrl = `${ ingestionUrl }/file-diff`;
+      const fileDiffUrl = `${ingestionUrl}/file-diff`;
       const scopeId = this.configService.get<string>('uniqueApi.scopeId') ?? 'unknown-scope';
       const basePath =
         this.configService.get<string>('uniqueApi.fileDiffBasePath') ??
@@ -93,7 +93,7 @@ export class UniqueApiService {
           path,
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${ uniqueToken }`,
+            Authorization: `Bearer ${uniqueToken}`,
           },
           body: JSON.stringify(diffRequest),
         });
@@ -102,8 +102,8 @@ export class UniqueApiService {
         if (statusCode < 200 || statusCode >= 300) {
           const errorText = await body.text().catch(() => 'No response body');
           throw new Error(
-            `File diff request failed with status ${ statusCode }. ` +
-            `URL: ${ fileDiffUrl }, Response: ${ errorText }`,
+            `File diff request failed with status ${statusCode}. ` +
+              `URL: ${fileDiffUrl}, Response: ${errorText}`,
           );
         }
 
@@ -184,7 +184,7 @@ export class UniqueApiService {
     return new GraphQLClient(graphqlUrl, {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${ uniqueToken }`,
+        Authorization: `Bearer ${uniqueToken}`,
       },
     });
   }

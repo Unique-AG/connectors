@@ -1,12 +1,81 @@
-import { Context, Middleware } from '@microsoft/microsoft-graph-client';
+import {
+  Context,
+  GraphClientError,
+  GraphError,
+  Middleware,
+} from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
+import { GraphApiErrorResponse, isGraphApiError } from './sharepoint.types';
 
-/**
- * Metrics middleware for Microsoft Graph requests
- */
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
   private nextMiddleware: Middleware | undefined;
+
+  public async execute(context: Context): Promise<void> {
+    if (!this.nextMiddleware) throw new Error('Next middleware not set');
+
+    const endpoint = this.extractEndpoint(context.request);
+    const method = this.extractMethod(context.options);
+    const startTime = Date.now();
+
+    try {
+      await this.nextMiddleware.execute(context);
+
+      const duration = Date.now() - startTime;
+      const statusCode = context.response?.status || 0;
+      const statusClass = this.getStatusClass(statusCode);
+
+      this.logger.debug({
+        msg: 'SharePoint Graph API request completed',
+        endpoint,
+        method,
+        statusCode,
+        statusClass,
+        duration,
+      });
+
+      if (this.isThrottled(context.response)) {
+        const policy = this.getThrottlePolicy(context.response);
+
+        this.logger.warn({
+          msg: 'SharePoint Graph API request throttled',
+          endpoint,
+          method,
+          statusCode,
+          policy,
+          duration,
+        });
+      }
+
+      if (duration > 5000) {
+        this.logger.warn({
+          msg: 'Slow SharePoint Graph API request detected',
+          endpoint,
+          method,
+          duration,
+          statusCode,
+        });
+      }
+    } catch (error) {
+      const duration = Date.now() - startTime;
+
+      const errorDetails = this.extractGraphErrorDetails(error);
+
+      this.logger.error({
+        msg: 'SharePoint Graph API request failed',
+        endpoint,
+        method,
+        duration,
+        error: errorDetails,
+      });
+
+      throw error;
+    }
+  }
+
+  public setNext(next: Middleware): void {
+    this.nextMiddleware = next;
+  }
 
   private extractEndpoint(request: RequestInfo): string {
     try {
@@ -64,103 +133,65 @@ export class MetricsMiddleware implements Middleware {
 
   private extractGraphErrorDetails(error: unknown): Record<string, unknown> {
     const details: Record<string, unknown> = {};
-  
+
     if (error instanceof Error) {
       details.message = error.message;
       details.name = error.name;
       details.stack = error.stack;
     }
-  
-    const graphError = error as Record<string, any>;
-  
-    const fields = ['statusCode', 'code', 'body', 'requestId', 'innerError'];
-    fields.forEach((field) => {
-      if (graphError[field] !== undefined) {
-        details[field] = graphError[field];
-      }
-    });
-  
-    const response = graphError?.response;
-    if (response) {
-      details.httpStatus = response.status;
-      try {
-        if (response.headers?.entries) {
-          details.headers = Object.fromEntries(response.headers.entries());
-        } else if (response.headers) {
-          details.headers = response.headers;
+
+    if (error instanceof GraphError) {
+      return {
+        ...details,
+        statusCode: error.statusCode,
+        code: error.code,
+        body: error.body,
+        requestId: error.requestId,
+        date: error.date,
+        headers: this.extractHeadersSafely(error.headers),
+      };
+    }
+
+    if (error instanceof GraphClientError && error.customError) {
+      return { ...details, customError: error.customError };
+    }
+
+    if (isGraphApiError(error)) {
+      const fields: (keyof GraphApiErrorResponse)[] = [
+        'statusCode',
+        'code',
+        'body',
+        'requestId',
+        'innerError',
+      ];
+
+      fields.forEach((field) => {
+        if (error[field] !== undefined) {
+          details[field] = error[field];
         }
-      } catch {
-        details.headers = response.headers;
+      });
+
+      if (error.response) {
+        Object.assign(details, {
+          httpStatus: error.response.status,
+          headers: this.extractHeadersSafely(error.response.headers),
+        });
       }
     }
-  
+
     return details;
   }
 
-  public async execute(context: Context): Promise<void> {
-    if (!this.nextMiddleware) throw new Error('Next middleware not set');
-
-    const endpoint = this.extractEndpoint(context.request);
-    const method = this.extractMethod(context.options);
-    const startTime = Date.now();
+  private extractHeadersSafely(headers: unknown): unknown {
+    if (!headers) return undefined;
 
     try {
-      await this.nextMiddleware.execute(context);
-
-      const duration = Date.now() - startTime;
-      const statusCode = context.response?.status || 0;
-      const statusClass = this.getStatusClass(statusCode);
-
-      this.logger.debug({
-        msg: 'SharePoint Graph API request completed',
-        endpoint,
-        method,
-        statusCode,
-        statusClass,
-        duration,
-      });
-
-      if (this.isThrottled(context.response)) {
-        const policy = this.getThrottlePolicy(context.response);
-
-        this.logger.warn({
-          msg: 'SharePoint Graph API request throttled',
-          endpoint,
-          method,
-          statusCode,
-          policy,
-          duration,
-        });
+      if (headers instanceof Headers) {
+        return Object.fromEntries(headers.entries());
       }
-
-      if (duration > 5000) {
-        this.logger.warn({
-          msg: 'Slow SharePoint Graph API request detected',
-          endpoint,
-          method,
-          duration,
-          statusCode,
-        });
-      }
-    } catch (error) {
-      const duration = Date.now() - startTime;
-
-      // Extract detailed Graph API error information
-      const errorDetails = this.extractGraphErrorDetails(error);
-
-      this.logger.error({
-        msg: 'SharePoint Graph API request failed',
-        endpoint,
-        method,
-        duration,
-        error: errorDetails,
-      });
-
-      throw error;
+      return headers;
+    } catch {
+      return String(headers);
     }
-  }
-
-  public setNext(next: Middleware): void {
-    this.nextMiddleware = next;
   }
 }

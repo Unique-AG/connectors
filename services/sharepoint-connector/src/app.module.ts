@@ -1,6 +1,6 @@
 import { defaultLoggerOptions } from '@unique-ag/logger';
 import { ProbeModule } from '@unique-ag/probe';
-import { Module, RequestMethod } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';

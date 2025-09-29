@@ -8,9 +8,7 @@ export class UniqueAuthService implements IAuthProvider {
   private cachedToken: string | null = null;
   private tokenExpirationTime: number | null = null;
 
-  public constructor(
-    private readonly configService: ConfigService,
-  ) {}
+  public constructor(private readonly configService: ConfigService) {}
 
   public async getToken(forceRefresh = false): Promise<string> {
     if (!forceRefresh && this.isTokenValid()) {
@@ -64,7 +62,7 @@ export class UniqueAuthService implements IAuthProvider {
 
       // Cache the token and calculate expiration time
       this.cachedToken = tokenData.access_token;
-      this.tokenExpirationTime = Date.now() + (tokenData.expires_in * 1000);
+      this.tokenExpirationTime = Date.now() + tokenData.expires_in * 1000;
 
       this.logger.debug(`Successfully acquired and cached new Zitadel token`);
       return tokenData.access_token;
