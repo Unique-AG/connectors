@@ -1,7 +1,9 @@
+import { defaultLoggerOptions } from '@unique-ag/logger';
 import { ProbeModule } from '@unique-ag/probe';
 import { Module, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { context, trace } from '@opentelemetry/api';
+import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { AppConfig, appConfig } from './app.config';
@@ -25,19 +27,10 @@ import { Redacted } from './utils/redacted';
     }),
     LoggerModule.forRootAsync({
       useFactory(appConfig: AppConfig) {
-        const productionTarget = {
-          target: 'pino/file',
-        };
-        const developmentTarget = {
-          target: 'pino-pretty',
-          options: {
-            ignore: 'trace_flags',
-          },
-        };
-
         return {
+          ...defaultLoggerOptions,
           pinoHttp: {
-            renameContext: appConfig.isDev ? 'caller' : undefined,
+            ...defaultLoggerOptions.pinoHttp,
             level: appConfig.logLevel,
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
@@ -48,24 +41,21 @@ import { Redacted } from './utils/redacted';
               paths: ['req.headers.authorization'],
               censor: (value) => (value instanceof Redacted ? value : new Redacted(value)),
             },
-            transport: appConfig.isDev ? developmentTarget : productionTarget,
           },
-          exclude: [
-            {
-              method: RequestMethod.GET,
-              path: 'probe',
-            },
-            {
-              method: RequestMethod.GET,
-              path: 'metrics',
-            },
-          ],
         };
       },
       inject: [appConfig.KEY],
     }),
     ProbeModule.forRoot({
       VERSION: packageJson.version,
+    }),
+    OpenTelemetryModule.forRoot({
+      metrics: {
+        hostMetrics: true,
+        apiMetrics: {
+          enable: true,
+        },
+      },
     }),
     HttpClientModule,
     SchedulerModule,
