@@ -1,27 +1,26 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { Client } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
 import { UniqueAuthService } from './unique-auth.service';
+
+// Mock fetch globally
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
 
 describe('UniqueAuthService', () => {
   let service: UniqueAuthService;
-  let httpClient: Client;
 
   beforeEach(async () => {
-    httpClient = {
-      request: vi.fn().mockResolvedValue({
-        body: {
-          json: vi.fn().mockResolvedValue({
-            access_token: 'jwt-token',
-            expires_in: 600,
-            token_type: 'Bearer',
-            id_token: 'id',
-          }),
-        },
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        access_token: 'jwt-token',
+        expires_in: 600,
+        token_type: 'Bearer',
+        id_token: 'id',
       }),
-    } as unknown as Client;
+    });
 
     const { unit } = await TestBed.solitary(UniqueAuthService)
       .mock(ConfigService)
@@ -36,8 +35,6 @@ describe('UniqueAuthService', () => {
           return undefined;
         }),
       }))
-      .mock(UNIQUE_HTTP_CLIENT)
-      .impl(() => httpClient)
       .compile();
     service = unit;
   });
@@ -45,5 +42,14 @@ describe('UniqueAuthService', () => {
   it('gets a token from Zitadel', async () => {
     const token = await service.getToken();
     expect(token).toBe('jwt-token');
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://auth.example.com/oauth/token',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/x-www-form-urlencoded',
+        }),
+      })
+    );
   });
 });

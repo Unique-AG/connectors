@@ -1,19 +1,23 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Client } from 'undici';
-import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
 import type { IAuthProvider } from './auth-provider.interface';
 
 @Injectable()
 export class UniqueAuthService implements IAuthProvider {
   private readonly logger = new Logger(this.constructor.name);
+  private cachedToken: string | null = null;
+  private tokenExpirationTime: number | null = null;
 
   public constructor(
     private readonly configService: ConfigService,
-    @Inject(UNIQUE_HTTP_CLIENT) private readonly httpClient: Client,
   ) {}
 
-  public async getToken(_forceRefresh = false): Promise<string> {
+  public async getToken(forceRefresh = false): Promise<string> {
+    if (!forceRefresh && this.isTokenValid()) {
+      this.logger.debug('Using cached Zitadel token');
+      return this.cachedToken as string;
+    }
+
     this.logger.debug('Acquiring new Unique API token from Zitadel...');
     try {
       const oAuthTokenUrl = this.configService.get<string>('uniqueApi.zitadelOAuthTokenUrl') ?? '';
@@ -30,12 +34,8 @@ export class UniqueAuthService implements IAuthProvider {
         grant_type: 'client_credentials',
       });
 
-      const url = new URL(oAuthTokenUrl);
-      const path = url.pathname + url.search;
-
-      const { statusCode, body } = await this.httpClient.request({
+      const response = await fetch(oAuthTokenUrl, {
         method: 'POST',
-        path,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
@@ -43,15 +43,15 @@ export class UniqueAuthService implements IAuthProvider {
         body: params.toString(),
       });
 
-      if (statusCode < 200 || statusCode >= 300) {
-        const errorText = await body.text().catch(() => 'No response body');
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'No response body');
         throw new Error(
-          `Zitadel token request failed with status ${statusCode}. ` +
+          `Zitadel token request failed with status ${response.status}. ` +
             `URL: ${oAuthTokenUrl}, Response: ${errorText}`,
         );
       }
 
-      const tokenData = (await body.json()) as {
+      const tokenData = (await response.json()) as {
         access_token: string;
         expires_in: number;
         token_type: string;
@@ -62,12 +62,24 @@ export class UniqueAuthService implements IAuthProvider {
         throw new Error('Invalid token response: missing access_token');
       }
 
-      this.logger.debug(`Successfully acquired new Zitadel token`);
+      // Cache the token and calculate expiration time
+      this.cachedToken = tokenData.access_token;
+      this.tokenExpirationTime = Date.now() + (tokenData.expires_in * 1000);
+
+      this.logger.debug(`Successfully acquired and cached new Zitadel token`);
       return tokenData.access_token;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error('Failed to acquire Unique API token from Zitadel:', errorMessage);
       throw error;
     }
+  }
+
+  private isTokenValid(): boolean {
+    return (
+      this.cachedToken !== null &&
+      this.tokenExpirationTime !== null &&
+      Date.now() < this.tokenExpirationTime
+    );
   }
 }

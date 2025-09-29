@@ -6,6 +6,7 @@ import { UniqueApiService } from '../../unique-api/unique-api.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
+import {ContentRegistrationRequest} from "../../unique-api/types/unique-api.types";
 
 @Injectable()
 export class ContentRegistrationStep implements IPipelineStep {
@@ -26,7 +27,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       );
       const uniqueToken = await this.uniqueAuthService.getToken();
       const fileKey = this.generateFileKey(context);
-      const registrationRequest = {
+      const registrationRequest: ContentRegistrationRequest = {
         key: fileKey,
         mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
         ownerType: 'SCOPE',
@@ -34,7 +35,7 @@ export class ContentRegistrationStep implements IPipelineStep {
         sourceOwnerType: 'USER',
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         sourceName: this.extractSiteName(context.siteUrl),
-      } as const;
+      };
 
       this.logger.debug(`[${context.correlationId}] Registering content with key: ${fileKey}`);
       const registrationResponse = await this.uniqueApiService.registerContent(
