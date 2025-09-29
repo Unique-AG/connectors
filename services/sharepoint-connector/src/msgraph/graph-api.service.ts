@@ -2,21 +2,25 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import type { Drive, DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DEFAULT_MAX_FILE_SIZE_BYTES } from '../constants/defaults.constants';
+import {
+  DEFAULT_DOWNLOAD_LOG_INTERVAL_BYTES,
+  DEFAULT_MAX_FILE_SIZE_BYTES,
+} from '../constants/defaults.constants';
+import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
-import { ModerationStatus } from './sharepoint.types';
 
 @Injectable()
 export class GraphApiService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly graphClient: Client;
 
-  // 🔧 TEST LIMIT - Remove after testing
+  // TODO FOR TESTING - TEST LIMIT - Remove after testing
   private readonly TEST_SCAN_LIMIT = 10;
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly configService: ConfigService,
+    private readonly fileFilterService: FileFilterService,
   ) {
     this.graphClient = this.graphClientFactory.createClient();
   }
@@ -89,7 +93,6 @@ export class GraphApiService {
 
       let url = `/drives/${driveId}/items/${itemId}/children`;
 
-      // Handle pagination - Graph SDK .get() only returns first page
       while (url) {
         const response = await this.graphClient
           .api(url)
@@ -110,20 +113,18 @@ export class GraphApiService {
           }
 
           if (driveItem.folder && driveItem.id) {
-            // Recursively fetch files from subfolders
-            if (syncableFiles.length > 0) return syncableFiles; // TODO REMOVE THIS TEST LINE
+            if (syncableFiles.length > 0) return syncableFiles; // TODO FOR TESTING - REMOVE THIS TEST LINE
             const filesInSubfolder = await this.recursivelyFetchSyncableFiles(
               driveId,
               driveItem.id,
             );
             syncableFiles.push(...filesInSubfolder);
           } else if (driveItem.file) {
-            if (this.isFileSyncable(driveItem)) {
+            if (this.fileFilterService.isFileSyncable(driveItem)) {
               syncableFiles.push(driveItem);
             }
           }
         }
-        // Handle pagination - check for @odata.nextLink
         url = response['@odata.nextLink'] ? response['@odata.nextLink'] : '';
       }
 
@@ -135,35 +136,6 @@ export class GraphApiService {
       this.logger.error(`Failed to fetch items for drive ${driveId}, item ${itemId}:`, error);
       throw error;
     }
-  }
-
-  private isFileSyncable(item: DriveItem): boolean {
-    const syncColumnName = this.configService.get<string>('sharepoint.syncColumnName') ?? '';
-    const allowedMimeTypes = this.configService.get<string[]>('sharepoint.allowedMimeTypes') ?? [];
-    const fields = item.listItem?.fields as Record<string, unknown> | undefined;
-
-    if (!fields) {
-      this.logger.debug(`File ${item.name} has no listItem fields, skipping`);
-      return false;
-    }
-
-    const hasSyncFlag = (fields as Record<string, unknown>)[syncColumnName] === true;
-    const moderation = (fields as Record<string, unknown>).OData__ModerationStatus as
-      | ModerationStatus
-      | undefined;
-    const isApproved = moderation === ModerationStatus.Approved;
-    const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
-
-    // hasSyncFlag && && isApproved
-    const syncable = Boolean(isAllowedMimeType);
-
-    if (!syncable) {
-      this.logger.debug(
-        `File ${item.name} not syncable - syncFlag: ${hasSyncFlag}, approved: ${isApproved}, allowedMimeType: ${isAllowedMimeType}`,
-      );
-    }
-
-    return syncable;
   }
 
   public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
@@ -185,7 +157,6 @@ export class GraphApiService {
         totalSize += bufferChunk.length;
 
         if (totalSize > maxFileSizeBytes) {
-          // Cancel the stream by getting a reader and cancelling it
           const reader = stream.getReader();
           await reader.cancel();
           reader.releaseLock();
@@ -194,7 +165,7 @@ export class GraphApiService {
 
         chunks.push(bufferChunk);
 
-        if (totalSize - lastLog > 1_000_000) {
+        if (totalSize - lastLog > DEFAULT_DOWNLOAD_LOG_INTERVAL_BYTES) {
           lastLog = totalSize;
           this.logger.log(`Downloaded ${Math.round(totalSize / 1024 / 1024)} MB so far...`);
         }
