@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { request } from 'undici';
 import type { IAuthProvider } from './auth-provider.interface';
 
 @Injectable()
@@ -34,7 +35,7 @@ export class UniqueAuthService implements IAuthProvider {
         grant_type: 'client_credentials',
       });
 
-      const response = await fetch(oAuthTokenUrl, {
+      const { statusCode, body } = await request(oAuthTokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -43,15 +44,15 @@ export class UniqueAuthService implements IAuthProvider {
         body: params.toString(),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'No response body');
+      if (statusCode < 200 || statusCode >= 300) {
+        const errorText = await body.text().catch(() => 'No response body');
         throw new Error(
-          `Zitadel token request failed with status ${response.status}. ` +
+          `Zitadel token request failed with status ${statusCode}. ` +
             `URL: ${oAuthTokenUrl}, Response: ${errorText}`,
         );
       }
 
-      const tokenData = (await response.json()) as {
+      const tokenData = (await body.json()) as {
         access_token: string;
         expires_in: number;
         token_type: string;
