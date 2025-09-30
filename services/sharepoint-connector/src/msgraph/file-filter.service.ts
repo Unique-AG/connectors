@@ -10,8 +10,8 @@ export class FileFilterService {
   public constructor(private readonly configService: ConfigService) {}
 
   public isFileSyncable(item: DriveItem): boolean {
-    const syncColumnName = this.configService.get<string>('sharepoint.syncColumnName') ?? '';
-    const allowedMimeTypes = this.configService.get<string[]>('sharepoint.allowedMimeTypes') ?? [];
+    const syncColumnName = this.configService.get<string>('sharepoint.syncColumnName') as string;
+    const allowedMimeTypes = this.configService.get<string[]>('sharepoint.allowedMimeTypes') as string[];
     const fields = item.listItem?.fields as Record<string, unknown> | undefined;
 
     if (!fields) {
@@ -39,10 +39,10 @@ export class FileFilterService {
   }
 
   public getAllowedMimeTypes(): string[] {
-    return this.configService.get<string[]>('sharepoint.allowedMimeTypes') ?? [];
+    return this.configService.get<string[]>('sharepoint.allowedMimeTypes') as string[];
   }
 
   public getSyncColumnName(): string {
-    return this.configService.get<string>('sharepoint.syncColumnName') ?? '';
+    return this.configService.get<string>('sharepoint.syncColumnName') as string;
   }
 }

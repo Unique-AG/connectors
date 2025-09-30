@@ -67,14 +67,11 @@ export class UniqueApiService {
     uniqueToken: string,
   ): Promise<FileDiffResponse> {
     return await this.makeRateLimitedRequest(async () => {
-      const ingestionUrl = this.configService.get<string>('uniqueApi.ingestionUrl') ?? '';
+      const ingestionUrl = this.configService.get<string>('uniqueApi.ingestionUrl') as string;
       const fileDiffUrl = `${ingestionUrl}/file-diff`;
-      const scopeId = this.configService.get<string>('uniqueApi.scopeId') ?? 'unknown-scope';
-      const basePath =
-        this.configService.get<string>('uniqueApi.fileDiffBasePath') ??
-        'https://next.qa.unique.app/';
-      const partialKey =
-        this.configService.get<string>('uniqueApi.fileDiffPartialKey') ?? 'sharepoint/default';
+      const scopeId = this.configService.get<string>('uniqueApi.scopeId') as string;
+      const basePath = this.configService.get<string>('uniqueApi.fileDiffBasePath') as string;
+      const partialKey = this.configService.get<string>('uniqueApi.fileDiffPartialKey') as string;
 
       const diffRequest: FileDiffRequest = {
         basePath,
@@ -180,7 +177,7 @@ export class UniqueApiService {
   }
 
   private createGraphqlClient(uniqueToken: string): GraphQLClient {
-    const graphqlUrl = this.configService.get<string>('uniqueApi.ingestionGraphQLUrl') ?? '';
+    const graphqlUrl = this.configService.get<string>('uniqueApi.ingestionGraphQLUrl') as string;
     return new GraphQLClient(graphqlUrl, {
       headers: {
         'Content-Type': 'application/json',

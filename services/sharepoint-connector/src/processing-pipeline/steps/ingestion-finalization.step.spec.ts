@@ -35,11 +35,17 @@ describe('IngestionFinalizationStep', () => {
       startTime: new Date(),
       metadata: {
         registration: {
+          id: 'reg-id',
           key: 'k',
+          byteSize: 10,
           mimeType: 'application/pdf',
           ownerType: 'SCOPE',
-          byteSize: 10,
+          ownerId: 'owner-id',
+          writeUrl: 'https://write',
           readUrl: 'https://read',
+          createdAt: '2023-01-01T00:00:00Z',
+          internallyStoredAt: null,
+          source: 'M365',
         },
       },
     };

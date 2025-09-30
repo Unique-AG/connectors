@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DEFAULT_STEP_TIMEOUT_SECONDS } from '../constants/defaults.constants';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
 import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
@@ -30,8 +29,7 @@ export class ProcessingPipelineService {
       this.ingestionFinalizationStep,
     ];
     this.stepTimeoutMs =
-      (this.configService.get<number>('pipeline.stepTimeoutSeconds') ??
-        DEFAULT_STEP_TIMEOUT_SECONDS) * 1000;
+      (this.configService.get<number>('pipeline.stepTimeoutSeconds') as number) * 1000;
   }
 
   public async processFile(file: DriveItem): Promise<PipelineResult> {

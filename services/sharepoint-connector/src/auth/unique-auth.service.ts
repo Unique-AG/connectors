@@ -18,12 +18,10 @@ export class UniqueAuthService implements IAuthProvider {
 
     this.logger.debug('Acquiring new Unique API token from Zitadel...');
     try {
-      const oAuthTokenUrl = this.configService.get<string>('uniqueApi.zitadelOAuthTokenUrl') ?? '';
-      const clientId = this.configService.get<string>('uniqueApi.zitadelClientId') ?? '';
-      const clientSecret = this.configService.get<string>('uniqueApi.zitadelClientSecret') ?? '';
-      const projectId = (
-        this.configService.get<string>('uniqueApi.zitadelProjectId') ?? ''
-      ).replace(/\D/g, '');
+      const oAuthTokenUrl = this.configService.get<string>('uniqueApi.zitadelOAuthTokenUrl') as string;
+      const clientId = this.configService.get<string>('uniqueApi.zitadelClientId') as string;
+      const clientSecret = this.configService.get<string>('uniqueApi.zitadelClientSecret') as string;
+      const projectId = (this.configService.get<string>('uniqueApi.zitadelProjectId') as string);
 
       const params = new URLSearchParams({
         scope:

@@ -26,9 +26,9 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
   private cachedToken: CachedToken | null = null;
 
   public constructor(private readonly configService: ConfigService) {
-    const tenantId = this.configService.get<string>('sharepoint.tenantId') ?? '';
-    const clientId = this.configService.get<string>('sharepoint.clientId', '');
-    const clientSecret = this.configService.get<string>('sharepoint.clientSecret', '');
+    const tenantId = this.configService.get<string>('sharepoint.tenantId') as string;
+    const clientId = this.configService.get<string>('sharepoint.clientId') as string;
+    const clientSecret = this.configService.get<string>('sharepoint.clientSecret') as string;
 
     if (!tenantId || !clientId || !clientSecret) {
       throw new Error(

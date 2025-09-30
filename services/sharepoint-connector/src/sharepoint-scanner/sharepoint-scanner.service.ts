@@ -21,7 +21,7 @@ export class SharepointScannerService {
 
   public async scanForWork(): Promise<void> {
     const scanStartTime = Date.now();
-    const sitesToScan = this.configService.get<string[]>('sharepoint.sites') ?? [];
+    const sitesToScan = this.configService.get<string[]>('sharepoint.sites') as string[];
 
     if (sitesToScan.length === 0) {
       this.logger.warn(

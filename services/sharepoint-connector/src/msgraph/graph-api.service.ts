@@ -2,7 +2,6 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import type { Drive, DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DEFAULT_MAX_FILE_SIZE_BYTES } from '../constants/defaults.constants';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 
@@ -44,8 +43,7 @@ export class GraphApiService {
 
   public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
     this.logger.debug(`Downloading file content for item ${itemId} from drive ${driveId}`);
-    const maxFileSizeBytes =
-      this.configService.get<number>('pipeline.maxFileSizeBytes') ?? DEFAULT_MAX_FILE_SIZE_BYTES;
+    const maxFileSizeBytes = this.configService.get<number>('pipeline.maxFileSizeBytes') as number;
 
     try {
       const stream: ReadableStream = await this.graphClient

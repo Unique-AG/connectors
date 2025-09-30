@@ -35,7 +35,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
         mimeType: registrationResponse.mimeType,
         ownerType: registrationResponse.ownerType,
         byteSize: registrationResponse.byteSize,
-        scopeId: this.configService.get<string>('uniqueApi.scopeId') ?? 'unknown-scope',
+        scopeId: this.configService.get<string>('uniqueApi.scopeId') as string,
         sourceOwnerType: 'USER',
         sourceName: this.extractSiteName(context.siteUrl),
         sourceKind: 'MICROSOFT_365_SHAREPOINT',

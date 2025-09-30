@@ -31,7 +31,7 @@ export class ContentRegistrationStep implements IPipelineStep {
         key: fileKey,
         mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
         ownerType: 'SCOPE',
-        scopeId: this.configService.get<string>('uniqueApi.scopeId') ?? 'unknown-scope',
+        scopeId: this.configService.get<string>('uniqueApi.scopeId') as string,
         sourceOwnerType: 'USER',
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         sourceName: this.extractSiteName(context.siteUrl),
