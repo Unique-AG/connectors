@@ -102,7 +102,6 @@ export class GraphApiService {
 
       for (const driveItem of allItems) {
         if (this.isFolder(driveItem)) {
-          if (syncableFiles.length > 0) return syncableFiles; // TODO FOR TESTING - REMOVE THIS TEST LINE
           const filesInSubfolder = await this.recursivelyFetchSyncableFiles(driveId, driveItem.id);
           syncableFiles.push(...filesInSubfolder);
         } else if (this.isFile(driveItem)) {

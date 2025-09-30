@@ -2,6 +2,7 @@ import { NullableOption } from '@microsoft/microsoft-graph-types';
 
 export interface ContentRegistrationRequest {
   key: string;
+  title: string;
   mimeType: string;
   ownerType: string;
   scopeId: string;
@@ -28,6 +29,7 @@ export interface ContentRegistrationResponse {
 
 export interface IngestionFinalizationRequest {
   key: string;
+  title: string;
   mimeType: string;
   ownerType: string;
   byteSize: number;

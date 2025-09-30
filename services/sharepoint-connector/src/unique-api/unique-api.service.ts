@@ -35,6 +35,7 @@ export class UniqueApiService {
         const variables = {
           input: {
             key: request.key,
+            title: request.title,
             mimeType: request.mimeType,
             ownerType: this.mapOwnerType(request.ownerType),
           },
@@ -95,7 +96,6 @@ export class UniqueApiService {
           body: JSON.stringify(diffRequest),
         });
 
-        // Check for HTTP error status codes
         if (statusCode < 200 || statusCode >= 300) {
           const errorText = await body.text().catch(() => 'No response body');
           throw new Error(
@@ -127,6 +127,7 @@ export class UniqueApiService {
         const variables = {
           input: {
             key: request.key,
+            title: request.title,
             mimeType: request.mimeType,
             ownerType: this.mapOwnerType(request.ownerType),
             byteSize: request.byteSize,
@@ -209,6 +210,7 @@ export class UniqueApiService {
     ) {
     id
     key
+    title
     byteSize
     mimeType
     ownerType

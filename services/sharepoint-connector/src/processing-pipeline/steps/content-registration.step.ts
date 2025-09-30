@@ -29,6 +29,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       const fileKey = this.generateFileKey(context);
       const registrationRequest: ContentRegistrationRequest = {
         key: fileKey,
+        title: context.fileName,
         mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
         ownerType: 'SCOPE',
         scopeId: this.configService.get<string>('uniqueApi.scopeId') as string,

@@ -32,6 +32,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
       }
       const finalizationRequest = {
         key: registrationResponse.key,
+        title: context.fileName,
         mimeType: registrationResponse.mimeType,
         ownerType: registrationResponse.ownerType,
         byteSize: registrationResponse.byteSize,
