@@ -1,15 +1,5 @@
-import {
-  BarChart3,
-  ChevronLeft,
-  ChevronRight,
-  FolderTree,
-  LogOut,
-  Mail,
-  Settings,
-  Users,
-  Waves,
-} from 'lucide-react';
-import { useState } from 'react';
+import { BarChart3, FolderTree, LogOut, Settings, Users, Waves } from 'lucide-react';
+import { useAuth } from 'react-oidc-context';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +15,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { useAuth } from '@/contexts/AuthContext';
 
 const navigationItems = [
   {
@@ -57,7 +46,7 @@ const navigationItems = [
 export const AppSidebar = () => {
   const { state } = useSidebar();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, signoutRedirect } = useAuth();
   const collapsed = state === 'collapsed';
 
   const isActive = (path: string) => location.pathname === path;
@@ -113,17 +102,17 @@ export const AppSidebar = () => {
             <div className="p-3 bg-muted rounded-lg group-data-[collapsible=icon]:hidden">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
-                  {user.name.charAt(0).toUpperCase()}
+                  {user.profile.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{user.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{user.email}</div>
+                  <div className="text-sm font-medium truncate">{user.profile.name}</div>
+                  <div className="text-xs text-muted-foreground truncate">{user.profile.email}</div>
                 </div>
               </div>
             </div>
           )}
           <Button
-            onClick={logout}
+            onClick={() => void signoutRedirect()}
             variant="outline"
             className="w-full justify-start group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 transition-all duration-200"
           >
