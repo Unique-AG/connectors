@@ -26,7 +26,7 @@ async function bootstrap() {
 
   const port = configService.get('app.port', { infer: true });
   await app.listen(port);
-  console.log(`Server is running on http://localhost:${port}`);
+  logger.log(`Server is running on http://localhost:${port}`);
 }
 
 initOpenTelemetry({
