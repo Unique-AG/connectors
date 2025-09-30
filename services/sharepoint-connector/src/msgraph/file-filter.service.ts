@@ -26,8 +26,8 @@ export class FileFilterService {
     const isApproved = moderation === ModerationStatus.Approved;
     const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
 
-    // TODO FOR TESTING - Removed: hasSyncFlag && && isApproved
-    const syncable = Boolean(isAllowedMimeType);
+    // && isApproved
+    const syncable = Boolean(hasSyncFlag && isAllowedMimeType);
 
     if (!syncable) {
       this.logger.debug(
