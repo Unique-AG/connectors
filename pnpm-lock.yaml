@@ -632,6 +632,9 @@ importers:
       '@microsoft/microsoft-graph-client':
         specifier: ^3.0.7
         version: 3.0.7
+      '@microsoft/microsoft-graph-types':
+        specifier: ^2.40.0
+        version: 2.40.0
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -692,6 +695,9 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+      serialize-error-cjs:
+        specifier: ^0.2.0
+        version: 0.2.0
       undici:
         specifier: ^7.15.0
         version: 7.16.0
