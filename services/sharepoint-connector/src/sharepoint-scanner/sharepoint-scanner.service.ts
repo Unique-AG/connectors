@@ -10,6 +10,7 @@ import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.ty
 @Injectable()
 export class SharepointScannerService {
   private readonly logger = new Logger(this.constructor.name);
+  private isScanning = false;
 
   public constructor(
     private readonly configService: ConfigService,
@@ -19,18 +20,19 @@ export class SharepointScannerService {
     private readonly uniqueApiService: UniqueApiService,
   ) {}
 
-  public async runSync(): Promise<void> {
-    const scanStartTime = Date.now();
-    const sitesToScan = this.configService.get<string[]>('sharepoint.sites') as string[];
-
-    if (sitesToScan.length === 0) {
+  public async synchronize(): Promise<void> {
+    if (this.isScanning) {
       this.logger.warn(
-        'No SharePoint sites configured for scanning. Please check your configuration.',
+        'Skipping scan - previous scan is still in progress. This prevents overlapping scans.',
       );
       return;
     }
 
+    this.isScanning = true;
+    const scanStartTime = Date.now();
+
     try {
+      const sitesToScan = this.configService.get<string[]>('sharepoint.sites') as string[];
       this.logger.log(`Starting scan of ${sitesToScan.length} SharePoint sites...`);
 
       for (const siteId of sitesToScan) {
@@ -63,6 +65,8 @@ export class SharepointScannerService {
         'Failed to complete SharePoint scan:',
         error instanceof Error ? error.stack : String(error),
       );
+    } finally {
+      this.isScanning = false;
     }
   }
 

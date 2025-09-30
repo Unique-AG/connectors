@@ -5,13 +5,13 @@ import { SchedulerService } from './scheduler.service';
 
 describe('SchedulerService', () => {
   it('triggers scan', async () => {
-    const runSyncMock = vi.fn().mockResolvedValue(undefined);
+    const synchronizeMock = vi.fn().mockResolvedValue(undefined);
     const { unit } = await TestBed.solitary(SchedulerService)
       .mock(SharepointScannerService)
-      .impl(() => ({ runSync: runSyncMock }))
+      .impl(() => ({ synchronize: synchronizeMock }))
       .compile();
     const svc = unit;
     await svc.runScheduledScan();
-    expect(runSyncMock).toHaveBeenCalledTimes(1);
+    expect(synchronizeMock).toHaveBeenCalledTimes(1);
   });
 });

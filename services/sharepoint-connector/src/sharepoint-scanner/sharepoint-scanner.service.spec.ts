@@ -53,10 +53,27 @@ describe('SharepointScannerService', () => {
   });
 
   it('scans and triggers processing', async () => {
-    await service.runSync();
+    await service.synchronize();
     expect(
       (orchestrator.processFilesForSite as MockedFunction<typeof orchestrator.processFilesForSite>)
         .mock.calls.length,
     ).toBe(1);
+  });
+
+  it('prevents overlapping scans', async () => {
+    const mockProcessFiles = orchestrator.processFilesForSite as MockedFunction<
+      typeof orchestrator.processFilesForSite
+    >;
+
+    mockProcessFiles.mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 100)),
+    );
+
+    const scan1 = service.synchronize();
+    const scan2 = service.synchronize();
+
+    await Promise.all([scan1, scan2]);
+
+    expect(mockProcessFiles.mock.calls.length).toBe(1);
   });
 });
