@@ -9,7 +9,6 @@
     "build": "nest build",
     "dev": "nest start",
     "debug": "nest start --debug --watch",
-    "codegen": "graphql-codegen --config codegen.ts",
     "db:generate": "echo \"No database for this server\"",
     "db:migrate": "echo \"No database for this server\"",
     "db:push": "echo \"No database for this server\"",
@@ -27,10 +26,6 @@
   },
   "dependencies": {
     "@azure/msal-node": "^3.7.3",
-    "@graphql-codegen/cli": "^5.0.4",
-    "@graphql-codegen/typed-document-node": "^5.0.13",
-    "@graphql-codegen/typescript": "^4.0.0",
-    "@graphql-codegen/typescript-operations": "^4.0.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@microsoft/microsoft-graph-types": "^2.40.0",
     "@nestjs/common": "^11.1.6",
