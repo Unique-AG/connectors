@@ -1,0 +1,48 @@
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: "Name of the MCP server (e.g., factset, outlook)"
+        required: true
+        type: string
+      service-path:
+        description: "Path to the server directory (e.g., services/factset-mcp)"
+        required: true
+        type: string
+      service-tag:
+        description: "The release tag for the package (e.g. factset@v1.2.0)"
+        required: true
+        type: string
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: "package.json"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --filter=${{ inputs.service-name }}
+
+      - name: Build package
+        run: pnpm build --filter=${{ inputs.service-name }}
+
+      - name: Pack package
+        run: pnpm pack --filter=${{ inputs.service-name }} --out=build.tgz
+
+      - name: Upload build artifact
+        run: gh release upload ${{ inputs.service-tag }} build.tgz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
