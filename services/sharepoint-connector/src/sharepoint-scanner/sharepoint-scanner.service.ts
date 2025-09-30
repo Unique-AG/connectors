@@ -19,7 +19,7 @@ export class SharepointScannerService {
     private readonly uniqueApiService: UniqueApiService,
   ) {}
 
-  public async scanForWork(): Promise<void> {
+  public async runSync(): Promise<void> {
     const scanStartTime = Date.now();
     const sitesToScan = this.configService.get<string[]>('sharepoint.sites') as string[];
 

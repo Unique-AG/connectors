@@ -63,7 +63,6 @@ export class UniqueAuthService implements IAuthProvider {
         throw new Error('Invalid token response: missing access_token');
       }
 
-      // Cache the token and calculate expiration time
       this.cachedToken = tokenData.access_token;
       this.tokenExpirationTime = Date.now() + tokenData.expires_in * 1000;
 

@@ -53,7 +53,7 @@ describe('SharepointScannerService', () => {
   });
 
   it('scans and triggers processing', async () => {
-    await service.scanForWork();
+    await service.runSync();
     expect(
       (orchestrator.processFilesForSite as MockedFunction<typeof orchestrator.processFilesForSite>)
         .mock.calls.length,
