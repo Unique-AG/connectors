@@ -81,7 +81,6 @@ export class MetricsMiddleware implements Middleware {
     try {
       const url = typeof request === 'string' ? request : request.url;
       const urlObj = new URL(url);
-      // Remove the base URL and version, keep just the endpoint path
       const endpoint = urlObj.pathname.replace(/^\/v\d+(\.\d+)?/, '');
       return endpoint || '/';
     } catch {

@@ -19,7 +19,7 @@ interface CachedToken {
 }
 
 @Injectable()
-export class GraphAuthenticationProvider implements AuthenticationProvider, OnModuleInit {
+export class GraphAuthenticationProvider implements AuthenticationProvider {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
   private readonly scopes = ['https://graph.microsoft.com/.default'];
@@ -47,20 +47,6 @@ export class GraphAuthenticationProvider implements AuthenticationProvider, OnMo
     this.msalClient = new ConfidentialClientApplication(msalConfig);
   }
 
-  public async onModuleInit(): Promise<void> {
-    // TODO remove this if not necessary after testing
-    try {
-      // await this.getAccessToken();
-      this.logger.log('Microsoft Graph authentication initialized successfully');
-    } catch (error) {
-      this.logger.error({
-        msg: 'Failed to initialize Microsoft Graph authentication',
-        error: serializeError(normalizeError(error)),
-      });
-      throw error;
-    }
-  }
-
   public async getAccessToken(
     _authenticationProviderOptions?: AuthenticationProviderOptions,
   ): Promise<string> {
@@ -68,7 +54,7 @@ export class GraphAuthenticationProvider implements AuthenticationProvider, OnMo
       return this.cachedToken.accessToken;
     }
 
-    this.logger.log('Acquiring new Microsoft Graph API token...');
+    this.logger.debug('Acquiring new Microsoft Graph API token...');
     return await this.acquireNewToken();
   }
 

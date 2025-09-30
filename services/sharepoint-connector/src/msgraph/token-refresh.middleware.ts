@@ -2,10 +2,6 @@ import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { GraphAuthenticationProvider } from './graph-authentication.service';
 
-/**
- * Token refresh middleware for Microsoft Graph requests
- * Handles token expiration
- */
 export class TokenRefreshMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
   private nextMiddleware: Middleware | undefined;
@@ -15,7 +11,6 @@ export class TokenRefreshMiddleware implements Middleware {
   public async execute(context: Context): Promise<void> {
     if (!this.nextMiddleware) throw new Error('Next middleware not set');
 
-    // Execute the request for the first time
     await this.nextMiddleware.execute(context);
 
     const isExpired = await this.isTokenExpiredError(context.response);
@@ -24,8 +19,6 @@ export class TokenRefreshMiddleware implements Middleware {
     this.logger.debug('SharePoint token expired, attempting to refresh...');
 
     try {
-      // Force refresh the token (client credentials flow doesn't have refresh tokens,
-      // but we can get a new access token)
       const newAccessToken = await this.graphAuthenticationProvider.getAccessToken();
       this.logger.debug('Successfully refreshed SharePoint token');
 
@@ -68,11 +61,9 @@ export class TokenRefreshMiddleware implements Middleware {
     if (response?.status !== 401) return false;
 
     try {
-      // Clone the response to read the body without consuming it
       const clonedResponse = response.clone();
       const errorBody = await clonedResponse.json();
 
-      // Check for specific InvalidAuthenticationToken error
       return (
         errorBody?.error?.code === 'InvalidAuthenticationToken' ||
         errorBody?.error?.message?.includes('Lifetime validation failed') ||
@@ -80,7 +71,6 @@ export class TokenRefreshMiddleware implements Middleware {
         errorBody?.error?.message?.includes('Access token has expired')
       );
     } catch {
-      // If we can't parse the body, just check for 401 status
       return response.status === 401;
     }
   }

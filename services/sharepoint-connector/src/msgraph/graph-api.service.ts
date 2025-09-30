@@ -2,10 +2,7 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import type { Drive, DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  DEFAULT_DOWNLOAD_LOG_INTERVAL_BYTES,
-  DEFAULT_MAX_FILE_SIZE_BYTES,
-} from '../constants/defaults.constants';
+import { DEFAULT_MAX_FILE_SIZE_BYTES } from '../constants/defaults.constants';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 
@@ -106,14 +103,9 @@ export class GraphApiService {
       const syncableFiles: DriveItem[] = [];
 
       for (const driveItem of allItems) {
-        this.ensureParentReference(driveItem, driveId);
-
         if (this.isFolder(driveItem)) {
           if (syncableFiles.length > 0) return syncableFiles; // TODO FOR TESTING - REMOVE THIS TEST LINE
-          const filesInSubfolder = await this.recursivelyFetchSyncableFiles(
-            driveId,
-            driveItem.id,
-          );
+          const filesInSubfolder = await this.recursivelyFetchSyncableFiles(driveId, driveItem.id);
           syncableFiles.push(...filesInSubfolder);
         } else if (this.isFile(driveItem)) {
           if (this.fileFilterService.isFileSyncable(driveItem)) {
@@ -161,16 +153,6 @@ export class GraphApiService {
     }
 
     return itemsInFolder;
-  }
-
-  private ensureParentReference(driveItem: DriveItem, driveId: string): void {
-    // TODO: Remove this if it turns out it is not necessary after doing multiple tests
-    if (driveItem.parentReference) {
-      driveItem.parentReference.driveId = driveId;
-    }
-    if (!driveItem.parentReference && driveItem.listItem?.parentReference) {
-      driveItem.parentReference = driveItem.listItem.parentReference;
-    }
   }
 
   private isFolder(driveItem: DriveItem): driveItem is DriveItem & { id: string } {
