@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { ProcessingContext } from '../types/processing-context';
 import { StorageUploadStep } from './storage-upload.step';
 
 vi.mock('undici', () => ({
@@ -8,7 +9,7 @@ vi.mock('undici', () => ({
 describe('StorageUploadStep', () => {
   it('uploads buffer to storage', async () => {
     const step = new StorageUploadStep();
-    const context = {
+    const context: ProcessingContext = {
       correlationId: 'c1',
       fileId: 'f1',
       fileName: 'n',
@@ -19,7 +20,7 @@ describe('StorageUploadStep', () => {
       metadata: { mimeType: 'application/pdf' },
       uploadUrl: 'https://upload.example.com',
       contentBuffer: Buffer.from('data'),
-    } as any;
+    };
     const result = await step.execute(context);
     expect(result.contentBuffer?.length).toBe(4);
   });

@@ -8,7 +8,7 @@ import {
   AuthenticationProvider,
   AuthenticationProviderOptions,
 } from '@microsoft/microsoft-graph-client';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { serializeError } from 'serialize-error-cjs';
 import { normalizeError } from '../utils/normalize-error';

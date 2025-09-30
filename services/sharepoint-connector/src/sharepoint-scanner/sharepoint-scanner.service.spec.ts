@@ -1,3 +1,4 @@
+import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, MockedFunction, vi } from 'vitest';
@@ -21,7 +22,7 @@ describe('SharepointScannerService', () => {
         parentReference: { siteId: 'site-1', driveId: 'drive-1' },
         file: { mimeType: 'application/pdf' },
       },
-    ] as any;
+    ] satisfies DriveItem[];
 
     const { unit, unitRef } = await TestBed.solitary(SharepointScannerService)
       .mock(ConfigService)

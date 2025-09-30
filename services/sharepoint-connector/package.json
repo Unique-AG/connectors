@@ -7,8 +7,7 @@
   "license": "Unique License v1",
   "scripts": {
     "build": "nest build",
-    "dev": "nodemon",
-    "dev:clean": "pkill -f \"nest start\" || true && sleep 1 && nodemon",
+    "dev": "nest start",
     "debug": "nest start --debug --watch",
     "codegen": "graphql-codegen --config codegen.ts",
     "db:generate": "echo \"No database for this server\"",

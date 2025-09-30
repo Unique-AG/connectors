@@ -26,7 +26,7 @@ export class FileFilterService {
     const isApproved = moderation === ModerationStatus.Approved;
     const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
 
-    // && isApproved
+    // TODO moderation status not coming back from graph api && isApproved
     const syncable = Boolean(hasSyncFlag && isAllowedMimeType);
 
     if (!syncable) {

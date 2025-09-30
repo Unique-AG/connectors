@@ -3,6 +3,7 @@ import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UniqueAuthService } from '../../auth/unique-auth.service';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
+import type { ProcessingContext } from '../types/processing-context';
 import { ContentRegistrationStep } from './content-registration.step';
 
 describe('ContentRegistrationStep', () => {
@@ -38,7 +39,7 @@ describe('ContentRegistrationStep', () => {
   });
 
   it('registers content and updates context', async () => {
-    const context = {
+    const context: ProcessingContext = {
       correlationId: 'c1',
       fileId: 'f1',
       fileName: 'n',
@@ -47,7 +48,7 @@ describe('ContentRegistrationStep', () => {
       libraryName: 'lib',
       startTime: new Date(),
       metadata: { siteId: 'site', driveId: 'drive', mimeType: 'application/pdf' },
-    } as any;
+    };
     const result = await step.execute(context);
     expect(result.uploadUrl).toBe('https://upload');
     expect(result.uniqueContentId).toBe('cid');
