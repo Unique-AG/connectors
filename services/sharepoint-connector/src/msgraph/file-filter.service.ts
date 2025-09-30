@@ -11,7 +11,9 @@ export class FileFilterService {
 
   public isFileSyncable(item: DriveItem): boolean {
     const syncColumnName = this.configService.get<string>('sharepoint.syncColumnName') as string;
-    const allowedMimeTypes = this.configService.get<string[]>('sharepoint.allowedMimeTypes') as string[];
+    const allowedMimeTypes = this.configService.get<string[]>(
+      'sharepoint.allowedMimeTypes',
+    ) as string[];
     const fields = item.listItem?.fields as Record<string, unknown> | undefined;
 
     if (!fields) {

@@ -51,7 +51,9 @@ export class ContentFetchingStep implements IPipelineStep {
   }
 
   private validateMimeType(mimeType: string | undefined, correlationId: string): void {
-    const allowedMimeTypes = this.configService.get<string[]>('sharepoint.allowedMimeTypes') as string[];
+    const allowedMimeTypes = this.configService.get<string[]>(
+      'sharepoint.allowedMimeTypes',
+    ) as string[];
     if (!mimeType) {
       throw new Error(`MIME type is missing for this item. Skipping download. [${correlationId}]`);
     }
