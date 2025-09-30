@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from '../auth/auth.module';
 import { MsGraphModule } from '../msgraph/msgraph.module';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
+import { SharePointPathService } from '../utils/sharepoint-path.service';
 import { FileProcessingOrchestratorService } from './file-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -15,11 +16,12 @@ import { StorageUploadStep } from './steps/storage-upload.step';
   providers: [
     ProcessingPipelineService,
     FileProcessingOrchestratorService,
+    SharePointPathService,
     ContentFetchingStep,
     ContentRegistrationStep,
     StorageUploadStep,
     IngestionFinalizationStep,
   ],
-  exports: [ProcessingPipelineService, FileProcessingOrchestratorService],
+  exports: [ProcessingPipelineService, FileProcessingOrchestratorService, SharePointPathService],
 })
 export class ProcessingPipelineModule {}

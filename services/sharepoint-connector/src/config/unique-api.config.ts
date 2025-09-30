@@ -7,7 +7,7 @@ const namespace = 'uniqueApi' as const;
 export const EnvironmentVariables = z.object({
   UNIQUE_INGESTION_URL_GRAPHQL: z.string().url(),
   UNIQUE_INGESTION_URL: z.string().url(),
-  UNIQUE_SCOPE_ID: z.string().min(1),
+  UNIQUE_SCOPE_ID: z.string().min(1).optional(),
   ZITADEL_OAUTH_TOKEN_URL: z.string().url(),
   ZITADEL_PROJECT_ID: z.string().min(1),
   ZITADEL_CLIENT_ID: z.string().min(1),
@@ -20,7 +20,7 @@ export interface Config {
   [namespace]: {
     ingestionGraphQLUrl: string;
     ingestionUrl: string;
-    scopeId: string;
+    scopeId: string | undefined;
     zitadelOAuthTokenUrl: string;
     zitadelProjectId: string;
     zitadelClientId: string;

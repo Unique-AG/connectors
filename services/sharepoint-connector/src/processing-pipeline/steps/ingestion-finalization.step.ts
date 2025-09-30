@@ -30,13 +30,14 @@ export class IngestionFinalizationStep implements IPipelineStep {
           'Registration response not found in context - content registration may have failed',
         );
       }
+      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
       const finalizationRequest = {
         key: registrationResponse.key,
         title: context.fileName,
         mimeType: registrationResponse.mimeType,
         ownerType: registrationResponse.ownerType,
         byteSize: registrationResponse.byteSize,
-        scopeId: this.configService.get<string>('uniqueApi.scopeId') as string,
+        scopeId: scopeId ?? 'PATH',
         sourceOwnerType: 'USER',
         sourceName: this.extractSiteName(context.siteUrl),
         sourceKind: 'MICROSOFT_365_SHAREPOINT',

@@ -6,6 +6,9 @@ export interface ProcessingMetadata {
   listItemFields?: Record<string, unknown>;
   driveId?: string;
   siteId?: string;
+  siteName?: string;
+  driveName?: string;
+  parentPath?: string;
   lastModifiedDateTime?: string;
 
   registration?: IngestionApiResponse;

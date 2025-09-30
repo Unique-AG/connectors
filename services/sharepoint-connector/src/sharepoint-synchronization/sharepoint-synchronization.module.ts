@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module';
 import { MsGraphModule } from '../msgraph/msgraph.module';
 import { ProcessingPipelineModule } from '../processing-pipeline/processing-pipeline.module';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
+import { SharePointPathService } from '../utils/sharepoint-path.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
 @Module({

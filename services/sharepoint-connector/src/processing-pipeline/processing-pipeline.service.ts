@@ -8,6 +8,7 @@ import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
 import type { IPipelineStep } from './steps/pipeline-step.interface';
 import { StorageUploadStep } from './steps/storage-upload.step';
 import type { PipelineResult, ProcessingContext } from './types/processing-context';
+import { SharePointPathService } from '../utils/sharepoint-path.service';
 
 @Injectable()
 export class ProcessingPipelineService {
@@ -17,6 +18,7 @@ export class ProcessingPipelineService {
 
   public constructor(
     private readonly configService: ConfigService,
+    private readonly sharePointPathService: SharePointPathService,
     private readonly contentFetchingStep: ContentFetchingStep,
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly storageUploadStep: StorageUploadStep,
@@ -35,10 +37,12 @@ export class ProcessingPipelineService {
   public async processFile(file: DriveItem): Promise<PipelineResult> {
     const correlationId = randomUUID();
     const startTime = new Date();
+    const parentRef = file.parentReference as Record<string, unknown> | undefined;
     const context: ProcessingContext = {
       correlationId,
       fileId: file.id ?? '',
       fileName: file.name ?? '',
+      fileKey: this.sharePointPathService.generatePathBasedKey(file),
       fileSize: file.size ?? 0,
       siteUrl: file.parentReference?.siteId ?? '',
       libraryName: file.parentReference?.driveId ?? '',
@@ -50,6 +54,9 @@ export class ProcessingPipelineService {
         listItemFields: (file.listItem?.fields as Record<string, unknown>) ?? undefined,
         driveId: file.parentReference?.driveId ?? undefined,
         siteId: file.parentReference?.siteId ?? undefined,
+        siteName: (parentRef?.siteName as string | undefined) ?? undefined,
+        driveName: (parentRef?.name as string | undefined) ?? undefined,
+        parentPath: file.parentReference?.path ?? undefined,
         lastModifiedDateTime: file.lastModifiedDateTime ?? undefined,
       },
     };

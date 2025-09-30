@@ -66,13 +66,20 @@ export class UniqueApiService {
   public async performFileDiff(
     fileList: FileDiffItem[],
     uniqueToken: string,
+    siteName?: string,
   ): Promise<FileDiffResponse> {
     return await this.makeRateLimitedRequest(async () => {
       const ingestionUrl = this.configService.get<string>('uniqueApi.ingestionUrl') as string;
       const fileDiffUrl = `${ingestionUrl}/file-diff`;
-      const scopeId = this.configService.get<string>('uniqueApi.scopeId') as string;
+      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
       const basePath = this.configService.get<string>('uniqueApi.fileDiffBasePath') as string;
-      const partialKey = this.configService.get<string>('uniqueApi.fileDiffPartialKey') as string;
+
+      // Use dynamic partialKey based on site for path-based ingestion
+      // For scope-based ingestion, use the configured partialKey
+      // For path-based ingestion, use site-specific partialKey to create separate directories
+      const partialKey: string = scopeId
+        ? (this.configService.get<string>('uniqueApi.fileDiffPartialKey') as string)
+        : `sharepoint/${siteName ?? 'unknown-site'}`; // path-based: create site-specific directory
 
       const diffRequest: FileDiffRequest = {
         basePath,
@@ -80,7 +87,7 @@ export class UniqueApiService {
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         sourceName: 'SharePoint Online Connector',
         fileList,
-        scope: scopeId,
+        scope: scopeId ?? 'PATH',
       };
 
       try {

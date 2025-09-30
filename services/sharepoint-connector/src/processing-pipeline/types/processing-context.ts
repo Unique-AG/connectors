@@ -15,6 +15,7 @@ export interface ProcessingContext {
   contentBuffer?: Buffer | undefined;
 
   startTime: Date;
+  fileKey?: string;
 
   metadata: ProcessingMetadata;
 }

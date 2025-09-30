@@ -26,19 +26,24 @@ export class ContentRegistrationStep implements IPipelineStep {
         `[${context.correlationId}] Starting content registration for file: ${context.fileName}`,
       );
       const uniqueToken = await this.uniqueAuthService.getToken();
-      const fileKey = this.generateFileKey(context);
+
+      if (!context.fileKey) {
+        throw new Error(`File key not found in processing context for file: ${context.fileName}`);
+      }
+
+      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
       const registrationRequest: ContentRegistrationRequest = {
-        key: fileKey,
+        key: context.fileKey,
         title: context.fileName,
         mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
         ownerType: 'SCOPE',
-        scopeId: this.configService.get<string>('uniqueApi.scopeId') as string,
+        scopeId: scopeId ?? 'PATH',
         sourceOwnerType: 'USER',
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         sourceName: this.extractSiteName(context.siteUrl),
       };
 
-      this.logger.debug(`[${context.correlationId}] Registering content with key: ${fileKey}`);
+      this.logger.debug(`[${context.correlationId}] Registering content with key: ${context.fileKey}`);
       const registrationResponse = await this.uniqueApiService.registerContent(
         registrationRequest,
         uniqueToken,
@@ -55,12 +60,6 @@ export class ContentRegistrationStep implements IPipelineStep {
     }
   }
 
-  private generateFileKey(context: ProcessingContext): string {
-    const meta = context.metadata as Record<string, unknown>;
-    const siteId = (meta.siteId as string | undefined) ?? 'unknown-site';
-    const driveId = (meta.driveId as string | undefined) ?? 'unknown-drive';
-    return `sharepoint_${siteId}_${driveId}_${context.fileId}`;
-  }
 
   private extractSiteName(siteUrl: string): string {
     if (!siteUrl) return 'SharePoint';

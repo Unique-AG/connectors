@@ -34,6 +34,7 @@ export class GraphApiService {
   public async findAllSyncableFilesForSite(siteId: string): Promise<DriveItem[]> {
     this.logger.log(`Starting recursive file scan for site: ${siteId}`);
 
+    const site = await this.getSite(siteId);
     const drives = await this.getDrivesForSite(siteId);
     const allSyncableFiles: DriveItem[] = [];
 
@@ -45,7 +46,17 @@ export class GraphApiService {
 
       this.logger.debug(`Scanning library (drive): ${drive.name} (${drive.id})`);
       const filesInDrive = await this.recursivelyFetchSyncableFiles(drive.id, 'root');
-      allSyncableFiles.push(...filesInDrive);
+      
+      const enrichedFiles = filesInDrive.map((file) => ({
+        ...file,
+        parentReference: {
+          ...file.parentReference,
+          name: drive.name,
+          siteName: site?.displayName ?? site?.name ?? siteId,
+        },
+      }));
+      
+      allSyncableFiles.push(...enrichedFiles);
     }
 
     this.logger.log(
@@ -85,6 +96,21 @@ export class GraphApiService {
     } catch (error) {
       this.logger.error(`Failed to download file content for item ${itemId}:`, error);
       throw error;
+    }
+  }
+
+  private async getSite(siteId: string): Promise<{ displayName?: string; name?: string } | null> {
+    try {
+      this.logger.debug(`Fetching site details: ${siteId}`);
+
+      const site = await this.makeRateLimitedRequest(() =>
+        this.graphClient.api(`/sites/${siteId}`).select(['displayName', 'name']).get(),
+      );
+
+      return site as { displayName?: string; name?: string };
+    } catch (error) {
+      this.logger.warn(`Failed to fetch site details for ${siteId}:`, error);
+      return null;
     }
   }
 
