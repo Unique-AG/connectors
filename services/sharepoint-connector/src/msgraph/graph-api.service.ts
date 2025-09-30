@@ -41,7 +41,7 @@ export class GraphApiService {
       const filesInDrive = await this.recursivelyFetchSyncableFiles(drive.id, 'root');
       allSyncableFiles.push(...filesInDrive);
 
-      // 🔧 TEST LIMIT - Final limit in case we got slightly over
+      // TODO TESTING -  TEST LIMIT - Final limit in case we got slightly over
       if (allSyncableFiles.length > this.TEST_SCAN_LIMIT) {
         this.logger.log(`🔧 TEST MODE: Limiting scan to ${this.TEST_SCAN_LIMIT} files`);
         return allSyncableFiles.slice(0, this.TEST_SCAN_LIMIT);
@@ -58,7 +58,6 @@ export class GraphApiService {
     try {
       this.logger.debug(`Fetching drives for site: ${siteId}`);
 
-      // Use Graph SDK's fluent API with automatic pagination handling
       const drives = await this.graphClient.api(`/sites/${siteId}/drives`).get();
 
       const allDrives = drives?.value || [];

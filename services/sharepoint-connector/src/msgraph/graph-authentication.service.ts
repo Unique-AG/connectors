@@ -22,10 +22,6 @@ interface CachedToken {
 export class GraphAuthenticationProvider implements AuthenticationProvider, OnModuleInit {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
-  // For delegated permissions, use the following scopes:
-  // private readonly scopes = ['https://graph.microsoft.com/Sites.Read.All', 'https://graph.microsoft.com/Files.Read.All'];
-
-  // For application permissions, use the following scopes:
   private readonly scopes = ['https://graph.microsoft.com/.default'];
   private cachedToken: CachedToken | null = null;
 
@@ -52,7 +48,7 @@ export class GraphAuthenticationProvider implements AuthenticationProvider, OnMo
   }
 
   public async onModuleInit(): Promise<void> {
-    // Eagerly acquire token on startup to catch configuration issues early
+    // TODO remove this if not necessary after testing
     try {
       // await this.getAccessToken();
       this.logger.log('Microsoft Graph authentication initialized successfully');
@@ -65,13 +61,9 @@ export class GraphAuthenticationProvider implements AuthenticationProvider, OnMo
     }
   }
 
-  /**
-   * Implementation of AuthenticationProvider interface for Microsoft Graph SDK
-   */
   public async getAccessToken(
     _authenticationProviderOptions?: AuthenticationProviderOptions,
   ): Promise<string> {
-    // Check if we have a valid cached token
     if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
       return this.cachedToken.accessToken;
     }
@@ -125,9 +117,6 @@ export class GraphAuthenticationProvider implements AuthenticationProvider, OnMo
     }
   }
 
-  /**
-   * Clears the cached token, forcing the next getAccessToken() call to acquire a fresh token
-   */
   public clearTokenCache(): void {
     this.logger.debug('Clearing cached Microsoft Graph API token');
     this.cachedToken = null;
