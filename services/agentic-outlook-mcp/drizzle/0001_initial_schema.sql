@@ -122,6 +122,7 @@ CREATE TABLE "emails" (
 CREATE TABLE "folders" (
 	"id" varchar PRIMARY KEY NOT NULL,
 	"name" varchar NOT NULL,
+	"original_name" varchar,
 	"folder_id" varchar NOT NULL,
 	"parent_folder_id" varchar,
 	"child_folder_count" integer DEFAULT 0 NOT NULL,
@@ -139,8 +140,9 @@ CREATE TABLE "folders" (
 --> statement-breakpoint
 CREATE TABLE "sync_jobs" (
 	"id" varchar PRIMARY KEY NOT NULL,
-	"user_profile_id" varchar NOT NULL,
+	"last_synced_at" timestamp,
 	"deactivated_at" timestamp,
+	"user_profile_id" varchar NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
