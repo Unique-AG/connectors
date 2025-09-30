@@ -14,9 +14,6 @@ export class GraphApiService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly graphClient: Client;
 
-  // TODO FOR TESTING - TEST LIMIT - Remove after testing
-  private readonly TEST_SCAN_LIMIT = 10;
-
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly configService: ConfigService,
@@ -40,18 +37,47 @@ export class GraphApiService {
       this.logger.debug(`Scanning library (drive): ${drive.name} (${drive.id})`);
       const filesInDrive = await this.recursivelyFetchSyncableFiles(drive.id, 'root');
       allSyncableFiles.push(...filesInDrive);
-
-      // TODO TESTING -  TEST LIMIT - Final limit in case we got slightly over
-      if (allSyncableFiles.length > this.TEST_SCAN_LIMIT) {
-        this.logger.log(`🔧 TEST MODE: Limiting scan to ${this.TEST_SCAN_LIMIT} files`);
-        return allSyncableFiles.slice(0, this.TEST_SCAN_LIMIT);
-      }
     }
 
     this.logger.log(
       `Completed scan for site ${siteId}. Found ${allSyncableFiles.length} syncable files.`,
     );
     return allSyncableFiles;
+  }
+
+  public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
+    this.logger.debug(`Downloading file content for item ${itemId} from drive ${driveId}`);
+    const maxFileSizeBytes =
+      this.configService.get<number>('pipeline.maxFileSizeBytes') ?? DEFAULT_MAX_FILE_SIZE_BYTES;
+
+    try {
+      const stream: ReadableStream = await this.graphClient
+        .api(`/drives/${driveId}/items/${itemId}/content`)
+        .getStream();
+
+      const chunks: Buffer[] = [];
+      let totalSize = 0;
+
+      for await (const chunk of stream) {
+        const bufferChunk = Buffer.from(chunk);
+        totalSize += bufferChunk.length;
+
+        if (totalSize > maxFileSizeBytes) {
+          const reader = stream.getReader();
+          await reader.cancel();
+          reader.releaseLock();
+          throw new Error(`File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
+        }
+
+        chunks.push(bufferChunk);
+      }
+
+      this.logger.log(`File download completed. Total size: ${totalSize} bytes.`);
+      return Buffer.concat(chunks);
+    } catch (error) {
+      this.logger.error(`Failed to download file content for item ${itemId}:`, error);
+      throw error;
+    }
   }
 
   private async getDrivesForSite(siteId: string): Promise<Drive[]> {
@@ -73,58 +99,27 @@ export class GraphApiService {
     driveId: string,
     itemId: string,
   ): Promise<DriveItem[]> {
-    const syncableFiles: DriveItem[] = [];
-    const selectFields = [
-      'id',
-      'name',
-      'webUrl',
-      'size',
-      'lastModifiedDateTime',
-      'folder',
-      'file',
-      'listItem',
-      'parentReference',
-    ];
-    const expandFields = 'listItem($expand=fields)';
-
     try {
       this.logger.debug(`Fetching items for drive ${driveId}, item ${itemId}`);
 
-      let url = `/drives/${driveId}/items/${itemId}/children`;
+      const allItems = await this.fetchAllItemsInFolder(driveId, itemId);
+      const syncableFiles: DriveItem[] = [];
 
-      while (url) {
-        const response = await this.graphClient
-          .api(url)
-          .select(selectFields)
-          .expand(expandFields)
-          .get();
+      for (const driveItem of allItems) {
+        this.ensureParentReference(driveItem, driveId);
 
-        const items: DriveItem[] = response?.value || [];
-
-        for (const driveItem of items) {
-          // Ensure parentReference has driveId
-          // TODO remove this reassigning of driveId after test running it
-          if (driveItem.parentReference) {
-            driveItem.parentReference.driveId = driveId;
-          }
-          if (!driveItem.parentReference && driveItem.listItem?.parentReference) {
-            driveItem.parentReference = driveItem.listItem.parentReference;
-          }
-
-          if (driveItem.folder && driveItem.id) {
-            if (syncableFiles.length > 0) return syncableFiles; // TODO FOR TESTING - REMOVE THIS TEST LINE
-            const filesInSubfolder = await this.recursivelyFetchSyncableFiles(
-              driveId,
-              driveItem.id,
-            );
-            syncableFiles.push(...filesInSubfolder);
-          } else if (driveItem.file) {
-            if (this.fileFilterService.isFileSyncable(driveItem)) {
-              syncableFiles.push(driveItem);
-            }
+        if (this.isFolder(driveItem)) {
+          if (syncableFiles.length > 0) return syncableFiles; // TODO FOR TESTING - REMOVE THIS TEST LINE
+          const filesInSubfolder = await this.recursivelyFetchSyncableFiles(
+            driveId,
+            driveItem.id,
+          );
+          syncableFiles.push(...filesInSubfolder);
+        } else if (this.isFile(driveItem)) {
+          if (this.fileFilterService.isFileSyncable(driveItem)) {
+            syncableFiles.push(driveItem);
           }
         }
-        url = response['@odata.nextLink'] ? response['@odata.nextLink'] : '';
       }
 
       this.logger.log(
@@ -137,44 +132,52 @@ export class GraphApiService {
     }
   }
 
-  public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
-    this.logger.log(`Downloading file content for item ${itemId} from drive ${driveId}`);
-    const maxFileSizeBytes =
-      this.configService.get<number>('pipeline.maxFileSizeBytes') ?? DEFAULT_MAX_FILE_SIZE_BYTES;
+  private async fetchAllItemsInFolder(driveId: string, itemId: string): Promise<DriveItem[]> {
+    const itemsInFolder: DriveItem[] = [];
+    const selectFields = [
+      'id',
+      'name',
+      'webUrl',
+      'size',
+      'lastModifiedDateTime',
+      'folder',
+      'file',
+      'listItem',
+      'parentReference',
+    ];
+    let nextPageUrl = `/drives/${driveId}/items/${itemId}/children`;
 
-    try {
-      const stream: ReadableStream = await this.graphClient
-        .api(`/drives/${driveId}/items/${itemId}/content`)
-        .getStream();
+    while (nextPageUrl) {
+      const response = await this.graphClient
+        .api(nextPageUrl)
+        .select(selectFields)
+        .expand('listItem($expand=fields)')
+        .get();
 
-      const chunks: Buffer[] = [];
-      let totalSize = 0;
-      let lastLog = 0;
+      const items: DriveItem[] = response?.value || [];
+      itemsInFolder.push(...items);
 
-      for await (const chunk of stream) {
-        const bufferChunk = Buffer.from(chunk);
-        totalSize += bufferChunk.length;
-
-        if (totalSize > maxFileSizeBytes) {
-          const reader = stream.getReader();
-          await reader.cancel();
-          reader.releaseLock();
-          throw new Error(`File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
-        }
-
-        chunks.push(bufferChunk);
-
-        if (totalSize - lastLog > DEFAULT_DOWNLOAD_LOG_INTERVAL_BYTES) {
-          lastLog = totalSize;
-          this.logger.log(`Downloaded ${Math.round(totalSize / 1024 / 1024)} MB so far...`);
-        }
-      }
-
-      this.logger.log(`File download completed. Total size: ${totalSize} bytes.`);
-      return Buffer.concat(chunks);
-    } catch (error) {
-      this.logger.error(`Failed to download file content for item ${itemId}:`, error);
-      throw error;
+      nextPageUrl = response['@odata.nextLink'] || '';
     }
+
+    return itemsInFolder;
+  }
+
+  private ensureParentReference(driveItem: DriveItem, driveId: string): void {
+    // TODO: Remove this if it turns out it is not necessary after doing multiple tests
+    if (driveItem.parentReference) {
+      driveItem.parentReference.driveId = driveId;
+    }
+    if (!driveItem.parentReference && driveItem.listItem?.parentReference) {
+      driveItem.parentReference = driveItem.listItem.parentReference;
+    }
+  }
+
+  private isFolder(driveItem: DriveItem): driveItem is DriveItem & { id: string } {
+    return Boolean(driveItem.folder && driveItem.id);
+  }
+
+  private isFile(driveItem: DriveItem): boolean {
+    return Boolean(driveItem.file);
   }
 }
