@@ -5,22 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1758218063965,
-      "tag": "0000_initial_schema",
+      "when": 1758729760047,
+      "tag": "0000_initialize-powersync",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1758219626800,
-      "tag": "0001_add_missing_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1758284934316,
-      "tag": "0002_change_columns",
+      "when": 1758729769800,
+      "tag": "0001_initial_schema",
       "breakpoints": true
     }
   ]

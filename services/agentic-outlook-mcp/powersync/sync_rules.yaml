@@ -3,19 +3,27 @@
 # Note that changes to this file are not watched.
 # The service needs to be restarted for changes to take effect.
 
-bucket_definitions:
-  global:
+bucket_definitions:  
+  user_data:
+    parameters: SELECT request.jwt() ->> 'user_profile_id' AS user_profile_id
     data:
-      - SELECT
-          id,
-          name,
-          "profileImage",
-          "isAdmin",
-          "createdAt",
-          "updatedAt"
-        FROM
-          "User"
-      - SELECT * FROM "Post"
-      - SELECT * FROM "PostImage"
-      - SELECT * FROM "Comment"
-      - SELECT * FROM "Like"
+      - SELECT id, provider, provider_user_id, username, email, 
+               display_name, avatar_url, created_at, updated_at
+        FROM user_profiles
+        WHERE user_profiles.id = bucket.user_profile_id
+      
+      - SELECT id, last_synced_at, deactivated_at, user_profile_id,
+               created_at, updated_at
+        FROM sync_jobs
+        WHERE sync_jobs.user_profile_id = bucket.user_profile_id
+      
+      - SELECT id, name, original_name, folder_id, parent_folder_id, 
+               child_folder_count, subscription_id,
+               activated_at, deactivated_at, last_synced_at,
+               user_profile_id, sync_job_id, created_at, updated_at
+        FROM folders
+        WHERE folders.user_profile_id = bucket.user_profile_id
+      
+      - SELECT id, user_profile_id, folder_id
+        FROM emails
+        WHERE emails.user_profile_id = bucket.user_profile_id

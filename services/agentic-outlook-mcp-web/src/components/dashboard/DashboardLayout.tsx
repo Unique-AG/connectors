@@ -1,14 +1,14 @@
 import { LogOut } from 'lucide-react';
 import { ReactNode } from 'react';
+import { useAuth } from 'react-oidc-context';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
-  const { user, logout } = useAuth();
+  const { user, signoutRedirect } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -21,16 +21,16 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
-                {user.name.charAt(0).toUpperCase()}
+                {user.profile.name.charAt(0).toUpperCase()}
               </div>
               <div className="hidden sm:block">
-                <div className="text-sm font-medium">{user.name}</div>
-                <div className="text-xs text-muted-foreground">{user.email}</div>
+                <div className="text-sm font-medium">{user.profile.name}</div>
+                <div className="text-xs text-muted-foreground">{user.profile.email}</div>
               </div>
             </div>
 
             <Button
-              onClick={logout}
+              onClick={() => void signoutRedirect()}
               variant="outline"
               size="sm"
               className="flex items-center gap-2"

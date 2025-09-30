@@ -1,8 +1,11 @@
+import { toCompilableQuery } from '@powersync/drizzle-driver';
+import { useQuery } from '@powersync/react';
 import { useEffect, useState } from 'react';
 import { FolderTree } from '@/components/folders/FolderTree';
 import { GlobalControls } from '@/components/folders/GlobalControls';
 import { useToast } from '@/hooks/use-toast';
 import { OutlookFolder, SyncStats } from '@/types/folder';
+import { db } from '../lib/powersync/database';
 
 // Mock data for demonstration
 const mockFolders: OutlookFolder[] = [
@@ -94,10 +97,15 @@ const mockFolders: OutlookFolder[] = [
 ];
 
 export default function FolderManagement() {
-  const [folders, setFolders] = useState<OutlookFolder[]>(mockFolders);
+  // const [folders, setFolders] = useState<OutlookFolder[]>(mockFolders);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  const { data: folders } = useQuery(toCompilableQuery(db.query.folders.findMany()));
+  const { data: syncJobs, isLoading: isSyncJobsLoading } = useQuery(toCompilableQuery(db.query.syncJobs.findMany()));
+
+  console.log(folders);
 
   // Calculate statistics
   const calculateStats = (folders: OutlookFolder[]): SyncStats => {
@@ -167,7 +175,7 @@ export default function FolderManagement() {
       });
     };
 
-    setFolders(updateFolder(folders));
+    // setFolders(updateFolder(folders));
     setIsLoading(false);
 
     toast({
@@ -200,7 +208,7 @@ export default function FolderManagement() {
       });
     };
 
-    setFolders(updateFolder(folders));
+    // setFolders(updateFolder(folders));
     setIsLoading(false);
 
     toast({
@@ -241,7 +249,7 @@ export default function FolderManagement() {
       }));
     };
 
-    setFolders(updateAllFolders(folders));
+    // setFolders(updateAllFolders(folders));
     setIsLoading(false);
 
     toast({
@@ -264,7 +272,7 @@ export default function FolderManagement() {
       }));
     };
 
-    setFolders(wipeAllFolders(folders));
+    // setFolders(wipeAllFolders(folders));
     setIsLoading(false);
 
     toast({
@@ -287,7 +295,7 @@ export default function FolderManagement() {
         stats={stats}
         onToggleGlobalSync={handleToggleGlobalSync}
         onGlobalWipe={handleGlobalWipe}
-        isLoading={isLoading}
+        isLoading={isLoading || isSyncJobsLoading}
       />
 
       <FolderTree

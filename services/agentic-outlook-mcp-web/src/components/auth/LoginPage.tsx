@@ -1,13 +1,13 @@
 import { Waves } from 'lucide-react';
 import { useEffect } from 'react';
+import { useAuth } from 'react-oidc-context';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 export const LoginPage = () => {
-  const { login, isLoading, isAuthenticated, error } = useAuth();
+  const { signinRedirect, isLoading, isAuthenticated, error } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -28,7 +28,7 @@ export const LoginPage = () => {
   }, [error, toast]);
 
   const handleLogin = () => {
-    login();
+    void signinRedirect();
   };
 
   return (

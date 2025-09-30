@@ -6,7 +6,7 @@
  */
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8080';
 
 async function registerClient() {
   const clientData = {
@@ -14,16 +14,15 @@ async function registerClient() {
     client_description: 'Web interface for Agentic Outlook MCP',
     redirect_uris: [
       `${FRONTEND_URL}/callback`,
-      'http://localhost:5173/callback', // Dev URL
-      'http://localhost:4173/callback', // Preview URL
+      'http://localhost:8080/callback',
     ],
     grant_types: ['authorization_code', 'refresh_token'],
     response_types: ['code'],
-    token_endpoint_auth_method: 'none', // Public client (SPA)
+    token_endpoint_auth_method: 'none',
   };
 
   try {
-    const response = await fetch(`${BACKEND_URL}/auth/register`, {
+    const response = await fetch(`${BACKEND_URL}/oauth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

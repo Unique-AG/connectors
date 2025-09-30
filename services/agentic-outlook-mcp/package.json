@@ -10,6 +10,7 @@
     "dev": "nodemon",
     "debug": "nest start --debug --watch",
     "codegen": "echo \"No codegen for this server\"",
+    "db:init": "psql ${DATABASE_URL:-postgresql://postgres:postgres@localhost:9001/postgres} -f scripts/init-db.sql",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",

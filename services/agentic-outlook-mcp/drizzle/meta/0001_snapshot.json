@@ -1,6 +1,6 @@
 {
-  "id": "b7dc1616-5d50-4db7-a6f7-bbe81c6ac961",
-  "prevId": "deb40c6c-2ff5-4b50-bd6a-8a62dfd44629",
+  "id": "fbd3f0e9-686e-4bba-8217-c660a76e5782",
+  "prevId": "0a594b44-e425-4d30-8024-3904330b67ac",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -911,6 +911,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "original_name": {
+          "name": "original_name",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
         "folder_id": {
           "name": "folder_id",
           "type": "varchar",
@@ -1039,12 +1045,6 @@
           "type": "varchar",
           "primaryKey": true,
           "notNull": true
-        },
-        "folder_subscription_id": {
-          "name": "folder_subscription_id",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
         },
         "last_synced_at": {
           "name": "last_synced_at",
