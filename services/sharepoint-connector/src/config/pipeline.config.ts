@@ -3,6 +3,7 @@ import { registerAs } from '@nestjs/config';
 import { z } from 'zod';
 import {
   DEFAULT_MAX_FILE_SIZE_BYTES,
+  DEFAULT_MS_GRAPH_RATE_LIMIT_PER_10_SECONDS,
   DEFAULT_PROCESSING_CONCURRENCY,
   DEFAULT_STEP_TIMEOUT_SECONDS,
 } from '../constants/defaults.constants';
@@ -17,6 +18,12 @@ export const EnvironmentVariables = z.object({
     .default(DEFAULT_PROCESSING_CONCURRENCY),
   STEP_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(DEFAULT_STEP_TIMEOUT_SECONDS),
   MAX_FILE_SIZE_BYTES: z.coerce.number().int().positive().default(DEFAULT_MAX_FILE_SIZE_BYTES),
+  MS_GRAPH_RATE_LIMIT_PER_10_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_MS_GRAPH_RATE_LIMIT_PER_10_SECONDS)
+    .describe('Number of MS Graph API requests allowed per 10 seconds'),
 });
 
 export interface Config {
@@ -24,6 +31,7 @@ export interface Config {
     processingConcurrency: number;
     stepTimeoutSeconds: number;
     maxFileSizeBytes: number;
+    msGraphRateLimitPer10Seconds: number;
   };
 }
 
@@ -36,6 +44,7 @@ export const pipelineConfig = registerAs<Config[typeof namespace]>(namespace, ()
     processingConcurrency: validEnv.data.PROCESSING_CONCURRENCY,
     stepTimeoutSeconds: validEnv.data.STEP_TIMEOUT_SECONDS,
     maxFileSizeBytes: validEnv.data.MAX_FILE_SIZE_BYTES,
+    msGraphRateLimitPer10Seconds: validEnv.data.MS_GRAPH_RATE_LIMIT_PER_10_SECONDS,
   } satisfies Config[typeof namespace];
 });
 

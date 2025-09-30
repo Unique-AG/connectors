@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { SharepointScannerModule } from '../sharepoint-scanner/sharepoint-scanner.module';
+import { SharepointSynchronizationModule } from '../sharepoint-synchronization/sharepoint-synchronization.module';
 import { SchedulerService } from './scheduler.service';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), SharepointScannerModule],
+  imports: [ScheduleModule.forRoot(), SharepointSynchronizationModule],
   providers: [SchedulerService],
 })
 export class SchedulerModule {}

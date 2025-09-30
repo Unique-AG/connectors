@@ -6,10 +6,10 @@ import { UniqueAuthService } from '../auth/unique-auth.service';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
-import { SharepointScannerService } from './sharepoint-scanner.service';
+import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
-describe('SharepointScannerService', () => {
-  let service: SharepointScannerService;
+describe('SharepointSynchronizationService', () => {
+  let service: SharepointSynchronizationService;
   let orchestrator: FileProcessingOrchestratorService;
 
   beforeEach(async () => {
@@ -24,7 +24,7 @@ describe('SharepointScannerService', () => {
       },
     ] satisfies DriveItem[];
 
-    const { unit, unitRef } = await TestBed.solitary(SharepointScannerService)
+    const { unit, unitRef } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
@@ -65,9 +65,7 @@ describe('SharepointScannerService', () => {
       typeof orchestrator.processFilesForSite
     >;
 
-    mockProcessFiles.mockImplementation(
-      () => new Promise((resolve) => setTimeout(resolve, 100)),
-    );
+    mockProcessFiles.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
     const scan1 = service.synchronize();
     const scan2 = service.synchronize();

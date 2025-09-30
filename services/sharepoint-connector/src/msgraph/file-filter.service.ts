@@ -21,10 +21,16 @@ export class FileFilterService {
       return false;
     }
 
-    const hasSyncFlag = (fields as Record<string, unknown>)[syncColumnName] === true;
-    const moderation = (fields as Record<string, unknown>).OData__ModerationStatus as
-      | ModerationStatus
-      | undefined;
+    const fileSize = item.size ?? 0;
+    if (fileSize === 0) {
+      this.logger.debug(
+        `File ${item.name} is empty (0 bytes), skipping to prevent ingestion failure`,
+      );
+      return false;
+    }
+
+    const hasSyncFlag = fields[syncColumnName] === true;
+    const moderation = fields.OData__ModerationStatus as ModerationStatus | undefined;
     const isApproved = moderation === ModerationStatus.Approved;
     const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
 

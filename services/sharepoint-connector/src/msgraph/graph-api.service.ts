@@ -2,6 +2,7 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import type { Drive, DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import Bottleneck from 'bottleneck';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 
@@ -9,6 +10,7 @@ import { GraphClientFactory } from './graph-client.factory';
 export class GraphApiService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly graphClient: Client;
+  private readonly limiter: Bottleneck;
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
@@ -16,6 +18,17 @@ export class GraphApiService {
     private readonly fileFilterService: FileFilterService,
   ) {
     this.graphClient = this.graphClientFactory.createClient();
+
+    const msGraphRateLimitPer10Seconds = this.configService.get<number>(
+      'pipeline.msGraphRateLimitPer10Seconds',
+      10000,
+    );
+
+    this.limiter = new Bottleneck({
+      reservoir: msGraphRateLimitPer10Seconds,
+      reservoirRefreshAmount: msGraphRateLimitPer10Seconds,
+      reservoirRefreshInterval: 10000,
+    });
   }
 
   public async findAllSyncableFilesForSite(siteId: string): Promise<DriveItem[]> {
@@ -46,9 +59,9 @@ export class GraphApiService {
     const maxFileSizeBytes = this.configService.get<number>('pipeline.maxFileSizeBytes') as number;
 
     try {
-      const stream: ReadableStream = await this.graphClient
-        .api(`/drives/${driveId}/items/${itemId}/content`)
-        .getStream();
+      const stream: ReadableStream = await this.makeRateLimitedRequest(() =>
+        this.graphClient.api(`/drives/${driveId}/items/${itemId}/content`).getStream(),
+      );
 
       const chunks: Buffer[] = [];
       let totalSize = 0;
@@ -79,7 +92,9 @@ export class GraphApiService {
     try {
       this.logger.debug(`Fetching drives for site: ${siteId}`);
 
-      const drives = await this.graphClient.api(`/sites/${siteId}/drives`).get();
+      const drives = await this.makeRateLimitedRequest(() =>
+        this.graphClient.api(`/sites/${siteId}/drives`).get(),
+      );
 
       const allDrives = drives?.value || [];
       this.logger.log(`Found ${allDrives.length} drives for site ${siteId}`);
@@ -137,11 +152,13 @@ export class GraphApiService {
     let nextPageUrl = `/drives/${driveId}/items/${itemId}/children`;
 
     while (nextPageUrl) {
-      const response = await this.graphClient
-        .api(nextPageUrl)
-        .select(selectFields)
-        .expand('listItem($expand=fields)')
-        .get();
+      const response = await this.makeRateLimitedRequest(() =>
+        this.graphClient
+          .api(nextPageUrl)
+          .select(selectFields)
+          .expand('listItem($expand=fields)')
+          .get(),
+      );
 
       const items: DriveItem[] = response?.value || [];
       itemsInFolder.push(...items);
@@ -150,6 +167,10 @@ export class GraphApiService {
     }
 
     return itemsInFolder;
+  }
+
+  private async makeRateLimitedRequest<T>(requestFn: () => Promise<T>): Promise<T> {
+    return await this.limiter.schedule(async () => await requestFn());
   }
 
   private isFolder(driveItem: DriveItem): driveItem is DriveItem & { id: string } {

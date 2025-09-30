@@ -14,7 +14,7 @@ import { uniqueApiConfig } from './config/unique-api.config';
 import { HttpClientModule } from './http-client.module';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
-import { SharepointScannerModule } from './sharepoint-scanner/sharepoint-scanner.module';
+import { SharepointSynchronizationModule } from './sharepoint-synchronization/sharepoint-synchronization.module';
 import { UniqueApiModule } from './unique-api/unique-api.module';
 import { Redacted } from './utils/redacted';
 
@@ -59,7 +59,7 @@ import { Redacted } from './utils/redacted';
     }),
     HttpClientModule,
     SchedulerModule,
-    SharepointScannerModule,
+    SharepointSynchronizationModule,
     AuthModule,
     MsGraphModule,
     UniqueApiModule,

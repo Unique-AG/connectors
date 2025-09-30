@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 import { CRON_EVERY_15_MINUTES } from '../constants/defaults.constants';
-import { SharepointScannerService } from '../sharepoint-scanner/sharepoint-scanner.service';
+import { SharepointSynchronizationService } from '../sharepoint-synchronization/sharepoint-synchronization.service';
 
 @Injectable()
 export class SchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -9,7 +9,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private isShuttingDown = false;
 
   public constructor(
-    private readonly sharepointScanner: SharepointScannerService,
+    private readonly sharepointScanner: SharepointSynchronizationService,
     private readonly schedulerRegistry: SchedulerRegistry,
   ) {
     this.logger.log('SchedulerService initialized with distributed locking');
