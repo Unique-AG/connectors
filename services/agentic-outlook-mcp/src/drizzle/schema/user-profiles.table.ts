@@ -1,10 +1,10 @@
 import { relations } from 'drizzle-orm';
-import { jsonb, pgTable, unique, varchar } from 'drizzle-orm/pg-core';
+import { jsonb, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
-import { timestamps } from '../../timestamps.columns';
-import { emails, folders, syncJobs } from '../sync';
-import { authorizationCodes } from './authorization-codes.table';
-import { tokens } from './tokens.table';
+import { timestamps } from '../timestamps.columns';
+import { authorizationCodes } from './auth/authorization-codes.table';
+import { tokens } from './auth/tokens.table';
+import { emails, folders } from './sync';
 
 export const userProfiles = pgTable(
   'user_profiles',
@@ -21,6 +21,9 @@ export const userProfiles = pgTable(
     raw: jsonb(),
     accessToken: varchar(),
     refreshToken: varchar(),
+    syncActivatedAt: timestamp(),
+    syncDeactivatedAt: timestamp(),
+    syncLastSyncedAt: timestamp(),
     ...timestamps,
   },
   (table) => [unique().on(table.provider, table.providerUserId)],
@@ -31,5 +34,4 @@ export const userProfileRelations = relations(userProfiles, ({ many }) => ({
   tokens: many(tokens),
   folders: many(folders),
   emails: many(emails),
-  syncJobs: many(syncJobs),
 }));
