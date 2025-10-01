@@ -1,9 +1,10 @@
 import { TokenValidationResult } from '@unique-ag/mcp-oauth';
-import { Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TypeID } from 'typeid-js';
 import { JwtGuard } from '../jwt.guard';
 import { User } from '../user.decorator';
+import { DeleteSyncDto } from './dto/delete-sync.dto';
 import { SyncStatusDto } from './dto/sync-status.dto';
 import { SyncService } from './sync.service';
 
@@ -18,23 +19,26 @@ export class SyncController {
   @ApiOperation({ summary: 'Enable sync for the authenticated user' })
   @ApiResponse({ status: 201, description: 'Sync enabled successfully', type: SyncStatusDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  public async createSyncJob(@User() user: TokenValidationResult): Promise<SyncStatusDto> {
+  public async activateSync(@User() user: TokenValidationResult): Promise<SyncStatusDto> {
     return this.syncService.enableSync(TypeID.fromString(user.userProfileId, 'user_profile'));
   }
 
-  // @Delete(':syncJobId')
-  // public async deleteSyncJob(
-  //   @Param('userProfileId') userProfileId: string,
-  //   @Param('syncJobId') syncJobId: string,
-  // ) {
-  //   return this.syncService.deleteSyncJob(userProfileId, syncJobId);
-  // }
+  @Patch()
+  @ApiOperation({ summary: 'Sync folders for the authenticated user' })
+  @ApiResponse({ status: 200, description: 'Folders synced successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  public async syncFolders(@User() user: TokenValidationResult): Promise<void> {
+    return this.syncService.syncFolders(TypeID.fromString(user.userProfileId, 'user_profile'));
+  }
 
-  // @Post(':syncJobId/run')
-  // public async runSyncJob(
-  //   @Param('userProfileId') userProfileId: string,
-  //   @Param('syncJobId') syncJobId: string,
-  // ) {
-  //   return this.syncService.runSyncJob(userProfileId, syncJobId);
-  // }
+  @Delete()
+  @ApiOperation({ summary: 'Deactivate sync for the authenticated user' })
+  @ApiResponse({ status: 200, description: 'Sync deactivated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  public async deactivateSync(@User() user: TokenValidationResult, @Body() body: DeleteSyncDto) {
+    return this.syncService.deactivateSync(
+      TypeID.fromString(user.userProfileId, 'user_profile'),
+      body.wipeData ?? false,
+    );
+  }
 }
