@@ -5,6 +5,7 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
+import { cleanupOpenApiDoc } from 'nestjs-zod';
 import * as packageJson from '../package.json';
 import { AppModule } from './app.module';
 import { AppConfig, AppSettings } from './app-settings';
@@ -35,7 +36,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config, {
     include: [SyncModule],
   });
-  SwaggerModule.setup('api-docs', app, document);
+  SwaggerModule.setup('api-docs', app, cleanupOpenApiDoc(document));
 
   const port = configService.get(AppSettings.PORT, { infer: true });
   await app.listen(port);
