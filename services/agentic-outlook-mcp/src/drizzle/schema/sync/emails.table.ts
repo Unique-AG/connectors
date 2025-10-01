@@ -11,7 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
-import { userProfiles } from '../auth';
+import { userProfiles } from '../user-profiles.table';
 import { folders } from './folders.table';
 
 export const emails = pgTable(

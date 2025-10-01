@@ -1,10 +1,10 @@
 import { relations } from 'drizzle-orm';
 import { integer, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
+import { z } from 'zod';
 import { timestamps } from '../../timestamps.columns';
-import { userProfiles } from '../auth';
+import { userProfiles } from '../user-profiles.table';
 import { emails } from './emails.table';
-import { syncJobs } from './sync-jobs.table';
 
 export const folders = pgTable('folders', {
   id: varchar()
@@ -28,9 +28,6 @@ export const folders = pgTable('folders', {
     .notNull()
     .references(() => userProfiles.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
   ...timestamps,
-  syncJobId: varchar()
-    .notNull()
-    .references(() => syncJobs.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
 });
 
 export const folderRelations = relations(folders, ({ one, many }) => ({
@@ -38,9 +35,24 @@ export const folderRelations = relations(folders, ({ one, many }) => ({
     fields: [folders.userProfileId],
     references: [userProfiles.id],
   }),
-  syncJob: one(syncJobs, {
-    fields: [folders.syncJobId],
-    references: [syncJobs.id],
-  }),
   emails: many(emails),
 }));
+
+// TODO: Ideally create with drizzle-zod, but it does not work yet...
+export const folderSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  originalName: z.string().nullable(),
+  folderId: z.string(),
+  parentFolderId: z.string().nullable(),
+  childFolderCount: z.number().nullable(),
+  subscriptionId: z.string().nullable(),
+  syncToken: z.string().nullable(),
+  activatedAt: z.iso.datetime().nullable(),
+  deactivatedAt: z.iso.datetime().nullable(),
+  lastSyncedAt: z.iso.datetime().nullable(),
+  userProfileId: z.string(),
+  createdAt: z.iso.datetime().nullable(),
+  updatedAt: z.iso.datetime().nullable(),
+});
+export const folderArraySchema = z.array(folderSchema);
