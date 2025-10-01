@@ -10,10 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, folderArraySchema, folders } from '../../drizzle';
-import {
-  folders as foldersTable,
-  userProfiles
-} from '../../drizzle/schema';
+import { folders as foldersTable, userProfiles } from '../../drizzle/schema';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import { normalizeError } from '../../utils/normalize-error';
 
@@ -35,6 +32,20 @@ export class FoldersService {
       where: and(eq(folders.userProfileId, userProfileId.toString())),
     });
     return folderArraySchema.parse(result);
+  }
+
+  public async activateSync(userProfileId: TypeID<'user_profile'>, folderId: string) {
+    await this.db
+      .update(folders)
+      .set({ activatedAt: new Date() })
+      .where(and(eq(folders.userProfileId, userProfileId.toString()), eq(folders.id, folderId)));
+  }
+
+  public async deactivateSync(userProfileId: TypeID<'user_profile'>, folderId: string) {
+    await this.db
+      .update(folders)
+      .set({ deactivatedAt: new Date() })
+      .where(and(eq(folders.userProfileId, userProfileId.toString()), eq(folders.id, folderId)));
   }
 
   public async syncFolders(userProfileId: TypeID<'user_profile'>) {
@@ -63,6 +74,12 @@ export class FoldersService {
           folders.push(...descendants);
         }
       }
+
+      this.logger.log({
+        msg: 'Synced folders for user',
+        userProfileId,
+        folderCount: folders.length,
+      });
 
       await this.saveFolders(userProfileId, folders);
     } catch (error) {

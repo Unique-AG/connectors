@@ -1,31 +1,26 @@
-import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { TypeID } from 'typeid-js';
-import { DRIZZLE, DrizzleDatabase, userProfiles } from '../drizzle';
-import { GraphClientFactory } from '../msgraph/graph-client.factory';
+import { DRIZZLE, DrizzleDatabase, emails, folders, userProfiles } from '../drizzle';
 import { FoldersService } from './folders/folders.service';
 
 @Injectable()
-export class SyncService implements OnApplicationBootstrap {
+export class SyncService {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    private readonly graphClientFactory: GraphClientFactory,
     private readonly foldersService: FoldersService,
   ) {}
 
-  public async onApplicationBootstrap() {
-    // await this.startSyncRun();
-  }
-
   public async enableSync(userProfileId: TypeID<'user_profile'>) {
+    this.logger.log({ msg: 'Enabling sync', userProfileId });
     await this.db
       .update(userProfiles)
       .set({ syncActivatedAt: new Date() })
       .where(eq(userProfiles.id, userProfileId.toString()));
     await this.foldersService.syncFolders(userProfileId);
-    
+
     const userProfile = await this.db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId.toString()),
       columns: {
@@ -35,12 +30,35 @@ export class SyncService implements OnApplicationBootstrap {
       },
     });
     if (!userProfile) throw new Error('User profile not found');
-    
+
     return {
       syncActivatedAt: userProfile.syncActivatedAt?.toISOString() ?? null,
       syncDeactivatedAt: userProfile.syncDeactivatedAt?.toISOString() ?? null,
       syncLastSyncedAt: userProfile.syncLastSyncedAt?.toISOString() ?? null,
     };
+  }
+
+  public async syncFolders(userProfileId: TypeID<'user_profile'>) {
+    this.logger.log({ msg: 'Syncing folders', userProfileId });
+    await this.foldersService.syncFolders(userProfileId);
+  }
+
+  public async deactivateSync(userProfileId: TypeID<'user_profile'>, wipeData: boolean) {
+    this.logger.log({ msg: 'Deactivating sync', userProfileId, wipeData });
+    await this.db
+      .update(userProfiles)
+      .set({ syncDeactivatedAt: new Date() })
+      .where(eq(userProfiles.id, userProfileId.toString()));
+
+    if (wipeData) await this.wipeAllUserData(userProfileId);
+  }
+
+  public async wipeAllUserData(userProfileId: TypeID<'user_profile'>) {
+    this.logger.log({ msg: 'Wiping all user data', userProfileId });
+    await Promise.all([
+      this.db.delete(folders).where(eq(folders.userProfileId, userProfileId.toString())),
+      this.db.delete(emails).where(eq(emails.userProfileId, userProfileId.toString())),
+    ]);
   }
 
   // @Cron('0 */30 * * * *') // Every 30 minutes
