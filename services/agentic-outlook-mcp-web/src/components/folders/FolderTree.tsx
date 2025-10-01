@@ -23,6 +23,7 @@ dayjs.extend(LocalizedFormat);
 type FolderWithChildren = FolderWithEmails & { children: FolderWithChildren[] };
 
 interface FolderTreeProps {
+  syncEnabled: boolean;
   folders: FolderWithEmails[];
   onToggleSync: (folderId: string, enabled: boolean) => void;
   onWipeFolder: (folderId: string) => void;
@@ -204,6 +205,7 @@ const buildFolderTree = (
 };
 
 export const FolderTree = ({
+  syncEnabled,
   folders,
   onToggleSync,
   onWipeFolder,
@@ -213,42 +215,56 @@ export const FolderTree = ({
   const folderTree = buildFolderTree(folders);
 
   return (
-    <Card className="shadow-medium">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <FolderOpen className="h-5 w-5 text-primary" />
-            Outlook Folders
-          </CardTitle>
-          <Button
-            onClick={onResync}
-            variant="outline"
-            disabled={isRefreshing}
-            className="hover:bg-primary hover:text-primary-foreground"
-          >
-            <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
-            Resync Folders
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {folders.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Folder className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No folders found. Click resync to sync with Outlook.</p>
+    <div className="relative">
+      <Card className="shadow-medium">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <FolderOpen className="h-5 w-5 text-primary" />
+              Outlook Folders
+            </CardTitle>
+            <Button
+              onClick={onResync}
+              variant="outline"
+              disabled={isRefreshing}
+              className="hover:bg-primary hover:text-primary-foreground"
+            >
+              <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
+              Resync Folders
+            </Button>
           </div>
-        ) : (
-          folderTree.map((folder) => (
-            <FolderItem
-              key={folder.id}
-              folder={folder}
-              level={0}
-              onToggleSync={onToggleSync}
-              onWipeFolder={onWipeFolder}
-            />
-          ))
-        )}
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {folders.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Folder className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No folders found. Click resync to sync with Outlook.</p>
+            </div>
+          ) : (
+            folderTree.map((folder) => (
+              <FolderItem
+                key={folder.id}
+                folder={folder}
+                level={0}
+                onToggleSync={onToggleSync}
+                onWipeFolder={onWipeFolder}
+              />
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {!syncEnabled && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
+          <div className="text-center space-y-2 p-6">
+            <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground opacity-50" />
+            <div className="text-lg font-semibold text-foreground">Sync is Disabled</div>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Enable sync in the Sync Control section above to start syncing folders from Outlook.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
