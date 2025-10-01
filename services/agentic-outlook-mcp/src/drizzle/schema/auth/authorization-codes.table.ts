@@ -2,7 +2,7 @@ import { relations } from 'drizzle-orm';
 import { pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
-import { userProfiles } from './user-profiles.table';
+import { userProfiles } from '../user-profiles.table';
 
 export const authorizationCodes = pgTable('authorization_codes', {
   id: varchar()

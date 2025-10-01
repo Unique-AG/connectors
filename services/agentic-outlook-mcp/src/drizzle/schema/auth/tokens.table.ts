@@ -2,7 +2,7 @@ import { relations } from 'drizzle-orm';
 import { index, integer, pgEnum, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
-import { userProfiles } from './user-profiles.table';
+import { userProfiles } from '../user-profiles.table';
 
 export const tokenType = pgEnum('token_type', ['ACCESS', 'REFRESH']);
 
