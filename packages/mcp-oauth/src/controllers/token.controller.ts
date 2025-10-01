@@ -10,7 +10,7 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { SkipThrottle, ThrottlerGuard } from '@nestjs/throttler';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { OAUTH_ENDPOINTS } from '../constants/oauth.constants';
 import { type IntrospectionResponse, IntrospectRequestDto } from '../dtos/introspect-request.dto';
@@ -21,6 +21,8 @@ import { McpOAuthService } from '../services/mcp-oauth.service';
 @Controller()
 @UseGuards(ThrottlerGuard)
 @UsePipes(ZodValidationPipe)
+// FIXME: Remove this once we have a better way to throttle the token endpoint
+@SkipThrottle()
 export class TokenController {
   private readonly logger = new Logger(this.constructor.name);
 
