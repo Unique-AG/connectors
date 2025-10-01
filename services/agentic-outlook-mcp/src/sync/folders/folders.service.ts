@@ -6,7 +6,7 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { MailFolder } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, folderArraySchema, folders } from '../../drizzle';
@@ -137,7 +137,15 @@ export class FoldersService {
           childFolderCount: folder.childFolderCount ?? 0,
           userProfileId: userProfileId.toString(),
         })),
-    );
+    ).onConflictDoUpdate({
+      target: foldersTable.folderId,
+      set: {
+        name: sql`excluded.name`,
+        originalName: sql`excluded.original_name`,
+        parentFolderId: sql`excluded.parent_folder_id`,
+        childFolderCount: sql`excluded.child_folder_count`,
+      },
+    });
     await this.db
       .update(userProfiles)
       .set({ syncLastSyncedAt: new Date() })
