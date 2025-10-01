@@ -9,8 +9,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
-import { DRIZZLE, DrizzleDatabase, folders } from '../../drizzle';
-import { folders as foldersTable, syncJobs as syncJobsTable } from '../../drizzle/schema';
+import { DRIZZLE, DrizzleDatabase, folderArraySchema, folders } from '../../drizzle';
+import {
+  folders as foldersTable,
+  userProfiles
+} from '../../drizzle/schema';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import { normalizeError } from '../../utils/normalize-error';
 
@@ -27,17 +30,14 @@ export class FoldersService {
     private readonly graphClientFactory: GraphClientFactory,
   ) {}
 
-  public async getFolders(userProfileId: TypeID<'user_profile'>, syncJobId: TypeID<'sync_job'>) {
+  public async getFolders(userProfileId: TypeID<'user_profile'>) {
     const result = await this.db.query.folders.findMany({
-      where: and(
-        eq(folders.userProfileId, userProfileId.toString()),
-        eq(folders.syncJobId, syncJobId.toString()),
-      ),
+      where: and(eq(folders.userProfileId, userProfileId.toString())),
     });
-    return result;
+    return folderArraySchema.parse(result);
   }
 
-  public async syncFolders(userProfileId: TypeID<'user_profile'>, syncJobId: TypeID<'sync_job'>) {
+  public async syncFolders(userProfileId: TypeID<'user_profile'>) {
     const graphClient = this.graphClientFactory.createClientForUser(userProfileId);
     try {
       const folders: FolderWithName[] = [];
@@ -64,7 +64,7 @@ export class FoldersService {
         }
       }
 
-      await this.saveFolders(userProfileId, syncJobId, folders);
+      await this.saveFolders(userProfileId, folders);
     } catch (error) {
       this.logger.error({
         msg: 'Failed to sync folders',
@@ -107,11 +107,7 @@ export class FoldersService {
     return children;
   }
 
-  private async saveFolders(
-    userProfileId: TypeID<'user_profile'>,
-    syncJobId: TypeID<'sync_job'>,
-    folders: FolderWithName[],
-  ) {
+  private async saveFolders(userProfileId: TypeID<'user_profile'>, folders: FolderWithName[]) {
     await this.db.insert(foldersTable).values(
       folders
         .filter((folder) => folder.id)
@@ -123,12 +119,11 @@ export class FoldersService {
           parentFolderId: folder.parentFolderId,
           childFolderCount: folder.childFolderCount ?? 0,
           userProfileId: userProfileId.toString(),
-          syncJobId: syncJobId.toString(),
         })),
     );
     await this.db
-      .update(syncJobsTable)
-      .set({ lastSyncedAt: new Date() })
-      .where(eq(syncJobsTable.id, syncJobId.toString()));
+      .update(userProfiles)
+      .set({ syncLastSyncedAt: new Date() })
+      .where(eq(userProfiles.id, userProfileId.toString()));
   }
 }

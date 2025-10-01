@@ -1,17 +1,9 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-  OnApplicationBootstrap,
-} from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
-import { and, eq } from 'drizzle-orm';
+import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { TypeID } from 'typeid-js';
-import { DRIZZLE, DrizzleDatabase, syncJobs } from '../drizzle';
+import { DRIZZLE, DrizzleDatabase, userProfiles } from '../drizzle';
 import { GraphClientFactory } from '../msgraph/graph-client.factory';
 import { FoldersService } from './folders/folders.service';
-import { SyncJob } from './sync.job';
 
 @Injectable()
 export class SyncService implements OnApplicationBootstrap {
@@ -25,6 +17,30 @@ export class SyncService implements OnApplicationBootstrap {
 
   public async onApplicationBootstrap() {
     // await this.startSyncRun();
+  }
+
+  public async enableSync(userProfileId: TypeID<'user_profile'>) {
+    await this.db
+      .update(userProfiles)
+      .set({ syncActivatedAt: new Date() })
+      .where(eq(userProfiles.id, userProfileId.toString()));
+    await this.foldersService.syncFolders(userProfileId);
+    
+    const userProfile = await this.db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userProfileId.toString()),
+      columns: {
+        syncActivatedAt: true,
+        syncDeactivatedAt: true,
+        syncLastSyncedAt: true,
+      },
+    });
+    if (!userProfile) throw new Error('User profile not found');
+    
+    return {
+      syncActivatedAt: userProfile.syncActivatedAt?.toISOString() ?? null,
+      syncDeactivatedAt: userProfile.syncDeactivatedAt?.toISOString() ?? null,
+      syncLastSyncedAt: userProfile.syncLastSyncedAt?.toISOString() ?? null,
+    };
   }
 
   // @Cron('0 */30 * * * *') // Every 30 minutes
@@ -45,25 +61,25 @@ export class SyncService implements OnApplicationBootstrap {
   //   this.logger.log({ msg: 'Sync run completed', results });
   // }
 
-  public async createSyncJob(userProfileId: TypeID<'user_profile'>) {
-    const syncJob = await this.db
-      .insert(syncJobs)
-      .values({ userProfileId: userProfileId.toString() })
-      .returning();
-    if (!syncJob[0]) throw new Error('Failed to create sync job');
-    await this.foldersService.syncFolders(
-      userProfileId,
-      TypeID.fromString(syncJob[0].id, 'sync_job'),
-    );
-    return syncJob;
-  }
+  // public async createSyncJob(userProfileId: TypeID<'user_profile'>) {
+  //   const syncJob = await this.db
+  //     .insert(syncJobs)
+  //     .values({ userProfileId: userProfileId.toString() })
+  //     .returning();
+  //   if (!syncJob[0]) throw new Error('Failed to create sync job');
+  //   await this.foldersService.syncFolders(
+  //     userProfileId,
+  //     TypeID.fromString(syncJob[0].id, 'sync_job'),
+  //   );
+  //   return syncJob;
+  // }
 
-  public async deleteSyncJob(userProfileId: string, syncJobId: string) {
-    return this.db
-      .update(syncJobs)
-      .set({ deactivatedAt: new Date() })
-      .where(and(eq(syncJobs.id, syncJobId), eq(syncJobs.userProfileId, userProfileId)));
-  }
+  // public async deleteSyncJob(userProfileId: string, syncJobId: string) {
+  //   return this.db
+  //     .update(syncJobs)
+  //     .set({ deactivatedAt: new Date() })
+  //     .where(and(eq(syncJobs.id, syncJobId), eq(syncJobs.userProfileId, userProfileId)));
+  // }
 
   // public async runSyncJob(userProfileId: TypeID<'user_profile'>, syncJobId: string) {
   //   this.logger.log({ msg: 'Manually run individual sync job', userProfileId, syncJobId });
