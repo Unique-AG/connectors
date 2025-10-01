@@ -149,10 +149,11 @@ describe('MetricsMiddleware', () => {
       middlewareControl: {} as never,
     };
 
-    const graphError = new GraphError(404, 'Not found', {
+    const graphError = new GraphError(404, 'Not found');
+    Object.assign(graphError, {
       statusCode: 404,
       code: 'itemNotFound',
-      message: 'Resource not found',
+      body: 'Resource not found',
     });
 
     mockNextMiddleware.execute.mockRejectedValue(graphError);
@@ -268,13 +269,12 @@ describe('MetricsMiddleware', () => {
     };
 
     const headers = new Headers({ 'x-request-id': '123' });
-    const graphError = new GraphError(500, 'Server error', {
+    const graphError = new GraphError(500, 'Server error');
+    Object.assign(graphError, {
       statusCode: 500,
       code: 'internalError',
-      message: 'Internal server error',
+      headers,
     });
-    // biome-ignore lint/suspicious/noExplicitAny: Test property assignment
-    (graphError as any).headers = headers;
 
     mockNextMiddleware.execute.mockRejectedValue(graphError);
 
