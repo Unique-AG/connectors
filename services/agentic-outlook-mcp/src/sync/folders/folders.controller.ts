@@ -1,5 +1,5 @@
 import { TokenValidationResult } from '@unique-ag/mcp-oauth';
-import { Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TypeID } from 'typeid-js';
 import { JwtGuard } from '../../jwt.guard';
@@ -22,11 +22,31 @@ export class FoldersController {
     return this.foldersService.getFolders(TypeID.fromString(user.userProfileId, 'user_profile'));
   }
 
-  @Patch()
-  @ApiOperation({ summary: 'Sync folders from Microsoft Graph for the authenticated user' })
-  @ApiResponse({ status: 200, description: 'Folders synced successfully' })
+  @Post(':folderId')
+  @ApiOperation({ summary: 'Activate sync for a folder.' })
+  @ApiResponse({ status: 200, description: 'Folder sync activated successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  public async updateFolders(@User() user: TokenValidationResult): Promise<void> {
-    return this.foldersService.syncFolders(TypeID.fromString(user.userProfileId, 'user_profile'));
+  public async updateFolders(
+    @User() user: TokenValidationResult,
+    @Param('folderId') folderId: string,
+  ): Promise<void> {
+    return this.foldersService.activateSync(
+      TypeID.fromString(user.userProfileId, 'user_profile'),
+      folderId,
+    );
+  }
+
+  @Delete(':folderId')
+  @ApiOperation({ summary: 'Deactivate sync for a folder.' })
+  @ApiResponse({ status: 200, description: 'Folder sync deactivated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  public async deactivateSync(
+    @User() user: TokenValidationResult,
+    @Param('folderId') folderId: string,
+  ): Promise<void> {
+    return this.foldersService.deactivateSync(
+      TypeID.fromString(user.userProfileId, 'user_profile'),
+      folderId,
+    );
   }
 }
