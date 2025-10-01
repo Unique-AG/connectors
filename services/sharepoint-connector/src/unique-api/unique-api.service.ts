@@ -67,6 +67,7 @@ export class UniqueApiService {
     fileList: FileDiffItem[],
     uniqueToken: string,
     siteName?: string,
+    driveId?: string,
   ): Promise<FileDiffResponse> {
     return await this.makeRateLimitedRequest(async () => {
       const ingestionUrl = this.configService.get<string>('uniqueApi.ingestionUrl') as string;
@@ -74,12 +75,12 @@ export class UniqueApiService {
       const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
       const basePath = this.configService.get<string>('uniqueApi.fileDiffBasePath') as string;
 
-      // Use dynamic partialKey based on site for path-based ingestion
+      // Use dynamic partialKey based on site and drive for path-based ingestion
       // For scope-based ingestion, use the configured partialKey
-      // For path-based ingestion, use site-specific partialKey to create separate directories
+      // For path-based ingestion, use site and drive-specific partialKey to create separate directories
       const partialKey: string = scopeId
         ? (this.configService.get<string>('uniqueApi.fileDiffPartialKey') as string)
-        : `sharepoint/${siteName ?? 'unknown-site'}`; // path-based: create site-specific directory
+        : `sharepoint/${siteName ?? 'unknown-site'}/${driveId ?? 'unknown-drive'}`; // path-based: create site and drive-specific directory
 
       const diffRequest: FileDiffRequest = {
         basePath,

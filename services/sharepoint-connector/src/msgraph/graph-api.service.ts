@@ -152,7 +152,7 @@ export class GraphApiService {
         }
       }
 
-      this.logger.log(
+      syncableFiles.length !== 0 && this.logger.log(
         `Found ${syncableFiles.length} syncable files in drive ${driveId}, item ${itemId}`,
       );
       return syncableFiles;

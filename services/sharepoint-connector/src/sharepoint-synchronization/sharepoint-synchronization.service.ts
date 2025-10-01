@@ -38,40 +38,22 @@ export class SharepointSynchronizationService {
       const sitesToScan = this.configService.get<string[]>('sharepoint.sites') as string[];
       this.logger.log(`Starting scan of ${sitesToScan.length} SharePoint sites...`);
 
-      const allFiles: DriveItem[] = [];
-
       for (const siteId of sitesToScan) {
         try {
           const files = await this.graphApiService.findAllSyncableFilesForSite(siteId);
           this.logger.log(`Found ${files.length} syncable files in site ${siteId}`);
-          allFiles.push(...files);
+
+          if (files.length === 0) {
+            continue;
+          }
+
+          await this.processSiteFiles(siteId, files);
         } catch (error) {
           this.logger.error(
-            `Failed to scan site ${siteId}:`,
+            `Failed during processing of site ${siteId}:`,
             error instanceof Error ? error.stack : String(error),
           );
         }
-      }
-
-      if (allFiles.length === 0) {
-        this.logger.log('No syncable files found across all sites');
-        return;
-      }
-
-      this.logger.log(`Total files found across all sites: ${allFiles.length}`);
-
-      // Group files by site for separate ingestion directories
-      const filesBySite = this.groupFilesBySite(allFiles);
-
-      for (const [siteName, siteFiles] of Object.entries(filesBySite)) {
-        this.logger.debug(`Processing ${siteFiles.length} files for site: ${siteName}`);
-
-        const diffResult = await this.calculateDiffForSite(siteFiles, siteName);
-        this.logger.debug(
-          `Site ${siteName}: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
-        );
-
-        await this.processFilesForSite(siteName, siteFiles, diffResult);
       }
 
       const scanDurationSeconds = (Date.now() - scanStartTime) / 1000;
@@ -86,24 +68,40 @@ export class SharepointSynchronizationService {
     }
   }
 
-  private groupFilesBySite(files: DriveItem[]): Record<string, DriveItem[]> {
+  private groupFilesByDrive(files: DriveItem[]): Record<string, DriveItem[]> {
     const grouped: Record<string, DriveItem[]> = {};
 
     for (const file of files) {
       const parentRef = file.parentReference as Record<string, unknown> | undefined;
-      const siteName = (parentRef?.siteName as string | undefined) ?? 'unknown-site';
+      const driveId = (parentRef?.driveId as string | undefined) ?? 'unknown-drive';
 
-      if (!grouped[siteName]) {
-        grouped[siteName] = [];
+      if (!grouped[driveId]) {
+        grouped[driveId] = [];
       }
-      grouped[siteName].push(file);
+      grouped[driveId].push(file);
     }
 
     return grouped;
   }
 
-  private async processFilesForSite(
-    siteName: string,
+  private async processSiteFiles(siteId: string, files: DriveItem[]): Promise<void> {
+    // Group files by drive within this site and process them by drive
+    const filesByDrive = this.groupFilesByDrive(files);
+
+    for (const [driveId, driveFiles] of Object.entries(filesByDrive)) {
+      this.logger.debug(`Processing ${driveFiles.length} files for drive: ${driveId}`);
+
+      const diffResult = await this.calculateDiffForDrive(driveFiles, siteId, driveId);
+      this.logger.debug(
+        `Drive ${driveId}: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
+      );
+
+      await this.processFilesForDrive(driveId, driveFiles, diffResult);
+    }
+  }
+
+  private async processFilesForDrive(
+    driveId: string,
     files: DriveItem[],
     diffResult: FileDiffResponse,
   ): Promise<void> {
@@ -114,11 +112,11 @@ export class SharepointSynchronizationService {
     });
 
     if (filesToProcess.length === 0) {
-      this.logger.debug(`No files need processing for site: ${siteName}`);
+      this.logger.debug(`No files need processing for drive: ${driveId}`);
       return;
     }
 
-    this.logger.log(`Processing ${filesToProcess.length} files for site: ${siteName}`);
+    this.logger.log(`Processing ${filesToProcess.length} files for drive: ${driveId}`);
 
     const concurrency = this.configService.get<number>('pipeline.processingConcurrency') as number;
     const limit = pLimit(concurrency);
@@ -140,12 +138,15 @@ export class SharepointSynchronizationService {
 
     const rejected = results.filter((r) => r.status === 'rejected');
     if (rejected.length > 0) {
-      this.logger.warn(`Site ${siteName}: Completed processing with ${rejected.length} failures`);
+      this.logger.warn(`Drive ${driveId}: Completed processing with ${rejected.length} failures`);
     }
   }
 
-
-  private async calculateDiffForSite(files: DriveItem[], siteName: string): Promise<FileDiffResponse> {
+  private async calculateDiffForDrive(
+    files: DriveItem[],
+    siteId: string,
+    driveId: string,
+  ): Promise<FileDiffResponse> {
     const fileDiffItems: FileDiffItem[] = files.map((file: DriveItem) => ({
       id: file.id,
       name: file.name,
@@ -155,7 +156,7 @@ export class SharepointSynchronizationService {
     }));
 
     const uniqueToken = await this.uniqueAuthService.getToken();
-    const diffResult = await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, siteName);
+    const diffResult = await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, siteId, driveId);
 
     return diffResult;
   }
