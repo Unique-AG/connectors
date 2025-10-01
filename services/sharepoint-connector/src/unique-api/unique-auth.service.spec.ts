@@ -12,6 +12,7 @@ describe('UniqueAuthService', () => {
 
   beforeEach(async () => {
     const { request } = await import('undici');
+    // biome-ignore lint/suspicious/noExplicitAny: Mock undici response type
     vi.mocked(request).mockResolvedValue({
       statusCode: 200,
       body: {
@@ -23,7 +24,7 @@ describe('UniqueAuthService', () => {
           id_token: 'id',
         }),
       },
-    });
+    } as any);
 
     const { unit } = await TestBed.solitary(UniqueAuthService)
       .mock(ConfigService)
@@ -57,3 +58,4 @@ describe('UniqueAuthService', () => {
     );
   });
 });
+

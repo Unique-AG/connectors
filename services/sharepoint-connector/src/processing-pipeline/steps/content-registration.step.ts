@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UniqueAuthService } from '../../auth/unique-auth.service';
+import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';

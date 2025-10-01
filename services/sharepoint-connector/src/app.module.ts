@@ -7,7 +7,6 @@ import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { AppConfig, appConfig } from './app.config';
-import { AuthModule } from './auth/auth.module';
 import { pipelineConfig } from './config/pipeline.config';
 import { sharepointConfig } from './config/sharepoint.config';
 import { uniqueApiConfig } from './config/unique-api.config';
@@ -60,7 +59,6 @@ import { Redacted } from './utils/redacted';
     HttpClientModule,
     SchedulerModule,
     SharepointSynchronizationModule,
-    AuthModule,
     MsGraphModule,
     UniqueApiModule,
   ],

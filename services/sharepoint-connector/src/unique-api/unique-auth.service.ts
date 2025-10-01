@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { request } from 'undici';
-import type { IAuthProvider } from './auth-provider.interface';
 
 @Injectable()
-export class UniqueAuthService implements IAuthProvider {
+export class UniqueAuthService {
   private readonly logger = new Logger(this.constructor.name);
   private cachedToken: string | null = null;
   private tokenExpirationTime: number | null = null;
@@ -83,3 +82,4 @@ export class UniqueAuthService implements IAuthProvider {
     );
   }
 }
+

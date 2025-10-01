@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UniqueAuthService } from '../../auth/unique-auth.service';
+import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
