@@ -1,4 +1,7 @@
-import { AlertTriangle, Calendar, FolderSync, Globe, Mail, RefreshCw, Trash2 } from 'lucide-react';
+import dayjs from 'dayjs';
+import LocalizedFormat from 'dayjs/plugin/localizedFormat';
+import { AlertTriangle, Calendar, FolderSync, Globe, Mail, Trash2 } from 'lucide-react';
+import { useMemo } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,80 +13,80 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { SyncStats } from '@/types/folder';
+import { FolderWithEmails, type UserProfile } from '../../lib/powersync/schema';
+
+dayjs.extend(LocalizedFormat);
 
 interface GlobalControlsProps {
-  stats: SyncStats;
+  userProfile: UserProfile;
+  folders: FolderWithEmails[];
   onToggleGlobalSync: (enabled: boolean) => void;
   onGlobalWipe: () => void;
   isLoading?: boolean;
 }
 
 export const GlobalControls = ({
-  stats,
+  userProfile,
+  folders,
   onToggleGlobalSync,
   onGlobalWipe,
   isLoading = false,
 }: GlobalControlsProps) => {
-  const formatDate = (date?: Date) => {
-    if (!date) return 'Never';
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  };
+  const syncEnabled = userProfile.syncActivatedAt && !userProfile.syncDeactivatedAt;
+  const totalEmails = useMemo(
+    () => folders.reduce((acc, folder) => acc + folder.emails.length, 0),
+    [folders],
+  );
+  const syncedFolders = useMemo(
+    () => folders.filter((folder) => folder.activatedAt && !folder.deactivatedAt),
+    [folders],
+  );
+  const totalFolders = folders.length;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Global Sync Control */}
       <Card className="shadow-medium">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Globe className="h-5 w-5 text-primary" />
-            Global Sync Control
+            Sync Control
           </CardTitle>
           <CardDescription>Enable or disable sync for all folders</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-medium">Global Sync Status</div>
+              <div className="font-medium">Sync Status</div>
               <div className="text-sm text-muted-foreground">
-                {stats.globalSyncEnabled
-                  ? 'All folder syncing enabled'
-                  : 'All folder syncing disabled'}
+                {syncEnabled ? 'All folder syncing enabled' : 'All folder syncing disabled'}
               </div>
             </div>
             <Switch
-              checked={stats.globalSyncEnabled}
+              checked={syncEnabled}
               onCheckedChange={onToggleGlobalSync}
               disabled={isLoading}
               className="data-[state=checked]:bg-primary"
             />
           </div>
 
-          <div className="pt-4 border-t">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              Last global sync: {formatDate(stats.lastGlobalSync)}
+          {userProfile.syncLastSyncedAt && (
+            <div className="pt-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                Last global sync: {dayjs(userProfile.syncLastSyncedAt).format('lll')}
+              </div>
             </div>
-          </div>
+          )}
 
-          {!stats.globalSyncEnabled && (
+          {!syncEnabled && (
             <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
                 <div className="text-sm">
-                  <div className="font-medium text-warning">Global sync disabled</div>
-                  <div className="text-muted-foreground">
-                    Individual folder sync settings are overridden
-                  </div>
+                  <div className="font-medium text-warning">Sync disabled</div>
                 </div>
               </div>
             </div>
@@ -103,18 +106,18 @@ export const GlobalControls = ({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center p-3 bg-primary/5 rounded-lg">
-              <div className="text-2xl font-bold text-primary">{stats.syncedFolders}</div>
+              <div className="text-2xl font-bold text-primary">{syncedFolders.length}</div>
               <div className="text-sm text-muted-foreground">Active Folders</div>
             </div>
             <div className="text-center p-3 bg-muted rounded-lg">
-              <div className="text-2xl font-bold text-foreground">{stats.totalFolders}</div>
+              <div className="text-2xl font-bold text-foreground">{totalFolders}</div>
               <div className="text-sm text-muted-foreground">Total Folders</div>
             </div>
           </div>
 
           <div className="flex items-center gap-2 text-sm">
             <Mail className="h-4 w-4 text-primary" />
-            <span className="font-medium">{stats.totalEmails.toLocaleString()}</span>
+            <span className="font-medium">{totalEmails.toLocaleString()}</span>
             <span className="text-muted-foreground">emails synced</span>
           </div>
 
@@ -122,10 +125,7 @@ export const GlobalControls = ({
             <div
               className="bg-gradient-primary h-2 rounded-full transition-all duration-300"
               style={{
-                width:
-                  stats.totalFolders > 0
-                    ? `${(stats.syncedFolders / stats.totalFolders) * 100}%`
-                    : '0%',
+                width: totalFolders > 0 ? `${(syncedFolders.length / totalFolders) * 100}%` : '0%',
               }}
             />
           </div>
@@ -158,7 +158,7 @@ export const GlobalControls = ({
                 <Button
                   variant="destructive"
                   className="w-full"
-                  disabled={isLoading || stats.totalEmails === 0}
+                  disabled={isLoading || totalEmails === 0}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Wipe All Data
@@ -171,9 +171,8 @@ export const GlobalControls = ({
                     Confirm Global Data Wipe
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action will permanently delete all {stats.totalEmails.toLocaleString()}
-                    synced emails from all {stats.totalFolders} folders. This action cannot be
-                    undone.
+                    This action will permanently delete all {totalEmails.toLocaleString()}
+                    synced emails from all {totalFolders} folders. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -189,7 +188,7 @@ export const GlobalControls = ({
             </AlertDialog>
           </div>
 
-          {stats.totalEmails === 0 && (
+          {totalEmails === 0 && (
             <div className="text-center text-sm text-muted-foreground">No data to wipe</div>
           )}
         </CardContent>

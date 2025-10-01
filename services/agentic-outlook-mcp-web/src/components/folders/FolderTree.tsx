@@ -1,3 +1,5 @@
+import dayjs from 'dayjs';
+import LocalizedFormat from 'dayjs/plugin/localizedFormat';
 import {
   Calendar,
   ChevronDown,
@@ -14,18 +16,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { OutlookFolder } from '@/types/folder';
+import { FolderWithEmails } from '../../lib/powersync/schema';
+
+dayjs.extend(LocalizedFormat);
+
+type FolderWithChildren = FolderWithEmails & { children: FolderWithChildren[] };
 
 interface FolderTreeProps {
-  folders: OutlookFolder[];
+  folders: FolderWithEmails[];
   onToggleSync: (folderId: string, enabled: boolean) => void;
   onWipeFolder: (folderId: string) => void;
-  onRefresh: () => void;
+  onResync: () => void;
   isRefreshing?: boolean;
 }
 
 interface FolderItemProps {
-  folder: OutlookFolder;
+  folder: FolderWithChildren;
   level: number;
   onToggleSync: (folderId: string, enabled: boolean) => void;
   onWipeFolder: (folderId: string) => void;
@@ -34,19 +40,10 @@ interface FolderItemProps {
 const FolderItem = ({ folder, level, onToggleSync, onWipeFolder }: FolderItemProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = folder.children && folder.children.length > 0;
-
-  const formatDate = (date?: Date) => {
-    if (!date) return 'Never';
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  };
+  const syncEnabled = folder.activatedAt && !folder.deactivatedAt;
 
   const getSyncStatusBadge = () => {
-    if (folder.syncEnabled) {
+    if (syncEnabled) {
       return (
         <Badge variant="outline" className="bg-success/10 text-success border-success/20">
           Active
@@ -65,7 +62,7 @@ const FolderItem = ({ folder, level, onToggleSync, onWipeFolder }: FolderItemPro
       <Card
         className={cn(
           'transition-all duration-200 hover:shadow-medium',
-          folder.syncEnabled && 'border-l-4 border-l-primary',
+          syncEnabled && 'border-l-4 border-l-primary',
         )}
       >
         <CardContent className="p-4">
@@ -109,27 +106,27 @@ const FolderItem = ({ folder, level, onToggleSync, onWipeFolder }: FolderItemPro
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Mail className="h-3 w-3" />
-                  {folder.emailCount} emails
+                  {folder.emails?.length || 0} emails
                 </div>
 
-                {folder.syncEnabled && folder.syncActivatedAt && (
+                {syncEnabled && folder.activatedAt && (
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    Activated: {formatDate(folder.syncActivatedAt)}
+                    Activated: {dayjs(folder.activatedAt).format('lll')}
                   </div>
                 )}
 
-                {folder.syncEnabled && folder.lastSyncAt && (
+                {syncEnabled && folder.lastSyncedAt && (
                   <div className="flex items-center gap-1">
                     <RefreshCw className="h-3 w-3" />
-                    Last sync: {formatDate(folder.lastSyncAt)}
+                    Last sync: {dayjs(folder.lastSyncedAt).format('lll')}
                   </div>
                 )}
 
-                {!folder.syncEnabled && folder.syncDeactivatedAt && (
+                {!syncEnabled && folder.deactivatedAt && (
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    Deactivated: {formatDate(folder.syncDeactivatedAt)}
+                    Deactivated: {dayjs(folder.deactivatedAt).format('lll')}
                   </div>
                 )}
               </div>
@@ -138,12 +135,12 @@ const FolderItem = ({ folder, level, onToggleSync, onWipeFolder }: FolderItemPro
             {/* Controls */}
             <div className="flex items-center gap-2">
               <Switch
-                checked={folder.syncEnabled}
+                checked={syncEnabled}
                 onCheckedChange={(enabled) => onToggleSync(folder.id, enabled)}
                 className="data-[state=checked]:bg-primary"
               />
 
-              {!folder.syncEnabled && folder.emailCount > 0 && (
+              {!syncEnabled && folder.emails?.length && folder.emails.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -162,7 +159,7 @@ const FolderItem = ({ folder, level, onToggleSync, onWipeFolder }: FolderItemPro
       {/* Child Folders */}
       {hasChildren && isExpanded && (
         <div className="ml-6 space-y-2">
-          {folder.children!.map((child) => (
+          {folder.children.map((child) => (
             <FolderItem
               key={child.id}
               folder={child}
@@ -177,13 +174,44 @@ const FolderItem = ({ folder, level, onToggleSync, onWipeFolder }: FolderItemPro
   );
 };
 
+const buildFolderTree = (
+  folders: FolderWithEmails[]
+): FolderWithChildren[] => {
+  const folderMap = new Map<string, FolderWithChildren>();
+  const rootFolders: FolderWithChildren[] = [];
+
+  folders.forEach((folder) => {
+    folderMap.set(folder.folderId, { ...folder, children: [] });
+  });
+
+  folders.forEach((folder) => {
+    const folderWithChildren = folderMap.get(folder.folderId);
+    if (!folderWithChildren) return;
+
+    if (folder.parentFolderId) {
+      const parent = folderMap.get(folder.parentFolderId);
+      if (parent) {
+        parent.children.push(folderWithChildren);
+      } else {
+        rootFolders.push(folderWithChildren);
+      }
+    } else {
+      rootFolders.push(folderWithChildren);
+    }
+  });
+
+  return rootFolders;
+};
+
 export const FolderTree = ({
   folders,
   onToggleSync,
   onWipeFolder,
-  onRefresh,
+  onResync,
   isRefreshing = false,
 }: FolderTreeProps) => {
+  const folderTree = buildFolderTree(folders);
+
   return (
     <Card className="shadow-medium">
       <CardHeader>
@@ -193,13 +221,13 @@ export const FolderTree = ({
             Outlook Folders
           </CardTitle>
           <Button
-            onClick={onRefresh}
+            onClick={onResync}
             variant="outline"
             disabled={isRefreshing}
             className="hover:bg-primary hover:text-primary-foreground"
           >
             <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
-            Refresh
+            Resync Folders
           </Button>
         </div>
       </CardHeader>
@@ -207,10 +235,10 @@ export const FolderTree = ({
         {folders.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Folder className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No folders found. Click refresh to sync with Outlook.</p>
+            <p>No folders found. Click resync to sync with Outlook.</p>
           </div>
         ) : (
-          folders.map((folder) => (
+          folderTree.map((folder) => (
             <FolderItem
               key={folder.id}
               folder={folder}
