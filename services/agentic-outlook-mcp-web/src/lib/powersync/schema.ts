@@ -15,27 +15,15 @@ export const userProfiles = sqliteTable('user_profiles', {
   email: text('email'),
   displayName: text('display_name'),
   avatarUrl: text('avatar_url'),
+  syncActivatedAt: text('sync_activated_at'),
+  syncDeactivatedAt: text('sync_deactivated_at'),
+  syncLastSyncedAt: text('sync_last_synced_at'),
   ...timestamps,
 });
 
 export const userProfilesRelations = relations(userProfiles, ({ many }) => ({
-  syncJobs: many(syncJobs),
   folders: many(folders),
   emails: many(emails),
-}));
-
-export const syncJobs = sqliteTable('sync_jobs', {
-  id: text('id').primaryKey(),
-  userProfileId: text('user_profile_id'),
-  ...timestamps,
-});
-
-export const syncJobsRelations = relations(syncJobs, ({ one, many }) => ({
-  userProfile: one(userProfiles, {
-    fields: [syncJobs.userProfileId],
-    references: [userProfiles.id],
-  }),
-  folders: many(folders),
 }));
 
 export const folders = sqliteTable('folders', {
@@ -60,10 +48,6 @@ export const foldersRelations = relations(folders, ({ one, many }) => ({
     fields: [folders.userProfileId],
     references: [userProfiles.id],
   }),
-  syncJob: one(syncJobs, {
-    fields: [folders.syncJobId],
-    references: [syncJobs.id],
-  }),
   emails: many(emails),
 }));
 
@@ -86,9 +70,11 @@ export const emailsRelations = relations(emails, ({ one }) => ({
 
 export const drizzleSchema = {
   userProfiles,
-  syncJobs,
+  userProfilesRelations,
   folders,
+  foldersRelations,
   emails,
+  emailsRelations,
 };
 
 export const schema = new DrizzleAppSchema(drizzleSchema);
@@ -115,6 +101,6 @@ export type InferResultType<
 >;
 
 export type UserProfile = typeof userProfiles.$inferSelect;
-export type SyncJob = typeof syncJobs.$inferSelect;
 export type Folder = typeof folders.$inferSelect;
 export type Email = typeof emails.$inferSelect;
+export type FolderWithEmails = Folder & { emails: Email[] };
