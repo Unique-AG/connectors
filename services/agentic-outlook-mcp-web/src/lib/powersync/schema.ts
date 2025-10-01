@@ -1,5 +1,10 @@
 import { DrizzleAppSchema } from '@powersync/drizzle-driver';
-import { BuildQueryResult, DBQueryConfig, ExtractTablesWithRelations, relations } from 'drizzle-orm';
+import {
+  BuildQueryResult,
+  DBQueryConfig,
+  ExtractTablesWithRelations,
+  relations,
+} from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 const timestamps = {
@@ -21,11 +26,6 @@ export const userProfiles = sqliteTable('user_profiles', {
   ...timestamps,
 });
 
-export const userProfilesRelations = relations(userProfiles, ({ many }) => ({
-  folders: many(folders),
-  emails: many(emails),
-}));
-
 export const folders = sqliteTable('folders', {
   id: text('id').primaryKey(),
   name: text('name'),
@@ -43,6 +43,12 @@ export const folders = sqliteTable('folders', {
   ...timestamps,
 });
 
+export const emails = sqliteTable('emails', {
+  id: text('id').primaryKey(),
+  userProfileId: text('user_profile_id'),
+  folderId: text('folder_id'),
+});
+
 export const foldersRelations = relations(folders, ({ one, many }) => ({
   userProfile: one(userProfiles, {
     fields: [folders.userProfileId],
@@ -50,12 +56,6 @@ export const foldersRelations = relations(folders, ({ one, many }) => ({
   }),
   emails: many(emails),
 }));
-
-export const emails = sqliteTable('emails', {
-  id: text('id').primaryKey(),
-  userProfileId: text('user_profile_id'),
-  folderId: text('folder_id'),
-});
 
 export const emailsRelations = relations(emails, ({ one }) => ({
   userProfile: one(userProfiles, {
@@ -66,6 +66,11 @@ export const emailsRelations = relations(emails, ({ one }) => ({
     fields: [emails.folderId],
     references: [folders.id],
   }),
+}));
+
+export const userProfilesRelations = relations(userProfiles, ({ many }) => ({
+  folders: many(folders),
+  emails: many(emails),
 }));
 
 export const drizzleSchema = {

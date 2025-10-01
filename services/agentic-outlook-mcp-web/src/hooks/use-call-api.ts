@@ -5,19 +5,35 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
 export const useCallApi = () => {
   const { user } = useAuth();
 
-  const callApi = async <TResponse>(
+  function callApi<TResponse>(
     apiFunction: (options?: RequestInit) => Promise<TResponse>,
     options?: RequestInit,
-  ): Promise<TResponse> => {
+  ): Promise<TResponse>;
+
+  function callApi<TParams, TResponse>(
+    apiFunction: (params: TParams, options?: RequestInit) => Promise<TResponse>,
+    params: TParams,
+    options?: RequestInit,
+  ): Promise<TResponse>;
+
+  async function callApi<TParams, TResponse>(
+    apiFunction: ((options?: RequestInit) => Promise<TResponse>) | ((params: TParams, options?: RequestInit) => Promise<TResponse>),
+    paramsOrOptions?: TParams | RequestInit,
+    maybeOptions?: RequestInit,
+  ): Promise<TResponse> {
     const { access_token } = user || {};
     if (!access_token) throw new Error('User not authenticated.');
 
-    const headers = new Headers(options?.headers);
-    headers.set('Authorization', `Bearer ${access_token}`);
+    const isParamsProvided = apiFunction.length > 1;
+    const params = isParamsProvided ? paramsOrOptions as TParams : undefined;
+    const options = isParamsProvided ? maybeOptions : paramsOrOptions as RequestInit | undefined;
 
     const enrichedOptions: RequestInit = {
       ...options,
-      headers,
+      headers: {
+        ...options?.headers,
+        Authorization: `Bearer ${access_token}`,
+      },
     };
 
     const originalFetch = window.fetch;
@@ -40,11 +56,14 @@ export const useCallApi = () => {
     };
 
     try {
-      return await apiFunction(enrichedOptions);
+      if (isParamsProvided) {
+        return await (apiFunction as (params: TParams, options?: RequestInit) => Promise<TResponse>)(params as TParams, enrichedOptions);
+      }
+      return await (apiFunction as (options?: RequestInit) => Promise<TResponse>)(enrichedOptions);
     } finally {
       window.fetch = originalFetch;
     }
-  };
+  }
 
   return { callApi };
 };
