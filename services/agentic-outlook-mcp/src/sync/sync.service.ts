@@ -19,6 +19,12 @@ export class SyncService {
       .update(userProfiles)
       .set({ syncActivatedAt: new Date() })
       .where(eq(userProfiles.id, userProfileId.toString()));
+    await this.db
+      .update(userProfiles)
+      .set({ syncDeactivatedAt: null })
+      .where(eq(userProfiles.id, userProfileId.toString()));
+
+    // When sync is enabled, we catch or refresh all folders
     await this.foldersService.syncFolders(userProfileId);
 
     const userProfile = await this.db.query.userProfiles.findFirst({

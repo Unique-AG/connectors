@@ -16,12 +16,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { FolderWithEmails, type UserProfile } from '../../lib/powersync/schema';
+import { FolderWithEmails } from '../../lib/powersync/schema';
 
 dayjs.extend(LocalizedFormat);
 
 interface GlobalControlsProps {
-  userProfile: UserProfile;
+  syncEnabled: boolean;
+  lastSyncedAt: string;
   folders: FolderWithEmails[];
   onToggleGlobalSync: (enabled: boolean) => void;
   onGlobalWipe: () => void;
@@ -29,13 +30,13 @@ interface GlobalControlsProps {
 }
 
 export const GlobalControls = ({
-  userProfile,
+  syncEnabled,
+  lastSyncedAt,
   folders,
   onToggleGlobalSync,
   onGlobalWipe,
   isLoading = false,
 }: GlobalControlsProps) => {
-  const syncEnabled = userProfile.syncActivatedAt && !userProfile.syncDeactivatedAt;
   const totalEmails = useMemo(
     () => folders.reduce((acc, folder) => acc + folder.emails.length, 0),
     [folders],
@@ -72,11 +73,11 @@ export const GlobalControls = ({
             />
           </div>
 
-          {userProfile.syncLastSyncedAt && (
+          {lastSyncedAt && (
             <div className="pt-4 border-t">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                Last global sync: {dayjs(userProfile.syncLastSyncedAt).format('lll')}
+                Last global sync: {dayjs(lastSyncedAt).format('lll')}
               </div>
             </div>
           )}

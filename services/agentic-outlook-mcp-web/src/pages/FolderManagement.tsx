@@ -1,12 +1,15 @@
 import { toCompilableQuery } from '@powersync/drizzle-driver';
 import { useQuery } from '@powersync/react';
 import { useState } from 'react';
-import { foldersControllerUpdateFolders } from '@/@generated/folders/folders';
-import { syncControllerCreateSyncJob } from '@/@generated/sync/sync';
 import { FolderTree } from '@/components/folders/FolderTree';
 import { GlobalControls } from '@/components/folders/GlobalControls';
 import { useCallApi } from '@/hooks/use-call-api';
 import { useToast } from '@/hooks/use-toast';
+import {
+  syncControllerActivateSync,
+  syncControllerDeactivateSync,
+  syncControllerSyncFolders,
+} from '../@generated/sync/sync';
 import { db } from '../lib/powersync/database';
 import { UserProfile } from '../lib/powersync/schema';
 
@@ -18,7 +21,9 @@ export default function FolderManagement() {
 
   // We only sync the user profile of the authenticated user
   const { data: userProfiles } = useQuery(toCompilableQuery(db.query.userProfiles.findFirst({})));
-  const userProfile = userProfiles?.[0];
+  // The type inference is broken. We need to manually cast it to UserProfile.
+  const userProfile = userProfiles?.[0] as unknown as UserProfile;
+  const syncEnabled = userProfile?.syncActivatedAt && !userProfile?.syncDeactivatedAt;
 
   const { data: folders } = useQuery(
     toCompilableQuery(
@@ -30,7 +35,7 @@ export default function FolderManagement() {
     ),
   );
 
-  const handleToggleSync = async (folderId: string, enabled: boolean) => {
+  const handleToggleFolderSync = async (folderId: string, enabled: boolean) => {
     setIsLoading(true);
 
     // try {
@@ -83,7 +88,7 @@ export default function FolderManagement() {
     setIsRefreshing(true);
 
     try {
-      const response = await callApi(foldersControllerUpdateFolders);
+      const response = await callApi(syncControllerSyncFolders);
 
       if (response.status === 200) {
         toast({
@@ -107,12 +112,21 @@ export default function FolderManagement() {
 
     try {
       if (enabled) {
-        const response = await callApi(syncControllerCreateSyncJob);
+        const response = await callApi(syncControllerActivateSync);
 
         if (response.status === 201) {
           toast({
             title: 'Sync Enabled',
             description: 'All folder syncing has been enabled.',
+          });
+        }
+      } else {
+        const response = await callApi(syncControllerDeactivateSync, { wipeData: false });
+
+        if (response.status === 200) {
+          toast({
+            title: 'Sync Disabled',
+            description: 'All folder syncing has been disabled.',
           });
         }
       }
@@ -127,13 +141,6 @@ export default function FolderManagement() {
     }
 
     setIsLoading(false);
-
-    if (!enabled) {
-      toast({
-        title: 'Sync Disabled',
-        description: 'All folder syncing has been disabled.',
-      });
-    }
   };
 
   const handleGlobalWipe = async () => {
@@ -163,7 +170,8 @@ export default function FolderManagement() {
       </div>
 
       <GlobalControls
-        userProfile={userProfile as unknown as UserProfile}
+        syncEnabled={syncEnabled}
+        lastSyncedAt={userProfile.syncLastSyncedAt}
         folders={folders}
         onToggleGlobalSync={handleToggleGlobalSync}
         onGlobalWipe={handleGlobalWipe}
@@ -171,8 +179,9 @@ export default function FolderManagement() {
       />
 
       <FolderTree
+        syncEnabled={syncEnabled}
         folders={folders}
-        onToggleSync={handleToggleSync}
+        onToggleSync={handleToggleFolderSync}
         onWipeFolder={handleWipeFolder}
         onResync={handleResync}
         isRefreshing={isRefreshing}

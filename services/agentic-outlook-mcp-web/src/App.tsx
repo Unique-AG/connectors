@@ -7,11 +7,8 @@ import { Toaster as Sonner } from '@/components/ui/sonner';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import getOidcConfig from '@/config/oidc.config';
-import Analytics from './pages/Analytics';
 import FolderManagement from './pages/FolderManagement';
 import NotFound from './pages/NotFound';
-import Settings from './pages/Settings';
-import Users from './pages/Users';
 import { SystemProvider } from './providers/SystemProvider';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -51,30 +48,6 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <FolderManagement />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/analytics"
-                element={
-                  <ProtectedRoute>
-                    <Analytics />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/users"
-                element={
-                  <ProtectedRoute>
-                    <Users />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <Settings />
                   </ProtectedRoute>
                 }
               />
