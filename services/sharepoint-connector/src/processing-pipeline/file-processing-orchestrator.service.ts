@@ -22,29 +22,29 @@ export class FileProcessingOrchestratorService {
     const concurrency = this.configService.get<number>('pipeline.processingConcurrency') as number;
 
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);
-    const siteFiles = files.filter(
+    const filesToProcess = files.filter(
       (file) =>
         file.parentReference?.siteId === siteId && newFileKeys.has(`sharepoint_file_${file.id}`),
     );
-    if (siteFiles.length === 0) {
+    if (filesToProcess.length === 0) {
       this.logger.debug(`No files to process for site ${siteId}`);
       return;
     }
 
     this.logger.log(
-      `Processing ${siteFiles.length} files for site ${siteId} with concurrency=${concurrency}`,
+      `Processing ${filesToProcess.length} files for site ${siteId} with concurrency=${concurrency}`,
     );
 
     const limit = pLimit(concurrency);
     const results = await Promise.allSettled(
-      siteFiles.map((file) =>
+      filesToProcess.map((file) =>
         limit(async () => {
           await this.processingPipelineService.processFile(file);
         }),
       ),
     );
 
-    const rejected = results.filter((r) => r.status === 'rejected');
+    const rejected = results.filter((result) => result.status === 'rejected');
     if (rejected.length > 0) {
       this.logger.warn(`Completed processing with ${rejected.length} failures for site ${siteId}`);
     }

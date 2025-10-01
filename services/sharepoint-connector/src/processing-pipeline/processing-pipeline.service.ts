@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { DriveItem } from '@microsoft/microsoft-graph-types';
+import {DriveItem, FieldValueSet} from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -12,7 +12,7 @@ import type { PipelineResult, ProcessingContext } from './types/processing-conte
 @Injectable()
 export class ProcessingPipelineService {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly steps: IPipelineStep[];
+  private readonly fileProcessingSteps: IPipelineStep[];
   private readonly stepTimeoutMs: number;
 
   public constructor(
@@ -22,7 +22,7 @@ export class ProcessingPipelineService {
     private readonly storageUploadStep: StorageUploadStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
   ) {
-    this.steps = [
+    this.fileProcessingSteps = [
       this.contentFetchingStep,
       this.contentRegistrationStep,
       this.storageUploadStep,
@@ -47,7 +47,7 @@ export class ProcessingPipelineService {
       metadata: {
         mimeType: file.file?.mimeType ?? undefined,
         isFolder: Boolean(file.folder),
-        listItemFields: (file.listItem?.fields as Record<string, unknown>) ?? undefined,
+        listItemFields: (file.listItem?.fields as Record<string, FieldValueSet>),
         driveId: file.parentReference?.driveId ?? undefined,
         siteId: file.parentReference?.siteId ?? undefined,
         lastModifiedDateTime: file.lastModifiedDateTime ?? undefined,
@@ -59,56 +59,64 @@ export class ProcessingPipelineService {
 
     try {
       this.logger.log(`[${correlationId}] Starting pipeline for file: ${file.name} (${file.id})`);
-      for (let i = 0; i < this.steps.length; i++) {
-        currentStepIndex = i;
-        const step = this.steps[i];
+      for (let stepIndex = 0; stepIndex < this.fileProcessingSteps.length; stepIndex++) {
+        currentStepIndex = stepIndex;
+        const step = this.fileProcessingSteps[stepIndex];
+
         if (!step) continue;
         this.logger.debug(
-          `[${correlationId}] Executing step ${i + 1}/${this.steps.length}: ${step.stepName}`,
+          `[${correlationId}] Executing step ${stepIndex + 1}/${this.fileProcessingSteps.length}: ${step.stepName}`,
         );
+
         await this.executeStepWithTimeout(step, context);
+
         completedSteps.push(step.stepName);
-        this.logger.log(`[${correlationId}] Completed step: ${step.stepName}`);
+        this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
+
         await this.cleanupStep(step, context);
       }
+
       const totalDuration = Date.now() - startTime.getTime();
       this.logger.log(
         `[${correlationId}] Pipeline completed successfully in ${totalDuration}ms for file: ${file.name}`,
       );
+
       await this.finalCleanup(context);
       return { success: true, context, completedSteps, totalDuration };
     } catch (error) {
       const totalDuration = Date.now() - startTime.getTime();
       this.logger.error(
-        `[${correlationId}] Pipeline failed at step: ${this.steps[currentStepIndex]?.stepName} after ${totalDuration}ms`,
+        `[${correlationId}] Pipeline failed at step: ${this.fileProcessingSteps[currentStepIndex]?.stepName} after ${totalDuration}ms`,
         error instanceof Error ? error.stack : String(error),
       );
-      const step = this.steps[currentStepIndex];
+
+      const step = this.fileProcessingSteps[currentStepIndex];
       if (step?.cleanup) {
         await this.cleanupStep(step, context);
       }
+
       return { success: false, context, error: error as Error, completedSteps, totalDuration };
     }
   }
 
   private async executeStepWithTimeout(
-    step: IPipelineStep,
+    fileProcessingStep: IPipelineStep,
     context: ProcessingContext,
   ): Promise<void> {
-    const timeoutPromise = new Promise<never>((_resolve, _reject) => {
+    const timeoutPromise = new Promise((_resolve, _reject) => {
       setTimeout(() => {
         _reject(
           new Error(
-            `Step ${String(step.stepName)} timed out after ${String(this.stepTimeoutMs)}ms`,
+            `Step ${String(fileProcessingStep.stepName)} timed out after ${String(this.stepTimeoutMs)}ms`,
           ),
         );
       }, this.stepTimeoutMs);
     });
     try {
-      await Promise.race([step.execute(context), timeoutPromise]);
+      await Promise.race([fileProcessingStep.execute(context), timeoutPromise]);
     } catch (error) {
       this.logger.error(
-        `[${context.correlationId}] Step ${String(step.stepName)} failed: ${String(
+        `[${context.correlationId}] Step ${String(fileProcessingStep.stepName)} failed: ${String(
           (error as Error).message,
         )}`,
       );

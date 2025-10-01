@@ -80,7 +80,7 @@ export class GraphApiService {
         chunks.push(bufferChunk);
       }
 
-      this.logger.log(`File download completed. Total size: ${totalSize} bytes.`);
+      this.logger.debug(`File download completed. Total size: ${totalSize} bytes.`);
       return Buffer.concat(chunks);
     } catch (error) {
       this.logger.error(`Failed to download file content for item ${itemId}:`, error);
@@ -132,6 +132,7 @@ export class GraphApiService {
       return syncableFiles;
     } catch (error) {
       this.logger.error(`Failed to fetch items for drive ${driveId}, item ${itemId}:`, error);
+      // TODO: probably we should not throw here, we want to continue scanning (add retry mechanism) - check implications with file-diffing
       throw error;
     }
   }
@@ -166,6 +167,7 @@ export class GraphApiService {
       nextPageUrl = response['@odata.nextLink'] || '';
     }
 
+    // TODO check if I can filter by FinanceGPTKnowledge fields when sending the request
     return itemsInFolder;
   }
 

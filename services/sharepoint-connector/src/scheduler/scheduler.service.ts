@@ -25,7 +25,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     this.isShuttingDown = true;
     this.destroyCronJobs();
   }
-
+  // TODO switch to kubernetes cron job
   @Cron(CRON_EVERY_15_MINUTES)
   public async runScheduledScan(): Promise<void> {
     if (this.isShuttingDown) {

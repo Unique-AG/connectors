@@ -48,10 +48,12 @@ export class IngestionFinalizationStep implements IPipelineStep {
           context.uniqueContentId ?? '',
         )}`,
       );
+
       const finalizationResponse = await this.uniqueApiService.finalizeIngestion(
         finalizationRequest,
         uniqueToken,
       );
+
       context.metadata.finalization = finalizationResponse;
       context.metadata.finalContentId = finalizationResponse.id ?? '';
       const _stepDuration = Date.now() - stepStartTime;

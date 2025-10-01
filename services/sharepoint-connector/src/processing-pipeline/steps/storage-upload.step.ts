@@ -29,8 +29,10 @@ export class StorageUploadStep implements IPipelineStep {
       this.logger.debug(
         `[${context.correlationId}] Uploading ${fileSizeKB}KB to storage: ${context.uploadUrl}`,
       );
+
       await this.performUpload(context);
       const _stepDuration = Date.now() - stepStartTime;
+
       return context;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -50,15 +52,18 @@ export class StorageUploadStep implements IPipelineStep {
     const uploadUrl = context.uploadUrl ?? '';
     const contentBuffer = context.contentBuffer ?? Buffer.alloc(0);
     const mimeType = context.metadata.mimeType ?? DEFAULT_MIME_TYPE;
+
     try {
       const response = await request(uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': mimeType, 'x-ms-blob-type': 'BlockBlob' },
         body: contentBuffer,
       });
+
       if (response.statusCode < 200 || response.statusCode >= HTTP_STATUS_OK_MAX) {
         throw new Error(`Upload failed with status ${response.statusCode}`);
       }
+
       this.logger.debug(`[${context.correlationId}] Upload completed successfully`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

@@ -143,10 +143,12 @@ export class UniqueApiService {
           this.getContentUpsertMutation(),
           variables,
         );
+
         const id = result?.contentUpsert?.id;
         if (!id) {
           throw new Error('Invalid response from Unique API ingestion finalization');
         }
+
         return { id };
       } catch (error) {
         this.logger.error(

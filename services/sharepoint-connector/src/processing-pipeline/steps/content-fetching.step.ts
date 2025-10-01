@@ -23,11 +23,14 @@ export class ContentFetchingStep implements IPipelineStep {
       );
       const driveId = this.extractDriveId(context);
       const itemId = context.fileId;
+
       if (!driveId) {
         throw new Error('Drive ID not found in file metadata');
       }
+
       this.validateMimeType(context.metadata.mimeType, context.correlationId);
       const contentBuffer = await this.apiService.downloadFileContent(driveId, itemId);
+
       context.contentBuffer = contentBuffer;
       context.fileSize = contentBuffer.length;
       this.logger.debug(
@@ -35,6 +38,7 @@ export class ContentFetchingStep implements IPipelineStep {
           Math.round(contentBuffer.length / 1024 / 1024),
         )}MB)`,
       );
+
       const _stepDuration = Date.now() - stepStartTime;
       return context;
     } catch (error) {
