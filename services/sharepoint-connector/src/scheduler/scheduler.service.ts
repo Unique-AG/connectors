@@ -25,6 +25,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     this.isShuttingDown = true;
     this.destroyCronJobs();
   }
+
   // TODO switch to kubernetes cron job
   @Cron(CRON_EVERY_15_MINUTES)
   public async runScheduledScan(): Promise<void> {
@@ -35,7 +36,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
 
     try {
       this.logger.log('Scheduler triggered');
+
       await this.sharepointScanner.synchronize();
+
       this.logger.log('SharePoint scan completed successfully.');
     } catch (error) {
       this.logger.error(

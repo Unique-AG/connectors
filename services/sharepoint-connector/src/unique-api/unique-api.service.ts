@@ -31,6 +31,7 @@ export class UniqueApiService {
   ): Promise<IngestionApiResponse> {
     return await this.makeRateLimitedRequest(async () => {
       try {
+        this.logger.log('Content registration request object: ' + JSON.stringify(request, null, 2));
         const client = this.createGraphqlClient(uniqueToken);
         const variables = {
           input: {
@@ -38,13 +39,18 @@ export class UniqueApiService {
             title: request.title,
             mimeType: request.mimeType,
             ownerType: this.mapOwnerType(request.ownerType),
+            url: request.url,
           },
           scopeId: request.scopeId,
           sourceOwnerType: request.sourceOwnerType,
           sourceKind: request.sourceKind,
           sourceName: request.sourceName,
           storeInternally: true,
+          baseUrl: request.baseUrl,
         };
+
+        this.logger.log('Content registration request body variables: ' + JSON.stringify(variables, null, 2));
+
         const result = await client.request<{ contentUpsert?: IngestionApiResponse }>(
           this.getContentUpsertMutation(),
           variables,
@@ -70,7 +76,7 @@ export class UniqueApiService {
     return await this.makeRateLimitedRequest(async () => {
       const ingestionUrl = this.configService.get<string>('uniqueApi.ingestionUrl') as string;
       const fileDiffUrl = `${ingestionUrl}/file-diff`;
-      const scopeId = this.configService.get<string>('uniqueApi.scopeId') as string;
+      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
       const basePath = this.configService.get<string>('uniqueApi.fileDiffBasePath') as string;
       const partialKey = this.configService.get<string>('uniqueApi.fileDiffPartialKey') as string;
 
@@ -80,7 +86,7 @@ export class UniqueApiService {
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         sourceName: 'SharePoint Online Connector',
         fileList,
-        scope: scopeId,
+        scope: scopeId ?? 'PATH',
       };
 
       try {
@@ -123,6 +129,7 @@ export class UniqueApiService {
   ): Promise<{ id: string }> {
     return await this.makeRateLimitedRequest(async () => {
       try {
+        this.logger.log('Ingestion finalization request object: ' + JSON.stringify(request, null, 2));
         const client = this.createGraphqlClient(uniqueToken);
         const variables = {
           input: {
@@ -131,6 +138,7 @@ export class UniqueApiService {
             mimeType: request.mimeType,
             ownerType: this.mapOwnerType(request.ownerType),
             byteSize: request.byteSize,
+            url: request.url,
           },
           scopeId: request.scopeId,
           sourceOwnerType: request.sourceOwnerType,
@@ -138,7 +146,11 @@ export class UniqueApiService {
           sourceKind: request.sourceKind,
           fileUrl: request.fileUrl,
           storeInternally: true,
+          baseUrl: request.baseUrl,
         };
+
+        this.logger.log('Ingestion finalization request body variables: ' + JSON.stringify(variables, null, 2));
+
         const result = await client.request<{ contentUpsert?: { id?: string } }>(
           this.getContentUpsertMutation(),
           variables,
@@ -199,6 +211,7 @@ export class UniqueApiService {
     $sourceName: String
     $sourceKind: String
     $storeInternally: Boolean
+    $baseUrl: String
     ) {
     contentUpsert(
     input: $input
@@ -209,6 +222,7 @@ export class UniqueApiService {
     sourceName: $sourceName
     sourceKind: $sourceKind
     storeInternally: $storeInternally
+    baseUrl: $baseUrl
     ) {
     id
     key

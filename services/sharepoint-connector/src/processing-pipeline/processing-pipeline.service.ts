@@ -38,12 +38,12 @@ export class ProcessingPipelineService {
     const startTime = new Date();
     const context: ProcessingContext = {
       correlationId,
-      fileId: file.id ?? '',
-      fileName: file.name ?? '',
-      fileSize: file.size ?? 0,
-      siteUrl: file.siteId,
+      fileId: file.id,
+      fileName: file.name,
+      fileSize: file.size,
+      siteUrl: file.siteWebUrl,
       libraryName: file.driveId,
-      downloadUrl: file.webUrl ?? '',
+      downloadUrl: file.webUrl,
       startTime,
       metadata: {
         mimeType: file.file?.mimeType ?? undefined,
@@ -51,6 +51,8 @@ export class ProcessingPipelineService {
         listItemFields: file.listItem?.fields as Record<string, FieldValueSet>,
         driveId: file.driveId,
         siteId: file.siteId,
+        driveName: file.driveName,
+        folderPath: file.folderPath,
         lastModifiedDateTime: file.lastModifiedDateTime ?? undefined,
       },
     };

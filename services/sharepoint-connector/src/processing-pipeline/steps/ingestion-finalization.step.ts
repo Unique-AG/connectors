@@ -30,32 +30,40 @@ export class IngestionFinalizationStep implements IPipelineStep {
           'Registration response not found in context - content registration may have failed',
         );
       }
-      const finalizationRequest = {
+      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
+      const isPathMode = !scopeId;
+      const baseUrl = this.configService.get<string | undefined>('uniqueApi.sharepointBaseUrl');
+
+      const ingestionFinalizationRequest = {
         key: registrationResponse.key,
         title: context.fileName,
         mimeType: registrationResponse.mimeType,
         ownerType: registrationResponse.ownerType,
         byteSize: registrationResponse.byteSize,
-        scopeId: this.configService.get<string>('uniqueApi.scopeId') as string,
+        scopeId: scopeId ?? 'PATH',
         sourceOwnerType: 'USER',
         sourceName: this.extractSiteName(context.siteUrl),
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         fileUrl: registrationResponse.readUrl,
-      } as const;
+        url: isPathMode ? context.downloadUrl : undefined,
+        baseUrl: isPathMode ? baseUrl : undefined,
+      };
 
       this.logger.debug(
-        `[${context.correlationId}] Finalizing ingestion for content ID: ${String(
-          context.uniqueContentId ?? '',
-        )}`,
+        `[${context.correlationId}] Finalizing ingestion for content ID: ${context.uniqueContentId}`,
       );
 
       const finalizationResponse = await this.uniqueApiService.finalizeIngestion(
-        finalizationRequest,
+        ingestionFinalizationRequest,
         uniqueToken,
       );
 
+      if (!finalizationResponse.id) {
+        throw new Error('Finalization response missing required field: id');
+      }
+
       context.metadata.finalization = finalizationResponse;
-      context.metadata.finalContentId = finalizationResponse.id ?? '';
+      context.metadata.finalContentId = finalizationResponse.id;
       const _stepDuration = Date.now() - stepStartTime;
       return context;
     } catch (error) {

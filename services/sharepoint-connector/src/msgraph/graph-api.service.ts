@@ -33,24 +33,44 @@ export class GraphApiService {
   }
 
   public async findAllSyncableFilesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
-    this.logger.log(`Starting recursive file scan for site: ${siteId}`);
-
-    const drives = await this.getDrivesForSite(siteId);
+    const maxFilesToScan = this.configService.get<number>('sharepoint.maxFilesToScan');
     const allSyncableFiles: EnrichedDriveItem[] = [];
+    let totalScanned = 0;
+
+    if (maxFilesToScan) {
+      this.logger.warn(`File scan limit set to ${maxFilesToScan} files for testing purpose.`);
+    }
+
+    const [siteWebUrl, drives] = await Promise.all([
+      await this.getSiteWebUrl(siteId),
+      await this.getDrivesForSite(siteId)
+      ]);
 
     for (const drive of drives) {
-      if (!drive.id) {
-        this.logger.warn(`Drive ${drive.name} has no ID, skipping`);
-        continue;
-      }
+      if (!drive.id || !drive.name) continue;
 
-      this.logger.debug(`Scanning library (drive): ${drive.name} (${drive.id})`);
-      const filesInDrive = await this.recursivelyFetchSyncableFiles(drive.id, 'root', siteId);
+      const remainingLimit = maxFilesToScan ? maxFilesToScan - totalScanned : undefined;
+      const filesInDrive = await this.recursivelyFetchSyncableFiles(
+        drive.id,
+        'root',
+        siteId,
+        siteWebUrl,
+        drive.name,
+        remainingLimit,
+      );
+
       allSyncableFiles.push(...filesInDrive);
+      totalScanned += filesInDrive.length;
+
+      // Stop scanning if we've reached the limit for testing
+      if (maxFilesToScan && totalScanned >= maxFilesToScan) {
+        this.logger.log(`Reached file scan limit of ${maxFilesToScan}, stopping scan`);
+        break;
+      }
     }
 
     this.logger.log(
-      `Completed scan for site ${siteId}. Found ${allSyncableFiles.length} syncable files.`,
+      `Completed scan for site ${siteId}. Found ${allSyncableFiles.length} files marked for synchronizing.`,
     );
     return allSyncableFiles;
   }
@@ -89,16 +109,30 @@ export class GraphApiService {
     }
   }
 
+  private async getSiteWebUrl(siteId: string): Promise<string> {
+    try {
+      this.logger.debug(`Fetching site info for: ${siteId}`);
+
+      const site = await this.makeRateLimitedRequest(() =>
+        this.graphClient.api(`/sites/${siteId}`).select('webUrl').get(),
+      );
+
+      return site.webUrl;
+    } catch (error) {
+      this.logger.error(`Failed to fetch site info for ${siteId}:`, error);
+      throw error;
+    }
+  }
+
   private async getDrivesForSite(siteId: string): Promise<Drive[]> {
     try {
-      this.logger.debug(`Fetching drives for site: ${siteId}`);
-
       const drives = await this.makeRateLimitedRequest(() =>
         this.graphClient.api(`/sites/${siteId}/drives`).get(),
       );
 
       const allDrives = drives?.value || [];
       this.logger.log(`Found ${allDrives.length} drives for site ${siteId}`);
+      
       return allDrives;
     } catch (error) {
       this.logger.error(`Failed to fetch drives for site ${siteId}:`, error);
@@ -110,42 +144,67 @@ export class GraphApiService {
     driveId: string,
     itemId: string,
     siteId: string,
+    siteWebUrl: string,
+    driveName: string,
+    maxFiles?: number,
   ): Promise<EnrichedDriveItem[]> {
     try {
-      this.logger.debug(`Fetching items for drive ${driveId}, item ${itemId}`);
-
       const allItems = await this.fetchAllItemsInFolder(driveId, itemId);
-      const syncableFiles: EnrichedDriveItem[] = [];
+      const filesToSynchronize: EnrichedDriveItem[] = [];
 
       for (const driveItem of allItems) {
+        // Check if we've reached the file limit for testing
+        if (maxFiles && filesToSynchronize.length >= maxFiles) {
+          this.logger.warn(`Reached file limit of ${maxFiles}, stopping scan in ${itemId}`);
+          break;
+        }
+
         if (this.isFolder(driveItem)) {
+          const remainingLimit = maxFiles ? maxFiles - filesToSynchronize.length : undefined;
           const filesInSubfolder = await this.recursivelyFetchSyncableFiles(
             driveId,
-            driveItem.id,
+            driveItem.id!,
             siteId,
+            siteWebUrl,
+            driveName,
+            remainingLimit,
           );
-          syncableFiles.push(...filesInSubfolder);
-        } else if (this.isFile(driveItem)) {
-          if (this.fileFilterService.isFileSyncable(driveItem)) {
-            const enrichedFile: EnrichedDriveItem = {
+
+          filesToSynchronize.push(...filesInSubfolder);
+        } else if (this.fileFilterService.isFileSyncable(driveItem)) {
+            const folderPath = this.extractFolderPath(driveItem);
+            filesToSynchronize.push({
               ...driveItem,
               siteId,
+              siteWebUrl,
               driveId,
-            };
-            syncableFiles.push(enrichedFile);
-          }
+              driveName,
+              folderPath,
+            } as EnrichedDriveItem);
         }
       }
 
       this.logger.log(
-        `Found ${syncableFiles.length} syncable files in drive ${driveId}, item ${itemId}`,
+        `Found ${filesToSynchronize.length} syncable files in drive ${driveId}, item ${itemId}`,
       );
-      return syncableFiles;
+      return filesToSynchronize;
     } catch (error) {
       this.logger.error(`Failed to fetch items for drive ${driveId}, item ${itemId}:`, error);
       // TODO: probably we should not throw here, we want to continue scanning (add retry mechanism) - check implications with file-diffing
       throw error;
     }
+  }
+
+  private extractFolderPath(driveItem: DriveItem): string {
+    if (!driveItem.parentReference?.path) {
+      return '';
+    }
+
+    const fullPath = driveItem.parentReference.path;
+    const rootPattern = /^\/drives\/[^/]+\/root:?/;
+    const cleanPath = fullPath.replace(rootPattern, '');
+
+    return cleanPath || '/';
   }
 
   private async fetchAllItemsInFolder(driveId: string, itemId: string): Promise<DriveItem[]> {
@@ -159,6 +218,7 @@ export class GraphApiService {
       'folder',
       'file',
       'listItem',
+      'parentReference',
     ];
     let nextPageUrl = `/drives/${driveId}/items/${itemId}/children`;
 
@@ -187,9 +247,5 @@ export class GraphApiService {
 
   private isFolder(driveItem: DriveItem): driveItem is DriveItem & { id: string } {
     return Boolean(driveItem.folder && driveItem.id);
-  }
-
-  private isFile(driveItem: DriveItem): boolean {
-    return Boolean(driveItem.file);
   }
 }

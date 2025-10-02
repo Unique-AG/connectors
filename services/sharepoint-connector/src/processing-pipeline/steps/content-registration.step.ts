@@ -26,27 +26,44 @@ export class ContentRegistrationStep implements IPipelineStep {
         `[${context.correlationId}] Starting content registration for file: ${context.fileName}`,
       );
       const uniqueToken = await this.uniqueAuthService.getToken();
-      const fileKey = this.generateFileKey(context);
-      const registrationRequest: ContentRegistrationRequest = {
+      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
+      const fileKey = this.generateFileKey(context, scopeId);
+      
+      this.logger.log(
+        `[${context.correlationId}] Generated file key for ingestion: ${fileKey}`,
+      );
+      
+      const isPathMode = !scopeId;
+      const baseUrl = this.configService.get<string | undefined>('uniqueApi.sharepointBaseUrl');
+
+      const contentRegistrationRequest: ContentRegistrationRequest = {
         key: fileKey,
         title: context.fileName,
         mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
         ownerType: 'SCOPE',
-        scopeId: this.configService.get<string>('uniqueApi.scopeId') as string,
+        scopeId: scopeId ?? 'PATH',
         sourceOwnerType: 'USER',
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
-        sourceName: this.extractSiteName(context.siteUrl),
+        sourceName: 'Sharepoint',
+        url: isPathMode ? context.downloadUrl : undefined,
+        baseUrl: isPathMode ? baseUrl : undefined,
       };
 
       this.logger.debug(`[${context.correlationId}] Registering content with key: ${fileKey}`);
       const registrationResponse = await this.uniqueApiService.registerContent(
-        registrationRequest,
+        contentRegistrationRequest,
         uniqueToken,
       );
+      
+      if (!registrationResponse.writeUrl) {
+        throw new Error('Registration response missing required fields: id or writeUrl');
+      }
+      
       context.uploadUrl = registrationResponse.writeUrl;
-      context.uniqueContentId = registrationResponse.id ?? '';
+      context.uniqueContentId = registrationResponse.id;
       context.metadata.registration = registrationResponse;
       const _stepDuration = Date.now() - stepStartTime;
+      
       return context;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -55,24 +72,24 @@ export class ContentRegistrationStep implements IPipelineStep {
     }
   }
 
-  private generateFileKey(context: ProcessingContext): string {
-    const meta = context.metadata as Record<string, unknown>;
-    const siteId = (meta.siteId as string | undefined) ?? 'unknown-site';
-    const driveId = (meta.driveId as string | undefined) ?? 'unknown-drive';
-    return `sharepoint_${siteId}_${driveId}_${context.fileId}`;
-  }
+  private generateFileKey(context: ProcessingContext, scopeId: string | undefined): string {
+    const siteId = context.metadata.siteId;
+    const driveName = context.metadata.driveName;
+    const folderPath = context.metadata.folderPath;
 
-  private extractSiteName(siteUrl: string): string {
-    if (!siteUrl) return 'SharePoint';
-    try {
-      const url = new URL(siteUrl);
-      const pathParts = url.pathname.split('/').filter(Boolean);
-      if (pathParts.length >= 2 && pathParts[0] === 'sites') {
-        return pathParts[1] || url.hostname;
+    if (!scopeId) {
+      const cleanFolderPath = folderPath.replace(/^\/+|\/+$/g, '');
+      const pathParts = [siteId, driveName];
+      
+      if (cleanFolderPath) {
+        pathParts.push(cleanFolderPath);
       }
-      return url.hostname;
-    } catch {
-      return 'SharePoint';
+      
+      pathParts.push(context.fileName);
+      
+      return pathParts.join('/');
     }
+
+    return `sharepoint_${siteId}_${context.fileId}`;
   }
 }

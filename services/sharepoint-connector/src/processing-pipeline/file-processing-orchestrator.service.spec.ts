@@ -16,10 +16,14 @@ describe('FileProcessingOrchestratorService', () => {
     id,
     name: `file-${id}.pdf`,
     size: 1024,
+    webUrl: `https://sharepoint.example.com/sites/test/file-${id}.pdf`,
     parentReference: { siteId, driveId: 'drive-1' },
     file: { mimeType: 'application/pdf' },
     siteId,
+    siteWebUrl: 'https://sharepoint.example.com/sites/test',
     driveId: 'drive-1',
+    driveName: 'Documents',
+    folderPath: '/test/folder',
   });
 
   beforeEach(async () => {

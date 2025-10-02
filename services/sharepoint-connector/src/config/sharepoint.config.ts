@@ -44,6 +44,11 @@ export const EnvironmentVariables = z.object({
         : [],
     )
     .describe('Comma-separated list of allowed MIME types for files to sync'),
+  SHAREPOINT_MAX_FILES_TO_SCAN: z
+    .string()
+    .optional()
+    .transform((val) => val ? parseInt(val, 10) : undefined)
+    .describe('Maximum number of files to scan (for testing, unlimited if not set)'),
 });
 
 export interface Config {
@@ -55,6 +60,7 @@ export interface Config {
     sites: string[];
     syncColumnName: string;
     allowedMimeTypes: string[];
+    maxFilesToScan?: number;
   };
 }
 
@@ -71,6 +77,7 @@ export const sharepointConfig = registerAs<Config[typeof namespace]>(namespace, 
     sites: validEnv.data.SHAREPOINT_SITES,
     syncColumnName: validEnv.data.SHAREPOINT_SYNC_COLUMN_NAME,
     allowedMimeTypes: validEnv.data.ALLOWED_MIME_TYPES,
+    maxFilesToScan: validEnv.data.SHAREPOINT_MAX_FILES_TO_SCAN,
   } satisfies Config[typeof namespace];
 });
 

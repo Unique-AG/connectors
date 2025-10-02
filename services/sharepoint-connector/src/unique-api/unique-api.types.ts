@@ -9,6 +9,8 @@ export interface ContentRegistrationRequest {
   sourceOwnerType: string;
   sourceKind: string;
   sourceName: string;
+  url?: string;
+  baseUrl?: string;
 }
 
 export interface ContentRegistrationResponse {
@@ -38,6 +40,8 @@ export interface IngestionFinalizationRequest {
   sourceName: string;
   sourceKind: string;
   fileUrl: string;
+  url?: string;
+  baseUrl?: string;
 }
 
 export interface FileDiffItem {
@@ -46,6 +50,8 @@ export interface FileDiffItem {
   url: NullableOption<string> | undefined;
   updatedAt: NullableOption<string> | undefined;
   key: NullableOption<string> | undefined;
+  driveId?: string;
+  siteId?: string;
 }
 
 export interface FileDiffRequest {
