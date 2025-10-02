@@ -281,4 +281,3 @@ describe('MetricsMiddleware', () => {
     await expect(middleware.execute(mockContext)).rejects.toThrow(graphError);
   });
 });
-

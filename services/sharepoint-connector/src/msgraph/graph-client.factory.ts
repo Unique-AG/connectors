@@ -13,8 +13,8 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GraphAuthenticationProvider } from './graph-authentication.service';
-import { MetricsMiddleware } from './metrics.middleware';
-import { TokenRefreshMiddleware } from './token-refresh.middleware';
+import { MetricsMiddleware } from './middlewares/metrics.middleware';
+import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
 
 @Injectable()
 export class GraphClientFactory {

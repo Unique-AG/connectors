@@ -1,7 +1,7 @@
-import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { FileProcessingOrchestratorService } from './file-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
@@ -12,12 +12,14 @@ describe('FileProcessingOrchestratorService', () => {
     processFile: ReturnType<typeof vi.fn>;
   };
 
-  const createMockFile = (id: string, siteId: string): DriveItem => ({
+  const createMockFile = (id: string, siteId: string): EnrichedDriveItem => ({
     id,
     name: `file-${id}.pdf`,
     size: 1024,
     parentReference: { siteId, driveId: 'drive-1' },
     file: { mimeType: 'application/pdf' },
+    siteId,
+    driveId: 'drive-1',
   });
 
   beforeEach(async () => {
@@ -151,5 +153,3 @@ describe('FileProcessingOrchestratorService', () => {
     expect(mockPipelineService.processFile).not.toHaveBeenCalled();
   });
 });
-
-

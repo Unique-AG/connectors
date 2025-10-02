@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import {DriveItem, FieldValueSet} from '@microsoft/microsoft-graph-types';
+import type { FieldValueSet } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
 import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
@@ -32,7 +33,7 @@ export class ProcessingPipelineService {
       (this.configService.get<number>('pipeline.stepTimeoutSeconds') as number) * 1000;
   }
 
-  public async processFile(file: DriveItem): Promise<PipelineResult> {
+  public async processFile(file: EnrichedDriveItem): Promise<PipelineResult> {
     const correlationId = randomUUID();
     const startTime = new Date();
     const context: ProcessingContext = {
@@ -40,16 +41,16 @@ export class ProcessingPipelineService {
       fileId: file.id ?? '',
       fileName: file.name ?? '',
       fileSize: file.size ?? 0,
-      siteUrl: file.parentReference?.siteId ?? '',
-      libraryName: file.parentReference?.driveId ?? '',
+      siteUrl: file.siteId,
+      libraryName: file.driveId,
       downloadUrl: file.webUrl ?? '',
       startTime,
       metadata: {
         mimeType: file.file?.mimeType ?? undefined,
         isFolder: Boolean(file.folder),
-        listItemFields: (file.listItem?.fields as Record<string, FieldValueSet>),
-        driveId: file.parentReference?.driveId ?? undefined,
-        siteId: file.parentReference?.siteId ?? undefined,
+        listItemFields: file.listItem?.fields as Record<string, FieldValueSet>,
+        driveId: file.driveId,
+        siteId: file.siteId,
         lastModifiedDateTime: file.lastModifiedDateTime ?? undefined,
       },
     };

@@ -1,7 +1,7 @@
 import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ModerationStatus } from './sharepoint.types';
+import { ModerationStatus } from './types/sharepoint.types';
 
 @Injectable()
 export class FileFilterService {

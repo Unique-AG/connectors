@@ -1,5 +1,5 @@
 import type { IngestionApiResponse } from '../../unique-api/unique-api.types';
-import {FieldValueSet} from "@microsoft/microsoft-graph-types";
+import { FieldValueSet } from '@microsoft/microsoft-graph-types';
 
 export interface ProcessingMetadata {
   mimeType?: string;

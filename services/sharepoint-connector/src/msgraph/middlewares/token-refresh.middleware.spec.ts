@@ -1,6 +1,5 @@
 import type { Context } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GraphAuthenticationProvider } from './graph-authentication.service';
 import { TokenRefreshMiddleware } from './token-refresh.middleware';
 
 describe('TokenRefreshMiddleware', () => {
@@ -238,5 +237,3 @@ describe('TokenRefreshMiddleware', () => {
     expect(mockNextMiddleware.execute).toHaveBeenCalledTimes(2);
   });
 });
-
-

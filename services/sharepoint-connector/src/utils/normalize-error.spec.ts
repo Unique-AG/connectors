@@ -115,4 +115,3 @@ describe('normalizeError', () => {
     expect(result.name).toBe('CustomError');
   });
 });
-

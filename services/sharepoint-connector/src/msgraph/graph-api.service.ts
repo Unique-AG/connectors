@@ -3,6 +3,7 @@ import type { Drive, DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
+import type { EnrichedDriveItem } from './types/enriched-drive-item';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 
@@ -31,11 +32,11 @@ export class GraphApiService {
     });
   }
 
-  public async findAllSyncableFilesForSite(siteId: string): Promise<DriveItem[]> {
+  public async findAllSyncableFilesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
     this.logger.log(`Starting recursive file scan for site: ${siteId}`);
 
     const drives = await this.getDrivesForSite(siteId);
-    const allSyncableFiles: DriveItem[] = [];
+    const allSyncableFiles: EnrichedDriveItem[] = [];
 
     for (const drive of drives) {
       if (!drive.id) {
@@ -44,7 +45,7 @@ export class GraphApiService {
       }
 
       this.logger.debug(`Scanning library (drive): ${drive.name} (${drive.id})`);
-      const filesInDrive = await this.recursivelyFetchSyncableFiles(drive.id, 'root');
+      const filesInDrive = await this.recursivelyFetchSyncableFiles(drive.id, 'root', siteId);
       allSyncableFiles.push(...filesInDrive);
     }
 
@@ -108,20 +109,30 @@ export class GraphApiService {
   private async recursivelyFetchSyncableFiles(
     driveId: string,
     itemId: string,
-  ): Promise<DriveItem[]> {
+    siteId: string,
+  ): Promise<EnrichedDriveItem[]> {
     try {
       this.logger.debug(`Fetching items for drive ${driveId}, item ${itemId}`);
 
       const allItems = await this.fetchAllItemsInFolder(driveId, itemId);
-      const syncableFiles: DriveItem[] = [];
+      const syncableFiles: EnrichedDriveItem[] = [];
 
       for (const driveItem of allItems) {
         if (this.isFolder(driveItem)) {
-          const filesInSubfolder = await this.recursivelyFetchSyncableFiles(driveId, driveItem.id);
+          const filesInSubfolder = await this.recursivelyFetchSyncableFiles(
+            driveId,
+            driveItem.id,
+            siteId,
+          );
           syncableFiles.push(...filesInSubfolder);
         } else if (this.isFile(driveItem)) {
           if (this.fileFilterService.isFileSyncable(driveItem)) {
-            syncableFiles.push(driveItem);
+            const enrichedFile: EnrichedDriveItem = {
+              ...driveItem,
+              siteId,
+              driveId,
+            };
+            syncableFiles.push(enrichedFile);
           }
         }
       }
@@ -148,7 +159,6 @@ export class GraphApiService {
       'folder',
       'file',
       'listItem',
-      'parentReference',
     ];
     let nextPageUrl = `/drives/${driveId}/items/${itemId}/children`;
 

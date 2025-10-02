@@ -1,7 +1,7 @@
-import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
+import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
@@ -16,16 +16,13 @@ export class FileProcessingOrchestratorService {
 
   public async processFilesForSite(
     siteId: string,
-    files: DriveItem[],
+    files: EnrichedDriveItem[],
     diffResult: FileDiffResponse,
   ): Promise<void> {
     const concurrency = this.configService.get<number>('pipeline.processingConcurrency') as number;
 
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);
-    const filesToProcess = files.filter(
-      (file) =>
-        file.parentReference?.siteId === siteId && newFileKeys.has(`sharepoint_file_${file.id}`),
-    );
+    const filesToProcess = files.filter((file) => newFileKeys.has(`sharepoint_file_${file.id}`));
     if (filesToProcess.length === 0) {
       this.logger.debug(`No files to process for site ${siteId}`);
       return;

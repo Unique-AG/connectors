@@ -131,7 +131,9 @@ describe('GraphAuthenticationProvider', () => {
         new GraphAuthenticationProvider({
           get: vi.fn(() => undefined),
         } as never),
-    ).toThrow('SharePoint configuration missing: tenantId, clientId, and clientSecret are required');
+    ).toThrow(
+      'SharePoint configuration missing: tenantId, clientId, and clientSecret are required',
+    );
   });
 
   it('clears cached token on authentication error', async () => {
@@ -150,4 +152,3 @@ describe('GraphAuthenticationProvider', () => {
     expect(token).toBe('new-token');
   });
 });
-

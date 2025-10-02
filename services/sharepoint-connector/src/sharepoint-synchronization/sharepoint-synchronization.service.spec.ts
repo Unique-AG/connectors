@@ -141,9 +141,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('releases scan lock on error', async () => {
-    mockGraphApiService.findAllSyncableFilesForSite.mockRejectedValueOnce(
-      new Error('API failure'),
-    );
+    mockGraphApiService.findAllSyncableFilesForSite.mockRejectedValueOnce(new Error('API failure'));
 
     await service.synchronize();
     await service.synchronize();
@@ -261,4 +259,3 @@ describe('SharepointSynchronizationService', () => {
     expect(mockOrchestrator.processFilesForSite).not.toHaveBeenCalled();
   });
 });
-

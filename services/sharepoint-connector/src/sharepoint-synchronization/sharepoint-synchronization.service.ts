@@ -1,11 +1,11 @@
-import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UniqueAuthService } from '../unique-api/unique-auth.service';
+import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
+import { UniqueAuthService } from '../unique-api/unique-auth.service';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -70,8 +70,8 @@ export class SharepointSynchronizationService {
     }
   }
 
-  private async calculateDiffForFiles(files: DriveItem[]): Promise<FileDiffResponse> {
-    const fileDiffItems: FileDiffItem[] = files.map((file: DriveItem) => ({
+  private async calculateDiffForFiles(files: EnrichedDriveItem[]): Promise<FileDiffResponse> {
+    const fileDiffItems: FileDiffItem[] = files.map((file: EnrichedDriveItem) => ({
       id: file.id,
       name: file.name,
       url: file.webUrl,

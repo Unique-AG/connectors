@@ -86,4 +86,3 @@ describe('GraphClientFactory', () => {
     expect(client).toBeDefined();
   });
 });
-

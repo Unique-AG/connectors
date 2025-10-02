@@ -107,4 +107,3 @@ describe('Redacted', () => {
     expect(typeof objectRedacted.value).toBe('object');
   });
 });
-

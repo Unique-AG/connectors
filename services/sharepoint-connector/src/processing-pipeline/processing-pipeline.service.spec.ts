@@ -1,7 +1,7 @@
-import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
 import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
@@ -19,7 +19,7 @@ describe('ProcessingPipelineService', () => {
     ingestionFinalization: IPipelineStep;
   };
 
-  const mockFile: DriveItem = {
+  const mockFile: EnrichedDriveItem = {
     id: 'file-123',
     name: 'test.pdf',
     size: 1024,
@@ -31,6 +31,8 @@ describe('ProcessingPipelineService', () => {
     },
     listItem: { fields: { Title: 'Test Document' } as never },
     lastModifiedDateTime: '2024-01-01T00:00:00Z',
+    siteId: 'site-1',
+    driveId: 'drive-1',
   };
 
   beforeEach(async () => {
@@ -134,20 +136,16 @@ describe('ProcessingPipelineService', () => {
     expect(mockSteps.contentRegistration.cleanup).toHaveBeenCalled();
   });
 
-  it(
-    'handles timeout for slow steps',
-    async () => {
-      vi.mocked(mockSteps.contentFetching.execute).mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 35000)),
-      );
+  it('handles timeout for slow steps', async () => {
+    vi.mocked(mockSteps.contentFetching.execute).mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 35000)),
+    );
 
-      const result = await service.processFile(mockFile);
+    const result = await service.processFile(mockFile);
 
-      expect(result.success).toBe(false);
-      expect(result.error?.message).toContain('timed out');
-    },
-    40000,
-  );
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('timed out');
+  }, 40000);
 
   it('handles cleanup errors gracefully', async () => {
     vi.mocked(mockSteps.contentFetching.cleanup).mockRejectedValue(new Error('Cleanup failed'));
@@ -177,4 +175,3 @@ describe('ProcessingPipelineService', () => {
     expect(result.success).toBe(true);
   });
 });
-
