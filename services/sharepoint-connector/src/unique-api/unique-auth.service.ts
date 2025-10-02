@@ -13,19 +13,15 @@ export class UniqueAuthService {
   public async getToken(forceRefresh = false): Promise<string> {
     if (!forceRefresh && this.isTokenValid()) {
       this.logger.debug('Using cached Zitadel token');
-      return this.cachedToken as string;
+      return <string>this.cachedToken;
     }
 
     this.logger.debug('Acquiring new Unique API token from Zitadel...');
     try {
-      const oAuthTokenUrl = this.configService.get<string>(
-        'uniqueApi.zitadelOAuthTokenUrl',
-      ) as string;
-      const clientId = this.configService.get<string>('uniqueApi.zitadelClientId') as string;
-      const clientSecret = this.configService.get<string>(
-        'uniqueApi.zitadelClientSecret',
-      ) as string;
-      const projectId = this.configService.get<string>('uniqueApi.zitadelProjectId') as string;
+      const oAuthTokenUrl = <string>this.configService.get('uniqueApi.zitadelOAuthTokenUrl');
+      const clientId = <string>this.configService.get('uniqueApi.zitadelClientId');
+      const clientSecret = <string>this.configService.get('uniqueApi.zitadelClientSecret');
+      const projectId = <string>this.configService.get('uniqueApi.zitadelProjectId');
 
       const params = new URLSearchParams({
         scope:

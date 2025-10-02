@@ -11,9 +11,7 @@ import { SharepointSynchronizationService } from './sharepoint-synchronization.s
 
 describe('SharepointSynchronizationService', () => {
   let service: SharepointSynchronizationService;
-  let mockGraphApiService: {
-    findAllSyncableFilesForSite: ReturnType<typeof vi.fn>;
-  };
+  let mockGraphApiService: Partial<GraphApiService>;
   let mockUniqueAuthService: {
     getToken: ReturnType<typeof vi.fn>;
   };
@@ -39,7 +37,7 @@ describe('SharepointSynchronizationService', () => {
 
   beforeEach(async () => {
     mockGraphApiService = {
-      findAllSyncableFilesForSite: vi.fn().mockResolvedValue([mockFile]),
+      getAllFilesForSite: vi.fn().mockResolvedValue([mockFile]),
     };
 
     mockUniqueAuthService = {
@@ -79,9 +77,9 @@ describe('SharepointSynchronizationService', () => {
   it('synchronizes files from all configured sites', async () => {
     await service.synchronize();
 
-    expect(mockGraphApiService.findAllSyncableFilesForSite).toHaveBeenCalledTimes(2);
-    expect(mockGraphApiService.findAllSyncableFilesForSite).toHaveBeenCalledWith('site-1');
-    expect(mockGraphApiService.findAllSyncableFilesForSite).toHaveBeenCalledWith('site-2');
+    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledTimes(2);
+    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledWith('site-1');
+    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledWith('site-2');
   });
 
   it('performs file diff for discovered files', async () => {
@@ -112,7 +110,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('skips sites with no files', async () => {
-    mockGraphApiService.findAllSyncableFilesForSite.mockResolvedValue([]);
+    mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue([]);
 
     await service.synchronize();
 
@@ -121,42 +119,48 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('prevents overlapping scans', async () => {
-    mockGraphApiService.findAllSyncableFilesForSite.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve([mockFile]), 100)),
-    );
+    mockGraphApiService.getAllFilesForSite = vi
+      .fn()
+      .mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve([mockFile]), 100)),
+      );
 
     const firstScan = service.synchronize();
     const secondScan = service.synchronize();
 
     await Promise.all([firstScan, secondScan]);
 
-    expect(mockGraphApiService.findAllSyncableFilesForSite).toHaveBeenCalledTimes(2);
+    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledTimes(2);
   });
 
   it('releases scan lock after completion', async () => {
     await service.synchronize();
     await service.synchronize();
 
-    expect(mockGraphApiService.findAllSyncableFilesForSite).toHaveBeenCalledTimes(4);
+    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledTimes(4);
   });
 
   it('releases scan lock on error', async () => {
-    mockGraphApiService.findAllSyncableFilesForSite.mockRejectedValueOnce(new Error('API failure'));
+    mockGraphApiService.getAllFilesForSite = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('API failure'))
+      .mockResolvedValue([mockFile]);
 
     await service.synchronize();
     await service.synchronize();
 
-    expect(mockGraphApiService.findAllSyncableFilesForSite).toHaveBeenCalledTimes(4);
+    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledTimes(4);
   });
 
   it('continues processing other sites after site error', async () => {
-    mockGraphApiService.findAllSyncableFilesForSite
+    mockGraphApiService.getAllFilesForSite = vi
+      .fn()
       .mockRejectedValueOnce(new Error('Site 1 failed'))
       .mockResolvedValueOnce([mockFile]);
 
     await service.synchronize();
 
-    expect(mockGraphApiService.findAllSyncableFilesForSite).toHaveBeenCalledTimes(2);
+    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledTimes(2);
     expect(mockOrchestrator.processFilesForSite).toHaveBeenCalledTimes(1);
   });
 
@@ -178,7 +182,7 @@ describe('SharepointSynchronizationService', () => {
       listItem: { lastModifiedDateTime: '2024-02-15T10:30:00Z' },
     };
 
-    mockGraphApiService.findAllSyncableFilesForSite.mockResolvedValue([fileWithAllFields]);
+    mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue([fileWithAllFields]);
 
     await service.synchronize();
 
@@ -204,7 +208,7 @@ describe('SharepointSynchronizationService', () => {
       listItem: {},
     };
 
-    mockGraphApiService.findAllSyncableFilesForSite.mockResolvedValue([fileWithoutTimestamp]);
+    mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue([fileWithoutTimestamp]);
 
     await service.synchronize();
 
@@ -229,7 +233,7 @@ describe('SharepointSynchronizationService', () => {
       { ...mockFile, id: 'file-3' },
     ];
 
-    mockGraphApiService.findAllSyncableFilesForSite.mockResolvedValue(files);
+    mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue(files);
 
     await service.synchronize();
 

@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UniqueAuthService } from '../../unique-api/unique-auth.service';
+import { OwnerType } from '../../constants/owner-type.enum';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
+import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -18,21 +19,24 @@ export class IngestionFinalizationStep implements IPipelineStep {
   ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
-    const stepStartTime = Date.now();
-    try {
-      this.logger.debug(
-        `[${context.correlationId}] Starting ingestion finalization for file: ${context.fileName}`,
+    const registrationResponse = context.metadata.registration;
+    const baseUrl = <string>this.configService.get('uniqueApi.sharepointBaseUrl');
+    const scopeId = this.configService.get('uniqueApi.scopeId');
+    const isPathBasedIngestion = !scopeId;
+
+    if (!registrationResponse) {
+      throw new Error(
+        `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
       );
+    }
+
+    this.logger.debug(
+      `[${context.correlationId}] Starting ingestion finalization for file: ${context.fileName}`,
+    );
+
+    try {
+      const stepStartTime = Date.now();
       const uniqueToken = await this.uniqueAuthService.getToken();
-      const registrationResponse = context.metadata.registration;
-      if (!registrationResponse) {
-        throw new Error(
-          'Registration response not found in context - content registration may have failed',
-        );
-      }
-      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
-      const isPathMode = !scopeId;
-      const baseUrl = this.configService.get<string | undefined>('uniqueApi.sharepointBaseUrl');
 
       const ingestionFinalizationRequest = {
         key: registrationResponse.key,
@@ -40,31 +44,21 @@ export class IngestionFinalizationStep implements IPipelineStep {
         mimeType: registrationResponse.mimeType,
         ownerType: registrationResponse.ownerType,
         byteSize: registrationResponse.byteSize,
-        scopeId: scopeId ?? 'PATH',
-        sourceOwnerType: 'USER',
+        scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
+        sourceOwnerType: OwnerType.COMPANY,
         sourceName: this.extractSiteName(context.siteUrl),
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         fileUrl: registrationResponse.readUrl,
-        url: isPathMode ? context.downloadUrl : undefined,
-        baseUrl: isPathMode ? baseUrl : undefined,
+        ...(isPathBasedIngestion && {
+          url: context.downloadUrl,
+          baseUrl: baseUrl,
+        }),
       };
 
-      this.logger.debug(
-        `[${context.correlationId}] Finalizing ingestion for content ID: ${context.uniqueContentId}`,
-      );
+      await this.uniqueApiService.finalizeIngestion(ingestionFinalizationRequest, uniqueToken);
 
-      const finalizationResponse = await this.uniqueApiService.finalizeIngestion(
-        ingestionFinalizationRequest,
-        uniqueToken,
-      );
-
-      if (!finalizationResponse.id) {
-        throw new Error('Finalization response missing required field: id');
-      }
-
-      context.metadata.finalization = finalizationResponse;
-      context.metadata.finalContentId = finalizationResponse.id;
       const _stepDuration = Date.now() - stepStartTime;
+
       return context;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

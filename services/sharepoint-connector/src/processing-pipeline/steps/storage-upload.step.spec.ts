@@ -17,7 +17,16 @@ describe('StorageUploadStep', () => {
       siteUrl: '',
       libraryName: '',
       startTime: new Date(),
-      metadata: { mimeType: 'application/pdf' },
+      metadata: {
+        mimeType: 'application/pdf',
+        isFolder: false,
+        listItemFields: {},
+        driveId: 'drive1',
+        siteId: 'site1',
+        driveName: 'Documents',
+        folderPath: '/test',
+        lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      },
       uploadUrl: 'https://upload.example.com',
       contentBuffer: Buffer.from('data'),
     };

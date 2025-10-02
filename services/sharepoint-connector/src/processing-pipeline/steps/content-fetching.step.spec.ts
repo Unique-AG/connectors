@@ -28,7 +28,16 @@ describe('ContentFetchingStep', () => {
       siteUrl: '',
       libraryName: '',
       startTime: new Date(),
-      metadata: { mimeType: 'application/pdf', driveId: 'drive1' },
+      metadata: {
+        mimeType: 'application/pdf',
+        driveId: 'drive1',
+        isFolder: false,
+        listItemFields: {},
+        siteId: 'site1',
+        driveName: 'Documents',
+        folderPath: '/test',
+        lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      },
     };
     const result = await step.execute(context);
     expect(result.fileSize).toBe(3);

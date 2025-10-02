@@ -1,8 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { UniqueAuthService } from '../../unique-api/unique-auth.service';
+import { OwnerType } from '../../constants/owner-type.enum';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
+import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { IngestionFinalizationStep } from './ingestion-finalization.step';
 
@@ -34,22 +35,30 @@ describe('IngestionFinalizationStep', () => {
       libraryName: 'lib',
       startTime: new Date(),
       metadata: {
+        mimeType: 'application/pdf',
+        isFolder: false,
+        listItemFields: {},
+        driveId: 'drive-1',
+        siteId: 'site-1',
+        driveName: 'Documents',
+        folderPath: '/test',
+        lastModifiedDateTime: '2024-01-01T00:00:00Z',
         registration: {
           id: 'reg-id',
           key: 'k',
           byteSize: 10,
           mimeType: 'application/pdf',
-          ownerType: 'SCOPE',
+          ownerType: OwnerType.SCOPE,
           ownerId: 'owner-id',
           writeUrl: 'https://write',
           readUrl: 'https://read',
           createdAt: '2023-01-01T00:00:00Z',
           internallyStoredAt: null,
-          source: 'M365',
+          source: { kind: 'M365' } as never,
         },
       },
     };
     const result = await step.execute(context);
-    expect(result.metadata.finalContentId).toBe('final-id');
+    expect(result).toEqual(context);
   });
 });

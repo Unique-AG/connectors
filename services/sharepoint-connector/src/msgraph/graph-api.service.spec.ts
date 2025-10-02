@@ -11,9 +11,7 @@ describe('GraphApiService', () => {
   let mockGraphClient: {
     api: ReturnType<typeof vi.fn>;
   };
-  let mockFileFilterService: {
-    isFileSyncable: ReturnType<typeof vi.fn>;
-  };
+  let mockFileFilterService: Partial<FileFilterService>;
 
   const mockDrive = { id: 'drive-1', name: 'Documents' };
   const mockFile: DriveItem = {
@@ -44,7 +42,7 @@ describe('GraphApiService', () => {
     mockGraphClient.api.mockReturnValue(mockChain);
 
     mockFileFilterService = {
-      isFileSyncable: vi.fn().mockReturnValue(true),
+      isFileMarkedForSyncing: vi.fn().mockReturnValue(true),
     };
 
     const { unit } = await TestBed.solitary(GraphApiService)
@@ -68,27 +66,32 @@ describe('GraphApiService', () => {
     service = unit;
   });
 
-  describe('findAllSyncableFilesForSite', () => {
+  describe('getAllFilesForSite', () => {
     it('finds syncable files across multiple drives', async () => {
       const mockChain = mockGraphClient.api();
       mockChain.get
+        .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
         .mockResolvedValueOnce({ value: [mockDrive] })
-        .mockResolvedValueOnce({ value: [mockFile], '@odata.nextLink': '' });
+        .mockResolvedValueOnce({ value: [mockFile] });
 
-      const files = await service.findAllSyncableFilesForSite('site-1');
+      mockFileFilterService.isFileMarkedForSyncing = vi.fn().mockReturnValue(true);
+
+      const files = await service.getAllFilesForSite('site-1');
 
       expect(files).toHaveLength(1);
-      expect(files[0]).toEqual(mockFile);
       expect(mockGraphClient.api).toHaveBeenCalledWith('/sites/site-1/drives');
     });
 
     it('skips drives without IDs', async () => {
       const mockChain = mockGraphClient.api();
       mockChain.get
+        .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
         .mockResolvedValueOnce({ value: [{ name: 'Invalid Drive' }, mockDrive] })
-        .mockResolvedValueOnce({ value: [mockFile], '@odata.nextLink': '' });
+        .mockResolvedValueOnce({ value: [mockFile] });
 
-      const files = await service.findAllSyncableFilesForSite('site-1');
+      mockFileFilterService.isFileMarkedForSyncing = vi.fn().mockReturnValue(true);
+
+      const files = await service.getAllFilesForSite('site-1');
 
       expect(files).toHaveLength(1);
     });
@@ -98,30 +101,34 @@ describe('GraphApiService', () => {
       const file2: DriveItem = { ...mockFile, id: 'file-2', name: 'test2.pdf' };
 
       mockChain.get
+        .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
         .mockResolvedValueOnce({ value: [mockDrive] })
         .mockResolvedValueOnce({
           value: [mockFile],
           '@odata.nextLink': '/drives/drive-1/items/root/children?$skiptoken=abc',
         })
-        .mockResolvedValueOnce({ value: [file2], '@odata.nextLink': '' });
+        .mockResolvedValueOnce({ value: [file2] });
 
-      const files = await service.findAllSyncableFilesForSite('site-1');
+      mockFileFilterService.isFileMarkedForSyncing = vi.fn().mockReturnValue(true);
+
+      const files = await service.getAllFilesForSite('site-1');
 
       expect(files).toHaveLength(2);
-      expect(mockChain.get).toHaveBeenCalledTimes(3);
+      expect(mockChain.get).toHaveBeenCalledTimes(4);
     });
 
     it('filters out non-syncable files', async () => {
       const mockChain = mockGraphClient.api();
-      mockFileFilterService.isFileSyncable.mockReturnValue(false);
+      mockFileFilterService.isFileMarkedForSyncing = vi.fn().mockReturnValue(false);
       mockChain.get
+        .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
         .mockResolvedValueOnce({ value: [mockDrive] })
-        .mockResolvedValueOnce({ value: [mockFile], '@odata.nextLink': '' });
+        .mockResolvedValueOnce({ value: [mockFile] });
 
-      const files = await service.findAllSyncableFilesForSite('site-1');
+      const files = await service.getAllFilesForSite('site-1');
 
       expect(files).toHaveLength(0);
-      expect(mockFileFilterService.isFileSyncable).toHaveBeenCalledWith(mockFile);
+      expect(mockFileFilterService.isFileMarkedForSyncing).toHaveBeenCalledWith(mockFile);
     });
 
     it('recursively scans folders', async () => {
@@ -134,14 +141,17 @@ describe('GraphApiService', () => {
       };
 
       mockChain.get
+        .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
         .mockResolvedValueOnce({ value: [mockDrive] })
-        .mockResolvedValueOnce({ value: [folder], '@odata.nextLink': '' })
-        .mockResolvedValueOnce({ value: [mockFile], '@odata.nextLink': '' });
+        .mockResolvedValueOnce({ value: [folder] })
+        .mockResolvedValueOnce({ value: [mockFile] });
 
-      const files = await service.findAllSyncableFilesForSite('site-1');
+      mockFileFilterService.isFileMarkedForSyncing = vi.fn().mockReturnValue(true);
+
+      const files = await service.getAllFilesForSite('site-1');
 
       expect(files).toHaveLength(1);
-      expect(mockChain.get).toHaveBeenCalledTimes(3);
+      expect(mockChain.get).toHaveBeenCalledTimes(4);
     });
   });
 

@@ -17,22 +17,20 @@ export class ContentFetchingStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
+    this.logger.debug(
+      `[${context.correlationId}] Starting content fetching for file: ${context.fileName}`,
+    );
+
     try {
-      this.logger.debug(
-        `[${context.correlationId}] Starting content fetching for file: ${context.fileName}`,
-      );
-      const driveId = this.extractDriveId(context);
-      const itemId = context.fileId;
-
-      if (!driveId) {
-        throw new Error('Drive ID not found in file metadata');
-      }
-
       this.validateMimeType(context.metadata.mimeType, context.correlationId);
-      const contentBuffer = await this.apiService.downloadFileContent(driveId, itemId);
+      const contentBuffer = await this.apiService.downloadFileContent(
+        context.metadata.driveId,
+        context.fileId,
+      );
 
       context.contentBuffer = contentBuffer;
       context.fileSize = contentBuffer.length;
+
       this.logger.debug(
         `[${context.correlationId}] Content fetching completed for file: ${context.fileName} (${String(
           Math.round(contentBuffer.length / 1024 / 1024),
@@ -40,6 +38,7 @@ export class ContentFetchingStep implements IPipelineStep {
       );
 
       const _stepDuration = Date.now() - stepStartTime;
+
       return context;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -48,29 +47,15 @@ export class ContentFetchingStep implements IPipelineStep {
     }
   }
 
-  private extractDriveId(context: ProcessingContext): string | null {
-    if (context.metadata.driveId) return context.metadata.driveId;
-    this.logger.warn(`[${context.correlationId}] Drive ID not found in metadata.`);
-    return null;
-  }
-
   private validateMimeType(mimeType: string | undefined, correlationId: string): void {
-    const allowedMimeTypes = this.configService.get<string[]>(
-      'sharepoint.allowedMimeTypes',
-    ) as string[];
+    const allowedMimeTypes = <string[]>this.configService.get('sharepoint.allowedMimeTypes');
+
     if (!mimeType) {
       throw new Error(`MIME type is missing for this item. Skipping download. [${correlationId}]`);
     }
-    if (allowedMimeTypes.length > 0 && !allowedMimeTypes.includes(mimeType)) {
-      throw new Error(
-        `MIME type ${mimeType} is not allowed. Allowed types: ${allowedMimeTypes.join(', ')}`,
-      );
-    }
-  }
 
-  public async cleanup(context: ProcessingContext): Promise<void> {
-    this.logger.debug(
-      `[${context.correlationId}] Content fetching cleanup completed (buffer preserved for next steps)`,
-    );
+    if (!allowedMimeTypes.includes(mimeType)) {
+      throw new Error(`MIME type ${mimeType} is not allowed. Skipping download.}`);
+    }
   }
 }

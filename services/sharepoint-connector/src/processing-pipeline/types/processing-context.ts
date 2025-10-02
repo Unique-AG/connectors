@@ -21,10 +21,6 @@ export interface ProcessingContext {
 
 export interface PipelineResult {
   success: boolean;
-  context: ProcessingContext;
-  error?: Error;
-  completedSteps: string[];
-  totalDuration: number;
 }
 
 export interface JobResult {

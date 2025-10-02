@@ -1,5 +1,5 @@
-import type { IngestionApiResponse } from '../../unique-api/unique-api.types';
 import { FieldValueSet } from '@microsoft/microsoft-graph-types';
+import type { IngestionApiResponse } from '../../unique-api/unique-api.types';
 
 export interface ProcessingMetadata {
   mimeType: string | undefined;
@@ -12,7 +12,4 @@ export interface ProcessingMetadata {
   lastModifiedDateTime: string | undefined;
 
   registration?: IngestionApiResponse;
-  finalization?: { id: string };
-
-  finalContentId?: string;
 }

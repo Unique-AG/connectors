@@ -47,7 +47,7 @@ export const EnvironmentVariables = z.object({
   SHAREPOINT_MAX_FILES_TO_SCAN: z
     .string()
     .optional()
-    .transform((val) => val ? parseInt(val, 10) : undefined)
+    .transform((val) => (val ? parseInt(val, 10) : undefined))
     .describe('Maximum number of files to scan (for testing, unlimited if not set)'),
 });
 

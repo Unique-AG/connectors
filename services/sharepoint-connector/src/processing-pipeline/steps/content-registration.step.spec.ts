@@ -1,8 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { UniqueAuthService } from '../../unique-api/unique-auth.service';
+import { OwnerType } from '../../constants/owner-type.enum';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
+import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { ContentRegistrationStep } from './content-registration.step';
 
@@ -26,7 +27,7 @@ describe('ContentRegistrationStep', () => {
           key: 'k',
           byteSize: 1,
           mimeType: 'application/pdf',
-          ownerType: 'SCOPE',
+          ownerType: OwnerType.SCOPE,
           ownerId: 'o',
           readUrl: 'https://read',
           createdAt: new Date().toISOString(),
@@ -47,7 +48,16 @@ describe('ContentRegistrationStep', () => {
       siteUrl: 'https://contoso.sharepoint.com/sites/Engineering',
       libraryName: 'lib',
       startTime: new Date(),
-      metadata: { siteId: 'site', driveId: 'drive', mimeType: 'application/pdf' },
+      metadata: {
+        siteId: 'site',
+        driveId: 'drive',
+        mimeType: 'application/pdf',
+        isFolder: false,
+        listItemFields: {},
+        driveName: 'Documents',
+        folderPath: '/test',
+        lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      },
     };
     const result = await step.execute(context);
     expect(result.uploadUrl).toBe('https://upload');

@@ -24,6 +24,7 @@ describe('FileProcessingOrchestratorService', () => {
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: '/test/folder',
+    lastModifiedDateTime: '2024-01-01T00:00:00Z',
   });
 
   beforeEach(async () => {
@@ -71,7 +72,7 @@ describe('FileProcessingOrchestratorService', () => {
     const files = [createMockFile('file-1', 'site-1'), createMockFile('file-2', 'site-2')];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: ['sharepoint_file_file-1', 'sharepoint_file_file-2'],
+      newAndUpdatedFiles: ['sharepoint_file_file-1'],
       deletedFiles: [],
       movedFiles: [],
     };

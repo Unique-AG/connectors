@@ -2,10 +2,10 @@ import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, MockedFunction, vi } from 'vitest';
-import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
+import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
 describe('SharepointSynchronizationService', () => {
@@ -33,7 +33,7 @@ describe('SharepointSynchronizationService', () => {
       .mock(UniqueAuthService)
       .impl(() => ({ getToken: vi.fn().mockResolvedValue('unique-token') }))
       .mock(GraphApiService)
-      .impl(() => ({ findAllSyncableFilesForSite: vi.fn().mockResolvedValue(files) }))
+      .impl(() => ({ getAllFilesForSite: vi.fn().mockResolvedValue(files) }))
       .mock(UniqueApiService)
       .impl(() => ({
         performFileDiff: vi.fn().mockResolvedValue({

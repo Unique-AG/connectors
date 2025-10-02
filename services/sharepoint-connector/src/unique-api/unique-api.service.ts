@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { GraphQLClient } from 'graphql-request';
 import { Client } from 'undici';
+import { OwnerType } from '../constants/owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
 import {
   type ContentRegistrationRequest,
@@ -31,14 +32,14 @@ export class UniqueApiService {
   ): Promise<IngestionApiResponse> {
     return await this.makeRateLimitedRequest(async () => {
       try {
-        this.logger.log('Content registration request object: ' + JSON.stringify(request, null, 2));
+        this.logger.log(`Content registration request object: ${JSON.stringify(request, null, 2)}`);
         const client = this.createGraphqlClient(uniqueToken);
         const variables = {
           input: {
             key: request.key,
             title: request.title,
             mimeType: request.mimeType,
-            ownerType: this.mapOwnerType(request.ownerType),
+            ownerType: OwnerType.SCOPE,
             url: request.url,
           },
           scopeId: request.scopeId,
@@ -49,15 +50,19 @@ export class UniqueApiService {
           baseUrl: request.baseUrl,
         };
 
-        this.logger.log('Content registration request body variables: ' + JSON.stringify(variables, null, 2));
+        this.logger.log(
+          `Content registration request body variables: ${JSON.stringify(variables, null, 2)}`,
+        );
 
         const result = await client.request<{ contentUpsert?: IngestionApiResponse }>(
           this.getContentUpsertMutation(),
           variables,
         );
-        if (!result || !result.contentUpsert) {
+
+        if (!result?.contentUpsert) {
           throw new Error('Invalid response from Unique API content registration');
         }
+
         return result.contentUpsert;
       } catch (error) {
         this.logger.error(
@@ -73,25 +78,25 @@ export class UniqueApiService {
     fileList: FileDiffItem[],
     uniqueToken: string,
   ): Promise<FileDiffResponse> {
+    const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
+    const partialKey = <string>this.configService.get('uniqueApi.fileDiffPartialKey');
+    const ingestionUrl = <string>this.configService.get('uniqueApi.ingestionUrl');
+    const basePath = <string>this.configService.get('uniqueApi.fileDiffBasePath');
+    const fileDiffUrl = `${ingestionUrl}/file-diff`;
+    const url = new URL(fileDiffUrl);
+    const path = url.pathname + url.search;
+
+    const diffRequest: FileDiffRequest = {
+      basePath,
+      partialKey,
+      sourceKind: 'MICROSOFT_365_SHAREPOINT',
+      sourceName: 'SharePoint Online Connector',
+      fileList,
+      scope: scopeId ?? 'PATH',
+    };
+
     return await this.makeRateLimitedRequest(async () => {
-      const ingestionUrl = this.configService.get<string>('uniqueApi.ingestionUrl') as string;
-      const fileDiffUrl = `${ingestionUrl}/file-diff`;
-      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
-      const basePath = this.configService.get<string>('uniqueApi.fileDiffBasePath') as string;
-      const partialKey = this.configService.get<string>('uniqueApi.fileDiffPartialKey') as string;
-
-      const diffRequest: FileDiffRequest = {
-        basePath,
-        partialKey,
-        sourceKind: 'MICROSOFT_365_SHAREPOINT',
-        sourceName: 'SharePoint Online Connector',
-        fileList,
-        scope: scopeId ?? 'PATH',
-      };
-
       try {
-        const url = new URL(fileDiffUrl);
-        const path = url.pathname + url.search;
         const { statusCode, body } = await this.httpClient.request({
           method: 'POST',
           path,
@@ -105,8 +110,7 @@ export class UniqueApiService {
         if (statusCode < 200 || statusCode >= 300) {
           const errorText = await body.text().catch(() => 'No response body');
           throw new Error(
-            `File diff request failed with status ${statusCode}. ` +
-              `URL: ${fileDiffUrl}, Response: ${errorText}`,
+            `File diff request failed with status ${statusCode}. Response: ${errorText}`,
           );
         }
 
@@ -127,44 +131,43 @@ export class UniqueApiService {
     request: IngestionFinalizationRequest,
     uniqueToken: string,
   ): Promise<{ id: string }> {
+    this.logger.log(`Ingestion finalization request object: ${JSON.stringify(request, null, 2)}`);
+
+    const graphQLVariables = {
+      input: {
+        key: request.key,
+        title: request.title,
+        mimeType: request.mimeType,
+        ownerType: OwnerType.SCOPE,
+        byteSize: request.byteSize,
+        url: request.url,
+      },
+      scopeId: request.scopeId,
+      sourceOwnerType: request.sourceOwnerType,
+      sourceName: request.sourceName,
+      sourceKind: request.sourceKind,
+      fileUrl: request.fileUrl,
+      storeInternally: true,
+      baseUrl: request.baseUrl,
+    };
+
     return await this.makeRateLimitedRequest(async () => {
       try {
-        this.logger.log('Ingestion finalization request object: ' + JSON.stringify(request, null, 2));
         const client = this.createGraphqlClient(uniqueToken);
-        const variables = {
-          input: {
-            key: request.key,
-            title: request.title,
-            mimeType: request.mimeType,
-            ownerType: this.mapOwnerType(request.ownerType),
-            byteSize: request.byteSize,
-            url: request.url,
-          },
-          scopeId: request.scopeId,
-          sourceOwnerType: request.sourceOwnerType,
-          sourceName: request.sourceName,
-          sourceKind: request.sourceKind,
-          fileUrl: request.fileUrl,
-          storeInternally: true,
-          baseUrl: request.baseUrl,
-        };
-
-        this.logger.log('Ingestion finalization request body variables: ' + JSON.stringify(variables, null, 2));
 
         const result = await client.request<{ contentUpsert?: { id?: string } }>(
           this.getContentUpsertMutation(),
-          variables,
+          graphQLVariables,
         );
 
-        const id = result?.contentUpsert?.id;
-        if (!id) {
+        if (!result?.contentUpsert?.id) {
           throw new Error('Invalid response from Unique API ingestion finalization');
         }
 
-        return { id };
+        return { id: result.contentUpsert.id };
       } catch (error) {
         this.logger.error(
-          'Ingestion finalization failed:',
+          `Ingestion finalization failed:`,
           error instanceof Error ? error.message : String(error),
         );
         throw error;
@@ -172,27 +175,12 @@ export class UniqueApiService {
     });
   }
 
-  private mapOwnerType(value: string): string {
-    switch (value) {
-      case 'SCOPE':
-        return 'SCOPE';
-      case 'COMPANY':
-        return 'COMPANY';
-      case 'USER':
-        return 'USER';
-      case 'CHAT':
-        return 'CHAT';
-      default:
-        return 'SCOPE';
-    }
-  }
-
   private async makeRateLimitedRequest<T>(requestFn: () => Promise<T>): Promise<T> {
     return await this.limiter.schedule(async () => await requestFn());
   }
 
   private createGraphqlClient(uniqueToken: string): GraphQLClient {
-    const graphqlUrl = this.configService.get<string>('uniqueApi.ingestionGraphQLUrl') as string;
+    const graphqlUrl = <string>this.configService.get('uniqueApi.ingestionGraphQLUrl');
     return new GraphQLClient(graphqlUrl, {
       headers: {
         'Content-Type': 'application/json',

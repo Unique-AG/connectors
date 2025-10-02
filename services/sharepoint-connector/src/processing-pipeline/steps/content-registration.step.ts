@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
+import { OwnerType } from '../../constants/owner-type.enum';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
+import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -21,32 +22,32 @@ export class ContentRegistrationStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
+
+    this.logger.debug(
+      `[${context.correlationId}] Starting content registration for file: ${context.fileName}`,
+    );
+
     try {
-      this.logger.debug(
-        `[${context.correlationId}] Starting content registration for file: ${context.fileName}`,
-      );
       const uniqueToken = await this.uniqueAuthService.getToken();
-      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
-      const fileKey = this.generateFileKey(context, scopeId);
-      
-      this.logger.log(
-        `[${context.correlationId}] Generated file key for ingestion: ${fileKey}`,
-      );
-      
-      const isPathMode = !scopeId;
-      const baseUrl = this.configService.get<string | undefined>('uniqueApi.sharepointBaseUrl');
+      const scopeId = this.configService.get<string>('uniqueApi.scopeId');
+      const baseUrl = <string>this.configService.get('uniqueApi.sharepointBaseUrl');
+      const isPathBasedIngestion = !scopeId;
+
+      const fileKey = this.generateFileKey(context, isPathBasedIngestion);
 
       const contentRegistrationRequest: ContentRegistrationRequest = {
         key: fileKey,
         title: context.fileName,
         mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
-        ownerType: 'SCOPE',
-        scopeId: scopeId ?? 'PATH',
-        sourceOwnerType: 'USER',
+        ownerType: OwnerType.SCOPE,
+        scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
+        sourceOwnerType: OwnerType.COMPANY,
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         sourceName: 'Sharepoint',
-        url: isPathMode ? context.downloadUrl : undefined,
-        baseUrl: isPathMode ? baseUrl : undefined,
+        ...(isPathBasedIngestion && {
+          url: context.downloadUrl,
+          baseUrl: baseUrl,
+        }),
       };
 
       this.logger.debug(`[${context.correlationId}] Registering content with key: ${fileKey}`);
@@ -54,16 +55,16 @@ export class ContentRegistrationStep implements IPipelineStep {
         contentRegistrationRequest,
         uniqueToken,
       );
-      
+
       if (!registrationResponse.writeUrl) {
         throw new Error('Registration response missing required fields: id or writeUrl');
       }
-      
+
       context.uploadUrl = registrationResponse.writeUrl;
       context.uniqueContentId = registrationResponse.id;
       context.metadata.registration = registrationResponse;
       const _stepDuration = Date.now() - stepStartTime;
-      
+
       return context;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -72,24 +73,17 @@ export class ContentRegistrationStep implements IPipelineStep {
     }
   }
 
-  private generateFileKey(context: ProcessingContext, scopeId: string | undefined): string {
-    const siteId = context.metadata.siteId;
-    const driveName = context.metadata.driveName;
-    const folderPath = context.metadata.folderPath;
-
-    if (!scopeId) {
-      const cleanFolderPath = folderPath.replace(/^\/+|\/+$/g, '');
-      const pathParts = [siteId, driveName];
-      
-      if (cleanFolderPath) {
-        pathParts.push(cleanFolderPath);
-      }
-      
-      pathParts.push(context.fileName);
-      
-      return pathParts.join('/');
+  private generateFileKey(context: ProcessingContext, isPathBasedIngestion: boolean): string {
+    if (!isPathBasedIngestion) {
+      return `sharepoint_${context.metadata.siteId}_${context.fileId}`;
     }
 
-    return `sharepoint_${siteId}_${context.fileId}`;
+    const cleanFolderPath = context.metadata.folderPath.replace(/^\/+|\/+$/g, '');
+    return [
+      context.metadata.siteId,
+      context.metadata.driveName,
+      cleanFolderPath,
+      context.fileName,
+    ].join('/');
   }
 }

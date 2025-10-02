@@ -10,4 +10,5 @@ export interface EnrichedDriveItem extends DriveItem {
   driveId: string;
   driveName: string;
   folderPath: string;
+  lastModifiedDateTime: string;
 }

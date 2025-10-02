@@ -3,9 +3,9 @@ import type { Drive, DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
-import type { EnrichedDriveItem } from './types/enriched-drive-item';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
+import type { EnrichedDriveItem } from './types/enriched-drive-item';
 
 @Injectable()
 export class GraphApiService {
@@ -32,7 +32,7 @@ export class GraphApiService {
     });
   }
 
-  public async findAllSyncableFilesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
+  public async getAllFilesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
     const maxFilesToScan = this.configService.get<number>('sharepoint.maxFilesToScan');
     const allSyncableFiles: EnrichedDriveItem[] = [];
     let totalScanned = 0;
@@ -43,14 +43,14 @@ export class GraphApiService {
 
     const [siteWebUrl, drives] = await Promise.all([
       await this.getSiteWebUrl(siteId),
-      await this.getDrivesForSite(siteId)
-      ]);
+      await this.getDrivesForSite(siteId),
+    ]);
 
     for (const drive of drives) {
       if (!drive.id || !drive.name) continue;
 
       const remainingLimit = maxFilesToScan ? maxFilesToScan - totalScanned : undefined;
-      const filesInDrive = await this.recursivelyFetchSyncableFiles(
+      const filesInDrive = await this.recursivelyFetchFiles(
         drive.id,
         'root',
         siteId,
@@ -100,8 +100,6 @@ export class GraphApiService {
 
         chunks.push(bufferChunk);
       }
-
-      this.logger.debug(`File download completed. Total size: ${totalSize} bytes.`);
       return Buffer.concat(chunks);
     } catch (error) {
       this.logger.error(`Failed to download file content for item ${itemId}:`, error);
@@ -111,8 +109,6 @@ export class GraphApiService {
 
   private async getSiteWebUrl(siteId: string): Promise<string> {
     try {
-      this.logger.debug(`Fetching site info for: ${siteId}`);
-
       const site = await this.makeRateLimitedRequest(() =>
         this.graphClient.api(`/sites/${siteId}`).select('webUrl').get(),
       );
@@ -132,7 +128,7 @@ export class GraphApiService {
 
       const allDrives = drives?.value || [];
       this.logger.log(`Found ${allDrives.length} drives for site ${siteId}`);
-      
+
       return allDrives;
     } catch (error) {
       this.logger.error(`Failed to fetch drives for site ${siteId}:`, error);
@@ -140,7 +136,7 @@ export class GraphApiService {
     }
   }
 
-  private async recursivelyFetchSyncableFiles(
+  private async recursivelyFetchFiles(
     driveId: string,
     itemId: string,
     siteId: string,
@@ -161,9 +157,9 @@ export class GraphApiService {
 
         if (this.isFolder(driveItem)) {
           const remainingLimit = maxFiles ? maxFiles - filesToSynchronize.length : undefined;
-          const filesInSubfolder = await this.recursivelyFetchSyncableFiles(
+          const filesInSubfolder = await this.recursivelyFetchFiles(
             driveId,
-            driveItem.id!,
+            <string>driveItem.id,
             siteId,
             siteWebUrl,
             driveName,
@@ -171,16 +167,16 @@ export class GraphApiService {
           );
 
           filesToSynchronize.push(...filesInSubfolder);
-        } else if (this.fileFilterService.isFileSyncable(driveItem)) {
-            const folderPath = this.extractFolderPath(driveItem);
-            filesToSynchronize.push({
-              ...driveItem,
-              siteId,
-              siteWebUrl,
-              driveId,
-              driveName,
-              folderPath,
-            } as EnrichedDriveItem);
+        } else if (this.fileFilterService.isFileMarkedForSyncing(driveItem)) {
+          const folderPath = this.extractFolderPath(driveItem);
+          filesToSynchronize.push({
+            ...driveItem,
+            siteId,
+            siteWebUrl,
+            driveId,
+            driveName,
+            folderPath,
+          } as EnrichedDriveItem);
         }
       }
 
@@ -195,6 +191,7 @@ export class GraphApiService {
     }
   }
 
+  //Example path: /drives/b!abc123def456/root:/Documents/Projects ; Removes root: from the folder path
   private extractFolderPath(driveItem: DriveItem): string {
     if (!driveItem.parentReference?.path) {
       return '';
@@ -237,7 +234,6 @@ export class GraphApiService {
       nextPageUrl = response['@odata.nextLink'] || '';
     }
 
-    // TODO check if I can filter by FinanceGPTKnowledge fields when sending the request
     return itemsInFolder;
   }
 

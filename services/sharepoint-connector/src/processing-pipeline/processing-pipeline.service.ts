@@ -53,73 +53,53 @@ export class ProcessingPipelineService {
         siteId: file.siteId,
         driveName: file.driveName,
         folderPath: file.folderPath,
-        lastModifiedDateTime: file.lastModifiedDateTime ?? undefined,
+        lastModifiedDateTime: file.lastModifiedDateTime,
       },
     };
 
-    const completedSteps: string[] = [];
-    let currentStepIndex = 0;
-
+    this.logger.log(
+      `[${correlationId}] Starting processing pipeline for file: ${file.name} (${file.id})`,
+    );
+    let currentStep = <IPipelineStep>this.fileProcessingSteps[0];
     try {
-      this.logger.log(`[${correlationId}] Starting pipeline for file: ${file.name} (${file.id})`);
-      for (let stepIndex = 0; stepIndex < this.fileProcessingSteps.length; stepIndex++) {
-        currentStepIndex = stepIndex;
-        const step = this.fileProcessingSteps[stepIndex];
-
-        if (!step) continue;
-        this.logger.debug(
-          `[${correlationId}] Executing step ${stepIndex + 1}/${this.fileProcessingSteps.length}: ${step.stepName}`,
-        );
-
+      for (const step of this.fileProcessingSteps) {
+        currentStep = step;
         await this.executeStepWithTimeout(step, context);
 
-        completedSteps.push(step.stepName);
         this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
 
-        await this.cleanupStep(step, context);
+        if (currentStep.cleanup) await currentStep.cleanup(context);
       }
 
       const totalDuration = Date.now() - startTime.getTime();
       this.logger.log(
-        `[${correlationId}] Pipeline completed successfully in ${totalDuration}ms for file: ${file.name}`,
+        `[${correlationId}] Pipeline completed successfully in ${totalDuration}ms for file name: ${file.name} file id:${file.id}`,
       );
 
-      await this.finalCleanup(context);
-      return { success: true, context, completedSteps, totalDuration };
+      return { success: true };
     } catch (error) {
       const totalDuration = Date.now() - startTime.getTime();
       this.logger.error(
-        `[${correlationId}] Pipeline failed at step: ${this.fileProcessingSteps[currentStepIndex]?.stepName} after ${totalDuration}ms`,
+        `[${correlationId}] Pipeline failed at step: ${currentStep.stepName} after ${totalDuration}ms`,
         error instanceof Error ? error.stack : String(error),
       );
 
-      const step = this.fileProcessingSteps[currentStepIndex];
-      if (step?.cleanup) {
-        await this.cleanupStep(step, context);
-      }
+      if (currentStep.cleanup) await currentStep.cleanup(context);
 
-      return { success: false, context, error: error as Error, completedSteps, totalDuration };
+      this.finalCleanup(context);
+      return { success: false };
     }
   }
 
   private async executeStepWithTimeout(
-    fileProcessingStep: IPipelineStep,
+    step: IPipelineStep,
     context: ProcessingContext,
   ): Promise<void> {
-    const timeoutPromise = new Promise((_resolve, _reject) => {
-      setTimeout(() => {
-        _reject(
-          new Error(
-            `Step ${String(fileProcessingStep.stepName)} timed out after ${String(this.stepTimeoutMs)}ms`,
-          ),
-        );
-      }, this.stepTimeoutMs);
-    });
     try {
-      await Promise.race([fileProcessingStep.execute(context), timeoutPromise]);
+      await Promise.race([step.execute(context), this.timeoutPromise(step)]);
     } catch (error) {
       this.logger.error(
-        `[${context.correlationId}] Step ${String(fileProcessingStep.stepName)} failed: ${String(
+        `[${context.correlationId}] Step ${String(step.stepName)} failed: ${String(
           (error as Error).message,
         )}`,
       );
@@ -127,21 +107,21 @@ export class ProcessingPipelineService {
     }
   }
 
-  private async cleanupStep(step: IPipelineStep, context: ProcessingContext): Promise<void> {
-    try {
-      if (step.cleanup) {
-        this.logger.log(`[${context.correlationId}] Cleaning up step: ${step.stepName}`);
-        await step.cleanup(context);
-      }
-    } catch (cleanupError) {
-      this.logger.error(
-        `[${context.correlationId}] Cleanup failed for step ${step.stepName}:`,
-        cleanupError as Error,
+  private timeoutPromise(step: IPipelineStep) {
+    return new Promise((_resolve, reject) => {
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `Step ${String(step.stepName)} timed out after ${String(this.stepTimeoutMs)}ms`,
+            ),
+          ),
+        this.stepTimeoutMs,
       );
-    }
+    });
   }
 
-  private async finalCleanup(context: ProcessingContext): Promise<void> {
+  private finalCleanup(context: ProcessingContext) {
     try {
       if (context.contentBuffer) {
         context.contentBuffer = undefined;

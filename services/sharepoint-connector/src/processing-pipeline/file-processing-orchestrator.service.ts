@@ -19,20 +19,18 @@ export class FileProcessingOrchestratorService {
     files: EnrichedDriveItem[],
     diffResult: FileDiffResponse,
   ): Promise<void> {
-    const concurrency = this.configService.get<number>('pipeline.processingConcurrency') as number;
+    const concurrency = <number>this.configService.get('pipeline.processingConcurrency');
+    const limit = pLimit(concurrency);
 
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);
     const filesToProcess = files.filter((file) => newFileKeys.has(`sharepoint_file_${file.id}`));
+
     if (filesToProcess.length === 0) {
-      this.logger.debug(`No files to process for site ${siteId}`);
       return;
     }
 
-    this.logger.log(
-      `Processing ${filesToProcess.length} files for site ${siteId} with concurrency=${concurrency}`,
-    );
+    this.logger.log(`Processing ${filesToProcess.length} files for site ${siteId}`);
 
-    const limit = pLimit(concurrency);
     const results = await Promise.allSettled(
       filesToProcess.map((file) =>
         limit(async () => {
