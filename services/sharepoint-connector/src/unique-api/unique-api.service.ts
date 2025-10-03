@@ -22,8 +22,6 @@ import assert from 'assert';
 export class UniqueApiService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly limiter: Bottleneck;
-  private cachedGraphqlClient?: GraphQLClient;
-  private cachedToken?: string;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -163,21 +161,13 @@ export class UniqueApiService {
   }
 
   private createGraphqlClient(uniqueToken: string): GraphQLClient {
-    // Reuse cached client if token hasn't changed
-    if (this.cachedGraphqlClient && this.cachedToken === uniqueToken) {
-      return this.cachedGraphqlClient;
-    }
-
     const graphqlUrl = this.configService.get('uniqueApi.ingestionGraphQLUrl', { infer: true });
-    this.cachedGraphqlClient = new GraphQLClient(graphqlUrl, {
+    return new GraphQLClient(graphqlUrl, {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${uniqueToken}`,
       },
     });
-
-    this.cachedToken = uniqueToken;
-    return this.cachedGraphqlClient;
   }
 
   private getContentUpsertMutation(): string {
