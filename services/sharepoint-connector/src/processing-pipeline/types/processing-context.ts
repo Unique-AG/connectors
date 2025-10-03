@@ -34,8 +34,8 @@ export interface JobResult {
 }
 
 export enum PipelineStep {
-  CONTENT_FETCHING = 'content-fetching',
-  CONTENT_REGISTRATION = 'content-registration',
-  STORAGE_UPLOAD = 'storage-upload',
-  INGESTION_FINALIZATION = 'ingestion-finalization',
+  ContentFetching = 'ContentFetching',
+  ContentRegistration = 'ContentRegistration',
+  StorageUpload = 'StorageUpload',
+  IngestionFinalization = 'IngestionFinalization',
 }

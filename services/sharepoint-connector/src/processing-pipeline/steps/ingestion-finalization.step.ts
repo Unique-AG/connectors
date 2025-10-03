@@ -14,7 +14,7 @@ import assert from 'assert';
 @Injectable()
 export class IngestionFinalizationStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
-  public readonly stepName = PipelineStep.INGESTION_FINALIZATION;
+  public readonly stepName = PipelineStep.IngestionFinalization;
 
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
@@ -30,10 +30,6 @@ export class IngestionFinalizationStep implements IPipelineStep {
     const stepStartTime = Date.now();
 
     assert.ok(registrationResponse, `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`)
-
-    this.logger.debug(
-      `[${context.correlationId}] Starting ingestion finalization for file: ${context.fileName}`,
-    );
 
     const ingestionFinalizationRequest = {
       key: buildSharepointFileKey({

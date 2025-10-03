@@ -11,7 +11,7 @@ import assert from 'assert';
 @Injectable()
 export class ContentFetchingStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
-  public readonly stepName = PipelineStep.CONTENT_FETCHING;
+  public readonly stepName = PipelineStep.ContentFetching;
 
   public constructor(
     private readonly apiService: GraphApiService,

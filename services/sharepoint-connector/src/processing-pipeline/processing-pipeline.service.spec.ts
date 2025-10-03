@@ -73,20 +73,20 @@ describe('ProcessingPipelineService', () => {
   beforeEach(async () => {
     mockSteps = {
       contentFetching: {
-        stepName: PipelineStep.CONTENT_FETCHING,
+        stepName: PipelineStep.ContentFetching,
         execute: vi.fn(),
         cleanup: vi.fn(),
       },
       contentRegistration: {
-        stepName: PipelineStep.CONTENT_REGISTRATION,
+        stepName: PipelineStep.ContentRegistration,
         execute: vi.fn(),
       },
       storageUpload: {
-        stepName: PipelineStep.STORAGE_UPLOAD,
+        stepName: PipelineStep.StorageUpload,
         execute: vi.fn(),
       },
       ingestionFinalization: {
-        stepName: PipelineStep.INGESTION_FINALIZATION,
+        stepName: PipelineStep.IngestionFinalization,
         execute: vi.fn(),
       },
     };

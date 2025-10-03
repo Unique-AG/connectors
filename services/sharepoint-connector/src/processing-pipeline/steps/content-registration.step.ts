@@ -16,7 +16,7 @@ import assert from 'assert';
 @Injectable()
 export class ContentRegistrationStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
-  public readonly stepName = PipelineStep.CONTENT_REGISTRATION;
+  public readonly stepName = PipelineStep.ContentRegistration;
 
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,

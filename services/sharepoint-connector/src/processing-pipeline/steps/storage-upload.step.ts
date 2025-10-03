@@ -10,7 +10,7 @@ import assert from 'assert';
 @Injectable()
 export class StorageUploadStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
-  public readonly stepName = PipelineStep.STORAGE_UPLOAD;
+  public readonly stepName = PipelineStep.StorageUpload;
 
   public constructor() {
   }
@@ -44,8 +44,8 @@ export class StorageUploadStep implements IPipelineStep {
   }
 
   private async performUpload(context: ProcessingContext): Promise<void> {
-    const uploadUrl = <string>context.uploadUrl;
-    const contentBuffer = <Buffer>context.contentBuffer;
+    const uploadUrl = context.uploadUrl as string;
+    const contentBuffer = context.contentBuffer as Buffer;
     const mimeType = context.metadata.mimeType;
 
     try {
