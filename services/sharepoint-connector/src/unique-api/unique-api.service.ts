@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { GraphQLClient } from 'graphql-request';
 import { Client } from 'undici';
-import { OwnerType } from '../constants/owner-type.enum';
+import { UniqueOwnerType } from '../constants/unique-owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
 import {
   type ContentRegistrationRequest,
@@ -39,7 +39,7 @@ export class UniqueApiService {
             key: request.key,
             title: request.title,
             mimeType: request.mimeType,
-            ownerType: OwnerType.SCOPE,
+            ownerType: UniqueOwnerType.SCOPE,
             url: request.url,
           },
           scopeId: request.scopeId,
@@ -138,7 +138,7 @@ export class UniqueApiService {
         key: request.key,
         title: request.title,
         mimeType: request.mimeType,
-        ownerType: OwnerType.SCOPE,
+        ownerType: UniqueOwnerType.SCOPE,
         byteSize: request.byteSize,
         url: request.url,
       },

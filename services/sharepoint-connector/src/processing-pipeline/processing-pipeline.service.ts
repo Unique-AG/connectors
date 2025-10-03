@@ -64,7 +64,8 @@ export class ProcessingPipelineService {
     try {
       for (const step of this.fileProcessingSteps) {
         currentStep = step;
-        await this.executeStepWithTimeout(step, context);
+
+        await Promise.race([step.execute(context), this.timeoutPromise(step)]);
 
         this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
 
@@ -91,45 +92,18 @@ export class ProcessingPipelineService {
     }
   }
 
-  private async executeStepWithTimeout(
-    step: IPipelineStep,
-    context: ProcessingContext,
-  ): Promise<void> {
-    try {
-      await Promise.race([step.execute(context), this.timeoutPromise(step)]);
-    } catch (error) {
-      this.logger.error(
-        `[${context.correlationId}] Step ${String(step.stepName)} failed: ${String(
-          (error as Error).message,
-        )}`,
-      );
-      throw error;
-    }
-  }
-
   private timeoutPromise(step: IPipelineStep) {
+    const timeoutError = new Error(`Step ${ String(step.stepName) } timed out after ${ String(this.stepTimeoutMs) }ms`)
     return new Promise((_resolve, reject) => {
-      setTimeout(
-        () =>
-          reject(
-            new Error(
-              `Step ${String(step.stepName)} timed out after ${String(this.stepTimeoutMs)}ms`,
-            ),
-          ),
-        this.stepTimeoutMs,
-      );
+      setTimeout(() => reject(timeoutError), this.stepTimeoutMs);
     });
   }
 
   private finalCleanup(context: ProcessingContext) {
-    try {
-      if (context.contentBuffer) {
-        context.contentBuffer = undefined;
-        this.logger.log(`[${context.correlationId}] Released remaining content buffer memory`);
-      }
-      context.metadata = {} as never;
-    } catch (cleanupError) {
-      this.logger.error(`[${context.correlationId}] Final cleanup failed:`, cleanupError as Error);
+    if (context.contentBuffer) {
+      context.contentBuffer = undefined;
+      this.logger.log(`[${ context.correlationId }] Released remaining content buffer memory`);
     }
+    context.metadata = {} as never;
   }
 }

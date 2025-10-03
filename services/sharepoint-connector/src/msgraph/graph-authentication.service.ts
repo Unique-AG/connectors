@@ -47,9 +47,7 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
     this.msalClient = new ConfidentialClientApplication(msalConfig);
   }
 
-  public async getAccessToken(
-    _authenticationProviderOptions?: AuthenticationProviderOptions,
-  ): Promise<string> {
+  public async getAccessToken(): Promise<string> {
     if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
       return this.cachedToken.accessToken;
     }

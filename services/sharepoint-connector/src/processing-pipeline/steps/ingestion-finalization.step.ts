@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OwnerType } from '../../constants/owner-type.enum';
+import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
@@ -45,7 +45,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
         ownerType: registrationResponse.ownerType,
         byteSize: registrationResponse.byteSize,
         scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
-        sourceOwnerType: OwnerType.COMPANY,
+        sourceOwnerType: UniqueOwnerType.COMPANY,
         sourceName: this.extractSiteName(context.siteUrl),
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         fileUrl: registrationResponse.readUrl,

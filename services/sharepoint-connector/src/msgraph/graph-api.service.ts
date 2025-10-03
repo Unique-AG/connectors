@@ -91,6 +91,7 @@ export class GraphApiService {
         const bufferChunk = Buffer.from(chunk);
         totalSize += bufferChunk.length;
 
+        // This is how we need to cancel the download stream
         if (totalSize > maxFileSizeBytes) {
           const reader = stream.getReader();
           await reader.cancel();
@@ -149,7 +150,7 @@ export class GraphApiService {
       const filesToSynchronize: EnrichedDriveItem[] = [];
 
       for (const driveItem of allItems) {
-        // Check if we've reached the file limit for testing
+        // Check if we've reached the file limit for local testing
         if (maxFiles && filesToSynchronize.length >= maxFiles) {
           this.logger.warn(`Reached file limit of ${maxFiles}, stopping scan in ${itemId}`);
           break;
@@ -159,7 +160,7 @@ export class GraphApiService {
           const remainingLimit = maxFiles ? maxFiles - filesToSynchronize.length : undefined;
           const filesInSubfolder = await this.recursivelyFetchFiles(
             driveId,
-            <string>driveItem.id,
+            driveItem.id,
             siteId,
             siteWebUrl,
             driveName,
@@ -167,7 +168,7 @@ export class GraphApiService {
           );
 
           filesToSynchronize.push(...filesInSubfolder);
-        } else if (this.fileFilterService.isFileMarkedForSyncing(driveItem)) {
+        } else if (this.fileFilterService.isFileValidForIngestion(driveItem)) {
           const folderPath = this.extractFolderPath(driveItem);
           filesToSynchronize.push({
             ...driveItem,
@@ -176,7 +177,7 @@ export class GraphApiService {
             driveId,
             driveName,
             folderPath,
-          } as EnrichedDriveItem);
+          });
         }
       }
 

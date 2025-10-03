@@ -42,7 +42,7 @@ describe('GraphApiService', () => {
     mockGraphClient.api.mockReturnValue(mockChain);
 
     mockFileFilterService = {
-      isFileMarkedForSyncing: vi.fn().mockReturnValue(true),
+      isFileValidForIngestion: vi.fn().mockReturnValue(true),
     };
 
     const { unit } = await TestBed.solitary(GraphApiService)
@@ -74,7 +74,7 @@ describe('GraphApiService', () => {
         .mockResolvedValueOnce({ value: [mockDrive] })
         .mockResolvedValueOnce({ value: [mockFile] });
 
-      mockFileFilterService.isFileMarkedForSyncing = vi.fn().mockReturnValue(true);
+      mockFileFilterService.isFileValidForIngestion = vi.fn().mockReturnValue(true);
 
       const files = await service.getAllFilesForSite('site-1');
 
@@ -89,7 +89,7 @@ describe('GraphApiService', () => {
         .mockResolvedValueOnce({ value: [{ name: 'Invalid Drive' }, mockDrive] })
         .mockResolvedValueOnce({ value: [mockFile] });
 
-      mockFileFilterService.isFileMarkedForSyncing = vi.fn().mockReturnValue(true);
+      mockFileFilterService.isFileValidForIngestion = vi.fn().mockReturnValue(true);
 
       const files = await service.getAllFilesForSite('site-1');
 
@@ -109,7 +109,7 @@ describe('GraphApiService', () => {
         })
         .mockResolvedValueOnce({ value: [file2] });
 
-      mockFileFilterService.isFileMarkedForSyncing = vi.fn().mockReturnValue(true);
+      mockFileFilterService.isFileValidForIngestion = vi.fn().mockReturnValue(true);
 
       const files = await service.getAllFilesForSite('site-1');
 
@@ -119,7 +119,7 @@ describe('GraphApiService', () => {
 
     it('filters out non-syncable files', async () => {
       const mockChain = mockGraphClient.api();
-      mockFileFilterService.isFileMarkedForSyncing = vi.fn().mockReturnValue(false);
+      mockFileFilterService.isFileValidForIngestion = vi.fn().mockReturnValue(false);
       mockChain.get
         .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
         .mockResolvedValueOnce({ value: [mockDrive] })
@@ -128,7 +128,7 @@ describe('GraphApiService', () => {
       const files = await service.getAllFilesForSite('site-1');
 
       expect(files).toHaveLength(0);
-      expect(mockFileFilterService.isFileMarkedForSyncing).toHaveBeenCalledWith(mockFile);
+      expect(mockFileFilterService.isFileValidForIngestion).toHaveBeenCalledWith(mockFile);
     });
 
     it('recursively scans folders', async () => {
@@ -146,7 +146,7 @@ describe('GraphApiService', () => {
         .mockResolvedValueOnce({ value: [folder] })
         .mockResolvedValueOnce({ value: [mockFile] });
 
-      mockFileFilterService.isFileMarkedForSyncing = vi.fn().mockReturnValue(true);
+      mockFileFilterService.isFileValidForIngestion = vi.fn().mockReturnValue(true);
 
       const files = await service.getAllFilesForSite('site-1');
 

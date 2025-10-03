@@ -1,10 +1,10 @@
-import { env } from 'node:process';
-import { registerAs } from '@nestjs/config';
-import { z } from 'zod';
+import {env} from 'node:process';
+import {registerAs} from '@nestjs/config';
+import {z} from 'zod';
 
 const namespace = 'uniqueApi' as const;
 
-export const EnvironmentVariables = z.object({
+const EnvironmentVariables = z.object({
   UNIQUE_INGESTION_URL_GRAPHQL: z.string().url(),
   UNIQUE_INGESTION_URL: z.string().url(),
   UNIQUE_SCOPE_ID: z.string().min(1).optional(),
@@ -29,13 +29,13 @@ export interface Config {
     fileDiffBasePath: string;
     fileDiffPartialKey: string;
     sharepointBaseUrl?: string;
-  };
+  }
 }
 
 export const uniqueApiConfig = registerAs<Config[typeof namespace]>(namespace, () => {
   const validEnv = EnvironmentVariables.safeParse(env);
   if (!validEnv.success) {
-    throw new TypeError(`Invalid config for namespace "${namespace}": ${validEnv.error.message}`);
+    throw new TypeError(`Invalid config for namespace "${ namespace }": ${ validEnv.error.message }`);
   }
 
   return {
@@ -49,7 +49,5 @@ export const uniqueApiConfig = registerAs<Config[typeof namespace]>(namespace, (
     fileDiffBasePath: validEnv.data.UNIQUE_FILE_DIFF_BASE_PATH,
     fileDiffPartialKey: validEnv.data.UNIQUE_FILE_DIFF_PARTIAL_KEY,
     sharepointBaseUrl: validEnv.data.SHAREPOINT_BASE_URL,
-  } satisfies Config[typeof namespace];
+  }
 });
-
-export type UniqueApiConfig = typeof uniqueApiConfig;

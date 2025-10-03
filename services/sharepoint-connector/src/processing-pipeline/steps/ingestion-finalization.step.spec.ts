@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { OwnerType } from '../../constants/owner-type.enum';
+import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
@@ -48,7 +48,7 @@ describe('IngestionFinalizationStep', () => {
           key: 'k',
           byteSize: 10,
           mimeType: 'application/pdf',
-          ownerType: OwnerType.SCOPE,
+          ownerType: UniqueOwnerType.SCOPE,
           ownerId: 'owner-id',
           writeUrl: 'https://write',
           readUrl: 'https://read',

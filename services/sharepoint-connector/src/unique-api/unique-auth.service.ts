@@ -13,7 +13,7 @@ export class UniqueAuthService {
   public async getToken(forceRefresh = false): Promise<string> {
     if (!forceRefresh && this.isTokenValid()) {
       this.logger.debug('Using cached Zitadel token');
-      return <string>this.cachedToken;
+      return this.cachedToken as string;
     }
 
     this.logger.debug('Acquiring new Unique API token from Zitadel...');

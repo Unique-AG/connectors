@@ -1,4 +1,4 @@
-export enum OwnerType {
+export enum UniqueOwnerType {
   SCOPE = 'SCOPE',
   COMPANY = 'COMPANY',
   USER = 'USER',

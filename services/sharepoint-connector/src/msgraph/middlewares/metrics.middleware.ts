@@ -4,8 +4,8 @@ import {
   GraphError,
   Middleware,
 } from '@microsoft/microsoft-graph-client';
-import { Logger } from '@nestjs/common';
-import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.types';
+import {Logger} from '@nestjs/common';
+import {GraphApiErrorResponse, isGraphApiError} from '../types/sharepoint.types';
 
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
@@ -181,16 +181,12 @@ export class MetricsMiddleware implements Middleware {
     return details;
   }
 
-  private extractHeadersSafely(headers: unknown): unknown {
+  private extractHeadersSafely(headers: unknown) {
     if (!headers) return undefined;
 
-    try {
-      if (headers instanceof Headers) {
-        return Object.fromEntries(headers.entries());
-      }
-      return headers;
-    } catch {
-      return String(headers);
+    if (headers instanceof Headers) {
+      return Object.fromEntries(headers.entries());
     }
+    return headers;
   }
 }

@@ -1,12 +1,15 @@
-import type { DriveItem } from '@microsoft/microsoft-graph-types';
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import type {DriveItem} from '@microsoft/microsoft-graph-types';
+import {Injectable} from '@nestjs/common';
+import {ConfigService} from '@nestjs/config';
+
+type DefinedFileProperties = 'file' | 'id' | 'name' | 'size' | 'webUrl' | 'listItem' | 'lastModifiedDateTime'
 
 @Injectable()
 export class FileFilterService {
-  public constructor(private readonly configService: ConfigService) {}
+  public constructor(private readonly configService: ConfigService) {
+  }
 
-  public isFileMarkedForSyncing(item: DriveItem): boolean {
+  public isFileValidForIngestion(item: DriveItem): item is Omit<DriveItem, DefinedFileProperties> & { [key in DefinedFileProperties]: Exclude<DriveItem[key], null | undefined> } {
     const fields = item.listItem?.fields as Record<string, unknown>;
     const syncColumnName = <string>this.configService.get('sharepoint.syncColumnName');
     const allowedMimeTypes = <string[]>this.configService.get('sharepoint.allowedMimeTypes');
@@ -17,6 +20,7 @@ export class FileFilterService {
       !item.name ||
       !item.size ||
       !item.webUrl ||
+      !item.lastModifiedDateTime ||
       !item.listItem?.fields ||
       item.size === 0
     ) {
@@ -28,3 +32,4 @@ export class FileFilterService {
     return Boolean(hasSyncFlag && isAllowedMimeType);
   }
 }
+

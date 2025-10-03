@@ -39,22 +39,22 @@ describe('FileFilterService', () => {
 
   it('returns true for valid syncable file', () => {
     const item = mockDriveItem();
-    expect(service.isFileMarkedForSyncing(item)).toBe(true);
+    expect(service.isFileValidForIngestion(item)).toBe(true);
   });
 
   it('returns false for file without listItem fields', () => {
     const item = mockDriveItem({ listItem: undefined });
-    expect(service.isFileMarkedForSyncing(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item)).toBe(false);
   });
 
   it('returns false for empty file (0 bytes)', () => {
     const item = mockDriveItem({ size: 0 });
-    expect(service.isFileMarkedForSyncing(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item)).toBe(false);
   });
 
   it('returns false for file with undefined size', () => {
     const item = mockDriveItem({ size: undefined });
-    expect(service.isFileMarkedForSyncing(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item)).toBe(false);
   });
 
   it('returns false for file without sync flag', () => {
@@ -65,20 +65,20 @@ describe('FileFilterService', () => {
         } as Record<string, unknown>,
       },
     });
-    expect(service.isFileMarkedForSyncing(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item)).toBe(false);
   });
 
   it('returns false for file with disallowed mime type', () => {
     const item = mockDriveItem({
       file: { mimeType: 'image/png' },
     });
-    expect(service.isFileMarkedForSyncing(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item)).toBe(false);
   });
 
   it('returns true for file with allowed text/plain mime type', () => {
     const item = mockDriveItem({
       file: { mimeType: 'text/plain' },
     });
-    expect(service.isFileMarkedForSyncing(item)).toBe(true);
+    expect(service.isFileValidForIngestion(item)).toBe(true);
   });
 });

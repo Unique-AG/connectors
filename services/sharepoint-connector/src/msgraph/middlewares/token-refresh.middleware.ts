@@ -64,6 +64,7 @@ export class TokenRefreshMiddleware implements Middleware {
       const clonedResponse = response.clone();
       const errorBody = await clonedResponse.json();
 
+      // taken from TODO add source of the example middlewares
       return (
         errorBody?.error?.code === 'InvalidAuthenticationToken' ||
         errorBody?.error?.message?.includes('Lifetime validation failed') ||

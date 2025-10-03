@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
-import { OwnerType } from '../../constants/owner-type.enum';
+import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
@@ -39,9 +39,9 @@ export class ContentRegistrationStep implements IPipelineStep {
         key: fileKey,
         title: context.fileName,
         mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
-        ownerType: OwnerType.SCOPE,
+        ownerType: UniqueOwnerType.SCOPE,
         scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
-        sourceOwnerType: OwnerType.COMPANY,
+        sourceOwnerType: UniqueOwnerType.COMPANY,
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         sourceName: 'Sharepoint',
         ...(isPathBasedIngestion && {
