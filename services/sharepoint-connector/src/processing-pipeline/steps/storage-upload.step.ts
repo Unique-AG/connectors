@@ -4,6 +4,7 @@ import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
+import {normalizeError} from "../../utils/normalize-error";
 
 @Injectable()
 export class StorageUploadStep implements IPipelineStep {
@@ -32,7 +33,7 @@ export class StorageUploadStep implements IPipelineStep {
 
       return context;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = normalizeError(error).message;
       this.logger.error(`[${context.correlationId}] Storage upload failed: ${message}`);
       throw error;
     }
@@ -63,7 +64,7 @@ export class StorageUploadStep implements IPipelineStep {
 
       this.logger.debug(`[${context.correlationId}] Upload completed successfully`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = normalizeError(error).message;
       this.logger.error(`[${context.correlationId}] Upload failed: ${message}`);
       throw error;
     }

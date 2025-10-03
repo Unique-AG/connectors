@@ -1,6 +1,7 @@
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { GraphAuthenticationProvider } from '../graph-authentication.service';
+import {normalizeError} from "../../utils/normalize-error";
 
 export class TokenRefreshMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
@@ -16,11 +17,8 @@ export class TokenRefreshMiddleware implements Middleware {
     const isExpired = await this.isTokenExpiredError(context.response);
     if (!isExpired) return;
 
-    this.logger.debug('SharePoint token expired, attempting to refresh...');
-
     try {
       const newAccessToken = await this.graphAuthenticationProvider.getAccessToken();
-      this.logger.debug('Successfully refreshed SharePoint token');
 
       const clonedRequest = this.cloneRequest(context.request, context.options);
       const updatedOptions = this.updateAuthorizationHeader(context.options, newAccessToken);
@@ -32,23 +30,13 @@ export class TokenRefreshMiddleware implements Middleware {
         customHosts: context.customHosts,
       };
 
-      this.logger.debug('Retrying SharePoint request with refreshed token');
       await this.nextMiddleware.execute(retryContext);
 
       context.response = retryContext.response;
-
-      if (context.response?.ok) {
-        this.logger.debug('SharePoint request succeeded after token refresh');
-      } else {
-        this.logger.warn({
-          msg: 'SharePoint request still failed after token refresh',
-          status: context.response?.status,
-        });
-      }
     } catch (error) {
       this.logger.error({
         msg: 'Failed to refresh SharePoint token or retry request',
-        error: error instanceof Error ? error.message : String(error),
+        error: normalizeError(error).message
       });
     }
   }

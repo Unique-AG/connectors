@@ -10,6 +10,7 @@ import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
+import {normalizeError} from "../../utils/normalize-error";
 
 @Injectable()
 export class ContentRegistrationStep implements IPipelineStep {
@@ -69,7 +70,7 @@ export class ContentRegistrationStep implements IPipelineStep {
 
       return context;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = normalizeError(error).message;
       this.logger.error(`[${context.correlationId}] Content registration failed: ${message}`);
       throw error;
     }

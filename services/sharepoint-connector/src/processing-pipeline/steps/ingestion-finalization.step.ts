@@ -8,6 +8,7 @@ import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
+import {normalizeError} from "../../utils/normalize-error";
 
 @Injectable()
 export class IngestionFinalizationStep implements IPipelineStep {
@@ -70,7 +71,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
       return context;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = normalizeError(error).message;
       this.logger.error(`[${context.correlationId}] Ingestion finalization failed: ${message}`);
       throw error;
     }
