@@ -4,6 +4,7 @@ import { GraphApiService } from '../msgraph/graph-api.service';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
+import { buildSharepointFileKey, buildSharepointPartialKey } from '../shared/sharepoint-key.util';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 
@@ -39,6 +40,8 @@ export class SharepointSynchronizationService {
         if (files.length === 0) {
           continue;
         }
+        // check what happens if a siteid is empty?
+        // if no files are in a site we still need to send the request to diff-file endpoint
 
         const diffResult = await this.calculateDiffForFiles(files);
         this.logger.log(
@@ -63,17 +66,27 @@ export class SharepointSynchronizationService {
     This step also triggers file deletion in node-ingestion service when a file is missing.
    */
   private async calculateDiffForFiles(files: EnrichedDriveItem[]): Promise<FileDiffResponse> {
+    const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
+
     const fileDiffItems: FileDiffItem[] = files.map((file: EnrichedDriveItem) => ({
       id: file.id,
       name: file.name,
       url: file.webUrl,
       updatedAt: file.listItem?.lastModifiedDateTime,
-      key: `sharepoint_file_${file.id}`,
+      key: buildSharepointFileKey({
+        scopeId,
+        siteId: file.siteId,
+        driveName: file.driveName,
+        folderPath: file.folderPath,
+        fileId: file.id,
+        fileName: file.name,
+      }),
       driveId: file.driveId,
       siteId: file.siteId,
     }));
 
     const uniqueToken = await this.uniqueAuthService.getToken();
-    return await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken);
+    const partialKey = buildSharepointPartialKey({ scopeId, siteId: files[0]?.siteId });
+    return await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, partialKey);
   }
 }

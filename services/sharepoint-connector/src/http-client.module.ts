@@ -10,7 +10,7 @@ import { Config } from "./config";
     {
       provide: UNIQUE_HTTP_CLIENT,
       useFactory: (configService: ConfigService<Config, true>) => {
-        const baseUrl = configService.get('uniqueApi.ingestionUrl', { infer: true });
+        const baseUrl = configService.get('uniqueApi.fileDiffUrl', { infer: true });
         const url = new URL(baseUrl);
         return new Client(`${url.protocol}//${url.host}`, {
           bodyTimeout: 30000,

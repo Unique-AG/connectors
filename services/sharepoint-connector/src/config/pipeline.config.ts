@@ -1,6 +1,6 @@
-import { env } from 'node:process';
-import { registerAs } from '@nestjs/config';
-import { z } from 'zod';
+import {env} from 'node:process';
+import {registerAs} from '@nestjs/config';
+import {z} from 'zod';
 import {
   DEFAULT_MAX_FILE_SIZE_BYTES,
   DEFAULT_MS_GRAPH_RATE_LIMIT_PER_10_SECONDS,
@@ -26,7 +26,7 @@ export const EnvironmentVariables = z.object({
     .describe('Number of MS Graph API requests allowed per 10 seconds'),
 });
 
-export interface Config {
+export interface PipelineConfig {
   [namespace]: {
     processingConcurrency: number;
     stepTimeoutSeconds: number;
@@ -35,17 +35,15 @@ export interface Config {
   };
 }
 
-export const pipelineConfig = registerAs<Config[typeof namespace]>(namespace, () => {
+export const pipelineConfig = registerAs<PipelineConfig[typeof namespace]>(namespace, () => {
   const validEnv = EnvironmentVariables.safeParse(env);
   if (!validEnv.success) {
-    throw new TypeError(`Invalid config for namespace "${namespace}": ${validEnv.error.message}`);
+    throw new TypeError(`Invalid config for namespace "${ namespace }": ${ validEnv.error.message }`);
   }
   return {
     processingConcurrency: validEnv.data.PROCESSING_CONCURRENCY,
     stepTimeoutSeconds: validEnv.data.STEP_TIMEOUT_SECONDS,
     maxFileSizeBytes: validEnv.data.MAX_FILE_SIZE_BYTES,
     msGraphRateLimitPer10Seconds: validEnv.data.MS_GRAPH_RATE_LIMIT_PER_10_SECONDS,
-  } satisfies Config[typeof namespace];
+  }
 });
-
-export type PipelineConfig = typeof pipelineConfig;

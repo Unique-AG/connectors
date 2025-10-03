@@ -5,6 +5,7 @@ import { GraphQLClient } from 'graphql-request';
 import { Client } from 'undici';
 import { UniqueOwnerType } from '../constants/unique-owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
+import { buildSharepointPartialKey } from '../shared/sharepoint-key.util';
 import {
   type ContentRegistrationRequest,
   type FileDiffItem,
@@ -13,6 +14,7 @@ import {
   type IngestionApiResponse,
   type IngestionFinalizationRequest,
 } from './unique-api.types';
+import { buildSharepointPartialKey } from '../shared/sharepoint-key.util';
 
 @Injectable()
 export class UniqueApiService {
@@ -77,18 +79,19 @@ export class UniqueApiService {
   public async performFileDiff(
     fileList: FileDiffItem[],
     uniqueToken: string,
+    partialKey?: string,
   ): Promise<FileDiffResponse> {
     const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
-    const partialKey = <string>this.configService.get('uniqueApi.fileDiffPartialKey');
-    const ingestionUrl = <string>this.configService.get('uniqueApi.ingestionUrl');
+    const resolvedPartialKey =
+      partialKey ?? buildSharepointPartialKey({ scopeId, siteId: fileList[0]?.siteId });
+    const fileDiffUrl = <string>this.configService.get('uniqueApi.fileDiffUrl');
     const basePath = <string>this.configService.get('uniqueApi.fileDiffBasePath');
-    const fileDiffUrl = `${ingestionUrl}/file-diff`;
     const url = new URL(fileDiffUrl);
     const path = url.pathname + url.search;
 
     const diffRequest: FileDiffRequest = {
       basePath,
-      partialKey,
+      partialKey: resolvedPartialKey,
       sourceKind: 'MICROSOFT_365_SHAREPOINT',
       sourceName: 'SharePoint Online Connector',
       fileList,

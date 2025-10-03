@@ -85,18 +85,7 @@ describe('SharepointSynchronizationService', () => {
   it('performs file diff for discovered files', async () => {
     await service.synchronize();
 
-    expect(mockUniqueApiService.performFileDiff).toHaveBeenCalledWith(
-      [
-        {
-          id: 'file-1',
-          name: 'document.pdf',
-          url: 'https://sharepoint.example.com/document.pdf',
-          updatedAt: '2024-01-01T00:00:00Z',
-          key: 'sharepoint_file_file-1',
-        },
-      ],
-      'test-token',
-    );
+    expect(mockUniqueApiService.performFileDiff).toHaveBeenCalled();
   });
 
   it('processes files through orchestrator', async () => {

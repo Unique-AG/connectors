@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
@@ -21,7 +22,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const registrationResponse = context.metadata.registration;
     const baseUrl = <string>this.configService.get('uniqueApi.sharepointBaseUrl');
-    const scopeId = this.configService.get('uniqueApi.scopeId');
+    const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
     const isPathBasedIngestion = !scopeId;
 
     if (!registrationResponse) {
@@ -39,7 +40,14 @@ export class IngestionFinalizationStep implements IPipelineStep {
       const uniqueToken = await this.uniqueAuthService.getToken();
 
       const ingestionFinalizationRequest = {
-        key: registrationResponse.key,
+        key: buildSharepointFileKey({
+          scopeId,
+          siteId: context.metadata.siteId,
+          driveName: context.metadata.driveName,
+          folderPath: context.metadata.folderPath,
+          fileId: context.fileId,
+          fileName: context.fileName,
+        }),
         title: context.fileName,
         mimeType: registrationResponse.mimeType,
         ownerType: registrationResponse.ownerType,

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
@@ -29,11 +30,11 @@ export class ContentRegistrationStep implements IPipelineStep {
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();
-      const scopeId = this.configService.get<string>('uniqueApi.scopeId');
+      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
       const baseUrl = <string>this.configService.get('uniqueApi.sharepointBaseUrl');
       const isPathBasedIngestion = !scopeId;
 
-      const fileKey = this.generateFileKey(context, isPathBasedIngestion);
+      const fileKey = this.buildFileKey(context, scopeId);
 
       const contentRegistrationRequest: ContentRegistrationRequest = {
         key: fileKey,
@@ -73,17 +74,14 @@ export class ContentRegistrationStep implements IPipelineStep {
     }
   }
 
-  private generateFileKey(context: ProcessingContext, isPathBasedIngestion: boolean): string {
-    if (!isPathBasedIngestion) {
-      return `sharepoint_${context.metadata.siteId}_${context.fileId}`;
-    }
-
-    const cleanFolderPath = context.metadata.folderPath.replace(/^\/+|\/+$/g, '');
-    return [
-      context.metadata.siteId,
-      context.metadata.driveName,
-      cleanFolderPath,
-      context.fileName,
-    ].join('/');
+  private buildFileKey(context: ProcessingContext, scopeId: string | undefined): string {
+    return buildSharepointFileKey({
+      scopeId,
+      siteId: context.metadata.siteId,
+      driveName: context.metadata.driveName,
+      folderPath: context.metadata.folderPath,
+      fileId: context.fileId,
+      fileName: context.fileName,
+    });
   }
 }

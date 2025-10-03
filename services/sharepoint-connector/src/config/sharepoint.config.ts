@@ -51,7 +51,7 @@ export const EnvironmentVariables = z.object({
     .describe('Maximum number of files to scan (for testing, unlimited if not set)'),
 });
 
-export interface Config {
+export interface SharepointConfig {
   [namespace]: {
     clientId: string;
     clientSecret: string;
@@ -64,7 +64,7 @@ export interface Config {
   };
 }
 
-export const sharepointConfig = registerAs<Config[typeof namespace]>(namespace, () => {
+export const sharepointConfig = registerAs<SharepointConfig[typeof namespace]>(namespace, () => {
   const validEnv = EnvironmentVariables.safeParse(env);
   if (!validEnv.success) {
     throw new TypeError(`Invalid config for namespace "${namespace}": ${validEnv.error.message}`);
@@ -78,7 +78,5 @@ export const sharepointConfig = registerAs<Config[typeof namespace]>(namespace, 
     syncColumnName: validEnv.data.SHAREPOINT_SYNC_COLUMN_NAME,
     allowedMimeTypes: validEnv.data.ALLOWED_MIME_TYPES,
     maxFilesToScan: validEnv.data.SHAREPOINT_MAX_FILES_TO_SCAN,
-  } satisfies Config[typeof namespace];
+  }
 });
-
-export type SharepointConfig = typeof sharepointConfig;
