@@ -8,11 +8,12 @@ import {
   AuthenticationProvider,
   AuthenticationProviderOptions,
 } from '@microsoft/microsoft-graph-client';
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../config';
-import { serializeError } from 'serialize-error-cjs';
-import { normalizeError } from '../utils/normalize-error';
+import {Injectable, Logger} from '@nestjs/common';
+import {ConfigService} from '@nestjs/config';
+import {Config} from '../config';
+import {serializeError} from 'serialize-error-cjs';
+import {normalizeError} from '../utils/normalize-error';
+import assert from 'assert';
 
 interface CachedToken {
   accessToken: string;
@@ -31,16 +32,12 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
     const clientId = this.configService.get('sharepoint.clientId', { infer: true });
     const clientSecret = this.configService.get('sharepoint.clientSecret', { infer: true });
 
-    if (!tenantId || !clientId || !clientSecret) {
-      throw new Error(
-        'SharePoint configuration missing: tenantId, clientId, and clientSecret are required',
-      );
-    }
+    assert.ok(!tenantId || !clientId || !clientSecret, 'SharePoint configuration missing: tenantId, clientId, and clientSecret are required')
 
     const msalConfig: Configuration = {
       auth: {
         clientId,
-        authority: `https://login.microsoftonline.com/${tenantId}`,
+        authority: `https://login.microsoftonline.com/${ tenantId }`,
         clientSecret,
       },
     };
@@ -53,7 +50,6 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
       return this.cachedToken.accessToken;
     }
 
-    this.logger.debug('Acquiring new Microsoft Graph API token...');
     return await this.acquireNewToken();
   }
 
@@ -68,27 +64,15 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
     };
 
     try {
-      const response: AuthenticationResult | null =
-        await this.msalClient.acquireTokenByClientCredential(tokenRequest);
+      const response = await this.msalClient.acquireTokenByClientCredential(tokenRequest);
 
-      if (!response?.accessToken) {
-        throw new Error('Failed to acquire Graph API token: no access token in response');
-      }
-
-      if (!response.expiresOn) {
-        throw new Error('Failed to acquire Graph API token: no expiration time in response');
-      }
+      assert.ok(response?.accessToken, 'Failed to acquire Graph API token: no access token in response');
+      assert.ok(response.expiresOn, 'Failed to acquire Graph API token: no expiration time in response');
 
       this.cachedToken = {
         accessToken: response.accessToken,
         expiresAt: response.expiresOn.getTime(),
       };
-
-      this.logger.debug({
-        msg: 'Successfully acquired new Microsoft Graph API token',
-        expiresAt: response.expiresOn.toISOString(),
-        cacheHit: false,
-      });
 
       return response.accessToken;
     } catch (error) {
@@ -100,10 +84,5 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
       this.cachedToken = null;
       throw error;
     }
-  }
-
-  public clearTokenCache(): void {
-    this.logger.debug('Clearing cached Microsoft Graph API token');
-    this.cachedToken = null;
   }
 }

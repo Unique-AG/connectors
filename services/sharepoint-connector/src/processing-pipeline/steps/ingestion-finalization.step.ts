@@ -9,6 +9,7 @@ import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
 import {normalizeError} from "../../utils/normalize-error";
+import assert from 'assert';
 
 @Injectable()
 export class IngestionFinalizationStep implements IPipelineStep {
@@ -26,47 +27,41 @@ export class IngestionFinalizationStep implements IPipelineStep {
     const baseUrl = this.configService.get('uniqueApi.sharepointBaseUrl', { infer: true });
     const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
     const isPathBasedIngestion = !scopeId;
+    const stepStartTime = Date.now();
 
-    if (!registrationResponse) {
-      throw new Error(
-        `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
-      );
-    }
+    assert.ok(registrationResponse, `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`)
 
     this.logger.debug(
       `[${context.correlationId}] Starting ingestion finalization for file: ${context.fileName}`,
     );
 
+    const ingestionFinalizationRequest = {
+      key: buildSharepointFileKey({
+        scopeId,
+        siteId: context.metadata.siteId,
+        driveName: context.metadata.driveName,
+        folderPath: context.metadata.folderPath,
+        fileId: context.fileId,
+        fileName: context.fileName,
+      }),
+      title: context.fileName,
+      mimeType: registrationResponse.mimeType,
+      ownerType: registrationResponse.ownerType,
+      byteSize: registrationResponse.byteSize,
+      scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
+      sourceOwnerType: UniqueOwnerType.Company,
+      sourceName: this.extractSiteName(context.siteUrl),
+      sourceKind: 'MICROSOFT_365_SHAREPOINT',
+      fileUrl: registrationResponse.readUrl,
+      ...(isPathBasedIngestion && {
+        url: context.downloadUrl,
+        baseUrl: baseUrl,
+      }),
+    };
+
     try {
-      const stepStartTime = Date.now();
       const uniqueToken = await this.uniqueAuthService.getToken();
-
-      const ingestionFinalizationRequest = {
-        key: buildSharepointFileKey({
-          scopeId,
-          siteId: context.metadata.siteId,
-          driveName: context.metadata.driveName,
-          folderPath: context.metadata.folderPath,
-          fileId: context.fileId,
-          fileName: context.fileName,
-        }),
-        title: context.fileName,
-        mimeType: registrationResponse.mimeType,
-        ownerType: registrationResponse.ownerType,
-        byteSize: registrationResponse.byteSize,
-        scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
-        sourceOwnerType: UniqueOwnerType.Company,
-        sourceName: this.extractSiteName(context.siteUrl),
-        sourceKind: 'MICROSOFT_365_SHAREPOINT',
-        fileUrl: registrationResponse.readUrl,
-        ...(isPathBasedIngestion && {
-          url: context.downloadUrl,
-          baseUrl: baseUrl,
-        }),
-      };
-
       await this.uniqueApiService.finalizeIngestion(ingestionFinalizationRequest, uniqueToken);
-
       const _stepDuration = Date.now() - stepStartTime;
 
       return context;

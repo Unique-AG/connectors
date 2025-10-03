@@ -119,7 +119,6 @@ describe('GraphAuthenticationProvider', () => {
     });
 
     await provider.getAccessToken();
-    provider.clearTokenCache();
     await provider.getAccessToken();
 
     expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledTimes(2);

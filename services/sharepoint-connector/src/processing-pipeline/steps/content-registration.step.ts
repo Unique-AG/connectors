@@ -11,6 +11,7 @@ import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
 import {normalizeError} from "../../utils/normalize-error";
+import assert from 'assert';
 
 @Injectable()
 export class ContentRegistrationStep implements IPipelineStep {
@@ -25,43 +26,35 @@ export class ContentRegistrationStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
+    const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
+    const baseUrl = this.configService.get('uniqueApi.sharepointBaseUrl', { infer: true });
+    const isPathBasedIngestion = !scopeId;
 
-    this.logger.debug(
-      `[${context.correlationId}] Starting content registration for file: ${context.fileName}`,
-    );
+    const fileKey = this.buildFileKey(context, scopeId);
+
+    const contentRegistrationRequest: ContentRegistrationRequest = {
+      key: fileKey,
+      title: context.fileName,
+      mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
+      ownerType: UniqueOwnerType.Scope,
+      scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
+      sourceOwnerType: UniqueOwnerType.Company,
+      sourceKind: 'MICROSOFT_365_SHAREPOINT',
+      sourceName: 'Sharepoint',
+      ...(isPathBasedIngestion && {
+        url: context.downloadUrl,
+        baseUrl: baseUrl,
+      }),
+    };
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();
-      const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
-      const baseUrl = this.configService.get('uniqueApi.sharepointBaseUrl', { infer: true });
-      const isPathBasedIngestion = !scopeId;
-
-      const fileKey = this.buildFileKey(context, scopeId);
-
-      const contentRegistrationRequest: ContentRegistrationRequest = {
-        key: fileKey,
-        title: context.fileName,
-        mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
-        ownerType: UniqueOwnerType.Scope,
-        scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
-        sourceOwnerType: UniqueOwnerType.Company,
-        sourceKind: 'MICROSOFT_365_SHAREPOINT',
-        sourceName: 'Sharepoint',
-        ...(isPathBasedIngestion && {
-          url: context.downloadUrl,
-          baseUrl: baseUrl,
-        }),
-      };
-
-      this.logger.debug(`[${context.correlationId}] Registering content with key: ${fileKey}`);
       const registrationResponse = await this.uniqueApiService.registerContent(
         contentRegistrationRequest,
         uniqueToken,
       );
 
-      if (!registrationResponse.writeUrl) {
-        throw new Error('Registration response missing required fields: id or writeUrl');
-      }
+      assert.ok(registrationResponse.writeUrl, 'Registration response missing required fields: id or writeUrl');
 
       context.uploadUrl = registrationResponse.writeUrl;
       context.uniqueContentId = registrationResponse.id;

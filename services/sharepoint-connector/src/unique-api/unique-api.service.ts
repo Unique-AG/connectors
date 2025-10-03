@@ -106,9 +106,7 @@ export class UniqueApiService {
       }
 
       const responseData = await body.json();
-      if (!responseData) {
-        throw new Error('Invalid response from Unique API file diff');
-      }
+      assert.ok(responseData, 'Invalid response from Unique API file diff')
       return responseData as FileDiffResponse;
     });
   }

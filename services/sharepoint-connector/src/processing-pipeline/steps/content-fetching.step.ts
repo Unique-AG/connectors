@@ -6,6 +6,7 @@ import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
 import {normalizeError} from "../../utils/normalize-error";
+import assert from 'assert';
 
 @Injectable()
 export class ContentFetchingStep implements IPipelineStep {
@@ -19,12 +20,9 @@ export class ContentFetchingStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
-    this.logger.debug(
-      `[${context.correlationId}] Starting content fetching for file: ${context.fileName}`,
-    );
+    this.validateMimeType(context.metadata.mimeType, context.correlationId);
 
     try {
-      this.validateMimeType(context.metadata.mimeType, context.correlationId);
       const contentBuffer = await this.apiService.downloadFileContent(
         context.metadata.driveId,
         context.fileId,
@@ -32,12 +30,6 @@ export class ContentFetchingStep implements IPipelineStep {
 
       context.contentBuffer = contentBuffer;
       context.fileSize = contentBuffer.length;
-
-      this.logger.debug(
-        `[${context.correlationId}] Content fetching completed for file: ${context.fileName} (${String(
-          Math.round(contentBuffer.length / 1024 / 1024),
-        )}MB)`,
-      );
 
       const _stepDuration = Date.now() - stepStartTime;
 
@@ -51,13 +43,7 @@ export class ContentFetchingStep implements IPipelineStep {
 
   private validateMimeType(mimeType: string | undefined, correlationId: string): void {
     const allowedMimeTypes = this.configService.get('sharepoint.allowedMimeTypes', { infer: true });
-
-    if (!mimeType) {
-      throw new Error(`MIME type is missing for this item. Skipping download. [${correlationId}]`);
-    }
-
-    if (!allowedMimeTypes.includes(mimeType)) {
-      throw new Error(`MIME type ${mimeType} is not allowed. Skipping download.}`);
-    }
+    assert.ok(mimeType, `MIME type is missing for this item. Skipping download. [${correlationId}]`)
+    assert.ok(allowedMimeTypes.includes(mimeType), `MIME type ${mimeType} is not allowed. Skipping download.}` )
   }
 }
