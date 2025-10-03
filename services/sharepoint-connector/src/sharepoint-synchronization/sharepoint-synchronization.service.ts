@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
@@ -14,7 +15,7 @@ export class SharepointSynchronizationService {
   private isScanning = false;
 
   public constructor(
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly graphApiService: GraphApiService,
     private readonly orchestrator: FileProcessingOrchestratorService,
@@ -30,7 +31,7 @@ export class SharepointSynchronizationService {
     }
     this.isScanning = true;
     const scanStartTime = Date.now();
-    const sitesToScan = this.configService.get<string[]>('sharepoint.sites') as string[];
+    const sitesToScan = this.configService.get('sharepoint.sites', { infer: true });
 
     this.logger.log(`Starting scan of ${sitesToScan.length} SharePoint sites...`);
 
@@ -66,7 +67,7 @@ export class SharepointSynchronizationService {
     This step also triggers file deletion in node-ingestion service when a file is missing.
    */
   private async calculateDiffForFiles(files: EnrichedDriveItem[]): Promise<FileDiffResponse> {
-    const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
+    const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
 
     const fileDiffItems: FileDiffItem[] = files.map((file: EnrichedDriveItem) => ({
       id: file.id,
@@ -86,7 +87,7 @@ export class SharepointSynchronizationService {
     }));
 
     const uniqueToken = await this.uniqueAuthService.getToken();
-    const partialKey = buildSharepointPartialKey({ scopeId, siteId: files[0]?.siteId });
+    const partialKey = buildSharepointPartialKey({ scopeId, siteId: files[0]?.siteId ?? '' });
     return await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, partialKey);
   }
 }

@@ -2,6 +2,7 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import type { Drive, DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
 import Bottleneck from 'bottleneck';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
@@ -15,14 +16,14 @@ export class GraphApiService {
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
     private readonly fileFilterService: FileFilterService,
   ) {
     this.graphClient = this.graphClientFactory.createClient();
 
-    const msGraphRateLimitPer10Seconds = this.configService.get<number>(
+    const msGraphRateLimitPer10Seconds = this.configService.get(
       'pipeline.msGraphRateLimitPer10Seconds',
-      10000,
+      { infer: true },
     );
 
     this.limiter = new Bottleneck({
@@ -33,7 +34,7 @@ export class GraphApiService {
   }
 
   public async getAllFilesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
-    const maxFilesToScan = this.configService.get<number>('sharepoint.maxFilesToScan');
+    const maxFilesToScan = this.configService.get('sharepoint.maxFilesToScan', { infer: true });
     const allSyncableFiles: EnrichedDriveItem[] = [];
     let totalScanned = 0;
 
@@ -77,7 +78,7 @@ export class GraphApiService {
 
   public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
     this.logger.debug(`Downloading file content for item ${itemId} from drive ${driveId}`);
-    const maxFileSizeBytes = this.configService.get<number>('pipeline.maxFileSizeBytes') as number;
+    const maxFileSizeBytes = this.configService.get('pipeline.maxFileSizeBytes', { infer: true });
 
     try {
       const stream: ReadableStream = await this.makeRateLimitedRequest(() =>

@@ -5,6 +5,7 @@ import { GraphQLClient } from 'graphql-request';
 import { Client } from 'undici';
 import { UniqueOwnerType } from '../constants/unique-owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
+import { Config } from '../config';
 import { buildSharepointPartialKey } from '../shared/sharepoint-key.util';
 import {
   type ContentRegistrationRequest,
@@ -14,7 +15,6 @@ import {
   type IngestionApiResponse,
   type IngestionFinalizationRequest,
 } from './unique-api.types';
-import { buildSharepointPartialKey } from '../shared/sharepoint-key.util';
 
 @Injectable()
 export class UniqueApiService {
@@ -22,7 +22,7 @@ export class UniqueApiService {
   private readonly limiter: Bottleneck;
 
   public constructor(
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
     @Inject(UNIQUE_HTTP_CLIENT) private readonly httpClient: Client,
   ) {
     this.limiter = new Bottleneck({ maxConcurrent: 1, minTime: 50 });
@@ -81,11 +81,11 @@ export class UniqueApiService {
     uniqueToken: string,
     partialKey?: string,
   ): Promise<FileDiffResponse> {
-    const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
+    const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
     const resolvedPartialKey =
-      partialKey ?? buildSharepointPartialKey({ scopeId, siteId: fileList[0]?.siteId });
-    const fileDiffUrl = <string>this.configService.get('uniqueApi.fileDiffUrl');
-    const basePath = <string>this.configService.get('uniqueApi.fileDiffBasePath');
+      partialKey ?? buildSharepointPartialKey({ scopeId, siteId: fileList[0]?.siteId ?? '' });
+    const fileDiffUrl = this.configService.get('uniqueApi.fileDiffUrl', { infer: true });
+    const basePath = this.configService.get('uniqueApi.fileDiffBasePath', { infer: true });
     const url = new URL(fileDiffUrl);
     const path = url.pathname + url.search;
 
@@ -183,7 +183,7 @@ export class UniqueApiService {
   }
 
   private createGraphqlClient(uniqueToken: string): GraphQLClient {
-    const graphqlUrl = <string>this.configService.get('uniqueApi.ingestionGraphQLUrl');
+    const graphqlUrl = this.configService.get('uniqueApi.ingestionGraphQLUrl', { infer: true });
     return new GraphQLClient(graphqlUrl, {
       headers: {
         'Content-Type': 'application/json',

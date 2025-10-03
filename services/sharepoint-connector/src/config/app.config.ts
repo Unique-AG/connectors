@@ -5,18 +5,18 @@ const ConfigSchema = z
   .object({
     nodeEnv: z
       .enum(['development', 'production', 'test'])
-      .default('production')
+      .prefault('production')
       .describe('Specifies the environment in which the application is running'),
     port: z
       .number()
       .int()
       .min(0)
       .max(65535)
-      .default(9541)
+      .prefault(9541)
       .describe('The local HTTP port to bind the server to'),
     logLevel: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
-      .default('info')
+      .prefault('info')
       .describe('The log level at which the services outputs (pino)'),
   })
   .transform((c) => ({

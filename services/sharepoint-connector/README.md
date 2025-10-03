@@ -28,7 +28,7 @@ The SharePoint connector requires the following Microsoft Graph API permissions 
 - Used to scan document libraries, list files, and download file contents
 
 ### Environment Configuration
-TODO: add an example env variable
+Check `env.example` file for a full .env example/ 
 
 ### Monitoring
 

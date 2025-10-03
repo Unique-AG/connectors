@@ -6,7 +6,7 @@ import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
-import { AppConfig, appConfig } from './app.config';
+import { AppConfig, appConfig } from './config/app.config';
 import { pipelineConfig } from './config/pipeline.config';
 import { sharepointConfig } from './config/sharepoint.config';
 import { uniqueApiConfig } from './config/unique-api.config';

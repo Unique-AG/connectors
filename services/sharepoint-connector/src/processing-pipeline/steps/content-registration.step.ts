@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../../config';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
@@ -18,7 +19,7 @@ export class ContentRegistrationStep implements IPipelineStep {
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly uniqueApiService: UniqueApiService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
   ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
@@ -30,8 +31,8 @@ export class ContentRegistrationStep implements IPipelineStep {
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();
-      const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
-      const baseUrl = <string>this.configService.get('uniqueApi.sharepointBaseUrl');
+      const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
+      const baseUrl = this.configService.get('uniqueApi.sharepointBaseUrl', { infer: true });
       const isPathBasedIngestion = !scopeId;
 
       const fileKey = this.buildFileKey(context, scopeId);

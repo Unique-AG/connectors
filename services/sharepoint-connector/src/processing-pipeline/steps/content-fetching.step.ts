@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../../config';
 import { GraphApiService } from '../../msgraph/graph-api.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -12,7 +13,7 @@ export class ContentFetchingStep implements IPipelineStep {
 
   public constructor(
     private readonly apiService: GraphApiService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
   ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
@@ -48,7 +49,7 @@ export class ContentFetchingStep implements IPipelineStep {
   }
 
   private validateMimeType(mimeType: string | undefined, correlationId: string): void {
-    const allowedMimeTypes = <string[]>this.configService.get('sharepoint.allowedMimeTypes');
+    const allowedMimeTypes = this.configService.get('sharepoint.allowedMimeTypes', { infer: true });
 
     if (!mimeType) {
       throw new Error(`MIME type is missing for this item. Skipping download. [${correlationId}]`);

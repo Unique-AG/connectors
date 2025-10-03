@@ -1,7 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';

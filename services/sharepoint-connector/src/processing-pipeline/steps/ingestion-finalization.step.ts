@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../../config';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
@@ -16,13 +17,13 @@ export class IngestionFinalizationStep implements IPipelineStep {
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly uniqueApiService: UniqueApiService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
   ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const registrationResponse = context.metadata.registration;
-    const baseUrl = <string>this.configService.get('uniqueApi.sharepointBaseUrl');
-    const scopeId = this.configService.get<string | undefined>('uniqueApi.scopeId');
+    const baseUrl = this.configService.get('uniqueApi.sharepointBaseUrl', { infer: true });
+    const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
     const isPathBasedIngestion = !scopeId;
 
     if (!registrationResponse) {

@@ -54,7 +54,7 @@ describe('IngestionFinalizationStep', () => {
           readUrl: 'https://read',
           createdAt: '2023-01-01T00:00:00Z',
           internallyStoredAt: null,
-          source: { kind: 'M365' } as never,
+          source: 'MICROSOFT_365_SHAREPOINT',
         },
       },
     };

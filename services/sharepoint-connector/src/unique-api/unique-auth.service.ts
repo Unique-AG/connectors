@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
 import { request } from 'undici';
 
 @Injectable()
@@ -8,7 +9,7 @@ export class UniqueAuthService {
   private cachedToken: string | null = null;
   private tokenExpirationTime: number | null = null;
 
-  public constructor(private readonly configService: ConfigService) {}
+  public constructor(private readonly configService: ConfigService<Config, true>) {}
 
   public async getToken(forceRefresh = false): Promise<string> {
     if (!forceRefresh && this.isTokenValid()) {
@@ -18,10 +19,10 @@ export class UniqueAuthService {
 
     this.logger.debug('Acquiring new Unique API token from Zitadel...');
     try {
-      const oAuthTokenUrl = <string>this.configService.get('uniqueApi.zitadelOAuthTokenUrl');
-      const clientId = <string>this.configService.get('uniqueApi.zitadelClientId');
-      const clientSecret = <string>this.configService.get('uniqueApi.zitadelClientSecret');
-      const projectId = <string>this.configService.get('uniqueApi.zitadelProjectId');
+      const oAuthTokenUrl = this.configService.get('uniqueApi.zitadelOAuthTokenUrl', { infer: true });
+      const clientId = this.configService.get('uniqueApi.zitadelClientId', { infer: true });
+      const clientSecret = this.configService.get('uniqueApi.zitadelClientSecret', { infer: true });
+      const projectId = this.configService.get('uniqueApi.zitadelProjectId', { infer: true });
 
       const params = new URLSearchParams({
         scope:

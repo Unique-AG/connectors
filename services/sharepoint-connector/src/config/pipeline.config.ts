@@ -15,14 +15,14 @@ export const EnvironmentVariables = z.object({
     .number()
     .int()
     .positive()
-    .default(DEFAULT_PROCESSING_CONCURRENCY),
-  STEP_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(DEFAULT_STEP_TIMEOUT_SECONDS),
-  MAX_FILE_SIZE_BYTES: z.coerce.number().int().positive().default(DEFAULT_MAX_FILE_SIZE_BYTES),
+    .prefault(DEFAULT_PROCESSING_CONCURRENCY),
+  STEP_TIMEOUT_SECONDS: z.coerce.number().int().positive().prefault(DEFAULT_STEP_TIMEOUT_SECONDS),
+  MAX_FILE_SIZE_BYTES: z.coerce.number().int().positive().prefault(DEFAULT_MAX_FILE_SIZE_BYTES),
   MS_GRAPH_RATE_LIMIT_PER_10_SECONDS: z.coerce
     .number()
     .int()
     .positive()
-    .default(DEFAULT_MS_GRAPH_RATE_LIMIT_PER_10_SECONDS)
+    .prefault(DEFAULT_MS_GRAPH_RATE_LIMIT_PER_10_SECONDS)
     .describe('Number of MS Graph API requests allowed per 10 seconds'),
 });
 

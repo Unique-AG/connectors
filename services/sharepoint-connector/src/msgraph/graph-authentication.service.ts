@@ -10,6 +10,7 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
 import { serializeError } from 'serialize-error-cjs';
 import { normalizeError } from '../utils/normalize-error';
 
@@ -25,10 +26,10 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
   private readonly scopes = ['https://graph.microsoft.com/.default'];
   private cachedToken: CachedToken | null = null;
 
-  public constructor(private readonly configService: ConfigService) {
-    const tenantId = this.configService.get<string>('sharepoint.tenantId') as string;
-    const clientId = this.configService.get<string>('sharepoint.clientId') as string;
-    const clientSecret = this.configService.get<string>('sharepoint.clientSecret') as string;
+  public constructor(private readonly configService: ConfigService<Config, true>) {
+    const tenantId = this.configService.get('sharepoint.tenantId', { infer: true });
+    const clientId = this.configService.get('sharepoint.clientId', { infer: true });
+    const clientSecret = this.configService.get('sharepoint.clientSecret', { infer: true });
 
     if (!tenantId || !clientId || !clientSecret) {
       throw new Error(

@@ -21,11 +21,8 @@ import { Config } from "./config";
     },
     {
       provide: SHAREPOINT_HTTP_CLIENT,
-      useFactory: (configService: ConfigService) => {
-        const apiUrl = configService.get<string>(
-          'sharepoint.apiUrl',
-          'https://graph.microsoft.com',
-        );
+      useFactory: (configService: ConfigService<Config, true>) => {
+        const apiUrl = configService.get('sharepoint.apiUrl', { infer: true });
         return new Client(apiUrl, {
           bodyTimeout: 30000,
           headersTimeout: 5000,

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { FieldValueSet } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
@@ -17,7 +18,7 @@ export class ProcessingPipelineService {
   private readonly stepTimeoutMs: number;
 
   public constructor(
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
     private readonly contentFetchingStep: ContentFetchingStep,
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly storageUploadStep: StorageUploadStep,
@@ -30,7 +31,7 @@ export class ProcessingPipelineService {
       this.ingestionFinalizationStep,
     ];
     this.stepTimeoutMs =
-      (this.configService.get<number>('pipeline.stepTimeoutSeconds') as number) * 1000;
+      this.configService.get('pipeline.stepTimeoutSeconds', { infer: true }) * 1000;
   }
 
   public async processFile(file: EnrichedDriveItem): Promise<PipelineResult> {

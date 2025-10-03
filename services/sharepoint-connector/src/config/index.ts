@@ -1,5 +1,6 @@
 import {UniqueApiConfig} from './unique-api.config'
 import {PipelineConfig} from './pipeline.config'
 import {SharepointConfig} from './sharepoint.config'
+import {AppConfig} from './app.config'
 
-export type Config = UniqueApiConfig & PipelineConfig & SharepointConfig
+export type Config = UniqueApiConfig & PipelineConfig & SharepointConfig & AppConfig

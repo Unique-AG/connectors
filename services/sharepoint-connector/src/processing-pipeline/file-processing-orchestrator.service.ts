@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
 import pLimit from 'p-limit';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
@@ -10,7 +11,7 @@ export class FileProcessingOrchestratorService {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
     private readonly processingPipelineService: ProcessingPipelineService,
   ) {}
 
@@ -19,7 +20,7 @@ export class FileProcessingOrchestratorService {
     files: EnrichedDriveItem[],
     diffResult: FileDiffResponse,
   ): Promise<void> {
-    const concurrency = <number>this.configService.get('pipeline.processingConcurrency');
+    const concurrency = this.configService.get('pipeline.processingConcurrency', { infer: true });
     const limit = pLimit(concurrency);
 
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);

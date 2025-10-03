@@ -12,6 +12,7 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
 import { GraphAuthenticationProvider } from './graph-authentication.service';
 import { MetricsMiddleware } from './middlewares/metrics.middleware';
 import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
@@ -21,7 +22,7 @@ export class GraphClientFactory {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
     private readonly graphAuthenticationProvider: GraphAuthenticationProvider,
   ) {}
 
@@ -57,7 +58,7 @@ export class GraphClientFactory {
 
     const clientOptions: ClientOptions = {
       middleware: middlewares[0],
-      debugLogging: this.configService.get<string>('logLevel') === 'debug',
+      debugLogging: this.configService.get('logLevel', { infer: true }) === 'debug',
     };
 
     this.logger.debug({
