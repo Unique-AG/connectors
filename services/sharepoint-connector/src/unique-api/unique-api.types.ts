@@ -83,10 +83,10 @@ export interface IngestionApiResponse {
   source: string;
 }
 
-export interface IngestionApiResponseWrapper {
-  contentUpsert: IngestionApiResponse;
-}
+export interface ZitadelLoginResponse {
+  access_token: string;
+  expires_in: number;
+  token_type: string;
+  id_token: string;
+};
 
-export interface ApiResponse<T> {
-  data: T;
-}

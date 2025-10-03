@@ -2,35 +2,35 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { request } from 'undici';
+import * as assert from 'assert';
+import {ZitadelLoginResponse} from "./unique-api.types";
+import {normalizeError} from "../utils/normalize-error";
 
 @Injectable()
 export class UniqueAuthService {
   private readonly logger = new Logger(this.constructor.name);
-  private cachedToken: string | null = null;
-  private tokenExpirationTime: number | null = null;
+  protected cachedToken?: string;
+  private tokenExpirationTime?: number;
 
   public constructor(private readonly configService: ConfigService<Config, true>) {}
 
-  public async getToken(forceRefresh = false): Promise<string> {
-    if (!forceRefresh && this.isTokenValid()) {
-      this.logger.debug('Using cached Zitadel token');
-      return this.cachedToken as string;
+  public async getToken(): Promise<string> {
+    if (this.isTokenValid()) {
+      return this.cachedToken;
     }
 
-    this.logger.debug('Acquiring new Unique API token from Zitadel...');
+    const oAuthTokenUrl = this.configService.get('uniqueApi.zitadelOAuthTokenUrl', { infer: true });
+    const clientId = this.configService.get('uniqueApi.zitadelClientId', { infer: true });
+    const clientSecret = this.configService.get('uniqueApi.zitadelClientSecret', { infer: true });
+    const projectId = this.configService.get('uniqueApi.zitadelProjectId', { infer: true });
+    const params = new URLSearchParams({
+      scope:
+        `openid profile email urn:zitadel:iam:user:resourceowner ` +
+        `urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${projectId}:aud`,
+      grant_type: 'client_credentials',
+    });
+
     try {
-      const oAuthTokenUrl = this.configService.get('uniqueApi.zitadelOAuthTokenUrl', { infer: true });
-      const clientId = this.configService.get('uniqueApi.zitadelClientId', { infer: true });
-      const clientSecret = this.configService.get('uniqueApi.zitadelClientSecret', { infer: true });
-      const projectId = this.configService.get('uniqueApi.zitadelProjectId', { infer: true });
-
-      const params = new URLSearchParams({
-        scope:
-          `openid profile email urn:zitadel:iam:user:resourceowner ` +
-          `urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${projectId}:aud`,
-        grant_type: 'client_credentials',
-      });
-
       const { statusCode, body } = await request(oAuthTokenUrl, {
         method: 'POST',
         headers: {
@@ -48,34 +48,23 @@ export class UniqueAuthService {
         );
       }
 
-      const tokenData = (await body.json()) as {
-        access_token: string;
-        expires_in: number;
-        token_type: string;
-        id_token: string;
-      };
-
-      if (!tokenData.access_token) {
-        throw new Error('Invalid token response: missing access_token');
-      }
+      const tokenData = await body.json() as ZitadelLoginResponse
+      assert.ok(tokenData.access_token, 'Invalid token response: missing access_token');
 
       this.cachedToken = tokenData.access_token;
       this.tokenExpirationTime = Date.now() + tokenData.expires_in * 1000;
-
-      this.logger.debug(`Successfully acquired and cached new Zitadel token`);
       return tokenData.access_token;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error('Failed to acquire Unique API token from Zitadel:', errorMessage);
+      const normalized = normalizeError(error);
+      this.logger.error('Failed to acquire Unique API token from Zitadel:', normalized.message);
       throw error;
     }
   }
 
-  private isTokenValid(): boolean {
+  private isTokenValid(): this is this & { cachedToken: string } {
     return (
-      this.cachedToken !== null &&
-      this.tokenExpirationTime !== null &&
-      Date.now() < this.tokenExpirationTime
-    );
+      Boolean(this.cachedToken !== null &&
+        this.tokenExpirationTime &&
+        Date.now() < this.tokenExpirationTime));
   }
 }
