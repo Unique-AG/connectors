@@ -54,7 +54,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
         ownerType: registrationResponse.ownerType,
         byteSize: registrationResponse.byteSize,
         scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
-        sourceOwnerType: UniqueOwnerType.COMPANY,
+        sourceOwnerType: UniqueOwnerType.Company,
         sourceName: this.extractSiteName(context.siteUrl),
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         fileUrl: registrationResponse.readUrl,

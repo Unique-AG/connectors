@@ -27,7 +27,7 @@ describe('ContentRegistrationStep', () => {
           key: 'k',
           byteSize: 1,
           mimeType: 'application/pdf',
-          ownerType: UniqueOwnerType.SCOPE,
+          ownerType: UniqueOwnerType.Scope,
           ownerId: 'o',
           readUrl: 'https://read',
           createdAt: new Date().toISOString(),

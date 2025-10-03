@@ -48,7 +48,7 @@ describe('IngestionFinalizationStep', () => {
           key: 'k',
           byteSize: 10,
           mimeType: 'application/pdf',
-          ownerType: UniqueOwnerType.SCOPE,
+          ownerType: UniqueOwnerType.Scope,
           ownerId: 'owner-id',
           writeUrl: 'https://write',
           readUrl: 'https://read',

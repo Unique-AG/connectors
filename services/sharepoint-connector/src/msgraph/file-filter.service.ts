@@ -1,4 +1,4 @@
-import type {DriveItem} from '@microsoft/microsoft-graph-types';
+import type {DriveItem, FieldValueSet} from '@microsoft/microsoft-graph-types';
 import {Injectable} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {Config} from '../config';
@@ -11,7 +11,7 @@ export class FileFilterService {
   }
 
   public isFileValidForIngestion(item: DriveItem): item is Omit<DriveItem, DefinedFileProperties> & { [key in DefinedFileProperties]: Exclude<DriveItem[key], null | undefined> } {
-    const fields = item.listItem?.fields as Record<string, unknown>;
+    const fields = item.listItem?.fields as Record<string, FieldValueSet>;
     const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
     const allowedMimeTypes = this.configService.get('sharepoint.allowedMimeTypes', { infer: true });
 

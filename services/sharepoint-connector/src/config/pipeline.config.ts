@@ -10,14 +10,17 @@ import {
 
 const namespace = 'pipeline' as const;
 
-export const EnvironmentVariables = z.object({
+const EnvironmentVariables = z.object({
   PROCESSING_CONCURRENCY: z.coerce
     .number()
     .int()
     .positive()
-    .prefault(DEFAULT_PROCESSING_CONCURRENCY),
-  STEP_TIMEOUT_SECONDS: z.coerce.number().int().positive().prefault(DEFAULT_STEP_TIMEOUT_SECONDS),
-  MAX_FILE_SIZE_BYTES: z.coerce.number().int().positive().prefault(DEFAULT_MAX_FILE_SIZE_BYTES),
+    .prefault(DEFAULT_PROCESSING_CONCURRENCY)
+    .describe('Sets the concurrency of how many files you want to ingest into unique at once'),
+  STEP_TIMEOUT_SECONDS: z.coerce.number().int().positive().prefault(DEFAULT_STEP_TIMEOUT_SECONDS)
+    .describe('Sets a time limit for a file processing step before it will stop and skip processing the file'),
+  MAX_FILE_SIZE_BYTES: z.coerce.number().int().positive().prefault(DEFAULT_MAX_FILE_SIZE_BYTES)
+    .describe('Sets the maximum file size in bytes that we are ingesting. Anything above this value will be skipped'),
   MS_GRAPH_RATE_LIMIT_PER_10_SECONDS: z.coerce
     .number()
     .int()

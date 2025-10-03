@@ -4,51 +4,47 @@ import { z } from 'zod';
 
 const namespace = 'sharepoint' as const;
 
-export const EnvironmentVariables = z.object({
-  GRAPH_CLIENT_ID: z.string().min(1).describe('Azure AD application client ID for Microsoft Graph'),
+const EnvironmentVariables = z.object({
+  GRAPH_CLIENT_ID: z.string().min(1)
+    .describe('Azure AD application client ID for Microsoft Graph'),
   GRAPH_CLIENT_SECRET: z
     .string()
-    .min(1)
     .describe('Azure AD application client secret for Microsoft Graph'),
-  GRAPH_TENANT_ID: z.string().min(1).describe('Azure AD tenant ID'),
+  GRAPH_TENANT_ID: z.string().min(1)
+    .describe('Azure AD tenant ID'),
   GRAPH_API_URL: z
     .string()
-    .default('https://graph.microsoft.com')
+    .prefault('https://graph.microsoft.com')
     .describe('Microsoft Graph API base URL'),
   SHAREPOINT_SITES: z
     .string()
-    .default('')
-    .transform((val) =>
-      val
-        ? val
+    .prefault('')
+    .transform((val) => val ? val
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean)
-        : [],
+            : [],
     )
     .describe('Comma-separated list of SharePoint site IDs to scan'),
   SHAREPOINT_SYNC_COLUMN_NAME: z
     .string()
-    .min(1)
-    .default('FinanceGPTKnowledge')
+    .prefault('FinanceGPTKnowledge')
     .describe('Name of the SharePoint column indicating sync flag'),
   ALLOWED_MIME_TYPES: z
     .string()
-    .default('')
-    .transform((val) =>
-      val
-        ? val
+    .transform((val) => val ? val
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean)
-        : [],
+            : [],
     )
     .describe('Comma-separated list of allowed MIME types for files to sync'),
   SHAREPOINT_MAX_FILES_TO_SCAN: z
-    .string()
+    .number()
+    .int()
+    .positive()
     .optional()
-    .transform((val) => (val ? parseInt(val, 10) : undefined))
-    .describe('Maximum number of files to scan (for testing, unlimited if not set)'),
+    .describe('For testing purpose. Maximum number of files to scan. Unlimited if not set'),
 });
 
 export interface SharepointConfig {

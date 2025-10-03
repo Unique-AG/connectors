@@ -1,14 +1,14 @@
-import { ConfigService } from '@nestjs/config';
-import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
-import { ProcessingPipelineService } from './processing-pipeline.service';
-import { ContentFetchingStep } from './steps/content-fetching.step';
-import { ContentRegistrationStep } from './steps/content-registration.step';
-import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
-import type { IPipelineStep } from './steps/pipeline-step.interface';
-import { StorageUploadStep } from './steps/storage-upload.step';
-import { PipelineStep } from './types/processing-context';
+import {ConfigService} from '@nestjs/config';
+import {TestBed} from '@suites/unit';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {ProcessingPipelineService} from './processing-pipeline.service';
+import {ContentFetchingStep} from './steps/content-fetching.step';
+import {ContentRegistrationStep} from './steps/content-registration.step';
+import {IngestionFinalizationStep} from './steps/ingestion-finalization.step';
+import type {IPipelineStep} from './steps/pipeline-step.interface';
+import {StorageUploadStep} from './steps/storage-upload.step';
+import {PipelineStep} from './types/processing-context';
+import {EnrichedDriveItem} from "../msgraph/types/enriched-drive-item";
 
 describe('ProcessingPipelineService', () => {
   let service: ProcessingPipelineService;
@@ -29,7 +29,39 @@ describe('ProcessingPipelineService', () => {
       siteId: 'site-1',
       driveId: 'drive-1',
     },
-    listItem: { fields: { Title: 'Test Document' } as never },
+    listItem: {
+      fields: {
+        '@odata.etag': '"47cc40f8-ba1f-4100-9623-fcdf93073928,4"',
+        FileLeafRef: 'test.pdf',
+        Modified: '2024-01-01T00:00:00Z',
+        MediaServiceImageTags: [],
+        FinanceGPTKnowledge: true,
+        Title: 'Test Document',
+        id: '16599',
+        ContentType: 'Dokument',
+        Created: '2024-01-01T00:00:00Z',
+        AuthorLookupId: '1704',
+        EditorLookupId: '1704',
+        _CheckinComment: '',
+        LinkFilenameNoMenu: 'test.pdf',
+        LinkFilename: 'test.pdf',
+        DocIcon: 'pdf',
+        FileSizeDisplay: '1024',
+        ItemChildCount: '0',
+        FolderChildCount: '0',
+        _ComplianceFlags: '',
+        _ComplianceTag: '',
+        _ComplianceTagWrittenTime: '',
+        _ComplianceTagUserId: '',
+        _CommentCount: '',
+        _LikeCount: '',
+        _DisplayName: '',
+        Edit: '0',
+        _UIVersionString: '4.0',
+        ParentVersionStringLookupId: '16599',
+        ParentLeafNameLookupId: '16599',
+      } as Record<string, unknown>,
+    },
     lastModifiedDateTime: '2024-01-01T00:00:00Z',
     siteId: 'site-1',
     siteWebUrl: 'https://sharepoint.example.com/sites/test',
@@ -131,19 +163,19 @@ describe('ProcessingPipelineService', () => {
 
   it('handles timeout for slow steps', async () => {
     vi.useFakeTimers();
-    
+
     vi.mocked(mockSteps.contentFetching.execute).mockImplementation(
       () => new Promise((resolve) => setTimeout(resolve, 35000)),
     );
 
     const processPromise = service.processFile(mockFile);
-    
+
     vi.advanceTimersByTime(31000);
-    
+
     const result = await processPromise;
 
     expect(result.success).toBe(false);
-    
+
     vi.useRealTimers();
   });
 

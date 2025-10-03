@@ -1,6 +1,6 @@
 export enum UniqueOwnerType {
-  SCOPE = 'SCOPE',
-  COMPANY = 'COMPANY',
-  USER = 'USER',
-  CHAT = 'CHAT',
+  Scope = 'SCOPE',
+  Company = 'COMPANY',
+  User = 'USER',
+  Chat = 'CHAT',
 }

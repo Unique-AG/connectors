@@ -1,6 +1,6 @@
-import { env } from 'node:process';
-import { registerAs } from '@nestjs/config';
-import { z } from 'zod';
+import {env} from 'node:process';
+import {registerAs} from '@nestjs/config';
+import {z} from 'zod';
 
 const namespace = 'uniqueApi' as const;
 

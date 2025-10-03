@@ -15,11 +15,15 @@ import {
   type IngestionApiResponse,
   type IngestionFinalizationRequest,
 } from './unique-api.types';
+import {normalizeError} from "../utils/normalize-error";
+import assert from 'assert';
 
 @Injectable()
 export class UniqueApiService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly limiter: Bottleneck;
+  private cachedGraphqlClient?: GraphQLClient;
+  private cachedToken?: string;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -32,47 +36,32 @@ export class UniqueApiService {
     request: ContentRegistrationRequest,
     uniqueToken: string,
   ): Promise<IngestionApiResponse> {
-    return await this.makeRateLimitedRequest(async () => {
-      try {
-        this.logger.log(`Content registration request object: ${JSON.stringify(request, null, 2)}`);
-        const client = this.createGraphqlClient(uniqueToken);
-        const variables = {
-          input: {
-            key: request.key,
-            title: request.title,
-            mimeType: request.mimeType,
-            ownerType: UniqueOwnerType.SCOPE,
-            url: request.url,
-          },
-          scopeId: request.scopeId,
-          sourceOwnerType: request.sourceOwnerType,
-          sourceKind: request.sourceKind,
-          sourceName: request.sourceName,
-          storeInternally: true,
-          baseUrl: request.baseUrl,
-        };
+    const client = this.createGraphqlClient(uniqueToken);
+    const variables = {
+      input: {
+        key: request.key,
+        title: request.title,
+        mimeType: request.mimeType,
+        ownerType: UniqueOwnerType.Scope,
+        url: request.url,
+      },
+      scopeId: request.scopeId,
+      sourceOwnerType: request.sourceOwnerType,
+      sourceKind: request.sourceKind,
+      sourceName: request.sourceName,
+      storeInternally: true,
+      baseUrl: request.baseUrl,
+    };
 
-        this.logger.log(
-          `Content registration request body variables: ${JSON.stringify(variables, null, 2)}`,
-        );
+    const errorMessage = 'Content registration failed:'
+    return await this.makeRateLimitedRequest(errorMessage, async () => {
+      const result = await client.request<{ contentUpsert?: IngestionApiResponse }>(
+        this.getContentUpsertMutation(),
+        variables,
+      );
 
-        const result = await client.request<{ contentUpsert?: IngestionApiResponse }>(
-          this.getContentUpsertMutation(),
-          variables,
-        );
-
-        if (!result?.contentUpsert) {
-          throw new Error('Invalid response from Unique API content registration');
-        }
-
-        return result.contentUpsert;
-      } catch (error) {
-        this.logger.error(
-          'Content registration failed:',
-          error instanceof Error ? error.message : String(error),
-        );
-        throw error;
-      }
+      assert.ok(result?.contentUpsert, 'Invalid response from Unique API content registration');
+      return result.contentUpsert;
     });
   }
 
@@ -84,6 +73,7 @@ export class UniqueApiService {
     const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
     const resolvedPartialKey =
       partialKey ?? buildSharepointPartialKey({ scopeId, siteId: fileList[0]?.siteId ?? '' });
+
     const fileDiffUrl = this.configService.get('uniqueApi.fileDiffUrl', { infer: true });
     const basePath = this.configService.get('uniqueApi.fileDiffBasePath', { infer: true });
     const url = new URL(fileDiffUrl);
@@ -98,35 +88,30 @@ export class UniqueApiService {
       scope: scopeId ?? 'PATH',
     };
 
-    return await this.makeRateLimitedRequest(async () => {
-      try {
-        const { statusCode, body } = await this.httpClient.request({
-          method: 'POST',
-          path,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${uniqueToken}`,
-          },
-          body: JSON.stringify(diffRequest),
-        });
+    const errorMessage = 'File diff failed:';
+    return await this.makeRateLimitedRequest(errorMessage, async () => {
+      const { statusCode, body } = await this.httpClient.request({
+        method: 'POST',
+        path,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${ uniqueToken }`,
+        },
+        body: JSON.stringify(diffRequest),
+      });
 
-        if (statusCode < 200 || statusCode >= 300) {
-          const errorText = await body.text().catch(() => 'No response body');
-          throw new Error(
-            `File diff request failed with status ${statusCode}. Response: ${errorText}`,
-          );
-        }
-
-        const responseData = await body.json();
-        if (!responseData) {
-          throw new Error('Invalid response from Unique API file diff');
-        }
-        return responseData as FileDiffResponse;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        this.logger.error('File diff failed:', errorMessage);
-        throw error;
+      if (statusCode < 200 || statusCode >= 300) {
+        const errorText = await body.text().catch(() => 'No response body');
+        throw new Error(
+          `File diff request failed with status ${ statusCode }. Response: ${ errorText }`,
+        );
       }
+
+      const responseData = await body.json();
+      if (!responseData) {
+        throw new Error('Invalid response from Unique API file diff');
+      }
+      return responseData as FileDiffResponse;
     });
   }
 
@@ -134,14 +119,13 @@ export class UniqueApiService {
     request: IngestionFinalizationRequest,
     uniqueToken: string,
   ): Promise<{ id: string }> {
-    this.logger.log(`Ingestion finalization request object: ${JSON.stringify(request, null, 2)}`);
-
+    const client = this.createGraphqlClient(uniqueToken);
     const graphQLVariables = {
       input: {
         key: request.key,
         title: request.title,
         mimeType: request.mimeType,
-        ownerType: UniqueOwnerType.SCOPE,
+        ownerType: UniqueOwnerType.Scope,
         byteSize: request.byteSize,
         url: request.url,
       },
@@ -154,80 +138,89 @@ export class UniqueApiService {
       baseUrl: request.baseUrl,
     };
 
-    return await this.makeRateLimitedRequest(async () => {
-      try {
-        const client = this.createGraphqlClient(uniqueToken);
-
+    const errorMessage = 'Invalid response from Unique API ingestion finalization';
+    return await this.makeRateLimitedRequest(errorMessage, async () => {
         const result = await client.request<{ contentUpsert?: { id?: string } }>(
           this.getContentUpsertMutation(),
           graphQLVariables,
         );
 
-        if (!result?.contentUpsert?.id) {
-          throw new Error('Invalid response from Unique API ingestion finalization');
-        }
-
+        assert.ok(result?.contentUpsert?.id, 'Invalid response from Unique API ingestion finalization');
         return { id: result.contentUpsert.id };
+    });
+  }
+
+  private async makeRateLimitedRequest<T>(errorMessage: string, requestFn: () => Promise<T>): Promise<T> {
+    return await this.limiter.schedule(async () => {
+      try {
+        return await requestFn()
       } catch (error) {
-        this.logger.error(
-          `Ingestion finalization failed:`,
-          error instanceof Error ? error.message : String(error),
-        );
+        const normalizedError = normalizeError(error)
+        this.logger.error(errorMessage, normalizedError.message);
         throw error;
       }
     });
   }
 
-  private async makeRateLimitedRequest<T>(requestFn: () => Promise<T>): Promise<T> {
-    return await this.limiter.schedule(async () => await requestFn());
-  }
-
   private createGraphqlClient(uniqueToken: string): GraphQLClient {
+    // Reuse cached client if token hasn't changed
+    if (this.cachedGraphqlClient && this.cachedToken === uniqueToken) {
+      return this.cachedGraphqlClient;
+    }
+
     const graphqlUrl = this.configService.get('uniqueApi.ingestionGraphQLUrl', { infer: true });
-    return new GraphQLClient(graphqlUrl, {
+    this.cachedGraphqlClient = new GraphQLClient(graphqlUrl, {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${uniqueToken}`,
       },
     });
+
+    this.cachedToken = uniqueToken;
+    return this.cachedGraphqlClient;
   }
 
   private getContentUpsertMutation(): string {
-    return `mutation ContentUpsert(
-    $input: ContentCreateInput!
-    $fileUrl: String
-    $chatId: String
-    $scopeId: String
-    $sourceOwnerType: String
-    $sourceName: String
-    $sourceKind: String
-    $storeInternally: Boolean
-    $baseUrl: String
+    return `
+    mutation ContentUpsert(
+      $input: ContentCreateInput!
+      $fileUrl: String
+      $chatId: String
+      $scopeId: String
+      $sourceOwnerType: String
+      $sourceName: String
+      $sourceKind: String
+      $storeInternally: Boolean
+      $baseUrl: String
     ) {
-    contentUpsert(
-    input: $input
-    fileUrl: $fileUrl
-    chatId: $chatId
-    scopeId: $scopeId
-    sourceOwnerType: $sourceOwnerType
-    sourceName: $sourceName
-    sourceKind: $sourceKind
-    storeInternally: $storeInternally
-    baseUrl: $baseUrl
-    ) {
-    id
-    key
-    title
-    byteSize
-    mimeType
-    ownerType
-    ownerId
-    writeUrl
-    readUrl
-    createdAt
-    internallyStoredAt
-    source { kind name }
+      contentUpsert(
+        input: $input
+        fileUrl: $fileUrl
+        chatId: $chatId
+        scopeId: $scopeId
+        sourceOwnerType: $sourceOwnerType
+        sourceName: $sourceName
+        sourceKind: $sourceKind
+        storeInternally: $storeInternally
+        baseUrl: $baseUrl
+      ) {
+        id
+        key
+        title
+        byteSize
+        mimeType
+        ownerType
+        ownerId
+        writeUrl
+        readUrl
+        createdAt
+        internallyStoredAt
+        source {
+          kind
+          name
+        }
+      }
     }
-    }`;
+  `;
   }
 }

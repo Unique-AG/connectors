@@ -41,9 +41,9 @@ export class ContentRegistrationStep implements IPipelineStep {
         key: fileKey,
         title: context.fileName,
         mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
-        ownerType: UniqueOwnerType.SCOPE,
+        ownerType: UniqueOwnerType.Scope,
         scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
-        sourceOwnerType: UniqueOwnerType.COMPANY,
+        sourceOwnerType: UniqueOwnerType.Company,
         sourceKind: 'MICROSOFT_365_SHAREPOINT',
         sourceName: 'Sharepoint',
         ...(isPathBasedIngestion && {
