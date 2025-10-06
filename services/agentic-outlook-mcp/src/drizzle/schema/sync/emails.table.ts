@@ -41,8 +41,8 @@ export const emails = pgTable(
       .notNull()
       .default(sql`'[]'::jsonb`),
 
-    sentAt: timestamp(),
-    receivedAt: timestamp(),
+    sentAt: timestamp({ mode: "string" }),
+    receivedAt: timestamp({ mode: "string" }),
 
     subject: text(),
     preview: text(),
@@ -99,3 +99,5 @@ export const emailRelations = relations(emails, ({ one }) => ({
     references: [folders.id],
   }),
 }));
+
+export type EmailInput = typeof emails.$inferInsert;
