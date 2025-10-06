@@ -16,8 +16,12 @@ jobs:
       # You need to explicitly output the tag name and release_created for each package
       # This assumes your release-please-config.json and .release-please-manifest.json
       # are set up to handle multiple packages and will output these.
+      "services/factset-mcp--tag_name": ${{ steps.release.outputs['services/factset-mcp--tag_name'] }}
+      "services/factset-mcp--release_created": ${{ steps.release.outputs['services/factset-mcp--release_created'] }}
       "services/outlook-mcp--tag_name": ${{ steps.release.outputs['services/outlook-mcp--tag_name'] }}
       "services/outlook-mcp--release_created": ${{ steps.release.outputs['services/outlook-mcp--release_created'] }}
+      "services/sharepoint-connector--tag_name": ${{ steps.release.outputs['services/sharepoint-connector--tag_name'] }}
+      "services/sharepoint-connector--release_created": ${{ steps.release.outputs['services/sharepoint-connector--release_created'] }}
       # Add more outputs for other packages here
 
     steps:
@@ -33,6 +37,15 @@ jobs:
           echo "Release outputs:"
           echo "${{ toJson(steps.release.outputs) }}"
 
+  release-factset-mcp:
+    if: ${{ needs.release-please.outputs['services/factset-mcp--release_created'] == 'true' }}
+    uses: ./.github/workflows/_template-release.yaml
+    needs: release-please
+    with:
+      service-name: "@unique-ag/factset-mcp"
+      service-path: services/factset-mcp
+      service-tag: ${{ needs.release-please.outputs['services/factset-mcp--tag_name'] }}
+
   release-outlook-mcp:
     if: ${{ needs.release-please.outputs['services/outlook-mcp--release_created'] == 'true' }}
     uses: ./.github/workflows/_template-release.yaml
@@ -41,3 +54,12 @@ jobs:
       service-name: "@unique-ag/outlook-mcp"
       service-path: services/outlook-mcp
       service-tag: ${{ needs.release-please.outputs['services/outlook-mcp--tag_name'] }}
+
+  release-sharepoint-connector:
+    if: ${{ needs.release-please.outputs['services/sharepoint-connector--release_created'] == 'true' }}
+    uses: ./.github/workflows/_template-release.yaml
+    needs: release-please
+    with:
+      service-name: "@unique-ag/sharepoint-connector"
+      service-path: services/sharepoint-connector
+      service-tag: ${{ needs.release-please.outputs['services/sharepoint-connector--tag_name'] }}

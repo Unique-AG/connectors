@@ -6,7 +6,28 @@
 	"release-type": "node",
 	"bump-minor-pre-major": true,
 	"bump-patch-for-minor-pre-major": true,
+	"initial-version": "0.1.0",
 	"packages": {
-		"services/outlook-mcp": {}
+		"services/factset-mcp": {
+			"extra-files": [{
+				"type": "yaml",
+				"path": "services/factset-mcp/deploy/helm-charts/factset-mcp/Chart.yaml",
+				"jsonpath": "$.version"
+			}]
+		},
+		"services/outlook-mcp": {
+			"extra-files": [{
+				"type": "yaml",
+				"path": "services/outlook-mcp/deploy/helm-charts/outlook-mcp/Chart.yaml",
+				"jsonpath": "$.version"
+			}]
+		},
+		"services/sharepoint-connector": {
+			"extra-files": [{
+				"type": "yaml",
+				"path": "services/sharepoint-connector/deploy/helm-charts/sharepoint-connector/Chart.yaml",
+				"jsonpath": "$.version"
+			}]
+		}
 	}
 }
