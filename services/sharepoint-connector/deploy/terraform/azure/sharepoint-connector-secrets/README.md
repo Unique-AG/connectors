@@ -1,1 +1,0 @@
-Given the connector is planned to use OIDC it does not need any secret as of today.
