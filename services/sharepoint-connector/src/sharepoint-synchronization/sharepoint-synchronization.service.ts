@@ -38,15 +38,9 @@ export class SharepointSynchronizationService {
     for (const siteId of sitesToScan) {
       try {
         const files = await this.graphApiService.getAllFilesForSite(siteId);
-        if (files.length === 0) {
-          continue;
-        }
-        // check what happens if a siteid is empty?
-        // if no files are in a site we still need to send the request to diff-file endpoint
-
-        const diffResult = await this.calculateDiffForFiles(files);
+        const diffResult = await this.calculateDiffForFiles(files, siteId);
         this.logger.log(
-          `Site ${siteId}: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
+          `File Diff Result: Site ${siteId}: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
         );
 
         await this.orchestrator.processFilesForSite(siteId, files, diffResult);
@@ -66,7 +60,10 @@ export class SharepointSynchronizationService {
   /*
     This step also triggers file deletion in node-ingestion service when a file is missing.
    */
-  private async calculateDiffForFiles(files: EnrichedDriveItem[]): Promise<FileDiffResponse> {
+  private async calculateDiffForFiles(
+    files: EnrichedDriveItem[],
+    siteId: string,
+  ): Promise<FileDiffResponse> {
     const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
 
     const fileDiffItems: FileDiffItem[] = files.map((file: EnrichedDriveItem) => ({
@@ -87,7 +84,7 @@ export class SharepointSynchronizationService {
     }));
 
     const uniqueToken = await this.uniqueAuthService.getToken();
-    const partialKey = buildSharepointPartialKey({ scopeId, siteId: files[0]?.siteId ?? '' });
+    const partialKey = buildSharepointPartialKey({ scopeId, siteId });
     return await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, partialKey);
   }
 }

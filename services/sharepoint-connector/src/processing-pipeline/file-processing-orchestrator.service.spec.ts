@@ -56,7 +56,10 @@ describe('FileProcessingOrchestratorService', () => {
     ];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: ['sharepoint_file_file-1', 'sharepoint_file_file-3'],
+      newAndUpdatedFiles: [
+        'site-1/Documents/test/folder/file-file-1.pdf',
+        'site-1/Documents/test/folder/file-file-3.pdf',
+      ],
       deletedFiles: [],
       movedFiles: [],
     };
@@ -72,7 +75,7 @@ describe('FileProcessingOrchestratorService', () => {
     const files = [createMockFile('file-1', 'site-1'), createMockFile('file-2', 'site-2')];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: ['sharepoint_file_file-1'],
+      newAndUpdatedFiles: ['site-1/Documents/test/folder/file-file-1.pdf'],
       deletedFiles: [],
       movedFiles: [],
     };
@@ -99,7 +102,7 @@ describe('FileProcessingOrchestratorService', () => {
     const files = Array.from({ length: 10 }, (_, i) => createMockFile(`file-${i}`, 'site-1'));
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: files.map((f) => `sharepoint_file_${f.id}`),
+      newAndUpdatedFiles: files.map((f) => `site-1/Documents/test/folder/file-${f.id}.pdf`),
       deletedFiles: [],
       movedFiles: [],
     };
@@ -129,7 +132,7 @@ describe('FileProcessingOrchestratorService', () => {
     ];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: files.map((f) => `sharepoint_file_${f.id}`),
+      newAndUpdatedFiles: files.map((f) => `site-1/Documents/test/folder/file-${f.id}.pdf`),
       deletedFiles: [],
       movedFiles: [],
     };

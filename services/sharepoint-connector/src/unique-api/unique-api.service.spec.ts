@@ -54,6 +54,7 @@ describe('UniqueApiService', () => {
         },
       ],
       'token-123',
+      'test-partial-key',
     );
     expect(result.newAndUpdatedFiles).toEqual(['sharepoint_file_1']);
   });

@@ -7,7 +7,6 @@ import { Client } from 'undici';
 import { Config } from '../config';
 import { UniqueOwnerType } from '../constants/unique-owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
-import { buildSharepointPartialKey } from '../shared/sharepoint-key.util';
 import { normalizeError } from '../utils/normalize-error';
 import {
   type ContentRegistrationRequest,
@@ -66,11 +65,9 @@ export class UniqueApiService {
   public async performFileDiff(
     fileList: FileDiffItem[],
     uniqueToken: string,
-    partialKey?: string,
+    partialKey: string,
   ): Promise<FileDiffResponse> {
     const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
-    const resolvedPartialKey =
-      partialKey ?? buildSharepointPartialKey({ scopeId, siteId: fileList[0]?.siteId ?? '' });
 
     const fileDiffUrl = this.configService.get('uniqueApi.fileDiffUrl', { infer: true });
     const basePath = this.configService.get('uniqueApi.fileDiffBasePath', { infer: true });
@@ -79,12 +76,14 @@ export class UniqueApiService {
 
     const diffRequest: FileDiffRequest = {
       basePath,
-      partialKey: resolvedPartialKey,
+      partialKey,
       sourceKind: 'MICROSOFT_365_SHAREPOINT',
       sourceName: 'SharePoint Online Connector',
       fileList,
       scope: scopeId ?? 'PATH',
     };
+
+    this.logger.debug(`File diff request payload: ${JSON.stringify(diffRequest, null, 2)}`);
 
     const errorMessage = 'File diff failed:';
     return await this.makeRateLimitedRequest(errorMessage, async () => {

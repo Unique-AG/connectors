@@ -37,7 +37,7 @@ describe('SharepointSynchronizationService', () => {
   };
 
   const mockDiffResult: FileDiffResponse = {
-    newAndUpdatedFiles: ['sharepoint_file_file-1'],
+    newAndUpdatedFiles: ['site-1/Documents/document.pdf'],
     deletedFiles: [],
     movedFiles: [],
   };
