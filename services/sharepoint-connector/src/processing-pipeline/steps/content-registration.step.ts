@@ -30,7 +30,14 @@ export class ContentRegistrationStep implements IPipelineStep {
     const baseUrl = this.configService.get('uniqueApi.sharepointBaseUrl', { infer: true });
     const isPathBasedIngestion = !scopeId;
 
-    const fileKey = this.buildFileKey(context, scopeId);
+    const fileKey = buildSharepointFileKey({
+      scopeId,
+      siteId: context.metadata.siteId,
+      driveName: context.metadata.driveName,
+      folderPath: context.metadata.folderPath,
+      fileId: context.fileId,
+      fileName: context.fileName,
+    });
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: fileKey,
@@ -49,6 +56,9 @@ export class ContentRegistrationStep implements IPipelineStep {
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();
+      this.logger.debug(
+        `[${context.correlationId}] Content registration request payload: ${JSON.stringify(contentRegistrationRequest, null, 2)}`,
+      );
       const registrationResponse = await this.uniqueApiService.registerContent(
         contentRegistrationRequest,
         uniqueToken,
@@ -70,16 +80,5 @@ export class ContentRegistrationStep implements IPipelineStep {
       this.logger.error(`[${context.correlationId}] Content registration failed: ${message}`);
       throw error;
     }
-  }
-
-  private buildFileKey(context: ProcessingContext, scopeId: string | undefined): string {
-    return buildSharepointFileKey({
-      scopeId,
-      siteId: context.metadata.siteId,
-      driveName: context.metadata.driveName,
-      folderPath: context.metadata.folderPath,
-      fileId: context.fileId,
-      fileName: context.fileName,
-    });
   }
 }

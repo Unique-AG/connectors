@@ -61,23 +61,23 @@ export class ProcessingPipelineService {
     this.logger.log(
       `[${correlationId}] Starting processing pipeline for file: ${file.name} (${file.id})`,
     );
-    let currentStep = this.fileProcessingSteps[0] as IPipelineStep;
 
     for (const step of this.fileProcessingSteps) {
-      currentStep = step;
       try {
         await Promise.race([step.execute(context), this.timeoutPromise(step)]);
 
         this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
-        if (currentStep.cleanup) await currentStep.cleanup(context);
+        if (step.cleanup) await step.cleanup(context);
+
       } catch (error) {
         const totalDuration = Date.now() - startTime.getTime();
         this.logger.error(
-          `[${correlationId}] Pipeline failed at step: ${currentStep.stepName} after ${totalDuration}ms`,
+          `[${correlationId}] Pipeline failed at step: ${step.stepName} after ${totalDuration}ms`,
           error instanceof Error ? error.stack : String(error),
         );
 
-        if (currentStep.cleanup) await currentStep.cleanup(context);
+        if (step.cleanup) await step.cleanup(context);
+        this.finalCleanup(context);
 
         return { success: false };
       }

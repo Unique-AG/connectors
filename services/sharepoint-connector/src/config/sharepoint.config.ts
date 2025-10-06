@@ -1,6 +1,7 @@
 import { env } from 'node:process';
 import { registerAs } from '@nestjs/config';
 import { z } from 'zod';
+import { Redacted } from '../utils/redacted';
 
 const namespace = 'sharepoint' as const;
 
@@ -14,12 +15,13 @@ const EnvironmentVariables = z
     GRAPH_CLIENT_SECRET: z
       .string()
       .optional()
+      .transform((val) => val ? new Redacted(val) : undefined)
       .describe(
         'Azure AD application client secret for Microsoft Graph (not required when using OIDC)',
       ),
     GRAPH_TENANT_ID: z.string().min(1).describe('Azure AD tenant ID'),
     GRAPH_API_URL: z
-      .string()
+      .url()
       .prefault('https://graph.microsoft.com')
       .describe('Microsoft Graph API base URL'),
     SHAREPOINT_SITES: z
@@ -78,7 +80,7 @@ const EnvironmentVariables = z
 export interface SharepointConfig {
   [namespace]: {
     clientId?: string;
-    clientSecret?: string;
+    clientSecret?: Redacted<string>;
     tenantId: string;
     apiUrl: string;
     sites: string[];

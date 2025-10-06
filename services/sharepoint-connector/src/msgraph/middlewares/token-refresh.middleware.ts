@@ -48,11 +48,12 @@ export class TokenRefreshMiddleware implements Middleware {
   private async isTokenExpiredError(response: Response | undefined): Promise<boolean> {
     if (response?.status !== 401) return false;
 
+    // leaving try block here to make sure .json() doesn't crash the server on malformed response
     try {
       const clonedResponse = response.clone();
       const errorBody = await clonedResponse.json();
 
-      // taken from TODO add source of the example middlewares
+      // TODO add source of the example middlewares (they are taken from an official example)
       return (
         errorBody?.error?.code === 'InvalidAuthenticationToken' ||
         errorBody?.error?.message?.includes('Lifetime validation failed') ||

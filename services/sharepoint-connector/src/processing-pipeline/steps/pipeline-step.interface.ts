@@ -1,7 +1,7 @@
-import type { ProcessingContext } from '../types/processing-context';
+import {PipelineStep, ProcessingContext} from '../types/processing-context';
 
 export interface IPipelineStep {
-  readonly stepName: string;
+  readonly stepName: PipelineStep;
   execute: (context: ProcessingContext) => Promise<ProcessingContext>;
   cleanup?: (context: ProcessingContext) => Promise<void>;
 }

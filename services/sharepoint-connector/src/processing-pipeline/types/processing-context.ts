@@ -23,19 +23,10 @@ export interface PipelineResult {
   success: boolean;
 }
 
-export interface JobResult {
-  success: boolean;
-  fileId: string;
-  fileName: string;
-  correlationId: string;
-  duration: number;
-  completedSteps: string[];
-  error?: string;
-}
-
-export enum PipelineStep {
-  ContentFetching = 'ContentFetching',
-  ContentRegistration = 'ContentRegistration',
-  StorageUpload = 'StorageUpload',
-  IngestionFinalization = 'IngestionFinalization',
-}
+export const PipelineStep = {
+  ContentFetching: 'ContentFetching',
+  ContentRegistration: 'ContentRegistration',
+  StorageUpload: 'StorageUpload',
+  IngestionFinalization:  'IngestionFinalization',
+} as const;
+export type PipelineStep = typeof PipelineStep[keyof typeof PipelineStep];

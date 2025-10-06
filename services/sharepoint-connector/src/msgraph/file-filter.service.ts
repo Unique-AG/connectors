@@ -12,17 +12,19 @@ type DefinedFileProperties =
   | 'listItem'
   | 'lastModifiedDateTime';
 
+type DriveItemWithDefinedProperties = Omit<
+  DriveItem,
+  DefinedFileProperties
+> & {
+  [key in DefinedFileProperties]: Exclude<DriveItem[key], null | undefined>;
+}
+
 @Injectable()
 export class FileFilterService {
   public constructor(private readonly configService: ConfigService<Config, true>) {}
 
-  public isFileValidForIngestion(item: DriveItem): item is Omit<
-    DriveItem,
-    DefinedFileProperties
-  > & {
-    [key in DefinedFileProperties]: Exclude<DriveItem[key], null | undefined>;
-  } {
-    const fields = item.listItem?.fields as Record<string, FieldValueSet>;
+  public isFileValidForIngestion(item: DriveItem): item is DriveItemWithDefinedProperties {
+    const fields = item.listItem?.fields as Record<string, unknown>;
     const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
     const allowedMimeTypes = this.configService.get('sharepoint.allowedMimeTypes', { infer: true });
 
@@ -40,7 +42,7 @@ export class FileFilterService {
     }
 
     const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
-    const hasSyncFlag = (fields[syncColumnName] as unknown) === true;
+    const hasSyncFlag = fields[syncColumnName] === true;
     return Boolean(hasSyncFlag && isAllowedMimeType);
   }
 }

@@ -9,6 +9,7 @@ import { ZitadelLoginResponse } from './unique-api.types';
 @Injectable()
 export class UniqueAuthService {
   private readonly logger = new Logger(this.constructor.name);
+  // used protected to allow use of typeguard isTokenValid
   protected cachedToken?: string;
   private tokenExpirationTime?: number;
 
@@ -35,7 +36,7 @@ export class UniqueAuthService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret.value}`).toString('base64')}`,
         },
         body: params.toString(),
       });
@@ -62,10 +63,6 @@ export class UniqueAuthService {
   }
 
   private isTokenValid(): this is this & { cachedToken: string } {
-    return Boolean(
-      this.cachedToken !== null &&
-        this.tokenExpirationTime &&
-        Date.now() < this.tokenExpirationTime,
-    );
+    return Boolean(this.cachedToken && this.tokenExpirationTime && Date.now() < this.tokenExpirationTime);
   }
 }

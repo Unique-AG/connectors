@@ -37,7 +37,7 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
       auth: {
         clientId,
         authority: `https://login.microsoftonline.com/${tenantId}`,
-        clientSecret,
+        clientSecret: clientSecret.value,
       },
     };
 

@@ -1,10 +1,3 @@
-export enum ModerationStatus {
-  Approved = 0,
-  Rejected = 1,
-  Pending = 2,
-  Draft = 3,
-}
-
 export interface GraphApiErrorResponse {
   statusCode?: number;
   code?: string;

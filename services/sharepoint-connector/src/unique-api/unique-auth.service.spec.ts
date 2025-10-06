@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Redacted } from '../utils/redacted';
 import { UniqueAuthService } from './unique-auth.service';
 
 vi.mock('undici', () => ({
@@ -33,7 +34,7 @@ describe('UniqueAuthService', () => {
           if (key === 'uniqueApi.zitadelOAuthTokenUrl')
             return 'https://auth.example.com/oauth/token';
           if (key === 'uniqueApi.zitadelClientId') return 'client';
-          if (key === 'uniqueApi.zitadelClientSecret') return 'secret';
+          if (key === 'uniqueApi.zitadelClientSecret') return new Redacted('secret');
           if (key === 'uniqueApi.zitadelProjectId') return 'proj-123';
           return undefined;
         }),
