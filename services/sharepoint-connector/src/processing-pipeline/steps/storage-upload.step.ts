@@ -1,19 +1,18 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { request } from 'undici';
 import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
+import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
-import {normalizeError} from "../../utils/normalize-error";
-import assert from 'assert';
 
 @Injectable()
 export class StorageUploadStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.StorageUpload;
 
-  public constructor() {
-  }
+  public constructor() {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
@@ -21,7 +20,7 @@ export class StorageUploadStep implements IPipelineStep {
     assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
 
     this.logger.debug(
-      `[${ context.correlationId }] Starting storage upload for file: ${ context.fileName }`,
+      `[${context.correlationId}] Starting storage upload for file: ${context.fileName}`,
     );
 
     try {
@@ -31,7 +30,7 @@ export class StorageUploadStep implements IPipelineStep {
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${ context.correlationId }] Storage upload failed: ${ message }`);
+      this.logger.error(`[${context.correlationId}] Storage upload failed: ${message}`);
       throw error;
     }
   }

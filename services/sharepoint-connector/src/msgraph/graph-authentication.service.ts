@@ -1,19 +1,15 @@
+import assert from 'node:assert';
 import {
-  AuthenticationResult,
   type ClientCredentialRequest,
   ConfidentialClientApplication,
   type Configuration,
 } from '@azure/msal-node';
-import {
-  AuthenticationProvider,
-  AuthenticationProviderOptions,
-} from '@microsoft/microsoft-graph-client';
-import {Injectable, Logger} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {Config} from '../config';
-import {serializeError} from 'serialize-error-cjs';
-import {normalizeError} from '../utils/normalize-error';
-import assert from 'assert';
+import { AuthenticationProvider } from '@microsoft/microsoft-graph-client';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { serializeError } from 'serialize-error-cjs';
+import { Config } from '../config';
+import { normalizeError } from '../utils/normalize-error';
 
 interface CachedToken {
   accessToken: string;
@@ -32,12 +28,15 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
     const clientId = this.configService.get('sharepoint.clientId', { infer: true });
     const clientSecret = this.configService.get('sharepoint.clientSecret', { infer: true });
 
-    assert.ok(!tenantId || !clientId || !clientSecret, 'SharePoint configuration missing: tenantId, clientId, and clientSecret are required')
+    assert.ok(
+      !tenantId || !clientId || !clientSecret,
+      'SharePoint configuration missing: tenantId, clientId, and clientSecret are required',
+    );
 
     const msalConfig: Configuration = {
       auth: {
         clientId,
-        authority: `https://login.microsoftonline.com/${ tenantId }`,
+        authority: `https://login.microsoftonline.com/${tenantId}`,
         clientSecret,
       },
     };
@@ -66,8 +65,14 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
     try {
       const response = await this.msalClient.acquireTokenByClientCredential(tokenRequest);
 
-      assert.ok(response?.accessToken, 'Failed to acquire Graph API token: no access token in response');
-      assert.ok(response.expiresOn, 'Failed to acquire Graph API token: no expiration time in response');
+      assert.ok(
+        response?.accessToken,
+        'Failed to acquire Graph API token: no access token in response',
+      );
+      assert.ok(
+        response.expiresOn,
+        'Failed to acquire Graph API token: no expiration time in response',
+      );
 
       this.cachedToken = {
         accessToken: response.accessToken,

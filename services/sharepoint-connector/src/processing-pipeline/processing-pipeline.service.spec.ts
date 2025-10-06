@@ -1,14 +1,14 @@
-import {ConfigService} from '@nestjs/config';
-import {TestBed} from '@suites/unit';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
-import {ProcessingPipelineService} from './processing-pipeline.service';
-import {ContentFetchingStep} from './steps/content-fetching.step';
-import {ContentRegistrationStep} from './steps/content-registration.step';
-import {IngestionFinalizationStep} from './steps/ingestion-finalization.step';
-import type {IPipelineStep} from './steps/pipeline-step.interface';
-import {StorageUploadStep} from './steps/storage-upload.step';
-import {PipelineStep} from './types/processing-context';
-import {EnrichedDriveItem} from "../msgraph/types/enriched-drive-item";
+import { ConfigService } from '@nestjs/config';
+import { TestBed } from '@suites/unit';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import { ProcessingPipelineService } from './processing-pipeline.service';
+import { ContentFetchingStep } from './steps/content-fetching.step';
+import { ContentRegistrationStep } from './steps/content-registration.step';
+import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
+import type { IPipelineStep } from './steps/pipeline-step.interface';
+import { StorageUploadStep } from './steps/storage-upload.step';
+import { PipelineStep } from './types/processing-context';
 
 describe('ProcessingPipelineService', () => {
   let service: ProcessingPipelineService;

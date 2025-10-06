@@ -1,7 +1,7 @@
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
+import { normalizeError } from '../../utils/normalize-error';
 import { GraphAuthenticationProvider } from '../graph-authentication.service';
-import {normalizeError} from "../../utils/normalize-error";
 
 export class TokenRefreshMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
@@ -36,7 +36,7 @@ export class TokenRefreshMiddleware implements Middleware {
     } catch (error) {
       this.logger.error({
         msg: 'Failed to refresh SharePoint token or retry request',
-        error: normalizeError(error).message
+        error: normalizeError(error).message,
       });
     }
   }
@@ -60,7 +60,7 @@ export class TokenRefreshMiddleware implements Middleware {
         errorBody?.error?.message?.includes('Access token has expired')
       );
     } catch {
-      return response.status === 401;
+      return true;
     }
   }
 

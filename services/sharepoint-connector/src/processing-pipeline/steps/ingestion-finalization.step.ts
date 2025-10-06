@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
@@ -5,11 +6,10 @@ import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
+import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
-import {normalizeError} from "../../utils/normalize-error";
-import assert from 'assert';
 
 @Injectable()
 export class IngestionFinalizationStep implements IPipelineStep {
@@ -29,7 +29,10 @@ export class IngestionFinalizationStep implements IPipelineStep {
     const isPathBasedIngestion = !scopeId;
     const stepStartTime = Date.now();
 
-    assert.ok(registrationResponse, `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`)
+    assert.ok(
+      registrationResponse,
+      `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
+    );
 
     const ingestionFinalizationRequest = {
       key: buildSharepointFileKey({

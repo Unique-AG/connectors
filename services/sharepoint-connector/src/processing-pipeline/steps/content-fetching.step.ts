@@ -1,12 +1,12 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { GraphApiService } from '../../msgraph/graph-api.service';
+import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
-import {normalizeError} from "../../utils/normalize-error";
-import assert from 'assert';
 
 @Injectable()
 export class ContentFetchingStep implements IPipelineStep {
@@ -43,7 +43,13 @@ export class ContentFetchingStep implements IPipelineStep {
 
   private validateMimeType(mimeType: string | undefined, correlationId: string): void {
     const allowedMimeTypes = this.configService.get('sharepoint.allowedMimeTypes', { infer: true });
-    assert.ok(mimeType, `MIME type is missing for this item. Skipping download. [${correlationId}]`)
-    assert.ok(allowedMimeTypes.includes(mimeType), `MIME type ${mimeType} is not allowed. Skipping download.}` )
+    assert.ok(
+      mimeType,
+      `MIME type is missing for this item. Skipping download. [${correlationId}]`,
+    );
+    assert.ok(
+      allowedMimeTypes.includes(mimeType),
+      `MIME type ${mimeType} is not allowed. Skipping download.}`,
+    );
   }
 }

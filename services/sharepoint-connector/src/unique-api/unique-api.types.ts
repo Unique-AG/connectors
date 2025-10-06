@@ -88,5 +88,4 @@ export interface ZitadelLoginResponse {
   expires_in: number;
   token_type: string;
   id_token: string;
-};
-
+}

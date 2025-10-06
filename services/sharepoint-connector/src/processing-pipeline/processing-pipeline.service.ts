@@ -1,15 +1,15 @@
-import {randomUUID} from 'node:crypto';
-import type {FieldValueSet} from '@microsoft/microsoft-graph-types';
-import {Injectable, Logger} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {Config} from '../config';
-import type {EnrichedDriveItem} from '../msgraph/types/enriched-drive-item';
-import {ContentFetchingStep} from './steps/content-fetching.step';
-import {ContentRegistrationStep} from './steps/content-registration.step';
-import {IngestionFinalizationStep} from './steps/ingestion-finalization.step';
-import type {IPipelineStep} from './steps/pipeline-step.interface';
-import {StorageUploadStep} from './steps/storage-upload.step';
-import type {PipelineResult, ProcessingContext} from './types/processing-context';
+import { randomUUID } from 'node:crypto';
+import type { FieldValueSet } from '@microsoft/microsoft-graph-types';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
+import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import { ContentFetchingStep } from './steps/content-fetching.step';
+import { ContentRegistrationStep } from './steps/content-registration.step';
+import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
+import type { IPipelineStep } from './steps/pipeline-step.interface';
+import { StorageUploadStep } from './steps/storage-upload.step';
+import type { PipelineResult, ProcessingContext } from './types/processing-context';
 
 @Injectable()
 export class ProcessingPipelineService {
@@ -59,7 +59,7 @@ export class ProcessingPipelineService {
     };
 
     this.logger.log(
-      `[${ correlationId }] Starting processing pipeline for file: ${ file.name } (${ file.id })`,
+      `[${correlationId}] Starting processing pipeline for file: ${file.name} (${file.id})`,
     );
     let currentStep = this.fileProcessingSteps[0] as IPipelineStep;
 
@@ -68,13 +68,12 @@ export class ProcessingPipelineService {
       try {
         await Promise.race([step.execute(context), this.timeoutPromise(step)]);
 
-        this.logger.debug(`[${ correlationId }] Completed step: ${ step.stepName }`);
+        this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
         if (currentStep.cleanup) await currentStep.cleanup(context);
-
       } catch (error) {
         const totalDuration = Date.now() - startTime.getTime();
         this.logger.error(
-          `[${ correlationId }] Pipeline failed at step: ${ currentStep.stepName } after ${ totalDuration }ms`,
+          `[${correlationId}] Pipeline failed at step: ${currentStep.stepName} after ${totalDuration}ms`,
           error instanceof Error ? error.stack : String(error),
         );
 
@@ -87,15 +86,14 @@ export class ProcessingPipelineService {
     this.finalCleanup(context);
     const totalDuration = Date.now() - startTime.getTime();
     this.logger.log(
-      `[${ correlationId }] Pipeline completed successfully in ${ totalDuration }ms for file name: ${ file.name } file id:${ file.id }`,
+      `[${correlationId}] Pipeline completed successfully in ${totalDuration}ms for file name: ${file.name} file id:${file.id}`,
     );
 
     return { success: true };
-
   }
 
   private timeoutPromise(step: IPipelineStep) {
-    const timeoutError = new Error(`Step ${ step.stepName } timed out after ${ this.stepTimeoutMs }ms`)
+    const timeoutError = new Error(`Step ${step.stepName} timed out after ${this.stepTimeoutMs}ms`);
     return new Promise((_resolve, reject) => {
       setTimeout(() => reject(timeoutError), this.stepTimeoutMs);
     });

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Config } from '../config';
 import pLimit from 'p-limit';
+import { Config } from '../config';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { ProcessingPipelineService } from './processing-pipeline.service';

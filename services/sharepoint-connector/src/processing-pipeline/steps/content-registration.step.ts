@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
@@ -7,11 +8,10 @@ import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
+import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
-import {normalizeError} from "../../utils/normalize-error";
-import assert from 'assert';
 
 @Injectable()
 export class ContentRegistrationStep implements IPipelineStep {
@@ -54,7 +54,10 @@ export class ContentRegistrationStep implements IPipelineStep {
         uniqueToken,
       );
 
-      assert.ok(registrationResponse.writeUrl, 'Registration response missing required fields: id or writeUrl');
+      assert.ok(
+        registrationResponse.writeUrl,
+        'Registration response missing required fields: id or writeUrl',
+      );
 
       context.uploadUrl = registrationResponse.writeUrl;
       context.uniqueContentId = registrationResponse.id;

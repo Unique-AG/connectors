@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Client } from 'undici';
+import { Config } from './config';
 import { SHAREPOINT_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.tokens';
-import { Config } from "./config";
 
 @Module({
   imports: [ConfigModule],

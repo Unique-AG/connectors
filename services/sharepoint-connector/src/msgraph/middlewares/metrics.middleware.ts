@@ -4,8 +4,8 @@ import {
   GraphError,
   Middleware,
 } from '@microsoft/microsoft-graph-client';
-import {Logger} from '@nestjs/common';
-import {GraphApiErrorResponse, isGraphApiError} from '../types/sharepoint.types';
+import { Logger } from '@nestjs/common';
+import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.types';
 
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);

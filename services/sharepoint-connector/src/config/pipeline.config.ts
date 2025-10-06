@@ -1,6 +1,6 @@
-import {env} from 'node:process';
-import {registerAs} from '@nestjs/config';
-import {z} from 'zod';
+import { env } from 'node:process';
+import { registerAs } from '@nestjs/config';
+import { z } from 'zod';
 import {
   DEFAULT_MAX_FILE_SIZE_BYTES,
   DEFAULT_MS_GRAPH_RATE_LIMIT_PER_10_SECONDS,
@@ -17,10 +17,22 @@ const EnvironmentVariables = z.object({
     .positive()
     .prefault(DEFAULT_PROCESSING_CONCURRENCY)
     .describe('Sets the concurrency of how many files you want to ingest into unique at once'),
-  STEP_TIMEOUT_SECONDS: z.coerce.number().int().positive().prefault(DEFAULT_STEP_TIMEOUT_SECONDS)
-    .describe('Sets a time limit for a file processing step before it will stop and skip processing the file'),
-  MAX_FILE_SIZE_BYTES: z.coerce.number().int().positive().prefault(DEFAULT_MAX_FILE_SIZE_BYTES)
-    .describe('Sets the maximum file size in bytes that we are ingesting. Anything above this value will be skipped'),
+  STEP_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .prefault(DEFAULT_STEP_TIMEOUT_SECONDS)
+    .describe(
+      'Sets a time limit for a file processing step before it will stop and skip processing the file',
+    ),
+  MAX_FILE_SIZE_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .prefault(DEFAULT_MAX_FILE_SIZE_BYTES)
+    .describe(
+      'Sets the maximum file size in bytes that we are ingesting. Anything above this value will be skipped',
+    ),
   MS_GRAPH_RATE_LIMIT_PER_10_SECONDS: z.coerce
     .number()
     .int()
@@ -41,12 +53,12 @@ export interface PipelineConfig {
 export const pipelineConfig = registerAs<PipelineConfig[typeof namespace]>(namespace, () => {
   const validEnv = EnvironmentVariables.safeParse(env);
   if (!validEnv.success) {
-    throw new TypeError(`Invalid config for namespace "${ namespace }": ${ validEnv.error.message }`);
+    throw new TypeError(`Invalid config for namespace "${namespace}": ${validEnv.error.message}`);
   }
   return {
     processingConcurrency: validEnv.data.PROCESSING_CONCURRENCY,
     stepTimeoutSeconds: validEnv.data.STEP_TIMEOUT_SECONDS,
     maxFileSizeBytes: validEnv.data.MAX_FILE_SIZE_BYTES,
     msGraphRateLimitPer10Seconds: validEnv.data.MS_GRAPH_RATE_LIMIT_PER_10_SECONDS,
-  }
+  };
 });

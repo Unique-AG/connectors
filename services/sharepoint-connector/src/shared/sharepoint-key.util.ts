@@ -44,4 +44,3 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
 
   return trimSlashes(siteId);
 }
-

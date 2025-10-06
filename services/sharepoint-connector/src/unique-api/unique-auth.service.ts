@@ -1,10 +1,10 @@
+import * as assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Config } from '../config';
 import { request } from 'undici';
-import * as assert from 'assert';
-import {ZitadelLoginResponse} from "./unique-api.types";
-import {normalizeError} from "../utils/normalize-error";
+import { Config } from '../config';
+import { normalizeError } from '../utils/normalize-error';
+import { ZitadelLoginResponse } from './unique-api.types';
 
 @Injectable()
 export class UniqueAuthService {
@@ -48,7 +48,7 @@ export class UniqueAuthService {
         );
       }
 
-      const tokenData = await body.json() as ZitadelLoginResponse
+      const tokenData = (await body.json()) as ZitadelLoginResponse;
       assert.ok(tokenData.access_token, 'Invalid token response: missing access_token');
 
       this.cachedToken = tokenData.access_token;
@@ -62,9 +62,10 @@ export class UniqueAuthService {
   }
 
   private isTokenValid(): this is this & { cachedToken: string } {
-    return (
-      Boolean(this.cachedToken !== null &&
+    return Boolean(
+      this.cachedToken !== null &&
         this.tokenExpirationTime &&
-        Date.now() < this.tokenExpirationTime));
+        Date.now() < this.tokenExpirationTime,
+    );
   }
 }

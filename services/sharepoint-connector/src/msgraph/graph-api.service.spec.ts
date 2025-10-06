@@ -73,7 +73,9 @@ describe('GraphApiService', () => {
     mockGraphClient.api.mockReturnValue(mockChain);
 
     mockFileFilterService = {
-      isFileValidForIngestion: vi.fn().mockReturnValue(true),
+      isFileValidForIngestion: vi
+        .fn()
+        .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'],
     };
 
     const { unit } = await TestBed.solitary(GraphApiService)
@@ -105,7 +107,9 @@ describe('GraphApiService', () => {
         .mockResolvedValueOnce({ value: [mockDrive] })
         .mockResolvedValueOnce({ value: [mockFile] });
 
-      mockFileFilterService.isFileValidForIngestion = vi.fn().mockReturnValue(true);
+      mockFileFilterService.isFileValidForIngestion = vi
+        .fn()
+        .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'];
 
       const files = await service.getAllFilesForSite('site-1');
 
@@ -120,7 +124,9 @@ describe('GraphApiService', () => {
         .mockResolvedValueOnce({ value: [{ name: 'Invalid Drive' }, mockDrive] })
         .mockResolvedValueOnce({ value: [mockFile] });
 
-      mockFileFilterService.isFileValidForIngestion = vi.fn().mockReturnValue(true);
+      mockFileFilterService.isFileValidForIngestion = vi
+        .fn()
+        .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'];
 
       const files = await service.getAllFilesForSite('site-1');
 
@@ -140,7 +146,9 @@ describe('GraphApiService', () => {
         })
         .mockResolvedValueOnce({ value: [file2] });
 
-      mockFileFilterService.isFileValidForIngestion = vi.fn().mockReturnValue(true);
+      mockFileFilterService.isFileValidForIngestion = vi
+        .fn()
+        .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'];
 
       const files = await service.getAllFilesForSite('site-1');
 
@@ -150,7 +158,9 @@ describe('GraphApiService', () => {
 
     it('filters out non-syncable files', async () => {
       const mockChain = mockGraphClient.api();
-      mockFileFilterService.isFileValidForIngestion = vi.fn().mockReturnValue(false);
+      mockFileFilterService.isFileValidForIngestion = vi
+        .fn()
+        .mockReturnValue(false) as unknown as FileFilterService['isFileValidForIngestion'];
       mockChain.get
         .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
         .mockResolvedValueOnce({ value: [mockDrive] })
@@ -177,7 +187,9 @@ describe('GraphApiService', () => {
         .mockResolvedValueOnce({ value: [folder] })
         .mockResolvedValueOnce({ value: [mockFile] });
 
-      mockFileFilterService.isFileValidForIngestion = vi.fn().mockReturnValue(true);
+      mockFileFilterService.isFileValidForIngestion = vi
+        .fn()
+        .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'];
 
       const files = await service.getAllFilesForSite('site-1');
 

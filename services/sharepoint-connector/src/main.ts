@@ -5,8 +5,8 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from 'nestjs-pino';
 import * as packageJson from '../package.json';
-import { AppConfigNamespaced } from './config/app.config';
 import { AppModule } from './app.module';
+import { AppConfigNamespaced } from './config/app.config';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });

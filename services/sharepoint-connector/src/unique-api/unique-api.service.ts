@@ -1,12 +1,14 @@
+import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { GraphQLClient } from 'graphql-request';
 import { Client } from 'undici';
+import { Config } from '../config';
 import { UniqueOwnerType } from '../constants/unique-owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
-import { Config } from '../config';
 import { buildSharepointPartialKey } from '../shared/sharepoint-key.util';
+import { normalizeError } from '../utils/normalize-error';
 import {
   type ContentRegistrationRequest,
   type FileDiffItem,
@@ -15,8 +17,6 @@ import {
   type IngestionApiResponse,
   type IngestionFinalizationRequest,
 } from './unique-api.types';
-import {normalizeError} from "../utils/normalize-error";
-import assert from 'assert';
 
 @Injectable()
 export class UniqueApiService {
@@ -51,7 +51,7 @@ export class UniqueApiService {
       baseUrl: request.baseUrl,
     };
 
-    const errorMessage = 'Content registration failed:'
+    const errorMessage = 'Content registration failed:';
     return await this.makeRateLimitedRequest(errorMessage, async () => {
       const result = await client.request<{ contentUpsert?: IngestionApiResponse }>(
         this.getContentUpsertMutation(),
@@ -93,7 +93,7 @@ export class UniqueApiService {
         path,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${ uniqueToken }`,
+          Authorization: `Bearer ${uniqueToken}`,
         },
         body: JSON.stringify(diffRequest),
       });
@@ -101,12 +101,12 @@ export class UniqueApiService {
       if (statusCode < 200 || statusCode >= 300) {
         const errorText = await body.text().catch(() => 'No response body');
         throw new Error(
-          `File diff request failed with status ${ statusCode }. Response: ${ errorText }`,
+          `File diff request failed with status ${statusCode}. Response: ${errorText}`,
         );
       }
 
       const responseData = await body.json();
-      assert.ok(responseData, 'Invalid response from Unique API file diff')
+      assert.ok(responseData, 'Invalid response from Unique API file diff');
       return responseData as FileDiffResponse;
     });
   }
@@ -136,22 +136,28 @@ export class UniqueApiService {
 
     const errorMessage = 'Invalid response from Unique API ingestion finalization';
     return await this.makeRateLimitedRequest(errorMessage, async () => {
-        const result = await client.request<{ contentUpsert?: { id?: string } }>(
-          this.getContentUpsertMutation(),
-          graphQLVariables,
-        );
+      const result = await client.request<{ contentUpsert?: { id?: string } }>(
+        this.getContentUpsertMutation(),
+        graphQLVariables,
+      );
 
-        assert.ok(result?.contentUpsert?.id, 'Invalid response from Unique API ingestion finalization');
-        return { id: result.contentUpsert.id };
+      assert.ok(
+        result?.contentUpsert?.id,
+        'Invalid response from Unique API ingestion finalization',
+      );
+      return { id: result.contentUpsert.id };
     });
   }
 
-  private async makeRateLimitedRequest<T>(errorMessage: string, requestFn: () => Promise<T>): Promise<T> {
+  private async makeRateLimitedRequest<T>(
+    errorMessage: string,
+    requestFn: () => Promise<T>,
+  ): Promise<T> {
     return await this.limiter.schedule(async () => {
       try {
-        return await requestFn()
+        return await requestFn();
       } catch (error) {
-        const normalizedError = normalizeError(error)
+        const normalizedError = normalizeError(error);
         this.logger.error(errorMessage, normalizedError.message);
         throw error;
       }

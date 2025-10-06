@@ -4,8 +4,8 @@ import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import { UniqueApiService } from '../unique-api/unique-api.service';
 import { buildSharepointFileKey, buildSharepointPartialKey } from '../shared/sharepoint-key.util';
+import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 
