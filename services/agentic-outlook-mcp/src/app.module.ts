@@ -7,6 +7,7 @@ import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { context, trace } from '@opentelemetry/api';
 import { Cache } from 'cache-manager';
@@ -17,12 +18,15 @@ import * as packageJson from '../package.json';
 import { AppConfig, AppSettings, validateConfig } from './app-settings';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { MicrosoftOAuthProvider } from './auth/microsoft.provider';
+import { BatchModule } from './batch/batch.module';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
+import { FolderModule } from './folder/folder.module';
 import { MailModule } from './mail/mail.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
 import { SyncModule } from './sync/sync.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -71,6 +75,7 @@ import { SyncModule } from './sync/sync.module';
       },
     }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     McpOAuthModule.forRootAsync({
       imports: [ConfigModule, DrizzleModule],
       useFactory: async (
@@ -121,7 +126,10 @@ import { SyncModule } from './sync/sync.module';
     }),
     MsGraphModule,
     MailModule,
+    BatchModule,
     SyncModule,
+    UserModule,
+    FolderModule,
   ],
   controllers: [ManifestController],
   providers: [
