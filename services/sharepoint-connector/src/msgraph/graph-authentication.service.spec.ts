@@ -111,7 +111,7 @@ describe('GraphAuthenticationProvider', () => {
     );
   });
 
-  it('clears token cache', async () => {
+  it('caches tokens to avoid redundant MSAL calls', async () => {
     const expirationDate = new Date(Date.now() + 3600000);
     mockMsalClient.acquireTokenByClientCredential.mockResolvedValue({
       accessToken: 'test-token-123',
@@ -121,7 +121,7 @@ describe('GraphAuthenticationProvider', () => {
     await provider.getAccessToken();
     await provider.getAccessToken();
 
-    expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledTimes(2);
+    expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledTimes(1);
   });
 
   it('throws error when SharePoint configuration is missing', () => {

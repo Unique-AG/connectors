@@ -1,8 +1,8 @@
-import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphApiService } from '../msgraph/graph-api.service';
+import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
@@ -22,11 +22,18 @@ describe('SharepointSynchronizationService', () => {
     processFilesForSite: ReturnType<typeof vi.fn>;
   };
 
-  const mockFile: DriveItem = {
+  const mockFile: EnrichedDriveItem = {
     id: 'file-1',
     name: 'document.pdf',
     webUrl: 'https://sharepoint.example.com/document.pdf',
     listItem: { lastModifiedDateTime: '2024-01-01T00:00:00Z' },
+    size: 1024,
+    siteId: 'site-1',
+    siteWebUrl: 'https://sharepoint.example.com/sites/site-1',
+    driveId: 'drive-1',
+    driveName: 'Documents',
+    folderPath: '/',
+    lastModifiedDateTime: '2024-01-01T00:00:00Z',
   };
 
   const mockDiffResult: FileDiffResponse = {
@@ -160,15 +167,23 @@ describe('SharepointSynchronizationService', () => {
     expect(mockUniqueApiService.performFileDiff).toHaveBeenCalledWith(
       expect.anything(),
       'test-token',
+      'site-1',
     );
   });
 
   it('transforms files to diff items correctly', async () => {
-    const fileWithAllFields: DriveItem = {
+    const fileWithAllFields: EnrichedDriveItem = {
       id: 'file-123',
       name: 'report.xlsx',
       webUrl: 'https://sp.example.com/report.xlsx',
       listItem: { lastModifiedDateTime: '2024-02-15T10:30:00Z' },
+      size: 2048,
+      siteId: 'site-1',
+      siteWebUrl: 'https://sp.example.com/sites/site-1',
+      driveId: 'drive-1',
+      driveName: 'Documents',
+      folderPath: '/',
+      lastModifiedDateTime: '2024-02-15T10:30:00Z',
     };
 
     mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue([fileWithAllFields]);
@@ -182,19 +197,29 @@ describe('SharepointSynchronizationService', () => {
           name: 'report.xlsx',
           url: 'https://sp.example.com/report.xlsx',
           updatedAt: '2024-02-15T10:30:00Z',
-          key: 'sharepoint_file_file-123',
+          key: 'site-1/Documents/report.xlsx',
+          driveId: 'drive-1',
+          siteId: 'site-1',
         },
       ],
       'test-token',
+      'site-1',
     );
   });
 
   it('handles missing lastModifiedDateTime gracefully', async () => {
-    const fileWithoutTimestamp: DriveItem = {
+    const fileWithoutTimestamp: EnrichedDriveItem = {
       id: 'file-2',
       name: 'doc.txt',
       webUrl: 'https://sp.example.com/doc.txt',
       listItem: {},
+      size: 1024,
+      siteId: 'site-1',
+      siteWebUrl: 'https://sp.example.com/sites/site-1',
+      driveId: 'drive-1',
+      driveName: 'Documents',
+      folderPath: '/',
+      lastModifiedDateTime: '2024-01-01T00:00:00Z',
     };
 
     mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue([fileWithoutTimestamp]);
@@ -208,18 +233,21 @@ describe('SharepointSynchronizationService', () => {
           name: 'doc.txt',
           url: 'https://sp.example.com/doc.txt',
           updatedAt: undefined,
-          key: 'sharepoint_file_file-2',
+          key: 'site-1/Documents/doc.txt',
+          driveId: 'drive-1',
+          siteId: 'site-1',
         },
       ],
       'test-token',
+      'site-1',
     );
   });
 
   it('processes multiple files from same site', async () => {
     const files = [
-      { ...mockFile, id: 'file-1' },
-      { ...mockFile, id: 'file-2' },
-      { ...mockFile, id: 'file-3' },
+      { ...mockFile, id: 'file-1', name: 'doc1.pdf' },
+      { ...mockFile, id: 'file-2', name: 'doc2.pdf' },
+      { ...mockFile, id: 'file-3', name: 'doc3.pdf' },
     ];
 
     mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue(files);
@@ -228,11 +256,12 @@ describe('SharepointSynchronizationService', () => {
 
     expect(mockUniqueApiService.performFileDiff).toHaveBeenCalledWith(
       expect.arrayContaining([
-        expect.objectContaining({ key: 'sharepoint_file_file-1' }),
-        expect.objectContaining({ key: 'sharepoint_file_file-2' }),
-        expect.objectContaining({ key: 'sharepoint_file_file-3' }),
+        expect.objectContaining({ key: 'site-1/Documents/doc1.pdf' }),
+        expect.objectContaining({ key: 'site-1/Documents/doc2.pdf' }),
+        expect.objectContaining({ key: 'site-1/Documents/doc3.pdf' }),
       ]),
       'test-token',
+      'site-1',
     );
   });
 

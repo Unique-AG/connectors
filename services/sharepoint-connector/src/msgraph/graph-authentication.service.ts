@@ -29,7 +29,7 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
     const clientSecret = this.configService.get('sharepoint.clientSecret', { infer: true });
 
     assert.ok(
-      !tenantId || !clientId || !clientSecret,
+      tenantId && clientId && clientSecret,
       'SharePoint configuration missing: tenantId, clientId, and clientSecret are required',
     );
 

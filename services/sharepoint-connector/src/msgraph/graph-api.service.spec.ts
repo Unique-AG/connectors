@@ -72,6 +72,9 @@ describe('GraphApiService', () => {
     mockChain.expand.mockReturnValue(mockChain);
     mockGraphClient.api.mockReturnValue(mockChain);
 
+    // Default behavior for get() - return empty result to terminate pagination
+    mockChain.get.mockResolvedValue({ value: [] });
+
     mockFileFilterService = {
       isFileValidForIngestion: vi
         .fn()
@@ -97,6 +100,13 @@ describe('GraphApiService', () => {
       .compile();
 
     service = unit;
+
+    // Mock the rate limiter to avoid async issues
+    // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+    (service as any).makeRateLimitedRequest = vi.fn().mockImplementation(
+      // biome-ignore lint/suspicious/noExplicitAny: Generic promise type for mocking
+      (requestFn: () => Promise<any>) => requestFn(),
+    );
   });
 
   describe('getAllFilesForSite', () => {
