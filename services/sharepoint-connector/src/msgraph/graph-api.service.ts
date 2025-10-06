@@ -185,7 +185,8 @@ export class GraphApiService {
       return filesToSynchronize;
     } catch (error) {
       this.logger.error(`Failed to fetch items for drive ${driveId}, item ${itemId}:`, error);
-      // TODO: Look if it's worth adding a retry mechanism - also check implications with file-diffing
+      // TODO: probably we should not throw here, we want to continue scanning (add retry mechanism) - check implications with file-diffing
+      throw error;
     }
   }
 

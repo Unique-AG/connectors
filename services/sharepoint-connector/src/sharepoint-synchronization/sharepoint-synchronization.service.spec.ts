@@ -105,13 +105,23 @@ describe('SharepointSynchronizationService', () => {
     );
   });
 
-  it('skips sites with no files', async () => {
+  it('handles sites with no files', async () => {
     mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue([]);
+    const emptyDiffResult = {
+      newAndUpdatedFiles: [],
+      movedFiles: [],
+      deletedFiles: [],
+    };
+    mockUniqueApiService.performFileDiff.mockResolvedValue(emptyDiffResult);
 
     await service.synchronize();
 
-    expect(mockUniqueApiService.performFileDiff).not.toHaveBeenCalled();
-    expect(mockOrchestrator.processFilesForSite).not.toHaveBeenCalled();
+    expect(mockUniqueApiService.performFileDiff).toHaveBeenCalledWith([], 'test-token', 'site-1');
+    expect(mockOrchestrator.processFilesForSite).toHaveBeenCalledWith(
+      'site-1',
+      [],
+      emptyDiffResult,
+    );
   });
 
   it('prevents overlapping scans', async () => {

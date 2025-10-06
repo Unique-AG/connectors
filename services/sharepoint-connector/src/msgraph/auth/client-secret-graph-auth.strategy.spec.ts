@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GraphAuthenticationProvider } from './graph-authentication.service';
+import { ClientSecretGraphAuthStrategy } from './client-secret-graph-auth.strategy';
 
 vi.mock('@azure/msal-node', () => ({
   ConfidentialClientApplication: vi.fn().mockImplementation(() => ({
@@ -9,8 +9,8 @@ vi.mock('@azure/msal-node', () => ({
   })),
 }));
 
-describe('GraphAuthenticationProvider', () => {
-  let provider: GraphAuthenticationProvider;
+describe('ClientSecretGraphAuthStrategy', () => {
+  let strategy: ClientSecretGraphAuthStrategy;
   let mockMsalClient: {
     acquireTokenByClientCredential: ReturnType<typeof vi.fn>;
   };
@@ -28,7 +28,7 @@ describe('GraphAuthenticationProvider', () => {
     };
     vi.mocked(ConfidentialClientApplication).mockImplementation(() => mockMsalClient as never);
 
-    const { unit } = await TestBed.solitary(GraphAuthenticationProvider)
+    const { unit } = await TestBed.solitary(ClientSecretGraphAuthStrategy)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
@@ -36,7 +36,7 @@ describe('GraphAuthenticationProvider', () => {
       }))
       .compile();
 
-    provider = unit;
+    strategy = unit;
   });
 
   it('acquires a new token successfully', async () => {
@@ -46,7 +46,7 @@ describe('GraphAuthenticationProvider', () => {
       expiresOn: expirationDate,
     });
 
-    const token = await provider.getAccessToken();
+    const token = await strategy.getAccessToken();
 
     expect(token).toBe('test-token-123');
     expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledWith({
@@ -61,8 +61,8 @@ describe('GraphAuthenticationProvider', () => {
       expiresOn: expirationDate,
     });
 
-    await provider.getAccessToken();
-    const secondToken = await provider.getAccessToken();
+    await strategy.getAccessToken();
+    const secondToken = await strategy.getAccessToken();
 
     expect(secondToken).toBe('test-token-123');
     expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledTimes(1);
@@ -82,8 +82,8 @@ describe('GraphAuthenticationProvider', () => {
         expiresOn: newExpirationDate,
       });
 
-    await provider.getAccessToken();
-    const newToken = await provider.getAccessToken();
+    await strategy.getAccessToken();
+    const newToken = await strategy.getAccessToken();
 
     expect(newToken).toBe('new-token');
     expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledTimes(2);
@@ -95,7 +95,7 @@ describe('GraphAuthenticationProvider', () => {
       expiresOn: new Date(),
     });
 
-    await expect(provider.getAccessToken()).rejects.toThrow(
+    await expect(strategy.getAccessToken()).rejects.toThrow(
       'Failed to acquire Graph API token: no access token in response',
     );
   });
@@ -106,7 +106,7 @@ describe('GraphAuthenticationProvider', () => {
       expiresOn: null,
     });
 
-    await expect(provider.getAccessToken()).rejects.toThrow(
+    await expect(strategy.getAccessToken()).rejects.toThrow(
       'Failed to acquire Graph API token: no expiration time in response',
     );
   });
@@ -118,8 +118,8 @@ describe('GraphAuthenticationProvider', () => {
       expiresOn: expirationDate,
     });
 
-    await provider.getAccessToken();
-    await provider.getAccessToken();
+    await strategy.getAccessToken();
+    await strategy.getAccessToken();
 
     expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledTimes(1);
   });
@@ -127,7 +127,7 @@ describe('GraphAuthenticationProvider', () => {
   it('throws error when SharePoint configuration is missing', () => {
     expect(
       () =>
-        new GraphAuthenticationProvider({
+        new ClientSecretGraphAuthStrategy({
           get: vi.fn(() => undefined),
         } as never),
     ).toThrow(
@@ -140,14 +140,14 @@ describe('GraphAuthenticationProvider', () => {
       new Error('Authentication failed'),
     );
 
-    await expect(provider.getAccessToken()).rejects.toThrow('Authentication failed');
+    await expect(strategy.getAccessToken()).rejects.toThrow('Authentication failed');
 
     mockMsalClient.acquireTokenByClientCredential.mockResolvedValue({
       accessToken: 'new-token',
       expiresOn: new Date(Date.now() + 3600000),
     });
 
-    const token = await provider.getAccessToken();
+    const token = await strategy.getAccessToken();
     expect(token).toBe('new-token');
   });
 });

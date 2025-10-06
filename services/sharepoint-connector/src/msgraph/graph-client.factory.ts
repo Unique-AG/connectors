@@ -13,7 +13,7 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
-import { GraphAuthenticationProvider } from './graph-authentication.service';
+import { GraphAuthenticationService } from './auth/graph-authentication.service';
 import { MetricsMiddleware } from './middlewares/metrics.middleware';
 import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
 
@@ -23,12 +23,12 @@ export class GraphClientFactory {
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
-    private readonly graphAuthenticationProvider: GraphAuthenticationProvider,
+    private readonly graphAuthenticationService: GraphAuthenticationService,
   ) {}
 
   public createClient(): Client {
-    const authenticationHandler = new AuthenticationHandler(this.graphAuthenticationProvider);
-    const tokenRefreshMiddleware = new TokenRefreshMiddleware(this.graphAuthenticationProvider);
+    const authenticationHandler = new AuthenticationHandler(this.graphAuthenticationService);
+    const tokenRefreshMiddleware = new TokenRefreshMiddleware(this.graphAuthenticationService);
     const retryHandler = new RetryHandler(new RetryHandlerOptions());
     const redirectHandler = new RedirectHandler(new RedirectHandlerOptions());
     const telemetryHandler = new TelemetryHandler();

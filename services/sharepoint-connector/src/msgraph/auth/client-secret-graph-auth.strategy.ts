@@ -4,12 +4,12 @@ import {
   ConfidentialClientApplication,
   type Configuration,
 } from '@azure/msal-node';
-import { AuthenticationProvider } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { serializeError } from 'serialize-error-cjs';
-import { Config } from '../config';
-import { normalizeError } from '../utils/normalize-error';
+import { Config } from '../../config';
+import { normalizeError } from '../../utils/normalize-error';
+import { GraphAuthStrategy } from './graph-auth-strategy.interface';
 
 interface CachedToken {
   accessToken: string;
@@ -17,7 +17,7 @@ interface CachedToken {
 }
 
 @Injectable()
-export class GraphAuthenticationProvider implements AuthenticationProvider {
+export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
   private readonly scopes = ['https://graph.microsoft.com/.default'];
@@ -30,7 +30,7 @@ export class GraphAuthenticationProvider implements AuthenticationProvider {
 
     assert.ok(
       tenantId && clientId && clientSecret,
-      'SharePoint configuration missing: tenantId, clientId, and clientSecret are required',
+      'SharePoint configuration missing: tenantId, clientId, and clientSecret are required when using client secret authentication',
     );
 
     const msalConfig: Configuration = {
