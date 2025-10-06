@@ -4,7 +4,7 @@ variable "key_vault_id" {
 }
 
 variable "secrets_placeholders" {
-  description = "List of secrets that are manually created and need to be placed in the core key vault. The manual- prefix is prepended automatically."
+  description = "Map of secrets that are manually created and need to be placed in the core key vault. The manual- prefix is prepended automatically."
   type = map(object({
     create          = optional(bool, true)
     expiration_date = optional(string, "2099-12-31T23:59:59Z")
