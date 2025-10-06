@@ -1,22 +1,25 @@
+name: "[TEMPLATE] CD: Github Artifact"
+
 on:
   workflow_call:
     inputs:
       service-name:
-        description: "Name of the MCP server (e.g., factset, outlook)"
-        required: true
-        type: string
-      service-path:
-        description: "Path to the server directory (e.g., services/factset-mcp)"
+        description: "Name of the service (e.g., factset-mcp)"
         required: true
         type: string
       service-tag:
-        description: "The release tag for the package (e.g. factset@v1.2.0)"
+        description: "Github release tag of the package (e.g., factset-mcp@1.2.0)"
         required: true
         type: string
 
 jobs:
-  build-and-upload:
+  # Builds and upload the built code artifact to the Github release
+  github-artifact:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      NPM_PACKAGE_NAME: '@unique-ag/${{ inputs.service-name }}'
 
     steps:
       - name: Checkout code
@@ -34,13 +37,13 @@ jobs:
           cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install --filter=${{ inputs.service-name }}
+        run: pnpm install --filter=${{ env.NPM_PACKAGE_NAME }}
 
       - name: Build package
-        run: pnpm build --filter=${{ inputs.service-name }}
+        run: pnpm build --filter=${{ env.NPM_PACKAGE_NAME }}
 
       - name: Pack package
-        run: pnpm pack --filter=${{ inputs.service-name }} --out=build.tgz
+        run: pnpm pack --filter=${{ env.NPM_PACKAGE_NAME }} --out=build.tgz
 
       - name: Upload build artifact
         run: gh release upload ${{ inputs.service-tag }} build.tgz

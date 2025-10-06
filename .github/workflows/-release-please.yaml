@@ -1,0 +1,33 @@
+name: Release-Please
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release-please:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      issues: write
+      packages: write
+      pull-requests: write
+    outputs:
+      services: ${{ steps.collect.outputs.services }}
+
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Collect release outputs
+        id: collect
+        run: |
+          echo "::set-output name=services::$(echo '${{ toJson(steps.release.outputs) }}')"
+
+      - name: Debug release outputs
+        run: |
+          echo "Release outputs: ${{ steps.collect.outputs.services }}"
