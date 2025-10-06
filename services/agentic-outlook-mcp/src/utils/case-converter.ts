@@ -15,8 +15,8 @@ export function toDrizzleOAuthClientInsert(client: OAuthClient): typeof oauthCli
     grantTypes: client.grant_types,
     responseTypes: client.response_types,
     tokenEndpointAuthMethod: client.token_endpoint_auth_method,
-    createdAt: client.created_at,
-    updatedAt: client.updated_at,
+    createdAt: client.created_at.toISOString(),
+    updatedAt: client.updated_at.toISOString(),
   };
 }
 
@@ -34,8 +34,8 @@ export function fromDrizzleOAuthClientRow(row: typeof oauthClients.$inferSelect)
     grant_types: row.grantTypes,
     response_types: row.responseTypes,
     token_endpoint_auth_method: row.tokenEndpointAuthMethod,
-    created_at: row.createdAt,
-    updated_at: row.updatedAt,
+    created_at: new Date(row.createdAt),
+    updated_at: new Date(row.updatedAt),
   };
 }
 
@@ -101,4 +101,21 @@ export function fromDrizzleSessionRow(row: typeof oauthSessions.$inferSelect): O
     resource: row.resource ?? undefined,
     expiresAt: (row.expiresAt ?? new Date()).getTime(),
   };
+}
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype;
+
+export function camelizeKeys(input: unknown): unknown {
+  if (Array.isArray(input)) return input.map(camelizeKeys);
+  if (isPlainObject(input)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input)) {
+      const ck = k.replace(/[_-]+([a-zA-Z0-9])/g, (_, c) => c.toUpperCase());
+      // prefer explicit camelCase if both forms provided
+      if (!(ck in out)) out[ck] = camelizeKeys(v);
+    }
+    return out;
+  }
+  return input;
 }

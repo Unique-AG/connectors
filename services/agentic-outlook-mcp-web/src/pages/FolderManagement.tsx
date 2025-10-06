@@ -1,17 +1,16 @@
 import { toCompilableQuery } from '@powersync/drizzle-driver';
 import { useQuery } from '@powersync/react';
+import { eq } from 'drizzle-orm';
 import { useState } from 'react';
 import { FolderTree } from '@/components/folders/FolderTree';
 import { GlobalControls } from '@/components/folders/GlobalControls';
 import { useCallApi } from '@/hooks/use-call-api';
 import { useToast } from '@/hooks/use-toast';
 import {
-  syncControllerActivateSync,
-  syncControllerDeactivateSync,
-  syncControllerSyncFolders,
+  syncFolders
 } from '../@generated/sync/sync';
 import { db } from '../lib/powersync/database';
-import { UserProfile } from '../lib/powersync/schema';
+import { UserProfile, userProfiles as userProfilesTable } from '../lib/powersync/schema';
 
 export default function FolderManagement() {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -88,7 +87,7 @@ export default function FolderManagement() {
     setIsRefreshing(true);
 
     try {
-      const response = await callApi(syncControllerSyncFolders);
+      const response = await callApi(syncFolders);
 
       if (response.status === 200) {
         toast({
@@ -108,39 +107,15 @@ export default function FolderManagement() {
   };
 
   const handleToggleGlobalSync = async (enabled: boolean) => {
-    setIsLoading(true);
-
-    try {
-      if (enabled) {
-        const response = await callApi(syncControllerActivateSync);
-
-        if (response.status === 201) {
-          toast({
-            title: 'Sync Enabled',
-            description: 'All folder syncing has been enabled.',
-          });
-        }
-      } else {
-        const response = await callApi(syncControllerDeactivateSync, { wipeData: false });
-
-        if (response.status === 200) {
-          toast({
-            title: 'Sync Disabled',
-            description: 'All folder syncing has been disabled.',
-          });
-        }
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to toggle sync',
-        variant: 'destructive',
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(false);
+    if (!userProfile?.id) return;
+    console.log('Toggling global sync', enabled);
+    const query = enabled
+      ? db
+          .update(userProfilesTable)
+          .set({ syncActivatedAt: new Date().toISOString(), syncDeactivatedAt: null })
+          .where(eq(userProfilesTable.id, userProfile.id))
+      : db.update(userProfilesTable).set({ syncDeactivatedAt: new Date().toISOString() });
+    await toCompilableQuery(query).execute();
   };
 
   const handleGlobalWipe = async () => {

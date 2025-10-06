@@ -1,4 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
+
+import { TypeID } from 'typeid-js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
 import { TokenProvider } from './token.provider';
@@ -9,7 +11,7 @@ vi.stubGlobal('fetch', mockFetch);
 
 describe('TokenProvider', () => {
   const mockConfig = {
-    userProfileId: 'user-profile-123',
+    userProfileId: TypeID.fromString('user-profile-123', 'user_profile'),
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
     scopes: ['https://graph.microsoft.com/.default'],

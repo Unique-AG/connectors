@@ -19,9 +19,9 @@ export const folders = pgTable('folders', {
   // Sync
   subscriptionId: varchar(),
   syncToken: varchar(),
-  activatedAt: timestamp(),
-  deactivatedAt: timestamp(),
-  lastSyncedAt: timestamp(),
+  activatedAt: timestamp({ mode: "string" }),
+  deactivatedAt: timestamp({ mode: "string" }),
+  lastSyncedAt: timestamp({ mode: "string" }),
 
   // References
   userProfileId: varchar()
@@ -56,3 +56,5 @@ export const folderSchema = z.object({
   updatedAt: z.iso.datetime().nullable(),
 });
 export const folderArraySchema = z.array(folderSchema);
+
+export type FolderInput = typeof folders.$inferInsert;

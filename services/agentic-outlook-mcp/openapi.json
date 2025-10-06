@@ -1,20 +1,23 @@
 {
   "openapi": "3.0.0",
   "paths": {
-    "/sync": {
+    "/batch": {
       "post": {
-        "operationId": "SyncController_activateSync",
+        "operationId": "batch",
         "parameters": [],
-        "responses": {
-          "201": {
-            "description": "Sync enabled successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SyncStatusDto"
-                }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchDto"
               }
             }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch processed successfully"
           },
           "401": {
             "description": "Unauthorized"
@@ -25,13 +28,15 @@
             "bearer": []
           }
         ],
-        "summary": "Enable sync for the authenticated user",
+        "summary": "Batch process Powersync write operations for the authenticated user",
         "tags": [
-          "sync"
+          "batch"
         ]
-      },
+      }
+    },
+    "/sync": {
       "patch": {
-        "operationId": "SyncController_syncFolders",
+        "operationId": "syncFolders",
         "parameters": [],
         "responses": {
           "200": {
@@ -52,21 +57,11 @@
         ]
       },
       "delete": {
-        "operationId": "SyncController_deactivateSync",
+        "operationId": "deleteAllUserData",
         "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeleteSyncDto"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
-            "description": "Sync deactivated successfully"
+            "description": "User data deleted successfully"
           },
           "401": {
             "description": "Unauthorized"
@@ -77,101 +72,9 @@
             "bearer": []
           }
         ],
-        "summary": "Deactivate sync for the authenticated user",
+        "summary": "Delete all user data for the authenticated user",
         "tags": [
           "sync"
-        ]
-      }
-    },
-    "/sync/folders": {
-      "get": {
-        "operationId": "FoldersController_getFolders",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "List of folders",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FolderArrayDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get all folders for the authenticated user",
-        "tags": [
-          "folders"
-        ]
-      }
-    },
-    "/sync/folders/{folderId}": {
-      "post": {
-        "operationId": "FoldersController_updateFolders",
-        "parameters": [
-          {
-            "name": "folderId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Folder sync activated successfully"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Activate sync for a folder.",
-        "tags": [
-          "folders"
-        ]
-      },
-      "delete": {
-        "operationId": "FoldersController_deactivateSync",
-        "parameters": [
-          {
-            "name": "folderId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Folder sync deactivated successfully"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Deactivate sync for a folder.",
-        "tags": [
-          "folders"
         ]
       }
     }
@@ -193,127 +96,73 @@
       }
     },
     "schemas": {
-      "SyncStatusDto": {
+      "BatchDto": {
         "type": "object",
         "properties": {
-          "syncActivatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-            "nullable": true
+          "clientId": {
+            "type": "string"
           },
-          "syncDeactivatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-            "nullable": true
-          },
-          "syncLastSyncedAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-            "nullable": true
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "op_id": {
+                  "type": "number"
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "PUT",
+                    "PATCH",
+                    "DELETE"
+                  ]
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "user_profiles",
+                    "folders",
+                    "emails"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "tx_id": {
+                  "type": "number"
+                },
+                "data": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "old": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "metadata": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op_id",
+                "op",
+                "type",
+                "id"
+              ]
+            }
           }
         },
         "required": [
-          "syncActivatedAt",
-          "syncDeactivatedAt",
-          "syncLastSyncedAt"
+          "clientId",
+          "data"
         ]
-      },
-      "DeleteSyncDto": {
-        "type": "object",
-        "properties": {
-          "wipeData": {
-            "type": "boolean"
-          }
-        }
-      },
-      "FolderArrayDto": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "originalName": {
-              "type": "string",
-              "nullable": true
-            },
-            "folderId": {
-              "type": "string"
-            },
-            "parentFolderId": {
-              "type": "string",
-              "nullable": true
-            },
-            "childFolderCount": {
-              "type": "number",
-              "nullable": true
-            },
-            "subscriptionId": {
-              "type": "string",
-              "nullable": true
-            },
-            "syncToken": {
-              "type": "string",
-              "nullable": true
-            },
-            "activatedAt": {
-              "type": "string",
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-              "nullable": true
-            },
-            "deactivatedAt": {
-              "type": "string",
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-              "nullable": true
-            },
-            "lastSyncedAt": {
-              "type": "string",
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-              "nullable": true
-            },
-            "userProfileId": {
-              "type": "string"
-            },
-            "createdAt": {
-              "type": "string",
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-              "nullable": true
-            },
-            "updatedAt": {
-              "type": "string",
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-              "nullable": true
-            }
-          },
-          "required": [
-            "id",
-            "name",
-            "originalName",
-            "folderId",
-            "parentFolderId",
-            "childFolderCount",
-            "subscriptionId",
-            "syncToken",
-            "activatedAt",
-            "deactivatedAt",
-            "lastSyncedAt",
-            "userProfileId",
-            "createdAt",
-            "updatedAt"
-          ]
-        }
       }
     }
   }

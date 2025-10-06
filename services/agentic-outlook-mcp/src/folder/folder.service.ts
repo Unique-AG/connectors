@@ -6,20 +6,22 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { MailFolder } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { OnEvent } from '@nestjs/event-emitter';
+import { eq, sql } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
-import { DRIZZLE, DrizzleDatabase, folderArraySchema, folders } from '../../drizzle';
-import { folders as foldersTable, userProfiles } from '../../drizzle/schema';
-import { GraphClientFactory } from '../../msgraph/graph-client.factory';
-import { normalizeError } from '../../utils/normalize-error';
+import { DRIZZLE, DrizzleDatabase } from '../drizzle';
+import { folders as foldersTable, userProfiles } from '../drizzle/schema';
+import { GraphClientFactory } from '../msgraph/graph-client.factory';
+import { normalizeError } from '../utils/normalize-error';
+import { FolderEvents, FolderSyncEvent } from './folder.events';
 
 const FOLDER_SELECT_FIELDS =
   'id,displayName,parentFolderId,childFolderCount,unreadItemCount,totalItemCount';
 type FolderWithName = MailFolder & { name: string };
 
 @Injectable()
-export class FoldersService {
+export class FolderService {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
@@ -27,28 +29,9 @@ export class FoldersService {
     private readonly graphClientFactory: GraphClientFactory,
   ) {}
 
-  public async getFolders(userProfileId: TypeID<'user_profile'>) {
-    const result = await this.db.query.folders.findMany({
-      where: and(eq(folders.userProfileId, userProfileId.toString())),
-    });
-    return folderArraySchema.parse(result);
-  }
-
-  public async activateSync(userProfileId: TypeID<'user_profile'>, folderId: string) {
-    await this.db
-      .update(folders)
-      .set({ activatedAt: new Date() })
-      .where(and(eq(folders.userProfileId, userProfileId.toString()), eq(folders.id, folderId)));
-  }
-
-  public async deactivateSync(userProfileId: TypeID<'user_profile'>, folderId: string) {
-    await this.db
-      .update(folders)
-      .set({ deactivatedAt: new Date() })
-      .where(and(eq(folders.userProfileId, userProfileId.toString()), eq(folders.id, folderId)));
-  }
-
-  public async syncFolders(userProfileId: TypeID<'user_profile'>) {
+  @OnEvent(FolderEvents.FolderSync)
+  public async syncFolders(event: FolderSyncEvent) {
+    const { userProfileId } = event;
     const graphClient = this.graphClientFactory.createClientForUser(userProfileId);
     try {
       const folders: FolderWithName[] = [];
@@ -125,30 +108,33 @@ export class FoldersService {
   }
 
   private async saveFolders(userProfileId: TypeID<'user_profile'>, folders: FolderWithName[]) {
-    await this.db.insert(foldersTable).values(
-      folders
-        .filter((folder) => folder.id)
-        .map((folder) => ({
-          name: folder.name,
-          originalName: folder.displayName,
-          // biome-ignore lint/style/noNonNullAssertion: map is filtered!
-          folderId: folder.id!,
-          parentFolderId: folder.parentFolderId,
-          childFolderCount: folder.childFolderCount ?? 0,
-          userProfileId: userProfileId.toString(),
-        })),
-    ).onConflictDoUpdate({
-      target: foldersTable.folderId,
-      set: {
-        name: sql`excluded.name`,
-        originalName: sql`excluded.original_name`,
-        parentFolderId: sql`excluded.parent_folder_id`,
-        childFolderCount: sql`excluded.child_folder_count`,
-      },
-    });
+    await this.db
+      .insert(foldersTable)
+      .values(
+        folders
+          .filter((folder) => folder.id)
+          .map((folder) => ({
+            name: folder.name,
+            originalName: folder.displayName,
+            // biome-ignore lint/style/noNonNullAssertion: map is filtered!
+            folderId: folder.id!,
+            parentFolderId: folder.parentFolderId,
+            childFolderCount: folder.childFolderCount ?? 0,
+            userProfileId: userProfileId.toString(),
+          })),
+      )
+      .onConflictDoUpdate({
+        target: foldersTable.folderId,
+        set: {
+          name: sql`excluded.name`,
+          originalName: sql`excluded.original_name`,
+          parentFolderId: sql`excluded.parent_folder_id`,
+          childFolderCount: sql`excluded.child_folder_count`,
+        },
+      });
     await this.db
       .update(userProfiles)
-      .set({ syncLastSyncedAt: new Date() })
+      .set({ syncLastSyncedAt: new Date().toISOString() })
       .where(eq(userProfiles.id, userProfileId.toString()));
   }
 }

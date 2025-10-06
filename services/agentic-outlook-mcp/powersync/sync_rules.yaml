@@ -3,7 +3,9 @@
 # Note that changes to this file are not watched.
 # The service needs to be restarted for changes to take effect.
 
-bucket_definitions:  
+# !Important: If you change the sync rules, you need to adjust the frontend drizzle schema and the batch dto table enum!
+
+bucket_definitions: 
   user_data:
     parameters: SELECT request.jwt() ->> 'user_profile_id' AS user_profile_id
     data:
