@@ -7,7 +7,7 @@ const ConfigSchema = z
       .enum(['development', 'production', 'test'])
       .prefault('production')
       .describe('Specifies the environment in which the application is running'),
-    port: z
+    port: z.coerce
       .number()
       .int()
       .min(0)

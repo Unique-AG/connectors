@@ -41,7 +41,7 @@ const EnvironmentVariables = z.object({
         : [],
     )
     .describe('Comma-separated list of allowed MIME types for files to sync'),
-  SHAREPOINT_MAX_FILES_TO_SCAN: z
+  SHAREPOINT_MAX_FILES_TO_SCAN: z.coerce
     .number()
     .int()
     .positive()
