@@ -1,4 +1,4 @@
-name: "[TEMPLATE] CD: Containerize"
+name: "[TEMPLATE] CD"
 
 on:
   workflow_call:

@@ -11,17 +11,17 @@
       "extra-files": [
         {
           "type": "yaml",
-          "path": "services/factset-mcp/deploy/helm-charts/factset-mcp/Chart.yaml",
+          "path": "deploy/helm-charts/factset-mcp/Chart.yaml",
           "jsonpath": "$.version"
         },
         {
           "type": "yaml",
-          "path": "services/factset-mcp/deploy/helm-charts/factset-mcp/Chart.yaml",
+          "path": "deploy/helm-charts/factset-mcp/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
         {
           "type": "yaml",
-          "path": "services/factset-mcp/deploy/helm-charts/factset-mcp/values.yaml",
+          "path": "deploy/helm-charts/factset-mcp/values.yaml",
           "jsonpath": "$.server.image.tag"
         }
       ]
@@ -30,17 +30,17 @@
       "extra-files": [
         {
           "type": "yaml",
-          "path": "services/outlook-mcp/deploy/helm-charts/outlook-mcp/Chart.yaml",
+          "path": "deploy/helm-charts/outlook-mcp/Chart.yaml",
           "jsonpath": "$.version"
         },
         {
           "type": "yaml",
-          "path": "services/outlook-mcp/deploy/helm-charts/outlook-mcp/Chart.yaml",
+          "path": "deploy/helm-charts/outlook-mcp/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
         {
           "type": "yaml",
-          "path": "services/outlook-mcp/deploy/helm-charts/outlook-mcp/values.yaml",
+          "path": "deploy/helm-charts/outlook-mcp/values.yaml",
           "jsonpath": "$.server.image.tag"
         }
       ]
@@ -49,17 +49,17 @@
       "extra-files": [
         {
           "type": "yaml",
-          "path": "services/sharepoint-connector/deploy/helm-charts/sharepoint-connector/Chart.yaml",
+          "path": "deploy/helm-charts/sharepoint-connector/Chart.yaml",
           "jsonpath": "$.version"
         },
         {
           "type": "yaml",
-          "path": "services/sharepoint-connector/deploy/helm-charts/sharepoint-connector/Chart.yaml",
+          "path": "deploy/helm-charts/sharepoint-connector/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
         {
           "type": "yaml",
-          "path": "services/sharepoint-connector/deploy/helm-charts/sharepoint-connector/values.yaml",
+          "path": "deploy/helm-charts/sharepoint-connector/values.yaml",
           "jsonpath": "$.connector.image.tag"
         }
       ]
