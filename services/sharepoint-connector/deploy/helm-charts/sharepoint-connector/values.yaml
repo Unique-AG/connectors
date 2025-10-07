@@ -14,6 +14,13 @@ connector:
   extraEnvCM:
     - sharepoint-connector-config
   extraEnvSecrets:
+    # -- by default the chart expects the ZITADEL Client Secret from a secret named sharepoint-connector-secret
+    # This is just for convenience. Users can supersed this with their own secret that contains ZITADEL_CLIENT_SECRET
+    # or use https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load completely
+    # arbitrary secret mappings.
+    # See also below in connectorConfig.zitadel.clientSecret.
+    #
+    # The same would apply for a potentially required GRAPH_CLIENT_SECRET.
     - sharepoint-connector-secret
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
@@ -81,7 +88,7 @@ connectorConfig:
     # example: https://acme.sharepoint.com
     fileDiffBasePath: unset_default_value
     # -- url for the file diff
-    # example: https://apiunique.app/ingestion/v1/content/file-diff
+    # example: https://api.unique.app/ingestion/v1/content/file-diff
     fileDiffUrl: unset_default_value
     # -- url for the ingestion graphql
     # TODO: should use only public urls!
@@ -92,9 +99,7 @@ connectorConfig:
     scopeId: null # null if not using scope based ingestion
   zitadel:
     clientId: unset_default_value
-    # clientSecret is presented from a secret
-    # is expected in secret named sharepoint-connector-secret as key ZITADEL_CLIENT_SECRET
-    # users preferring another setup must set the extraEnvSecrets to [] and present a matching environment variable to the deployment
+    # clientSecret is presented from a secret, see connector.extraEnvSecrets
     oauthTokenUrl: unset_default_value
     # -- project id for the zitadel project
     # example: 225317577440629999

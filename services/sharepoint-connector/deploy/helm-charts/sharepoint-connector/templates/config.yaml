@@ -1,3 +1,4 @@
+{{- if .Values.connectorConfig.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -24,3 +25,4 @@ data:
   {{- if .Values.connectorConfig.unique.scopeId }}
   UNIQUE_SCOPE_ID: {{ .Values.connectorConfig.unique.scopeId }}
   {{- end }}
+{{- end }}
