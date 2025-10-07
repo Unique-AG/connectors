@@ -1,0 +1,20 @@
+{{- if .Values.grafana.dashboard.enabled }}
+{{- fail "Grafana dashboard is not yet implemented. Please keep grafana.dashboard.enabled to false." }}
+{{- end }}
+
+{{/*
+# Grafana dashboard template - not yet implemented
+{{- if .Values.grafana.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "chart.fullname" . }}-grafana-dashboard
+  labels:
+    grafana_dashboard: "1"
+    {{- include "chart.labels" . | nindent 4 }}
+  annotations:
+    grafana_folder: {{ .Values.grafana.dashboard.folder | quote }}
+data:
+  dashboard.json: {{ .Files.Get "files/grafana-dashboard.json" | quote }}
+{{- end }}
+*/}}
