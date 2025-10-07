@@ -1,6 +1,6 @@
 {
   "name": "@unique-ag/sharepoint-connector",
-  "description": "Service that connects to SharePoint for document and data integration.",
+  "description": "Take content from SharePoint and send it to Unique AI for RAG ingestion..",
   "version": "2.0.0-alpha.1",
   "author": "",
   "private": true,
