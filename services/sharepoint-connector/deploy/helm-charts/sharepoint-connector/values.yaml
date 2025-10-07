@@ -50,6 +50,14 @@ connector:
     workloadIdentity:
       enabled: true
       clientId: unset_default_value
+  # The volume is needed for CorePack afawct
+  # FIXME: Correct @konsti?
+  volumes:
+    - name: tmp
+      emptyDir: {}
+  volumeMounts:
+    - name: tmp
+      mountPath: /tmp
 
 grafana:
   dashboard:
