@@ -10,7 +10,7 @@ on:
 
 jobs:
   check_chart:
-    runs-on: singularity
+    runs-on: ubuntu-latest # TODO: can we use singularity here?
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
