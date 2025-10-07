@@ -54,3 +54,4 @@ jobs:
     with:
       service-name: sharepoint-connector
       service-version: ${{ needs.release-please.outputs['services/sharepoint-connector--version'] }}
+      dockerfile: services/sharepoint-connector/deploy/Dockerfile
