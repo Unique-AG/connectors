@@ -2,40 +2,31 @@ connector:
   deployment:
     metadata:
       annotations:
-        reloader.stakater.com/auto: "true"
+        reloader.stakater.com/auto: 'true'
   env:
     LOG_LEVEL: info
     MAX_FILE_SIZE_BYTES: 209715200
     MAX_HEAP_MB: 1920
     NODE_ENV: production
-    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
-    OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
-    OTEL_METRICS_EXPORTER: "prometheus"
+    OTEL_EXPORTER_PROMETHEUS_HOST: 0.0.0.0
+    OTEL_EXPORTER_PROMETHEUS_PORT: '51346'
+    OTEL_METRICS_EXPORTER: prometheus
   extraEnvCM:
     - sharepoint-connector-config
   extraEnvSecrets:
-    # -- by default the chart expects the ZITADEL Client Secret from a secret named sharepoint-connector-secret
-    # This is just for convenience. Users can supersed this with their own secret that contains ZITADEL_CLIENT_SECRET
-    # or use https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load completely
-    # arbitrary secret mappings.
-    # See also below in connectorConfig.zitadel.clientSecret.
-    #
-    # The same would apply for a potentially required GRAPH_CLIENT_SECRET.
     - sharepoint-connector-secret
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
-    tag: 2.0.0-alpha.1 # TODO: Tag must be auto-injected via release process from package.json
+    tag: 2.0.0-alpha.2
   networkPolicy:
     enabled: true
     policyTypes:
-      # - Egress # We can not yet leverage egress policies as Kubernetes flavor policies do not support FQDN and MS Graph IP-Addresses are not easily deterministic
       - Ingress
     egress: null
   ports:
     application: 51345
     metrics: 51346
   resources:
-    # Resources are granted generously as the service for now is a singleton
     limits:
       memory: 2048Mi
     requests:
@@ -50,65 +41,38 @@ connector:
     workloadIdentity:
       enabled: true
       clientId: unset_default_value
-  # The volume is needed for CorePack afawct
-  # FIXME: Correct @konsti?
   volumes:
     - name: tmp
       emptyDir: {}
   volumeMounts:
     - name: tmp
       mountPath: /tmp
-
 grafana:
   dashboard:
-    enabled: false # TODO: Not yet implemented, template will fail on purpose if enabled
+    enabled: false
     folder: connectors
-
-# -- config for the deployed connector, will be mapped to the connectors environment variables
-# users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
 connectorConfig:
-  # -- if disabled, connector.extraEnvCM must be set to []
   enabled: true
-  allowedMimeTypes: application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.wordprocessingml.document
+  allowedMimeTypes: >-
+    application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.wordprocessingml.document
   processingConcurrency: 1
   stepTimeoutSeconds: 300
   graph:
-    # -- tenant id against which the graph api calls are made
-    # example: 12345678-1234-1234-1234-123456789012
     tenantId: unset_default_value
     useOidcAuth: true
     apiUrl: https://graph.microsoft.com
     clientId: null
-    # clientSecret would need to be presented from a secret as well
   sharepoint:
-    # -- base url of the sharepoint instance
-    # example: https://acme.sharepoint.com
     baseUrl: unset_default_value
     maxFilesToScan: 2
-    # -- sites to scan
-    # example: sharepoint-site-id-1,sharepoint-site-id-2 @lorand93: make concrete examples here
     sites: unset_default_value
-    # -- column name against which the files are synced
-    # example: FinanceGPTKnowledge
     syncColumnName: unset_default_value
   unique:
-    # -- base path for the file diff
-    # example: https://acme.sharepoint.com
     fileDiffBasePath: unset_default_value
-    # -- url for the file diff
-    # example: https://api.unique.app/ingestion/v1/content/file-diff
     fileDiffUrl: unset_default_value
-    # -- url for the ingestion graphql
-    # TODO: should use only public urls!
-    # example: https://api.unique.app/ingestion/graphql
     ingestionGraphqlUrl: unset_default_value
-    # -- scope id for the scope based ingestion
-    # example: scope_bu4gokr0atzj0kfiuaaaaaaa
-    scopeId: null # null if not using scope based ingestion
+    scopeId: null
   zitadel:
     clientId: unset_default_value
-    # clientSecret is presented from a secret, see connector.extraEnvSecrets
     oauthTokenUrl: unset_default_value
-    # -- project id for the zitadel project
-    # example: 225317577440629999
     projectId: unset_default_value

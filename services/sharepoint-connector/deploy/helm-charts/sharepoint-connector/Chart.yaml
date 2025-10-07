@@ -2,8 +2,8 @@ apiVersion: v2
 name: sharepoint-connector
 description: Take content from SharePoint and send it to Unique AI for RAG ingestion.
 type: application
-version: 2.0.0-alpha.1 # TODO: Tag must be auto-injected via release process from package.json
-appVersion: 2.0.0-alpha.1 # FIXME: this does not work as intended sadly, this version does not trickle down into the dependency
+version: 2.0.0-alpha.2
+appVersion: 2.0.0-alpha.2
 dependencies:
   - alias: connector
     name: backend-service

@@ -1,0 +1,22 @@
+# Changelog
+
+## [2.0.0-alpha.2](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.1...sharepoint-connector@v2.0.0-alpha.2) (2025-10-07)
+
+
+### Features
+
+* **outlook:** switch to Drizzle ORM ([#30](https://github.com/Unique-AG/connectors/issues/30)) ([26261c3](https://github.com/Unique-AG/connectors/commit/26261c3d28ec98296a46438e39953b43b3b817eb))
+* restructure infra components to streamline ([#28](https://github.com/Unique-AG/connectors/issues/28)) ([21245a9](https://github.com/Unique-AG/connectors/commit/21245a9c933816be9e29df183444fc2f3b6c5d3e))
+* **sharepoint-connector:** migrate and integrate sharepoint-connector service into monorepo ([#23](https://github.com/Unique-AG/connectors/issues/23)) ([c73fbec](https://github.com/Unique-AG/connectors/commit/c73fbec2136acf5136f52dae37c7a346c89b6989))
+* **sharepoint-connector:** release as alpha ([#45](https://github.com/Unique-AG/connectors/issues/45)) ([030b72d](https://github.com/Unique-AG/connectors/commit/030b72d04119b3f8b1eab8c886c7828fa7448ca7))
+* **sharepoint-connector:** UN-13757 Sharepoint  connector existing business logic ([#33](https://github.com/Unique-AG/connectors/issues/33)) ([bf0f41a](https://github.com/Unique-AG/connectors/commit/bf0f41a76fa2042a5d5fa0a73bf9b7dd6d4d1afc))
+* **spc:** add helm chart ([#37](https://github.com/Unique-AG/connectors/issues/37)) ([962c6b2](https://github.com/Unique-AG/connectors/commit/962c6b2fdf1f632983e18d0aa244b46a78fa4f05))
+* **spc:** add terraform secret for azure ([#36](https://github.com/Unique-AG/connectors/issues/36)) ([f444cb0](https://github.com/Unique-AG/connectors/commit/f444cb0863f54c873b0247ad1b401c7395ec2b7d))
+* **spc:** remove unused permissions ([#40](https://github.com/Unique-AG/connectors/issues/40)) ([dc2e05e](https://github.com/Unique-AG/connectors/commit/dc2e05e02f562809ac16dae5e170c859f6eb0c98))
+* **spcv2:** output client id ([#34](https://github.com/Unique-AG/connectors/issues/34)) ([027cd87](https://github.com/Unique-AG/connectors/commit/027cd87108cfe344c257600213dd27b3192be521))
+* **terraform:** refactor all modules into folders ([69b07e0](https://github.com/Unique-AG/connectors/commit/69b07e05f6277fcd08d98df1691cd7833b9c2e4d))
+
+
+### Bug Fixes
+
+* **spc:** add corepack tmp volume ([#39](https://github.com/Unique-AG/connectors/issues/39)) ([ed4f880](https://github.com/Unique-AG/connectors/commit/ed4f880881065c8f34f3196a3754d72c6a91374a))
