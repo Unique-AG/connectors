@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-alpha.3](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.2...sharepoint-connector@v2.0.0-alpha.3) (2025-10-07)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** fix base url for UNIQUE_HTTP_CLIENT ([#49](https://github.com/Unique-AG/connectors/issues/49)) ([d6d45dc](https://github.com/Unique-AG/connectors/commit/d6d45dce6ec1b2d2e5ec3ba0999eab0c6e2942a0))
+* **spc:** release as alpha.3 ([#52](https://github.com/Unique-AG/connectors/issues/52)) ([6067a8c](https://github.com/Unique-AG/connectors/commit/6067a8c3289478ce06a3a8975109be51ef082961))
+
 ## [2.0.0-alpha.2](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.1...sharepoint-connector@v2.0.0-alpha.2) (2025-10-07)
 
 
