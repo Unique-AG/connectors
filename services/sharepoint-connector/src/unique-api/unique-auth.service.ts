@@ -63,6 +63,8 @@ export class UniqueAuthService {
   }
 
   private isTokenValid(): this is this & { cachedToken: string } {
-    return Boolean(this.cachedToken && this.tokenExpirationTime && Date.now() < this.tokenExpirationTime);
+    return Boolean(
+      this.cachedToken && this.tokenExpirationTime && Date.now() < this.tokenExpirationTime,
+    );
   }
 }

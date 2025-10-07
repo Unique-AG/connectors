@@ -15,7 +15,7 @@ const EnvironmentVariables = z
     GRAPH_CLIENT_SECRET: z
       .string()
       .optional()
-      .transform((val) => val ? new Redacted(val) : undefined)
+      .transform((val) => (val ? new Redacted(val) : undefined))
       .describe(
         'Azure AD application client secret for Microsoft Graph (not required when using OIDC)',
       ),

@@ -1,4 +1,4 @@
-import type { DriveItem, FieldValueSet } from '@microsoft/microsoft-graph-types';
+import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
@@ -12,12 +12,9 @@ type DefinedFileProperties =
   | 'listItem'
   | 'lastModifiedDateTime';
 
-type DriveItemWithDefinedProperties = Omit<
-  DriveItem,
-  DefinedFileProperties
-> & {
+type DriveItemWithDefinedProperties = Omit<DriveItem, DefinedFileProperties> & {
   [key in DefinedFileProperties]: Exclude<DriveItem[key], null | undefined>;
-}
+};
 
 @Injectable()
 export class FileFilterService {

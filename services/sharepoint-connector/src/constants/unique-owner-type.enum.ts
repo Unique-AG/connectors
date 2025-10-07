@@ -5,4 +5,4 @@ export const UniqueOwnerType = {
   Chat: 'CHAT',
 } as const;
 
-export type UniqueOwnerType = typeof UniqueOwnerType[keyof typeof UniqueOwnerType];
+export type UniqueOwnerType = (typeof UniqueOwnerType)[keyof typeof UniqueOwnerType];

@@ -27,6 +27,6 @@ export const PipelineStep = {
   ContentFetching: 'ContentFetching',
   ContentRegistration: 'ContentRegistration',
   StorageUpload: 'StorageUpload',
-  IngestionFinalization:  'IngestionFinalization',
+  IngestionFinalization: 'IngestionFinalization',
 } as const;
-export type PipelineStep = typeof PipelineStep[keyof typeof PipelineStep];
+export type PipelineStep = (typeof PipelineStep)[keyof typeof PipelineStep];

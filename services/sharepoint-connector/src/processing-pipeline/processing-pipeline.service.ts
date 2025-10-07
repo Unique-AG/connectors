@@ -68,7 +68,6 @@ export class ProcessingPipelineService {
 
         this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
         if (step.cleanup) await step.cleanup(context);
-
       } catch (error) {
         const totalDuration = Date.now() - startTime.getTime();
         this.logger.error(
