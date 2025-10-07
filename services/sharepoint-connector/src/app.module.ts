@@ -1,9 +1,20 @@
-import { Module, RequestMethod } from '@nestjs/common';
+import { defaultLoggerOptions } from '@unique-ag/logger';
+import { ProbeModule } from '@unique-ag/probe';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { context, trace } from '@opentelemetry/api';
+import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
-import { AppConfig, appConfig } from './app.config';
-import { HealthModule } from './health/health.module';
+import * as packageJson from '../package.json';
+import { AppConfig, appConfig } from './config/app.config';
+import { pipelineConfig } from './config/pipeline.config';
+import { sharepointConfig } from './config/sharepoint.config';
+import { uniqueApiConfig } from './config/unique-api.config';
+import { HttpClientModule } from './http-client.module';
+import { MsGraphModule } from './msgraph/msgraph.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
+import { SharepointSynchronizationModule } from './sharepoint-synchronization/sharepoint-synchronization.module';
+import { UniqueApiModule } from './unique-api/unique-api.module';
 import { Redacted } from './utils/redacted';
 
 @Module({
@@ -11,23 +22,14 @@ import { Redacted } from './utils/redacted';
     ConfigModule.forRoot({
       isGlobal: true,
       ignoreEnvFile: true,
-      load: [appConfig],
+      load: [appConfig, sharepointConfig, pipelineConfig, uniqueApiConfig],
     }),
     LoggerModule.forRootAsync({
       useFactory(appConfig: AppConfig) {
-        const productionTarget = {
-          target: 'pino/file',
-        };
-        const developmentTarget = {
-          target: 'pino-pretty',
-          options: {
-            ignore: 'trace_flags',
-          },
-        };
-
         return {
+          ...defaultLoggerOptions,
           pinoHttp: {
-            renameContext: appConfig.isDev ? 'caller' : undefined,
+            ...defaultLoggerOptions.pinoHttp,
             level: appConfig.logLevel,
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
@@ -38,25 +40,28 @@ import { Redacted } from './utils/redacted';
               paths: ['req.headers.authorization'],
               censor: (value) => (value instanceof Redacted ? value : new Redacted(value)),
             },
-            transport: appConfig.isDev ? developmentTarget : productionTarget,
           },
-          exclude: [
-            {
-              method: RequestMethod.GET,
-              path: 'health',
-            },
-            {
-              method: RequestMethod.GET,
-              path: 'metrics',
-            },
-          ],
         };
       },
       inject: [appConfig.KEY],
     }),
-    HealthModule,
+    ProbeModule.forRoot({
+      VERSION: packageJson.version,
+    }),
+    OpenTelemetryModule.forRoot({
+      metrics: {
+        hostMetrics: true,
+        apiMetrics: {
+          enable: true,
+        },
+      },
+    }),
+    HttpClientModule,
+    SchedulerModule,
+    SharepointSynchronizationModule,
+    MsGraphModule,
+    UniqueApiModule,
   ],
   controllers: [],
-  providers: [],
 })
 export class AppModule {}

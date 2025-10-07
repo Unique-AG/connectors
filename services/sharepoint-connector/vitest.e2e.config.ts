@@ -7,6 +7,6 @@ export default defineConfig({
     ...globalConfig.test,
     root: './',
     include: ['**/*.e2e-spec.ts'],
-    setupFiles: ['./test/setup.ts'],
+    setupFiles: ['./test/setup.e2e.ts'],
   },
 });
