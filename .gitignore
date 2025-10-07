@@ -45,3 +45,4 @@ factset-auth.json
 .terraform.lock.hcl
 
 .idea
+helm-charts/**/charts

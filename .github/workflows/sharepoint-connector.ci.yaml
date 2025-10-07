@@ -22,4 +22,5 @@ jobs:
           version: v3.19.0
       - working-directory: services/sharepoint-connector/deploy/helm-charts/sharepoint-connector
         run: |
+          helm dependency build
           helm template .

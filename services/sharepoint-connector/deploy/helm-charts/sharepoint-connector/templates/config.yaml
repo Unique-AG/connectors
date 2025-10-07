@@ -8,7 +8,6 @@ metadata:
 data:
   ALLOWED_MIME_TYPES: {{ .Values.connectorConfig.allowedMimeTypes }}
   GRAPH_API_URL: {{ .Values.connectorConfig.graph.apiUrl }}
-  GRAPH_CLIENT_ID: {{ .Values.connectorConfig.graph.clientId }}
   GRAPH_TENANT_ID: {{ .Values.connectorConfig.graph.tenantId }}
   GRAPH_USE_OIDC_AUTH: {{ .Values.connectorConfig.graph.useOidcAuth }}
   PROCESSING_CONCURRENCY: {{ .Values.connectorConfig.processingConcurrency }}
@@ -22,6 +21,9 @@ data:
   ZITADEL_CLIENT_ID: {{ .Values.connectorConfig.zitadel.clientId }}
   ZITADEL_OAUTH_TOKEN_URL: {{ .Values.connectorConfig.zitadel.oauthTokenUrl }}
   ZITADEL_PROJECT_ID: {{ .Values.connectorConfig.zitadel.projectId }}
+  {{- if .Values.connectorConfig.graph.clientId }}
+  GRAPH_CLIENT_ID: {{ .Values.connectorConfig.graph.clientId }}
+  {{- end }}
   {{- if .Values.connectorConfig.unique.scopeId }}
   UNIQUE_SCOPE_ID: {{ .Values.connectorConfig.unique.scopeId }}
   {{- end }}
