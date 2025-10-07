@@ -24,22 +24,10 @@ variable "required_resource_access" {
       means      = "Application"
       identifier = "01d4889c-1287-42c6-ac1f-5d1e02578ef6"
     }
-    "Directory.Read.All" = {
-      # https://learn.microsoft.com/en-us/graph/permissions-reference#directoryreadall
-      means      = "Application"
-      identifier = "7ab1d382-f21e-4acd-a863-ba3e13f7da61"
-    }
     "Sites.Read.All" = {
-      # TODO: @lorand93: reason this permission exceptionally well
       # https://learn.microsoft.com/en-us/graph/permissions-reference#sidesreadall
       means      = "Application"
       identifier = "332a536c-c7ef-4017-ab91-336970924f0d"
-    }
-    "User.Read.All" = {
-      # TODO: @lorand93: reason this permission exceptionally well
-      # https://learn.microsoft.com/en-us/graph/permissions-reference#userreadall
-      means      = "Application"
-      identifier = "df021288-bdef-4463-88db-98f22de89214"
     }
   }
 }
