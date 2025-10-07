@@ -1,0 +1,21 @@
+name: "[sharepoint-connector] Validate"
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "**/services/sharepoint-connector/**"
+      - .github/workflows/sharepoint-connector.ci.yaml
+
+jobs:
+  check_chart:
+    runs-on: singularity
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.19.0
+      - working-directory: services/sharepoint-connector/deploy/helm-charts/sharepoint-connector
+        run: |
+          helm template .

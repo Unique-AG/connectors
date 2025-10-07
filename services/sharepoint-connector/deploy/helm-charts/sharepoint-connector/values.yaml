@@ -70,6 +70,8 @@ connectorConfig:
     # example: https://acme.sharepoint.com
     baseUrl: unset_default_value
     maxFilesToScan: 2
+    # -- sites to scan
+    # example: sharepoint-site-id-1,sharepoint-site-id-2 @lorand93: make concrete examples here
     sites: unset_default_value
     # -- column name against which the files are synced
     # example: FinanceGPTKnowledge
