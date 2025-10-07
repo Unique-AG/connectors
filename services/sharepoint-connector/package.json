@@ -5,6 +5,10 @@
   "author": "",
   "private": true,
   "license": "Unique License v1",
+  "files": [
+    "dist",
+    "deploy"
+  ],
   "scripts": {
     "build": "nest build",
     "dev": "nest start",

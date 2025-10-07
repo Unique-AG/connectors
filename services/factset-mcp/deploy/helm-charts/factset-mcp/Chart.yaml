@@ -2,7 +2,7 @@ apiVersion: v2
 name: mcp-server-factset
 description: An experimental MCP server for Factset.
 type: application
-version: 0.2.1 # TODO: Tag must be auto-injected via release process from package.json
+version: 0.2.1 # injected via release-please
 appVersion: 0.2.1 # FIXME: this does not work as intended sadly, this version does not trickle down into the dependency
 dependencies:
   - alias: server

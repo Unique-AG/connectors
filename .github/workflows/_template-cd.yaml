@@ -1,14 +1,14 @@
-name: "[TEMPLATE] MCP Server CD"
+name: "[TEMPLATE] CD"
 
 on:
   workflow_call:
     inputs:
       service-name:
-        description: "Name of the service (e.g., factset, outlook)"
+        description: "Name of the service (e.g., factset-mcp)"
         required: true
         type: string
-      service-path:
-        description: "Path to the service directory (e.g., services/factset-mcp)"
+      service-version:
+        description: "Version of the package (e.g., 1.2.0)"
         required: true
         type: string
       dockerfile:
@@ -17,39 +17,48 @@ on:
         type: string
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  # Build and push container to registry
+  containerize:
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       packages: write
     env:
-      SERVICE_PATH: ${{ inputs.service-path }}
-      CHART_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}-mcp
-      GHA_CACHE_SCOPE: ${{ inputs.service-name }}-mcp
+      CHART_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - id: version
-        run: |
-          VERSION=$(jq -r '.version' "${{ env.SERVICE_PATH }}/package.json")
-          echo "content=$VERSION" >> $GITHUB_OUTPUT
-      - id: pnpm-version
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup docker buildx
+        uses: docker/setup-buildx-action@v3
+
+      # TODO: remove me and let `corepack` do its job to use and setup the correct package manager in the dockerfile
+      - name: Extract PNPM version for build
+        id: pnpm-version
         run: |
           PNPM_VERSION=$(jq -r '.packageManager | split("@")[1]' package.json)
           echo "version=$PNPM_VERSION" >> $GITHUB_OUTPUT
-      - id: meta
+
+      - name: Add docker metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.CHART_REPO }}
           tags: |
-            type=raw,value=${{ steps.version.outputs.content }}
-      - uses: docker/login-action@v3
+            type=raw,value=${{ inputs.service-version }}
+
+      - name: Login to registry hub
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - name: Build and push container
+        uses: docker/build-push-action@v6
         with:
           file: ${{ inputs.dockerfile }}
           context: .
@@ -57,12 +66,12 @@ jobs:
           push: true
           provenance: false
           cache-from: |
-            type=gha,scope=${{ env.GHA_CACHE_SCOPE }}
+            type=gha,scope=${{ inputs.service-name }}
             type=registry,ref=${{ env.CHART_REPO }}:cache
           cache-to: |
             type=registry,ref=${{ env.CHART_REPO }}:cache,mode=min
           build-args: |
-            APP_NAME=${{ inputs.service-name }}-mcp
+            APP_NAME=${{ inputs.service-name }}
             PNPM_VERSION=${{ steps.pnpm-version.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

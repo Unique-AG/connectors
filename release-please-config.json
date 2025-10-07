@@ -1,0 +1,68 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "tag-separator": "@",
+  "separate-pull-requests": true,
+  "release-type": "node",
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "initial-version": "0.1.0",
+  "packages": {
+    "services/factset-mcp": {
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/factset-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/factset-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/factset-mcp/values.yaml",
+          "jsonpath": "$.server.image.tag"
+        }
+      ]
+    },
+    "services/outlook-mcp": {
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/outlook-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/outlook-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/outlook-mcp/values.yaml",
+          "jsonpath": "$.server.image.tag"
+        }
+      ]
+    },
+    "services/sharepoint-connector": {
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/sharepoint-connector/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/sharepoint-connector/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/sharepoint-connector/values.yaml",
+          "jsonpath": "$.connector.image.tag"
+        }
+      ]
+    }
+  }
+}
