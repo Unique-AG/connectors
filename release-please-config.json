@@ -20,9 +20,8 @@
           "jsonpath": "$.appVersion"
         },
         {
-          "type": "yaml",
-          "path": "deploy/helm-charts/factset-mcp/values.yaml",
-          "jsonpath": "$.server.image.tag"
+          "type": "generic",
+          "path": "deploy/helm-charts/factset-mcp/values.yaml"
         }
       ]
     },
@@ -39,9 +38,8 @@
           "jsonpath": "$.appVersion"
         },
         {
-          "type": "yaml",
-          "path": "deploy/helm-charts/outlook-mcp/values.yaml",
-          "jsonpath": "$.server.image.tag"
+          "type": "generic",
+          "path": "deploy/helm-charts/outlook-mcp/values.yaml"
         }
       ]
     },
@@ -58,9 +56,8 @@
           "jsonpath": "$.appVersion"
         },
         {
-          "type": "yaml",
-          "path": "deploy/helm-charts/sharepoint-connector/values.yaml",
-          "jsonpath": "$.connector.image.tag"
+          "type": "generic",
+          "path": "deploy/helm-charts/sharepoint-connector/values.yaml"
         }
       ]
     }
