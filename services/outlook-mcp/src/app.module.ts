@@ -16,11 +16,10 @@ import * as packageJson from '../package.json';
 import { AppConfig, AppSettings, validateConfig } from './app-settings.enum';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { MicrosoftOAuthProvider } from './auth/microsoft.provider';
+import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
 import { MailModule } from './mail/mail.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { PrismaService } from './prisma/prisma.service';
 import { serverInstructions } from './server.instructions';
 
 @Module({
@@ -70,11 +69,11 @@ import { serverInstructions } from './server.instructions';
       },
     }),
     McpOAuthModule.forRootAsync({
-      imports: [ConfigModule, PrismaModule],
+      imports: [ConfigModule, DrizzleModule],
       useFactory: async (
         configService: ConfigService<AppConfig, true>,
         aesService: AesGcmEncryptionService,
-        prisma: PrismaService,
+        drizzle: DrizzleDatabase,
         cacheManager: Cache,
         metricService: MetricService,
       ) => ({
@@ -90,11 +89,11 @@ import { serverInstructions } from './server.instructions';
         accessTokenExpiresIn: configService.get(AppSettings.ACCESS_TOKEN_EXPIRES_IN_SECONDS),
         refreshTokenExpiresIn: configService.get(AppSettings.REFRESH_TOKEN_EXPIRES_IN_SECONDS),
 
-        oauthStore: new McpOAuthStore(prisma, aesService, cacheManager),
+        oauthStore: new McpOAuthStore(drizzle, aesService, cacheManager),
         encryptionService: aesService,
         metricService,
       }),
-      inject: [ConfigService, AesGcmEncryptionService, PrismaService, CACHE_MANAGER, MetricService],
+      inject: [ConfigService, AesGcmEncryptionService, DRIZZLE, CACHE_MANAGER, MetricService],
     }),
     McpModule.forRoot({
       name: 'outlook-mcp',

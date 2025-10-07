@@ -11,16 +11,26 @@ import {
 } from '@unique-ag/mcp-oauth';
 import { Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
+import { eq, lt } from 'drizzle-orm';
+import { serializeError } from 'serialize-error-cjs';
 import { typeid } from 'typeid-js';
-import { PrismaService } from '../prisma/prisma.service';
+import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import {
-  convertAuthCodeToPrisma,
-  convertOAuthClientToPrisma,
-  convertPrismaToAuthCode,
-  convertPrismaToOAuthClient,
-  convertPrismaToSession,
-  convertSessionToPrisma,
+  authorizationCodes,
+  oauthClients,
+  oauthSessions,
+  tokens,
+  userProfiles,
+} from '../drizzle/schema';
+import {
+  fromDrizzleAuthCodeRow,
+  fromDrizzleOAuthClientRow,
+  fromDrizzleSessionRow,
+  toDrizzleAuthCodeInsert,
+  toDrizzleOAuthClientInsert,
+  toDrizzleSessionInsert,
 } from '../utils/case-converter';
+import { normalizeError } from '../utils/normalize-error';
 
 export class McpOAuthStore implements IOAuthStore {
   private readonly logger = new Logger(this.constructor.name);
@@ -30,37 +40,36 @@ export class McpOAuthStore implements IOAuthStore {
   private readonly REFRESH_TOKEN_CACHE_PREFIX = 'refresh_token:';
 
   public constructor(
-    private readonly prisma: PrismaService,
+    private readonly drizzle: DrizzleDatabase,
     private readonly encryptionService: IEncryptionService,
     private readonly cacheManager: Cache,
   ) {}
 
   public async storeClient(client: OAuthClient): Promise<OAuthClient> {
-    const saved = await this.prisma.oAuthClient.create({
-      data: convertOAuthClientToPrisma(client),
-    });
-
-    return convertPrismaToOAuthClient(saved);
+    const saved = await this.drizzle
+      .insert(oauthClients)
+      .values(toDrizzleOAuthClientInsert(client))
+      .returning();
+    if (!saved.length || !saved[0]) throw new Error('Failed to store client');
+    return fromDrizzleOAuthClientRow(saved[0]);
   }
 
   public async getClient(client_id: string): Promise<OAuthClient | undefined> {
-    const client = await this.prisma.oAuthClient.findUnique({
-      where: { clientId: client_id },
-    });
-
+    const [client] = await this.drizzle
+      .select()
+      .from(oauthClients)
+      .where(eq(oauthClients.clientId, client_id));
     if (!client) return undefined;
-
-    return convertPrismaToOAuthClient(client);
+    return fromDrizzleOAuthClientRow(client);
   }
 
   public async findClient(client_name: string): Promise<OAuthClient | undefined> {
-    const client = await this.prisma.oAuthClient.findFirst({
-      where: { clientName: client_name },
-    });
-
+    const [client] = await this.drizzle
+      .select()
+      .from(oauthClients)
+      .where(eq(oauthClients.clientName, client_name));
     if (!client) return undefined;
-
-    return convertPrismaToOAuthClient(client);
+    return fromDrizzleOAuthClientRow(client);
   }
 
   public generateClientId(client: OAuthClient): string {
@@ -70,68 +79,60 @@ export class McpOAuthStore implements IOAuthStore {
   }
 
   public async storeAuthCode(code: AuthorizationCode): Promise<void> {
-    await this.prisma.authorizationCode.create({
-      data: convertAuthCodeToPrisma(code),
-    });
+    await this.drizzle.insert(authorizationCodes).values(toDrizzleAuthCodeInsert(code));
   }
 
   public async getAuthCode(code: string): Promise<AuthorizationCode | undefined> {
-    const authCode = await this.prisma.authorizationCode.findUnique({
-      where: { code },
-    });
-
+    const [authCode] = await this.drizzle
+      .select()
+      .from(authorizationCodes)
+      .where(eq(authorizationCodes.code, code));
     if (!authCode) return undefined;
     if (authCode.expiresAt < new Date()) {
       await this.removeAuthCode(code);
       return undefined;
     }
-
-    return convertPrismaToAuthCode(authCode);
+    return fromDrizzleAuthCodeRow(authCode);
   }
 
   public async removeAuthCode(code: string): Promise<void> {
-    await this.prisma.authorizationCode
-      .delete({
-        where: { code },
-      })
-      .catch((error) => {
-        this.logger.warn(`Failed to remove auth code: ${error.message}`);
+    try {
+      await this.drizzle.delete(authorizationCodes).where(eq(authorizationCodes.code, code));
+    } catch (error) {
+      this.logger.warn({
+        msg: 'Failed to remove auth code',
+        error: serializeError(normalizeError(error)),
       });
+    }
   }
 
   public async storeOAuthSession(sessionId: string, session: OAuthSession): Promise<void> {
-    const prismaData = convertSessionToPrisma(session);
-
-    await this.prisma.oAuthSession.create({
-      data: {
-        ...prismaData,
-        sessionId,
-      },
-    });
+    const payload = toDrizzleSessionInsert(session);
+    await this.drizzle.insert(oauthSessions).values({ ...payload, sessionId });
   }
 
   public async getOAuthSession(sessionId: string): Promise<OAuthSession | undefined> {
-    const session = await this.prisma.oAuthSession.findUnique({
-      where: { sessionId },
-    });
-
+    const [session] = await this.drizzle
+      .select()
+      .from(oauthSessions)
+      .where(eq(oauthSessions.sessionId, sessionId));
     if (!session) return undefined;
-    if (session.expiresAt < new Date()) {
+    if (session.expiresAt && session.expiresAt < new Date()) {
       await this.removeOAuthSession(sessionId);
       return undefined;
     }
-
-    return convertPrismaToSession(session);
+    return fromDrizzleSessionRow(session);
   }
 
   public async removeOAuthSession(sessionId: string): Promise<void> {
-    await this.prisma.oAuthSession
-      .delete({
-        where: { sessionId },
-      })
-      .catch((error) => {
-        this.logger.warn(`Failed to remove OAuth session: ${error.message}`);
+    try {
+      await this.drizzle.delete(oauthSessions).where(eq(oauthSessions.sessionId, sessionId));
+    } catch (error) {
+      this.logger.warn({
+        msg: 'Failed to remove OAuth session',
+        error: serializeError(normalizeError(error)),
       });
+    }
   }
 
   public async upsertUserProfile(user: PassportUser): Promise<string> {
@@ -152,26 +153,25 @@ export class McpOAuthStore implements IOAuthStore {
       refreshToken: encryptedRefreshToken,
     };
 
-    const saved = await this.prisma.userProfile.upsert({
-      where: {
-        provider_providerUserId: {
-          provider,
-          providerUserId: profile.id,
-        },
-      },
-      update: mappedProfile,
-      create: mappedProfile,
-    });
-
+    const [saved] = await this.drizzle
+      .insert(userProfiles)
+      .values(mappedProfile)
+      .onConflictDoUpdate({
+        target: [userProfiles.provider, userProfiles.providerUserId],
+        set: mappedProfile,
+      })
+      .returning({ id: userProfiles.id });
+    if (!saved) throw new Error('Failed to upsert user profile');
     return saved.id;
   }
 
   public async getUserProfileById(
     profileId: string,
   ): Promise<(OAuthUserProfile & { profile_id: string; provider: string }) | undefined> {
-    const profile = await this.prisma.userProfile.findUnique({
-      where: { id: profileId },
-    });
+    const [profile] = await this.drizzle
+      .select()
+      .from(userProfiles)
+      .where(eq(userProfiles.id, profileId));
 
     if (!profile) return undefined;
 
@@ -191,17 +191,15 @@ export class McpOAuthStore implements IOAuthStore {
     const profile = await this.getUserProfileById(metadata.userProfileId);
     if (!profile) throw new Error('User profile not found');
 
-    await this.prisma.token.create({
-      data: {
-        token,
-        type: 'ACCESS',
-        expiresAt: metadata.expiresAt,
-        userId: metadata.userId,
-        clientId: metadata.clientId,
-        scope: metadata.scope,
-        resource: metadata.resource,
-        userProfileId: metadata.userProfileId,
-      },
+    await this.drizzle.insert(tokens).values({
+      token,
+      type: 'ACCESS',
+      expiresAt: metadata.expiresAt,
+      userId: metadata.userId,
+      clientId: metadata.clientId,
+      scope: metadata.scope,
+      resource: metadata.resource,
+      userProfileId: metadata.userProfileId,
     });
 
     await this.cacheAccessTokenMetadata(token, metadata);
@@ -219,32 +217,34 @@ export class McpOAuthStore implements IOAuthStore {
       return cached;
     }
 
-    const metadata = await this.prisma.token.findUnique({
-      where: { token },
-      include: {
-        userProfile: true,
-      },
-    });
+    const metadata = await this.drizzle
+      .select({
+        token: tokens.token,
+        type: tokens.type,
+        expiresAt: tokens.expiresAt,
+        userId: tokens.userId,
+        clientId: tokens.clientId,
+        scope: tokens.scope,
+        resource: tokens.resource,
+        userProfileId: tokens.userProfileId,
+        userData: userProfiles.raw,
+      })
+      .from(tokens)
+      .leftJoin(userProfiles, eq(tokens.userProfileId, userProfiles.id))
+      .where(eq(tokens.token, token))
+      .then((rows) => rows[0]);
     if (!metadata) return undefined;
     if (metadata.expiresAt < new Date()) {
       await this.removeAccessToken(token);
       return undefined;
     }
 
-    const result = {
-      ...metadata,
-      userData: metadata.userProfile?.raw,
-    };
-
-    await this.cacheAccessTokenMetadata(token, result);
-
-    return result;
+    await this.cacheAccessTokenMetadata(token, metadata as unknown as AccessTokenMetadata);
+    return metadata as unknown as AccessTokenMetadata;
   }
 
   public async removeAccessToken(token: string): Promise<void> {
-    await this.prisma.token.delete({
-      where: { token },
-    });
+    await this.drizzle.delete(tokens).where(eq(tokens.token, token));
 
     await this.removeCachedAccessToken(token);
   }
@@ -253,19 +253,17 @@ export class McpOAuthStore implements IOAuthStore {
     const profile = await this.getUserProfileById(metadata.userProfileId);
     if (!profile) throw new Error('User profile not found');
 
-    await this.prisma.token.create({
-      data: {
-        token,
-        type: 'REFRESH',
-        expiresAt: metadata.expiresAt,
-        userId: metadata.userId,
-        clientId: metadata.clientId,
-        scope: metadata.scope,
-        resource: metadata.resource,
-        userProfileId: metadata.userProfileId,
-        familyId: metadata.familyId,
-        generation: metadata.generation,
-      },
+    await this.drizzle.insert(tokens).values({
+      token,
+      type: 'REFRESH',
+      expiresAt: metadata.expiresAt,
+      userId: metadata.userId,
+      clientId: metadata.clientId,
+      scope: metadata.scope,
+      resource: metadata.resource,
+      userProfileId: metadata.userProfileId,
+      familyId: metadata.familyId ?? undefined,
+      generation: metadata.generation ?? undefined,
     });
 
     await this.cacheRefreshTokenMetadata(token, metadata);
@@ -283,9 +281,22 @@ export class McpOAuthStore implements IOAuthStore {
       return cached;
     }
 
-    const metadata = await this.prisma.token.findUnique({
-      where: { token },
-    });
+    const metadata = await this.drizzle
+      .select({
+        token: tokens.token,
+        type: tokens.type,
+        expiresAt: tokens.expiresAt,
+        userId: tokens.userId,
+        clientId: tokens.clientId,
+        scope: tokens.scope,
+        resource: tokens.resource,
+        userProfileId: tokens.userProfileId,
+        familyId: tokens.familyId,
+        generation: tokens.generation,
+      })
+      .from(tokens)
+      .where(eq(tokens.token, token))
+      .then((rows) => rows[0]);
 
     if (!metadata) return undefined;
     if (metadata.expiresAt < new Date()) {
@@ -299,23 +310,19 @@ export class McpOAuthStore implements IOAuthStore {
   }
 
   public async removeRefreshToken(token: string): Promise<void> {
-    await this.prisma.token.delete({
-      where: { token },
-    });
+    await this.drizzle.delete(tokens).where(eq(tokens.token, token));
 
     await this.removeCachedRefreshToken(token);
   }
 
   public async revokeTokenFamily(familyId: string): Promise<void> {
     // First, get all tokens in the family from database to remove from cache
-    const tokensInFamily = await this.prisma.token.findMany({
-      where: { familyId },
-      select: { token: true, type: true },
-    });
+    const tokensInFamily = await this.drizzle
+      .select({ token: tokens.token, type: tokens.type })
+      .from(tokens)
+      .where(eq(tokens.familyId, familyId));
 
-    await this.prisma.token.deleteMany({
-      where: { familyId },
-    });
+    await this.drizzle.delete(tokens).where(eq(tokens.familyId, familyId));
 
     // Remove each token from cache
     for (const tokenData of tokensInFamily) {
@@ -328,19 +335,17 @@ export class McpOAuthStore implements IOAuthStore {
   }
 
   public async markRefreshTokenAsUsed(token: string): Promise<void> {
-    await this.prisma.token.update({
-      where: { token },
-      data: { usedAt: new Date() },
-    });
+    await this.drizzle.update(tokens).set({ usedAt: new Date() }).where(eq(tokens.token, token));
 
     await this.removeCachedRefreshToken(token);
   }
 
   public async isRefreshTokenUsed(token: string): Promise<boolean> {
     // Always check DB, not cache.
-    const metadata = await this.prisma.token.findUnique({
-      where: { token },
-    });
+    const [metadata] = await this.drizzle
+      .select({ usedAt: tokens.usedAt })
+      .from(tokens)
+      .where(eq(tokens.token, token));
 
     return !!metadata?.usedAt;
   }
@@ -390,37 +395,22 @@ export class McpOAuthStore implements IOAuthStore {
 
     this.logger.debug(`Cleaning up tokens expired before ${cutoffDate.toISOString()}`);
 
-    const deletedTokens = await this.prisma.token.deleteMany({
-      where: {
-        expiresAt: {
-          lt: cutoffDate,
-        },
-      },
-    });
+    const deletedTokens = await this.drizzle
+      .delete(tokens)
+      .where(lt(tokens.expiresAt, cutoffDate))
+      .returning({ id: tokens.id });
 
-    const deletedAuthCodes = await this.prisma.authorizationCode.deleteMany({
-      where: {
-        expiresAt: {
-          lt: cutoffDate,
-        },
-      },
-    });
+    const deletedAuthCodes = await this.drizzle
+      .delete(authorizationCodes)
+      .where(lt(authorizationCodes.expiresAt, cutoffDate))
+      .returning({ id: authorizationCodes.id });
 
-    const deletedSessions = await this.prisma.oAuthSession.deleteMany({
-      where: {
-        expiresAt: {
-          lt: cutoffDate,
-        },
-      },
-    });
+    const deletedSessions = await this.drizzle
+      .delete(oauthSessions)
+      .where(lt(oauthSessions.expiresAt, cutoffDate))
+      .returning({ id: oauthSessions.id });
 
-    const totalDeleted = deletedTokens.count + deletedAuthCodes.count + deletedSessions.count;
-
-    if (totalDeleted > 0) {
-      this.logger.log(
-        `Cleanup completed: ${deletedTokens.count} tokens, ${deletedAuthCodes.count} auth codes, ${deletedSessions.count} sessions deleted`,
-      );
-    }
+    const totalDeleted = deletedTokens.length + deletedAuthCodes.length + deletedSessions.length;
 
     return totalDeleted;
   }

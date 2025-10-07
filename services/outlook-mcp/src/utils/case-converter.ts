@@ -1,14 +1,7 @@
 import { AuthorizationCode, OAuthClient, OAuthSession } from '@unique-ag/mcp-oauth';
-import {
-  AuthorizationCode as PrismaAuthorizationCode,
-  OAuthClient as PrismaOAuthClient,
-  OAuthSession as PrismaOAuthSession,
-} from '@generated/prisma';
+import { authorizationCodes, oauthClients, oauthSessions } from '../drizzle/schema';
 
-/**
- * Type-safe converter for OAuthClient
- */
-export function convertOAuthClientToPrisma(client: OAuthClient) {
+export function toDrizzleOAuthClientInsert(client: OAuthClient): typeof oauthClients.$inferInsert {
   return {
     clientId: client.client_id,
     clientSecret: client.client_secret,
@@ -27,32 +20,28 @@ export function convertOAuthClientToPrisma(client: OAuthClient) {
   };
 }
 
-/**
- * Type-safe converter for Prisma to OAuthClient interface
- */
-export function convertPrismaToOAuthClient(prismaClient: PrismaOAuthClient) {
+export function fromDrizzleOAuthClientRow(row: typeof oauthClients.$inferSelect): OAuthClient {
   return {
-    client_id: prismaClient.clientId,
-    client_secret: prismaClient.clientSecret ?? undefined,
-    client_name: prismaClient.clientName,
-    client_description: prismaClient.clientDescription ?? undefined,
-    logo_uri: prismaClient.logoUri ?? undefined,
-    client_uri: prismaClient.clientUri ?? undefined,
-    developer_name: prismaClient.developerName ?? undefined,
-    developer_email: prismaClient.developerEmail ?? undefined,
-    redirect_uris: prismaClient.redirectUris,
-    grant_types: prismaClient.grantTypes,
-    response_types: prismaClient.responseTypes,
-    token_endpoint_auth_method: prismaClient.tokenEndpointAuthMethod,
-    created_at: prismaClient.createdAt,
-    updated_at: prismaClient.updatedAt,
+    client_id: row.clientId,
+    client_secret: row.clientSecret ?? undefined,
+    client_name: row.clientName,
+    client_description: row.clientDescription ?? undefined,
+    logo_uri: row.logoUri ?? undefined,
+    client_uri: row.clientUri ?? undefined,
+    developer_name: row.developerName ?? undefined,
+    developer_email: row.developerEmail ?? undefined,
+    redirect_uris: row.redirectUris,
+    grant_types: row.grantTypes,
+    response_types: row.responseTypes,
+    token_endpoint_auth_method: row.tokenEndpointAuthMethod,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
   };
 }
 
-/**
- * Convert AuthorizationCode interface to Prisma model
- */
-export function convertAuthCodeToPrisma(code: AuthorizationCode) {
+export function toDrizzleAuthCodeInsert(
+  code: AuthorizationCode,
+): typeof authorizationCodes.$inferInsert {
   return {
     code: code.code,
     userId: code.user_id,
@@ -67,28 +56,24 @@ export function convertAuthCodeToPrisma(code: AuthorizationCode) {
   };
 }
 
-/**
- * Convert Prisma AuthorizationCode to interface
- */
-export function convertPrismaToAuthCode(prismaCode: PrismaAuthorizationCode) {
+export function fromDrizzleAuthCodeRow(
+  row: typeof authorizationCodes.$inferSelect,
+): AuthorizationCode {
   return {
-    code: prismaCode.code,
-    user_id: prismaCode.userId,
-    client_id: prismaCode.clientId,
-    redirect_uri: prismaCode.redirectUri,
-    code_challenge: prismaCode.codeChallenge,
-    code_challenge_method: prismaCode.codeChallengeMethod,
-    resource: prismaCode.resource ?? undefined,
-    scope: prismaCode.scope ?? undefined,
-    expires_at: prismaCode.expiresAt.getTime(),
-    user_profile_id: prismaCode.userProfileId,
+    code: row.code,
+    user_id: row.userId,
+    client_id: row.clientId,
+    redirect_uri: row.redirectUri,
+    code_challenge: row.codeChallenge,
+    code_challenge_method: row.codeChallengeMethod,
+    resource: row.resource ?? undefined,
+    scope: row.scope ?? undefined,
+    expires_at: row.expiresAt.getTime(),
+    user_profile_id: row.userProfileId,
   };
 }
 
-/**
- * Convert OAuthSession to Prisma (already camelCase but handle timestamp)
- */
-export function convertSessionToPrisma(session: OAuthSession) {
+export function toDrizzleSessionInsert(session: OAuthSession): typeof oauthSessions.$inferInsert {
   return {
     sessionId: session.sessionId,
     state: session.state,
@@ -103,20 +88,17 @@ export function convertSessionToPrisma(session: OAuthSession) {
   };
 }
 
-/**
- * Convert Prisma OAuthSession to interface
- */
-export function convertPrismaToSession(prismaSession: PrismaOAuthSession) {
+export function fromDrizzleSessionRow(row: typeof oauthSessions.$inferSelect): OAuthSession {
   return {
-    sessionId: prismaSession.sessionId,
-    state: prismaSession.state,
-    clientId: prismaSession.clientId ?? undefined,
-    redirectUri: prismaSession.redirectUri ?? undefined,
-    codeChallenge: prismaSession.codeChallenge ?? undefined,
-    codeChallengeMethod: prismaSession.codeChallengeMethod ?? undefined,
-    oauthState: prismaSession.oauthState ?? undefined,
-    scope: prismaSession.scope ?? undefined,
-    resource: prismaSession.resource ?? undefined,
-    expiresAt: prismaSession.expiresAt.getTime(),
+    sessionId: row.sessionId,
+    state: row.state,
+    clientId: row.clientId ?? undefined,
+    redirectUri: row.redirectUri ?? undefined,
+    codeChallenge: row.codeChallenge ?? undefined,
+    codeChallengeMethod: row.codeChallengeMethod ?? undefined,
+    oauthState: row.oauthState ?? undefined,
+    scope: row.scope ?? undefined,
+    resource: row.resource ?? undefined,
+    expiresAt: (row.expiresAt ?? new Date()).getTime(),
   };
 }

@@ -11,6 +11,10 @@ on:
         description: "Path to the server directory (e.g., services/factset-mcp)"
         required: true
         type: string
+      orm:
+        description: "ORM in use (e.g., prisma, drizzle)"
+        type: string
+        default: "prisma"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -60,7 +64,13 @@ jobs:
         
       - name: Generate Prisma client
         working-directory: ${{ env.SERVICE_PATH }}
+        if: ${{ inputs.orm == 'prisma' }}
         run: pnpm db:generate
+
+      - name: Check Drizzle migrations
+        working-directory: ${{ env.SERVICE_PATH }}
+        if: ${{ inputs.orm == 'drizzle' }}
+        run: pnpm db:check
 
       - name: Run codegen
         working-directory: ${{ env.SERVICE_PATH }}

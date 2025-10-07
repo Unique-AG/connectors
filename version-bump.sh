@@ -27,7 +27,7 @@ fi
 # Define paths
 SERVICE_DIR="services/$SERVICE_NAME"
 PACKAGE_JSON="$SERVICE_DIR/package.json"
-CHART_DIR="$SERVICE_DIR/chart"
+CHART_DIR="$SERVICE_DIR/deploy/helm-charts/$SERVICE_NAME"
 CHART_YAML="$CHART_DIR/Chart.yaml"
 VALUES_YAML="$CHART_DIR/values.yaml"
 

@@ -2,5 +2,5 @@ apiVersion: v2
 name: tiny-postgres
 description: A microtic postgres chart for use in MCP servers just to for testing and demo purposes.
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "17.6"

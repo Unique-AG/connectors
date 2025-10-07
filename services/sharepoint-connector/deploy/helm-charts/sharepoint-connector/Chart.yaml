@@ -1,0 +1,11 @@
+apiVersion: v2
+name: sharepoint-connector
+description: Take content from SharePoint and send it to Unique AI for RAG ingestion.
+type: application
+version: 2.0.0-alpha.1 # TODO: Tag must be auto-injected via release process from package.json
+appVersion: 2.0.0-alpha.1 # FIXME: this does not work as intended sadly, this version does not trickle down into the dependency
+dependencies:
+  - alias: connector
+    name: backend-service
+    repository: oci://ghcr.io/unique-ag/helm-charts
+    version: ~6.1.0

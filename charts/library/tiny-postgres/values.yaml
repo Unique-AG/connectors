@@ -3,3 +3,5 @@ image:
   repository: postgres
 port: 5432
 secretRef: override, must contain POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+annotations: {}
+podAnnotations: {}

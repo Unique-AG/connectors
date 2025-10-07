@@ -32,6 +32,5 @@ async function bootstrap() {
 initOpenTelemetry({
   defaultServiceName: 'factset-mcp',
   defaultServiceVersion: packageJson.version,
-  includePrismaInstrumentation: true,
 });
 void runWithInstrumentation(bootstrap, 'factset-mcp');

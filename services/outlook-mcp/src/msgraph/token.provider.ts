@@ -4,8 +4,10 @@ import {
   AuthenticationProviderOptions,
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
-import { PrismaService } from '../prisma/prisma.service';
+import { DrizzleDatabase } from '../drizzle/drizzle.module';
+import { userProfiles } from '../drizzle/schema';
 import { normalizeError } from '../utils/normalize-error';
 
 export class TokenProvider implements AuthenticationProvider {
@@ -14,7 +16,7 @@ export class TokenProvider implements AuthenticationProvider {
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly scopes: string[];
-  private readonly prisma: PrismaService;
+  private readonly drizzle: DrizzleDatabase;
   private readonly encryptionService: AesGcmEncryptionService;
 
   public constructor(
@@ -30,10 +32,10 @@ export class TokenProvider implements AuthenticationProvider {
       scopes: string[];
     },
     {
-      prisma,
+      drizzle,
       encryptionService,
     }: {
-      prisma: PrismaService;
+      drizzle: DrizzleDatabase;
       encryptionService: AesGcmEncryptionService;
     },
   ) {
@@ -41,17 +43,15 @@ export class TokenProvider implements AuthenticationProvider {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
     this.scopes = scopes;
-    this.prisma = prisma;
+    this.drizzle = drizzle;
     this.encryptionService = encryptionService;
   }
 
   public async getAccessToken(
     _authenticationProviderOptions?: AuthenticationProviderOptions,
   ): Promise<string> {
-    const userProfile = await this.prisma.userProfile.findUnique({
-      where: {
-        id: this.userProfileId,
-      },
+    const userProfile = await this.drizzle.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, this.userProfileId),
     });
 
     if (!userProfile) throw new Error(`User profile not found: ${this.userProfileId}`);
@@ -67,10 +67,8 @@ export class TokenProvider implements AuthenticationProvider {
   }
 
   public async refreshAccessToken(userProfileId: string): Promise<string> {
-    const userProfile = await this.prisma.userProfile.findUnique({
-      where: {
-        id: userProfileId,
-      },
+    const userProfile = await this.drizzle.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userProfileId),
     });
 
     if (!userProfile?.refreshToken)
@@ -109,13 +107,13 @@ export class TokenProvider implements AuthenticationProvider {
       );
 
       // Update the stored tokens
-      await this.prisma.userProfile.update({
-        where: { id: this.userProfileId },
-        data: {
+      await this.drizzle
+        .update(userProfiles)
+        .set({
           accessToken: encryptedAccessToken,
           refreshToken: encryptedRefreshToken,
-        },
-      });
+        })
+        .where(eq(userProfiles.id, userProfileId));
 
       this.logger.debug(`Successfully refreshed token for user ${this.userProfileId}`);
       return tokenData.access_token;

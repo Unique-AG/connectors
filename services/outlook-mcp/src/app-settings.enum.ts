@@ -12,7 +12,7 @@ const appSettingsSchema = z.object({
   DATABASE_URL: z
     .url()
     .startsWith('postgresql://')
-    .describe('The prisma database url for Postgres. Must start with "postgresql://".'),
+    .describe('The database url for Postgres. Must start with "postgresql://".'),
   ACCESS_TOKEN_EXPIRES_IN_SECONDS: z
     .string()
     .optional()
