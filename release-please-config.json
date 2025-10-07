@@ -22,7 +22,7 @@
         {
           "type": "yaml",
           "path": "services/factset-mcp/deploy/helm-charts/factset-mcp/values.yaml",
-          "jsonpath": "$.image.tag"
+          "jsonpath": "$.server.image.tag"
         }
       ]
     },
@@ -41,7 +41,7 @@
         {
           "type": "yaml",
           "path": "services/outlook-mcp/deploy/helm-charts/outlook-mcp/values.yaml",
-          "jsonpath": "$.image.tag"
+          "jsonpath": "$.server.image.tag"
         }
       ]
     },
@@ -60,7 +60,7 @@
         {
           "type": "yaml",
           "path": "services/sharepoint-connector/deploy/helm-charts/sharepoint-connector/values.yaml",
-          "jsonpath": "$.image.tag"
+          "jsonpath": "$.connector.image.tag"
         }
       ]
     }
