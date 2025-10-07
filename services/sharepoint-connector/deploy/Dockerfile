@@ -30,7 +30,6 @@ COPY ./tsconfig.json ./tsconfig.json
 COPY ./turbo.json ./turbo.json
 COPY --from=pruner /app/out/full/ .
 
-RUN pnpm --filter=@unique-ag/${APP_NAME} codegen
 RUN --mount=type=cache,target=/root/.cache/turbo \
     pnpm turbo build --filter=@unique-ag/${APP_NAME}... && \
     pnpm --filter=@unique-ag/${APP_NAME} deploy out
