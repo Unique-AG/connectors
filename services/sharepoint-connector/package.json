@@ -1,15 +1,14 @@
 {
   "name": "@unique-ag/sharepoint-connector",
   "description": "Service that connects to SharePoint for document and data integration.",
-  "version": "0.0.1",
+  "version": "2.0.0-alpha.1",
   "author": "",
   "private": true,
   "license": "Unique License v1",
   "scripts": {
     "build": "nest build",
-    "dev": "nodemon",
+    "dev": "nest start",
     "debug": "nest start --debug --watch",
-    "codegen": "echo \"No codegen for this server\"",
     "db:generate": "echo \"No database for this server\"",
     "db:migrate": "echo \"No database for this server\"",
     "db:push": "echo \"No database for this server\"",
@@ -26,22 +25,32 @@
     "test:coverage": "vitest run --config vitest.coverage.config.ts && istanbul-badges-readme --style='square-flat'"
   },
   "dependencies": {
+    "@azure/identity": "^4.12.0",
+    "@azure/msal-node": "^3.7.3",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@microsoft/microsoft-graph-types": "^2.40.0",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",
-    "@nestjs/terminus": "^11.0.0",
+    "@nestjs/schedule": "^6.0.0",
     "@opentelemetry/api": "^1.9.0",
     "@proventuslabs/nestjs-zod": "^1.2.0",
     "@unique-ag/instrumentation": "workspace:*",
     "@unique-ag/logger": "workspace:*",
     "@unique-ag/probe": "workspace:*",
+    "bottleneck": "^2.19.5",
+    "graphql": "^16.11.0",
+    "graphql-request": "^7.2.0",
     "nestjs-otel": "^7.0.1",
     "nestjs-pino": "^4.4.0",
     "nestjs-zod": "^5.0.1",
+    "p-limit": "^2.3.0",
     "pino-http": "^10.5.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "serialize-error-cjs": "^0.2.0",
+    "undici": "^7.15.0",
     "zod": "^4.1.5"
   },
   "devDependencies": {
@@ -74,7 +83,6 @@
     "ignore": [
       "../../packages/**/node_modules/**",
       "../../packages/**/.turbo/**"
-    ],
-    "exec": "nest start --watch"
+    ]
   }
 }
