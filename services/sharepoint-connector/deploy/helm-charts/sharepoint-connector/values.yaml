@@ -5,7 +5,7 @@ connector:
         reloader.stakater.com/auto: "true"
   env:
     LOG_LEVEL: info
-    MAX_FILE_SIZE_BYTES: 209715200
+    MAX_FILE_SIZE_BYTES: "209715200"
     MAX_HEAP_MB: 1920
     NODE_ENV: production
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
@@ -45,6 +45,8 @@ connector:
     paths:
       default:
         enabled: false
+  service:
+    enabled: false
   serviceAccount:
     enabled: true
     workloadIdentity:
