@@ -93,7 +93,9 @@ connectorConfig:
     # -- sites to scan
     # example: 00000000-0000-0000-0000-000000000000,00000000-0000-0000-0000-000000000001
     # Note: these are the site IDs, not the site URLs or names
-    sites: []
+    sites:
+      - 00000000-0000-0000-0000-000000000000
+      - 00000000-0000-0000-0000-000000000001
     # -- column name against which the files are synced
     # example: FinanceGPTKnowledge
     syncColumnName: unset_default_value

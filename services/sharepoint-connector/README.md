@@ -43,3 +43,19 @@ The service exposes standard metrics and health endpoints:
 Double-check the `Sites` you are supplying. Sites are UUIDs (`00000000-0000-0000-0000-000000000000` format) and not names or URL/URIs.
 
 A site ID can be grabbed from suffixing `_api/site/id` to your site, like `https://<your-site>.sharepoint.com/sites/<real-site>/_api/site/id` ([Test](https://uniqueapp.sharepoint.com/sites/UniqueAG/_api/site/id)) and then using `Edm.Guid`.
+
+### `Error scraping target: Get "http://10.1.16.45:51346/metrics": context deadline exceeded`
+
+The chart comes with ingress network policies enabled. In case your scraper is deployed in another namespace or anywhere actually, you must explicitly allow that.
+
+**Example**
+```yaml
+    …
+connector:
+  networkPolicy:
+    ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+                app.kubernetes.io/managed-by: prometheus-operator
+```
