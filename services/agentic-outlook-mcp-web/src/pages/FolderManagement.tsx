@@ -6,11 +6,13 @@ import { FolderTree } from '@/components/folders/FolderTree';
 import { GlobalControls } from '@/components/folders/GlobalControls';
 import { useCallApi } from '@/hooks/use-call-api';
 import { useToast } from '@/hooks/use-toast';
-import {
-  syncFolders
-} from '../@generated/sync/sync';
+import { deleteAllUserData, syncFolders } from '../@generated/sync/sync';
 import { db } from '../lib/powersync/database';
-import { UserProfile, userProfiles as userProfilesTable } from '../lib/powersync/schema';
+import {
+  folders as foldersTable,
+  UserProfile,
+  userProfiles as userProfilesTable,
+} from '../lib/powersync/schema';
 
 export default function FolderManagement() {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -35,37 +37,16 @@ export default function FolderManagement() {
   );
 
   const handleToggleFolderSync = async (folderId: string, enabled: boolean) => {
-    setIsLoading(true);
-
-    // try {
-    //   if (enabled) {
-    //     const response = await callApi(syncControllerCreateSyncJob);
-
-    //     if (response.status === 201) {
-    //       toast({
-    //         title: 'Sync Enabled',
-    //         description: 'Folder sync has been enabled successfully.',
-    //       });
-    //     }
-    //   }
-    // } catch (error) {
-    //   toast({
-    //     title: 'Error',
-    //     description: error instanceof Error ? error.message : 'Failed to toggle sync',
-    //     variant: 'destructive',
-    //   });
-    //   setIsLoading(false);
-    //   return;
-    // }
-
-    setIsLoading(false);
-
-    if (!enabled) {
-      toast({
-        title: 'Sync Disabled',
-        description: 'Folder sync has been disabled successfully.',
-      });
-    }
+    const query = enabled
+      ? db
+          .update(foldersTable)
+          .set({ activatedAt: new Date().toISOString(), deactivatedAt: null })
+          .where(eq(foldersTable.id, folderId))
+      : db
+          .update(foldersTable)
+          .set({ deactivatedAt: new Date().toISOString() })
+          .where(eq(foldersTable.id, folderId));
+    await toCompilableQuery(query).execute();
   };
 
   const handleWipeFolder = async (folderId: string) => {
@@ -108,7 +89,6 @@ export default function FolderManagement() {
 
   const handleToggleGlobalSync = async (enabled: boolean) => {
     if (!userProfile?.id) return;
-    console.log('Toggling global sync', enabled);
     const query = enabled
       ? db
           .update(userProfilesTable)
@@ -121,16 +101,24 @@ export default function FolderManagement() {
   const handleGlobalWipe = async () => {
     setIsLoading(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const response = await callApi(deleteAllUserData);
 
-    setIsLoading(false);
-
-    toast({
-      title: 'All Data Wiped',
-      description: 'All synced emails have been permanently deleted.',
-      variant: 'destructive',
-    });
+      if (response.status === 200) {
+        toast({
+          title: 'All Data Wiped',
+          description: 'All synced emails and folders have been permanently deleted.',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to wipe all data',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!userProfile) return <div>Loading...</div>;
