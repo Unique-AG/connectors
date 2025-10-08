@@ -10,26 +10,10 @@ variable "sign_in_audience" {
   default     = "AzureADMultipleOrgs"
 }
 
-variable "required_resource_access" {
-  description = "A map of resource application IDs to their required access permissions. Each value should be a list of objects with 'id' (permission ID) and 'type' (permission type: 'Scope' or 'Role')"
-  type = map(object({
-    identifier = string
-    means      = string # only added for modules internal documentation reference, thus required
-    type       = optional(string, "Scope")
-  }))
-  # https://learn.microsoft.com/en-us/graph/permissions-reference
-  default = {
-    "Files.Read.All" = {
-      # https://learn.microsoft.com/en-us/graph/permissions-reference#filesreadall
-      means      = "Application"
-      identifier = "01d4889c-1287-42c6-ac1f-5d1e02578ef6"
-    }
-    "Sites.Read.All" = {
-      # https://learn.microsoft.com/en-us/graph/permissions-reference#sidesreadall
-      means      = "Application"
-      identifier = "332a536c-c7ef-4017-ab91-336970924f0d"
-    }
-  }
+variable "graph_roles" {
+  description = "A list of Graph API roles to assign to the application."
+  type        = list(string)
+  default     = ["Files.Read.All", "Sites.Read.All"]
 }
 
 variable "federated_identity_credentials" {
