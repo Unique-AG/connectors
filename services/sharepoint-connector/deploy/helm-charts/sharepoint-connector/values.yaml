@@ -24,7 +24,7 @@ connector:
     - sharepoint-connector-secret
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
-    tag: 2.0.0-alpha.3 # x-release-please-version
+    tag: 2.0.0-alpha.4 # x-release-please-version
   networkPolicy:
     enabled: true
     policyTypes:
@@ -71,7 +71,10 @@ grafana:
 connectorConfig:
   # -- if disabled, connector.extraEnvCM must be set to []
   enabled: true
-  allowedMimeTypes: application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.wordprocessingml.document
+  allowedMimeTypes:
+    - application/pdf
+    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
   processingConcurrency: 1
   stepTimeoutSeconds: 300
   graph:

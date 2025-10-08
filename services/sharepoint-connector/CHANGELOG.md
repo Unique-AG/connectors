@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-alpha.4](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.3...sharepoint-connector@v2.0.0-alpha.4) (2025-10-08)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** fix non-string envs and avoid error swallowing ([#57](https://github.com/Unique-AG/connectors/issues/57)) ([bf9079a](https://github.com/Unique-AG/connectors/commit/bf9079a1aa4bc73f7040b3f3650931b8f9ed5935))
+* **spc:** provider naming mismatch ([#54](https://github.com/Unique-AG/connectors/issues/54)) ([f2472bc](https://github.com/Unique-AG/connectors/commit/f2472bcc107fc9b2573005fc6629c80fecac2333))
+
 ## [2.0.0-alpha.3](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.2...sharepoint-connector@v2.0.0-alpha.3) (2025-10-07)
 
 
