@@ -3,12 +3,10 @@ import { initOpenTelemetry, runWithInstrumentation } from '@unique-ag/instrument
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { AppModule } from './app.module';
 import { AppConfig, AppSettings } from './app-settings';
-import { getSwaggerDocument } from './openapi.configuration';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
@@ -26,12 +24,9 @@ async function bootstrap() {
 
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
-  SwaggerModule.setup('api-docs', app, getSwaggerDocument(app));
-
   const port = configService.get(AppSettings.PORT, { infer: true });
   await app.listen(port);
   console.log(`Server is running on http://localhost:${port}`);
-  console.log(`OpenAPI docs available at http://localhost:${port}/api-docs`);
 }
 
 initOpenTelemetry({

@@ -43,6 +43,9 @@ export class MockDrizzleDatabase {
     userProfiles: {
       findFirst: vi.fn(async (_args: unknown) => this.__nextQueryUserProfile ?? undefined),
     },
+    folders: {
+      findMany: vi.fn(async (_args: unknown) => this.__nextQueryFolders ?? []),
+    },
   };
 
   // Configuration knobs per test
@@ -50,6 +53,7 @@ export class MockDrizzleDatabase {
   public __nextSelectRows: unknown[] | undefined;
   public __nextDeleteReturningRows: unknown[] | undefined;
   public __nextQueryUserProfile: unknown | undefined;
+  public __nextQueryFolders: unknown[] | undefined;
 }
 
 export const createMockDrizzleDatabase = (): MockDrizzleDatabase => new MockDrizzleDatabase();
