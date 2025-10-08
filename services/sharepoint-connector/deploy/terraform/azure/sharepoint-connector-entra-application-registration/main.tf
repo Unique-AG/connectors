@@ -23,7 +23,8 @@ resource "azuread_application" "sharepoint_connector" {
 }
 
 resource "azuread_service_principal" "sharepoint_connector" {
-  client_id = azuread_application.sharepoint_connector.client_id
+  client_id    = azuread_application.sharepoint_connector.client_id
+  use_existing = true
 }
 
 resource "azuread_app_role_assignment" "grant_admin_consent" {
