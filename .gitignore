@@ -36,6 +36,7 @@ yarn-error.log*
 
 # Misc
 .DS_Store
+.idea
 *.pem
 factset-auth.json
 
@@ -44,5 +45,4 @@ factset-auth.json
 .terraform
 .terraform.lock.hcl
 
-.idea
-helm-charts/**/charts
+**/helm-charts/**/charts
