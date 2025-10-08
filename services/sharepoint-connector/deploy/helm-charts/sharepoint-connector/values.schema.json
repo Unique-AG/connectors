@@ -37,15 +37,18 @@
           "description": "Wether to use the connector config."
         },
         "allowedMimeTypes": {
-          "type": "string",
-          "description": "Comma-separated list of allowed MIME types for file processing"
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of allowed MIME types for file processing"
         },
         "processingConcurrency": {
-          "type": "string",
+          "type": "integer",
           "description": "Number of concurrent processing operations"
         },
         "stepTimeoutSeconds": {
-          "type": "string",
+          "type": "integer",
           "description": "Timeout in seconds for processing steps"
         },
         "graph": {
@@ -57,7 +60,7 @@
               "description": "Azure AD tenant ID"
             },
             "useOidcAuth": {
-              "type": "string",
+              "type": "boolean",
               "description": "Enable OIDC authentication"
             },
             "apiUrl": {
@@ -84,7 +87,7 @@
               "description": "SharePoint base URL"
             },
             "maxFilesToScan": {
-              "type": "string",
+              "type": "integer",
               "description": "Maximum number of files to scan"
             },
             "sites": {
