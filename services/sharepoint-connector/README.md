@@ -36,3 +36,10 @@ The service exposes standard metrics and health endpoints:
 - `/probe` - Health check endpoint
 - `/metrics` - Prometheus metrics (if configured)
 - Structured logging with correlation IDs for request tracing
+
+## Troubleshooting
+
+### `Invalid hostname for this tenancy`
+Double-check the `Sites` you are supplying. Sites are UUIDs (`00000000-0000-0000-0000-000000000000` format) and not names or URL/URIs.
+
+A site ID can be grabbed from suffixing `_api/site/id` to your site, like `https://<your-site>.sharepoint.com/sites/<real-site>/_api/site/id` ([Test](https://uniqueapp.sharepoint.com/sites/UniqueAG/_api/site/id)) and then using `Edm.Guid`.

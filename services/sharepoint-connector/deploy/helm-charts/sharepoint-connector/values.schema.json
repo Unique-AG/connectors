@@ -91,8 +91,11 @@
               "description": "Maximum number of files to scan"
             },
             "sites": {
-              "type": "string",
-              "description": "SharePoint sites configuration"
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "SharePoint sites list (UUIDs)"
             },
             "syncColumnName": {
               "type": "string",

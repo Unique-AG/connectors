@@ -91,8 +91,9 @@ connectorConfig:
     baseUrl: unset_default_value
     maxFilesToScan: 2
     # -- sites to scan
-    # example: sharepoint-site-id-1,sharepoint-site-id-2 @lorand93: make concrete examples here
-    sites: unset_default_value
+    # example: 00000000-0000-0000-0000-000000000000,00000000-0000-0000-0000-000000000001
+    # Note: these are the site IDs, not the site URLs or names
+    sites: []
     # -- column name against which the files are synced
     # example: FinanceGPTKnowledge
     syncColumnName: unset_default_value
