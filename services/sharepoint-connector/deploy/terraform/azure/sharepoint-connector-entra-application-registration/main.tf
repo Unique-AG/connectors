@@ -27,13 +27,18 @@ resource "azuread_service_principal" "sharepoint_connector" {
   use_existing = true
 }
 
+resource "time_sleep" "wait_for_graph_propagation" {
+  depends_on      = [azuread_application.sharepoint_connector]
+  create_duration = "15s"
+}
+
 resource "azuread_app_role_assignment" "grant_admin_consent" {
   for_each            = toset(var.graph_roles)
   app_role_id         = azuread_service_principal.msgraph.app_role_ids[each.value]
   principal_object_id = azuread_service_principal.sharepoint_connector.object_id
   resource_object_id  = azuread_service_principal.msgraph.object_id
 
-  depends_on = [azuread_application.sharepoint_connector]
+  depends_on = [time_sleep.wait_for_graph_propagation]
 }
 
 resource "azuread_application_federated_identity_credential" "sharepoint_connector_fic" {
