@@ -8,6 +8,7 @@
   "scripts": {
     "build": "nest build",
     "dev": "nodemon",
+    "dev:webhook": "ngrok http 3000 --url=agentic-outlook-mcp.ngrok.io",
     "debug": "nest start --debug --watch",
     "codegen": "ts-node scripts/generate-openapi-spec.ts",
     "db:init": "psql ${DATABASE_URL:-postgresql://postgres:postgres@localhost:9001/postgres} -f scripts/init-db.sql",
