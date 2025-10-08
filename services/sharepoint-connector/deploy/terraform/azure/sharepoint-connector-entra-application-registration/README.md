@@ -10,7 +10,13 @@ Clients and users are not required to use this module per se. Any means to creat
 ## Requirements
 
 - Module just creates the principal, the workload must be deployed separately.
-- Once installed, a Application or Global Administrator must grant the permissions via the Azure Portal as this step can't be automated and the permissions aren't `Delegated` but `Application`
+
+## Setup steps
+It is not yet 100% clear how Azure resolves the permissions and assignments.
+
+After applying the module, one must check in Entra Application Registrations that the permissions are `Configured permissions` and that they are `Granted`.
+
+If they are not, make them by Click and please open an issue.
 
 ---
 
