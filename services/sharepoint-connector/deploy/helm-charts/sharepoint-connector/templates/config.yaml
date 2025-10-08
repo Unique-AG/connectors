@@ -6,25 +6,26 @@ metadata:
   labels:
     {{- include "chart.labels" . | nindent 4 }}
 data:
-  ALLOWED_MIME_TYPES: {{ .Values.connectorConfig.allowedMimeTypes }}
-  GRAPH_API_URL: {{ .Values.connectorConfig.graph.apiUrl }}
-  GRAPH_TENANT_ID: {{ .Values.connectorConfig.graph.tenantId }}
-  GRAPH_USE_OIDC_AUTH: {{ .Values.connectorConfig.graph.useOidcAuth }}
-  PROCESSING_CONCURRENCY: {{ .Values.connectorConfig.processingConcurrency }}
-  SHAREPOINT_BASE_URL: {{ .Values.connectorConfig.sharepoint.baseUrl }}
-  SHAREPOINT_MAX_FILES_TO_SCAN: {{ .Values.connectorConfig.sharepoint.maxFilesToScan }}
-  SHAREPOINT_SITES: {{ .Values.connectorConfig.sharepoint.sites }}
-  SHAREPOINT_SYNC_COLUMN_NAME: {{ .Values.connectorConfig.sharepoint.syncColumnName }}
-  UNIQUE_FILE_DIFF_BASE_PATH: {{ .Values.connectorConfig.unique.fileDiffBasePath }}
-  UNIQUE_FILE_DIFF_URL: {{ .Values.connectorConfig.unique.fileDiffUrl }}
-  UNIQUE_INGESTION_GRAPHQL_URL: {{ .Values.connectorConfig.unique.ingestionGraphqlUrl }}
-  ZITADEL_CLIENT_ID: {{ .Values.connectorConfig.zitadel.clientId }}
-  ZITADEL_OAUTH_TOKEN_URL: {{ .Values.connectorConfig.zitadel.oauthTokenUrl }}
-  ZITADEL_PROJECT_ID: {{ .Values.connectorConfig.zitadel.projectId }}
-  {{- if .Values.connectorConfig.graph.clientId }}
-  GRAPH_CLIENT_ID: {{ .Values.connectorConfig.graph.clientId }}
+  ALLOWED_MIME_TYPES: {{ .Values.connectorConfig.allowedMimeTypes | join "," }}
+  GRAPH_API_URL: {{ .Values.connectorConfig.graph.apiUrl | quote }}
+  GRAPH_TENANT_ID: {{ .Values.connectorConfig.graph.tenantId | quote }}
+  GRAPH_USE_OIDC_AUTH: {{ .Values.connectorConfig.graph.useOidcAuth | quote }}
+  PROCESSING_CONCURRENCY: {{ .Values.connectorConfig.processingConcurrency | quote }}
+  SHAREPOINT_BASE_URL: {{ .Values.connectorConfig.sharepoint.baseUrl | quote }}
+  SHAREPOINT_MAX_FILES_TO_SCAN: {{ .Values.connectorConfig.sharepoint.maxFilesToScan | quote }}
+  SHAREPOINT_SITES: {{ .Values.connectorConfig.sharepoint.sites | quote }}
+  SHAREPOINT_SYNC_COLUMN_NAME: {{ .Values.connectorConfig.sharepoint.syncColumnName | quote }}
+  STEP_TIMEOUT_SECONDS: {{ .Values.connectorConfig.stepTimeoutSeconds | quote }}
+  UNIQUE_FILE_DIFF_BASE_PATH: {{ .Values.connectorConfig.unique.fileDiffBasePath | quote }}
+  UNIQUE_FILE_DIFF_URL: {{ .Values.connectorConfig.unique.fileDiffUrl | quote }}
+  UNIQUE_INGESTION_GRAPHQL_URL: {{ .Values.connectorConfig.unique.ingestionGraphqlUrl | quote }}
+  ZITADEL_CLIENT_ID: {{ .Values.connectorConfig.zitadel.clientId | quote }}
+  ZITADEL_OAUTH_TOKEN_URL: {{ .Values.connectorConfig.zitadel.oauthTokenUrl | quote }}
+  ZITADEL_PROJECT_ID: {{ .Values.connectorConfig.zitadel.projectId | quote }}
+  {{- if .Values.connectorConfig.graph.clientId | quote }}
+  GRAPH_CLIENT_ID: {{ .Values.connectorConfig.graph.clientId | quote }}
   {{- end }}
   {{- if .Values.connectorConfig.unique.scopeId }}
-  UNIQUE_SCOPE_ID: {{ .Values.connectorConfig.unique.scopeId }}
+  UNIQUE_SCOPE_ID: {{ .Values.connectorConfig.unique.scopeId | quote }}
   {{- end }}
 {{- end }}

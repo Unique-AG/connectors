@@ -71,7 +71,10 @@ grafana:
 connectorConfig:
   # -- if disabled, connector.extraEnvCM must be set to []
   enabled: true
-  allowedMimeTypes: application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.wordprocessingml.document
+  allowedMimeTypes:
+    - application/pdf
+    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
   processingConcurrency: 1
   stepTimeoutSeconds: 300
   graph:

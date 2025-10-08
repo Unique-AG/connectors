@@ -37,8 +37,11 @@
           "description": "Wether to use the connector config."
         },
         "allowedMimeTypes": {
-          "type": "string",
-          "description": "Comma-separated list of allowed MIME types for file processing"
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of allowed MIME types for file processing"
         },
         "processingConcurrency": {
           "type": "integer",

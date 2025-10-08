@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { normalizeError } from 'src/utils/normalize-error';
 import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
@@ -44,11 +45,12 @@ export class SharepointSynchronizationService {
         );
 
         await this.orchestrator.processFilesForSite(siteId, files, diffResult);
-      } catch (error) {
-        this.logger.error(
-          `Failed during processing of site ${siteId}:`,
-          error instanceof Error ? error.stack : String(error),
-        );
+      } catch (rawError) {
+        const error = normalizeError(rawError);
+        this.logger.error({
+          msg: `Failed during processing of site ${siteId}: ${error.message}`,
+          err: rawError,
+        });
       }
     }
 
