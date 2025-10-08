@@ -41,11 +41,11 @@
           "description": "Comma-separated list of allowed MIME types for file processing"
         },
         "processingConcurrency": {
-          "type": "integer",
+          "type": "string",
           "description": "Number of concurrent processing operations"
         },
         "stepTimeoutSeconds": {
-          "type": "integer",
+          "type": "string",
           "description": "Timeout in seconds for processing steps"
         },
         "graph": {
@@ -57,7 +57,7 @@
               "description": "Azure AD tenant ID"
             },
             "useOidcAuth": {
-              "type": "boolean",
+              "type": "string",
               "description": "Enable OIDC authentication"
             },
             "apiUrl": {
@@ -84,7 +84,7 @@
               "description": "SharePoint base URL"
             },
             "maxFilesToScan": {
-              "type": "integer",
+              "type": "string",
               "description": "Maximum number of files to scan"
             },
             "sites": {
