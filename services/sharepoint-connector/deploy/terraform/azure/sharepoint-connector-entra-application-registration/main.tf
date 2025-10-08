@@ -23,10 +23,10 @@ resource "azuread_application" "sharepoint_connector" {
 }
 
 resource "azuread_app_role_assignment" "grant_admin_consent" {
-  for_each            = var.graph_roles
+  for_each            = toset(var.graph_roles)
   app_role_id         = azuread_service_principal.msgraph.app_role_ids[each.value]
   principal_object_id = azuread_application.sharepoint_connector.object_id
-  resource_object_id  = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
+  resource_object_id  = azuread_service_principal.msgraph.object_id
 }
 
 resource "azuread_application_federated_identity_credential" "sharepoint_connector_fic" {
