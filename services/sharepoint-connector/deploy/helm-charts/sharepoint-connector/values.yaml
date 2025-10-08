@@ -72,13 +72,13 @@ connectorConfig:
   # -- if disabled, connector.extraEnvCM must be set to []
   enabled: true
   allowedMimeTypes: application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.wordprocessingml.document
-  processingConcurrency: 1
-  stepTimeoutSeconds: 300
+  processingConcurrency: "1"
+  stepTimeoutSeconds: "300"
   graph:
     # -- tenant id against which the graph api calls are made
     # example: 12345678-1234-1234-1234-123456789012
     tenantId: unset_default_value
-    useOidcAuth: true
+    useOidcAuth: "true"
     apiUrl: https://graph.microsoft.com
     clientId: null
     # clientSecret would need to be presented from a secret as well
@@ -86,7 +86,7 @@ connectorConfig:
     # -- base url of the sharepoint instance
     # example: https://acme.sharepoint.com
     baseUrl: unset_default_value
-    maxFilesToScan: 2
+    maxFilesToScan: "2"
     # -- sites to scan
     # example: sharepoint-site-id-1,sharepoint-site-id-2 @lorand93: make concrete examples here
     sites: unset_default_value
