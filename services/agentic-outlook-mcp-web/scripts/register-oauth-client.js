@@ -12,10 +12,7 @@ async function registerClient() {
   const clientData = {
     client_name: 'Agentic Outlook MCP Web',
     client_description: 'Web interface for Agentic Outlook MCP',
-    redirect_uris: [
-      `${FRONTEND_URL}/callback`,
-      'http://localhost:8080/callback',
-    ],
+    redirect_uris: [`${FRONTEND_URL}/callback`, 'http://localhost:8080/callback'],
     grant_types: ['authorization_code', 'refresh_token'],
     response_types: ['code'],
     token_endpoint_auth_method: 'none',

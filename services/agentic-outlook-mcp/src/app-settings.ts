@@ -72,6 +72,12 @@ const appSettingsSchema = z.object({
   JWT_ALGORITHM: z
     .enum(['ES256', 'ES384', 'ES512'])
     .describe('The algorithm for the MCP Server to sign JWT tokens.'),
+  PUBLIC_WEBHOOK_URL: z
+    .url()
+    .describe('The public webhook URL for the MCP Server to receive webhooks.'),
+  MICROSOFT_WEBHOOK_SECRET: z
+    .string()
+    .describe('A random webhook secret to validate webhooks signed and sent by Microsoft.'),
 });
 
 export const AppSettings = appSettingsSchema.keyof().enum;

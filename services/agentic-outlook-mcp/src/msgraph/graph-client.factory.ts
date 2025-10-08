@@ -27,6 +27,7 @@ export class GraphClientFactory {
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly scopes: string[];
+  private readonly graphClients: Map<string, Client> = new Map();
 
   public constructor(
     private readonly configService: ConfigService<AppConfig, true>,
@@ -40,6 +41,10 @@ export class GraphClientFactory {
   }
 
   public createClientForUser(userProfileId: TypeID<'user_profile'>): Client {
+    if (this.graphClients.has(userProfileId.toString()))
+      // biome-ignore lint/style/noNonNullAssertion: We already checked if the client exists
+      return this.graphClients.get(userProfileId.toString())!;
+
     const tokenProvider = new TokenProvider(
       {
         userProfileId,
@@ -91,6 +96,8 @@ export class GraphClientFactory {
       debugLogging: this.configService.get(AppSettings.LOG_LEVEL, { infer: true }) === 'debug',
     };
 
-    return Client.initWithMiddleware(clientOptions);
+    const client = Client.initWithMiddleware(clientOptions);
+    this.graphClients.set(userProfileId.toString(), client);
+    return client;
   }
 }

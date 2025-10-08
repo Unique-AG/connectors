@@ -2,13 +2,15 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { eq } from 'drizzle-orm';
 import { TypeID } from 'typeid-js';
-import * as z from 'zod';
 import { BatchProcessor } from '../batch/batch-processor.decorator';
-import { DRIZZLE, DrizzleDatabase, userProfiles, userUpdateSchema } from '../drizzle';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  UserUpdateZod,
+  userProfiles,
+  userUpdateSchemaCamelized,
+} from '../drizzle';
 import { FolderEvents, FolderSyncEvent } from '../folder/folder.events';
-import { camelizeKeys } from '../utils/case-converter';
-
-const userUpdateSchemaCamelized = z.unknown().transform(camelizeKeys).pipe(userUpdateSchema);
 
 @Injectable()
 export class UserService {
@@ -20,24 +22,31 @@ export class UserService {
   ) {}
 
   @BatchProcessor({ table: 'user_profiles', operation: 'PUT' })
-  public async onPut(userProfileId: TypeID<'user_profile'>, data?: Record<string, unknown>) {
+  public async onPut(
+    userProfileId: TypeID<'user_profile'>,
+    id: string,
+    data?: Record<string, unknown>,
+  ) {
     this.logger.warn({
       msg: 'This should never be called by the frontend, as the user profile is created by the backend.',
       userProfileId,
+      id,
       data,
     });
   }
 
-  @BatchProcessor({ table: 'user_profiles', operation: 'PATCH' })
-  public async onPatch(userProfileId: TypeID<'user_profile'>, data?: Record<string, unknown>) {
-    const parsedData = userUpdateSchemaCamelized.parse(data);
+  @BatchProcessor({ table: 'user_profiles', operation: 'PATCH', schema: userUpdateSchemaCamelized })
+  public async onPatch(userProfileId: TypeID<'user_profile'>, id: string, data?: UserUpdateZod) {
+    if (!data) return;
+    if (id !== userProfileId.toString()) throw new Error('User profile ID mismatch');
+
     await this.db
       .update(userProfiles)
-      .set(parsedData)
+      .set(data)
       .where(eq(userProfiles.id, userProfileId.toString()));
 
     // When sync is enabled, we catch or refresh all folders
-    const syncEnabled = parsedData.syncActivatedAt && !parsedData.syncDeactivatedAt;
+    const syncEnabled = data.syncActivatedAt && !data.syncDeactivatedAt;
     if (syncEnabled) {
       this.logger.debug({ msg: 'Sync enabled, syncing folders' });
       this.eventEmitter.emit(FolderEvents.FolderSync, new FolderSyncEvent(userProfileId));
@@ -46,16 +55,22 @@ export class UserService {
     this.logger.log({
       msg: 'User profile patched',
       userProfileId: userProfileId.toString(),
-      parsedData,
+      id,
+      data,
       syncEnabled,
     });
   }
 
   @BatchProcessor({ table: 'user_profiles', operation: 'DELETE' })
-  public async onDelete(userProfileId: TypeID<'user_profile'>, data?: Record<string, unknown>) {
+  public async onDelete(
+    userProfileId: TypeID<'user_profile'>,
+    id: string,
+    data?: Record<string, unknown>,
+  ) {
     this.logger.warn({
       msg: 'This should not have been called. Frontend does not support deleting user profiles.',
       userProfileId,
+      id,
       data,
     });
   }

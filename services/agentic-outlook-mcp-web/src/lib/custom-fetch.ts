@@ -12,10 +12,7 @@ const getBody = <T>(c: Response | Request): Promise<T> => {
   return c.text() as Promise<T>;
 };
 
-export const customFetch = async <T>(
-  url: string,
-  options: RequestInit,
-): Promise<T> => {
+export const customFetch = async <T>(url: string, options: RequestInit): Promise<T> => {
   const requestUrl = `${import.meta.env.VITE_BACKEND_URL}${url}`;
 
   const response = await fetch(requestUrl, options);

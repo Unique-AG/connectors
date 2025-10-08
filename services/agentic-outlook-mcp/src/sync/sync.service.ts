@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { eq } from 'drizzle-orm';
 import { TypeID } from 'typeid-js';
-import { DRIZZLE, DrizzleDatabase, emails, folders } from '../drizzle';
+import { DRIZZLE, DrizzleDatabase, emails, folders, userProfiles } from '../drizzle';
 import { FolderEvents, FolderSyncEvent } from '../folder/folder.events';
 
 @Injectable()
@@ -24,6 +24,10 @@ export class SyncService {
     await Promise.all([
       this.db.delete(folders).where(eq(folders.userProfileId, userProfileId.toString())),
       this.db.delete(emails).where(eq(emails.userProfileId, userProfileId.toString())),
+      this.db
+        .update(userProfiles)
+        .set({ syncActivatedAt: null, syncDeactivatedAt: null, syncLastSyncedAt: null })
+        .where(eq(userProfiles.id, userProfileId.toString())),
     ]);
   }
 

@@ -7,12 +7,20 @@ import {
 import { MailFolder } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
+import { BatchProcessor } from '../batch/batch-processor.decorator';
 import { DRIZZLE, DrizzleDatabase } from '../drizzle';
-import { folders as foldersTable, userProfiles } from '../drizzle/schema';
+import {
+  FolderUpdateZod,
+  folders as foldersTable,
+  folderUpdateSchemaCamelized,
+  userProfiles,
+} from '../drizzle/schema';
 import { GraphClientFactory } from '../msgraph/graph-client.factory';
+import { SubscriptionEvent } from '../msgraph/subscription.events';
+import { SubscriptionService } from '../msgraph/subscription.service';
 import { normalizeError } from '../utils/normalize-error';
 import { FolderEvents, FolderSyncEvent } from './folder.events';
 
@@ -27,7 +35,89 @@ export class FolderService {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
+
+  @BatchProcessor({ table: 'folders', operation: 'PUT' })
+  public async onPut(
+    userProfileId: TypeID<'user_profile'>,
+    id: string,
+    data?: Record<string, unknown>,
+  ): Promise<void> {
+    this.logger.warn({
+      msg: 'This should never be called by the frontend, as the folders are created by the backend.',
+      userProfileId,
+      operationId: id,
+      data,
+    });
+  }
+
+  @BatchProcessor({ table: 'folders', operation: 'PATCH', schema: folderUpdateSchemaCamelized })
+  public async onPatch(
+    userProfileId: TypeID<'user_profile'>,
+    id: string,
+    data?: FolderUpdateZod,
+  ): Promise<void> {
+    this.logger.debug({
+      msg: 'Patching folder',
+      userProfileId: userProfileId.toString(),
+      operationId: id,
+      data,
+    });
+
+    if (!data) return;
+    await this.db
+      .update(foldersTable)
+      .set(data)
+      .where(
+        and(eq(foldersTable.userProfileId, userProfileId.toString()), eq(foldersTable.id, id)),
+      );
+
+    const folder = await this.db.query.folders.findFirst({
+      where: and(eq(foldersTable.userProfileId, userProfileId.toString()), eq(foldersTable.id, id)),
+      with: {
+        subscription: true,
+      },
+    });
+    if (!folder) throw new Error('Folder not found');
+
+    const syncEnabled = data.activatedAt && !data.deactivatedAt;
+    if (syncEnabled) {
+      this.logger.debug({
+        msg: 'Sync activated for folder',
+        userProfileId: userProfileId.toString(),
+        folderId: id,
+      });
+      await this.subscriptionService.createSubscription(userProfileId, 'folder', folder);
+    }
+
+    const syncDisabled = data.deactivatedAt;
+    if (syncDisabled) {
+      this.logger.debug({
+        msg: 'Sync deactivated for folder',
+        userProfileId: userProfileId.toString(),
+        folderId: id,
+      });
+      if (folder.subscription)
+        await this.subscriptionService.deleteSubscription(
+          TypeID.fromString(folder.subscription.id, 'subscription'),
+        );
+    }
+  }
+
+  @BatchProcessor({ table: 'folders', operation: 'DELETE' })
+  public async onDelete(
+    userProfileId: TypeID<'user_profile'>,
+    id: string,
+    data?: Record<string, unknown>,
+  ): Promise<void> {
+    this.logger.warn({
+      msg: 'This should never be called by the frontend, as the folders are managed in the backend.',
+      userProfileId,
+      operationId: id,
+      data,
+    });
+  }
 
   @OnEvent(FolderEvents.FolderSync)
   public async syncFolders(event: FolderSyncEvent) {
@@ -74,6 +164,16 @@ export class FolderService {
     }
   }
 
+  @OnEvent('folder.created')
+  @OnEvent('folder.updated')
+  @OnEvent('folder.deleted')
+  public async onFolderEvent(event: SubscriptionEvent) {
+    this.logger.debug({
+      msg: 'Folder event received',
+      event,
+    });
+  }
+
   private async getChildFolders(
     graphClient: Client,
     folderId: string,
@@ -108,6 +208,15 @@ export class FolderService {
   }
 
   private async saveFolders(userProfileId: TypeID<'user_profile'>, folders: FolderWithName[]) {
+    const existingFolders = await this.db.query.folders.findMany({
+      columns: {
+        folderId: true,
+      },
+    });
+    const foldersToDelete = existingFolders.filter(
+      (f) => !folders.some((folder) => folder.id === f.folderId),
+    );
+
     await this.db
       .insert(foldersTable)
       .values(
@@ -132,6 +241,16 @@ export class FolderService {
           childFolderCount: sql`excluded.child_folder_count`,
         },
       });
+
+    if (foldersToDelete.length > 0) {
+      await this.db.delete(foldersTable).where(
+        inArray(
+          foldersTable.folderId,
+          foldersToDelete.map((f) => f.folderId),
+        ),
+      );
+    }
+
     await this.db
       .update(userProfiles)
       .set({ syncLastSyncedAt: new Date().toISOString() })

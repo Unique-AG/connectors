@@ -159,7 +159,7 @@ export const GlobalControls = ({
                 <Button
                   variant="destructive"
                   className="w-full"
-                  disabled={isLoading || totalEmails === 0}
+                  disabled={isLoading || (totalEmails === 0 && totalFolders === 0)}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Wipe All Data
@@ -172,8 +172,8 @@ export const GlobalControls = ({
                     Confirm Global Data Wipe
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action will permanently delete all {totalEmails.toLocaleString()}
-                    synced emails from all {totalFolders} folders. This action cannot be undone.
+                    This action will permanently delete all {totalEmails.toLocaleString()} synced
+                    emails and all {totalFolders} folders. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -189,7 +189,7 @@ export const GlobalControls = ({
             </AlertDialog>
           </div>
 
-          {totalEmails === 0 && (
+          {totalEmails === 0 && totalFolders === 0 && (
             <div className="text-center text-sm text-muted-foreground">No data to wipe</div>
           )}
         </CardContent>

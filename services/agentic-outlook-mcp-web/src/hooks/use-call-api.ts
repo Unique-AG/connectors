@@ -1,6 +1,5 @@
 import { useAuth } from 'react-oidc-context';
 
-
 export const useCallApi = () => {
   const { user } = useAuth();
 

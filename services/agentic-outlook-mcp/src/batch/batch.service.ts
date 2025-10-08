@@ -1,13 +1,18 @@
 import { DiscoveredMethod, DiscoveryService } from '@golevelup/nestjs-discovery';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { TypeID } from 'typeid-js';
+import * as z from 'zod';
 import { BatchDto, BatchOperation } from './batch.dto';
 import { BatchProcessor, BatchProcessorOptions } from './batch-processor.decorator';
 
+type BatchProcessorHandler = {
+  handler: DiscoveredMethod;
+  schema?: z.ZodType;
+};
 @Injectable()
 export class BatchService implements OnModuleInit {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly batchProcessors = new Map<string, Map<BatchOperation, DiscoveredMethod>>();
+  private readonly batchProcessors = new Map<string, Map<BatchOperation, BatchProcessorHandler>>();
 
   public constructor(private readonly discoveryService: DiscoveryService) {}
 
@@ -17,16 +22,16 @@ export class BatchService implements OnModuleInit {
     );
 
     for (const method of methods) {
-      if (this.batchProcessors.has(method.meta.table)) {
-        this.batchProcessors
-          .get(method.meta.table)
-          ?.set(method.meta.operation, method.discoveredMethod);
-      } else {
-        this.batchProcessors.set(method.meta.table, new Map<BatchOperation, DiscoveredMethod>());
-        this.batchProcessors
-          .get(method.meta.table)
-          ?.set(method.meta.operation, method.discoveredMethod);
-      }
+      if (!this.batchProcessors.has(method.meta.table))
+        this.batchProcessors.set(
+          method.meta.table,
+          new Map<BatchOperation, BatchProcessorHandler>(),
+        );
+
+      this.batchProcessors.get(method.meta.table)?.set(method.meta.operation, {
+        handler: method.discoveredMethod,
+        schema: method.meta.schema,
+      });
     }
   }
 
@@ -36,6 +41,7 @@ export class BatchService implements OnModuleInit {
       userProfileId: userProfileId.toString(),
       clientId: body.clientId,
       size: body.data.length,
+      data: body.data,
     });
 
     for (const operation of body.data) {
@@ -58,10 +64,20 @@ export class BatchService implements OnModuleInit {
         continue;
       }
 
+      const { handler: discoveredHandler, schema } = batchProcessor;
+
       try {
         // biome-ignore lint/suspicious/noExplicitAny: The discovery module does not infer the type of the instance
-        const handler = (batchProcessor.parentClass.instance as any)[batchProcessor.methodName];
-        await handler.call(batchProcessor.parentClass.instance, userProfileId, operation.data);
+        const handler = (discoveredHandler.parentClass.instance as any)[
+          discoveredHandler.methodName
+        ];
+        const data = schema ? schema.parse(operation.data) : operation.data;
+        await handler.call(
+          discoveredHandler.parentClass.instance,
+          userProfileId,
+          operation.id,
+          data,
+        );
       } catch (error) {
         this.logger.error({
           msg: 'Error processing operation',

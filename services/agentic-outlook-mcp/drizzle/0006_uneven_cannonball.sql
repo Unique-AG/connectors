@@ -1,0 +1,2 @@
+ALTER TABLE "folders" ALTER COLUMN "subscription_type" SET DEFAULT 'folder'::"public"."subscription_for_type";--> statement-breakpoint
+ALTER TABLE "folders" ALTER COLUMN "subscription_type" SET DATA TYPE "public"."subscription_for_type" USING "subscription_type"::"public"."subscription_for_type";

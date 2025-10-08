@@ -1,0 +1,1 @@
+ALTER TABLE "subscriptions" ADD COLUMN "change_type" varchar DEFAULT 'created,updated,deleted' NOT NULL;

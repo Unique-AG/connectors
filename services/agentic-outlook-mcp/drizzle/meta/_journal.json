@@ -22,6 +22,34 @@
       "when": 1759253111288,
       "tag": "0002_remove_sync_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1759945172692,
+      "tag": "0003_overjoyed_blockbuster",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1759946079961,
+      "tag": "0004_medical_shotgun",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1759946478164,
+      "tag": "0005_oval_black_cat",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1759953524475,
+      "tag": "0006_uneven_cannonball",
+      "breakpoints": true
     }
   ]
 }

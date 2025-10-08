@@ -1,10 +1,13 @@
 import { relations } from 'drizzle-orm';
 import { integer, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { createInsertSchema, createUpdateSchema } from 'drizzle-zod';
 import { typeid } from 'typeid-js';
 import { z } from 'zod';
+import { camelizeKeys } from '../../../utils/case-converter';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 import { emails } from './emails.table';
+import { subscriptionForType, subscriptions } from './subscriptions.table';
 
 export const folders = pgTable('folders', {
   id: varchar()
@@ -17,17 +20,17 @@ export const folders = pgTable('folders', {
   childFolderCount: integer().notNull().default(0),
 
   // Sync
-  subscriptionId: varchar(),
   syncToken: varchar(),
-  activatedAt: timestamp({ mode: "string" }),
-  deactivatedAt: timestamp({ mode: "string" }),
-  lastSyncedAt: timestamp({ mode: "string" }),
+  activatedAt: timestamp({ mode: 'string' }),
+  deactivatedAt: timestamp({ mode: 'string' }),
+  lastSyncedAt: timestamp({ mode: 'string' }),
 
   // References
   userProfileId: varchar()
     .notNull()
     .references(() => userProfiles.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
   ...timestamps,
+  subscriptionType: subscriptionForType().default('folder'),
 });
 
 export const folderRelations = relations(folders, ({ one, many }) => ({
@@ -36,25 +39,23 @@ export const folderRelations = relations(folders, ({ one, many }) => ({
     references: [userProfiles.id],
   }),
   emails: many(emails),
+  subscription: one(subscriptions, {
+    fields: [folders.id, folders.subscriptionType],
+    references: [subscriptions.forId, subscriptions.forType],
+  }),
 }));
 
-// TODO: Ideally create with drizzle-zod, but it does not work yet...
-export const folderSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  originalName: z.string().nullable(),
-  folderId: z.string(),
-  parentFolderId: z.string().nullable(),
-  childFolderCount: z.number().nullable(),
-  subscriptionId: z.string().nullable(),
-  syncToken: z.string().nullable(),
-  activatedAt: z.iso.datetime().nullable(),
-  deactivatedAt: z.iso.datetime().nullable(),
-  lastSyncedAt: z.iso.datetime().nullable(),
-  userProfileId: z.string(),
-  createdAt: z.iso.datetime().nullable(),
-  updatedAt: z.iso.datetime().nullable(),
-});
-export const folderArraySchema = z.array(folderSchema);
-
+export type Folder = typeof folders.$inferSelect;
 export type FolderInput = typeof folders.$inferInsert;
+export const folderInsertSchema = createInsertSchema(folders);
+export const folderInsertSchemaCamelized = z
+  .unknown()
+  .transform(camelizeKeys)
+  .pipe(folderInsertSchema);
+
+export const folderUpdateSchema = createUpdateSchema(folders);
+export const folderUpdateSchemaCamelized = z
+  .unknown()
+  .transform(camelizeKeys)
+  .pipe(folderUpdateSchema);
+export type FolderUpdateZod = z.infer<typeof folderUpdateSchema>;
