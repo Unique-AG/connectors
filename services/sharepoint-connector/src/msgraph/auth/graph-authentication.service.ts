@@ -17,7 +17,7 @@ export class GraphAuthenticationService implements AuthenticationProvider {
   private readonly strategy: GraphAuthStrategy;
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
-    const useOidc = this.configService.get('sharepoint.useOidc', { infer: true });
+    const useOidc = this.configService.get('sharepoint.graphUseOidcAuth', { infer: true });
 
     if (useOidc) {
       this.strategy = new OidcGraphAuthStrategy(configService);

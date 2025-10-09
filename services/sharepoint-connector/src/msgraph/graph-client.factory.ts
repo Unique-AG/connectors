@@ -58,7 +58,7 @@ export class GraphClientFactory {
 
     const clientOptions: ClientOptions = {
       middleware: middlewares[0],
-      debugLogging: this.configService.get('logLevel', { infer: true }) === 'debug',
+      debugLogging: this.configService.get('app.logLevel', { infer: true }) === 'debug',
     };
 
     this.logger.debug({

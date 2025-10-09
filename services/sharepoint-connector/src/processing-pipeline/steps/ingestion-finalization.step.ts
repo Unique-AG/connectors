@@ -24,8 +24,8 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const registrationResponse = context.metadata.registration;
-    const baseUrl = this.configService.get('uniqueApi.sharepointBaseUrl', { infer: true });
-    const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
+    const baseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const isPathBasedIngestion = !scopeId;
     const stepStartTime = Date.now();
 
