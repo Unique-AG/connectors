@@ -8,6 +8,8 @@
 # 9007 - langfuse-worker
 # 9008 - langfuse-web
 # 9009 - powersync
+# 9010 - rabbitmq
+# 9011 - rabbitmq management
 
 name: connectors-monorepo
 services:
@@ -38,6 +40,19 @@ services:
       interval: 3s
       timeout: 10s
       retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    restart: always
+    hostname: rabbit1
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    ports:
+      - 9010:5672
+      - 9011:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
 
   powersync:
     profiles: ["agentic-outlook-mcp"] # To run this profile `docker-compose --profile agentic-outlook-mcp up -d`
@@ -203,6 +218,7 @@ volumes:
   postgres:
   rabbitmq:
   redis:
+  rabbitmq:
   minio:
   qdrant:
   clickhouse_data:
