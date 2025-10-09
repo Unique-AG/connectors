@@ -18,6 +18,7 @@ import {
   folderUpdateSchemaCamelized,
   userProfiles,
 } from '../drizzle/schema';
+import { EmailSyncService } from '../email/email-sync.service';
 import { GraphClientFactory } from '../msgraph/graph-client.factory';
 import { SubscriptionEvent } from '../msgraph/subscription.events';
 import { SubscriptionService } from '../msgraph/subscription.service';
@@ -36,6 +37,7 @@ export class FolderService {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly subscriptionService: SubscriptionService,
+    private readonly emailSyncService: EmailSyncService,
   ) {}
 
   @BatchProcessor({ table: 'folders', operation: 'PUT' })
@@ -88,7 +90,29 @@ export class FolderService {
         userProfileId: userProfileId.toString(),
         folderId: id,
       });
+
+      // Create subscription for folder changes
       await this.subscriptionService.createSubscription(userProfileId, 'folder', folder);
+
+      // Trigger initial email sync
+      this.logger.log({
+        msg: 'Starting initial email sync for folder',
+        userProfileId: userProfileId.toString(),
+        folderId: id,
+        folderName: folder.name,
+      });
+
+      try {
+        await this.emailSyncService.syncFolderEmails(userProfileId, id);
+      } catch (error) {
+        this.logger.error({
+          msg: 'Failed to perform initial email sync',
+          folderId: id,
+          error: serializeError(normalizeError(error)),
+        });
+        // Don't throw here - we still want the folder to be marked as active
+        // The sync can be retried later
+      }
     }
 
     const syncDisabled = data.deactivatedAt;
@@ -162,16 +186,6 @@ export class FolderService {
       });
       throw error;
     }
-  }
-
-  @OnEvent('folder.created')
-  @OnEvent('folder.updated')
-  @OnEvent('folder.deleted')
-  public async onFolderEvent(event: SubscriptionEvent) {
-    this.logger.debug({
-      msg: 'Folder event received',
-      event,
-    });
   }
 
   private async getChildFolders(

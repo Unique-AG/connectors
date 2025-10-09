@@ -132,7 +132,7 @@ export class SubscriptionService implements OnApplicationBootstrap, BeforeApplic
         continue;
       }
       this.eventEmitter.emit(
-        `${subscription.forType}.${notification.changeType}`,
+        `subscription.notification.for.${subscription.forType}.${notification.changeType}`,
         new SubscriptionEvent(
           notification.subscriptionId,
           subscription.forId,
