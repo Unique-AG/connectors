@@ -55,6 +55,7 @@ export const emails = pgTable(
 
     tags: text().array(),
 
+    hasAttachments: boolean().notNull().default(false),
     attachments: jsonb()
       .$type<
         Array<{

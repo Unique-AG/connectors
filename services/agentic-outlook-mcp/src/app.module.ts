@@ -20,6 +20,7 @@ import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { MicrosoftOAuthProvider } from './auth/microsoft.provider';
 import { BatchModule } from './batch/batch.module';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
+import { EmailModule } from './email/email.module';
 import { FolderModule } from './folder/folder.module';
 import { MailModule } from './mail/mail.module';
 import { ManifestController } from './manifest.controller';
@@ -126,6 +127,7 @@ import { UserModule } from './user/user.module';
     }),
     MsGraphModule,
     MailModule,
+    EmailModule,
     BatchModule,
     SyncModule,
     UserModule,
