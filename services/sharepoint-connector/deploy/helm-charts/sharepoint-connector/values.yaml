@@ -71,34 +71,28 @@ grafana:
 connectorConfig:
   # -- if disabled, connector.extraEnvCM must be set to []
   enabled: true
-  allowedMimeTypes:
-    - application/pdf
-    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
-    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
-  processingConcurrency: 1
-  stepTimeoutSeconds: 300
-  graph:
-    # -- tenant id against which the graph api calls are made
-    # example: 12345678-1234-1234-1234-123456789012
-    tenantId: unset_default_value
-    useOidcAuth: true
-    apiUrl: https://graph.microsoft.com
-    clientId: null
-    # clientSecret would need to be presented from a secret as well
   sharepoint:
     # -- base url of the sharepoint instance
     # example: https://acme.sharepoint.com
     baseUrl: unset_default_value
-    maxFilesToScan: 2
-    # -- sites to scan
-    # example: 00000000-0000-0000-0000-000000000000,00000000-0000-0000-0000-000000000001
-    # Note: these are the site IDs, not the site URLs or names
-    sites:
+    # -- Array of site IDs to scan
+    siteIds:
+      # Example values
       - 00000000-0000-0000-0000-000000000000
       - 00000000-0000-0000-0000-000000000001
     # -- column name against which the files are synced
     # example: FinanceGPTKnowledge
     syncColumnName: unset_default_value
+    graph:
+      useOidcAuth: true
+      # -- tenant id against which the graph api calls are made
+      # example: 12345678-1234-1234-1234-123456789012
+      tenantId: unset_default_value
+      apiUrl: https://graph.microsoft.com
+      rateLimitPer10Seconds: null
+      clientId: null
+      # clientSecret would need to be presented from a secret as well
+
   unique:
     # -- base path for the file diff
     # example: https://acme.sharepoint.com
@@ -113,10 +107,19 @@ connectorConfig:
     # -- scope id for the scope based ingestion
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion
-  zitadel:
-    clientId: unset_default_value
-    # clientSecret is presented from a secret, see connector.extraEnvSecrets
-    oauthTokenUrl: unset_default_value
-    # -- project id for the zitadel project
-    # example: 225317577440629999
-    projectId: unset_default_value
+    zitadel:
+      clientId: unset_default_value
+      # clientSecret is presented from a secret, see connector.extraEnvSecrets
+      oauthTokenUrl: unset_default_value
+      # -- project id for the zitadel project
+      # example: 225317577440629999
+      projectId: unset_default_value
+
+  processing:
+    stepTimeoutSeconds: 300
+    concurrency: 1
+    allowedMimeTypes:
+      - application/pdf
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    maxFilesToScan: 2
+    maxFileSizeBytes: null
