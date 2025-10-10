@@ -1,3 +1,4 @@
+import { isRabbitContext } from '@golevelup/nestjs-rabbitmq';
 import {
   CanActivate,
   ExecutionContext,
@@ -25,6 +26,8 @@ export class McpAuthJwtGuard implements CanActivate {
   ) {}
 
   public async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (isRabbitContext(context)) return true;
+
     const request = context.switchToHttp().getRequest<McpAuthenticatedRequest>();
 
     // This is a global guard, as we cannot inject it into the McpModule
