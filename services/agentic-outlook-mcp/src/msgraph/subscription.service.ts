@@ -38,14 +38,14 @@ export class SubscriptionService implements OnApplicationBootstrap, BeforeApplic
   ) {}
 
   public async onApplicationBootstrap() {
-    const subscriptionsList = await this.db.select().from(subscriptions);
-    this.logger.log({
-      msg: 'Creating subscriptions',
-      count: subscriptionsList.length,
-    });
-    for (const subscription of subscriptionsList) {
-      await this.startSubscription(subscription);
-    }
+    // const subscriptionsList = await this.db.select().from(subscriptions);
+    // this.logger.log({
+    //   msg: 'Creating subscriptions',
+    //   count: subscriptionsList.length,
+    // });
+    // for (const subscription of subscriptionsList) {
+    //   await this.startSubscription(subscription);
+    // }
   }
 
   // Cleanup via in-memory map, as other replicas of this service could hold other subscriptions.
