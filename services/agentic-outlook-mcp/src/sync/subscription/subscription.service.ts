@@ -12,14 +12,14 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
-import { AppConfig, AppSettings } from '../app-settings';
-import { DRIZZLE, DrizzleDatabase, Folder, Subscription, subscriptions } from '../drizzle';
-import { normalizeError } from '../utils/normalize-error';
+import { AppConfig, AppSettings } from '../../app-settings';
+import { DRIZZLE, DrizzleDatabase, Folder, Subscription, subscriptions } from '../../drizzle';
+import { GraphClientFactory } from '../../msgraph/graph-client.factory';
+import { normalizeError } from '../../utils/normalize-error';
 import {
   ChangeNotificationCollectionDto,
   ChangeNotificationDto,
 } from './dto/change-notification-collection.dto';
-import { GraphClientFactory } from './graph-client.factory';
 import { SubscriptionEvent } from './subscription.events';
 
 type SubscriptionResourceType = 'folder';
