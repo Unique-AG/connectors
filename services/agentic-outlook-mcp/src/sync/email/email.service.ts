@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { TypeID } from 'typeid-js';
-import { DRIZZLE, DrizzleDatabase, EmailInput, emails as emailsTable } from '../drizzle';
+import { DRIZZLE, DrizzleDatabase, EmailInput, emails as emailsTable } from '../../drizzle';
 
 @Injectable()
 export class EmailService {

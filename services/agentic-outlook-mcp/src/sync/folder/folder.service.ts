@@ -10,19 +10,18 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
-import { BatchProcessor } from '../batch/batch-processor.decorator';
-import { DRIZZLE, DrizzleDatabase } from '../drizzle';
+import { BatchProcessor } from '../../batch/batch-processor.decorator';
+import { DRIZZLE, DrizzleDatabase } from '../../drizzle';
 import {
   FolderUpdateZod,
   folders as foldersTable,
   folderUpdateSchemaCamelized,
   userProfiles,
-} from '../drizzle/schema';
+} from '../../drizzle/schema';
+import { GraphClientFactory } from '../../msgraph/graph-client.factory';
+import { normalizeError } from '../../utils/normalize-error';
 import { EmailSyncService } from '../email/email-sync.service';
-import { GraphClientFactory } from '../msgraph/graph-client.factory';
-import { SubscriptionEvent } from '../msgraph/subscription.events';
-import { SubscriptionService } from '../msgraph/subscription.service';
-import { normalizeError } from '../utils/normalize-error';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { FolderEvents, FolderSyncEvent } from './folder.events';
 
 const FOLDER_SELECT_FIELDS =
