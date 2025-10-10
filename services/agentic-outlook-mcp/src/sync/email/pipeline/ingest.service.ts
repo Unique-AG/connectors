@@ -2,6 +2,7 @@ import { AmqpConnection, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import { Message } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConsumeMessage } from 'amqplib';
+import { snakeCase } from 'lodash';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, EmailInput } from '../../../drizzle';
@@ -56,11 +57,13 @@ export class IngestService {
 
     await this.ensureFoldersMap();
 
-    this.logger.log({
-      msg: 'Ingesting message',
-      message,
-      attempt,
-    });
+    if (attempt > 1) {
+      this.logger.log({
+        msg: 'Retrying ingest for message',
+        messageId: message.id,
+        attempt,
+      });
+    }
 
     try {
       const isDeleted = (message as unknown as DeletedItem)['@removed'] !== undefined;
@@ -124,6 +127,13 @@ export class IngestService {
     folderId: string,
     foldersMap?: Map<string, string>,
   ): EmailInput {
+    const tags: string[] = [];
+
+    if (message.importance) tags.push(`importance:${snakeCase(message.importance)}`);
+
+    if (message.parentFolderId && foldersMap?.get(message.parentFolderId))
+      tags.push(`folder:${snakeCase(foldersMap.get(message.parentFolderId))}`);
+
     return {
       // biome-ignore lint/style/noNonNullAssertion: Microsoft Graph API returns emails with an id
       messageId: message.id!,
@@ -174,10 +184,7 @@ export class IngestService {
       isRead: message.isRead || false,
       isDraft: message.isDraft || false,
 
-      tags: [
-        `importance:${message.importance}`,
-        `${foldersMap?.get(message.parentFolderId || '') || null}`,
-      ].filter(Boolean),
+      tags,
 
       hasAttachments: message.hasAttachments || false,
 
