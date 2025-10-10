@@ -315,9 +315,6 @@ importers:
       '@prisma/instrumentation':
         specifier: ^6.15.0
         version: 6.16.0(@opentelemetry/api@1.9.0)
-      '@proventuslabs/nestjs-zod':
-        specifier: ^1.2.0
-        version: 1.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.1.5)
       '@unique-ag/aes-gcm-encryption':
         specifier: workspace:*
         version: link:../../packages/aes-gcm-encryption
@@ -463,9 +460,6 @@ importers:
       '@opentelemetry/instrumentation-pg':
         specifier: ^0.58.0
         version: 0.58.0(@opentelemetry/api@1.9.0)
-      '@proventuslabs/nestjs-zod':
-        specifier: ^1.2.0
-        version: 1.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.1.5)
       '@unique-ag/aes-gcm-encryption':
         specifier: workspace:*
         version: link:../../packages/aes-gcm-encryption
@@ -2399,13 +2393,6 @@ packages:
 
   '@protobufjs/utf8@1.1.0':
     resolution: {integrity: sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==}
-
-  '@proventuslabs/nestjs-zod@1.2.0':
-    resolution: {integrity: sha512-GpihamZMr/NsY4KRYtiUzbuWJT13BnY6WsdLbKXxkqRh+huLbgZkBWhjkVU+8gF+4lbiEqsqXnizYpGY4sVI4A==}
-    peerDependencies:
-      '@nestjs/common': ^10.0.0 || ^11.0.0
-      '@nestjs/config': ^3.0.0 || ^4.0.0
-      zod: ^3.25.0 || ^4.0.0
 
   '@proventuslabs/nestjs-zod@2.0.0':
     resolution: {integrity: sha512-XIhWD7sLNNPFPzG3JYl+474Fn3FwhxUt55u9ykluwGCkRoeiZaOm5zU7+yyDTrewGVvsOsrGfdMeI4a+ylJfgw==}
@@ -8224,14 +8211,6 @@ snapshots:
   '@protobufjs/pool@1.1.0': {}
 
   '@protobufjs/utf8@1.1.0': {}
-
-  '@proventuslabs/nestjs-zod@1.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.1.5)':
-    dependencies:
-      '@nestjs/common': 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/config': 4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
-      lodash: 4.17.21
-      yaml: 2.8.1
-      zod: 4.1.5
 
   '@proventuslabs/nestjs-zod@2.0.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.1.5)':
     dependencies:
