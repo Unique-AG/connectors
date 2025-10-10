@@ -26,8 +26,8 @@ export class ContentRegistrationStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
-    const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
-    const baseUrl = this.configService.get('uniqueApi.sharepointBaseUrl', { infer: true });
+    const scopeId = this.configService.get('unique.scopeId', { infer: true });
+    const baseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const isPathBasedIngestion = !scopeId;
 
     const fileKey = buildSharepointFileKey({

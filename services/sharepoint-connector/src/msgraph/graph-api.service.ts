@@ -22,7 +22,7 @@ export class GraphApiService {
     this.graphClient = this.graphClientFactory.createClient();
 
     const msGraphRateLimitPer10Seconds = this.configService.get(
-      'pipeline.msGraphRateLimitPer10Seconds',
+      'sharepoint.graphRateLimitPer10Seconds',
       { infer: true },
     );
 
@@ -34,7 +34,7 @@ export class GraphApiService {
   }
 
   public async getAllFilesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
-    const maxFilesToScan = this.configService.get('sharepoint.maxFilesToScan', { infer: true });
+    const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
     const allSyncableFiles: EnrichedDriveItem[] = [];
     let totalScanned = 0;
 
@@ -78,7 +78,7 @@ export class GraphApiService {
 
   public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
     this.logger.debug(`Downloading file content for item ${itemId} from drive ${driveId}`);
-    const maxFileSizeBytes = this.configService.get('pipeline.maxFileSizeBytes', { infer: true });
+    const maxFileSizeBytes = this.configService.get('processing.maxFileSizeBytes', { infer: true });
 
     try {
       const stream: ReadableStream = await this.makeRateLimitedRequest(() =>

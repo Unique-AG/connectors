@@ -21,8 +21,8 @@ export class FileProcessingOrchestratorService {
     files: EnrichedDriveItem[],
     diffResult: FileDiffResponse,
   ): Promise<void> {
-    const concurrency = this.configService.get('pipeline.processingConcurrency', { infer: true });
-    const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
+    const concurrency = this.configService.get('processing.concurrency', { infer: true });
+    const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const limit = pLimit(concurrency);
 
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);

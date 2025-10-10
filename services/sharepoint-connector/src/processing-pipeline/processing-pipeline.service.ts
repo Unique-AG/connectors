@@ -31,7 +31,7 @@ export class ProcessingPipelineService {
       this.ingestionFinalizationStep,
     ];
     this.stepTimeoutMs =
-      this.configService.get('pipeline.stepTimeoutSeconds', { infer: true }) * 1000;
+      this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
   }
 
   public async processFile(file: EnrichedDriveItem): Promise<PipelineResult> {

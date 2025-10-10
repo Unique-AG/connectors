@@ -1,30 +1,43 @@
-import { env } from 'node:process';
-import { registerAs } from '@nestjs/config';
+import { ConfigType } from '@nestjs/config';
+import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { DEFAULT_GRAPH_RATE_LIMIT_PER_10_SECONDS } from 'src/constants/defaults.constants';
 import { z } from 'zod';
 import { Redacted } from '../utils/redacted';
 
-const namespace = 'sharepoint' as const;
-
-const EnvironmentVariables = z
+const SharepointConfig = z
   .object({
-    GRAPH_CLIENT_ID: z
+    // We do not use standard boolean coercion because any non-empty string is true, while we would
+    // like any string different from "true" to be false
+    graphUseOidcAuth: z
+      .string()
+      .transform((val) => val.toLowerCase() === 'true')
+      .default(false)
+      .describe('Use OIDC/Workload Identity authentication instead of client secret'),
+    graphClientId: z
       .string()
       .min(1)
       .optional()
       .describe('Azure AD application client ID for Microsoft Graph (optional when using OIDC)'),
-    GRAPH_CLIENT_SECRET: z
+    graphClientSecret: z
       .string()
       .optional()
       .transform((val) => (val ? new Redacted(val) : undefined))
       .describe(
         'Azure AD application client secret for Microsoft Graph (not required when using OIDC)',
       ),
-    GRAPH_TENANT_ID: z.string().min(1).describe('Azure AD tenant ID'),
-    GRAPH_API_URL: z
+    graphTenantId: z.string().min(1).describe('Azure AD tenant ID'),
+    graphApiUrl: z
       .url()
       .prefault('https://graph.microsoft.com')
       .describe('Microsoft Graph API base URL'),
-    SHAREPOINT_SITES: z
+    graphRateLimitPer10Seconds: z.coerce
+      .number()
+      .int()
+      .positive()
+      .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_10_SECONDS)
+      .describe('Number of MS Graph API requests allowed per 10 seconds'),
+    baseUrl: z.url().describe("Your company's sharepoint URL"),
+    siteIds: z
       .string()
       .prefault('')
       .transform((val) =>
@@ -36,37 +49,16 @@ const EnvironmentVariables = z
           : [],
       )
       .describe('Comma-separated list of SharePoint site IDs to scan'),
-    SHAREPOINT_SYNC_COLUMN_NAME: z
+    syncColumnName: z
       .string()
       .prefault('FinanceGPTKnowledge')
       .describe('Name of the SharePoint column indicating sync flag'),
-    ALLOWED_MIME_TYPES: z
-      .string()
-      .transform((val) =>
-        val
-          ? val
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : [],
-      )
-      .describe('Comma-separated list of allowed MIME types for files to sync'),
-    SHAREPOINT_MAX_FILES_TO_SCAN: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('For testing purpose. Maximum number of files to scan. Unlimited if not set'),
-    GRAPH_USE_OIDC_AUTH: z.coerce
-      .boolean()
-      .default(false)
-      .describe('Use OIDC/Workload Identity authentication instead of client secret'),
   })
   .refine(
-    (data) => {
+    (config) => {
       // When not using OIDC, client credentials are required
-      if (!data.GRAPH_USE_OIDC_AUTH) {
-        return data.GRAPH_CLIENT_ID && data.GRAPH_CLIENT_SECRET;
+      if (!config.graphUseOidcAuth) {
+        return config.graphClientId && config.graphClientSecret;
       }
       // When using OIDC, only tenant ID is required
       return true;
@@ -77,34 +69,7 @@ const EnvironmentVariables = z
     },
   );
 
-export interface SharepointConfig {
-  [namespace]: {
-    clientId?: string;
-    clientSecret?: Redacted<string>;
-    tenantId: string;
-    apiUrl: string;
-    sites: string[];
-    syncColumnName: string;
-    allowedMimeTypes: string[];
-    maxFilesToScan?: number;
-    useOidc: boolean;
-  };
-}
+export const sharepointConfig = registerConfig('sharepoint', SharepointConfig);
 
-export const sharepointConfig = registerAs<SharepointConfig[typeof namespace]>(namespace, () => {
-  const validEnv = EnvironmentVariables.safeParse(env);
-  if (!validEnv.success) {
-    throw new TypeError(`Invalid config for namespace "${namespace}": ${validEnv.error.message}`);
-  }
-  return {
-    clientId: validEnv.data.GRAPH_CLIENT_ID,
-    clientSecret: validEnv.data.GRAPH_CLIENT_SECRET,
-    tenantId: validEnv.data.GRAPH_TENANT_ID,
-    apiUrl: validEnv.data.GRAPH_API_URL,
-    sites: validEnv.data.SHAREPOINT_SITES,
-    syncColumnName: validEnv.data.SHAREPOINT_SYNC_COLUMN_NAME,
-    allowedMimeTypes: validEnv.data.ALLOWED_MIME_TYPES,
-    maxFilesToScan: validEnv.data.SHAREPOINT_MAX_FILES_TO_SCAN,
-    useOidc: validEnv.data.GRAPH_USE_OIDC_AUTH,
-  };
-});
+export type SharepointConfigNamespaced = NamespacedConfigType<typeof sharepointConfig>;
+export type SharepointConfig = ConfigType<typeof sharepointConfig>;

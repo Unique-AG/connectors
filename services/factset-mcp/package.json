@@ -38,7 +38,6 @@
     "@prisma/client": "6.15.0",
     "@prisma/engines": "6.15.0",
     "@prisma/instrumentation": "^6.15.0",
-    "@proventuslabs/nestjs-zod": "^1.2.0",
     "@unique-ag/aes-gcm-encryption": "workspace:*",
     "@unique-ag/instrumentation": "workspace:*",
     "@unique-ag/logger": "workspace:*",

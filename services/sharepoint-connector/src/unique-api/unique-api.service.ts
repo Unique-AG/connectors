@@ -67,10 +67,10 @@ export class UniqueApiService {
     uniqueToken: string,
     partialKey: string,
   ): Promise<FileDiffResponse> {
-    const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
+    const scopeId = this.configService.get('unique.scopeId', { infer: true });
 
-    const fileDiffUrl = this.configService.get('uniqueApi.fileDiffUrl', { infer: true });
-    const basePath = this.configService.get('uniqueApi.fileDiffBasePath', { infer: true });
+    const fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
+    const basePath = this.configService.get('unique.fileDiffBasePath', { infer: true });
     const url = new URL(fileDiffUrl);
     const path = url.pathname + url.search;
 
@@ -164,7 +164,7 @@ export class UniqueApiService {
   }
 
   private createGraphqlClient(uniqueToken: string): GraphQLClient {
-    const graphqlUrl = this.configService.get('uniqueApi.ingestionGraphQLUrl', { infer: true });
+    const graphqlUrl = this.configService.get('unique.ingestionGraphqlUrl', { infer: true });
     return new GraphQLClient(graphqlUrl, {
       headers: {
         'Content-Type': 'application/json',

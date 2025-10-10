@@ -7,9 +7,9 @@ import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { AppConfig, appConfig } from './config/app.config';
-import { pipelineConfig } from './config/pipeline.config';
+import { processingConfig } from './config/processing.config';
 import { sharepointConfig } from './config/sharepoint.config';
-import { uniqueApiConfig } from './config/unique-api.config';
+import { uniqueConfig } from './config/unique.config';
 import { HttpClientModule } from './http-client.module';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
@@ -22,7 +22,7 @@ import { Redacted } from './utils/redacted';
     ConfigModule.forRoot({
       isGlobal: true,
       ignoreEnvFile: true,
-      load: [appConfig, sharepointConfig, pipelineConfig, uniqueApiConfig],
+      load: [appConfig, sharepointConfig, processingConfig, uniqueConfig],
     }),
     LoggerModule.forRootAsync({
       useFactory(appConfig: AppConfig) {

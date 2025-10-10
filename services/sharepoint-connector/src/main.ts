@@ -6,12 +6,12 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { AppModule } from './app.module';
-import { AppConfigNamespaced } from './config/app.config';
+import { Config } from './config';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
 
-  const configService = app.get<ConfigService<AppConfigNamespaced, true>>(ConfigService);
+  const configService = app.get<ConfigService<Config, true>>(ConfigService);
 
   app.enableShutdownHooks();
 

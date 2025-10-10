@@ -31,66 +31,22 @@
     "connectorConfig": {
       "type": "object",
       "description": "SharePoint connector configuration",
+      "required": ["enabled", "sharepoint", "unique", "processing"],
       "properties": {
         "enabled": {
           "type": "boolean",
           "description": "Wether to use the connector config."
         },
-        "allowedMimeTypes": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of allowed MIME types for file processing"
-        },
-        "processingConcurrency": {
-          "type": "integer",
-          "description": "Number of concurrent processing operations"
-        },
-        "stepTimeoutSeconds": {
-          "type": "integer",
-          "description": "Timeout in seconds for processing steps"
-        },
-        "graph": {
-          "type": "object",
-          "description": "Microsoft Graph API configuration",
-          "properties": {
-            "tenantId": {
-              "type": "string",
-              "description": "Azure AD tenant ID"
-            },
-            "useOidcAuth": {
-              "type": "boolean",
-              "description": "Enable OIDC authentication"
-            },
-            "apiUrl": {
-              "type": "string",
-              "description": "Microsoft Graph API URL"
-            },
-            "clientId": {
-              "type": ["string", "null"],
-              "description": "Microsoft Graph client ID"
-            },
-            "clientSecret": {
-              "type": ["string", "null"],
-              "description": "Microsoft Graph client secret"
-            }
-          },
-          "additionalProperties": false
-        },
         "sharepoint": {
           "type": "object",
           "description": "SharePoint configuration",
+          "required": ["baseUrl", "siteIds", "syncColumnName", "graph"],
           "properties": {
             "baseUrl": {
               "type": "string",
               "description": "SharePoint base URL"
             },
-            "maxFilesToScan": {
-              "type": "integer",
-              "description": "Maximum number of files to scan"
-            },
-            "sites": {
+            "siteIds": {
               "type": "array",
               "items": {
                 "type": "string"
@@ -100,6 +56,38 @@
             "syncColumnName": {
               "type": "string",
               "description": "Column name for synchronization"
+            },
+            "graph": {
+              "type": "object",
+              "description": "Microsoft Graph API configuration for Sharepoint",
+              "required": ["tenantId", "apiUrl"],
+              "properties": {
+                "tenantId": {
+                  "type": "string",
+                  "description": "Azure AD tenant ID"
+                },
+                "useOidcAuth": {
+                  "type": "boolean",
+                  "description": "Enable OIDC authentication"
+                },
+                "apiUrl": {
+                  "type": "string",
+                  "description": "Microsoft Graph API URL"
+                },
+                "rateLimitPer10Seconds": {
+                  "type": ["number", "null"],
+                  "description": "Rate limiting for Graph API requests"
+                },
+                "clientId": {
+                  "type": ["string", "null"],
+                  "description": "Microsoft Graph client ID"
+                },
+                "clientSecret": {
+                  "type": ["string", "null"],
+                  "description": "Microsoft Graph client secret"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -107,6 +95,7 @@
         "unique": {
           "type": "object",
           "description": "Unique platform configuration",
+          "required": ["fileDiffBasePath", "fileDiffUrl", "ingestionGraphqlUrl", "zitadel"],
           "properties": {
             "fileDiffBasePath": {
               "type": "string",
@@ -123,29 +112,61 @@
             "scopeId": {
               "type": ["string", "null"],
               "description": "Scope ID for scope based ingestion"
+            },
+            "zitadel": {
+              "type": "object",
+              "description": "Zitadel authentication configuration",
+              "required": ["clientId", "oauthTokenUrl", "projectId"],
+              "properties": {
+                "clientId": {
+                  "type": "string",
+                  "description": "Zitadel client ID"
+                },
+                "clientSecret": {
+                  "type": "string",
+                  "description": "Zitadel client secret"
+                },
+                "oauthTokenUrl": {
+                  "type": "string",
+                  "description": "OAuth token URL"
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Zitadel project ID"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
         },
-        "zitadel": {
+        "processing": {
           "type": "object",
-          "description": "Zitadel authentication configuration",
+          "description": "Files processing configuration",
+          "required": ["allowedMimeTypes", "concurrency"],
           "properties": {
-            "clientId": {
-              "type": "string",
-              "description": "Zitadel client ID"
+            "allowedMimeTypes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of allowed MIME types for file processing"
             },
-            "clientSecret": {
-              "type": "string",
-              "description": "Zitadel client secret"
+            "concurrency": {
+              "type": "integer",
+              "description": "Number of concurrent processing operations"
             },
-            "oauthTokenUrl": {
-              "type": "string",
-              "description": "OAuth token URL"
+            "stepTimeoutSeconds": {
+              "type": "integer",
+              "description": "Timeout in seconds for processing steps"
             },
-            "projectId": {
-              "type": "string",
-              "description": "Zitadel project ID"
+            "maxFilesToScan": {
+              "type": "integer",
+              "description": "Maximum number of files to scan"
+            },
+            "maxFileSizeBytes": {
+              "type": ["integer", "null"],
+              "description": "Maximum number of files to scan"
             }
           },
           "additionalProperties": false

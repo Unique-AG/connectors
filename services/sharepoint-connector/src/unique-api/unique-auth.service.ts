@@ -20,10 +20,10 @@ export class UniqueAuthService {
       return this.cachedToken;
     }
 
-    const oAuthTokenUrl = this.configService.get('uniqueApi.zitadelOAuthTokenUrl', { infer: true });
-    const clientId = this.configService.get('uniqueApi.zitadelClientId', { infer: true });
-    const clientSecret = this.configService.get('uniqueApi.zitadelClientSecret', { infer: true });
-    const projectId = this.configService.get('uniqueApi.zitadelProjectId', { infer: true });
+    const oAuthTokenUrl = this.configService.get('unique.zitadelOauthTokenUrl', { infer: true });
+    const clientId = this.configService.get('unique.zitadelClientId', { infer: true });
+    const clientSecret = this.configService.get('unique.zitadelClientSecret', { infer: true });
+    const projectId = this.configService.get('unique.zitadelProjectId', { infer: true });
     const params = new URLSearchParams({
       scope:
         `openid profile email urn:zitadel:iam:user:resourceowner ` +

@@ -28,8 +28,8 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
   private cachedToken: CachedToken | null = null;
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
-    const tenantId = this.configService.get('sharepoint.tenantId', { infer: true });
-    // const clientId = this.configService.get('sharepoint.clientId', { infer: true });
+    const tenantId = this.configService.get('sharepoint.graphTenantId', { infer: true });
+    // const clientId = this.configService.get('sharepoint.graphClientId', { infer: true });
 
     this.credential = new DefaultAzureCredential({
       tenantId,
