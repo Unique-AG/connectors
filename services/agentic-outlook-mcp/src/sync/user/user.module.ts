@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DrizzleModule } from '../drizzle/drizzle.module';
+import { DrizzleModule } from '../../drizzle/drizzle.module';
 import { UserService } from './user.service';
 
 @Module({
