@@ -4,8 +4,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConsumeMessage } from 'amqplib';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
-import { DRIZZLE, DrizzleDatabase, EmailInput } from '../../drizzle';
-import { normalizeError } from '../../utils/normalize-error';
+import { DRIZZLE, DrizzleDatabase, EmailInput } from '../../../drizzle';
+import { normalizeError } from '../../../utils/normalize-error';
 import { EmailService } from '../email.service';
 
 const MAX_ATTEMPTS = 6;
