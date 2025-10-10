@@ -3,7 +3,6 @@ import { defaultLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
-import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -16,20 +15,16 @@ import { MetricService, OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
-import { AmqpModule } from './amqp/amqp.module';
 import { AppConfig, AppSettings, validateConfig } from './app-settings';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { MicrosoftOAuthProvider } from './auth/microsoft.provider';
 import { BatchModule } from './batch/batch.module';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
-import { EmailModule } from './email/email.module';
-import { FolderModule } from './folder/folder.module';
 import { MailModule } from './mail/mail.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
 import { SyncModule } from './sync/sync.module';
-import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -129,11 +124,8 @@ import { UserModule } from './user/user.module';
     }),
     MsGraphModule,
     MailModule,
-    EmailModule,
     BatchModule,
     SyncModule,
-    UserModule,
-    FolderModule,
   ],
   controllers: [ManifestController],
   providers: [

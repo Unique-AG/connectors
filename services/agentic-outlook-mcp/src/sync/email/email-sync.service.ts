@@ -7,10 +7,10 @@ import { and, eq } from 'drizzle-orm';
 import { debounce } from 'lodash';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
-import { DRIZZLE, DrizzleDatabase, Folder, folders as foldersTable } from '../drizzle';
-import { GraphClientFactory } from '../msgraph/graph-client.factory';
-import { SubscriptionEvent } from '../msgraph/subscription.events';
-import { normalizeError } from '../utils/normalize-error';
+import { DRIZZLE, DrizzleDatabase, Folder, folders as foldersTable } from '../../drizzle';
+import { GraphClientFactory } from '../../msgraph/graph-client.factory';
+import { normalizeError } from '../../utils/normalize-error';
+import { SubscriptionEvent } from '../subscription/subscription.events';
 import {
   EmailDeltaSyncRequestedEvent,
   EmailEvents,

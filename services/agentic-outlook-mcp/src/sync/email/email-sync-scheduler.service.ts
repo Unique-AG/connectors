@@ -64,7 +64,7 @@ export class EmailSyncSchedulerService {
         });
 
         this.syncInProgress.add(folder.id);
-        
+
         // Emit delta sync request
         this.eventEmitter.emit(
           EmailEvents.EmailDeltaSyncRequested,
@@ -100,7 +100,7 @@ export class EmailSyncSchedulerService {
   @OnEvent(EmailEvents.EmailSyncFailed)
   public async onSyncFailed(event: { folderId: string; error: Error }) {
     this.syncInProgress.delete(event.folderId);
-    
+
     this.logger.warn({
       msg: 'Folder sync failed, will retry in next scheduled check',
       folderId: event.folderId,
@@ -163,7 +163,7 @@ export class EmailSyncSchedulerService {
         });
 
         this.syncInProgress.add(folder.id);
-        
+
         // Emit delta sync request (will trigger initial sync since no token exists)
         this.eventEmitter.emit(
           EmailEvents.EmailDeltaSyncRequested,
