@@ -6,8 +6,11 @@ import { Redacted } from '../utils/redacted';
 
 const SharepointConfig = z
   .object({
-    graphUseOidcAuth: z.coerce
-      .boolean()
+    // We do not use standard boolean coercion because any non-empty string is true, while we would
+    // like any string different from "true" to be false
+    graphUseOidcAuth: z
+      .string()
+      .transform((val) => val.toLowerCase() === 'true')
       .default(false)
       .describe('Use OIDC/Workload Identity authentication instead of client secret'),
     graphClientId: z

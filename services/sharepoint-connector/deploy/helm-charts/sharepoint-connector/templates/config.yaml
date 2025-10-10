@@ -29,9 +29,7 @@ data:
   UNIQUE_INGESTION_GRAPHQL_URL: {{ .Values.connectorConfig.unique.ingestionGraphqlUrl | quote }}
   UNIQUE_ZITADEL_CLIENT_ID: {{ .Values.connectorConfig.unique.zitadel.clientId | quote }}
   UNIQUE_ZITADEL_OAUTH_TOKEN_URL: {{ .Values.connectorConfig.unique.zitadel.oauthTokenUrl | quote }}
-  # Zitadel project ID is double quoted because env variables that are numbers outside of JS
-  # precision cause problems. They are parsed as JSON values and precision problems alter the value.
-  UNIQUE_ZITADEL_PROJECT_ID: {{ .Values.connectorConfig.unique.zitadel.projectId | quote | squote }}
+  UNIQUE_ZITADEL_PROJECT_ID: {{ .Values.connectorConfig.unique.zitadel.projectId | quote }}
   # Processing config
   PROCESSING_STEP_TIMEOUT_SECONDS: {{ .Values.connectorConfig.processing.stepTimeoutSeconds | quote }}
   PROCESSING_ALLOWED_MIME_TYPES: {{ .Values.connectorConfig.processing.allowedMimeTypes | join "," }}
