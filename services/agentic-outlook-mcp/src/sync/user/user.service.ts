@@ -2,14 +2,14 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { eq } from 'drizzle-orm';
 import { TypeID } from 'typeid-js';
-import { BatchProcessor } from '../batch/batch-processor.decorator';
+import { BatchProcessor } from '../../batch/batch-processor.decorator';
 import {
   DRIZZLE,
   DrizzleDatabase,
   UserUpdateZod,
   userProfiles,
   userUpdateSchemaCamelized,
-} from '../drizzle';
+} from '../../drizzle';
 import { FolderEvents, FolderSyncEvent } from '../folder/folder.events';
 
 @Injectable()
