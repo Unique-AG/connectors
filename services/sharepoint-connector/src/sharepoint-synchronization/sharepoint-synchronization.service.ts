@@ -32,11 +32,11 @@ export class SharepointSynchronizationService {
     }
     this.isScanning = true;
     const scanStartTime = Date.now();
-    const sitesToScan = this.configService.get('sharepoint.sites', { infer: true });
+    const siteIdsToScan = this.configService.get('sharepoint.siteIds', { infer: true });
 
-    this.logger.log(`Starting scan of ${sitesToScan.length} SharePoint sites...`);
+    this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
 
-    for (const siteId of sitesToScan) {
+    for (const siteId of siteIdsToScan) {
       try {
         const files = await this.graphApiService.getAllFilesForSite(siteId);
         const diffResult = await this.calculateDiffForFiles(files, siteId);
@@ -66,7 +66,7 @@ export class SharepointSynchronizationService {
     files: EnrichedDriveItem[],
     siteId: string,
   ): Promise<FileDiffResponse> {
-    const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
+    const scopeId = this.configService.get('unique.scopeId', { infer: true });
 
     const fileDiffItems: FileDiffItem[] = files.map((file: EnrichedDriveItem) => ({
       id: file.id,

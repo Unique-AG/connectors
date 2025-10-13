@@ -1,6 +1,9 @@
-import { AppConfig } from './app.config';
-import { PipelineConfig } from './pipeline.config';
-import { SharepointConfig } from './sharepoint.config';
-import { UniqueApiConfig } from './unique-api.config';
+import { AppConfigNamespaced } from './app.config';
+import { ProcessingConfigNamespaced } from './processing.config';
+import { SharepointConfigNamespaced } from './sharepoint.config';
+import { UniqueConfigNamespaced } from './unique.config';
 
-export type Config = UniqueApiConfig & PipelineConfig & SharepointConfig & AppConfig;
+export type Config = UniqueConfigNamespaced &
+  ProcessingConfigNamespaced &
+  SharepointConfigNamespaced &
+  AppConfigNamespaced;
