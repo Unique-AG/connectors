@@ -46,11 +46,9 @@ describe('UniqueApiService', () => {
     const result = await service.performFileDiff(
       [
         {
-          id: '1',
-          name: 'a.pdf',
+          key: 'sharepoint_file_1',
           url: 'https://sp.example.com/a.pdf',
           updatedAt: new Date().toISOString(),
-          key: 'sharepoint_file_1',
         },
       ],
       'token-123',

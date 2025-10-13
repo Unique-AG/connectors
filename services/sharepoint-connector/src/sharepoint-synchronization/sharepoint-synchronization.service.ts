@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { normalizeError } from 'src/utils/normalize-error';
+import { normalizeError } from '../utils/normalize-error';
 import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import { buildSharepointFileKey, buildSharepointPartialKey } from '../shared/sharepoint-key.util';
+import { buildSharepointPartialKey } from '../shared/sharepoint-key.util';
+import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
@@ -22,6 +23,7 @@ export class SharepointSynchronizationService {
     private readonly orchestrator: FileProcessingOrchestratorService,
     private readonly uniqueApiService: UniqueApiService,
   ) {}
+
 
   public async synchronize(): Promise<void> {
     if (this.isScanning) {
@@ -45,6 +47,9 @@ export class SharepointSynchronizationService {
         );
 
         await this.orchestrator.processFilesForSite(siteId, files, diffResult);
+
+        const siteScanDurationSeconds = (Date.now() - scanStartTime) / 1000;
+        this.logger.log(`Finished processing site ${siteId} in ${siteScanDurationSeconds.toFixed(2)}s`);
       } catch (rawError) {
         const error = normalizeError(rawError);
         this.logger.error({
@@ -55,7 +60,7 @@ export class SharepointSynchronizationService {
     }
 
     const scanDurationSeconds = (Date.now() - scanStartTime) / 1000;
-    this.logger.log(`SharePoint scan completed in ${scanDurationSeconds.toFixed(2)}s`);
+    this.logger.log(`SharePoint scan finished scanning all sites in ${scanDurationSeconds.toFixed(2)}s`);
     this.isScanning = false;
   }
 
@@ -68,22 +73,13 @@ export class SharepointSynchronizationService {
   ): Promise<FileDiffResponse> {
     const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
 
-    const fileDiffItems: FileDiffItem[] = files.map((file: EnrichedDriveItem) => ({
-      id: file.id,
-      name: file.name,
-      url: file.webUrl,
-      updatedAt: file.listItem?.lastModifiedDateTime,
-      key: buildSharepointFileKey({
-        scopeId,
-        siteId: file.siteId,
-        driveName: file.driveName,
-        folderPath: file.folderPath,
-        fileId: file.id,
-        fileName: file.name,
-      }),
-      driveId: file.driveId,
-      siteId: file.siteId,
-    }));
+    const fileDiffItems: FileDiffItem[] = files.map((file: EnrichedDriveItem) => {
+      return {
+        key: file.name, // It is a must to send just the filename
+        url: buildKnowledgeBaseUrl(file), // SharePoint URL for location
+        updatedAt: file.listItem?.lastModifiedDateTime as string,
+      };
+    });
 
     const uniqueToken = await this.uniqueAuthService.getToken();
     const partialKey = buildSharepointPartialKey({ scopeId, siteId });

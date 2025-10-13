@@ -34,26 +34,28 @@ export class IngestionFinalizationStep implements IPipelineStep {
       `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
     );
 
+    const fileKey = buildSharepointFileKey({
+      scopeId,
+      siteId: context.metadata.siteId,
+      driveName: context.metadata.driveName,
+      folderPath: context.metadata.folderPath,
+      fileId: context.fileId,
+      fileName: context.fileName,
+    });
+
     const ingestionFinalizationRequest = {
-      key: buildSharepointFileKey({
-        scopeId,
-        siteId: context.metadata.siteId,
-        driveName: context.metadata.driveName,
-        folderPath: context.metadata.folderPath,
-        fileId: context.fileId,
-        fileName: context.fileName,
-      }),
+      key: fileKey,
       title: context.fileName,
       mimeType: registrationResponse.mimeType,
       ownerType: registrationResponse.ownerType,
       byteSize: registrationResponse.byteSize,
       scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
-      sourceName: this.extractSiteName(context.siteUrl),
+      sourceName: 'SharePoint Online Connector',
       sourceKind: 'MICROSOFT_365_SHAREPOINT',
       fileUrl: registrationResponse.readUrl,
       ...(isPathBasedIngestion && {
-        url: context.downloadUrl,
+        url: context.knowledgeBaseUrl,
         baseUrl: baseUrl,
       }),
     };
@@ -71,20 +73,6 @@ export class IngestionFinalizationStep implements IPipelineStep {
       const message = normalizeError(error).message;
       this.logger.error(`[${context.correlationId}] Ingestion finalization failed: ${message}`);
       throw error;
-    }
-  }
-
-  private extractSiteName(siteUrl: string): string {
-    if (!siteUrl) return 'SharePoint';
-    try {
-      const url = new URL(siteUrl);
-      const pathParts = url.pathname.split('/').filter(Boolean);
-      if (pathParts.length >= 2 && pathParts[0] === 'sites') {
-        return pathParts[1] || url.hostname;
-      }
-      return url.hostname;
-    } catch {
-      return 'SharePoint';
     }
   }
 }

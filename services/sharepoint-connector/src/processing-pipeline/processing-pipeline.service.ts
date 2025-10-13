@@ -4,6 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
 import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
@@ -44,7 +45,7 @@ export class ProcessingPipelineService {
       fileSize: file.size,
       siteUrl: file.siteWebUrl,
       libraryName: file.driveId,
-      downloadUrl: file.webUrl,
+      knowledgeBaseUrl: buildKnowledgeBaseUrl(file),
       startTime,
       metadata: {
         mimeType: file.file?.mimeType ?? undefined,
@@ -99,7 +100,10 @@ export class ProcessingPipelineService {
   }
 
   private finalCleanup(context: ProcessingContext) {
-    if (context.contentBuffer) context.contentBuffer = undefined;
+    if (context.contentBuffer) {
+      context.contentBuffer = undefined;
+      delete context.contentBuffer;
+    }
     context.metadata = {} as never;
   }
 }

@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
@@ -20,33 +21,33 @@ describe('ProcessingPipelineService', () => {
   };
 
   const mockFile: EnrichedDriveItem = {
-    id: 'file-123',
-    name: 'test.pdf',
-    size: 1024,
-    webUrl: 'https://sharepoint.example.com/test.pdf',
-    file: { mimeType: 'application/pdf' },
+    id: '01JWNC3IM2TIAIFMTM4JHYR6RX3E2REDPW',
+    name: 'Document.docx',
+    size: 20791,
+    webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/_layouts/15/Doc.aspx?sourcedoc=%7B82009A9A-6CB2-4FE2-88FA-37D935120DF6%7D&file=Document.docx&action=default&mobileredirect=true',
+    file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
     parentReference: {
-      siteId: 'site-1',
-      driveId: 'drive-1',
+      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     },
     listItem: {
       fields: {
-        '@odata.etag': '"47cc40f8-ba1f-4100-9623-fcdf93073928,4"',
-        FileLeafRef: 'test.pdf',
-        Modified: '2024-01-01T00:00:00Z',
+        '@odata.etag': '"82009a9a-6cb2-4fe2-88fa-37d935120df6,7"',
+        FileLeafRef: 'Document.docx',
+        Modified: '2025-10-10T13:59:28Z',
         MediaServiceImageTags: [],
         FinanceGPTKnowledge: true,
-        Title: 'Test Document',
-        id: '16599',
+        Title: 'Document',
+        id: '16852',
         ContentType: 'Dokument',
-        Created: '2024-01-01T00:00:00Z',
+        Created: '2025-10-02T14:36:24Z',
         AuthorLookupId: '1704',
         EditorLookupId: '1704',
         _CheckinComment: '',
-        LinkFilenameNoMenu: 'test.pdf',
-        LinkFilename: 'test.pdf',
-        DocIcon: 'pdf',
-        FileSizeDisplay: '1024',
+        LinkFilenameNoMenu: 'Document.docx',
+        LinkFilename: 'Document.docx',
+        DocIcon: 'docx',
+        FileSizeDisplay: '20791',
         ItemChildCount: '0',
         FolderChildCount: '0',
         _ComplianceFlags: '',
@@ -57,17 +58,17 @@ describe('ProcessingPipelineService', () => {
         _LikeCount: '',
         _DisplayName: '',
         Edit: '0',
-        _UIVersionString: '4.0',
-        ParentVersionStringLookupId: '16599',
-        ParentLeafNameLookupId: '16599',
+        _UIVersionString: '6.0',
+        ParentVersionStringLookupId: '16852',
+        ParentLeafNameLookupId: '16852',
       } as Record<string, unknown>,
     },
-    lastModifiedDateTime: '2024-01-01T00:00:00Z',
-    siteId: 'site-1',
-    siteWebUrl: 'https://sharepoint.example.com/sites/test',
-    driveId: 'drive-1',
-    driveName: 'Shared Documents',
-    folderPath: '/test-folder',
+    lastModifiedDateTime: '2025-10-10T13:59:28Z',
+    siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+    siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG',
+    driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+    driveName: 'Documents',
+    folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
   };
 
   beforeEach(async () => {
@@ -129,11 +130,11 @@ describe('ProcessingPipelineService', () => {
     const executeCalls = vi.mocked(mockSteps.contentFetching.execute).mock.calls;
     const context = executeCalls[0]?.[0];
 
-    expect(context?.fileId).toBe('file-123');
-    expect(context?.fileName).toBe('test.pdf');
-    expect(context?.fileSize).toBe(1024);
-    expect(context?.siteUrl).toBe('https://sharepoint.example.com/sites/test');
-    expect(context?.libraryName).toBe('drive-1');
+    expect(context?.fileId).toBe('01JWNC3IM2TIAIFMTM4JHYR6RX3E2REDPW');
+    expect(context?.fileName).toBe('Document.docx');
+    expect(context?.fileSize).toBe(20791);
+    expect(context?.siteUrl).toBe('https://uniqueapp.sharepoint.com/sites/UniqueAG');
+    expect(context?.libraryName).toBe('b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq');
     expect(context?.correlationId).toBeDefined();
   });
 
@@ -204,5 +205,147 @@ describe('ProcessingPipelineService', () => {
     const result = await service.processFile(mockFile);
 
     expect(result.success).toBe(true);
+  });
+
+  describe('buildSharePointUrl', () => {
+    it('should build proper SharePoint URL for file in subfolder', () => {
+      const file: EnrichedDriveItem = {
+        id: 'file123',
+        name: 'document.docx',
+        size: 1024,
+        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+        siteId: 'site456',
+        siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
+        driveId: 'drive789',
+        driveName: 'Documents',
+        folderPath: '/folder/subfolder',
+        lastModifiedDateTime: '2023-01-01T00:00:00Z',
+        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      };
+
+      const result = buildKnowledgeBaseUrl(file);
+
+      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/folder/subfolder/document.docx');
+    });
+
+    it('should build proper SharePoint URL for file in root folder', () => {
+      const file: EnrichedDriveItem = {
+        id: 'file123',
+        name: 'document.docx',
+        size: 1024,
+        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+        siteId: 'site456',
+        siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
+        driveId: 'drive789',
+        driveName: 'Documents',
+        folderPath: '/',
+        lastModifiedDateTime: '2023-01-01T00:00:00Z',
+        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      };
+
+      const result = buildKnowledgeBaseUrl(file);
+
+      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/document.docx');
+    });
+
+    it('should build proper SharePoint URL for file in root folder with empty path', () => {
+      const file: EnrichedDriveItem = {
+        id: 'file123',
+        name: 'document.docx',
+        size: 1024,
+        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+        siteId: 'site456',
+        siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
+        driveId: 'drive789',
+        driveName: 'Documents',
+        folderPath: '',
+        lastModifiedDateTime: '2023-01-01T00:00:00Z',
+        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      };
+
+      const result = buildKnowledgeBaseUrl(file);
+
+      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/document.docx');
+    });
+
+    it('should handle siteWebUrl with trailing slash', () => {
+      const file: EnrichedDriveItem = {
+        id: 'file123',
+        name: 'document.docx',
+        size: 1024,
+        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+        siteId: 'site456',
+        siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site/',
+        driveId: 'drive789',
+        driveName: 'Documents',
+        folderPath: '/folder',
+        lastModifiedDateTime: '2023-01-01T00:00:00Z',
+        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      };
+
+      const result = buildKnowledgeBaseUrl(file);
+
+      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/folder/document.docx');
+    });
+
+    it('should handle folderPath with leading slash', () => {
+      const file: EnrichedDriveItem = {
+        id: 'file123',
+        name: 'document.docx',
+        size: 1024,
+        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+        siteId: 'site456',
+        siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
+        driveId: 'drive789',
+        driveName: 'Documents',
+        folderPath: '/folder/subfolder',
+        lastModifiedDateTime: '2023-01-01T00:00:00Z',
+        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      };
+
+      const result = buildKnowledgeBaseUrl(file);
+
+      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/folder/subfolder/document.docx');
+    });
+
+    it('should handle folderPath without leading slash', () => {
+      const file: EnrichedDriveItem = {
+        id: 'file123',
+        name: 'document.docx',
+        size: 1024,
+        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+        siteId: 'site456',
+        siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
+        driveId: 'drive789',
+        driveName: 'Documents',
+        folderPath: 'folder/subfolder',
+        lastModifiedDateTime: '2023-01-01T00:00:00Z',
+        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      };
+
+      const result = buildKnowledgeBaseUrl(file);
+
+      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/folder/subfolder/document.docx');
+    });
+
+    it('should URL encode special characters in folder names', () => {
+      const file: EnrichedDriveItem = {
+        id: 'file123',
+        name: 'document.docx',
+        size: 1024,
+        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+        siteId: 'site456',
+        siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
+        driveId: 'drive789',
+        driveName: 'Documents',
+        folderPath: '/folder with spaces/sub folder',
+        lastModifiedDateTime: '2023-01-01T00:00:00Z',
+        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      };
+
+      const result = buildKnowledgeBaseUrl(file);
+
+      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/folder%20with%20spaces/sub%20folder/document.docx');
+    });
   });
 });

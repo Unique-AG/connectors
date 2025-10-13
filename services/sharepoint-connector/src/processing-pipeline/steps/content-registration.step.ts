@@ -47,9 +47,9 @@ export class ContentRegistrationStep implements IPipelineStep {
       scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: 'MICROSOFT_365_SHAREPOINT',
-      sourceName: 'Sharepoint',
+      sourceName: 'SharePoint Online Connector',
       ...(isPathBasedIngestion && {
-        url: context.downloadUrl,
+        url: context.knowledgeBaseUrl,
         baseUrl: baseUrl,
       }),
     };

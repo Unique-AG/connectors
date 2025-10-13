@@ -12,7 +12,18 @@ interface SharepointPartialKeyParams {
   siteId: string;
 }
 
-const trimSlashes = (value: string): string => value.replace(/^\/+|\/+$/g, '');
+const trimSlashes = (value: string): string => {
+  // 1. Remove leading/trailing whitespace
+  let result = value.trim();
+
+  // 2. Remove leading and trailing slashes
+  result = result.replace(/^\/+|\/+$/g, '');
+
+  // 3. Replace multiple consecutive slashes with single slash
+  result = result.replace(/\/+/g, '/');
+
+  return result;
+};
 
 export function buildSharepointFileKey({
   scopeId,

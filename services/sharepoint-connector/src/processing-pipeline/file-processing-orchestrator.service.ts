@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
 import { Config } from '../config';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
-import { buildSharepointFileKey } from '../shared/sharepoint-key.util';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
@@ -22,20 +21,12 @@ export class FileProcessingOrchestratorService {
     diffResult: FileDiffResponse,
   ): Promise<void> {
     const concurrency = this.configService.get('pipeline.processingConcurrency', { infer: true });
-    const scopeId = this.configService.get('uniqueApi.scopeId', { infer: true });
     const limit = pLimit(concurrency);
+
 
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);
     const filesToProcess = files.filter((file) => {
-      const fileKey = buildSharepointFileKey({
-        scopeId,
-        siteId: file.siteId,
-        driveName: file.driveName,
-        folderPath: file.folderPath,
-        fileId: file.id,
-        fileName: file.name,
-      });
-      return newFileKeys.has(fileKey);
+      return newFileKeys.has(file.name);
     });
 
     if (filesToProcess.length === 0) {

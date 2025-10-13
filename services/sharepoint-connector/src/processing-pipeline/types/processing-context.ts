@@ -8,7 +8,7 @@ export interface ProcessingContext {
 
   siteUrl: string;
   libraryName: string;
-  downloadUrl?: string;
+  knowledgeBaseUrl?: string;
 
   uploadUrl?: string;
   uniqueContentId?: string;
