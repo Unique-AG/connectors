@@ -23,7 +23,7 @@ export class FileFilterService {
   public isFileValidForIngestion(item: DriveItem): item is DriveItemWithDefinedProperties {
     const fields = item.listItem?.fields as Record<string, unknown>;
     const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
-    const allowedMimeTypes = this.configService.get('sharepoint.allowedMimeTypes', { infer: true });
+    const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
 
     if (
       !item.file ||

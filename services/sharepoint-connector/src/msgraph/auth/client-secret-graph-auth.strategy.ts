@@ -24,9 +24,9 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
   private cachedToken: CachedToken | null = null;
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
-    const tenantId = this.configService.get('sharepoint.tenantId', { infer: true });
-    const clientId = this.configService.get('sharepoint.clientId', { infer: true });
-    const clientSecret = this.configService.get('sharepoint.clientSecret', { infer: true });
+    const tenantId = this.configService.get('sharepoint.graphTenantId', { infer: true });
+    const clientId = this.configService.get('sharepoint.graphClientId', { infer: true });
+    const clientSecret = this.configService.get('sharepoint.graphClientSecret', { infer: true });
 
     assert.ok(
       tenantId && clientId && clientSecret,

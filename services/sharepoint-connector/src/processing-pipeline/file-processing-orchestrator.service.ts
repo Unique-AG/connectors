@@ -20,7 +20,7 @@ export class FileProcessingOrchestratorService {
     files: EnrichedDriveItem[],
     diffResult: FileDiffResponse,
   ): Promise<void> {
-    const concurrency = this.configService.get('pipeline.processingConcurrency', { infer: true });
+    const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
 
 
