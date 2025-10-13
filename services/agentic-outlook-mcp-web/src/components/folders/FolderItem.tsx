@@ -1,5 +1,7 @@
+import { toCompilableQuery } from '@powersync/drizzle-driver';
 import dayjs from 'dayjs';
 import LocalizedFormat from 'dayjs/plugin/localizedFormat';
+import { eq } from 'drizzle-orm';
 import {
   Archive,
   ArchiveX,
@@ -21,7 +23,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { useCallApi } from '@/hooks/use-call-api';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { syncFolderEmails } from '../../@generated/sync/sync';
+import { db } from '../../lib/powersync/database';
+import { folders as foldersTable } from '../../lib/powersync/schema';
 import { type FolderWithChildren } from './FolderTree';
 
 dayjs.extend(LocalizedFormat);
@@ -29,12 +36,14 @@ dayjs.extend(LocalizedFormat);
 interface FolderItemProps {
   folder: FolderWithChildren;
   level: number;
-  onToggleSync: (folderId: string, enabled: boolean) => void;
-  onWipeFolder: (folderId: string) => void;
 }
 
-export const FolderItem: FC<FolderItemProps> = ({ folder, level, onToggleSync, onWipeFolder }) => {
+export const FolderItem: FC<FolderItemProps> = ({ folder, level }) => {
   const [isExpanded, setIsExpanded] = useState(true);
+  const { toast } = useToast();
+  const { callApi } = useCallApi();
+  const [isLoading, setIsLoading] = useState(false);
+
   const hasChildren = folder.children && folder.children.length > 0;
   const syncEnabled = folder.activatedAt && !folder.deactivatedAt;
 
@@ -61,6 +70,51 @@ export const FolderItem: FC<FolderItemProps> = ({ folder, level, onToggleSync, o
         Disabled
       </Badge>
     );
+  };
+
+  const handleToggleFolderSync = async (folderId: string, enabled: boolean) => {
+    const query = enabled
+      ? db
+          .update(foldersTable)
+          .set({ activatedAt: new Date().toISOString(), deactivatedAt: null })
+          .where(eq(foldersTable.id, folderId))
+      : db
+          .update(foldersTable)
+          .set({ deactivatedAt: new Date().toISOString() })
+          .where(eq(foldersTable.id, folderId));
+    await toCompilableQuery(query).execute();
+  };
+
+  const handleResync = async (folderId: string) => {
+    setIsLoading(true);
+    try {
+      const response = await callApi(syncFolderEmails, folderId);
+      if (response.status === 200) {
+        toast({
+          title: 'Folder Resynced',
+          description: 'All emails have been resynced from the folder.',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to resync folder',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleWipeFolder = async (folderId: string) => {
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    toast({
+      title: 'Folder Wiped',
+      description: 'All emails have been permanently deleted from the folder.',
+      variant: 'destructive',
+    });
   };
 
   return (
@@ -144,15 +198,28 @@ export const FolderItem: FC<FolderItemProps> = ({ folder, level, onToggleSync, o
             <div className="flex items-center gap-2">
               <Switch
                 checked={syncEnabled}
-                onCheckedChange={(enabled) => onToggleSync(folder.id, enabled)}
+                onCheckedChange={(enabled) => handleToggleFolderSync(folder.id, enabled)}
                 className="data-[state=checked]:bg-primary"
               />
+
+              {syncEnabled && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleResync(folder.id)}
+                  className="text-primary hover:text-primary-foreground hover:bg-primary"
+                  disabled={isLoading}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Resync
+                </Button>
+              )}
 
               {!syncEnabled && !!folder.emails?.length && folder.emails.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onWipeFolder(folder.id)}
+                  onClick={() => handleWipeFolder(folder.id)}
                   className="text-destructive hover:text-destructive-foreground hover:bg-destructive"
                 >
                   <Trash2 className="h-3 w-3 mr-1" />
@@ -172,8 +239,6 @@ export const FolderItem: FC<FolderItemProps> = ({ folder, level, onToggleSync, o
               key={child.id}
               folder={child}
               level={level + 1}
-              onToggleSync={onToggleSync}
-              onWipeFolder={onWipeFolder}
             />
           ))}
         </div>

@@ -15,8 +15,6 @@ export type FolderWithChildren = FolderWithEmails & { children: FolderWithChildr
 interface FolderTreeProps {
   syncEnabled: boolean;
   folders: FolderWithEmails[];
-  onToggleSync: (folderId: string, enabled: boolean) => void;
-  onWipeFolder: (folderId: string) => void;
   onResync: () => void;
   isRefreshing?: boolean;
 }
@@ -81,8 +79,6 @@ const buildFolderTree = (folders: FolderWithEmails[]): FolderWithChildren[] => {
 export const FolderTree = ({
   syncEnabled,
   folders,
-  onToggleSync,
-  onWipeFolder,
   onResync,
   isRefreshing = false,
 }: FolderTreeProps) => {
@@ -120,8 +116,6 @@ export const FolderTree = ({
                 key={folder.id}
                 folder={folder}
                 level={0}
-                onToggleSync={onToggleSync}
-                onWipeFolder={onWipeFolder}
               />
             ))
           )}

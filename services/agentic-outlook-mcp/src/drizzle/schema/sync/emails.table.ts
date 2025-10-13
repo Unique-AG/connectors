@@ -4,6 +4,7 @@ import {
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -13,6 +14,16 @@ import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 import { folders } from './folders.table';
+
+export const ingestionStatus = pgEnum('ingestion_status', [
+  'pending',
+  'ingested',
+  'processed',
+  'chunked',
+  'embedded',
+  'completed', // == indexed
+  'failed',
+]);
 
 export const emails = pgTable(
   'emails',
@@ -47,7 +58,11 @@ export const emails = pgTable(
     subject: text(),
     preview: text(),
     bodyText: text(),
+    bodyTextFingerprint: text(),
     bodyHtml: text(),
+    bodyHtmlFingerprint: text(),
+
+    processedBody: text(),
 
     isRead: boolean().notNull().default(true),
     isDraft: boolean().notNull().default(false),
@@ -59,12 +74,11 @@ export const emails = pgTable(
     attachments: jsonb()
       .$type<
         Array<{
-          id: string | null;
-          filename: string | null;
-          mimeType: string | null;
-          sizeBytes: number | null;
-          isInline: boolean | null;
-          contentId: string | null;
+          id: string | undefined | null;
+          filename: string | undefined | null;
+          mimeType: string | undefined | null;
+          sizeBytes: number | undefined | null;
+          isInline: boolean | undefined | null;
         }>
       >()
       .notNull()
@@ -79,6 +93,12 @@ export const emails = pgTable(
     folderId: varchar()
       .notNull()
       .references(() => folders.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+
+    // Ingestion Status
+    ingestionStatus: ingestionStatus().notNull().default('pending'),
+    ingestionLastError: text(),
+    ingestionLastAttemptAt: timestamp({ mode: "string" }),
+    ingestionCompletedAt: timestamp({ mode: "string" }),
 
     ...timestamps,
   },

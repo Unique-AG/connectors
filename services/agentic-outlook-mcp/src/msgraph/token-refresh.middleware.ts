@@ -86,13 +86,16 @@ export class TokenRefreshMiddleware implements Middleware {
       if (context.response?.ok) {
         this.logger.debug(`Request succeeded after token refresh for user ${this.userProfileId}`);
       } else {
-        this.logger.warn(`Request still failed after token refresh for user ${this.userProfileId}`);
+        this.logger.warn({
+          msg: `Request still failed after token refresh for user ${this.userProfileId}`,
+          error: context.response,
+        });
       }
     } catch (error) {
-      this.logger.error(
-        `Failed to refresh token or retry request for user ${this.userProfileId}:`,
+      this.logger.error({
+        msg: `Failed to refresh token or retry request for user ${this.userProfileId}:`,
         error,
-      );
+      });
       // Keep the original 401 response if refresh fails
       // The calling code will handle the authentication error appropriately
     }

@@ -2,9 +2,11 @@ import { join } from 'node:path';
 import { initOpenTelemetry, runWithInstrumentation } from '@unique-ag/instrumentation';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from 'nestjs-pino';
 import * as packageJson from '../package.json';
+import { AppEvents } from './app.events';
 import { AppModule } from './app.module';
 import { AppConfig, AppSettings } from './app-settings';
 
@@ -27,6 +29,7 @@ async function bootstrap() {
   const port = configService.get(AppSettings.PORT, { infer: true });
   await app.listen(port);
   console.log(`Server is running on http://localhost:${port}`);
+  app.get(EventEmitter2).emit(AppEvents.AppReady);
 }
 
 initOpenTelemetry({

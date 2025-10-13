@@ -4,13 +4,9 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { and, eq, isNotNull, isNull, lt } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
-import { DRIZZLE, DrizzleDatabase, folders as foldersTable } from '../drizzle';
-import { normalizeError } from '../utils/normalize-error';
+import { DRIZZLE, DrizzleDatabase } from '../../drizzle';
 import { EmailDeltaSyncRequestedEvent, EmailEvents } from './email.events';
 
-/**
- * Service to handle scheduled sync operations and retry failed syncs
- */
 @Injectable()
 export class EmailSyncSchedulerService {
   private readonly logger = new Logger(EmailSyncSchedulerService.name);
@@ -23,8 +19,7 @@ export class EmailSyncSchedulerService {
   ) {}
 
   /**
-   * Periodic check for folders that need syncing
-   * Runs every 5 minutes
+   * Periodic check for folders that need syncing as a safeguard against failing subscription events.
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   public async checkFoldersForSync() {
