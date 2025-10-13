@@ -1,0 +1,1 @@
+ALTER TABLE "emails" DROP COLUMN "ingestion_attempts";
