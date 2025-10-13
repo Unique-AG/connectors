@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { normalizeError } from '../utils/normalize-error';
 import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
@@ -10,6 +9,7 @@ import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
+import { normalizeError } from '../utils/normalize-error';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -39,6 +39,7 @@ export class SharepointSynchronizationService {
     this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
 
     for (const siteId of siteIdsToScan) {
+      const siteStartTime = Date.now();
       try {
         const files = await this.graphApiService.getAllFilesForSite(siteId);
         const diffResult = await this.calculateDiffForFiles(files, siteId);
@@ -48,7 +49,7 @@ export class SharepointSynchronizationService {
 
         await this.orchestrator.processFilesForSite(siteId, files, diffResult);
 
-        const siteScanDurationSeconds = (Date.now() - scanStartTime) / 1000;
+        const siteScanDurationSeconds = (Date.now() - siteStartTime) / 1000;
         this.logger.log(`Finished processing site ${siteId} in ${siteScanDurationSeconds.toFixed(2)}s`);
       } catch (rawError) {
         const error = normalizeError(rawError);
