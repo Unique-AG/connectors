@@ -24,7 +24,8 @@ describe('ProcessingPipelineService', () => {
     id: '01JWNC3IM2TIAIFMTM4JHYR6RX3E2REDPW',
     name: 'Document.docx',
     size: 20791,
-    webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/_layouts/15/Doc.aspx?sourcedoc=%7B82009A9A-6CB2-4FE2-88FA-37D935120DF6%7D&file=Document.docx&action=default&mobileredirect=true',
+    webUrl:
+      'https://uniqueapp.sharepoint.com/sites/UniqueAG/_layouts/15/Doc.aspx?sourcedoc=%7B82009A9A-6CB2-4FE2-88FA-37D935120DF6%7D&file=Document.docx&action=default&mobileredirect=true',
     file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
     parentReference: {
       siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
@@ -134,7 +135,9 @@ describe('ProcessingPipelineService', () => {
     expect(context?.fileName).toBe('Document.docx');
     expect(context?.fileSize).toBe(20791);
     expect(context?.siteUrl).toBe('https://uniqueapp.sharepoint.com/sites/UniqueAG');
-    expect(context?.libraryName).toBe('b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq');
+    expect(context?.libraryName).toBe(
+      'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+    );
     expect(context?.correlationId).toBeDefined();
   });
 
@@ -220,12 +223,16 @@ describe('ProcessingPipelineService', () => {
         driveName: 'Documents',
         folderPath: '/folder/subfolder',
         lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+        file: {
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
       };
 
       const result = buildKnowledgeBaseUrl(file);
 
-      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/folder/subfolder/document.docx');
+      expect(result).toBe(
+        'https://tenant.sharepoint.com/sites/test-site/folder/subfolder/document.docx',
+      );
     });
 
     it('should build proper SharePoint URL for file in root folder', () => {
@@ -240,7 +247,9 @@ describe('ProcessingPipelineService', () => {
         driveName: 'Documents',
         folderPath: '/',
         lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+        file: {
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
       };
 
       const result = buildKnowledgeBaseUrl(file);
@@ -260,7 +269,9 @@ describe('ProcessingPipelineService', () => {
         driveName: 'Documents',
         folderPath: '',
         lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+        file: {
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
       };
 
       const result = buildKnowledgeBaseUrl(file);
@@ -280,7 +291,9 @@ describe('ProcessingPipelineService', () => {
         driveName: 'Documents',
         folderPath: '/folder',
         lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+        file: {
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
       };
 
       const result = buildKnowledgeBaseUrl(file);
@@ -300,12 +313,16 @@ describe('ProcessingPipelineService', () => {
         driveName: 'Documents',
         folderPath: '/folder/subfolder',
         lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+        file: {
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
       };
 
       const result = buildKnowledgeBaseUrl(file);
 
-      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/folder/subfolder/document.docx');
+      expect(result).toBe(
+        'https://tenant.sharepoint.com/sites/test-site/folder/subfolder/document.docx',
+      );
     });
 
     it('should handle folderPath without leading slash', () => {
@@ -320,12 +337,16 @@ describe('ProcessingPipelineService', () => {
         driveName: 'Documents',
         folderPath: 'folder/subfolder',
         lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+        file: {
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
       };
 
       const result = buildKnowledgeBaseUrl(file);
 
-      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/folder/subfolder/document.docx');
+      expect(result).toBe(
+        'https://tenant.sharepoint.com/sites/test-site/folder/subfolder/document.docx',
+      );
     });
 
     it('should URL encode special characters in folder names', () => {
@@ -340,12 +361,16 @@ describe('ProcessingPipelineService', () => {
         driveName: 'Documents',
         folderPath: '/folder with spaces/sub folder',
         lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+        file: {
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
       };
 
       const result = buildKnowledgeBaseUrl(file);
 
-      expect(result).toBe('https://tenant.sharepoint.com/sites/test-site/folder%20with%20spaces/sub%20folder/document.docx');
+      expect(result).toBe(
+        'https://tenant.sharepoint.com/sites/test-site/folder%20with%20spaces/sub%20folder/document.docx',
+      );
     });
   });
 });

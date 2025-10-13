@@ -37,7 +37,7 @@ describe('FileProcessingOrchestratorService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'pipeline.processingConcurrency') return 3;
+          if (key === 'processing.concurrency') return 3;
           return undefined;
         }),
       }))
@@ -56,10 +56,7 @@ describe('FileProcessingOrchestratorService', () => {
     ];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: [
-        'file-file-1.pdf',
-        'file-file-3.pdf',
-      ],
+      newAndUpdatedFiles: ['file-1', 'file-3'],
       deletedFiles: [],
       movedFiles: [],
     };
@@ -71,11 +68,14 @@ describe('FileProcessingOrchestratorService', () => {
     expect(mockPipelineService.processFile).toHaveBeenCalledWith(files[2]);
   });
 
-  it('filters files by site ID', async () => {
-    const files = [createMockFile('file-1', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'), createMockFile('file-2', 'site-2')];
+  it('filters files by drive ID', async () => {
+    const files = [
+      createMockFile('file-1', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      createMockFile('file-2', 'site-2'),
+    ];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: ['file-file-1.pdf'],
+      newAndUpdatedFiles: ['file-1'],
       deletedFiles: [],
       movedFiles: [],
     };
@@ -99,10 +99,12 @@ describe('FileProcessingOrchestratorService', () => {
   });
 
   it('processes files with configured concurrency', async () => {
-    const files = Array.from({ length: 10 }, (_, i) => createMockFile(`file-${i}`, 'bd9c85ee-998f-4665-9c44-577cf5a08a66'));
+    const files = Array.from({ length: 10 }, (_, i) =>
+      createMockFile(`file-${i}`, 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+    );
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: files.map((f) => `file-${f.id}.pdf`),
+      newAndUpdatedFiles: files.map((f) => `${f.id}`),
       deletedFiles: [],
       movedFiles: [],
     };
@@ -132,7 +134,7 @@ describe('FileProcessingOrchestratorService', () => {
     ];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: files.map((f) => `file-${f.id}.pdf`),
+      newAndUpdatedFiles: files.map((f) => `${f.id}`),
       deletedFiles: [],
       movedFiles: [],
     };

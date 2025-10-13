@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
@@ -27,17 +26,10 @@ export class ContentRegistrationStep implements IPipelineStep {
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
-    const baseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const isPathBasedIngestion = !scopeId;
 
-    const fileKey = buildSharepointFileKey({
-      scopeId,
-      siteId: context.metadata.siteId,
-      driveName: context.metadata.driveName,
-      folderPath: context.metadata.folderPath,
-      fileId: context.fileId,
-      fileName: context.fileName,
-    });
+    const fileKey = `${context.metadata.siteId}/${context.fileId}`;
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: fileKey,
@@ -50,7 +42,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       sourceName: 'SharePoint Online Connector',
       ...(isPathBasedIngestion && {
         url: context.knowledgeBaseUrl,
-        baseUrl: baseUrl,
+        baseUrl: sharepointBaseUrl,
       }),
     };
 

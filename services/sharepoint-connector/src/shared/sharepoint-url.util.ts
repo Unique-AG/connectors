@@ -8,7 +8,9 @@ export function buildKnowledgeBaseUrl(file: EnrichedDriveItem): string {
   const baseUrl = file.siteWebUrl.replace(/\/$/, '');
 
   // 2. Ensure folder path starts with slash for consistent processing
-  const normalizedFolderPath = file.folderPath.startsWith('/') ? file.folderPath : `/${file.folderPath}`;
+  const normalizedFolderPath = file.folderPath.startsWith('/')
+    ? file.folderPath
+    : `/${file.folderPath}`;
 
   // 3. Handle root folder case (empty folder path)
   if (normalizedFolderPath === '/') {
@@ -17,8 +19,8 @@ export function buildKnowledgeBaseUrl(file: EnrichedDriveItem): string {
 
   // 4. Remove leading slash, URL-encode each folder segment, then add back leading slash
   const pathSegments = normalizedFolderPath.substring(1).split('/');
-  const encodedSegments = pathSegments.map(segment => encodeURIComponent(segment));
-  const encodedPath = '/' + encodedSegments.join('/');
+  const encodedSegments = pathSegments.map((segment) => encodeURIComponent(segment));
+  const encodedPath = `/${encodedSegments.join('/')}`;
 
   return `${baseUrl}${encodedPath}/${file.name}`;
 }

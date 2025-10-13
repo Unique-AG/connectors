@@ -3,7 +3,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { normalizeError } from '../../utils/normalize-error';
@@ -24,7 +23,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const registrationResponse = context.metadata.registration;
-    const baseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const isPathBasedIngestion = !scopeId;
     const stepStartTime = Date.now();
@@ -34,14 +33,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
       `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
     );
 
-    const fileKey = buildSharepointFileKey({
-      scopeId,
-      siteId: context.metadata.siteId,
-      driveName: context.metadata.driveName,
-      folderPath: context.metadata.folderPath,
-      fileId: context.fileId,
-      fileName: context.fileName,
-    });
+    const fileKey = `${context.metadata.siteId}/${context.fileId}`;
 
     const ingestionFinalizationRequest = {
       key: fileKey,
@@ -56,7 +48,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
       fileUrl: registrationResponse.readUrl,
       ...(isPathBasedIngestion && {
         url: context.knowledgeBaseUrl,
-        baseUrl: baseUrl,
+        baseUrl: sharepointBaseUrl,
       }),
     };
 

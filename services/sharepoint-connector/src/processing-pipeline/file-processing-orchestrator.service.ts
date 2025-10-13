@@ -23,12 +23,8 @@ export class FileProcessingOrchestratorService {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
 
-
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);
-    const filesToProcess = files.filter((file) => {
-      return newFileKeys.has(file.name);
-    });
-
+    const filesToProcess = files.filter((file) => newFileKeys.has(file.id));
     if (filesToProcess.length === 0) {
       this.logger.log(`No files to process for site ${siteId}`);
       return;
