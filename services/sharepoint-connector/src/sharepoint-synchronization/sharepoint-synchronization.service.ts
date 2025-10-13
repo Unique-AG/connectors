@@ -80,7 +80,7 @@ export class SharepointSynchronizationService {
       return {
         key: file.id,
         url: buildKnowledgeBaseUrl(file), // SharePoint URL for location
-        updatedAt: file.listItem?.lastModifiedDateTime  ?? file.lastModifiedDateTime
+        updatedAt: file.listItem?.lastModifiedDateTime ?? file.lastModifiedDateTime,
       };
     });
 

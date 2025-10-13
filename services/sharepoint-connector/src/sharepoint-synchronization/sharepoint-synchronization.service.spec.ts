@@ -67,7 +67,7 @@ describe('SharepointSynchronizationService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.sites') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
+          if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
           return undefined;
         }),
       }))
@@ -207,7 +207,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockUniqueApiService.performFileDiff).toHaveBeenCalledWith(
       [
         {
-          key: '2019-BMW-Maintenance.pdf',
+          key: '01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI',
           url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
           updatedAt: '2025-10-10T13:59:11Z',
         },
@@ -242,9 +242,9 @@ describe('SharepointSynchronizationService', () => {
     expect(mockUniqueApiService.performFileDiff).toHaveBeenCalledWith(
       [
         {
-          key: '6034030.pdf',
+          key: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV',
           url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
-          updatedAt: undefined,
+          updatedAt: '2025-10-10T13:59:12Z', // Falls back to file.lastModifiedDateTime
         },
       ],
       'test-token',
@@ -265,9 +265,9 @@ describe('SharepointSynchronizationService', () => {
 
     expect(mockUniqueApiService.performFileDiff).toHaveBeenCalledWith(
       expect.arrayContaining([
-        expect.objectContaining({ key: '1173246.pdf' }),
-        expect.objectContaining({ key: '2019-BMW-Maintenance.pdf' }),
-        expect.objectContaining({ key: '6034030.pdf' }),
+        expect.objectContaining({ key: '01JWNC3IKFO6XBRCRFWRHKJ77NAYYM3NTX' }),
+        expect.objectContaining({ key: '01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI' }),
+        expect.objectContaining({ key: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV' }),
       ]),
       'test-token',
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
