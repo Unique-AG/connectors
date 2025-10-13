@@ -9,21 +9,20 @@ export class EmailService {
 
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
-  public async upsertEmails(
+  public async upsertEmail(
     userProfileId: TypeID<'user_profile'>,
     folderId: string,
-    emails: EmailInput[],
-  ): Promise<void> {
-    if (!emails.length) return;
+    email: EmailInput,
+  ): Promise<TypeID<'email'>> {
 
-    await this.db
+    const result = await this.db
       .insert(emailsTable)
       .values(
-        emails.map((email) => ({
+        ({
           ...email,
           userProfileId: userProfileId.toString(),
           folderId,
-        })),
+        }),
       )
       .onConflictDoUpdate({
         target: emailsTable.messageId,
@@ -42,24 +41,37 @@ export class EmailService {
           subject: sql`excluded.subject`,
           preview: sql`excluded.preview`,
           bodyText: sql`excluded.body_text`,
+          bodyTextFingerprint: sql`excluded.body_text_fingerprint`,
           bodyHtml: sql`excluded.body_html`,
+          bodyHtmlFingerprint: sql`excluded.body_html_fingerprint`,
+          processedBody: sql`excluded.processed_body`,
           isRead: sql`excluded.is_read`,
           isDraft: sql`excluded.is_draft`,
           sizeBytes: sql`excluded.size_bytes`,
           tags: sql`excluded.tags`,
+          hasAttachments: sql`excluded.has_attachments`,
           attachments: sql`excluded.attachments`,
           attachmentCount: sql`excluded.attachment_count`,
           headers: sql`excluded.headers`,
-          updatedAt: sql`NOW()`,
+          ingestionStatus: sql`excluded.ingestion_status`,
+          ingestionLastError: sql`excluded.ingestion_last_error`,
+          ingestionLastAttemptAt: sql`excluded.ingestion_last_attempt_at`,
+          ingestionCompletedAt: sql`excluded.ingestion_completed_at`,
         },
-      });
+      }).returning({ id: emailsTable.id });
+
+    const [savedEmail] = result;
+    if (!savedEmail) throw new Error('Failed to upsert email');
 
     this.logger.debug({
-      msg: 'Upserted emails',
-      count: emails.length,
+      msg: 'Upserted email',
+      emailId: email.id,
+      messageId: email.messageId,
       folderId,
       userProfileId: userProfileId.toString(),
     });
+
+    return TypeID.fromString(savedEmail.id, 'email');
   }
 
   public async deleteEmails(

@@ -8,10 +8,11 @@ import {
   OnApplicationBootstrap,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
+import { AppEvents } from '../../app.events';
 import { AppConfig, AppSettings } from '../../app-settings';
 import { DRIZZLE, DrizzleDatabase, Folder, Subscription, subscriptions } from '../../drizzle';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
@@ -26,7 +27,7 @@ type SubscriptionResourceType = 'folder';
 type SubscriptionResource = Folder;
 
 @Injectable()
-export class SubscriptionService implements OnApplicationBootstrap, BeforeApplicationShutdown {
+export class SubscriptionService implements BeforeApplicationShutdown {
   private readonly logger = new Logger(this.constructor.name);
   private readonly activeSubscriptions: Map<string, Subscription> = new Map();
 
@@ -37,16 +38,17 @@ export class SubscriptionService implements OnApplicationBootstrap, BeforeApplic
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  public async onApplicationBootstrap() {
-    // const subscriptionsList = await this.db.select().from(subscriptions);
-    // this.logger.log({
-    //   msg: 'Creating subscriptions',
-    //   count: subscriptionsList.length,
-    // });
-    // for (const subscription of subscriptionsList) {
-    //   await this.startSubscription(subscription);
-    // }
-  }
+  // @OnEvent(AppEvents.AppReady)
+  // public async onAppReady() {
+  //   const subscriptionsList = await this.db.select().from(subscriptions);
+  //   this.logger.log({
+  //     msg: 'Creating subscriptions',
+  //     count: subscriptionsList.length,
+  //   });
+  //   for (const subscription of subscriptionsList) {
+  //     await this.startSubscription(subscription);
+  //   }
+  // }
 
   // Cleanup via in-memory map, as other replicas of this service could hold other subscriptions.
   public async beforeApplicationShutdown() {
@@ -241,73 +243,87 @@ export class SubscriptionService implements OnApplicationBootstrap, BeforeApplic
   }
 
   private async reauthorizeSubscription(msGraphSubscriptionId: string) {
-    const subscription = await this.db.query.subscriptions.findFirst({
-      where: eq(subscriptions.subscriptionId, msGraphSubscriptionId),
-    });
-    if (!subscription) throw new Error('Subscription not found');
-    const client = this.graphClientFactory.createClientForUser(
-      TypeID.fromString(subscription.userProfileId, 'user_profile'),
-    );
-    const newExpirationTime = this.getMsGraphExpirationTime(subscription.forType);
-    await client.api(`/subscriptions/${msGraphSubscriptionId}`).patch({
-      expirationDateTime: newExpirationTime,
-    });
-    await this.db
-      .update(subscriptions)
-      .set({
-        expiresAt: newExpirationTime,
-      })
-      .where(eq(subscriptions.id, subscription.id));
+    try {
+      const subscription = await this.db.query.subscriptions.findFirst({
+        where: eq(subscriptions.subscriptionId, msGraphSubscriptionId),
+      });
+      if (!subscription) throw new Error('Subscription not found');
+      const client = this.graphClientFactory.createClientForUser(
+        TypeID.fromString(subscription.userProfileId, 'user_profile'),
+      );
+      const newExpirationTime = this.getMsGraphExpirationTime(subscription.forType);
+      await client.api(`/subscriptions/${msGraphSubscriptionId}`).patch({
+        expirationDateTime: newExpirationTime,
+      });
+      await this.db
+        .update(subscriptions)
+        .set({
+          expiresAt: newExpirationTime,
+        })
+        .where(eq(subscriptions.id, subscription.id));
 
-    this.logger.log({
-      msg: 'Subscription reauthorized',
-      id: subscription.id,
-      msGraphId: subscription.subscriptionId,
-      newExpirationTime,
-    });
+      this.logger.log({
+        msg: 'Subscription reauthorized',
+        id: subscription.id,
+        msGraphId: subscription.subscriptionId,
+        newExpirationTime,
+      });
+    } catch (error) {
+      this.logger.error({
+        msg: 'Failed to reauthorize subscription.',
+        error: serializeError(normalizeError(error)),
+      });
+    }
   }
 
   private async stopSubscription(subscription: Subscription | string) {
     let subscriptionToStop: Subscription;
 
-    if (typeof subscription === 'string') {
-      const foundSubscription = await this.db.query.subscriptions.findFirst({
-        where: eq(subscriptions.subscriptionId, subscription),
-      });
-      if (!foundSubscription) return;
-      subscriptionToStop = foundSubscription;
-    } else {
-      subscriptionToStop = subscription;
-    }
+    try {
+      if (typeof subscription === 'string') {
+        const foundSubscription = await this.db.query.subscriptions.findFirst({
+          where: eq(subscriptions.subscriptionId, subscription),
+        });
+        if (!foundSubscription) return;
+        subscriptionToStop = foundSubscription;
+      } else {
+        subscriptionToStop = subscription;
+      }
 
-    if (!subscriptionToStop.subscriptionId)
-      throw new Error('This subscription does not have a MS Graph ID and seems to be inactive');
-    await this.deleteMsGraphSubscription(subscriptionToStop.subscriptionId);
-    if (!this.activeSubscriptions.has(subscriptionToStop.id)) {
-      this.logger.warn({
-        msg: 'Subscription is not active',
+      if (!subscriptionToStop.subscriptionId)
+        throw new Error('This subscription does not have a MS Graph ID and seems to be inactive');
+      await this.deleteMsGraphSubscription(subscriptionToStop.subscriptionId);
+      if (!this.activeSubscriptions.has(subscriptionToStop.id)) {
+        this.logger.warn({
+          msg: 'Subscription is not active',
+          id: subscriptionToStop.id,
+          msGraphId: subscriptionToStop.subscriptionId,
+        });
+        return;
+      }
+
+      await this.db
+        .update(subscriptions)
+        .set({
+          subscriptionId: null,
+          expiresAt: null,
+        })
+        .where(eq(subscriptions.id, subscriptionToStop.id));
+
+      this.activeSubscriptions.delete(subscriptionToStop.id);
+
+      this.logger.log({
+        msg: 'Subscription deleted',
         id: subscriptionToStop.id,
         msGraphId: subscriptionToStop.subscriptionId,
+        resource: subscriptionToStop.resource,
       });
-      return;
+    } catch (error) {
+      this.logger.error({
+        msg: 'Failed to delete and stop subscription.',
+        error: serializeError(normalizeError(error)),
+      });
     }
-
-    await this.db
-      .update(subscriptions)
-      .set({
-        subscriptionId: null,
-        expiresAt: null,
-      })
-      .where(eq(subscriptions.id, subscriptionToStop.id));
-
-    this.activeSubscriptions.delete(subscriptionToStop.id);
-
-    this.logger.log({
-      msg: 'Subscription deleted',
-      id: subscriptionToStop.id,
-      msGraphId: subscriptionToStop.subscriptionId,
-      resource: subscriptionToStop.resource,
-    });
   }
 
   private async createMsGraphSubscription(

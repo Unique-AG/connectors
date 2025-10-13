@@ -9,7 +9,6 @@ import { useToast } from '@/hooks/use-toast';
 import { deleteAllUserData, syncFolders } from '../@generated/sync/sync';
 import { db } from '../lib/powersync/database';
 import {
-  folders as foldersTable,
   UserProfile,
   userProfiles as userProfilesTable,
 } from '../lib/powersync/schema';
@@ -35,34 +34,6 @@ export default function FolderManagement() {
       }),
     ),
   );
-
-  const handleToggleFolderSync = async (folderId: string, enabled: boolean) => {
-    const query = enabled
-      ? db
-          .update(foldersTable)
-          .set({ activatedAt: new Date().toISOString(), deactivatedAt: null })
-          .where(eq(foldersTable.id, folderId))
-      : db
-          .update(foldersTable)
-          .set({ deactivatedAt: new Date().toISOString() })
-          .where(eq(foldersTable.id, folderId));
-    await toCompilableQuery(query).execute();
-  };
-
-  const handleWipeFolder = async (folderId: string) => {
-    setIsLoading(true);
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    setIsLoading(false);
-
-    toast({
-      title: 'Folder Wiped',
-      description: 'All emails have been permanently deleted from the folder.',
-      variant: 'destructive',
-    });
-  };
 
   const handleResync = async () => {
     setIsRefreshing(true);
@@ -144,8 +115,6 @@ export default function FolderManagement() {
       <FolderTree
         syncEnabled={syncEnabled}
         folders={folders}
-        onToggleSync={handleToggleFolderSync}
-        onWipeFolder={handleWipeFolder}
         onResync={handleResync}
         isRefreshing={isRefreshing}
       />

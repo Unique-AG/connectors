@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import { AmqpConnection, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
-import { Message } from '@microsoft/microsoft-graph-types';
+import { Attachment, Message } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConsumeMessage } from 'amqplib';
 import { snakeCase } from 'lodash';
 import { serializeError } from 'serialize-error-cjs';
@@ -8,6 +10,8 @@ import { TypeID } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, EmailInput } from '../../../drizzle';
 import { normalizeError } from '../../../utils/normalize-error';
 import { EmailService } from '../email.service';
+import { EmailSyncService } from '../email-sync.service';
+import { IngestCompletedEvent, PipelineEvents } from './pipeline.events';
 
 const MAX_ATTEMPTS = 6;
 const BASE_DELAY_MS = 60_000; // 1 minute
@@ -44,6 +48,8 @@ export class IngestService {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly amqpConnection: AmqpConnection,
     private readonly emailService: EmailService,
+    private readonly emailSyncService: EmailSyncService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @RabbitSubscribe({
@@ -55,12 +61,16 @@ export class IngestService {
     const { message, userProfileId, folderId } = ingestMessage;
     const attempt = Number(amqpMessage.properties.headers?.['x-attempt'] ?? 1);
 
+    // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
+    const messageId = message.id!;
+
+    // This can cause data inconsistency if a folder is changed while ingesting.
     await this.ensureFoldersMap();
 
     if (attempt > 1) {
       this.logger.log({
         msg: 'Retrying ingest for message',
-        messageId: message.id,
+        messageId,
         attempt,
       });
     }
@@ -69,17 +79,43 @@ export class IngestService {
       const isDeleted = (message as unknown as DeletedItem)['@removed'] !== undefined;
       if (isDeleted) {
         await this.emailService.deleteEmails(TypeID.fromString(userProfileId, 'user_profile'), [
-          // biome-ignore lint/style/noNonNullAssertion: Microsoft Graph API returns deleted items with an id
-          message.id!,
+          messageId,
         ]);
         return;
       }
 
-      const mappedEmail = this.mapMessageToEmail(message, userProfileId, folderId, this.foldersMap);
-      await this.emailService.upsertEmails(
+      let attachments: Attachment[] = [];
+      if (message.hasAttachments)
+        attachments = await this.emailSyncService.getAttachments(
+          messageId,
+          folderId,
+          TypeID.fromString(userProfileId, 'user_profile'),
+        );
+
+      const mappedEmail = this.mapMessageToEmail({ message, attachments, userProfileId, folderId });
+      mappedEmail.bodyTextFingerprint = mappedEmail.bodyText
+        ? createHash('sha256').update(this.normalizeBody(mappedEmail.bodyText)).digest('hex')
+        : null;
+      mappedEmail.bodyHtmlFingerprint = mappedEmail.bodyHtml
+        ? createHash('sha256').update(this.normalizeBody(mappedEmail.bodyHtml)).digest('hex')
+        : null;
+
+      mappedEmail.ingestionStatus = 'ingested';
+      mappedEmail.ingestionLastAttemptAt = new Date().toISOString();
+
+      const savedId = await this.emailService.upsertEmail(
         TypeID.fromString(userProfileId, 'user_profile'),
         folderId,
-        [mappedEmail],
+        mappedEmail,
+      );
+
+      this.eventEmitter.emit(
+        PipelineEvents.IngestCompleted,
+        new IngestCompletedEvent(
+          TypeID.fromString(userProfileId, 'user_profile'),
+          folderId,
+          savedId,
+        ),
       );
 
       return;
@@ -99,6 +135,19 @@ export class IngestService {
           __failedAt: new Date().toISOString(),
           __attempt: attempt,
         });
+        await this.emailService.upsertEmail(
+          TypeID.fromString(userProfileId, 'user_profile'),
+          folderId,
+          {
+            messageId,
+            userProfileId,
+            folderId,
+            ingestionStatus: 'failed',
+            ingestionLastError: serializedError.message,
+            ingestionLastAttemptAt: new Date().toISOString(),
+            ingestionCompletedAt: new Date().toISOString(),
+          },
+        );
         return;
       }
 
@@ -121,21 +170,34 @@ export class IngestService {
     }
   }
 
-  private mapMessageToEmail(
-    message: Message,
-    userProfileId: string,
-    folderId: string,
-    foldersMap?: Map<string, string>,
-  ): EmailInput {
+  private normalizeBody(body: string): string {
+    return body
+      .normalize('NFKC')
+      .replace(/\r\n/g, '\n')
+      .replace(/[ \t]+/g, ' ')
+      .trim();
+  }
+
+  private mapMessageToEmail({
+    message,
+    attachments,
+    userProfileId,
+    folderId,
+  }: {
+    message: Message;
+    attachments: Attachment[];
+    userProfileId: string;
+    folderId: string;
+  }): EmailInput {
     const tags: string[] = [];
 
     if (message.importance) tags.push(`importance:${snakeCase(message.importance)}`);
 
-    if (message.parentFolderId && foldersMap?.get(message.parentFolderId))
-      tags.push(`folder:${snakeCase(foldersMap.get(message.parentFolderId))}`);
+    if (message.parentFolderId && this.foldersMap?.get(message.parentFolderId))
+      tags.push(`folder:${snakeCase(this.foldersMap.get(message.parentFolderId))}`);
 
     return {
-      // biome-ignore lint/style/noNonNullAssertion: Microsoft Graph API returns emails with an id
+      // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
       messageId: message.id!,
       conversationId: message.conversationId,
       internetMessageId: message.internetMessageId,
@@ -187,11 +249,17 @@ export class IngestService {
       tags,
 
       hasAttachments: message.hasAttachments || false,
+      attachments: attachments.map((attachment) => ({
+        id: attachment.id,
+        filename: attachment.name,
+        mimeType: attachment.contentType,
+        sizeBytes: attachment.size,
+        isInline: attachment.isInline,
+      })),
+      attachmentCount: attachments.length,
 
       // These values must be updated in post-processing.
       sizeBytes: 0,
-      attachments: [],
-      attachmentCount: 0,
       headers: null,
 
       userProfileId,
