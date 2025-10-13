@@ -5,10 +5,11 @@ import { AmqpModule } from '../amqp/amqp.module';
 import { EmailService } from './email.service';
 import { EmailSyncService } from './email-sync.service';
 import { IngestService } from './pipeline/ingest.service';
+import { OrchestratorService } from './pipeline/orchestrator.service';
 
 @Module({
   imports: [MsGraphModule, DrizzleModule, AmqpModule],
-  providers: [EmailService, EmailSyncService, IngestService],
+  providers: [EmailService, EmailSyncService, OrchestratorService, IngestService],
   exports: [EmailService, EmailSyncService],
 })
 export class EmailModule {}
