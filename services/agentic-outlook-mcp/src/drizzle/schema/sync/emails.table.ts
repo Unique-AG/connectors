@@ -19,6 +19,7 @@ export const ingestionStatus = pgEnum('ingestion_status', [
   'pending',
   'ingested',
   'processed',
+  'weighted',
   'chunked',
   'embedded',
   'completed', // == indexed
@@ -35,6 +36,7 @@ export const emails = pgTable(
     conversationId: varchar(),
     internetMessageId: varchar(),
     webLink: varchar(),
+    version: varchar(), // e.g. the changeKey in Microsoft Graph
 
     from: jsonb().$type<{ name: string | null; address: string } | null>(),
     sender: jsonb().$type<{ name: string | null; address: string } | null>(),
@@ -58,9 +60,9 @@ export const emails = pgTable(
     subject: text(),
     preview: text(),
     bodyText: text(),
-    bodyTextFingerprint: text(),
     bodyHtml: text(),
-    bodyHtmlFingerprint: text(),
+    uniqueBodyText: text(),
+    uniqueBodyHtml: text(),
 
     processedBody: text(),
 
@@ -84,7 +86,7 @@ export const emails = pgTable(
       .notNull()
       .default(sql`'[]'::jsonb`),
     attachmentCount: integer().notNull().default(0),
-    headers: jsonb().$type<Record<string, string> | null>(),
+    headers: jsonb().$type<Array<{ name: string; value: string | undefined | null }> | null>(),
 
     // References
     userProfileId: varchar()

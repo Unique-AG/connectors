@@ -14,7 +14,6 @@ import { AppConfig, AppSettings } from '../../app-settings';
         exchanges: [
           { name: 'email.pipeline', type: 'topic', options: { durable: true } },
           { name: 'email.pipeline.retry', type: 'topic', options: { durable: true } },
-          { name: 'email.pipeline.dlx', type: 'topic', options: { durable: true } },
         ],
         queues: [
           {
@@ -34,14 +33,21 @@ import { AppConfig, AppSettings } from '../../app-settings';
             },
           },
           {
-            name: 'q.email.ingest.dlx',
-            exchange: 'email.pipeline.dlx',
-            routingKey: 'email.ingest.dlx',
+            name: 'q.email.process',
+            exchange: 'email.pipeline',
+            routingKey: 'email.process',
             options: { durable: true },
           },
-          // { name: 'q.email.process' },
-          // { name: 'q.email.process.retry' },
-          // { name: 'q.email.process.dlx' },
+          {
+            name: 'q.email.process.retry',
+            exchange: 'email.pipeline.retry',
+            routingKey: 'email.process.retry',
+            options: {
+              durable: true,
+              deadLetterExchange: 'email.pipeline',
+              deadLetterRoutingKey: 'email.process',
+            },
+          },
           // { name: 'q.email.embed' },
           // { name: 'q.email.embed.retry' },
           // { name: 'q.email.embed.dlx' },

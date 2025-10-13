@@ -1,30 +1,14 @@
-import { createHash } from 'node:crypto';
-import { AmqpConnection, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
-import { Attachment, Message } from '@microsoft/microsoft-graph-types';
+import { RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
+import { Message } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConsumeMessage } from 'amqplib';
 import { snakeCase } from 'lodash';
-import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, EmailInput } from '../../../drizzle';
-import { normalizeError } from '../../../utils/normalize-error';
 import { EmailService } from '../email.service';
-import { EmailSyncService } from '../email-sync.service';
-import { IngestCompletedEvent, PipelineEvents } from './pipeline.events';
-
-const MAX_ATTEMPTS = 6;
-const BASE_DELAY_MS = 60_000; // 1 minute
-const MIN_DELAY_MS = 15_000; // clamp floor (optional)
-const MAX_DELAY_MS = 30 * 60_000; // 30 minutes cap
-const JITTER_RATIO = 0.2; // ±20%
-
-function computeDelayMs(attempt: number) {
-  const exp = 2 ** Math.max(0, attempt - 1);
-  const base = Math.min(MAX_DELAY_MS, Math.max(MIN_DELAY_MS, BASE_DELAY_MS * exp));
-  const jitter = 1 + (Math.random() * 2 - 1) * JITTER_RATIO; // 0.8..1.2 if 20%
-  return Math.floor(base * jitter);
-}
+import { IngestCompletedEvent, IngestFailedEvent, PipelineEvents } from '../pipeline.events';
+import { PipelineRetryService } from '../pipeline-retry.service';
 
 interface DeletedItem {
   id: string;
@@ -46,10 +30,9 @@ export class IngestService {
 
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    private readonly amqpConnection: AmqpConnection,
     private readonly emailService: EmailService,
-    private readonly emailSyncService: EmailSyncService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly pipelineRetryService: PipelineRetryService,
   ) {}
 
   @RabbitSubscribe({
@@ -84,24 +67,7 @@ export class IngestService {
         return;
       }
 
-      let attachments: Attachment[] = [];
-      if (message.hasAttachments)
-        attachments = await this.emailSyncService.getAttachments(
-          messageId,
-          folderId,
-          TypeID.fromString(userProfileId, 'user_profile'),
-        );
-
-      const mappedEmail = this.mapMessageToEmail({ message, attachments, userProfileId, folderId });
-      mappedEmail.bodyTextFingerprint = mappedEmail.bodyText
-        ? createHash('sha256').update(this.normalizeBody(mappedEmail.bodyText)).digest('hex')
-        : null;
-      mappedEmail.bodyHtmlFingerprint = mappedEmail.bodyHtml
-        ? createHash('sha256').update(this.normalizeBody(mappedEmail.bodyHtml)).digest('hex')
-        : null;
-
-      mappedEmail.ingestionStatus = 'ingested';
-      mappedEmail.ingestionLastAttemptAt = new Date().toISOString();
+      const mappedEmail = this.mapMessageToEmail({ message, userProfileId, folderId });
 
       const savedId = await this.emailService.upsertEmail(
         TypeID.fromString(userProfileId, 'user_profile'),
@@ -120,44 +86,21 @@ export class IngestService {
 
       return;
     } catch (error) {
-      const serializedError = serializeError(normalizeError(error));
-      this.logger.error({
-        msg: 'INGEST failed.',
-        message,
-        attempt,
-        error: serializedError,
-      });
-
-      if (attempt >= MAX_ATTEMPTS) {
-        await this.amqpConnection.publish('email.pipeline.dlq', 'email.ingest.dlq', {
-          ...message,
-          __error: serializedError,
-          __failedAt: new Date().toISOString(),
-          __attempt: attempt,
-        });
-        await this.emailService.upsertEmail(
-          TypeID.fromString(userProfileId, 'user_profile'),
-          folderId,
-          {
-            messageId,
-            userProfileId,
+      await this.pipelineRetryService.handlePipelineError({
+        message: ingestMessage,
+        amqpMessage,
+        error,
+        retryExchange: 'email.pipeline.retry',
+        retryRoutingKey: 'email.ingest.retry',
+        failedEventName: PipelineEvents.IngestFailed,
+        createFailedEvent: (serializedError) =>
+          new IngestFailedEvent(
+            TypeID.fromString(userProfileId, 'user_profile'),
             folderId,
-            ingestionStatus: 'failed',
-            ingestionLastError: serializedError.message,
-            ingestionLastAttemptAt: new Date().toISOString(),
-            ingestionCompletedAt: new Date().toISOString(),
-          },
-        );
-        return;
-      }
-
-      const delayMs = computeDelayMs(attempt);
-      await this.amqpConnection.publish('email.pipeline.retry', 'email.ingest.retry', message, {
-        expiration: String(delayMs),
-        headers: { 'x-attempt': attempt + 1 },
+            messageId,
+            serializedError,
+          ),
       });
-
-      return;
     }
   }
 
@@ -170,22 +113,12 @@ export class IngestService {
     }
   }
 
-  private normalizeBody(body: string): string {
-    return body
-      .normalize('NFKC')
-      .replace(/\r\n/g, '\n')
-      .replace(/[ \t]+/g, ' ')
-      .trim();
-  }
-
   private mapMessageToEmail({
     message,
-    attachments,
     userProfileId,
     folderId,
   }: {
     message: Message;
-    attachments: Attachment[];
     userProfileId: string;
     folderId: string;
   }): EmailInput {
@@ -202,6 +135,7 @@ export class IngestService {
       conversationId: message.conversationId,
       internetMessageId: message.internetMessageId,
       webLink: message.webLink,
+      version: message.changeKey,
 
       from: message.from
         ? {
@@ -243,24 +177,34 @@ export class IngestService {
       bodyText: message.body?.contentType === 'text' ? message.body?.content : null,
       bodyHtml: message.body?.contentType === 'html' ? message.body?.content : null,
 
+      uniqueBodyText:
+        message.uniqueBody?.contentType === 'text' ? message.uniqueBody?.content : null,
+      uniqueBodyHtml:
+        message.uniqueBody?.contentType === 'html' ? message.uniqueBody?.content : null,
+
       isRead: message.isRead || false,
       isDraft: message.isDraft || false,
 
       tags,
 
       hasAttachments: message.hasAttachments || false,
-      attachments: attachments.map((attachment) => ({
+      attachments: message.attachments?.map((attachment) => ({
         id: attachment.id,
         filename: attachment.name,
         mimeType: attachment.contentType,
         sizeBytes: attachment.size,
         isInline: attachment.isInline,
       })),
-      attachmentCount: attachments.length,
+      attachmentCount: message.attachments?.length || 0,
+
+      headers: message.internetMessageHeaders?.map((header) => ({
+        // biome-ignore lint/style/noNonNullAssertion: MS Graph does not send headers without a name.
+        name: header.name!,
+        value: header.value,
+      })),
 
       // These values must be updated in post-processing.
       sizeBytes: 0,
-      headers: null,
 
       userProfileId,
       folderId,

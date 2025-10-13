@@ -30,6 +30,7 @@ export class EmailService {
           conversationId: sql`excluded.conversation_id`,
           internetMessageId: sql`excluded.internet_message_id`,
           webLink: sql`excluded.web_link`,
+          version: sql`excluded.version`,
           from: sql`excluded.from`,
           sender: sql`excluded.sender`,
           replyTo: sql`excluded.reply_to`,
@@ -41,9 +42,9 @@ export class EmailService {
           subject: sql`excluded.subject`,
           preview: sql`excluded.preview`,
           bodyText: sql`excluded.body_text`,
-          bodyTextFingerprint: sql`excluded.body_text_fingerprint`,
           bodyHtml: sql`excluded.body_html`,
-          bodyHtmlFingerprint: sql`excluded.body_html_fingerprint`,
+          uniqueBodyText: sql`excluded.unique_body_text`,
+          uniqueBodyHtml: sql`excluded.unique_body_html`,
           processedBody: sql`excluded.processed_body`,
           isRead: sql`excluded.is_read`,
           isDraft: sql`excluded.is_draft`,
@@ -62,14 +63,6 @@ export class EmailService {
 
     const [savedEmail] = result;
     if (!savedEmail) throw new Error('Failed to upsert email');
-
-    this.logger.debug({
-      msg: 'Upserted email',
-      emailId: email.id,
-      messageId: email.messageId,
-      folderId,
-      userProfileId: userProfileId.toString(),
-    });
 
     return TypeID.fromString(savedEmail.id, 'email');
   }

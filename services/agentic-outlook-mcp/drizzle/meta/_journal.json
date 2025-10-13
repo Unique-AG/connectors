@@ -78,6 +78,13 @@
       "when": 1760360422857,
       "tag": "0010_cynical_luminals",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1760376335002,
+      "tag": "0011_lazy_warhawk",
+      "breakpoints": true
     }
   ]
 }

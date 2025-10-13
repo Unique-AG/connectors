@@ -1,7 +1,7 @@
 import { Client } from '@microsoft/microsoft-graph-client';
-import { Attachment, Message } from '@microsoft/microsoft-graph-types';
+import { Message } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { and, eq } from 'drizzle-orm';
 import { debounce } from 'lodash';
 import { serializeError } from 'serialize-error-cjs';
@@ -21,6 +21,7 @@ import {
   EmailEvents,
   EmailFullSyncRequestedEvent,
 } from './email.events';
+import { IngestRequestedEvent, PipelineEvents } from './pipeline.events';
 
 interface DeltaResponse {
   '@odata.context'?: string;
@@ -34,6 +35,30 @@ export class EmailSyncService {
   private readonly logger = new Logger(EmailSyncService.name);
   private readonly PAGE_SIZE = 100;
   private readonly SYNC_DEBOUNCE_MS = 1000;
+  private readonly SELECT_FIELDS = [
+    'id',
+    'conversationId',
+    'internetMessageId',
+    'webLink',
+    'changeKey',
+    'from',
+    'sender',
+    'replyTo',
+    'toRecipients',
+    'ccRecipients',
+    'bccRecipients',
+    'sentDateTime',
+    'receivedDateTime',
+    'subject',
+    'bodyPreview',
+    'body',
+    'uniqueBody',
+    'importance',
+    'isRead',
+    'isDraft',
+    'hasAttachments',
+    'internetMessageHeaders',
+  ];
 
   private readonly debouncedSyncs = new Map<string, ReturnType<typeof debounce>>();
   private readonly runningSyncs = new Map<string, Promise<void>>();
@@ -42,19 +67,8 @@ export class EmailSyncService {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
-
-  public async getAttachments(
-    msMessageId: string,
-    msFolderId: string,
-    userProfileId: TypeID<'user_profile'>,
-  ): Promise<Attachment[]> {
-    const graphClient = this.graphClientFactory.createClientForUser(userProfileId);
-    const attachments = await graphClient
-      .api(`/me/mailFolders/${msFolderId}/messages/${msMessageId}/attachments`)
-      .get();
-    return attachments.value;
-  }
 
   @OnEvent(EmailEvents.EmailFullSyncRequested)
   public async onFullSyncRequested(event: EmailFullSyncRequestedEvent) {
@@ -230,7 +244,7 @@ export class EmailSyncService {
 
     url = folder.syncToken
       ? folder.syncToken
-      : `/me/mailFolders/${folder.folderId}/messages/delta?$top=${this.PAGE_SIZE}`;
+      : `/me/mailFolders/${folder.folderId}/messages/delta?$top=${this.PAGE_SIZE}&$select=${this.SELECT_FIELDS.join(',')}&$expand=attachments`;
 
     const isInitialSync = !folder.syncToken;
     let deltaLink: string | undefined;
@@ -251,6 +265,11 @@ export class EmailSyncService {
             folderId: folder.id,
           })
           .onConflictDoNothing();
+
+        this.eventEmitter.emit(
+          PipelineEvents.IngestRequested,
+          new IngestRequestedEvent(userProfileId, folder.id, message),
+        );
 
         totalEmailsProcessed++;
       }
