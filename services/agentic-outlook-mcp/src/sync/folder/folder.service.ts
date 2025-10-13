@@ -6,7 +6,7 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { MailFolder } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
@@ -20,7 +20,7 @@ import {
 } from '../../drizzle/schema';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import { normalizeError } from '../../utils/normalize-error';
-import { EmailSyncService } from '../email/email-sync.service';
+import { EmailDeltaSyncRequestedEvent, EmailEvents } from '../email/email.events';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { FolderEvents, FolderSyncEvent } from './folder.events';
 
@@ -36,7 +36,7 @@ export class FolderService {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly subscriptionService: SubscriptionService,
-    private readonly emailSyncService: EmailSyncService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @BatchProcessor({ table: 'folders', operation: 'PUT' })
@@ -93,7 +93,7 @@ export class FolderService {
       // Create subscription for folder changes
       await this.subscriptionService.createSubscription(userProfileId, 'folder', folder);
 
-      // Trigger initial email sync
+      // Trigger email sync
       this.logger.log({
         msg: 'Starting initial email sync for folder',
         userProfileId: userProfileId.toString(),
@@ -101,17 +101,10 @@ export class FolderService {
         folderName: folder.name,
       });
 
-      try {
-        await this.emailSyncService.syncFolderEmails(userProfileId, id);
-      } catch (error) {
-        this.logger.error({
-          msg: 'Failed to perform initial email sync',
-          folderId: id,
-          error: serializeError(normalizeError(error)),
-        });
-        // Don't throw here - we still want the folder to be marked as active
-        // The sync can be retried later
-      }
+      this.eventEmitter.emit(
+        EmailEvents.EmailDeltaSyncRequested,
+        new EmailDeltaSyncRequestedEvent(userProfileId, id),
+      );
     }
 
     const syncDisabled = data.deactivatedAt;

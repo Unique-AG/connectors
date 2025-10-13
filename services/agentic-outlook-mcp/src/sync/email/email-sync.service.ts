@@ -1,22 +1,25 @@
-import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Client } from '@microsoft/microsoft-graph-client';
-import { Message } from '@microsoft/microsoft-graph-types';
+import { Attachment, Message } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { OnEvent } from '@nestjs/event-emitter';
 import { and, eq } from 'drizzle-orm';
 import { debounce } from 'lodash';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
-import { DRIZZLE, DrizzleDatabase, Folder, folders as foldersTable } from '../../drizzle';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  emails as emailsTable,
+  Folder,
+  folders as foldersTable,
+} from '../../drizzle';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import { normalizeError } from '../../utils/normalize-error';
 import { SubscriptionEvent } from '../subscription/subscription.events';
 import {
   EmailDeltaSyncRequestedEvent,
   EmailEvents,
-  EmailSyncCompletedEvent,
-  EmailSyncFailedEvent,
-  EmailSyncStartedEvent,
+  EmailFullSyncRequestedEvent,
 } from './email.events';
 
 interface DeltaResponse {
@@ -39,89 +42,28 @@ export class EmailSyncService {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
-    private readonly eventEmitter: EventEmitter2,
-    private readonly amqpConnection: AmqpConnection,
   ) {}
 
-  public async syncFolderEmails(
+  public async getAttachments(
+    msMessageId: string,
+    msFolderId: string,
     userProfileId: TypeID<'user_profile'>,
-    folderId: string,
-  ): Promise<void> {
-    const folder = await this.db.query.folders.findFirst({
-      where: and(
-        eq(foldersTable.id, folderId),
-        eq(foldersTable.userProfileId, userProfileId.toString()),
-      ),
-    });
-
-    if (!folder) throw new Error(`Folder not found: ${folderId}`);
-
+  ): Promise<Attachment[]> {
     const graphClient = this.graphClientFactory.createClientForUser(userProfileId);
+    const attachments = await graphClient
+      .api(`/me/mailFolders/${msFolderId}/messages/${msMessageId}/attachments`)
+      .get();
+    return attachments.value;
+  }
 
-    try {
-      const isInitialSync = !folder.syncToken;
-
-      this.logger.log({
-        msg: isInitialSync ? 'Starting initial sync' : 'Starting delta sync',
-        folderId,
-        folderName: folder.name,
-        userProfileId: userProfileId.toString(),
-      });
-
-      this.eventEmitter.emit(
-        EmailEvents.EmailSyncStarted,
-        new EmailSyncStartedEvent(userProfileId, folderId, folder.name, isInitialSync),
-      );
-
-      const deltaToken = await this.performDeltaSync(
-        graphClient,
-        folder,
-        userProfileId,
-        isInitialSync,
-      );
-
-      await this.db
-        .update(foldersTable)
-        .set({
-          syncToken: deltaToken,
-          lastSyncedAt: new Date().toISOString(),
-        })
-        .where(eq(foldersTable.id, folderId));
-
-      this.logger.log({
-        msg: 'Email sync completed',
-        folderId,
-        folderName: folder.name,
-        userProfileId: userProfileId.toString(),
-      });
-    } catch (error) {
-      this.logger.error({
-        msg: 'Failed to sync emails',
-        folderId,
-        folderName: folder.name,
-        error: serializeError(normalizeError(error)),
-      });
-
-      this.eventEmitter.emit(
-        EmailEvents.EmailSyncFailed,
-        new EmailSyncFailedEvent(userProfileId, folderId, folder.name, normalizeError(error)),
-      );
-
-      throw error;
-    }
+  @OnEvent(EmailEvents.EmailFullSyncRequested)
+  public async onFullSyncRequested(event: EmailFullSyncRequestedEvent) {
+    await this.syncFolderEmails(event.userProfileId, event.folderId, true);
   }
 
   @OnEvent(EmailEvents.EmailDeltaSyncRequested)
   public async onDeltaSyncRequested(event: EmailDeltaSyncRequestedEvent) {
-    try {
-      await this.syncFolderEmails(event.userProfileId, event.folderId);
-    } catch (error) {
-      this.logger.error({
-        msg: 'Failed to perform delta sync',
-        folderId: event.folderId,
-        error: serializeError(normalizeError(error)),
-      });
-    }
+    await this.syncFolderEmails(event.userProfileId, event.folderId);
   }
 
   /**
@@ -151,6 +93,71 @@ export class EmailSyncService {
     debouncedSync();
   }
 
+  /**
+   * Executes a full or partial sync for a folder without checking any pre-conditions
+   * like if there is already a sync in progress or if the folder is activated for sync or not.
+   */
+  private async syncFolderEmails(
+    userProfileId: TypeID<'user_profile'>,
+    folderId: string,
+    forceInitialSync: boolean = false,
+  ): Promise<void> {
+    const folder = await this.db.query.folders.findFirst({
+      where: and(
+        eq(foldersTable.id, folderId),
+        eq(foldersTable.userProfileId, userProfileId.toString()),
+      ),
+    });
+
+    if (!folder) throw new Error(`Folder not found: ${folderId}`);
+
+    if (forceInitialSync) folder.syncToken = null;
+
+    const graphClient = this.graphClientFactory.createClientForUser(userProfileId);
+
+    try {
+      const isInitialSync = !folder.syncToken;
+
+      this.logger.log({
+        msg: isInitialSync ? 'Starting initial sync' : 'Starting delta sync',
+        folderId,
+        folderName: folder.name,
+        userProfileId: userProfileId.toString(),
+      });
+
+      const deltaToken = await this.performDeltaSync(graphClient, folder, userProfileId);
+
+      await this.db
+        .update(foldersTable)
+        .set({
+          syncToken: deltaToken,
+          lastSyncedAt: new Date().toISOString(),
+        })
+        .where(eq(foldersTable.id, folderId));
+
+      this.logger.log({
+        msg: 'Email sync completed',
+        folderId,
+        folderName: folder.name,
+        userProfileId: userProfileId.toString(),
+      });
+    } catch (error) {
+      this.logger.error({
+        msg: 'Failed to sync emails',
+        folderId,
+        folderName: folder.name,
+        error: serializeError(normalizeError(error)),
+        forcedInitialSync: forceInitialSync,
+      });
+
+      // We do not re-throw here, as all logging was done.
+    }
+  }
+
+  /**
+   * Executes a full or partial sync AND validates all pre-conditions (sync in progress, folder activated, etc.)
+   * Use this method for events from subscriptions, so we can be sure that the sync is valid and still running.
+   */
   private async executeFolderSync(folderId: string): Promise<void> {
     const runningSync = this.runningSyncs.get(folderId);
     if (runningSync) {
@@ -218,7 +225,6 @@ export class EmailSyncService {
     graphClient: Client,
     folder: Folder,
     userProfileId: TypeID<'user_profile'>,
-    isInitialSync: boolean,
   ): Promise<string> {
     let url: string;
 
@@ -226,35 +232,26 @@ export class EmailSyncService {
       ? folder.syncToken
       : `/me/mailFolders/${folder.folderId}/messages/delta?$top=${this.PAGE_SIZE}`;
 
+    const isInitialSync = !folder.syncToken;
     let deltaLink: string | undefined;
-    // let allEmails: Message[] = [];
-    // let deletedIds: string[] = [];
     let hasMorePages = true;
     let totalEmailsProcessed = 0;
-    // let totalEmailsDeleted = 0;
 
     while (hasMorePages) {
       const response: DeltaResponse = await graphClient.api(url).get();
 
-      // // Process messages
-      // const emailsInPage = response.value.filter(
-      //   (item) => !(item as unknown as DeletedItem)['@removed'],
-      // );
-
-      // // Process deleted items
-      // const deletedInPage = response.value
-      //   .filter((item) => (item as unknown as DeletedItem)['@removed'])
-      //   // biome-ignore lint/style/noNonNullAssertion: Microsoft Graph API returns deleted items with an id
-      //   .map((item) => item.id!);
-
-      // allEmails = allEmails.concat(emailsInPage);
-      // deletedIds = deletedIds.concat(deletedInPage);
       for (const message of response.value) {
-        this.amqpConnection.publish('email.pipeline', 'email.ingest', {
-          message,
-          userProfileId: userProfileId.toString(),
-          folderId: folder.id,
-        });
+        // Ensure the message is present in the database for reference
+        await this.db
+          .insert(emailsTable)
+          .values({
+            // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
+            messageId: message.id!,
+            userProfileId: userProfileId.toString(),
+            folderId: folder.id,
+          })
+          .onConflictDoNothing();
+
         totalEmailsProcessed++;
       }
 
@@ -278,39 +275,13 @@ export class EmailSyncService {
       }
     }
 
-    // Process emails in batches to avoid memory issues
-    // const BATCH_SIZE = 100;
-    // for (let i = 0; i < allEmails.length; i += BATCH_SIZE) {
-    //   const batch = allEmails.slice(i, i + BATCH_SIZE);
-    //   await this.emailService.upsertEmails(userProfileId, folder.id, batch);
-    // }
-    // totalEmailsProcessed = allEmails.length;
-
-    // if (deletedIds.length > 0) {
-    //   await this.emailService.deleteEmails(userProfileId, deletedIds);
-    //   totalEmailsDeleted = deletedIds.length;
-    // }
-
     this.logger.log({
       msg: 'Delta sync completed',
       folderId: folder.id,
       folderName: folder.name,
       emailsUpserted: totalEmailsProcessed,
-      // emailsDeleted: totalEmailsDeleted,
       isInitialSync,
     });
-
-    this.eventEmitter.emit(
-      EmailEvents.EmailSyncCompleted,
-      new EmailSyncCompletedEvent(
-        userProfileId,
-        folder.id,
-        folder.name,
-        totalEmailsProcessed,
-        // totalEmailsDeleted,
-        deltaLink || '',
-      ),
-    );
 
     if (!deltaLink) throw new Error('No delta link returned from Microsoft Graph');
 
