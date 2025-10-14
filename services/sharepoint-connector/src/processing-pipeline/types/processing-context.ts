@@ -25,6 +25,7 @@ export interface PipelineResult {
 
 export const PipelineStep = {
   ContentFetching: 'ContentFetching',
+  AspxProcessing: 'AspxProcessing',
   ContentRegistration: 'ContentRegistration',
   StorageUpload: 'StorageUpload',
   IngestionFinalization: 'IngestionFinalization',

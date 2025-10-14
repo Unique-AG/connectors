@@ -136,4 +136,44 @@ describe('FileFilterService', () => {
     });
     expect(service.isFileValidForIngestion(item)).toBe(true);
   });
+
+  it('returns true for ASPX file with allowed MIME type', () => {
+    const item = mockDriveItem({
+      name: 'test.aspx',
+      file: { mimeType: 'text/html' },
+    });
+    expect(service.isFileValidForIngestion(item)).toBe(true);
+  });
+
+  it('returns true for ASPX file with disallowed MIME type', () => {
+    const item = mockDriveItem({
+      name: 'test.aspx',
+      file: { mimeType: 'image/png' }, // disallowed MIME type
+    });
+    expect(service.isFileValidForIngestion(item)).toBe(true);
+  });
+
+  it('returns true for ASPX file without MIME type', () => {
+    const item = mockDriveItem({
+      name: 'test.aspx',
+      file: { mimeType: undefined },
+    });
+    expect(service.isFileValidForIngestion(item)).toBe(true);
+  });
+
+  it('returns false for file with .aspx in middle of name but not extension', () => {
+    const item = mockDriveItem({
+      name: 'test.aspx.doc',
+      file: { mimeType: 'application/msword' },
+    });
+    expect(service.isFileValidForIngestion(item)).toBe(false);
+  });
+
+  it('returns false for file ending with .aspx but without file property', () => {
+    const item = mockDriveItem({
+      name: 'test.aspx',
+      file: undefined,
+    });
+    expect(service.isFileValidForIngestion(item)).toBe(false);
+  });
 });

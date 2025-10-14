@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
+import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
 import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
@@ -21,12 +22,14 @@ export class ProcessingPipelineService {
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly contentFetchingStep: ContentFetchingStep,
+    private readonly aspxProcessingStep: AspxProcessingStep,
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly storageUploadStep: StorageUploadStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
   ) {
     this.fileProcessingSteps = [
       this.contentFetchingStep,
+      this.aspxProcessingStep,
       this.contentRegistrationStep,
       this.storageUploadStep,
       this.ingestionFinalizationStep,

@@ -1,5 +1,5 @@
 import type { DriveItem } from '@microsoft/microsoft-graph-types';
-import { Injectable } from '@nestjs/common';
+import {Injectable, Logger} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 
@@ -18,6 +18,8 @@ type DriveItemWithDefinedProperties = Omit<DriveItem, DefinedFileProperties> & {
 
 @Injectable()
 export class FileFilterService {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(private readonly configService: ConfigService<Config, true>) {}
 
   public isFileValidForIngestion(item: DriveItem): item is DriveItemWithDefinedProperties {
@@ -37,9 +39,10 @@ export class FileFilterService {
     ) {
       return false;
     }
-
+    this.logger.log('item.file: ' + ' ' + JSON.stringify(item, null, 2));
+    const isAspxFile = item.name?.toLowerCase().endsWith('.aspx');
     const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
     const hasSyncFlag = fields[syncColumnName] === true;
-    return Boolean(hasSyncFlag && isAllowedMimeType);
+    return Boolean(hasSyncFlag && (isAllowedMimeType || isAspxFile));
   }
 }
