@@ -16,9 +16,9 @@ describe('ClientSecretGraphAuthStrategy', () => {
   };
 
   const mockConfig = {
-    'sharepoint.tenantId': 'tenant-123',
-    'sharepoint.clientId': 'client-456',
-    'sharepoint.clientSecret': 'secret-789',
+    'sharepoint.graphTenantId': 'tenant-123',
+    'sharepoint.graphClientId': 'client-456',
+    'sharepoint.graphClientSecret': 'secret-789',
   };
 
   beforeEach(async () => {

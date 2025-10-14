@@ -38,6 +38,7 @@ export class StorageUploadStep implements IPipelineStep {
   public async cleanup(context: ProcessingContext): Promise<void> {
     if (context.contentBuffer) {
       context.contentBuffer = undefined;
+      delete context.contentBuffer;
       this.logger.debug(`[${context.correlationId}] Released content buffer memory`);
     }
   }

@@ -37,7 +37,7 @@ describe('FileProcessingOrchestratorService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'pipeline.processingConcurrency') return 3;
+          if (key === 'processing.concurrency') return 3;
           return undefined;
         }),
       }))
@@ -50,37 +50,37 @@ describe('FileProcessingOrchestratorService', () => {
 
   it('processes only files in diff result', async () => {
     const files = [
-      createMockFile('file-1', 'site-1'),
-      createMockFile('file-2', 'site-1'),
-      createMockFile('file-3', 'site-1'),
+      createMockFile('file-1', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      createMockFile('file-2', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      createMockFile('file-3', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
     ];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: [
-        'site-1/Documents/test/folder/file-file-1.pdf',
-        'site-1/Documents/test/folder/file-file-3.pdf',
-      ],
+      newAndUpdatedFiles: ['file-1', 'file-3'],
       deletedFiles: [],
       movedFiles: [],
     };
 
-    await service.processFilesForSite('site-1', files, diffResult);
+    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
     expect(mockPipelineService.processFile).toHaveBeenCalledTimes(2);
     expect(mockPipelineService.processFile).toHaveBeenCalledWith(files[0]);
     expect(mockPipelineService.processFile).toHaveBeenCalledWith(files[2]);
   });
 
-  it('filters files by site ID', async () => {
-    const files = [createMockFile('file-1', 'site-1'), createMockFile('file-2', 'site-2')];
+  it('filters files by drive ID', async () => {
+    const files = [
+      createMockFile('file-1', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      createMockFile('file-2', 'site-2'),
+    ];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: ['site-1/Documents/test/folder/file-file-1.pdf'],
+      newAndUpdatedFiles: ['file-1'],
       deletedFiles: [],
       movedFiles: [],
     };
 
-    await service.processFilesForSite('site-1', files, diffResult);
+    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
     expect(mockPipelineService.processFile).toHaveBeenCalledTimes(1);
     expect(mockPipelineService.processFile).toHaveBeenCalledWith(files[0]);
@@ -99,10 +99,12 @@ describe('FileProcessingOrchestratorService', () => {
   });
 
   it('processes files with configured concurrency', async () => {
-    const files = Array.from({ length: 10 }, (_, i) => createMockFile(`file-${i}`, 'site-1'));
+    const files = Array.from({ length: 10 }, (_, i) =>
+      createMockFile(`file-${i}`, 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+    );
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: files.map((f) => `site-1/Documents/test/folder/file-${f.id}.pdf`),
+      newAndUpdatedFiles: files.map((f) => `${f.id}`),
       deletedFiles: [],
       movedFiles: [],
     };
@@ -118,7 +120,7 @@ describe('FileProcessingOrchestratorService', () => {
       return { success: true };
     });
 
-    await service.processFilesForSite('site-1', files, diffResult);
+    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
     expect(mockPipelineService.processFile).toHaveBeenCalledTimes(10);
     expect(maxConcurrentCalls).toBeLessThanOrEqual(3);
@@ -126,13 +128,13 @@ describe('FileProcessingOrchestratorService', () => {
 
   it('continues processing even if some files fail', async () => {
     const files = [
-      createMockFile('file-1', 'site-1'),
-      createMockFile('file-2', 'site-1'),
-      createMockFile('file-3', 'site-1'),
+      createMockFile('file-1', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      createMockFile('file-2', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      createMockFile('file-3', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
     ];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: files.map((f) => `site-1/Documents/test/folder/file-${f.id}.pdf`),
+      newAndUpdatedFiles: files.map((f) => `${f.id}`),
       deletedFiles: [],
       movedFiles: [],
     };
@@ -142,7 +144,7 @@ describe('FileProcessingOrchestratorService', () => {
       .mockRejectedValueOnce(new Error('Processing failed'))
       .mockResolvedValueOnce({ success: true });
 
-    await service.processFilesForSite('site-1', files, diffResult);
+    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
     expect(mockPipelineService.processFile).toHaveBeenCalledTimes(3);
   });

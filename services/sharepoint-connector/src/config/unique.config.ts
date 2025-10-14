@@ -13,7 +13,7 @@ const UniqueConfig = z.object({
   ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
   fileDiffBasePath: z
     .string()
-    .prefault('https://next.qa.unique.app/')
+    .prefault('https://uniqueapp.sharepoint.com/sites/UniqueAG')
     .describe('Common prefix that all diffed files share'),
   fileDiffUrl: z.url().describe('Unique file diff service URL'),
   zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),

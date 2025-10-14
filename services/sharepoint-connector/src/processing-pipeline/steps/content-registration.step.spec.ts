@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { INGESTION_SOURCE_KIND } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
@@ -32,7 +33,7 @@ describe('ContentRegistrationStep', () => {
           readUrl: 'https://read',
           createdAt: new Date().toISOString(),
           internallyStoredAt: null,
-          source: 'MICROSOFT_365_SHAREPOINT',
+          source: INGESTION_SOURCE_KIND,
         }),
       }))
       .compile();

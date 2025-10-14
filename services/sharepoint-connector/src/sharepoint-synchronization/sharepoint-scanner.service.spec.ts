@@ -39,7 +39,7 @@ describe('SharepointSynchronizationService', () => {
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
-        get: vi.fn((k: string) => (k === 'sharepoint.sites' ? ['site-1'] : undefined)),
+        get: vi.fn((k: string) => (k === 'sharepoint.siteIds' ? ['site-1'] : undefined)),
       }))
       .mock(UniqueAuthService)
       .impl(() => ({ getToken: vi.fn().mockResolvedValue('unique-token') }))
@@ -48,7 +48,7 @@ describe('SharepointSynchronizationService', () => {
       .mock(UniqueApiService)
       .impl(() => ({
         performFileDiff: vi.fn().mockResolvedValue({
-          newAndUpdatedFiles: ['sharepoint_file_1'],
+          newAndUpdatedFiles: ['1'],
           deletedFiles: [],
           movedFiles: [],
         }),

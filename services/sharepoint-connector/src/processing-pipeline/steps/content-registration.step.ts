@@ -3,8 +3,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
+import {
+  INGESTION_SOURCE_KIND,
+  INGESTION_SOURCE_NAME,
+  PATH_BASED_INGESTION,
+} from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
@@ -27,30 +31,23 @@ export class ContentRegistrationStep implements IPipelineStep {
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
-    const baseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const isPathBasedIngestion = !scopeId;
 
-    const fileKey = buildSharepointFileKey({
-      scopeId,
-      siteId: context.metadata.siteId,
-      driveName: context.metadata.driveName,
-      folderPath: context.metadata.folderPath,
-      fileId: context.fileId,
-      fileName: context.fileName,
-    });
+    const fileKey = `${context.metadata.siteId}/${context.fileId}`;
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: fileKey,
       title: context.fileName,
       mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
       ownerType: UniqueOwnerType.Scope,
-      scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
+      scopeId: isPathBasedIngestion ? PATH_BASED_INGESTION : scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
-      sourceKind: 'MICROSOFT_365_SHAREPOINT',
-      sourceName: 'Sharepoint',
+      sourceKind: INGESTION_SOURCE_KIND,
+      sourceName: INGESTION_SOURCE_NAME,
       ...(isPathBasedIngestion && {
-        url: context.downloadUrl,
-        baseUrl: baseUrl,
+        url: context.knowledgeBaseUrl,
+        baseUrl: sharepointBaseUrl,
       }),
     };
 

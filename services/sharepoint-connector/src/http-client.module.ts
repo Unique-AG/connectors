@@ -10,8 +10,8 @@ import { SHAREPOINT_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.tokens
     {
       provide: UNIQUE_HTTP_CLIENT,
       useFactory: (configService: ConfigService<Config, true>) => {
-        const baseUrl = configService.get('unique.fileDiffUrl', { infer: true });
-        const url = new URL(baseUrl);
+        const fileDiffBaseUrl = configService.get('unique.fileDiffUrl', { infer: true });
+        const url = new URL(fileDiffBaseUrl);
         return new Client(`${url.protocol}//${url.host}`, {
           bodyTimeout: 30000,
           headersTimeout: 5000,

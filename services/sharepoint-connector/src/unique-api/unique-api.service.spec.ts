@@ -27,11 +27,10 @@ describe('UniqueApiService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'uniqueApi.fileDiffUrl') return 'https://ingestion.example.com';
-          if (key === 'uniqueApi.ingestionGraphQLUrl')
-            return 'https://ingestion.example.com/graphql';
-          if (key === 'uniqueApi.scopeId') return 'scope-1';
-          if (key === 'uniqueApi.fileDiffBasePath') return 'https://app.example.com/';
+          if (key === 'unique.fileDiffUrl') return 'https://ingestion.example.com/api';
+          if (key === 'unique.ingestionGraphQLUrl') return 'https://ingestion.example.com/graphql';
+          if (key === 'unique.scopeId') return 'scope-1';
+          if (key === 'unique.fileDiffBasePath') return 'https://app.example.com/';
           return undefined;
         }),
       }))
@@ -46,11 +45,9 @@ describe('UniqueApiService', () => {
     const result = await service.performFileDiff(
       [
         {
-          id: '1',
-          name: 'a.pdf',
+          key: 'sharepoint_file_1',
           url: 'https://sp.example.com/a.pdf',
           updatedAt: new Date().toISOString(),
-          key: 'sharepoint_file_1',
         },
       ],
       'token-123',

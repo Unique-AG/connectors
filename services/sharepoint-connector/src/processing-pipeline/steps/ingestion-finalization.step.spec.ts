@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { INGESTION_SOURCE_KIND } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
@@ -54,7 +55,7 @@ describe('IngestionFinalizationStep', () => {
           readUrl: 'https://read',
           createdAt: '2023-01-01T00:00:00Z',
           internallyStoredAt: null,
-          source: 'MICROSOFT_365_SHAREPOINT',
+          source: INGESTION_SOURCE_KIND,
         },
       },
     };

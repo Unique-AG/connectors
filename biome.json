@@ -20,6 +20,11 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedPrivateClassMembers": "error",
+        "noUnusedVariables": "error"
+      },
       "style": {
         "useImportType": "off",
         "useConsistentMemberAccessibility": {
@@ -31,6 +36,9 @@
       },
       "complexity": {
         "noUselessConstructor": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "error"
       }
     }
   },

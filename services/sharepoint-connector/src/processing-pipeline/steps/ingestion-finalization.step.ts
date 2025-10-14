@@ -2,8 +2,12 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
+import {
+  INGESTION_SOURCE_KIND,
+  INGESTION_SOURCE_NAME,
+  PATH_BASED_INGESTION,
+} from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import { buildSharepointFileKey } from '../../shared/sharepoint-key.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { normalizeError } from '../../utils/normalize-error';
@@ -24,7 +28,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const registrationResponse = context.metadata.registration;
-    const baseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const isPathBasedIngestion = !scopeId;
     const stepStartTime = Date.now();
@@ -34,27 +38,22 @@ export class IngestionFinalizationStep implements IPipelineStep {
       `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
     );
 
+    const fileKey = `${context.metadata.siteId}/${context.fileId}`;
+
     const ingestionFinalizationRequest = {
-      key: buildSharepointFileKey({
-        scopeId,
-        siteId: context.metadata.siteId,
-        driveName: context.metadata.driveName,
-        folderPath: context.metadata.folderPath,
-        fileId: context.fileId,
-        fileName: context.fileName,
-      }),
+      key: fileKey,
       title: context.fileName,
       mimeType: registrationResponse.mimeType,
       ownerType: registrationResponse.ownerType,
       byteSize: registrationResponse.byteSize,
-      scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
+      scopeId: isPathBasedIngestion ? PATH_BASED_INGESTION : scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
-      sourceName: this.extractSiteName(context.siteUrl),
-      sourceKind: 'MICROSOFT_365_SHAREPOINT',
+      sourceName: INGESTION_SOURCE_NAME,
+      sourceKind: INGESTION_SOURCE_KIND,
       fileUrl: registrationResponse.readUrl,
       ...(isPathBasedIngestion && {
-        url: context.downloadUrl,
-        baseUrl: baseUrl,
+        url: context.knowledgeBaseUrl,
+        baseUrl: sharepointBaseUrl,
       }),
     };
 
@@ -71,20 +70,6 @@ export class IngestionFinalizationStep implements IPipelineStep {
       const message = normalizeError(error).message;
       this.logger.error(`[${context.correlationId}] Ingestion finalization failed: ${message}`);
       throw error;
-    }
-  }
-
-  private extractSiteName(siteUrl: string): string {
-    if (!siteUrl) return 'SharePoint';
-    try {
-      const url = new URL(siteUrl);
-      const pathParts = url.pathname.split('/').filter(Boolean);
-      if (pathParts.length >= 2 && pathParts[0] === 'sites') {
-        return pathParts[1] || url.hostname;
-      }
-      return url.hostname;
-    } catch {
-      return 'SharePoint';
     }
   }
 }

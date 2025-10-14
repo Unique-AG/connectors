@@ -46,3 +46,6 @@ factset-auth.json
 .terraform.lock.hcl
 
 **/helm-charts/**/charts
+
+# local scripts
+**/local-scripts/**

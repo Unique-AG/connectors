@@ -31,11 +31,10 @@ describe('UniqueAuthService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'uniqueApi.zitadelOAuthTokenUrl')
-            return 'https://auth.example.com/oauth/token';
-          if (key === 'uniqueApi.zitadelClientId') return 'client';
-          if (key === 'uniqueApi.zitadelClientSecret') return new Redacted('secret');
-          if (key === 'uniqueApi.zitadelProjectId') return 'proj-123';
+          if (key === 'unique.zitadelOauthTokenUrl') return 'https://auth.example.com/oauth/token';
+          if (key === 'unique.zitadelClientId') return 'client';
+          if (key === 'unique.zitadelClientSecret') return new Redacted('secret');
+          if (key === 'unique.zitadelProjectId') return 'proj-123';
           return undefined;
         }),
       }))

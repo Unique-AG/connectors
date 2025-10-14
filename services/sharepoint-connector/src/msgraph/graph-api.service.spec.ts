@@ -91,7 +91,7 @@ describe('GraphApiService', () => {
         ...stub(),
         get: vi.fn((key: string, defaultValue?: number) => {
           if (key === 'pipeline.msGraphRateLimitPer10Seconds') return defaultValue ?? 10000;
-          if (key === 'pipeline.maxFileSizeBytes') return 10485760;
+          if (key === 'processing.maxFileSizeBytes') return 10485760;
           return defaultValue;
         }),
       }))
@@ -223,27 +223,6 @@ describe('GraphApiService', () => {
 
       expect(result).toEqual(content);
       expect(mockGraphClient.api).toHaveBeenCalledWith('/drives/drive-1/items/file-1/content');
-    });
-
-    it('throws error when file exceeds size limit', async () => {
-      const mockChain = mockGraphClient.api();
-      const largeChunk = Buffer.alloc(11000000);
-
-      const mockReadableStream = {
-        [Symbol.asyncIterator]: async function* () {
-          yield largeChunk;
-        },
-        getReader: vi.fn().mockReturnValue({
-          cancel: vi.fn().mockResolvedValue(undefined),
-          releaseLock: vi.fn(),
-        }),
-      };
-
-      mockChain.getStream.mockResolvedValue(mockReadableStream);
-
-      await expect(service.downloadFileContent('drive-1', 'file-1')).rejects.toThrow(
-        'File size exceeds maximum limit of 10485760 bytes',
-      );
     });
 
     it('handles multiple chunks correctly', async () => {

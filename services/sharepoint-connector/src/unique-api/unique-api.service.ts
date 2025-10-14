@@ -5,6 +5,11 @@ import Bottleneck from 'bottleneck';
 import { GraphQLClient } from 'graphql-request';
 import { Client } from 'undici';
 import { Config } from '../config';
+import {
+  INGESTION_SOURCE_KIND,
+  INGESTION_SOURCE_NAME,
+  PATH_BASED_INGESTION,
+} from '../constants/ingestion.constants';
 import { UniqueOwnerType } from '../constants/unique-owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
 import { normalizeError } from '../utils/normalize-error';
@@ -77,10 +82,10 @@ export class UniqueApiService {
     const diffRequest: FileDiffRequest = {
       basePath,
       partialKey,
-      sourceKind: 'MICROSOFT_365_SHAREPOINT',
-      sourceName: 'SharePoint Online Connector',
+      sourceKind: INGESTION_SOURCE_KIND,
+      sourceName: INGESTION_SOURCE_NAME,
       fileList,
-      scope: scopeId ?? 'PATH',
+      scope: scopeId ?? PATH_BASED_INGESTION,
     };
 
     this.logger.debug(`File diff request payload: ${JSON.stringify(diffRequest, null, 2)}`);
