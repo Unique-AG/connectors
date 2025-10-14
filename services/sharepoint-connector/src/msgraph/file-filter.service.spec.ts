@@ -56,7 +56,7 @@ describe('FileFilterService', () => {
         ...stub(),
         get: vi.fn((key: string) => {
           if (key === 'sharepoint.syncColumnName') return 'FinanceGPTKnowledge';
-          if (key === 'sharepoint.allowedMimeTypes') return ['application/pdf', 'text/plain'];
+          if (key === 'processing.allowedMimeTypes') return ['application/pdf', 'text/plain'];
           return undefined;
         }),
       }))

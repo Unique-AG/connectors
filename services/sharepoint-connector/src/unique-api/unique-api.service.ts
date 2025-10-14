@@ -5,6 +5,11 @@ import Bottleneck from 'bottleneck';
 import { GraphQLClient } from 'graphql-request';
 import { Client } from 'undici';
 import { Config } from '../config';
+import {
+  INGESTION_SOURCE_KIND,
+  INGESTION_SOURCE_NAME,
+  PATH_BASED_INGESTION,
+} from '../constants/ingestion.constants';
 import { UniqueOwnerType } from '../constants/unique-owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
 import { normalizeError } from '../utils/normalize-error';
@@ -16,7 +21,6 @@ import {
   type IngestionApiResponse,
   type IngestionFinalizationRequest,
 } from './unique-api.types';
-import {PATH_BASED_INGESTION, INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME} from "../constants/ingestion.constants";
 
 @Injectable()
 export class UniqueApiService {
