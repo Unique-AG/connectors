@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.0.0-alpha.5](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.4...sharepoint-connector@v2.0.0-alpha.5) (2025-10-14)
+
+
+### Features
+
+* **sharepoint-connector:** fixed path based ingestion ([#62](https://github.com/Unique-AG/connectors/issues/62)) ([c606b32](https://github.com/Unique-AG/connectors/commit/c606b32791dea0aa88968007961f8e03c0adaeb0))
+
+
+### Bug Fixes
+
+* **spc:** clarify sites parameter ([#59](https://github.com/Unique-AG/connectors/issues/59)) ([9af2eef](https://github.com/Unique-AG/connectors/commit/9af2eefa124d8b0e14288d438893c796516d8825))
+* **spc:** support graph roles properly ([#58](https://github.com/Unique-AG/connectors/issues/58)) ([331227d](https://github.com/Unique-AG/connectors/commit/331227d12a55be2bd89269ca0efac8ba60b52937))
+
 ## [2.0.0-alpha.4](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.3...sharepoint-connector@v2.0.0-alpha.4) (2025-10-08)
 
 
