@@ -9,6 +9,7 @@ import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
+import {PATH_BASED_INGESTION, INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME} from "../../constants/ingestion.constants";
 
 @Injectable()
 export class IngestionFinalizationStep implements IPipelineStep {
@@ -41,10 +42,10 @@ export class IngestionFinalizationStep implements IPipelineStep {
       mimeType: registrationResponse.mimeType,
       ownerType: registrationResponse.ownerType,
       byteSize: registrationResponse.byteSize,
-      scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
+      scopeId: isPathBasedIngestion ? PATH_BASED_INGESTION : scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
-      sourceName: 'SharePoint Online Connector',
-      sourceKind: 'MICROSOFT_365_SHAREPOINT',
+      sourceName: INGESTION_SOURCE_NAME,
+      sourceKind: INGESTION_SOURCE_KIND,
       fileUrl: registrationResponse.readUrl,
       ...(isPathBasedIngestion && {
         url: context.knowledgeBaseUrl,

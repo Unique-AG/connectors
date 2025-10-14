@@ -12,7 +12,7 @@ interface SharepointPartialKeyParams {
   siteId: string;
 }
 
-const trimSlashes = (value: string): string => {
+const normalizeSlashes = (value: string): string => {
   // 1. Remove leading/trailing whitespace
   let result = value.trim();
 
@@ -37,9 +37,9 @@ export function buildSharepointFileKey({
     return `sharepoint_scope_${scopeId}_${fileId}`;
   }
 
-  const normalizedSiteId = trimSlashes(siteId);
-  const normalizedDriveName = trimSlashes(driveName);
-  const normalizedFolderPath = trimSlashes(folderPath);
+  const normalizedSiteId = normalizeSlashes(siteId);
+  const normalizedDriveName = normalizeSlashes(driveName);
+  const normalizedFolderPath = normalizeSlashes(folderPath);
 
   const segments = [normalizedSiteId, normalizedDriveName, normalizedFolderPath, fileName]
     .map((segment) => segment.trim())
@@ -53,5 +53,5 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
     return `sharepoint_scope_${scopeId}_`;
   }
 
-  return trimSlashes(siteId);
+  return normalizeSlashes(siteId);
 }

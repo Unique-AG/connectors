@@ -6,6 +6,7 @@ import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { IngestionFinalizationStep } from './ingestion-finalization.step';
+import {INGESTION_SOURCE_KIND} from "../../constants/ingestion.constants";
 
 describe('IngestionFinalizationStep', () => {
   let step: IngestionFinalizationStep;
@@ -54,7 +55,7 @@ describe('IngestionFinalizationStep', () => {
           readUrl: 'https://read',
           createdAt: '2023-01-01T00:00:00Z',
           internallyStoredAt: null,
-          source: 'MICROSOFT_365_SHAREPOINT',
+          source: INGESTION_SOURCE_KIND,
         },
       },
     };

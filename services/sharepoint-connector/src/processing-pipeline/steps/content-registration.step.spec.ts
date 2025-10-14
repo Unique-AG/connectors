@@ -6,6 +6,7 @@ import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { ContentRegistrationStep } from './content-registration.step';
+import {INGESTION_SOURCE_KIND} from "../../constants/ingestion.constants";
 
 describe('ContentRegistrationStep', () => {
   let step: ContentRegistrationStep;
@@ -32,7 +33,7 @@ describe('ContentRegistrationStep', () => {
           readUrl: 'https://read',
           createdAt: new Date().toISOString(),
           internallyStoredAt: null,
-          source: 'MICROSOFT_365_SHAREPOINT',
+          source: INGESTION_SOURCE_KIND,
         }),
       }))
       .compile();

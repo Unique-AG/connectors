@@ -16,6 +16,7 @@ import {
   type IngestionApiResponse,
   type IngestionFinalizationRequest,
 } from './unique-api.types';
+import {PATH_BASED_INGESTION, INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME} from "../constants/ingestion.constants";
 
 @Injectable()
 export class UniqueApiService {
@@ -77,10 +78,10 @@ export class UniqueApiService {
     const diffRequest: FileDiffRequest = {
       basePath,
       partialKey,
-      sourceKind: 'MICROSOFT_365_SHAREPOINT',
-      sourceName: 'SharePoint Online Connector',
+      sourceKind: INGESTION_SOURCE_KIND,
+      sourceName: INGESTION_SOURCE_NAME,
       fileList,
-      scope: scopeId ?? 'PATH',
+      scope: scopeId ?? PATH_BASED_INGESTION,
     };
 
     this.logger.debug(`File diff request payload: ${JSON.stringify(diffRequest, null, 2)}`);

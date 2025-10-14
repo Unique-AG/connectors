@@ -11,6 +11,7 @@ import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
+import {PATH_BASED_INGESTION, INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME} from "../../constants/ingestion.constants";
 
 @Injectable()
 export class ContentRegistrationStep implements IPipelineStep {
@@ -36,10 +37,10 @@ export class ContentRegistrationStep implements IPipelineStep {
       title: context.fileName,
       mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
       ownerType: UniqueOwnerType.Scope,
-      scopeId: isPathBasedIngestion ? 'PATH' : scopeId,
+      scopeId: isPathBasedIngestion ? PATH_BASED_INGESTION : scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
-      sourceKind: 'MICROSOFT_365_SHAREPOINT',
-      sourceName: 'SharePoint Online Connector',
+      sourceKind: INGESTION_SOURCE_KIND,
+      sourceName: INGESTION_SOURCE_NAME,
       ...(isPathBasedIngestion && {
         url: context.knowledgeBaseUrl,
         baseUrl: sharepointBaseUrl,
