@@ -116,7 +116,7 @@ connectorConfig:
       projectId: unset_default_value
 
   processing:
-    stepTimeoutSeconds: 600
+    stepTimeoutSeconds: 300
     concurrency: 1
     allowedMimeTypes:
       - application/pdf
