@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Config } from '../config';
 import { FileFilterService } from './file-filter.service';
+import { GraphBatchService } from './graph-batch.service';
 import { GraphClientFactory } from './graph-client.factory';
 import type { EnrichedDriveItem } from './types/enriched-drive-item';
 
@@ -18,6 +19,7 @@ export class GraphApiService {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly configService: ConfigService<Config, true>,
     private readonly fileFilterService: FileFilterService,
+    private readonly graphBatchService: GraphBatchService,
   ) {
     this.graphClient = this.graphClientFactory.createClient();
 
@@ -42,10 +44,8 @@ export class GraphApiService {
       this.logger.warn(`File scan limit set to ${maxFilesToScan} files for testing purpose.`);
     }
 
-    const [siteWebUrl, drives] = await Promise.all([
-      await this.getSiteWebUrl(siteId),
-      await this.getDrivesForSite(siteId),
-    ]);
+    const { webUrl: siteWebUrl, drives } = await this.graphBatchService.fetchSiteMetadata(siteId);
+    this.logger.log(`Found ${drives.length} drives for site ${siteId}`);
 
     for (const drive of drives) {
       if (!drive.id || !drive.name) continue;
@@ -109,35 +109,6 @@ export class GraphApiService {
     }
   }
 
-  private async getSiteWebUrl(siteId: string): Promise<string> {
-    try {
-      const site = await this.makeRateLimitedRequest(() =>
-        this.graphClient.api(`/sites/${siteId}`).select('webUrl').get(),
-      );
-
-      return site.webUrl;
-    } catch (error) {
-      this.logger.error(`Failed to fetch site info for ${siteId}:`, error);
-      throw error;
-    }
-  }
-
-  private async getDrivesForSite(siteId: string): Promise<Drive[]> {
-    try {
-      const drives = await this.makeRateLimitedRequest(() =>
-        this.graphClient.api(`/sites/${siteId}/drives`).get(),
-      );
-
-      const allDrives = drives?.value || [];
-      this.logger.log(`Found ${allDrives.length} drives for site ${siteId}`);
-
-      return allDrives;
-    } catch (error) {
-      this.logger.error(`Failed to fetch drives for site ${siteId}:`, error);
-      throw error;
-    }
-  }
-
   private async recursivelyFetchFiles(
     driveId: string,
     itemId: string,
@@ -149,26 +120,16 @@ export class GraphApiService {
     try {
       const allItems = await this.fetchAllItemsInFolder(driveId, itemId);
       const filesToSynchronize: EnrichedDriveItem[] = [];
+      const foldersToScan: Array<DriveItem & { id: string }> = [];
 
       for (const driveItem of allItems) {
-        // Check if we've reached the file limit for local testing
         if (maxFiles && filesToSynchronize.length >= maxFiles) {
           this.logger.warn(`Reached file limit of ${maxFiles}, stopping scan in ${itemId}`);
           break;
         }
 
         if (this.isFolder(driveItem)) {
-          const remainingLimit = maxFiles ? maxFiles - filesToSynchronize.length : undefined;
-          const filesInSubfolder = await this.recursivelyFetchFiles(
-            driveId,
-            driveItem.id,
-            siteId,
-            siteWebUrl,
-            driveName,
-            remainingLimit,
-          );
-
-          filesToSynchronize.push(...filesInSubfolder);
+          foldersToScan.push(driveItem);
         } else if (this.fileFilterService.isFileValidForIngestion(driveItem)) {
           const folderPath = this.extractFolderPath(driveItem);
           filesToSynchronize.push({
@@ -182,12 +143,107 @@ export class GraphApiService {
         }
       }
 
+      if (foldersToScan.length > 0) {
+        const remainingLimit = maxFiles ? maxFiles - filesToSynchronize.length : undefined;
+        const filesFromSubfolders = await this.batchScanFolders(
+          driveId,
+          foldersToScan,
+          siteId,
+          siteWebUrl,
+          driveName,
+          remainingLimit,
+        );
+        filesToSynchronize.push(...filesFromSubfolders);
+      }
+
       return filesToSynchronize;
     } catch (error) {
       this.logger.error(`Failed to fetch items for drive ${driveId}, item ${itemId}:`, error);
-      // TODO: probably we should not throw here, we want to continue scanning (add retry mechanism) - check implications with file-diffing
       throw error;
     }
+  }
+
+  private async batchScanFolders(
+    driveId: string,
+    folders: Array<DriveItem & { id: string }>,
+    siteId: string,
+    siteWebUrl: string,
+    driveName: string,
+    maxFiles?: number,
+  ): Promise<EnrichedDriveItem[]> {
+    const allFiles: EnrichedDriveItem[] = [];
+    const selectFields = [
+      'id',
+      'name',
+      'webUrl',
+      'size',
+      'lastModifiedDateTime',
+      'folder',
+      'file',
+      'listItem',
+      'parentReference',
+    ];
+
+    const batchRequests = folders.map((folder) => ({
+      driveId,
+      itemId: folder.id,
+      selectFields,
+    }));
+
+    const resultsMap = await this.graphBatchService.fetchMultipleFolderChildren(batchRequests);
+
+    for (const folder of folders) {
+      if (maxFiles && allFiles.length >= maxFiles) {
+        break;
+      }
+
+      const key = `${driveId}:${folder.id}`;
+      const folderItems = resultsMap.get(key);
+
+      if (!folderItems) {
+        this.logger.warn(`No results found for folder ${folder.name} (${folder.id})`);
+        continue;
+      }
+
+      const subFolders: Array<DriveItem & { id: string }> = [];
+      
+      for (const item of folderItems.value) {
+        const driveItem = item as DriveItem;
+        
+        if (maxFiles && allFiles.length >= maxFiles) {
+          break;
+        }
+
+        if (this.isFolder(driveItem)) {
+          subFolders.push(driveItem);
+        } else if (this.fileFilterService.isFileValidForIngestion(driveItem)) {
+          const folderPath = this.extractFolderPath(driveItem);
+          allFiles.push({
+            ...driveItem,
+            siteId,
+            siteWebUrl,
+            driveId,
+            driveName,
+            folderPath,
+          });
+        }
+      }
+
+      if (subFolders.length > 0) {
+        const remainingLimit = maxFiles ? maxFiles - allFiles.length : undefined;
+        const filesFromSubfolders = await this.batchScanFolders(
+          driveId,
+          subFolders,
+          siteId,
+          siteWebUrl,
+          driveName,
+          remainingLimit,
+        );
+        allFiles.push(...filesFromSubfolders);
+      }
+    }
+
+    return allFiles;
   }
 
   //Example path: /drives/b!abc123def456/root:/Documents/Projects ; Removes root: from the folder path
@@ -219,7 +275,10 @@ export class GraphApiService {
     let nextPageUrl = `/drives/${driveId}/items/${itemId}/children`;
 
     while (nextPageUrl) {
-      const response = await this.makeRateLimitedRequest(() =>
+      const response = await this.makeRateLimitedRequest<{
+        value?: DriveItem[];
+        '@odata.nextLink'?: string;
+      }>(() =>
         this.graphClient
           .api(nextPageUrl)
           .select(selectFields)
