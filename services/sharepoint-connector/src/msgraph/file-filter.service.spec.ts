@@ -176,4 +176,86 @@ describe('FileFilterService', () => {
     });
     expect(service.isFileValidForIngestion(item)).toBe(false);
   });
+
+  describe('isAspxFileValidForIngestion', () => {
+    it('returns true for valid ASPX file with all required fields', () => {
+      const fields = {
+        FileLeafRef: 'test.aspx',
+        FinanceGPTKnowledge: true,
+        _ModerationStatus: 0,
+      };
+      expect(service.isAspxFileValidForIngestion(fields)).toBe(true);
+    });
+
+    it('returns false for non-ASPX file', () => {
+      const fields = {
+        FileLeafRef: 'test.pdf',
+        FinanceGPTKnowledge: true,
+        _ModerationStatus: 0,
+      };
+      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+    });
+
+    it('returns false for ASPX file without sync flag', () => {
+      const fields = {
+        FileLeafRef: 'test.aspx',
+        FinanceGPTKnowledge: false,
+        _ModerationStatus: 0,
+      };
+      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+    });
+
+    it('returns false for ASPX file with undefined sync flag', () => {
+      const fields = {
+        FileLeafRef: 'test.aspx',
+        FinanceGPTKnowledge: undefined,
+        _ModerationStatus: 0,
+      };
+      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+    });
+
+    it('returns false for ASPX file that is not approved', () => {
+      const fields = {
+        FileLeafRef: 'test.aspx',
+        FinanceGPTKnowledge: true,
+        _ModerationStatus: 1, // Rejected
+      };
+      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+    });
+
+    it('returns false for ASPX file with pending moderation status', () => {
+      const fields = {
+        FileLeafRef: 'test.aspx',
+        FinanceGPTKnowledge: true,
+        _ModerationStatus: 2, // Pending
+      };
+      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+    });
+
+    it('returns false for ASPX file with undefined moderation status', () => {
+      const fields = {
+        FileLeafRef: 'test.aspx',
+        FinanceGPTKnowledge: true,
+        _ModerationStatus: undefined,
+      };
+      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+    });
+
+    it('returns false for file without FileLeafRef', () => {
+      const fields = {
+        FinanceGPTKnowledge: true,
+        _ModerationStatus: 0,
+      };
+      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+    });
+
+    it('returns false for file with non-string FileLeafRef', () => {
+      const fields = {
+        FileLeafRef: 123,
+        FinanceGPTKnowledge: true,
+        _ModerationStatus: 0,
+      };
+      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+    });
+  });
 });

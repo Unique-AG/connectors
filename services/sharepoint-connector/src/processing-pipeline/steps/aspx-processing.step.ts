@@ -65,20 +65,12 @@ export class AspxProcessingStep implements IPipelineStep {
   }
 
   private buildAuthorHtml(fields: Record<string, unknown>): string {
-    const author = fields.Author as Record<string, unknown>;
+    const author = fields.Author as string;
     if (!author) {
       return '';
     }
 
-    const firstName = author.FirstName as string;
-    const lastName = author.LastName as string;
-
-    if (!firstName && !lastName) {
-      return '';
-    }
-
-    const fullName = [firstName, lastName].filter(Boolean).join(' ');
-    return `<h4>${fullName}</h4>`;
+    return `<h4>${author}</h4>`;
   }
 
   private buildHtmlStructure(title: string, authorHtml: string, content: string): string {

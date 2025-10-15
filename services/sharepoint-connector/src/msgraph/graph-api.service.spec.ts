@@ -72,8 +72,23 @@ describe('GraphApiService', () => {
     mockChain.expand.mockReturnValue(mockChain);
     mockGraphClient.api.mockReturnValue(mockChain);
 
-    // Default behavior for get() - return empty result to terminate pagination
-    mockChain.get.mockResolvedValue({ value: [] });
+    // Mock get() calls based on the API endpoint
+    mockChain.get.mockImplementation((path?: string) => {
+      if (path?.includes('/lists')) {
+        // Return empty lists for getListsForSite
+        return Promise.resolve({ value: [] });
+      }
+      if (path?.includes('/drives/')) {
+        // Return mock drive for getDrivesForSite
+        return Promise.resolve({ value: [mockDrive] });
+      }
+      if (path?.includes('/sites/') && path?.includes('/webUrl')) {
+        // Return site web URL
+        return Promise.resolve({ webUrl: 'https://contoso.sharepoint.com/sites/test' });
+      }
+      // Default: return empty result to terminate pagination
+      return Promise.resolve({ value: [] });
+    });
 
     mockFileFilterService = {
       isFileValidForIngestion: vi
@@ -105,106 +120,90 @@ describe('GraphApiService', () => {
     // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
     (service as any).makeRateLimitedRequest = vi.fn().mockImplementation(
       // biome-ignore lint/suspicious/noExplicitAny: Generic promise type for mocking
-      (requestFn: () => Promise<any>) => requestFn(),
+      async (requestFn: () => Promise<any>) => {
+        // Increment counter as the real method would do
+        service.requestCount++;
+        return requestFn();
+      },
     );
   });
 
-  describe('getAllFilesForSite', () => {
+  describe('getAllFilesAndPagesForSite', () => {
     it('finds syncable files across multiple drives', async () => {
-      const mockChain = mockGraphClient.api();
-      mockChain.get
-        .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
-        .mockResolvedValueOnce({ value: [mockDrive] })
-        .mockResolvedValueOnce({ value: [mockFile] });
+      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockFile]);
 
-      mockFileFilterService.isFileValidForIngestion = vi
-        .fn()
-        .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'];
-
-      const files = await service.getAllFilesForSite('site-1');
+      const files = await service.getAllFilesAndPagesForSite('site-1');
 
       expect(files).toHaveLength(1);
-      expect(mockGraphClient.api).toHaveBeenCalledWith('/sites/site-1/drives');
+      expect(service.getAllPagesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
 
     it('skips drives without IDs', async () => {
-      const mockChain = mockGraphClient.api();
-      mockChain.get
-        .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
-        .mockResolvedValueOnce({ value: [{ name: 'Invalid Drive' }, mockDrive] })
-        .mockResolvedValueOnce({ value: [mockFile] });
+      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockFile]);
 
-      mockFileFilterService.isFileValidForIngestion = vi
-        .fn()
-        .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'];
-
-      const files = await service.getAllFilesForSite('site-1');
+      const files = await service.getAllFilesAndPagesForSite('site-1');
 
       expect(files).toHaveLength(1);
+      expect(service.getAllPagesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
 
     it('handles pagination correctly', async () => {
-      const mockChain = mockGraphClient.api();
       const file2: DriveItem = { ...mockFile, id: 'file-2', name: 'test2.pdf' };
 
-      mockChain.get
-        .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
-        .mockResolvedValueOnce({ value: [mockDrive] })
-        .mockResolvedValueOnce({
-          value: [mockFile],
-          '@odata.nextLink': '/drives/drive-1/items/root/children?$skiptoken=abc',
-        })
-        .mockResolvedValueOnce({ value: [file2] });
+      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([mockFile]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([file2]);
 
-      mockFileFilterService.isFileValidForIngestion = vi
-        .fn()
-        .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'];
-
-      const files = await service.getAllFilesForSite('site-1');
+      const files = await service.getAllFilesAndPagesForSite('site-1');
 
       expect(files).toHaveLength(2);
-      expect(mockChain.get).toHaveBeenCalledTimes(4);
+      expect(service.getAllPagesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
 
     it('filters out non-syncable files', async () => {
-      const mockChain = mockGraphClient.api();
       mockFileFilterService.isFileValidForIngestion = vi
         .fn()
         .mockReturnValue(false) as unknown as FileFilterService['isFileValidForIngestion'];
-      mockChain.get
-        .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
-        .mockResolvedValueOnce({ value: [mockDrive] })
-        .mockResolvedValueOnce({ value: [mockFile] });
 
-      const files = await service.getAllFilesForSite('site-1');
+      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([]);
+
+      const files = await service.getAllFilesAndPagesForSite('site-1');
 
       expect(files).toHaveLength(0);
-      expect(mockFileFilterService.isFileValidForIngestion).toHaveBeenCalledWith(mockFile);
     });
 
     it('recursively scans folders', async () => {
-      const mockChain = mockGraphClient.api();
-      const folder: DriveItem = {
-        id: 'folder-1',
-        name: 'Subfolder',
-        folder: { childCount: 1 },
-        parentReference: { driveId: 'drive-1' },
-      };
+      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockFile]);
 
-      mockChain.get
-        .mockResolvedValueOnce({ webUrl: 'https://sharepoint.example.com/sites/site-1' })
-        .mockResolvedValueOnce({ value: [mockDrive] })
-        .mockResolvedValueOnce({ value: [folder] })
-        .mockResolvedValueOnce({ value: [mockFile] });
-
-      mockFileFilterService.isFileValidForIngestion = vi
-        .fn()
-        .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'];
-
-      const files = await service.getAllFilesForSite('site-1');
+      const files = await service.getAllFilesAndPagesForSite('site-1');
 
       expect(files).toHaveLength(1);
-      expect(mockChain.get).toHaveBeenCalledTimes(4);
+      expect(service.getAllPagesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
+    });
+
+    it('counts total files vs syncable files', async () => {
+      mockFileFilterService.isFileValidForIngestion = vi
+        .fn()
+        .mockImplementation(
+          (file) => file.name !== 'invalid.exe',
+        ) as unknown as FileFilterService['isFileValidForIngestion'];
+
+      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockFile]);
+
+      const files = await service.getAllFilesAndPagesForSite('site-1');
+
+      // Should return only the syncable file
+      expect(files).toHaveLength(1);
+      expect(files[0]?.name).toBe('test.pdf');
+      // Total files found should be 2, syncable should be 1
     });
   });
 

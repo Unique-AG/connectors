@@ -4,11 +4,11 @@ import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { normalizeError } from '../utils/normalize-error';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -39,9 +39,11 @@ export class SharepointSynchronizationService {
     for (const siteId of siteIdsToScan) {
       const siteStartTime = Date.now();
       try {
-        const files = await this.graphApiService.getAllFilesForSite(siteId);
+        const files = await this.graphApiService.getAllFilesAndPagesForSite(siteId);
 
-        this.logger.log(`Finished scanning site id ${siteId} in ${((Date.now() - siteStartTime) / 1000).toFixed(2)} seconds`);
+        this.logger.log(
+          `Finished scanning site id ${siteId} in ${((Date.now() - siteStartTime) / 1000).toFixed(2)} seconds`,
+        );
 
         const diffResult = await this.calculateDiffForSite(files, siteId);
         this.logger.log(

@@ -1,5 +1,5 @@
 import type { DriveItem } from '@microsoft/microsoft-graph-types';
-import {Injectable, Logger} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 
@@ -22,6 +22,16 @@ export class FileFilterService {
 
   public constructor(private readonly configService: ConfigService<Config, true>) {}
 
+  public isAspxFileValidForIngestion(fields: Record<string, unknown>): boolean {
+    return Boolean(
+      fields.FileLeafRef &&
+        typeof fields.FileLeafRef === 'string' &&
+        fields.FileLeafRef.toLowerCase().endsWith('.aspx') &&
+        fields.FinanceGPTKnowledge === true &&
+        fields._ModerationStatus === 0,
+    );
+  }
+
   public isFileValidForIngestion(item: DriveItem): item is DriveItemWithDefinedProperties {
     const fields = item.listItem?.fields as Record<string, unknown>;
     const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
@@ -39,7 +49,7 @@ export class FileFilterService {
     ) {
       return false;
     }
-    this.logger.log('item.file: ' + ' ' + JSON.stringify(item, null, 2));
+    this.logger.log(`item.file: ${JSON.stringify(item, null, 2)}`);
     const isAspxFile = item.name?.toLowerCase().endsWith('.aspx');
     const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
     const hasSyncFlag = fields[syncColumnName] === true;

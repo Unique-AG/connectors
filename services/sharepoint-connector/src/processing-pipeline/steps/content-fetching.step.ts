@@ -20,6 +20,20 @@ export class ContentFetchingStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
+
+    // For ASPX files from SitePages, content is already available in listItemFields
+    // No need to download traditional file content
+    // TODO WE MIGHT NEED TO DOWNLOAD CONTENT FOR OLD SITEPAGES
+    if (
+      context.fileName.toLowerCase().endsWith('.aspx') &&
+      context.metadata.driveName === 'SitePages'
+    ) {
+      this.logger.debug(
+        `[${context.correlationId}] Skipping content download for ASPX file from SitePages - content available in metadata`,
+      );
+      return context;
+    }
+
     this.validateMimeType(context.metadata.mimeType, context.correlationId);
 
     try {

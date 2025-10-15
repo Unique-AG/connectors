@@ -1,5 +1,5 @@
 import { Client } from '@microsoft/microsoft-graph-client';
-import type { Drive, DriveItem } from '@microsoft/microsoft-graph-types';
+import type { Drive, DriveItem, List } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
@@ -33,6 +33,31 @@ export class GraphApiService {
     });
   }
 
+  public async getAllPagesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
+    const [siteWebUrl, lists] = await Promise.all([
+      this.getSiteWebUrl(siteId),
+      this.getListsForSite(siteId),
+    ]);
+
+    // Scan ASPX files from SitePages list
+    const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
+    if (!sitePagesList?.id) {
+      this.logger.warn(
+        `Cannot scan Site Pages because SitePages list was not found for site ${siteId}`,
+      );
+      return [];
+    }
+
+    try {
+      const aspxFiles = await this.getAspxFilesFromSitePages(siteId, sitePagesList.id, siteWebUrl);
+      this.logger.log(`Found ${aspxFiles.length} ASPX files from SitePages for site ${siteId}`);
+      return aspxFiles;
+    } catch (error) {
+      this.logger.warn(`Failed to scan ASPX files from SitePages for site ${siteId}: ${error}`);
+      return [];
+    }
+  }
+
   public async getAllFilesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
     const allSyncableFiles: EnrichedDriveItem[] = [];
@@ -43,14 +68,19 @@ export class GraphApiService {
     }
 
     const [siteWebUrl, drives] = await Promise.all([
-      await this.getSiteWebUrl(siteId),
-      await this.getDrivesForSite(siteId),
+      this.getSiteWebUrl(siteId), //TODO THIS IS NOT NO LONGER REQUIRED
+      this.getDrivesForSite(siteId),
     ]);
 
     for (const drive of drives) {
       if (!drive.id || !drive.name) continue;
 
       const remainingLimit = maxFilesToScan ? maxFilesToScan - totalScanned : undefined;
+      if (remainingLimit !== undefined && remainingLimit <= 0) {
+        this.logger.log(`Reached file scan limit of ${maxFilesToScan}, stopping drive scan`);
+        break;
+      }
+
       const filesInDrive = await this.recursivelyFetchFiles(
         drive.id,
         'root',
@@ -70,8 +100,32 @@ export class GraphApiService {
       }
     }
 
+    this.logger.log(`Found ${allSyncableFiles.length} drive files for site ${siteId}`);
+    return allSyncableFiles;
+  }
+
+  public async getAllFilesAndPagesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
+    const [pagesResult, filesResult] = await Promise.allSettled([
+      this.getAllPagesForSite(siteId),
+      this.getAllFilesForSite(siteId),
+    ]);
+
+    const allSyncableFiles: EnrichedDriveItem[] = [];
+
+    if (pagesResult.status === 'fulfilled') {
+      allSyncableFiles.push(...pagesResult.value);
+    } else {
+      this.logger.error(`Failed to scan pages for site ${siteId}:`, pagesResult.reason);
+    }
+
+    if (filesResult.status === 'fulfilled') {
+      allSyncableFiles.push(...filesResult.value);
+    } else {
+      this.logger.error(`Failed to scan drive files for site ${siteId}:`, filesResult.reason);
+    }
+
     this.logger.log(
-      `Completed scan for site ${siteId}. Found ${allSyncableFiles.length} files marked for synchronizing.`,
+      `Completed scan for site ${siteId}. Found ${allSyncableFiles.length} total files marked for synchronizing.`,
     );
     return allSyncableFiles;
   }
@@ -105,6 +159,78 @@ export class GraphApiService {
       return Buffer.concat(chunks);
     } catch (error) {
       this.logger.error(`Failed to download file content for item ${itemId}:`, error);
+      throw error;
+    }
+  }
+
+  public async getListsForSite(siteId: string): Promise<List[]> {
+    try {
+      const lists = await this.makeRateLimitedRequest(() =>
+        this.graphClient.api(`/sites/${siteId}/lists`).select('system,name,id').get(),
+      );
+
+      const allLists = lists?.value || [];
+      this.logger.log(`Found ${allLists.length} lists for site ${siteId}`);
+
+      return allLists;
+    } catch (error) {
+      this.logger.error(`Failed to fetch lists for site ${siteId}:`, error);
+      throw error;
+    }
+  }
+
+  public async getAspxFilesFromSitePages(
+    siteId: string,
+    listId: string,
+    siteWebUrl: string,
+  ): Promise<EnrichedDriveItem[]> {
+    try {
+      const aspxFiles: EnrichedDriveItem[] = [];
+
+      let nextPageUrl = `/sites/${siteId}/lists/${listId}/items?$select=id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy&$expand=fields($select=CanvasContent1,WikiField,Title,FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus)`;
+
+      while (nextPageUrl) {
+        const response = await this.makeRateLimitedRequest(() =>
+          this.graphClient.api(nextPageUrl).get(),
+        );
+
+        const items = response?.value || [];
+        for (const item of items) {
+          // Filter for ASPX files that are flagged for sync and approved
+          if (this.fileFilterService.isAspxFileValidForIngestion(item.fields || {})) {
+            const aspxFile: EnrichedDriveItem = {
+              id: item.id,
+              name: item.fields.FileLeafRef,
+              webUrl: item.webUrl,
+              size: parseInt(item.fields.FileSizeDisplay, 10),
+              lastModifiedDateTime: item.lastModifiedDateTime,
+              file: {
+                mimeType: 'text/html',
+              },
+              listItem: {
+                fields: {
+                  ...item.fields,
+                  Author: item.createdBy?.user?.displayName || undefined,
+                },
+              },
+              siteId,
+              siteWebUrl,
+              driveId: listId,
+              driveName: 'SitePages',
+              folderPath: '/',
+            };
+
+            aspxFiles.push(aspxFile);
+          }
+        }
+
+        nextPageUrl = response['@odata.nextLink'];
+      }
+
+      this.logger.log(`Found ${aspxFiles.length} ASPX files in SitePages list`);
+      return aspxFiles;
+    } catch (error) {
+      this.logger.error(`Failed to fetch ASPX files from SitePages list ${listId}:`, error);
       throw error;
     }
   }

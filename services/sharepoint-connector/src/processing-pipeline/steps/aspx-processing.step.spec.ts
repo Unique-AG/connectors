@@ -58,7 +58,7 @@ describe('AspxProcessingStep', () => {
         listItemFields: {
           Title: 'Test Page',
           CanvasContent1: '<p>Canvas content</p>',
-          Author: { FirstName: 'John', LastName: 'Doe' },
+          Author: 'John Doe',
         },
       },
     });
@@ -79,7 +79,7 @@ describe('AspxProcessingStep', () => {
         listItemFields: {
           Title: 'Wiki Page',
           WikiField: '<p>Wiki content</p>',
-          Author: { FirstName: 'Jane', LastName: 'Smith' },
+          Author: 'Jane Smith',
         },
       },
     });
@@ -131,7 +131,7 @@ describe('AspxProcessingStep', () => {
         listItemFields: {
           Title: 'Partial Author',
           CanvasContent1: '<p>Content</p>',
-          Author: { FirstName: 'John' },
+          Author: 'John',
         },
       },
     });
