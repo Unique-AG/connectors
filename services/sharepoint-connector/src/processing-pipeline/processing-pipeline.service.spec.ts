@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
-import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';

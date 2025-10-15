@@ -4,7 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
-import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';

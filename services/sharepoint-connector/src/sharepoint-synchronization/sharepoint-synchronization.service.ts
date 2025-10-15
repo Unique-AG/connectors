@@ -4,7 +4,7 @@ import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
@@ -41,16 +41,18 @@ export class SharepointSynchronizationService {
       try {
         const files = await this.graphApiService.getAllFilesForSite(siteId);
 
+        this.logger.log(`Finished scanning site id ${siteId} in ${((Date.now() - siteStartTime) / 1000).toFixed(2)} seconds`);
+
         const diffResult = await this.calculateDiffForSite(files, siteId);
         this.logger.log(
-          `File Diff Result: Site ${siteId}: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
+          `File Diff Results: Site ${siteId}: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
         );
 
+        const processStartTime = Date.now();
         await this.orchestrator.processFilesForSite(siteId, files, diffResult);
 
-        const siteScanDurationSeconds = (Date.now() - siteStartTime) / 1000;
         this.logger.log(
-          `Finished processing site ${siteId} in ${siteScanDurationSeconds.toFixed(2)}s`,
+          `Finished processing site ${siteId} in ${((Date.now() - processStartTime) / 1000).toFixed(2)} seconds`,
         );
       } catch (rawError) {
         const error = normalizeError(rawError);
