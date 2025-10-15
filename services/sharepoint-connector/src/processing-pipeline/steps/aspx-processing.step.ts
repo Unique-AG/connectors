@@ -9,50 +9,83 @@ import type { IPipelineStep } from './pipeline-step.interface';
 @Injectable()
 export class AspxProcessingStep implements IPipelineStep {
   private readonly logger = new Logger(AspxProcessingStep.name);
-  readonly stepName = PipelineStep.AspxProcessing;
+  public readonly stepName = PipelineStep.AspxProcessing;
 
-  constructor(
-    private readonly configService: ConfigService<Config, true>,
-  ) {}
+  public constructor(private readonly configService: ConfigService<Config, true>) {}
 
-  async execute(context: ProcessingContext): Promise<ProcessingContext> {
+  public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const { fileName } = context;
-    if (!fileName?.toLowerCase().endsWith('.aspx')) {
+    if (!this.isAspxFile(fileName)) {
       return context;
     }
-
-    const stepStart = Date.now();
 
     try {
       const htmlContent = this.buildHtmlFromAspx(context);
       context.contentBuffer = Buffer.from(htmlContent, 'utf-8');
       context.metadata.mimeType = 'text/html';
       return context;
-
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(
-        `[${context.correlationId}] ASPX processing failed: ${message}`,
-      );
+      this.logger.error(`[${context.correlationId}] ASPX processing failed: ${message}`);
       throw error;
     }
   }
 
-  /**
-   * Builds an HTML representation of the ASPX page fields.
-   */
+  private isAspxFile(fileName: string | undefined): boolean {
+    return fileName?.toLowerCase().endsWith('.aspx') ?? false;
+  }
+
   private buildHtmlFromAspx(context: ProcessingContext): string {
-    const { metadata, fileName } = context;
-    const fields = metadata?.listItemFields ?? {};
-  
-    const content = fields.CanvasContent1 || fields.WikiField || '';
-    const title = fields.Title || fileName;
-  
-    return `
-      <div>
-        <h2>${title}</h2>
-        ${content}
-      </div>
-    `.trim();
+    const fields = context.metadata.listItemFields ?? {};
+    const sharepointBaseUrl = this.getSharepointBaseUrl();
+
+    const content = this.extractContent(fields);
+    const processedContent = this.processRelativeLinks(content, sharepointBaseUrl);
+    const title = this.extractTitle(fields, context.fileName);
+    const authorHtml = this.buildAuthorHtml(fields);
+
+    return this.buildHtmlStructure(title, authorHtml, processedContent);
+  }
+
+  // Prioritize CanvasContent1 (modern) over WikiField (legacy) for SharePoint compatibility
+  private extractContent(fields: Record<string, unknown>): string {
+    return (fields.CanvasContent1 as string) || (fields.WikiField as string) || '';
+  }
+
+  private processRelativeLinks(content: string, baseUrl: string): string {
+    if (!content || !baseUrl) {
+      return content;
+    }
+
+    return content.replace(/href="\/([^"]*)"/g, `href="${baseUrl}/$1"`);
+  }
+
+  private extractTitle(fields: Record<string, unknown>, fallbackFileName: string): string {
+    return (fields.Title as string) || fallbackFileName;
+  }
+
+  private buildAuthorHtml(fields: Record<string, unknown>): string {
+    const author = fields.Author as Record<string, unknown>;
+    if (!author) {
+      return '';
+    }
+
+    const firstName = author.FirstName as string;
+    const lastName = author.LastName as string;
+
+    if (!firstName && !lastName) {
+      return '';
+    }
+
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
+    return `<h4>${fullName}</h4>`;
+  }
+
+  private buildHtmlStructure(title: string, authorHtml: string, content: string): string {
+    return `<div><h2>${title}</h2>${authorHtml}${content}</div>`;
+  }
+
+  private getSharepointBaseUrl(): string {
+    return this.configService.get('sharepoint.baseUrl', { infer: true });
   }
 }
