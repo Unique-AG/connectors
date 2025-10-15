@@ -212,6 +212,86 @@ describe('GraphApiService', () => {
       expect(files).toHaveLength(1);
       expect(mockGraphBatchService.fetchMultipleFolderChildren).toHaveBeenCalled();
     });
+
+    it('batches subfolders from multiple parents in parallel', async () => {
+      const mockChain = mockGraphClient.api();
+      const folderA: DriveItem = {
+        id: 'folder-a',
+        name: 'Folder A',
+        folder: { childCount: 2 },
+        parentReference: { driveId: 'drive-1' },
+      };
+      const folderB: DriveItem = {
+        id: 'folder-b',
+        name: 'Folder B',
+        folder: { childCount: 2 },
+        parentReference: { driveId: 'drive-1' },
+      };
+      const subFolderA1: DriveItem = {
+        id: 'subfolder-a1',
+        name: 'Subfolder A1',
+        folder: { childCount: 0 },
+        parentReference: { driveId: 'drive-1' },
+      };
+      const subFolderA2: DriveItem = {
+        id: 'subfolder-a2',
+        name: 'Subfolder A2',
+        folder: { childCount: 0 },
+        parentReference: { driveId: 'drive-1' },
+      };
+      const subFolderB1: DriveItem = {
+        id: 'subfolder-b1',
+        name: 'Subfolder B1',
+        folder: { childCount: 0 },
+        parentReference: { driveId: 'drive-1' },
+      };
+      const subFolderB2: DriveItem = {
+        id: 'subfolder-b2',
+        name: 'Subfolder B2',
+        folder: { childCount: 0 },
+        parentReference: { driveId: 'drive-1' },
+      };
+      const fileInA1 = { ...mockFile, id: 'file-a1', name: 'file-a1.pdf' };
+      const fileInB1 = { ...mockFile, id: 'file-b1', name: 'file-b1.pdf' };
+
+      mockChain.get.mockResolvedValueOnce({ value: [folderA, folderB] });
+
+      const fetchMultipleMock = vi.fn();
+      fetchMultipleMock
+        .mockResolvedValueOnce(
+          new Map([
+            ['drive-1:folder-a', { value: [subFolderA1, subFolderA2] }],
+            ['drive-1:folder-b', { value: [subFolderB1, subFolderB2] }],
+          ]),
+        )
+        .mockResolvedValueOnce(
+          new Map([
+            ['drive-1:subfolder-a1', { value: [fileInA1] }],
+            ['drive-1:subfolder-a2', { value: [] }],
+            ['drive-1:subfolder-b1', { value: [fileInB1] }],
+            ['drive-1:subfolder-b2', { value: [] }],
+          ]),
+        );
+
+      mockGraphBatchService.fetchMultipleFolderChildren = fetchMultipleMock;
+      mockFileFilterService.isFileValidForIngestion = vi
+        .fn()
+        .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'];
+
+      const files = await service.getAllFilesForSite('site-1');
+
+      expect(files).toHaveLength(2);
+      expect(mockGraphBatchService.fetchMultipleFolderChildren).toHaveBeenCalledTimes(2);
+
+      const secondCall = fetchMultipleMock.mock.calls[1][0];
+      expect(secondCall).toHaveLength(4);
+      expect(secondCall.map((req: { itemId: string }) => req.itemId)).toEqual([
+        'subfolder-a1',
+        'subfolder-a2',
+        'subfolder-b1',
+        'subfolder-b2',
+      ]);
+    });
   });
 
   describe('downloadFileContent', () => {

@@ -172,6 +172,7 @@ export class GraphApiService {
     maxFiles?: number,
   ): Promise<EnrichedDriveItem[]> {
     const allFiles: EnrichedDriveItem[] = [];
+    const allSubFolders: Array<DriveItem & { id: string }> = [];
     const selectFields = [
       'id',
       'name',
@@ -205,17 +206,15 @@ export class GraphApiService {
         continue;
       }
 
-      const subFolders: Array<DriveItem & { id: string }> = [];
-      
       for (const item of folderItems.value) {
         const driveItem = item as DriveItem;
-        
+
         if (maxFiles && allFiles.length >= maxFiles) {
           break;
         }
 
         if (this.isFolder(driveItem)) {
-          subFolders.push(driveItem);
+          allSubFolders.push(driveItem);
         } else if (this.fileFilterService.isFileValidForIngestion(driveItem)) {
           const folderPath = this.extractFolderPath(driveItem);
           allFiles.push({
@@ -228,19 +227,22 @@ export class GraphApiService {
           });
         }
       }
+    }
 
-      if (subFolders.length > 0) {
-        const remainingLimit = maxFiles ? maxFiles - allFiles.length : undefined;
-        const filesFromSubfolders = await this.batchScanFolders(
-          driveId,
-          subFolders,
-          siteId,
-          siteWebUrl,
-          driveName,
-          remainingLimit,
-        );
-        allFiles.push(...filesFromSubfolders);
-      }
+    if (allSubFolders.length > 0) {
+      const remainingLimit = maxFiles ? maxFiles - allFiles.length : undefined;
+      this.logger.debug(
+        `Scanning ${allSubFolders.length} subfolders in parallel across ${folders.length} parent folders`,
+      );
+      const filesFromSubfolders = await this.batchScanFolders(
+        driveId,
+        allSubFolders,
+        siteId,
+        siteWebUrl,
+        driveName,
+        remainingLimit,
+      );
+      allFiles.push(...filesFromSubfolders);
     }
 
     return allFiles;
