@@ -34,12 +34,12 @@ export class ContentRegistrationStep implements IPipelineStep {
     const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const isPathBasedIngestion = !scopeId;
 
-    const fileKey = `${context.metadata.siteId}/${context.fileId}`;
+    const itemKey = `${context.pipelineItem.siteId}/${context.pipelineItem.item.id}`;
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
-      key: fileKey,
-      title: context.fileName,
-      mimeType: context.metadata.mimeType ?? DEFAULT_MIME_TYPE,
+      key: itemKey,
+      title: context.pipelineItem.fileName,
+      mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
       ownerType: UniqueOwnerType.Scope,
       scopeId: isPathBasedIngestion ? PATH_BASED_INGESTION : scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
@@ -65,7 +65,7 @@ export class ContentRegistrationStep implements IPipelineStep {
 
       context.uploadUrl = registrationResponse.writeUrl;
       context.uniqueContentId = registrationResponse.id;
-      context.metadata.registration = registrationResponse;
+      context.registrationResponse = registrationResponse;
       const _stepDuration = Date.now() - stepStartTime;
 
       return context;

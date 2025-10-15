@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import type { EnrichedItems } from '../msgraph/types/pipeline-item.interface';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
@@ -14,7 +14,7 @@ describe('SharepointSynchronizationService', () => {
     processFilesForSite: ReturnType<typeof vi.fn>;
   };
 
-  const mockFile: EnrichedDriveItem = {
+  const mockFile: EnrichedItems = {
     id: '1',
     name: 'a.pdf',
     webUrl: 'https://web',

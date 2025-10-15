@@ -1,22 +1,18 @@
-import type { ProcessingMetadata } from './processing-metadata';
+import type {PipelineItem} from "../../msgraph/types/pipeline-item.interface";
+import type {IngestionApiResponse} from "../../unique-api/unique-api.types";
 
 export interface ProcessingContext {
   correlationId: string;
-  fileId: string;
-  fileName: string;
-  fileSize: number;
-
-  siteUrl: string;
-  libraryName: string;
-  knowledgeBaseUrl?: string;
-
+  pipelineItem: PipelineItem;
+  knowledgeBaseUrl: string;
   uploadUrl?: string;
   uniqueContentId?: string;
-  contentBuffer?: Buffer | undefined;
+  contentBuffer?: Buffer;
+  fileSize?: number;
 
   startTime: Date;
-
-  metadata: ProcessingMetadata;
+  mimeType?: string;
+  registrationResponse?: IngestionApiResponse
 }
 
 export interface PipelineResult {

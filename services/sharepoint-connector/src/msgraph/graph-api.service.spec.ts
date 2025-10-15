@@ -1,10 +1,10 @@
-import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileFilterService } from './file-filter.service';
 import { GraphApiService } from './graph-api.service';
 import { GraphClientFactory } from './graph-client.factory';
+import type { EnrichedDriveFile, MsGraphSitePage } from './types/pipeline-item.interface';
 
 describe('GraphApiService', () => {
   let service: GraphApiService;
@@ -14,47 +14,6 @@ describe('GraphApiService', () => {
   let mockFileFilterService: Partial<FileFilterService>;
 
   const mockDrive = { id: 'drive-1', name: 'Documents' };
-  const mockFile: DriveItem = {
-    id: 'file-1',
-    name: 'test.pdf',
-    size: 1024,
-    file: { mimeType: 'application/pdf' },
-    webUrl: 'https://sharepoint.example.com/test.pdf',
-    lastModifiedDateTime: '2024-01-01T00:00:00Z',
-    parentReference: { driveId: 'drive-1', siteId: 'site-1' },
-    listItem: {
-      fields: {
-        '@odata.etag': '"47cc40f8-ba1f-4100-9623-fcdf93073928,4"',
-        FileLeafRef: 'test.pdf',
-        Modified: '2024-01-01T00:00:00Z',
-        MediaServiceImageTags: [],
-        FinanceGPTKnowledge: true,
-        id: '16599',
-        ContentType: 'Dokument',
-        Created: '2024-01-01T00:00:00Z',
-        AuthorLookupId: '1704',
-        EditorLookupId: '1704',
-        _CheckinComment: '',
-        LinkFilenameNoMenu: 'test.pdf',
-        LinkFilename: 'test.pdf',
-        DocIcon: 'pdf',
-        FileSizeDisplay: '1024',
-        ItemChildCount: '0',
-        FolderChildCount: '0',
-        _ComplianceFlags: '',
-        _ComplianceTag: '',
-        _ComplianceTagWrittenTime: '',
-        _ComplianceTagUserId: '',
-        _CommentCount: '',
-        _LikeCount: '',
-        _DisplayName: '',
-        Edit: '0',
-        _UIVersionString: '4.0',
-        ParentVersionStringLookupId: '16599',
-        ParentLeafNameLookupId: '16599',
-      } as Record<string, unknown>,
-    },
-  };
 
   beforeEach(async () => {
     mockGraphClient = {
@@ -121,46 +80,83 @@ describe('GraphApiService', () => {
     (service as any).makeRateLimitedRequest = vi.fn().mockImplementation(
       // biome-ignore lint/suspicious/noExplicitAny: Generic promise type for mocking
       async (requestFn: () => Promise<any>) => {
-        // Increment counter as the real method would do
-        service.requestCount++;
         return requestFn();
       },
     );
   });
 
   describe('getAllFilesAndPagesForSite', () => {
-    it('finds syncable files across multiple drives', async () => {
-      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockFile]);
+    const mockEnrichedFile: EnrichedDriveFile = {
+      itemType: 'file' as const,
+      id: 'file-1',
+      name: 'test.pdf',
+      size: 1024,
+      webUrl: 'https://sharepoint.example.com/test.pdf',
+      lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      file: { mimeType: 'application/pdf' },
+      siteId: 'site-1',
+      siteWebUrl: 'https://sharepoint.example.com',
+      driveId: 'drive-1',
+      driveName: 'Documents',
+      folderPath: '/',
+    };
 
-      const files = await service.getAllFilesAndPagesForSite('site-1');
+    const mockEnrichedSitePage: MsGraphSitePage = {
+      itemType: 'sitePage' as const,
+      id: 'page-1',
+      name: 'test.aspx',
+      size: 512,
+      webUrl: 'https://sharepoint.example.com/test.aspx',
+      lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      siteId: 'site-1',
+      siteWebUrl: 'https://sharepoint.example.com',
+      driveId: 'sitepages-list',
+      driveName: 'SitePages',
+      folderPath: '/',
+      listItem: {
+        fields: {
+          FileLeafRef: 'test.aspx',
+          Title: 'Test Page',
+        },
+      },
+    };
+
+    it('finds syncable files across multiple drives', async () => {
+      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockEnrichedFile]);
+
+      const files = await service.getAllSiteItems('site-1');
 
       expect(files).toHaveLength(1);
-      expect(service.getAllPagesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
       expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
 
     it('skips drives without IDs', async () => {
-      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockFile]);
+      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockEnrichedFile]);
 
-      const files = await service.getAllFilesAndPagesForSite('site-1');
+      const files = await service.getAllSiteItems('site-1');
 
       expect(files).toHaveLength(1);
-      expect(service.getAllPagesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
       expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
 
     it('handles pagination correctly', async () => {
-      const file2: DriveItem = { ...mockFile, id: 'file-2', name: 'test2.pdf' };
+      const file2: EnrichedDriveFile = {
+        ...mockEnrichedFile,
+        id: 'file-2',
+        name: 'test2.pdf',
+      };
 
-      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([mockFile]);
+      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([mockEnrichedSitePage]);
       vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([file2]);
 
-      const files = await service.getAllFilesAndPagesForSite('site-1');
+      const files = await service.getAllSiteItems('site-1');
 
       expect(files).toHaveLength(2);
-      expect(service.getAllPagesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
       expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
 
@@ -169,22 +165,22 @@ describe('GraphApiService', () => {
         .fn()
         .mockReturnValue(false) as unknown as FileFilterService['isFileValidForIngestion'];
 
-      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
       vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([]);
 
-      const files = await service.getAllFilesAndPagesForSite('site-1');
+      const files = await service.getAllSiteItems('site-1');
 
       expect(files).toHaveLength(0);
     });
 
     it('recursively scans folders', async () => {
-      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockFile]);
+      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockEnrichedFile]);
 
-      const files = await service.getAllFilesAndPagesForSite('site-1');
+      const files = await service.getAllSiteItems('site-1');
 
       expect(files).toHaveLength(1);
-      expect(service.getAllPagesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
       expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
 
@@ -195,15 +191,13 @@ describe('GraphApiService', () => {
           (file) => file.name !== 'invalid.exe',
         ) as unknown as FileFilterService['isFileValidForIngestion'];
 
-      vi.spyOn(service, 'getAllPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockFile]);
+      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockEnrichedFile]);
 
-      const files = await service.getAllFilesAndPagesForSite('site-1');
+      const files = await service.getAllSiteItems('site-1');
 
-      // Should return only the syncable file
       expect(files).toHaveLength(1);
       expect(files[0]?.name).toBe('test.pdf');
-      // Total files found should be 2, syncable should be 1
     });
   });
 
@@ -239,6 +233,73 @@ describe('GraphApiService', () => {
       const result = await service.downloadFileContent('drive-1', 'file-1');
 
       expect(result).toEqual(Buffer.concat([chunk1, chunk2]));
+    });
+  });
+
+  describe('getSitePageContent', () => {
+    it('fetches site page content successfully', async () => {
+      const mockChain = mockGraphClient.api();
+      mockChain.get.mockResolvedValue({
+        fields: {
+          CanvasContent1: '<div>Modern content</div>',
+          WikiField: '<div>Legacy content</div>',
+        },
+      });
+
+      const result = await service.getAspxPageContent('site-1', 'list-1', 'item-1');
+
+      expect(result).toEqual({
+        canvasContent: '<div>Modern content</div>',
+        wikiField: '<div>Legacy content</div>',
+      });
+      expect(mockGraphClient.api).toHaveBeenCalledWith('/sites/site-1/lists/list-1/items/item-1');
+      expect(mockChain.expand).toHaveBeenCalledWith('fields($select=CanvasContent1,WikiField)');
+    });
+
+    it('handles missing CanvasContent1 field', async () => {
+      const mockChain = mockGraphClient.api();
+      mockChain.get.mockResolvedValue({
+        fields: {
+          WikiField: '<div>Legacy content</div>',
+        },
+      });
+
+      const result = await service.getAspxPageContent('site-1', 'list-1', 'item-1');
+
+      expect(result).toEqual({
+        canvasContent: undefined,
+        wikiField: '<div>Legacy content</div>',
+      });
+    });
+
+    it('handles missing WikiField field', async () => {
+      const mockChain = mockGraphClient.api();
+      mockChain.get.mockResolvedValue({
+        fields: {
+          CanvasContent1: '<div>Modern content</div>',
+        },
+      });
+
+      const result = await service.getAspxPageContent('site-1', 'list-1', 'item-1');
+
+      expect(result).toEqual({
+        canvasContent: '<div>Modern content</div>',
+        wikiField: undefined,
+      });
+    });
+
+    it('throws error when content exceeds size limit', async () => {
+      const mockChain = mockGraphClient.api();
+      const largeContent = 'x'.repeat(10485761);
+      mockChain.get.mockResolvedValue({
+        fields: {
+          CanvasContent1: largeContent,
+        },
+      });
+
+      await expect(service.getAspxPageContent('site-1', 'list-1', 'item-1')).rejects.toThrow(
+        'Site page content size',
+      );
     });
   });
 });

@@ -1,20 +1,7 @@
-import type { DriveItem } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
-
-type DefinedFileProperties =
-  | 'file'
-  | 'id'
-  | 'name'
-  | 'size'
-  | 'webUrl'
-  | 'listItem'
-  | 'lastModifiedDateTime';
-
-type DriveItemWithDefinedProperties = Omit<DriveItem, DefinedFileProperties> & {
-  [key in DefinedFileProperties]: Exclude<DriveItem[key], null | undefined>;
-};
+import {DriveItem, ListItem} from "./types/sharepoint.types";
 
 @Injectable()
 export class FileFilterService {
@@ -22,7 +9,7 @@ export class FileFilterService {
 
   public constructor(private readonly configService: ConfigService<Config, true>) {}
 
-  public isAspxFileValidForIngestion(fields: Record<string, unknown>): boolean {
+  public isListItemValidForIngestion(fields: ListItem['fields']) {
     return Boolean(
       fields.FileLeafRef &&
         typeof fields.FileLeafRef === 'string' &&
@@ -32,7 +19,7 @@ export class FileFilterService {
     );
   }
 
-  public isFileValidForIngestion(item: DriveItem): item is DriveItemWithDefinedProperties {
+  public isFileValidForIngestion(item: DriveItem): boolean {
     const fields = item.listItem?.fields as Record<string, unknown>;
     const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
     const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
@@ -49,10 +36,13 @@ export class FileFilterService {
     ) {
       return false;
     }
+
     this.logger.log(`item.file: ${JSON.stringify(item, null, 2)}`);
+
     const isAspxFile = item.name?.toLowerCase().endsWith('.aspx');
     const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
     const hasSyncFlag = fields[syncColumnName] === true;
+
     return Boolean(hasSyncFlag && (isAllowedMimeType || isAspxFile));
   }
 }

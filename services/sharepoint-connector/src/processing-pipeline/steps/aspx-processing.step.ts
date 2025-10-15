@@ -1,28 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
+import { isListItem} from '../../msgraph/types/type-guards.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
+import {ListItem} from "../../msgraph/types/sharepoint.types";
 
 @Injectable()
 export class AspxProcessingStep implements IPipelineStep {
   private readonly logger = new Logger(AspxProcessingStep.name);
   public readonly stepName = PipelineStep.AspxProcessing;
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {}
+  public constructor(
+    private readonly configService: ConfigService<Config, true>,
+  ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
-    const { fileName } = context;
-    if (!this.isAspxFile(fileName)) {
+    if (!isListItem(context.pipelineItem)) {
       return context;
     }
 
     try {
-      const htmlContent = this.buildHtmlFromAspx(context);
+      const htmlContent = this.buildHtmlContent(context, context.pipelineItem.item);
       context.contentBuffer = Buffer.from(htmlContent, 'utf-8');
-      context.metadata.mimeType = 'text/html';
+      context.mimeType = 'text/html';
+
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
@@ -31,46 +35,22 @@ export class AspxProcessingStep implements IPipelineStep {
     }
   }
 
-  private isAspxFile(fileName: string | undefined): boolean {
-    return fileName?.toLowerCase().endsWith('.aspx') ?? false;
-  }
-
-  private buildHtmlFromAspx(context: ProcessingContext): string {
-    const fields = context.metadata.listItemFields ?? {};
+  private buildHtmlContent(context: ProcessingContext, item: ListItem): string {
+    const rawContent = context.contentBuffer?.toString('utf-8') || '';
     const sharepointBaseUrl = this.getSharepointBaseUrl();
 
-    const content = this.extractContent(fields);
-    const processedContent = this.processRelativeLinks(content, sharepointBaseUrl);
-    const title = this.extractTitle(fields, context.fileName);
-    const authorHtml = this.buildAuthorHtml(fields);
+    const processedContent = this.convertRelativeLinks(rawContent, sharepointBaseUrl);
+    const authorHtml = this.buildAuthorHtml(item.fields);
 
-    return this.buildHtmlStructure(title, authorHtml, processedContent);
+    return this.buildHtmlStructure(item.fields.Title, authorHtml, processedContent);
   }
 
-  // Prioritize CanvasContent1 (modern) over WikiField (legacy) for SharePoint compatibility
-  private extractContent(fields: Record<string, unknown>): string {
-    return (fields.CanvasContent1 as string) || (fields.WikiField as string) || '';
-  }
-
-  private processRelativeLinks(content: string, baseUrl: string): string {
-    if (!content || !baseUrl) {
-      return content;
-    }
-
+  private convertRelativeLinks(content: string, baseUrl: string): string {
     return content.replace(/href="\/([^"]*)"/g, `href="${baseUrl}/$1"`);
   }
 
-  private extractTitle(fields: Record<string, unknown>, fallbackFileName: string): string {
-    return (fields.Title as string) || fallbackFileName;
-  }
-
-  private buildAuthorHtml(fields: Record<string, unknown>): string {
-    const author = fields.Author as string;
-    if (!author) {
-      return '';
-    }
-
-    return `<h4>${author}</h4>`;
+  private buildAuthorHtml(fields:ListItem['fields'] ): string {
+    return `<h4>${fields.Author}</h4>`;
   }
 
   private buildHtmlStructure(title: string, authorHtml: string, content: string): string {

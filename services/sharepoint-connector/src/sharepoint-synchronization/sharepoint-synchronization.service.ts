@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import type {PipelineItem} from '../msgraph/types/pipeline-item.interface';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
@@ -39,19 +39,19 @@ export class SharepointSynchronizationService {
     for (const siteId of siteIdsToScan) {
       const siteStartTime = Date.now();
       try {
-        const files = await this.graphApiService.getAllFilesAndPagesForSite(siteId);
+        const items = await this.graphApiService.getAllSiteItems(siteId);
 
         this.logger.log(
           `Finished scanning site id ${siteId} in ${((Date.now() - siteStartTime) / 1000).toFixed(2)} seconds`,
         );
 
-        const diffResult = await this.calculateDiffForSite(files, siteId);
+        const diffResult = await this.calculateDiffForSite(items, siteId);
         this.logger.log(
           `File Diff Results: Site ${siteId}: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
         );
 
         const processStartTime = Date.now();
-        await this.orchestrator.processFilesForSite(siteId, files, diffResult);
+        await this.orchestrator.processSiteItems(siteId, items, diffResult);
 
         this.logger.log(
           `Finished processing site ${siteId} in ${((Date.now() - processStartTime) / 1000).toFixed(2)} seconds`,
@@ -75,16 +75,15 @@ export class SharepointSynchronizationService {
   /*
     This step also triggers file deletion in node-ingestion service when a file is missing.
    */
-
   private async calculateDiffForSite(
-    files: EnrichedDriveItem[],
+    pipelineItems: PipelineItem[],
     siteId: string,
   ): Promise<FileDiffResponse> {
-    const fileDiffItems: FileDiffItem[] = files.map((file: EnrichedDriveItem) => {
+    const fileDiffItems: FileDiffItem[] = pipelineItems.map((pipelineItem: PipelineItem) => {
       return {
-        key: file.id,
-        url: buildKnowledgeBaseUrl(file), // SharePoint URL for location
-        updatedAt: file.listItem?.lastModifiedDateTime ?? file.lastModifiedDateTime,
+        key: pipelineItem.item.id,
+        url: buildKnowledgeBaseUrl(pipelineItem),
+        updatedAt: pipelineItem.item.lastModifiedDateTime,
       };
     });
 

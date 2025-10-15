@@ -1,26 +1,39 @@
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
+import { isDriveItem, isListItem } from "../msgraph/types/type-guards.util";
 
 /**
- * Builds the path of the file in knowledge base
+ * Builds the path of the item in knowledge base
  */
-export function buildKnowledgeBaseUrl(file: EnrichedDriveItem): string {
-  // 1. Normalize base URL by removing trailing slash
-  const baseUrl = file.siteWebUrl.replace(/\/$/, '');
+export function buildKnowledgeBaseUrl(pipelineItem: PipelineItem): string {
+  let itemName: string;
 
-  // 2. Ensure folder path starts with slash for consistent processing
-  const normalizedFolderPath = file.folderPath.startsWith('/')
-    ? file.folderPath
-    : `/${file.folderPath}`;
-
-  // 3. Handle root folder case (empty folder path)
-  if (normalizedFolderPath === '/') {
-    return `${baseUrl}/${file.name}`;
+  if (isDriveItem(pipelineItem)) {
+    itemName = pipelineItem.item.name;
+  } else if (isListItem(pipelineItem)) {
+    itemName = pipelineItem.item.fields.Title;
+  } else {
+    itemName = pipelineItem.item.id; // fallback to id
   }
 
-  // 4. Remove leading slash, URL-encode each folder segment, then add back leading slash
+  return buildUrl(pipelineItem.siteWebUrl, pipelineItem.folderPath, itemName);
+}
+
+function buildUrl(baseUrlRaw: string, folderPathRaw: string, itemName: string): string {
+  // Normalize base URL by removing trailing slash
+  const baseUrl = baseUrlRaw.replace(/\/$/, '');
+
+  // Ensure folder path starts with slash
+  const normalizedFolderPath = folderPathRaw.startsWith('/') ? folderPathRaw : `/${folderPathRaw}`;
+
+  // Handle root folder case
+  if (normalizedFolderPath === '/') {
+    return `${baseUrl}/${itemName}`;
+  }
+
+  // Remove leading slash, URL-encode each segment
   const pathSegments = normalizedFolderPath.substring(1).split('/');
   const encodedSegments = pathSegments.map((segment) => encodeURIComponent(segment));
   const encodedPath = `/${encodedSegments.join('/')}`;
 
-  return `${baseUrl}${encodedPath}/${file.name}`;
+  return `${baseUrl}${encodedPath}/${itemName}`;
 }

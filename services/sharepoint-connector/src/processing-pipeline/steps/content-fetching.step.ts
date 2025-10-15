@@ -1,12 +1,14 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../../config';
-import { GraphApiService } from '../../msgraph/graph-api.service';
-import { normalizeError } from '../../utils/normalize-error';
-import type { ProcessingContext } from '../types/processing-context';
-import { PipelineStep } from '../types/processing-context';
-import type { IPipelineStep } from './pipeline-step.interface';
+import {Injectable, Logger} from '@nestjs/common';
+import {ConfigService} from '@nestjs/config';
+import {Config} from '../../config';
+import {GraphApiService} from '../../msgraph/graph-api.service';
+import { isDriveItem, isListItem} from '../../msgraph/types/type-guards.util';
+import {normalizeError} from '../../utils/normalize-error';
+import type {ProcessingContext} from '../types/processing-context';
+import {PipelineStep} from '../types/processing-context';
+import type {IPipelineStep} from './pipeline-step.interface';
+import {DriveItem} from "../../msgraph/types/sharepoint.types";
 
 @Injectable()
 export class ContentFetchingStep implements IPipelineStep {
@@ -16,54 +18,69 @@ export class ContentFetchingStep implements IPipelineStep {
   public constructor(
     private readonly apiService: GraphApiService,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+  }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
-    const stepStartTime = Date.now();
-
-    // For ASPX files from SitePages, content is already available in listItemFields
-    // No need to download traditional file content
-    // TODO WE MIGHT NEED TO DOWNLOAD CONTENT FOR OLD SITEPAGES
-    if (
-      context.fileName.toLowerCase().endsWith('.aspx') &&
-      context.metadata.driveName === 'SitePages'
-    ) {
-      this.logger.debug(
-        `[${context.correlationId}] Skipping content download for ASPX file from SitePages - content available in metadata`,
-      );
-      return context;
+    if (isListItem(context.pipelineItem)) {
+      return await this.fetchListItemContent(context);
     }
 
-    this.validateMimeType(context.metadata.mimeType, context.correlationId);
+    if (isDriveItem(context.pipelineItem)) {
+      return await this.fetchFileContent(context, context.pipelineItem.item);
+    }
+    return context;
+  }
+
+  private async fetchListItemContent(context: ProcessingContext): Promise<ProcessingContext> {
+    try {
+      const { canvasContent, wikiField } = await this.apiService.getAspxPageContent(
+        context.pipelineItem.siteId,
+        context.pipelineItem.driveId,
+        context.pipelineItem.item.id,
+      );
+
+      const content = canvasContent || wikiField || '';
+      context.contentBuffer = Buffer.from(content, 'utf-8');
+      context.fileSize = context.contentBuffer.length;
+
+      return context;
+    } catch (error) {
+      const message = normalizeError(error).message;
+      this.logger.error(`[${ context.correlationId }] Site page content fetching failed: ${ message }`);
+      throw error;
+    }
+  }
+
+  private async fetchFileContent(context: ProcessingContext, item: DriveItem): Promise<ProcessingContext> {
+    this.validateMimeType(item);
 
     try {
       const contentBuffer = await this.apiService.downloadFileContent(
-        context.metadata.driveId,
-        context.fileId,
+        context.pipelineItem.driveId,
+        context.pipelineItem.item.id,
       );
 
       context.contentBuffer = contentBuffer;
       context.fileSize = contentBuffer.length;
 
-      const _stepDuration = Date.now() - stepStartTime;
-
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] Content fetching failed: ${message}`);
+      this.logger.error(`[${ context.correlationId }] Content fetching failed: ${ message }`);
       throw error;
     }
   }
 
-  private validateMimeType(mimeType: string | undefined, correlationId: string): void {
+  private validateMimeType(item: DriveItem): void {
     const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
     assert.ok(
-      mimeType,
-      `MIME type is missing for this item. Skipping download. [${correlationId}]`,
+      item.file?.mimeType,
+      `MIME type is missing for this item. Skipping download.`,
     );
     assert.ok(
-      allowedMimeTypes.includes(mimeType),
-      `MIME type ${mimeType} is not allowed. Skipping download.}`,
+      allowedMimeTypes.includes(item.file.mimeType),
+      `MIME type ${ item.file.mimeType } is not allowed. Skipping download.}`,
     );
   }
 }

@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type { FieldValueSet } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import {DEFAULT_MIME_TYPE} from "../constants/defaults.constants";
+import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
+import {isDriveItem} from "../msgraph/types/type-guards.util";
 import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -16,7 +17,7 @@ import type { PipelineResult, ProcessingContext } from './types/processing-conte
 @Injectable()
 export class ProcessingPipelineService {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly fileProcessingSteps: IPipelineStep[];
+  private readonly pipelineSteps: IPipelineStep[];
   private readonly stepTimeoutMs: number;
 
   public constructor(
@@ -27,7 +28,7 @@ export class ProcessingPipelineService {
     private readonly storageUploadStep: StorageUploadStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
   ) {
-    this.fileProcessingSteps = [
+    this.pipelineSteps = [
       this.contentFetchingStep,
       this.aspxProcessingStep,
       this.contentRegistrationStep,
@@ -38,40 +39,27 @@ export class ProcessingPipelineService {
       this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
   }
 
-  public async processFile(file: EnrichedDriveItem): Promise<PipelineResult> {
-    const correlationId = randomUUID();
+  public async processItem(pipelineItem: PipelineItem): Promise<PipelineResult> {
     const startTime = new Date();
+    const correlationId = randomUUID();
+
     const context: ProcessingContext = {
       correlationId,
-      fileId: file.id,
-      fileName: file.name,
-      fileSize: file.size,
-      siteUrl: file.siteWebUrl,
-      libraryName: file.driveId,
-      knowledgeBaseUrl: buildKnowledgeBaseUrl(file),
+      pipelineItem,
       startTime,
-      metadata: {
-        mimeType: file.file?.mimeType ?? undefined,
-        isFolder: Boolean(file.folder),
-        listItemFields: file.listItem?.fields as Record<string, FieldValueSet>,
-        driveId: file.driveId,
-        siteId: file.siteId,
-        driveName: file.driveName,
-        folderPath: file.folderPath,
-        lastModifiedDateTime: file.lastModifiedDateTime,
-      },
+      knowledgeBaseUrl: buildKnowledgeBaseUrl(pipelineItem),
+      mimeType: isDriveItem(pipelineItem) ? pipelineItem.item.file?.mimeType : DEFAULT_MIME_TYPE,
     };
 
-    this.logger.log(
-      `[${correlationId}] Starting processing pipeline for file: ${file.name} (${file.id})`,
-    );
+    this.logger.log(`[${correlationId}] Starting processing pipeline for item: ${pipelineItem.item.id}`);
 
-    for (const step of this.fileProcessingSteps) {
+    for (const step of this.pipelineSteps) {
       try {
         await Promise.race([step.execute(context), this.timeoutPromise(step)]);
 
         this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
         if (step.cleanup) await step.cleanup(context);
+
       } catch (error) {
         const totalDuration = Date.now() - startTime.getTime();
         this.logger.error(
@@ -89,7 +77,7 @@ export class ProcessingPipelineService {
     this.finalCleanup(context);
     const totalDuration = Date.now() - startTime.getTime();
     this.logger.log(
-      `[${correlationId}] Pipeline completed successfully in ${totalDuration}ms for file name: ${file.name} file id:${file.id}`,
+      `[${correlationId}] Pipeline completed successfully in ${totalDuration}ms for file id:${pipelineItem.item.id}`,
     );
 
     return { success: true };
@@ -107,6 +95,5 @@ export class ProcessingPipelineService {
       context.contentBuffer = undefined;
       delete context.contentBuffer;
     }
-    context.metadata = {} as never;
   }
 }

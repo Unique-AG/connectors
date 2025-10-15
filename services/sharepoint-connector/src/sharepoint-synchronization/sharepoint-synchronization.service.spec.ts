@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import type { EnrichedItems } from '../msgraph/types/pipeline-item.interface';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
@@ -23,7 +23,7 @@ describe('SharepointSynchronizationService', () => {
     processFilesForSite: ReturnType<typeof vi.fn>;
   };
 
-  const mockFile: EnrichedDriveItem = {
+  const mockFile: EnrichedItems = {
     id: '01JWNC3IKFO6XBRCRFWRHKJ77NAYYM3NTX',
     name: '1173246.pdf',
     webUrl:
@@ -47,7 +47,7 @@ describe('SharepointSynchronizationService', () => {
 
   beforeEach(async () => {
     mockGraphApiService = {
-      getAllFilesAndPagesForSite: vi.fn().mockResolvedValue([mockFile]),
+      getAllSiteItems: vi.fn().mockResolvedValue([mockFile]),
     };
 
     mockUniqueAuthService = {
@@ -87,8 +87,8 @@ describe('SharepointSynchronizationService', () => {
   it('synchronizes files from all configured sites', async () => {
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllFilesAndPagesForSite).toHaveBeenCalledTimes(1);
-    expect(mockGraphApiService.getAllFilesAndPagesForSite).toHaveBeenCalledWith(
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
     );
   });
@@ -110,7 +110,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('handles sites with no files', async () => {
-    mockGraphApiService.getAllFilesAndPagesForSite = vi.fn().mockResolvedValue([]);
+    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([]);
     const emptyDiffResult = {
       newAndUpdatedFiles: [],
       movedFiles: [],
@@ -133,7 +133,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('prevents overlapping scans', async () => {
-    mockGraphApiService.getAllFilesAndPagesForSite = vi
+    mockGraphApiService.getAllSiteItems = vi
       .fn()
       .mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve([mockFile]), 100)),
@@ -144,18 +144,18 @@ describe('SharepointSynchronizationService', () => {
 
     await Promise.all([firstScan, secondScan]);
 
-    expect(mockGraphApiService.getAllFilesAndPagesForSite).toHaveBeenCalledTimes(1);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
   });
 
   it('releases scan lock after completion', async () => {
     await service.synchronize();
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllFilesAndPagesForSite).toHaveBeenCalledTimes(2);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
   });
 
   it('releases scan lock on error', async () => {
-    mockGraphApiService.getAllFilesAndPagesForSite = vi
+    mockGraphApiService.getAllSiteItems = vi
       .fn()
       .mockRejectedValueOnce(new Error('API failure'))
       .mockResolvedValue([mockFile]);
@@ -163,7 +163,7 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllFilesAndPagesForSite).toHaveBeenCalledTimes(2);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
   });
 
   it.skip('continues processing other sites after site error', async () => {
@@ -183,7 +183,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('transforms files to diff items correctly', async () => {
-    const fileWithAllFields: EnrichedDriveItem = {
+    const fileWithAllFields: EnrichedItems = {
       id: '01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI',
       name: '2019-BMW-Maintenance.pdf',
       webUrl:
@@ -199,7 +199,7 @@ describe('SharepointSynchronizationService', () => {
       file: { mimeType: 'application/pdf' },
     };
 
-    mockGraphApiService.getAllFilesAndPagesForSite = vi.fn().mockResolvedValue([fileWithAllFields]);
+    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([fileWithAllFields]);
     mockUniqueApiService.performFileDiff = vi.fn().mockResolvedValue(mockDiffResult);
 
     await service.synchronize();
@@ -218,7 +218,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('handles missing lastModifiedDateTime gracefully', async () => {
-    const fileWithoutTimestamp: EnrichedDriveItem = {
+    const fileWithoutTimestamp: EnrichedItems = {
       id: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV',
       name: '6034030.pdf',
       webUrl:
@@ -234,7 +234,7 @@ describe('SharepointSynchronizationService', () => {
       file: { mimeType: 'application/pdf' },
     };
 
-    mockGraphApiService.getAllFilesAndPagesForSite = vi
+    mockGraphApiService.getAllSiteItems = vi
       .fn()
       .mockResolvedValue([fileWithoutTimestamp]);
     mockUniqueApiService.performFileDiff = vi.fn().mockResolvedValue(mockDiffResult);
@@ -261,7 +261,7 @@ describe('SharepointSynchronizationService', () => {
       { ...mockFile, id: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV', name: '6034030.pdf' },
     ];
 
-    mockGraphApiService.getAllFilesAndPagesForSite = vi.fn().mockResolvedValue(files);
+    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue(files);
 
     await service.synchronize();
 
@@ -294,7 +294,7 @@ describe('SharepointSynchronizationService', () => {
 
   describe('buildSharePointUrl', () => {
     it('should build proper SharePoint URL for file in subfolder', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -318,7 +318,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should build proper SharePoint URL for file in root folder', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -340,7 +340,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should build proper SharePoint URL for file in root folder with empty path', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -362,7 +362,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should handle siteWebUrl with trailing slash', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -384,7 +384,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should handle folderPath with leading slash', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -408,7 +408,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should handle folderPath without leading slash', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -432,7 +432,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should URL encode special characters in folder names', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,

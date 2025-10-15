@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import type { EnrichedItems } from '../msgraph/types/pipeline-item.interface';
 import { buildKnowledgeBaseUrl } from './sharepoint-url.util';
 
 describe('buildKnowledgeBaseUrl', () => {
   it('should build proper SharePoint URL for file in subfolder', () => {
-    const file: EnrichedDriveItem = {
+    const file: EnrichedItems = {
       id: '1',
       name: 'test.pdf',
       size: 100,
@@ -27,7 +27,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should build proper SharePoint URL for file in root folder', () => {
-    const file: EnrichedDriveItem = {
+    const file: EnrichedItems = {
       id: '1',
       name: 'test.pdf',
       size: 100,
@@ -50,7 +50,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should build proper SharePoint URL for file in root folder with empty path', () => {
-    const file: EnrichedDriveItem = {
+    const file: EnrichedItems = {
       id: '1',
       name: 'test.pdf',
       size: 100,
@@ -73,7 +73,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should handle siteWebUrl with trailing slash', () => {
-    const file: EnrichedDriveItem = {
+    const file: EnrichedItems = {
       id: '1',
       name: 'test.pdf',
       size: 100,
@@ -96,7 +96,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should handle folderPath with leading slash', () => {
-    const file: EnrichedDriveItem = {
+    const file: EnrichedItems = {
       id: '1',
       name: 'test.pdf',
       size: 100,
@@ -119,7 +119,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should handle folderPath without leading slash', () => {
-    const file: EnrichedDriveItem = {
+    const file: EnrichedItems = {
       id: '1',
       name: 'test.pdf',
       size: 100,
@@ -142,7 +142,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should URL encode special characters in folder names', () => {
-    const file: EnrichedDriveItem = {
+    const file: EnrichedItems = {
       id: '1',
       name: 'test.pdf',
       size: 100,

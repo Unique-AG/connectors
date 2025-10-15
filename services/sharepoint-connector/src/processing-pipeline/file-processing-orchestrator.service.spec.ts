@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import type { EnrichedItems } from '../msgraph/types/pipeline-item.interface';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { FileProcessingOrchestratorService } from './file-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
@@ -12,7 +12,7 @@ describe('FileProcessingOrchestratorService', () => {
     processFile: ReturnType<typeof vi.fn>;
   };
 
-  const createMockFile = (id: string, siteId: string): EnrichedDriveItem => ({
+  const createMockFile = (id: string, siteId: string): EnrichedItems => ({
     id,
     name: `file-${id}.pdf`,
     size: 1024,
@@ -61,7 +61,7 @@ describe('FileProcessingOrchestratorService', () => {
       movedFiles: [],
     };
 
-    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
+    await service.processSiteItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
     expect(mockPipelineService.processFile).toHaveBeenCalledTimes(2);
     expect(mockPipelineService.processFile).toHaveBeenCalledWith(files[0]);
@@ -80,7 +80,7 @@ describe('FileProcessingOrchestratorService', () => {
       movedFiles: [],
     };
 
-    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
+    await service.processSiteItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
     expect(mockPipelineService.processFile).toHaveBeenCalledTimes(1);
     expect(mockPipelineService.processFile).toHaveBeenCalledWith(files[0]);
@@ -93,7 +93,7 @@ describe('FileProcessingOrchestratorService', () => {
       movedFiles: [],
     };
 
-    await service.processFilesForSite('site-1', [], diffResult);
+    await service.processSiteItems('site-1', [], diffResult);
 
     expect(mockPipelineService.processFile).not.toHaveBeenCalled();
   });
@@ -120,7 +120,7 @@ describe('FileProcessingOrchestratorService', () => {
       return { success: true };
     });
 
-    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
+    await service.processSiteItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
     expect(mockPipelineService.processFile).toHaveBeenCalledTimes(10);
     expect(maxConcurrentCalls).toBeLessThanOrEqual(3);
@@ -144,7 +144,7 @@ describe('FileProcessingOrchestratorService', () => {
       .mockRejectedValueOnce(new Error('Processing failed'))
       .mockResolvedValueOnce({ success: true });
 
-    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
+    await service.processSiteItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
     expect(mockPipelineService.processFile).toHaveBeenCalledTimes(3);
   });
@@ -158,7 +158,7 @@ describe('FileProcessingOrchestratorService', () => {
       movedFiles: [],
     };
 
-    await service.processFilesForSite('site-1', files, diffResult);
+    await service.processSiteItems('site-1', files, diffResult);
 
     expect(mockPipelineService.processFile).not.toHaveBeenCalled();
   });

@@ -1,11 +1,32 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MsGraphSitePage } from '../../msgraph/types/pipeline-item.interface';
 import type { ProcessingContext } from '../types/processing-context';
 import { AspxProcessingStep } from './aspx-processing.step';
 
 describe('AspxProcessingStep', () => {
   let step: AspxProcessingStep;
+
+  const mockSitePage: MsGraphSitePage = {
+    itemType: 'sitePage',
+    id: 'page-1',
+    name: 'test.aspx',
+    size: 512,
+    webUrl: 'https://sharepoint.example.com/test.aspx',
+    lastModifiedDateTime: '2024-01-01T00:00:00Z',
+    siteId: 'site-1',
+    siteWebUrl: 'https://sharepoint.example.com',
+    driveId: 'sitepages-list',
+    driveName: 'SitePages',
+    folderPath: '/',
+    listItem: {
+      fields: {
+        FileLeafRef: 'test.aspx',
+        Title: 'Test Page',
+      },
+    },
+  };
 
   beforeEach(async () => {
     const { unit } = await TestBed.solitary(AspxProcessingStep)
@@ -40,24 +61,33 @@ describe('AspxProcessingStep', () => {
       driveName: 'Documents',
       folderPath: '/test',
       lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      sourceItem: mockSitePage,
     },
     ...overrides,
   });
 
   it('passes through non-ASPX files unchanged', async () => {
-    const context = createContext({ fileName: 'document.pdf' });
+    const context = createContext({
+      fileName: 'document.pdf',
+      contentBuffer: Buffer.from('pdf content')
+    });
     const result = await step.execute(context);
     expect(result).toBe(context);
-    expect(result.contentBuffer).toBeUndefined();
+    expect(result.contentBuffer?.toString()).toBe('pdf content');
   });
 
   it('processes ASPX files with CanvasContent1', async () => {
+    mockGraphApiService.getSitePageContent = vi.fn().mockResolvedValue({
+      canvasContent: '<p>Canvas content</p>',
+      wikiField: undefined,
+    });
+
     const context = createContext({
       metadata: {
         ...createContext().metadata,
+        sourceItem: mockSitePage,
         listItemFields: {
           Title: 'Test Page',
-          CanvasContent1: '<p>Canvas content</p>',
           Author: 'John Doe',
         },
       },
@@ -65,6 +95,7 @@ describe('AspxProcessingStep', () => {
 
     const result = await step.execute(context);
 
+    expect(mockGraphApiService.getSitePageContent).toHaveBeenCalledWith('site', 'drive', 'f1');
     expect(result.metadata.mimeType).toBe('text/html');
     const html = result.contentBuffer?.toString();
     expect(html).toContain('<h2>Test Page</h2>');
@@ -73,18 +104,24 @@ describe('AspxProcessingStep', () => {
   });
 
   it('processes ASPX files with WikiField when CanvasContent1 is empty', async () => {
+    mockGraphApiService.getSitePageContent = vi.fn().mockResolvedValue({
+      canvasContent: undefined,
+      wikiField: '<p>Wiki content</p>',
+    });
+
     const context = createContext({
       metadata: {
         ...createContext().metadata,
+        sourceItem: mockSitePage,
         listItemFields: {
           Title: 'Wiki Page',
-          WikiField: '<p>Wiki content</p>',
           Author: 'Jane Smith',
         },
       },
     });
 
     const result = await step.execute(context);
+    expect(mockGraphApiService.getSitePageContent).toHaveBeenCalledWith('site', 'drive', 'f1');
     const html = result.contentBuffer?.toString();
     expect(html).toContain('<h2>Wiki Page</h2>');
     expect(html).toContain('<h4>Jane Smith</h4>');
@@ -92,12 +129,16 @@ describe('AspxProcessingStep', () => {
   });
 
   it('falls back to filename when Title is missing', async () => {
+    mockGraphApiService.getSitePageContent = vi.fn().mockResolvedValue({
+      canvasContent: '<p>Content</p>',
+      wikiField: undefined,
+    });
+
     const context = createContext({
       metadata: {
         ...createContext().metadata,
-        listItemFields: {
-          CanvasContent1: '<p>Content</p>',
-        },
+        sourceItem: mockSitePage,
+        listItemFields: {},
       },
     });
 
@@ -107,12 +148,17 @@ describe('AspxProcessingStep', () => {
   });
 
   it('handles missing author information', async () => {
+    mockGraphApiService.getSitePageContent = vi.fn().mockResolvedValue({
+      canvasContent: '<p>Content</p>',
+      wikiField: undefined,
+    });
+
     const context = createContext({
       metadata: {
         ...createContext().metadata,
+        sourceItem: mockSitePage,
         listItemFields: {
           Title: 'No Author Page',
-          CanvasContent1: '<p>Content</p>',
         },
       },
     });
@@ -125,12 +171,17 @@ describe('AspxProcessingStep', () => {
   });
 
   it('handles partial author information', async () => {
+    mockGraphApiService.getSitePageContent = vi.fn().mockResolvedValue({
+      canvasContent: '<p>Content</p>',
+      wikiField: undefined,
+    });
+
     const context = createContext({
       metadata: {
         ...createContext().metadata,
+        sourceItem: mockSitePage,
         listItemFields: {
           Title: 'Partial Author',
-          CanvasContent1: '<p>Content</p>',
           Author: 'John',
         },
       },
@@ -142,12 +193,17 @@ describe('AspxProcessingStep', () => {
   });
 
   it('converts relative links to absolute links', async () => {
+    mockGraphApiService.getSitePageContent = vi.fn().mockResolvedValue({
+      canvasContent: '<a href="/sites/test/page.aspx">Link</a>',
+      wikiField: undefined,
+    });
+
     const context = createContext({
       metadata: {
         ...createContext().metadata,
+        sourceItem: mockSitePage,
         listItemFields: {
           Title: 'Link Test',
-          CanvasContent1: '<a href="/sites/test/page.aspx">Link</a>',
         },
       },
     });
@@ -158,9 +214,15 @@ describe('AspxProcessingStep', () => {
   });
 
   it('handles empty content', async () => {
+    mockGraphApiService.getSitePageContent = vi.fn().mockResolvedValue({
+      canvasContent: undefined,
+      wikiField: undefined,
+    });
+
     const context = createContext({
       metadata: {
         ...createContext().metadata,
+        sourceItem: mockSitePage,
         listItemFields: {
           Title: 'Empty Page',
         },
@@ -175,13 +237,18 @@ describe('AspxProcessingStep', () => {
   });
 
   it('handles case insensitive ASPX detection', async () => {
+    mockGraphApiService.getSitePageContent = vi.fn().mockResolvedValue({
+      canvasContent: '<p>Content</p>',
+      wikiField: undefined,
+    });
+
     const context = createContext({
       fileName: 'Test.ASPX',
       metadata: {
         ...createContext().metadata,
+        sourceItem: mockSitePage,
         listItemFields: {
           Title: 'Case Test',
-          CanvasContent1: '<p>Content</p>',
         },
       },
     });

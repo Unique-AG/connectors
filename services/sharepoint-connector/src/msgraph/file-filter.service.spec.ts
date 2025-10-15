@@ -184,7 +184,7 @@ describe('FileFilterService', () => {
         FinanceGPTKnowledge: true,
         _ModerationStatus: 0,
       };
-      expect(service.isAspxFileValidForIngestion(fields)).toBe(true);
+      expect(service.isListItemValidForIngestion(fields)).toBe(true);
     });
 
     it('returns false for non-ASPX file', () => {
@@ -193,7 +193,7 @@ describe('FileFilterService', () => {
         FinanceGPTKnowledge: true,
         _ModerationStatus: 0,
       };
-      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
 
     it('returns false for ASPX file without sync flag', () => {
@@ -202,7 +202,7 @@ describe('FileFilterService', () => {
         FinanceGPTKnowledge: false,
         _ModerationStatus: 0,
       };
-      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
 
     it('returns false for ASPX file with undefined sync flag', () => {
@@ -211,7 +211,7 @@ describe('FileFilterService', () => {
         FinanceGPTKnowledge: undefined,
         _ModerationStatus: 0,
       };
-      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
 
     it('returns false for ASPX file that is not approved', () => {
@@ -220,7 +220,7 @@ describe('FileFilterService', () => {
         FinanceGPTKnowledge: true,
         _ModerationStatus: 1, // Rejected
       };
-      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
 
     it('returns false for ASPX file with pending moderation status', () => {
@@ -229,7 +229,7 @@ describe('FileFilterService', () => {
         FinanceGPTKnowledge: true,
         _ModerationStatus: 2, // Pending
       };
-      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
 
     it('returns false for ASPX file with undefined moderation status', () => {
@@ -238,7 +238,7 @@ describe('FileFilterService', () => {
         FinanceGPTKnowledge: true,
         _ModerationStatus: undefined,
       };
-      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
 
     it('returns false for file without FileLeafRef', () => {
@@ -246,7 +246,7 @@ describe('FileFilterService', () => {
         FinanceGPTKnowledge: true,
         _ModerationStatus: 0,
       };
-      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
 
     it('returns false for file with non-string FileLeafRef', () => {
@@ -255,7 +255,7 @@ describe('FileFilterService', () => {
         FinanceGPTKnowledge: true,
         _ModerationStatus: 0,
       };
-      expect(service.isAspxFileValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
   });
 });

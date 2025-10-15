@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import { EnrichedItems } from '../msgraph/types/pipeline-item.interface';
 import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -20,7 +20,7 @@ describe('ProcessingPipelineService', () => {
     ingestionFinalization: IPipelineStep;
   };
 
-  const mockFile: EnrichedDriveItem = {
+  const mockFile: EnrichedItems = {
     id: '01JWNC3IM2TIAIFMTM4JHYR6RX3E2REDPW',
     name: 'Document.docx',
     size: 20791,
@@ -116,7 +116,7 @@ describe('ProcessingPipelineService', () => {
   });
 
   it('processes file through all pipeline steps successfully', async () => {
-    const result = await service.processFile(mockFile);
+    const result = await service.processItem(mockFile);
 
     expect(result.success).toBe(true);
     expect(mockSteps.contentFetching.execute).toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe('ProcessingPipelineService', () => {
   });
 
   it('creates proper processing context', async () => {
-    await service.processFile(mockFile);
+    await service.processItem(mockFile);
 
     const executeCalls = vi.mocked(mockSteps.contentFetching.execute).mock.calls;
     const context = executeCalls[0]?.[0];
@@ -142,7 +142,7 @@ describe('ProcessingPipelineService', () => {
   });
 
   it('calls cleanup for each completed step', async () => {
-    await service.processFile(mockFile);
+    await service.processItem(mockFile);
 
     expect(mockSteps.contentFetching.cleanup).toHaveBeenCalled();
   });
@@ -151,7 +151,7 @@ describe('ProcessingPipelineService', () => {
     const testError = new Error('Step failed');
     vi.mocked(mockSteps.contentRegistration.execute).mockRejectedValue(testError);
 
-    const result = await service.processFile(mockFile);
+    const result = await service.processItem(mockFile);
 
     expect(result.success).toBe(false);
     expect(mockSteps.storageUpload.execute).not.toHaveBeenCalled();
@@ -160,7 +160,7 @@ describe('ProcessingPipelineService', () => {
   it('calls cleanup on failed step', async () => {
     vi.mocked(mockSteps.contentFetching.execute).mockRejectedValue(new Error('Step failed'));
 
-    await service.processFile(mockFile);
+    await service.processItem(mockFile);
 
     expect(mockSteps.contentFetching.cleanup).toHaveBeenCalled();
   });
@@ -172,7 +172,7 @@ describe('ProcessingPipelineService', () => {
       () => new Promise((resolve) => setTimeout(resolve, 35000)),
     );
 
-    const processPromise = service.processFile(mockFile);
+    const processPromise = service.processItem(mockFile);
 
     vi.advanceTimersByTime(31000);
 
@@ -187,32 +187,32 @@ describe('ProcessingPipelineService', () => {
     vi.mocked(mockSteps.contentFetching.execute).mockRejectedValue(new Error('Step failed'));
     mockSteps.contentFetching.cleanup.mockResolvedValue(undefined);
 
-    const result = await service.processFile(mockFile);
+    const result = await service.processItem(mockFile);
 
     expect(result.success).toBe(false);
   });
 
   it('releases content buffer in final cleanup', async () => {
-    const result = await service.processFile(mockFile);
+    const result = await service.processItem(mockFile);
 
     expect(result.success).toBe(true);
   });
 
   it('tracks total duration of pipeline execution', async () => {
-    const result = await service.processFile(mockFile);
+    const result = await service.processItem(mockFile);
 
     expect(result.success).toBe(true);
   });
 
   it('handles steps without cleanup method', async () => {
-    const result = await service.processFile(mockFile);
+    const result = await service.processItem(mockFile);
 
     expect(result.success).toBe(true);
   });
 
   describe('buildSharePointUrl', () => {
     it('should build proper SharePoint URL for file in subfolder', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -236,7 +236,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should build proper SharePoint URL for file in root folder', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -258,7 +258,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should build proper SharePoint URL for file in root folder with empty path', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -280,7 +280,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should handle siteWebUrl with trailing slash', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -302,7 +302,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should handle folderPath with leading slash', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -326,7 +326,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should handle folderPath without leading slash', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,
@@ -350,7 +350,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should URL encode special characters in folder names', () => {
-      const file: EnrichedDriveItem = {
+      const file: EnrichedItems = {
         id: 'file123',
         name: 'document.docx',
         size: 1024,

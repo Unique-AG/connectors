@@ -1,12 +1,19 @@
-import { Client } from '@microsoft/microsoft-graph-client';
-import type { Drive, DriveItem, List } from '@microsoft/microsoft-graph-types';
+import assert from 'assert';
+import {Client, GraphRequest} from '@microsoft/microsoft-graph-client';
+import type {Drive, List } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Config } from '../config';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
-import type { EnrichedDriveItem } from './types/enriched-drive-item';
+import { PipelineItem } from "./types/pipeline-item.interface";
+import {
+  DriveItem,GraphDriveItemsResponse,
+  GraphListItemsResponse,
+  ListItemDetailsResponse,
+  SitePageContent
+} from './types/sharepoint.types';
 
 @Injectable()
 export class GraphApiService {
@@ -33,34 +40,35 @@ export class GraphApiService {
     });
   }
 
-  public async getAllPagesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
-    const [siteWebUrl, lists] = await Promise.all([
-      this.getSiteWebUrl(siteId),
-      this.getListsForSite(siteId),
+  public async getAllSiteItems(siteId: string): Promise<PipelineItem[]> {
+    const [aspxPagesResult, filesResult] = await Promise.allSettled([
+      this.getAspxPagesForSite(siteId),
+      this.getAllFilesForSite(siteId),
     ]);
 
-    // Scan ASPX files from SitePages list
-    const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
-    if (!sitePagesList?.id) {
-      this.logger.warn(
-        `Cannot scan Site Pages because SitePages list was not found for site ${siteId}`,
-      );
-      return [];
+    const allSyncableFiles: PipelineItem[] = [];
+
+    if (aspxPagesResult.status === 'fulfilled') {
+      allSyncableFiles.push(...aspxPagesResult.value);
+    } else {
+      this.logger.error(`Failed to scan pages for site ${siteId}:`, aspxPagesResult.reason);
     }
 
-    try {
-      const aspxFiles = await this.getAspxFilesFromSitePages(siteId, sitePagesList.id, siteWebUrl);
-      this.logger.log(`Found ${aspxFiles.length} ASPX files from SitePages for site ${siteId}`);
-      return aspxFiles;
-    } catch (error) {
-      this.logger.warn(`Failed to scan ASPX files from SitePages for site ${siteId}: ${error}`);
-      return [];
+    if (filesResult.status === 'fulfilled') {
+      allSyncableFiles.push(...filesResult.value);
+    } else {
+      this.logger.error(`Failed to scan drive files for site ${siteId}:`, filesResult.reason);
     }
+
+    this.logger.log(
+      `Completed scan for site ${siteId}. Found ${allSyncableFiles.length} total files marked for synchronizing.`,
+    );
+    return allSyncableFiles;
   }
 
-  public async getAllFilesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
+  public async getAllFilesForSite(siteId: string): Promise<PipelineItem[]> {
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
-    const allSyncableFiles: EnrichedDriveItem[] = [];
+    const allSyncableFiles: PipelineItem[] = [];
     let totalScanned = 0;
 
     if (maxFilesToScan) {
@@ -104,32 +112,6 @@ export class GraphApiService {
     return allSyncableFiles;
   }
 
-  public async getAllFilesAndPagesForSite(siteId: string): Promise<EnrichedDriveItem[]> {
-    const [pagesResult, filesResult] = await Promise.allSettled([
-      this.getAllPagesForSite(siteId),
-      this.getAllFilesForSite(siteId),
-    ]);
-
-    const allSyncableFiles: EnrichedDriveItem[] = [];
-
-    if (pagesResult.status === 'fulfilled') {
-      allSyncableFiles.push(...pagesResult.value);
-    } else {
-      this.logger.error(`Failed to scan pages for site ${siteId}:`, pagesResult.reason);
-    }
-
-    if (filesResult.status === 'fulfilled') {
-      allSyncableFiles.push(...filesResult.value);
-    } else {
-      this.logger.error(`Failed to scan drive files for site ${siteId}:`, filesResult.reason);
-    }
-
-    this.logger.log(
-      `Completed scan for site ${siteId}. Found ${allSyncableFiles.length} total files marked for synchronizing.`,
-    );
-    return allSyncableFiles;
-  }
-
   public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
     this.logger.debug(`Downloading file content for item ${itemId} from drive ${driveId}`);
     const maxFileSizeBytes = this.configService.get('processing.maxFileSizeBytes', { infer: true });
@@ -163,7 +145,32 @@ export class GraphApiService {
     }
   }
 
-  public async getListsForSite(siteId: string): Promise<List[]> {
+  public async getAspxPagesForSite(siteId: string): Promise<PipelineItem[]> {
+    const [siteWebUrl, lists] = await Promise.all([
+      this.getSiteWebUrl(siteId),
+      this.getSiteLists(siteId),
+    ]);
+
+    // Scan ASPX files from SitePages list
+    const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
+    if (!sitePagesList?.id) {
+      this.logger.warn(
+        `Cannot scan Site Pages because SitePages list was not found for site ${siteId}`,
+      );
+      return [];
+    }
+
+    try {
+      const aspxFiles: PipelineItem[] = await this.getAspxListItems(siteId, sitePagesList.id, siteWebUrl);
+      this.logger.log(`Found ${aspxFiles.length} ASPX files from SitePages for site ${siteId}`);
+      return aspxFiles;
+    } catch (error) {
+      this.logger.warn(`Failed to scan ASPX files from SitePages for site ${siteId}: ${error}`);
+      return [];
+    }
+  }
+
+  public async getSiteLists(siteId: string): Promise<List[]> {
     try {
       const lists = await this.makeRateLimitedRequest(() =>
         this.graphClient.api(`/sites/${siteId}/lists`).select('system,name,id').get(),
@@ -179,58 +186,77 @@ export class GraphApiService {
     }
   }
 
-  public async getAspxFilesFromSitePages(
+  public async getAspxListItems(
     siteId: string,
     listId: string,
     siteWebUrl: string,
-  ): Promise<EnrichedDriveItem[]> {
+  ): Promise<PipelineItem[]> {
     try {
-      const aspxFiles: EnrichedDriveItem[] = [];
+      const aspxItems: PipelineItem[] = [];
 
-      let nextPageUrl = `/sites/${siteId}/lists/${listId}/items?$select=id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy&$expand=fields($select=CanvasContent1,WikiField,Title,FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus)`;
+      let nextPageRequest: GraphRequest | null = this.graphClient
+        .api(`/sites/${siteId}/lists/${listId}/items`)
+        .select('id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy')
+        .expand('fields($select=FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus,Title)');
 
-      while (nextPageUrl) {
-        const response = await this.makeRateLimitedRequest(() =>
-          this.graphClient.api(nextPageUrl).get(),
+      while (nextPageRequest !== null) {
+        const response = await this.makeRateLimitedRequest<GraphListItemsResponse>(() =>
+          (nextPageRequest as GraphRequest).get(),
         );
 
-        const items = response?.value || [];
-        for (const item of items) {
-          // Filter for ASPX files that are flagged for sync and approved
-          if (this.fileFilterService.isAspxFileValidForIngestion(item.fields || {})) {
-            const aspxFile: EnrichedDriveItem = {
-              id: item.id,
-              name: item.fields.FileLeafRef,
-              webUrl: item.webUrl,
-              size: parseInt(item.fields.FileSizeDisplay, 10),
-              lastModifiedDateTime: item.lastModifiedDateTime,
-              file: {
-                mimeType: 'text/html',
-              },
-              listItem: {
-                fields: {
-                  ...item.fields,
-                  Author: item.createdBy?.user?.displayName || undefined,
-                },
-              },
-              siteId,
-              siteWebUrl,
-              driveId: listId,
-              driveName: 'SitePages',
-              folderPath: '/',
-            };
+        const items = response.value || [];
 
-            aspxFiles.push(aspxFile);
-          }
+        for (const item of items) {
+          if (!this.fileFilterService.isListItemValidForIngestion(item.fields)) continue;
+
+          const listItem: PipelineItem = {
+            itemType: 'listItem',
+            item,
+            siteId,
+            siteWebUrl,
+            driveId: listId,
+            driveName: 'SitePages',
+            folderPath: item.webUrl, // TODO compute proper folder path
+            fileName: item.fields.Title,
+          };
+
+          aspxItems.push(listItem);
         }
 
-        nextPageUrl = response['@odata.nextLink'];
+        nextPageRequest = response['@odata.nextLink']
+          ? this.graphClient.api(response['@odata.nextLink'])
+          : null;
       }
 
-      this.logger.log(`Found ${aspxFiles.length} ASPX files in SitePages list`);
-      return aspxFiles;
+      this.logger.log(`Found ${aspxItems.length} ASPX files in SitePages list`);
+      return aspxItems;
     } catch (error) {
       this.logger.error(`Failed to fetch ASPX files from SitePages list ${listId}:`, error);
+      throw error;
+    }
+  }
+
+  public async getAspxPageContent(siteId: string, listId: string, itemId: string): Promise<SitePageContent> {
+    this.logger.debug(`Fetching site page content for item ${itemId} from list ${listId}`);
+
+    try {
+      const response = await this.makeRateLimitedRequest<ListItemDetailsResponse>(() =>
+        this.graphClient
+          .api(`/sites/${siteId}/lists/${listId}/items/${itemId}`)
+          .select('id')
+          .expand('fields($select=CanvasContent1,WikiField,Title)')
+          .get(),
+      );
+
+      assert(response?.fields, 'MS Graph response missing fields for page content');
+
+      return {
+        canvasContent: response.fields.CanvasContent1,
+        wikiField: response.fields.WikiField,
+        title: response.fields.Title,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to fetch site page content for item ${itemId}:`, error);
       throw error;
     }
   }
@@ -271,10 +297,10 @@ export class GraphApiService {
     siteWebUrl: string,
     driveName: string,
     maxFiles?: number,
-  ): Promise<EnrichedDriveItem[]> {
+  ): Promise<PipelineItem[]> {
     try {
-      const allItems = await this.fetchAllItemsInFolder(driveId, itemId);
-      const filesToSynchronize: EnrichedDriveItem[] = [];
+      const allItems = await this.fetchAllDriveItemsInDrive(driveId, itemId);
+      const filesToSynchronize: PipelineItem[] = [];
 
       for (const driveItem of allItems) {
         // Check if we've reached the file limit for local testing
@@ -285,7 +311,7 @@ export class GraphApiService {
 
         if (this.isFolder(driveItem)) {
           const remainingLimit = maxFiles ? maxFiles - filesToSynchronize.length : undefined;
-          const filesInSubfolder = await this.recursivelyFetchFiles(
+          const filesInNestedDrive = await this.recursivelyFetchFiles(
             driveId,
             driveItem.id,
             siteId,
@@ -294,16 +320,18 @@ export class GraphApiService {
             remainingLimit,
           );
 
-          filesToSynchronize.push(...filesInSubfolder);
+          filesToSynchronize.push(...filesInNestedDrive);
         } else if (this.fileFilterService.isFileValidForIngestion(driveItem)) {
           const folderPath = this.extractFolderPath(driveItem);
           filesToSynchronize.push({
-            ...driveItem,
+            itemType: 'listItem',
+            item: driveItem,
             siteId,
             siteWebUrl,
             driveId,
             driveName,
             folderPath,
+            fileName: driveItem.name
           });
         }
       }
@@ -329,7 +357,7 @@ export class GraphApiService {
     return cleanPath || '/';
   }
 
-  private async fetchAllItemsInFolder(driveId: string, itemId: string): Promise<DriveItem[]> {
+  private async fetchAllDriveItemsInDrive(driveId: string, itemId: string): Promise<DriveItem[]> {
     const itemsInFolder: DriveItem[] = [];
     const selectFields = [
       'id',
@@ -342,12 +370,12 @@ export class GraphApiService {
       'listItem',
       'parentReference',
     ];
-    let nextPageUrl = `/drives/${driveId}/items/${itemId}/children`;
+    let nextPageUrl: string | undefined = `/drives/${driveId}/items/${itemId}/children`;
 
     while (nextPageUrl) {
-      const response = await this.makeRateLimitedRequest(() =>
+      const response = await this.makeRateLimitedRequest<GraphDriveItemsResponse>(() =>
         this.graphClient
-          .api(nextPageUrl)
+          .api(nextPageUrl as string)
           .select(selectFields)
           .expand('listItem($expand=fields)')
           .get(),
@@ -356,7 +384,7 @@ export class GraphApiService {
       const items: DriveItem[] = response?.value || [];
       itemsInFolder.push(...items);
 
-      nextPageUrl = response['@odata.nextLink'] || '';
+      nextPageUrl = response['@odata.nextLink'];
     }
 
     return itemsInFolder;
@@ -366,7 +394,7 @@ export class GraphApiService {
     return await this.limiter.schedule(async () => await requestFn());
   }
 
-  private isFolder(driveItem: DriveItem): driveItem is DriveItem & { id: string } {
+  private isFolder(driveItem: DriveItem): boolean {
     return Boolean(driveItem.folder && driveItem.id);
   }
 }

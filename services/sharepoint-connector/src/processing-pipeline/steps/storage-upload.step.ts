@@ -16,11 +16,9 @@ export class StorageUploadStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
-    assert.ok(context.contentBuffer, 'Content buffer not found - content fetching may have failed');
-    assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
 
     this.logger.debug(
-      `[${context.correlationId}] Starting storage upload for file: ${context.fileName}`,
+      `[${context.correlationId}] Starting storage upload for file: ${context.pipelineItem.item.id}`,
     );
 
     try {
@@ -44,15 +42,15 @@ export class StorageUploadStep implements IPipelineStep {
   }
 
   private async performUpload(context: ProcessingContext): Promise<void> {
-    const uploadUrl = context.uploadUrl as string;
-    const contentBuffer = context.contentBuffer as Buffer;
-    const mimeType = context.metadata.mimeType;
+    assert.ok(context.contentBuffer, 'Content buffer not found - content fetching may have failed');
+    assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
 
+    const mimeType = context.mimeType;
     try {
-      const response = await request(uploadUrl, {
+      const response = await request(context.uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': mimeType, 'x-ms-blob-type': 'BlockBlob' },
-        body: contentBuffer,
+        body: context.contentBuffer,
       });
 
       if (response.statusCode < 200 || response.statusCode >= HTTP_STATUS_OK_MAX) {
