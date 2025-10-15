@@ -59,9 +59,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();
-      this.logger.debug(
-        `[${context.correlationId}] Ingestion finalization request payload: ${JSON.stringify(ingestionFinalizationRequest, null, 2)}`,
-      );
+
       await this.uniqueApiService.finalizeIngestion(ingestionFinalizationRequest, uniqueToken);
       const _stepDuration = Date.now() - stepStartTime;
 

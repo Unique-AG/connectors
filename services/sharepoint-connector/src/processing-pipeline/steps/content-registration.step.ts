@@ -53,9 +53,6 @@ export class ContentRegistrationStep implements IPipelineStep {
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();
-      this.logger.debug(
-        `[${context.correlationId}] Content registration request payload: ${JSON.stringify(contentRegistrationRequest, null, 2)}`,
-      );
       const registrationResponse = await this.uniqueApiService.registerContent(
         contentRegistrationRequest,
         uniqueToken,
