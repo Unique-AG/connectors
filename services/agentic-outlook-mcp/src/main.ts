@@ -1,16 +1,18 @@
+import './instrumentation';
+
 import { join } from 'node:path';
-import { initOpenTelemetry, runWithInstrumentation } from '@unique-ag/instrumentation';
+import { runWithInstrumentation } from '@unique-ag/instrumentation';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from 'nestjs-pino';
-import * as packageJson from '../package.json';
 import { AppEvents } from './app.events';
 import { AppModule } from './app.module';
 import { AppConfig, AppSettings } from './app-settings';
 
 async function bootstrap() {
+  console.log('Bootstrapping Nest application...');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
 
   const configService = app.get<ConfigService<AppConfig, true>>(ConfigService);
@@ -32,9 +34,4 @@ async function bootstrap() {
   app.get(EventEmitter2).emit(AppEvents.AppReady);
 }
 
-initOpenTelemetry({
-  defaultServiceName: 'agentic-outlook-mcp',
-  defaultServiceVersion: packageJson.version,
-  includePgInstrumentation: true,
-});
 void runWithInstrumentation(bootstrap, 'agentic-outlook-mcp');
