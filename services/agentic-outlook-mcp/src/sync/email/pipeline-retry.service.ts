@@ -5,6 +5,7 @@ import { ConsumeMessage } from 'amqplib';
 import { serializeError } from 'serialize-error-cjs';
 import { normalizeError } from '../../utils/normalize-error';
 import { FatalPipelineError } from './pipeline.errors';
+import { TracePropagationService } from './trace-propagation.service';
 
 export interface RetryHandlerOptions<TMessage, TFailedEvent> {
   message: TMessage;
@@ -21,7 +22,7 @@ export class PipelineRetryService {
   private readonly logger = new Logger(this.constructor.name);
 
   private readonly MAX_ATTEMPTS = 6;
-  private readonly BASE_DELAY_MS = 60_000; // 1 minute
+  private readonly BASE_DELAY_MS = 30_000; // 30 seconds
   private readonly MIN_DELAY_MS = 15_000; // clamp floor
   private readonly MAX_DELAY_MS = 30 * 60_000; // 30 minutes cap
   private readonly JITTER_RATIO = 0.2; // ±20%
@@ -29,6 +30,7 @@ export class PipelineRetryService {
   public constructor(
     private readonly amqpConnection: AmqpConnection,
     private readonly eventEmitter: EventEmitter2,
+    private readonly tracePropagation: TracePropagationService,
   ) {}
 
   public async handlePipelineError<TMessage, TFailedEvent>(
@@ -69,9 +71,10 @@ export class PipelineRetryService {
     }
 
     const delayMs = this.computeDelayMs(attempt);
+    const traceHeaders = this.tracePropagation.extractTraceHeaders(amqpMessage);
     await this.amqpConnection.publish(retryExchange, retryRoutingKey, message, {
-      expiration: String(delayMs),
-      headers: { 'x-attempt': attempt + 1 },
+      expiration: delayMs,
+      headers: { ...traceHeaders, 'x-attempt': attempt + 1 },
     });
   }
 
