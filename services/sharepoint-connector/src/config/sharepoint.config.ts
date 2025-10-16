@@ -1,7 +1,7 @@
 import { ConfigType } from '@nestjs/config';
 import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
-import { DEFAULT_GRAPH_RATE_LIMIT_PER_10_SECONDS } from '../constants/defaults.constants';
 import { z } from 'zod';
+import { DEFAULT_GRAPH_RATE_LIMIT_PER_10_SECONDS } from '../constants/defaults.constants';
 import { Redacted } from '../utils/redacted';
 
 const SharepointConfig = z

@@ -135,6 +135,7 @@ describe('GraphApiService', () => {
       fileName: 'test.pdf',
     };
 
+    // biome-ignore lint/suspicious/noExplicitAny: Mock data for testing site pages which have different structure
     const mockEnrichedSitePage: any = {
       itemType: 'sitePage' as const,
       id: 'page-1',
@@ -178,6 +179,7 @@ describe('GraphApiService', () => {
     });
 
     it('handles pagination correctly', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: File variant for pagination test
       const file2: any = {
         ...mockEnrichedFile,
         id: 'file-2',
@@ -293,7 +295,9 @@ describe('GraphApiService', () => {
         title: 'Test Page',
       });
       expect(mockGraphClient.api).toHaveBeenCalledWith('/sites/site-1/lists/list-1/items/item-1');
-      expect(mockChain.expand).toHaveBeenCalledWith('fields($select=CanvasContent1,WikiField,Title)');
+      expect(mockChain.expand).toHaveBeenCalledWith(
+        'fields($select=CanvasContent1,WikiField,Title)',
+      );
     });
 
     it('handles missing CanvasContent1 field', async () => {

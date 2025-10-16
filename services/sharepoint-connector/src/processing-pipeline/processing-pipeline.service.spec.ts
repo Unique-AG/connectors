@@ -144,7 +144,9 @@ describe('ProcessingPipelineService', () => {
 
     expect(context?.pipelineItem.item.id).toBe('01JWNC3IM2TIAIFMTM4JHYR6RX3E2REDPW');
     expect(context?.pipelineItem.fileName).toBe('Document.docx');
-    expect(context?.pipelineItem.siteWebUrl).toBe('https://uniqueapp.sharepoint.com/sites/UniqueAG');
+    expect(context?.pipelineItem.siteWebUrl).toBe(
+      'https://uniqueapp.sharepoint.com/sites/UniqueAG',
+    );
     expect(context?.pipelineItem.driveId).toBe(
       'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     );
@@ -229,7 +231,8 @@ describe('ProcessingPipelineService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -245,7 +248,8 @@ describe('ProcessingPipelineService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -287,7 +291,8 @@ describe('ProcessingPipelineService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -303,7 +308,8 @@ describe('ProcessingPipelineService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -343,7 +349,8 @@ describe('ProcessingPipelineService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -359,7 +366,8 @@ describe('ProcessingPipelineService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -399,7 +407,8 @@ describe('ProcessingPipelineService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -415,7 +424,8 @@ describe('ProcessingPipelineService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -455,7 +465,8 @@ describe('ProcessingPipelineService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -471,7 +482,8 @@ describe('ProcessingPipelineService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -513,7 +525,8 @@ describe('ProcessingPipelineService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -529,7 +542,8 @@ describe('ProcessingPipelineService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -571,7 +585,8 @@ describe('ProcessingPipelineService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -587,7 +602,8 @@ describe('ProcessingPipelineService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,

@@ -29,7 +29,8 @@ describe('SharepointSynchronizationService', () => {
       '@odata.etag': 'etag1',
       id: '01JWNC3IKFO6XBRCRFWRHKJ77NAYYM3NTX',
       name: '1173246.pdf',
-      webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
+      webUrl:
+        'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
       size: 2178118,
       lastModifiedDateTime: '2025-10-10T13:59:12Z',
       parentReference: {
@@ -47,7 +48,8 @@ describe('SharepointSynchronizationService', () => {
         eTag: 'etag1',
         createdDateTime: '2025-10-10T13:59:12Z',
         lastModifiedDateTime: '2025-10-10T13:59:12Z',
-        webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
+        webUrl:
+          'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
         fields: {
           '@odata.etag': 'etag1',
           FinanceGPTKnowledge: false,
@@ -241,7 +243,8 @@ describe('SharepointSynchronizationService', () => {
           eTag: 'etag2',
           createdDateTime: '2025-10-10T13:59:11Z',
           lastModifiedDateTime: '2025-10-10T13:59:11Z',
-          webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
           fields: {
             '@odata.etag': 'etag2',
             FinanceGPTKnowledge: false,
@@ -310,7 +313,8 @@ describe('SharepointSynchronizationService', () => {
           eTag: 'etag3',
           createdDateTime: '2025-10-10T13:59:12Z',
           lastModifiedDateTime: '2025-10-10T13:59:12Z',
-          webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
           fields: {
             '@odata.etag': 'etag3',
             FinanceGPTKnowledge: false,
@@ -335,9 +339,7 @@ describe('SharepointSynchronizationService', () => {
       fileName: '6034030.pdf',
     };
 
-    mockGraphApiService.getAllSiteItems = vi
-      .fn()
-      .mockResolvedValue([fileWithoutTimestamp]);
+    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([fileWithoutTimestamp]);
     mockUniqueApiService.performFileDiff = vi.fn().mockResolvedValue(mockDiffResult);
 
     await service.synchronize();
@@ -362,7 +364,8 @@ describe('SharepointSynchronizationService', () => {
         '@odata.etag': 'etag1',
         id: '01JWNC3IKFO6XBRCRFWRHKJ77NAYYM3NTX',
         name: '1173246.pdf',
-        webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
+        webUrl:
+          'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
         size: 2178118,
         lastModifiedDateTime: '2025-10-10T13:59:12Z',
         parentReference: {
@@ -380,7 +383,8 @@ describe('SharepointSynchronizationService', () => {
           eTag: 'etag1',
           createdDateTime: '2025-10-10T13:59:12Z',
           lastModifiedDateTime: '2025-10-10T13:59:12Z',
-          webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
           fields: {
             '@odata.etag': 'etag1',
             FinanceGPTKnowledge: false,
@@ -411,7 +415,8 @@ describe('SharepointSynchronizationService', () => {
         '@odata.etag': 'etag2',
         id: '01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI',
         name: '2019-BMW-Maintenance.pdf',
-        webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+        webUrl:
+          'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
         size: 1027813,
         lastModifiedDateTime: '2025-10-10T13:59:11Z',
         parentReference: {
@@ -429,7 +434,8 @@ describe('SharepointSynchronizationService', () => {
           eTag: 'etag2',
           createdDateTime: '2025-10-10T13:59:11Z',
           lastModifiedDateTime: '2025-10-10T13:59:11Z',
-          webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
           fields: {
             '@odata.etag': 'etag2',
             FinanceGPTKnowledge: false,
@@ -460,7 +466,8 @@ describe('SharepointSynchronizationService', () => {
         '@odata.etag': 'etag3',
         id: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV',
         name: '6034030.pdf',
-        webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+        webUrl:
+          'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
         size: 932986,
         lastModifiedDateTime: '2025-10-10T13:59:10Z',
         parentReference: {
@@ -478,7 +485,8 @@ describe('SharepointSynchronizationService', () => {
           eTag: 'etag3',
           createdDateTime: '2025-10-10T13:59:10Z',
           lastModifiedDateTime: '2025-10-10T13:59:10Z',
-          webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
           fields: {
             '@odata.etag': 'etag3',
             FinanceGPTKnowledge: false,
@@ -543,7 +551,8 @@ describe('SharepointSynchronizationService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -559,7 +568,8 @@ describe('SharepointSynchronizationService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -601,7 +611,8 @@ describe('SharepointSynchronizationService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -617,7 +628,8 @@ describe('SharepointSynchronizationService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -657,7 +669,8 @@ describe('SharepointSynchronizationService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -673,7 +686,8 @@ describe('SharepointSynchronizationService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -713,7 +727,8 @@ describe('SharepointSynchronizationService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -729,7 +744,8 @@ describe('SharepointSynchronizationService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -769,7 +785,8 @@ describe('SharepointSynchronizationService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -785,7 +802,8 @@ describe('SharepointSynchronizationService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -827,7 +845,8 @@ describe('SharepointSynchronizationService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -843,7 +862,8 @@ describe('SharepointSynchronizationService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
@@ -885,7 +905,8 @@ describe('SharepointSynchronizationService', () => {
           id: 'file123',
           name: 'document.docx',
           size: 1024,
-          webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
           lastModifiedDateTime: '2023-01-01T00:00:00Z',
           parentReference: {
             driveType: 'documentLibrary',
@@ -901,7 +922,8 @@ describe('SharepointSynchronizationService', () => {
             eTag: 'etag1',
             createdDateTime: '2023-01-01T00:00:00Z',
             lastModifiedDateTime: '2023-01-01T00:00:00Z',
-            webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
             fields: {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,

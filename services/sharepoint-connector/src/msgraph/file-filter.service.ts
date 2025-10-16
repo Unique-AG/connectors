@@ -1,12 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
-import {DriveItem, ListItem} from "./types/sharepoint.types";
+import { DriveItem, ListItem } from './types/sharepoint.types';
 
 @Injectable()
 export class FileFilterService {
-  private readonly logger = new Logger(this.constructor.name);
-
   public constructor(private readonly configService: ConfigService<Config, true>) {}
 
   public isListItemValidForIngestion(fields: ListItem['fields']) {

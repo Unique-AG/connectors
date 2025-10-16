@@ -1,22 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
-import { isListItem} from '../../msgraph/types/type-guards.util';
+import { ListItem } from '../../msgraph/types/sharepoint.types';
+import { isListItem } from '../../msgraph/types/type-guards.util';
+import { getTitle } from '../../utils/list-item.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
-import {ListItem} from "../../msgraph/types/sharepoint.types";
-import {getTitle} from "../../utils/list-item.util";
 
 @Injectable()
 export class AspxProcessingStep implements IPipelineStep {
   private readonly logger = new Logger(AspxProcessingStep.name);
   public readonly stepName = PipelineStep.AspxProcessing;
 
-  public constructor(
-    private readonly configService: ConfigService<Config, true>,
-  ) {}
+  public constructor(private readonly configService: ConfigService<Config, true>) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     if (!isListItem(context.pipelineItem)) {
@@ -56,7 +54,7 @@ export class AspxProcessingStep implements IPipelineStep {
     return content.replace(/href="\/(.*?)"/g, `href="${baseUrl}$1"`);
   }
 
-  private buildAuthorHtml(createdBy: ListItem['createdBy'] ): string {
+  private buildAuthorHtml(createdBy: ListItem['createdBy']): string {
     return `<h4>${createdBy.user.displayName}</h4>`;
   }
 

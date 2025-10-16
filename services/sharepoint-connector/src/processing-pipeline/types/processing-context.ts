@@ -1,5 +1,5 @@
-import type {PipelineItem} from "../../msgraph/types/pipeline-item.interface";
-import type {IngestionApiResponse} from "../../unique-api/unique-api.types";
+import type { PipelineItem } from '../../msgraph/types/pipeline-item.interface';
+import type { IngestionApiResponse } from '../../unique-api/unique-api.types';
 
 export interface ProcessingContext {
   correlationId: string;
@@ -12,7 +12,7 @@ export interface ProcessingContext {
 
   startTime: Date;
   mimeType?: string;
-  registrationResponse?: IngestionApiResponse
+  registrationResponse?: IngestionApiResponse;
 }
 
 export interface PipelineResult {

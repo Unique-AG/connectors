@@ -1,14 +1,14 @@
 import assert from 'node:assert';
-import {Injectable, Logger} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {Config} from '../../config';
-import {GraphApiService} from '../../msgraph/graph-api.service';
-import { isDriveItem, isListItem} from '../../msgraph/types/type-guards.util';
-import {normalizeError} from '../../utils/normalize-error';
-import type {ProcessingContext} from '../types/processing-context';
-import {PipelineStep} from '../types/processing-context';
-import type {IPipelineStep} from './pipeline-step.interface';
-import {DriveItem} from "../../msgraph/types/sharepoint.types";
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Config } from '../../config';
+import { GraphApiService } from '../../msgraph/graph-api.service';
+import { DriveItem } from '../../msgraph/types/sharepoint.types';
+import { isDriveItem, isListItem } from '../../msgraph/types/type-guards.util';
+import { normalizeError } from '../../utils/normalize-error';
+import type { ProcessingContext } from '../types/processing-context';
+import { PipelineStep } from '../types/processing-context';
+import type { IPipelineStep } from './pipeline-step.interface';
 
 @Injectable()
 export class ContentFetchingStep implements IPipelineStep {
@@ -18,8 +18,7 @@ export class ContentFetchingStep implements IPipelineStep {
   public constructor(
     private readonly apiService: GraphApiService,
     private readonly configService: ConfigService<Config, true>,
-  ) {
-  }
+  ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     if (isListItem(context.pipelineItem)) {
@@ -47,12 +46,15 @@ export class ContentFetchingStep implements IPipelineStep {
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${ context.correlationId }] Site page content fetching failed: ${ message }`);
+      this.logger.error(`[${context.correlationId}] Site page content fetching failed: ${message}`);
       throw error;
     }
   }
 
-  private async fetchFileContent(context: ProcessingContext, item: DriveItem): Promise<ProcessingContext> {
+  private async fetchFileContent(
+    context: ProcessingContext,
+    item: DriveItem,
+  ): Promise<ProcessingContext> {
     this.validateMimeType(item);
 
     try {
@@ -67,20 +69,17 @@ export class ContentFetchingStep implements IPipelineStep {
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${ context.correlationId }] Content fetching failed: ${ message }`);
+      this.logger.error(`[${context.correlationId}] Content fetching failed: ${message}`);
       throw error;
     }
   }
 
   private validateMimeType(item: DriveItem): void {
     const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
-    assert.ok(
-      item.file?.mimeType,
-      `MIME type is missing for this item. Skipping download.`,
-    );
+    assert.ok(item.file?.mimeType, `MIME type is missing for this item. Skipping download.`);
     assert.ok(
       allowedMimeTypes.includes(item.file.mimeType),
-      `MIME type ${ item.file.mimeType } is not allowed. Skipping download.}`,
+      `MIME type ${item.file.mimeType} is not allowed. Skipping download.}`,
     );
   }
 }

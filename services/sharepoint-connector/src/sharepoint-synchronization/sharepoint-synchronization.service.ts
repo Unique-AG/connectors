@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type {PipelineItem} from '../msgraph/types/pipeline-item.interface';
+import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';

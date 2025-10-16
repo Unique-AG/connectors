@@ -1,6 +1,11 @@
-import {ListItem} from "../msgraph/types/sharepoint.types";
+import { ListItem } from '../msgraph/types/sharepoint.types';
 
-export function getTitle(fields: ListItem['fields'] ): string {
-  if(!fields.Title || fields.Title === 'Title') return fields.FileLeafRef
-  return fields.Title
+export function getTitle(fields: ListItem['fields']): string {
+  const title = fields.Title?.trim();
+
+  if (!title || title.toLowerCase() === 'title') {
+    return fields.FileLeafRef;
+  }
+
+  return title;
 }

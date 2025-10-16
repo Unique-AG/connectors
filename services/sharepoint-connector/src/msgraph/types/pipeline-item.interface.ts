@@ -1,4 +1,4 @@
-import {DriveItem, ListItem} from "./sharepoint.types";
+import { DriveItem, ListItem } from './sharepoint.types';
 
 // This can be named something like ItemToProcess
 export interface PipelineItem {

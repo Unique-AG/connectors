@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
-import {DEFAULT_MIME_TYPE} from "../constants/defaults.constants";
+import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
-import {isDriveItem} from "../msgraph/types/type-guards.util";
+import { isDriveItem } from '../msgraph/types/type-guards.util';
 import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -51,7 +51,9 @@ export class ProcessingPipelineService {
       mimeType: isDriveItem(pipelineItem) ? pipelineItem.item.file?.mimeType : DEFAULT_MIME_TYPE,
     };
 
-    this.logger.log(`[${correlationId}] Starting processing pipeline for item: ${pipelineItem.item.id}`);
+    this.logger.log(
+      `[${correlationId}] Starting processing pipeline for item: ${pipelineItem.item.id}`,
+    );
 
     for (const step of this.pipelineSteps) {
       try {
@@ -59,7 +61,6 @@ export class ProcessingPipelineService {
 
         this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
         if (step.cleanup) await step.cleanup(context);
-
       } catch (error) {
         const totalDuration = Date.now() - startTime.getTime();
         this.logger.error(

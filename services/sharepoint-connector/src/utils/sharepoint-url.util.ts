@@ -1,5 +1,5 @@
 import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
-import { isDriveItem, isListItem } from "../msgraph/types/type-guards.util";
+import { isDriveItem, isListItem } from '../msgraph/types/type-guards.util';
 
 /**
  * Builds the path of the item in knowledge base

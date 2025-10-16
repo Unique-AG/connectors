@@ -2,13 +2,12 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphApiService } from '../../msgraph/graph-api.service';
-import type { DriveItem, ListItem } from '../../msgraph/types/sharepoint.types';
+import type { DriveItem } from '../../msgraph/types/sharepoint.types';
 import type { ProcessingContext } from '../types/processing-context';
 import { ContentFetchingStep } from './content-fetching.step';
 
 describe('ContentFetchingStep', () => {
   let step: ContentFetchingStep;
-  let mockGraphApiService: GraphApiService;
 
   beforeEach(async () => {
     const { unit } = await TestBed.solitary(ContentFetchingStep)
@@ -24,7 +23,9 @@ describe('ContentFetchingStep', () => {
       .impl((stub) => ({
         ...stub(),
         downloadFileContent: vi.fn().mockResolvedValue(Buffer.from('abc')),
-        getAspxPageContent: vi.fn().mockResolvedValue({ canvasContent: 'content', wikiField: undefined }),
+        getAspxPageContent: vi
+          .fn()
+          .mockResolvedValue({ canvasContent: 'content', wikiField: undefined }),
       }))
       .compile();
     step = unit;

@@ -1,20 +1,21 @@
-import assert from 'assert';
-import {Client, GraphRequest} from '@microsoft/microsoft-graph-client';
-import type {Drive, List } from '@microsoft/microsoft-graph-types';
+import assert from 'node:assert';
+import { Client, GraphRequest } from '@microsoft/microsoft-graph-client';
+import type { Drive, List } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Config } from '../config';
+import { getTitle } from '../utils/list-item.util';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
-import { PipelineItem } from "./types/pipeline-item.interface";
+import { PipelineItem } from './types/pipeline-item.interface';
 import {
-  DriveItem,GraphDriveItemsResponse,
+  DriveItem,
+  GraphDriveItemsResponse,
   GraphListItemsResponse,
   ListItemDetailsResponse,
-  SitePageContent
+  SitePageContent,
 } from './types/sharepoint.types';
-import {getTitle} from "../utils/list-item.util";
 
 @Injectable()
 export class GraphApiService {
@@ -162,7 +163,11 @@ export class GraphApiService {
     }
 
     try {
-      const aspxFiles: PipelineItem[] = await this.getAspxListItems(siteId, sitePagesList.id, siteWebUrl);
+      const aspxFiles: PipelineItem[] = await this.getAspxListItems(
+        siteId,
+        sitePagesList.id,
+        siteWebUrl,
+      );
       this.logger.log(`Found ${aspxFiles.length} ASPX files from SitePages for site ${siteId}`);
       return aspxFiles;
     } catch (error) {
@@ -198,7 +203,9 @@ export class GraphApiService {
       let nextPageRequest: GraphRequest | null = this.graphClient
         .api(`/sites/${siteId}/lists/${listId}/items`)
         .select('id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy')
-        .expand('fields($select=FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus,Title)');
+        .expand(
+          'fields($select=FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus,Title)',
+        );
 
       while (nextPageRequest !== null) {
         const response = await this.makeRateLimitedRequest<GraphListItemsResponse>(() =>
@@ -218,7 +225,7 @@ export class GraphApiService {
             driveId: listId,
             driveName: 'SitePages',
             folderPath: item.webUrl,
-            fileName: getTitle(item.fields)
+            fileName: getTitle(item.fields),
           };
 
           aspxItems.push(listItem);
@@ -237,7 +244,11 @@ export class GraphApiService {
     }
   }
 
-  public async getAspxPageContent(siteId: string, listId: string, itemId: string): Promise<SitePageContent> {
+  public async getAspxPageContent(
+    siteId: string,
+    listId: string,
+    itemId: string,
+  ): Promise<SitePageContent> {
     this.logger.debug(`Fetching site page content for item ${itemId} from list ${listId}`);
 
     try {
@@ -332,7 +343,7 @@ export class GraphApiService {
             driveId,
             driveName,
             folderPath,
-            fileName: driveItem.name
+            fileName: driveItem.name,
           });
         }
       }

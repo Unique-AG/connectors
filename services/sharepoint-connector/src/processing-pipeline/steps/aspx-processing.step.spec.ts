@@ -171,7 +171,9 @@ describe('AspxProcessingStep', () => {
 
     const result = convertRelativeLinks(input, baseUrl);
 
-    expect(result).toBe('<a href="https://contoso.sharepoint.comsites/test/page.aspx">Link</a><img src="/sites/test/image.png">');
+    expect(result).toBe(
+      '<a href="https://contoso.sharepoint.comsites/test/page.aspx">Link</a><img src="/sites/test/image.png">',
+    );
   });
 
   it('handles empty content', async () => {

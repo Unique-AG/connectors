@@ -41,7 +41,6 @@ export interface ListItemDetailsResponse {
   };
 }
 
-
 export interface SitePageContent {
   canvasContent?: string;
   wikiField?: string;
@@ -101,7 +100,7 @@ export interface DriveItem {
     mimeType: string;
     hashes: {
       quickXorHash: string;
-    }
+    };
   };
 
   /** When expanded using ?expand=listItem($expand=fields) */
