@@ -94,9 +94,6 @@ connectorConfig:
       # clientSecret would need to be presented from a secret as well
 
   unique:
-    # -- base path for the file diff
-    # example: https://acme.sharepoint.com
-    fileDiffBasePath: unset_default_value
     # -- url for the file diff
     # example: https://api.unique.app/ingestion/v1/content/file-diff
     fileDiffUrl: unset_default_value

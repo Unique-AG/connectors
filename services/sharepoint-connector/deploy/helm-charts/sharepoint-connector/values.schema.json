@@ -95,12 +95,8 @@
         "unique": {
           "type": "object",
           "description": "Unique platform configuration",
-          "required": ["fileDiffBasePath", "fileDiffUrl", "ingestionGraphqlUrl", "zitadel"],
+          "required": ["fileDiffUrl", "ingestionGraphqlUrl", "zitadel"],
           "properties": {
-            "fileDiffBasePath": {
-              "type": "string",
-              "description": "Base path for file differences"
-            },
             "fileDiffUrl": {
               "type": "string",
               "description": "URL for file differences"
