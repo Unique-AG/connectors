@@ -48,4 +48,4 @@ factset-auth.json
 **/helm-charts/**/charts
 
 # local scripts
-/services/sharepoint-connector/local-scripts/**
+**/local-scripts/**
