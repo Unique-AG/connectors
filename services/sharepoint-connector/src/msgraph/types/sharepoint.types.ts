@@ -62,7 +62,7 @@ export interface ListItem {
   };
   fields: {
     '@odata.etag': string;
-    FinanceGptKnowledge: boolean;
+    FinanceGPTKnowledge: boolean;
     _ModerationStatus: number;
     CanvasContent1?: string;
     WikiField?: string;

@@ -2,7 +2,8 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type { EnrichedItems } from '../msgraph/types/pipeline-item.interface';
+import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
+import type { DriveItem } from '../msgraph/types/sharepoint.types';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
@@ -11,28 +12,61 @@ import { SharepointSynchronizationService } from './sharepoint-synchronization.s
 describe('SharepointSynchronizationService', () => {
   let service: SharepointSynchronizationService;
   let mockOrchestrator: {
-    processFilesForSite: ReturnType<typeof vi.fn>;
+    processSiteItems: ReturnType<typeof vi.fn>;
   };
 
-  const mockFile: EnrichedItems = {
+  const mockDriveItem: DriveItem = {
+    '@odata.etag': 'etag1',
     id: '1',
     name: 'a.pdf',
     webUrl: 'https://web',
-    listItem: { lastModifiedDateTime: new Date().toISOString(), fields: {} },
-    parentReference: { siteId: 'site-1', driveId: 'drive-1' },
-    file: { mimeType: 'application/pdf' },
     size: 1024,
+    lastModifiedDateTime: new Date().toISOString(),
+    parentReference: {
+      driveType: 'documentLibrary',
+      siteId: 'site-1',
+      driveId: 'drive-1',
+      id: 'parent1',
+      name: 'Documents',
+      path: '/drive/root:/',
+    },
+    file: { mimeType: 'application/pdf', hashes: { quickXorHash: 'hash1' } },
+    listItem: {
+      '@odata.etag': 'etag1',
+      id: 'item1',
+      eTag: 'etag1',
+      createdDateTime: new Date().toISOString(),
+      lastModifiedDateTime: new Date().toISOString(),
+      webUrl: 'https://web',
+      fields: {
+        '@odata.etag': 'etag1',
+        FinanceGPTKnowledge: false,
+        FileLeafRef: 'a.pdf',
+        Modified: new Date().toISOString(),
+        Created: new Date().toISOString(),
+        ContentType: 'Document',
+        AuthorLookupId: '1',
+        EditorLookupId: '1',
+        ItemChildCount: '0',
+        FolderChildCount: '0',
+      },
+    },
+  };
+
+  const mockFile: PipelineItem = {
+    itemType: 'driveItem',
+    item: mockDriveItem,
     siteId: 'site-1',
     siteWebUrl: 'https://sharepoint.example.com/sites/site-1',
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: '/',
-    lastModifiedDateTime: new Date().toISOString(),
+    fileName: 'a.pdf',
   };
 
   beforeEach(async () => {
     mockOrchestrator = {
-      processFilesForSite: vi.fn().mockResolvedValue(undefined),
+      processSiteItems: vi.fn().mockResolvedValue(undefined),
     };
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
@@ -44,7 +78,7 @@ describe('SharepointSynchronizationService', () => {
       .mock(UniqueAuthService)
       .impl(() => ({ getToken: vi.fn().mockResolvedValue('unique-token') }))
       .mock(GraphApiService)
-      .impl(() => ({ getAllFilesForSite: vi.fn().mockResolvedValue([mockFile]) }))
+      .impl(() => ({ getAllSiteItems: vi.fn().mockResolvedValue([mockFile]) }))
       .mock(UniqueApiService)
       .impl(() => ({
         performFileDiff: vi.fn().mockResolvedValue({
@@ -62,11 +96,11 @@ describe('SharepointSynchronizationService', () => {
 
   it('scans and triggers processing', async () => {
     await service.synchronize();
-    expect(mockOrchestrator.processFilesForSite).toHaveBeenCalledTimes(1);
+    expect(mockOrchestrator.processSiteItems).toHaveBeenCalledTimes(1);
   });
 
   it('prevents overlapping scans', async () => {
-    mockOrchestrator.processFilesForSite.mockImplementation(
+    mockOrchestrator.processSiteItems.mockImplementation(
       () => new Promise((resolve) => setTimeout(resolve, 100)),
     );
 
@@ -75,6 +109,6 @@ describe('SharepointSynchronizationService', () => {
 
     await Promise.all([scan1, scan2]);
 
-    expect(mockOrchestrator.processFilesForSite).toHaveBeenCalledTimes(1);
+    expect(mockOrchestrator.processSiteItems).toHaveBeenCalledTimes(1);
   });
 });

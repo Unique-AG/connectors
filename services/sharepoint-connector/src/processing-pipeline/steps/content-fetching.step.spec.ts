@@ -2,43 +2,90 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphApiService } from '../../msgraph/graph-api.service';
+import type { DriveItem, ListItem } from '../../msgraph/types/sharepoint.types';
 import type { ProcessingContext } from '../types/processing-context';
 import { ContentFetchingStep } from './content-fetching.step';
 
 describe('ContentFetchingStep', () => {
   let step: ContentFetchingStep;
+  let mockGraphApiService: GraphApiService;
 
   beforeEach(async () => {
-    const mockConfig = { get: vi.fn(() => ['application/pdf']) } as unknown as ConfigService;
     const { unit } = await TestBed.solitary(ContentFetchingStep)
       .mock(ConfigService)
-      .impl(() => mockConfig)
+      .impl((stub) => ({
+        ...stub(),
+        get: vi.fn((key: string) => {
+          if (key === 'processing.allowedMimeTypes') return ['application/pdf'];
+          return undefined;
+        }),
+      }))
       .mock(GraphApiService)
-      .impl(() => ({ downloadFileContent: vi.fn().mockResolvedValue(Buffer.from('abc')) }))
+      .impl((stub) => ({
+        ...stub(),
+        downloadFileContent: vi.fn().mockResolvedValue(Buffer.from('abc')),
+        getAspxPageContent: vi.fn().mockResolvedValue({ canvasContent: 'content', wikiField: undefined }),
+      }))
       .compile();
     step = unit;
   });
 
   it('fetches content and sets buffer and size', async () => {
-    const context: ProcessingContext = {
-      correlationId: 'c1',
-      fileId: 'f1',
-      fileName: 'n',
-      fileSize: 0,
-      siteUrl: '',
-      libraryName: '',
-      startTime: new Date(),
-      metadata: {
-        mimeType: 'application/pdf',
+    const driveItem: DriveItem = {
+      '@odata.etag': 'etag1',
+      id: 'f1',
+      name: 'test.pdf',
+      webUrl: 'https://sharepoint.example.com/test.pdf',
+      size: 1024,
+      lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      parentReference: {
+        driveType: 'documentLibrary',
         driveId: 'drive1',
-        isFolder: false,
-        listItemFields: {},
+        id: 'parent1',
+        name: 'Documents',
+        path: '/drive/root:/test',
         siteId: 'site1',
-        driveName: 'Documents',
-        folderPath: '/test',
+      },
+      file: { mimeType: 'application/pdf', hashes: { quickXorHash: 'hash1' } },
+      listItem: {
+        '@odata.etag': 'etag1',
+        id: 'item1',
+        eTag: 'etag1',
+        createdDateTime: '2024-01-01T00:00:00Z',
         lastModifiedDateTime: '2024-01-01T00:00:00Z',
+        webUrl: 'https://sharepoint.example.com/test.pdf',
+        fields: {
+          '@odata.etag': 'etag1',
+          FinanceGPTKnowledge: false,
+          FileLeafRef: 'test.pdf',
+          Modified: '2024-01-01T00:00:00Z',
+          Created: '2024-01-01T00:00:00Z',
+          ContentType: 'Document',
+          AuthorLookupId: '1',
+          EditorLookupId: '1',
+          ItemChildCount: '0',
+          FolderChildCount: '0',
+        },
       },
     };
+
+    const context: ProcessingContext = {
+      correlationId: 'c1',
+      startTime: new Date(),
+      knowledgeBaseUrl: 'https://sharepoint.example.com/test.pdf',
+      mimeType: 'application/pdf',
+      pipelineItem: {
+        itemType: 'driveItem',
+        item: driveItem,
+        siteId: 'site1',
+        siteWebUrl: 'https://sharepoint.example.com',
+        driveId: 'drive1',
+        driveName: 'Documents',
+        folderPath: '/test',
+        fileName: 'test.pdf',
+      },
+    };
+
     const result = await step.execute(context);
     expect(result.fileSize).toBe(3);
     expect(Buffer.isBuffer(result.contentBuffer)).toBe(true);
