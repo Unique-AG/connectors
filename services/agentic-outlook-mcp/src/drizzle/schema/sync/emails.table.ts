@@ -71,6 +71,7 @@ export const emails = pgTable(
     sizeBytes: integer(),
 
     tags: text().array(),
+    language: text(),
 
     hasAttachments: boolean().notNull().default(false),
     attachments: jsonb()
@@ -123,4 +124,5 @@ export const emailRelations = relations(emails, ({ one }) => ({
   }),
 }));
 
+export type Email = typeof emails.$inferSelect;
 export type EmailInput = typeof emails.$inferInsert;

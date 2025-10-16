@@ -23,6 +23,7 @@ export class IngestRequestedEvent {
   public constructor(
     public readonly userProfileId: TypeID<'user_profile'>,
     public readonly folderId: string,
+    public readonly emailId: TypeID<'email'>,
     public readonly message: Message,
   ) {}
 }
@@ -32,6 +33,7 @@ export class IngestCompletedEvent {
     public readonly userProfileId: TypeID<'user_profile'>,
     public readonly folderId: string,
     public readonly emailId: TypeID<'email'>,
+    public readonly traceHeaders?: Record<string, unknown>,
   ) {}
 }
 
@@ -48,6 +50,7 @@ export class ProcessingRequestedEvent {
   public constructor(
     public readonly userProfileId: TypeID<'user_profile'>,
     public readonly emailId: TypeID<'email'>,
+    public readonly traceHeaders?: Record<string, unknown>,
   ) {}
 }
 

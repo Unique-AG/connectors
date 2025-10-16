@@ -2,25 +2,22 @@ import { RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import { Message } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { SpanStatusCode } from '@opentelemetry/api';
 import { ConsumeMessage } from 'amqplib';
 import { snakeCase } from 'lodash';
 import { TypeID } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, EmailInput } from '../../../drizzle';
 import { EmailService } from '../email.service';
+import { DeletedItem } from '../email-sync.service';
 import { IngestCompletedEvent, IngestFailedEvent, PipelineEvents } from '../pipeline.events';
 import { PipelineRetryService } from '../pipeline-retry.service';
-
-interface DeletedItem {
-  id: string;
-  '@removed'?: {
-    reason: string;
-  };
-}
+import { TracePropagationService } from '../trace-propagation.service';
 
 interface IngestMessage {
   message: Message;
   userProfileId: string;
   folderId: string;
+  emailId: string;
 }
 
 @Injectable()
@@ -33,6 +30,7 @@ export class IngestService {
     private readonly emailService: EmailService,
     private readonly eventEmitter: EventEmitter2,
     private readonly pipelineRetryService: PipelineRetryService,
+    private readonly tracePropagation: TracePropagationService,
   ) {}
 
   @RabbitSubscribe({
@@ -47,61 +45,88 @@ export class IngestService {
     // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
     const messageId = message.id!;
 
-    // This can cause data inconsistency if a folder is changed while ingesting.
-    await this.ensureFoldersMap();
+    return this.tracePropagation.withExtractedContext(
+      amqpMessage,
+      'email.pipeline.ingest',
+      {
+        'email.id': ingestMessage.emailId,
+        'user.id': userProfileId,
+        'folder.id': folderId,
+        'pipeline.step': 'ingest',
+        'attempt': attempt,
+      },
+      async (span) => {
+        // This can cause data inconsistency if a folder is changed while ingesting.
+        await this.ensureFoldersMap();
 
-    if (attempt > 1) {
-      this.logger.log({
-        msg: 'Retrying ingest for message',
-        messageId,
-        attempt,
-      });
-    }
+        if (attempt > 1) {
+          this.logger.log({
+            msg: 'Retrying ingest for message',
+            messageId,
+            attempt,
+          });
+          span.addEvent('retry', { attempt });
+        }
 
-    try {
-      const isDeleted = (message as unknown as DeletedItem)['@removed'] !== undefined;
-      if (isDeleted) {
-        await this.emailService.deleteEmails(TypeID.fromString(userProfileId, 'user_profile'), [
-          messageId,
-        ]);
-        return;
-      }
+        try {
+          const isDeleted = (message as unknown as DeletedItem)['@removed'] !== undefined;
+          if (isDeleted) {
+            span.addEvent('email.deleted');
+            await this.emailService.deleteEmails(TypeID.fromString(userProfileId, 'user_profile'), [
+              messageId,
+            ]);
+            span.setStatus({ code: SpanStatusCode.OK });
+            return;
+          }
 
-      const mappedEmail = this.mapMessageToEmail({ message, userProfileId, folderId });
+          const mappedEmail = this.mapMessageToEmail({ message, userProfileId, folderId });
 
-      const savedId = await this.emailService.upsertEmail(
-        TypeID.fromString(userProfileId, 'user_profile'),
-        folderId,
-        mappedEmail,
-      );
-
-      this.eventEmitter.emit(
-        PipelineEvents.IngestCompleted,
-        new IngestCompletedEvent(
-          TypeID.fromString(userProfileId, 'user_profile'),
-          folderId,
-          savedId,
-        ),
-      );
-
-      return;
-    } catch (error) {
-      await this.pipelineRetryService.handlePipelineError({
-        message: ingestMessage,
-        amqpMessage,
-        error,
-        retryExchange: 'email.pipeline.retry',
-        retryRoutingKey: 'email.ingest.retry',
-        failedEventName: PipelineEvents.IngestFailed,
-        createFailedEvent: (serializedError) =>
-          new IngestFailedEvent(
+          const savedId = await this.emailService.upsertEmail(
             TypeID.fromString(userProfileId, 'user_profile'),
             folderId,
-            messageId,
-            serializedError,
-          ),
-      });
-    }
+            mappedEmail,
+          );
+
+          span.addEvent('email.saved', { 'email.id': savedId.toString() });
+          span.setStatus({ code: SpanStatusCode.OK });
+
+          const traceHeaders = this.tracePropagation.extractTraceHeaders(amqpMessage);
+          this.eventEmitter.emit(
+            PipelineEvents.IngestCompleted,
+            new IngestCompletedEvent(
+              TypeID.fromString(userProfileId, 'user_profile'),
+              folderId,
+              savedId,
+              traceHeaders,
+            ),
+          );
+
+          return;
+        } catch (error) {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          span.recordException(error as Error);
+          await this.pipelineRetryService.handlePipelineError({
+            message: ingestMessage,
+            amqpMessage,
+            error,
+            retryExchange: 'email.pipeline.retry',
+            retryRoutingKey: 'email.ingest.retry',
+            failedEventName: PipelineEvents.IngestFailed,
+            createFailedEvent: (serializedError) =>
+              new IngestFailedEvent(
+                TypeID.fromString(userProfileId, 'user_profile'),
+                folderId,
+                messageId,
+                serializedError,
+              ),
+          });
+          return;
+        }
+      },
+    );
   }
 
   private async ensureFoldersMap(): Promise<void> {
