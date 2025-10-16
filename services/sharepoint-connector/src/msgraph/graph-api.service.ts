@@ -78,7 +78,7 @@ export class GraphApiService {
     }
 
     const [siteWebUrl, drives] = await Promise.all([
-      this.getSiteWebUrl(siteId), //TODO THIS IS NOT NO LONGER REQUIRED
+      this.getSiteWebUrl(siteId),
       this.getDrivesForSite(siteId),
     ]);
 

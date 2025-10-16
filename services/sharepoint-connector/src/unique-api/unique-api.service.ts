@@ -79,7 +79,7 @@ export class UniqueApiService {
     const path = url.pathname + url.search;
 
     const diffRequest: FileDiffRequest = {
-      basePath: sharepointBaseUrl, //TODO check if here we should add /sites/<site-name>
+      basePath: sharepointBaseUrl,
       partialKey,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
