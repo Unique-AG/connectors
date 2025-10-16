@@ -1,6 +1,7 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { context, ROOT_CONTEXT, trace } from '@opentelemetry/api';
 import { eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDatabase, emails as emailsTable } from '../../drizzle';
 import {
@@ -12,6 +13,7 @@ import {
   ProcessingCompletedEvent,
   ProcessingRequestedEvent,
 } from './pipeline.events';
+import { TracePropagationService } from './trace-propagation.service';
 
 @Injectable()
 export class OrchestratorService {
@@ -21,22 +23,46 @@ export class OrchestratorService {
     private readonly amqpConnection: AmqpConnection,
     private readonly eventEmitter: EventEmitter2,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    private readonly tracePropagation: TracePropagationService,
   ) {}
 
   @OnEvent(PipelineEvents.IngestRequested)
   public async handleIngestRequested(event: IngestRequestedEvent) {
-    const { userProfileId, folderId, message } = event;
+    const { userProfileId, folderId, emailId, message } = event;
 
-    await this.amqpConnection.publish('email.pipeline', 'email.ingest', {
-      message,
-      userProfileId: userProfileId.toString(),
-      folderId,
+    const span = this.tracePropagation.startPipelineRootSpan(
+      emailId.toString(),
+      userProfileId.toString(),
+    );
+
+    await context.with(trace.setSpan(ROOT_CONTEXT, span), async () => {
+      try {
+        const headers = this.tracePropagation.injectTraceContext({
+          'x-pipeline-id': emailId.toString(),
+        });
+
+        await this.amqpConnection.publish(
+          'email.pipeline',
+          'email.ingest',
+          {
+            message,
+            userProfileId: userProfileId.toString(),
+            emailId: emailId.toString(),
+            folderId,
+          },
+          { headers },
+        );
+
+        span.addEvent('ingest.queued');
+      } finally {
+        span.end();
+      }
     });
   }
 
   @OnEvent(PipelineEvents.IngestCompleted)
   public async handleIngestCompleted(event: IngestCompletedEvent) {
-    const { userProfileId, emailId } = event;
+    const { userProfileId, emailId, traceHeaders } = event;
 
     this.logger.debug({
       msg: 'Ingest completed',
@@ -51,7 +77,7 @@ export class OrchestratorService {
 
     this.eventEmitter.emit(
       PipelineEvents.ProcessingRequested,
-      new ProcessingRequestedEvent(userProfileId, emailId),
+      new ProcessingRequestedEvent(userProfileId, emailId, traceHeaders),
     );
   }
 
@@ -71,12 +97,25 @@ export class OrchestratorService {
 
   @OnEvent(PipelineEvents.ProcessingRequested)
   public async handleProcessingRequested(event: ProcessingRequestedEvent) {
-    const { userProfileId, emailId } = event;
+    const { userProfileId, emailId, traceHeaders } = event;
 
-    this.amqpConnection.publish('email.pipeline', 'email.process', {
-      userProfileId: userProfileId.toString(),
-      emailId: emailId.toString(),
-    });
+    const headers = traceHeaders
+      ? this.tracePropagation.injectSpecificTraceHeaders(traceHeaders, {
+          'x-pipeline-id': emailId.toString(),
+        })
+      : this.tracePropagation.injectTraceContext({
+          'x-pipeline-id': emailId.toString(),
+        });
+
+    await this.amqpConnection.publish(
+      'email.pipeline',
+      'email.process',
+      {
+        userProfileId: userProfileId.toString(),
+        emailId: emailId.toString(),
+      },
+      { headers },
+    );
   }
 
   @OnEvent(PipelineEvents.ProcessingCompleted)

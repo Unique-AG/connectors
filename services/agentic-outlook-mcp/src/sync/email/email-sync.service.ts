@@ -30,6 +30,13 @@ interface DeltaResponse {
   value: Message[];
 }
 
+export interface DeletedItem {
+  id: string;
+  '@removed'?: {
+    reason: string;
+  };
+}
+
 @Injectable()
 export class EmailSyncService {
   private readonly logger = new Logger(EmailSyncService.name);
@@ -255,20 +262,45 @@ export class EmailSyncService {
       const response: DeltaResponse = await graphClient.api(url).get();
 
       for (const message of response.value) {
-        // Ensure the message is present in the database for reference
-        await this.db
-          .insert(emailsTable)
-          .values({
-            // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
-            messageId: message.id!,
-            userProfileId: userProfileId.toString(),
-            folderId: folder.id,
-          })
-          .onConflictDoNothing();
+        let emailId: TypeID<'email'> | undefined;
+        const isDeleted = (message as unknown as DeletedItem)['@removed'] !== undefined;
+
+        if (isDeleted) {
+          const savedEmail = await this.db.query.emails.findFirst({
+            where: and(
+              // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
+              eq(emailsTable.messageId, message.id!),
+              eq(emailsTable.userProfileId, userProfileId.toString()),
+              eq(emailsTable.folderId, folder.id),
+            ),
+          });
+          if (!savedEmail) throw new Error('Email not found');
+          emailId = TypeID.fromString(savedEmail.id, 'email');
+        } else {
+          // Ensure the message is present in the database for reference
+          const [savedEmail] = await this.db
+            .insert(emailsTable)
+            .values({
+              // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
+              messageId: message.id!,
+              userProfileId: userProfileId.toString(),
+              folderId: folder.id,
+              version: message.changeKey,
+            })
+            .onConflictDoUpdate({
+              target: emailsTable.messageId,
+              set: {
+                version: message.changeKey,
+              },
+            })
+            .returning();
+          if (!savedEmail) throw new Error('Failed to save email');
+          emailId = TypeID.fromString(savedEmail.id, 'email');
+        }
 
         this.eventEmitter.emit(
           PipelineEvents.IngestRequested,
-          new IngestRequestedEvent(userProfileId, folder.id, message),
+          new IngestRequestedEvent(userProfileId, folder.id, emailId, message),
         );
 
         totalEmailsProcessed++;

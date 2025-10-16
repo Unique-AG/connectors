@@ -79,6 +79,8 @@ const appSettingsSchema = z.object({
   MICROSOFT_WEBHOOK_SECRET: z
     .string()
     .describe('A random webhook secret to validate webhooks signed and sent by Microsoft.'),
+  LITELLM_API_KEY: z.string().describe('The API key for Litellm.'),
+  LITELLM_BASE_URL: z.url().describe('The base URL for Litellm.'),
 });
 
 export const AppSettings = appSettingsSchema.keyof().enum;
