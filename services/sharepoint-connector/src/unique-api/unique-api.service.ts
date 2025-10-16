@@ -73,14 +73,13 @@ export class UniqueApiService {
     partialKey: string,
   ): Promise<FileDiffResponse> {
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
-
+    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
-    const basePath = this.configService.get('unique.fileDiffBasePath', { infer: true });
     const url = new URL(fileDiffUrl);
     const path = url.pathname + url.search;
 
     const diffRequest: FileDiffRequest = {
-      basePath,
+      basePath: sharepointBaseUrl, //TODO check if here we should add /sites/<site-name>
       partialKey,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,

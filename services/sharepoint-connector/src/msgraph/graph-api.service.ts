@@ -14,6 +14,7 @@ import {
   ListItemDetailsResponse,
   SitePageContent
 } from './types/sharepoint.types';
+import {getTitle} from "../utils/list-item.util";
 
 @Injectable()
 export class GraphApiService {
@@ -89,7 +90,7 @@ export class GraphApiService {
         break;
       }
 
-      const filesInDrive = await this.recursivelyFetchFiles(
+      const filesInDrive = await this.recursivelyFetchDriveItems(
         drive.id,
         'root',
         siteId,
@@ -216,8 +217,8 @@ export class GraphApiService {
             siteWebUrl,
             driveId: listId,
             driveName: 'SitePages',
-            folderPath: item.webUrl, // TODO compute proper folder path
-            fileName: item.fields.Title,
+            folderPath: item.webUrl,
+            fileName: getTitle(item.fields)
           };
 
           aspxItems.push(listItem);
@@ -290,7 +291,7 @@ export class GraphApiService {
     }
   }
 
-  private async recursivelyFetchFiles(
+  private async recursivelyFetchDriveItems(
     driveId: string,
     itemId: string,
     siteId: string,
@@ -311,7 +312,7 @@ export class GraphApiService {
 
         if (this.isFolder(driveItem)) {
           const remainingLimit = maxFiles ? maxFiles - filesToSynchronize.length : undefined;
-          const filesInNestedDrive = await this.recursivelyFetchFiles(
+          const filesInNestedDrive = await this.recursivelyFetchDriveItems(
             driveId,
             driveItem.id,
             siteId,
@@ -324,7 +325,7 @@ export class GraphApiService {
         } else if (this.fileFilterService.isFileValidForIngestion(driveItem)) {
           const folderPath = this.extractFolderPath(driveItem);
           filesToSynchronize.push({
-            itemType: 'listItem',
+            itemType: 'driveItem',
             item: driveItem,
             siteId,
             siteWebUrl,

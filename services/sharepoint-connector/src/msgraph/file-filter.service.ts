@@ -37,8 +37,6 @@ export class FileFilterService {
       return false;
     }
 
-    this.logger.log(`item.file: ${JSON.stringify(item, null, 2)}`);
-
     const isAspxFile = item.name?.toLowerCase().endsWith('.aspx');
     const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
     const hasSyncFlag = fields[syncColumnName] === true;

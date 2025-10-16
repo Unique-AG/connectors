@@ -7,10 +7,13 @@ import { isDriveItem, isListItem } from "../msgraph/types/type-guards.util";
 export function buildKnowledgeBaseUrl(pipelineItem: PipelineItem): string {
   let itemName: string;
 
+  // we cannot use webUrl for driveItems as they are not using the real path but proxy _layouts
   if (isDriveItem(pipelineItem)) {
     itemName = pipelineItem.item.name;
-  } else if (isListItem(pipelineItem)) {
-    itemName = pipelineItem.item.fields.Title;
+  }
+  // for listItems we can use directly the webUrl property
+  else if (isListItem(pipelineItem)) {
+    return pipelineItem.item.webUrl;
   } else {
     itemName = pipelineItem.item.id; // fallback to id
   }

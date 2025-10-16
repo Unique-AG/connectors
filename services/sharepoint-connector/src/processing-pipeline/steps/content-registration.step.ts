@@ -35,7 +35,6 @@ export class ContentRegistrationStep implements IPipelineStep {
     const isPathBasedIngestion = !scopeId;
 
     const itemKey = `${context.pipelineItem.siteId}/${context.pipelineItem.item.id}`;
-
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: itemKey,
       title: context.pipelineItem.fileName,
