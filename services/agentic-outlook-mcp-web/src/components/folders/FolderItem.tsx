@@ -1,6 +1,7 @@
 import { toCompilableQuery } from '@powersync/drizzle-driver';
 import dayjs from 'dayjs';
 import LocalizedFormat from 'dayjs/plugin/localizedFormat';
+import RelativeTime from 'dayjs/plugin/relativeTime';
 import { eq } from 'drizzle-orm';
 import {
   Archive,
@@ -18,6 +19,7 @@ import {
   SendHorizonal,
   Trash2,
 } from 'lucide-react';
+import numeral from 'numeral';
 import { FC, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,7 @@ import { folders as foldersTable } from '../../lib/powersync/schema';
 import { type FolderWithChildren } from './FolderTree';
 
 dayjs.extend(LocalizedFormat);
+dayjs.extend(RelativeTime);
 
 interface FolderItemProps {
   folder: FolderWithChildren;
@@ -106,7 +109,7 @@ export const FolderItem: FC<FolderItemProps> = ({ folder, level }) => {
     }
   };
 
-  const handleWipeFolder = async (folderId: string) => {
+  const handleWipeFolder = async (_folderId: string) => {
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -166,30 +169,58 @@ export const FolderItem: FC<FolderItemProps> = ({ folder, level }) => {
               </div>
 
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Mail className="h-3 w-3" />
-                  {folder.emails?.length || 0} emails
-                </div>
+                {syncEnabled ? (
+                  <>
+                    <div className="flex items-center gap-1 text-primary">
+                      <Mail className="h-3 w-3" />
+                      <span className="font-medium">
+                        {numeral(folder.emails?.length || 0).format('0,0')}
+                      </span>{' '}
+                      synced
+                    </div>
 
-                {syncEnabled && folder.activatedAt && (
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    Activated: {dayjs(folder.activatedAt).format('lll')}
-                  </div>
-                )}
+                    {folder.activatedAt && (
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Activated: {dayjs(folder.activatedAt).format('lll')}
+                      </div>
+                    )}
 
-                {syncEnabled && folder.lastSyncedAt && (
-                  <div className="flex items-center gap-1">
-                    <RefreshCw className="h-3 w-3" />
-                    Last sync: {dayjs(folder.lastSyncedAt).format('lll')}
-                  </div>
-                )}
+                    {folder.lastSyncedAt && (
+                      <div className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3" />
+                        Last sync: {dayjs(folder.lastSyncedAt).format('lll')}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      {numeral(folder.totalItemCount || 0).format('0,0')} total items
+                    </div>
 
-                {!syncEnabled && folder.deactivatedAt && (
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    Deactivated: {dayjs(folder.deactivatedAt).format('lll')}
-                  </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">
+                        Est. cost:{' '}
+                        {numeral((folder.totalItemCount || 0) * 0.0002).format('$0,0.0000')}
+                      </span>
+                    </div>
+
+                    {folder.updatedAt && (
+                      <div className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3" />
+                        Info updated: {dayjs(folder.updatedAt).fromNow()}
+                      </div>
+                    )}
+
+                    {folder.deactivatedAt && (
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Deactivated: {dayjs(folder.deactivatedAt).format('lll')}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -235,11 +266,7 @@ export const FolderItem: FC<FolderItemProps> = ({ folder, level }) => {
       {hasChildren && isExpanded && (
         <div className="ml-6 space-y-2">
           {folder.children.map((child) => (
-            <FolderItem
-              key={child.id}
-              folder={child}
-              level={level + 1}
-            />
+            <FolderItem key={child.id} folder={child} level={level + 1} />
           ))}
         </div>
       )}
