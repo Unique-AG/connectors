@@ -79,7 +79,7 @@ export class ContentFetchingStep implements IPipelineStep {
     assert.ok(item.file?.mimeType, `MIME type is missing for this item. Skipping download.`);
     assert.ok(
       allowedMimeTypes.includes(item.file.mimeType),
-      `MIME type ${item.file.mimeType} is not allowed. Skipping download.}`,
+      `MIME type ${item.file.mimeType} is not allowed. Skipping download.`,
     );
   }
 }
