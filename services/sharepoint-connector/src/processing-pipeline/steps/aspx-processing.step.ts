@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { ListItem } from '../../msgraph/types/sharepoint.types';
-import { isListItem } from '../../msgraph/types/type-guards.util';
 import { getTitle } from '../../utils/list-item.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
@@ -17,7 +16,7 @@ export class AspxProcessingStep implements IPipelineStep {
   public constructor(private readonly configService: ConfigService<Config, true>) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
-    if (!isListItem(context.pipelineItem)) {
+    if (context.pipelineItem.itemType !== 'listItem') {
       return context;
     }
 

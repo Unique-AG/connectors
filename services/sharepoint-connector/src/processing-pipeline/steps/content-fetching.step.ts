@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { GraphApiService } from '../../msgraph/graph-api.service';
 import { DriveItem } from '../../msgraph/types/sharepoint.types';
-import { isDriveItem, isListItem } from '../../msgraph/types/type-guards.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -21,14 +20,15 @@ export class ContentFetchingStep implements IPipelineStep {
   ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
-    if (isListItem(context.pipelineItem)) {
+    if (context.pipelineItem.itemType === 'listItem') {
       return await this.fetchListItemContent(context);
     }
 
-    if (isDriveItem(context.pipelineItem)) {
+    if (context.pipelineItem.itemType === 'driveItem') {
       return await this.fetchFileContent(context, context.pipelineItem.item);
     }
-    return context;
+
+    assert.fail('Invalid pipeline item type');
   }
 
   private async fetchListItemContent(context: ProcessingContext): Promise<ProcessingContext> {

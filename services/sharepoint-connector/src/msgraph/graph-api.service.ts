@@ -8,7 +8,6 @@ import { Config } from '../config';
 import { getTitle } from '../utils/list-item.util';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
-import { SharepointContentItem } from './types/sharepoint-content-item.interface';
 import {
   DriveItem,
   GraphDriveItemsResponse,
@@ -16,6 +15,7 @@ import {
   ListItemDetailsResponse,
   SitePageContent,
 } from './types/sharepoint.types';
+import { SharepointContentItem } from './types/sharepoint-content-item.interface';
 
 @Injectable()
 export class GraphApiService {

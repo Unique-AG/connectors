@@ -1,8 +1,6 @@
 import { DriveItem, ListItem } from './sharepoint.types';
 
-export interface SharepointContentItem {
-  itemType: 'listItem' | 'driveItem';
-  item: DriveItem | ListItem;
+interface BaseItem {
   siteId: string;
   siteWebUrl: string;
   driveId: string;
@@ -10,3 +8,11 @@ export interface SharepointContentItem {
   folderPath: string;
   fileName: string;
 }
+export type SharepointContentItem = BaseItem & (
+  {
+    itemType: 'driveItem';
+    item: DriveItem;
+  } | {
+    itemType: 'listItem';
+    item: ListItem;
+  })

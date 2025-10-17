@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
-import { isDriveItem } from '../msgraph/types/type-guards.util';
 import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -48,7 +47,7 @@ export class ProcessingPipelineService {
       pipelineItem,
       startTime,
       knowledgeBaseUrl: buildKnowledgeBaseUrl(pipelineItem),
-      mimeType: isDriveItem(pipelineItem) ? pipelineItem.item.file?.mimeType : DEFAULT_MIME_TYPE,
+      mimeType: this.resolveMimeType(pipelineItem),
     };
 
     this.logger.log(
@@ -82,6 +81,12 @@ export class ProcessingPipelineService {
     );
 
     return { success: true };
+  }
+
+  private resolveMimeType(pipelineItem: SharepointContentItem): string {
+    const isDriveItem = pipelineItem.itemType === 'driveItem';
+    const mimeType = isDriveItem ? pipelineItem.item.file?.mimeType : undefined;
+    return mimeType ?? DEFAULT_MIME_TYPE;
   }
 
   private timeoutPromise(step: IPipelineStep) {

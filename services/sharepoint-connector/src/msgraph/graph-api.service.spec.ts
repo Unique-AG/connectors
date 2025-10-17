@@ -4,9 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileFilterService } from './file-filter.service';
 import { GraphApiService } from './graph-api.service';
 import { GraphClientFactory } from './graph-client.factory';
-import type { SharepointContentItem } from './types/sharepoint-content-item.interface';
 import type { DriveItem } from './types/sharepoint.types';
-import { isDriveItem } from './types/type-guards.util';
+import type { SharepointContentItem } from './types/sharepoint-content-item.interface';
 
 describe('GraphApiService', () => {
   let service: GraphApiService;
@@ -66,7 +65,7 @@ describe('GraphApiService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string, defaultValue?: number) => {
-          if (key === 'pipeline.msGraphRateLimitPer10Seconds') return defaultValue ?? 10000;
+          if (key === 'sharepoint.graphApiRateLimitPerMinute') return defaultValue ?? 10000;
           if (key === 'processing.maxFileSizeBytes') return 10485760;
           return defaultValue;
         }),
@@ -235,7 +234,7 @@ describe('GraphApiService', () => {
       expect(files).toHaveLength(1);
       expect(files[0]).toBeDefined();
       if (files[0]) {
-        expect(isDriveItem(files[0])).toBe(true);
+        expect(files[0].itemType === 'driveItem').toBe(true);
         expect((files[0].item as DriveItem).name).toBe('test.pdf');
       }
     });
