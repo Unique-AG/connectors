@@ -73,11 +73,11 @@ export interface ListItem {
     '@odata.etag': string;
     FinanceGPTKnowledge: boolean;
     _ModerationStatus: ModerationStatusValue;
-    CanvasContent1?: string;
-    WikiField?: string;
+    CanvasContent1?: string; // This is the HTML content of the page for modern pages
+    WikiField?: string; // This is the wiki content of the page for classic pages
     Title: string;
     FileSizeDisplay: string;
-    FileLeafRef: string;
+    FileLeafRef: string; // This is the file name of the page
     [key: string]: unknown;
   };
 }
