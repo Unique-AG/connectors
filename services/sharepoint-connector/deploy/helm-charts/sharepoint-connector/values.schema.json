@@ -75,7 +75,7 @@
                   "description": "Microsoft Graph API URL"
                 },
                 "apiRateLimitPerMinute": {
-                  "type": ["number", "null"],
+                  "type": "integer",
                   "description": "Rate limiting for Graph API requests per minute"
                 },
                 "clientId": {
