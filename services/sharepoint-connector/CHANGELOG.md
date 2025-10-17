@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-alpha.6](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.5...sharepoint-connector@v2.0.0-alpha.6) (2025-10-17)
+
+
+### Features
+
+* **sharepoint-connector:** Implemented ASPX file processing and scanning of Lists (SitePages list specifically) ([#64](https://github.com/Unique-AG/connectors/issues/64)) ([6944066](https://github.com/Unique-AG/connectors/commit/6944066ce08126a0e2da910f0f63d9f21fa24b53))
+
 ## [2.0.0-alpha.5](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.4...sharepoint-connector@v2.0.0-alpha.5) (2025-10-14)
 
 
