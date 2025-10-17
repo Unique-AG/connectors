@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/correctness/noNestedComponentDefinitions: We don't want to change the component's behavior. */
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import * as React from 'react';
 import { DayPicker } from 'react-day-picker';

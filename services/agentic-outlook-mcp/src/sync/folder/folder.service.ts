@@ -235,6 +235,7 @@ export class FolderService {
             folderId: folder.id!,
             parentFolderId: folder.parentFolderId,
             childFolderCount: folder.childFolderCount ?? 0,
+            totalItemCount: folder.totalItemCount ?? 0,
             userProfileId: userProfileId.toString(),
           })),
       )
@@ -245,6 +246,7 @@ export class FolderService {
           originalName: sql`excluded.original_name`,
           parentFolderId: sql`excluded.parent_folder_id`,
           childFolderCount: sql`excluded.child_folder_count`,
+          totalItemCount: sql`excluded.total_item_count`,
         },
       });
 

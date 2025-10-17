@@ -14,16 +14,13 @@ export class EmailService {
     folderId: string,
     email: EmailInput,
   ): Promise<TypeID<'email'>> {
-
     const result = await this.db
       .insert(emailsTable)
-      .values(
-        ({
-          ...email,
-          userProfileId: userProfileId.toString(),
-          folderId,
-        }),
-      )
+      .values({
+        ...email,
+        userProfileId: userProfileId.toString(),
+        folderId,
+      })
       .onConflictDoUpdate({
         target: emailsTable.messageId,
         set: {
@@ -59,7 +56,8 @@ export class EmailService {
           ingestionLastAttemptAt: sql`excluded.ingestion_last_attempt_at`,
           ingestionCompletedAt: sql`excluded.ingestion_completed_at`,
         },
-      }).returning({ id: emailsTable.id });
+      })
+      .returning({ id: emailsTable.id });
 
     const [savedEmail] = result;
     if (!savedEmail) throw new Error('Failed to upsert email');

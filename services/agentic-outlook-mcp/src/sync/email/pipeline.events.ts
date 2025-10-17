@@ -1,5 +1,5 @@
-import { Message } from "@microsoft/microsoft-graph-types";
-import { TypeID } from "typeid-js";
+import { Message } from '@microsoft/microsoft-graph-types';
+import { TypeID } from 'typeid-js';
 
 export enum PipelineEvents {
   IngestRequested = 'pipeline.ingest.requested',

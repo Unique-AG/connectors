@@ -13,7 +13,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from '@/components/ui/sidebar';
 
 const navigationItems = [
@@ -44,10 +43,8 @@ const navigationItems = [
 ];
 
 export const AppSidebar = () => {
-  const { state } = useSidebar();
   const location = useLocation();
   const { user, signoutRedirect } = useAuth();
-  const collapsed = state === 'collapsed';
 
   const isActive = (path: string) => location.pathname === path;
 

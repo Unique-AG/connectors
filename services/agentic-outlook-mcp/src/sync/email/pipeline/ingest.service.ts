@@ -53,7 +53,7 @@ export class IngestService {
         'user.id': userProfileId,
         'folder.id': folderId,
         'pipeline.step': 'ingest',
-        'attempt': attempt,
+        attempt: attempt,
       },
       async (span) => {
         // This can cause data inconsistency if a folder is changed while ingesting.

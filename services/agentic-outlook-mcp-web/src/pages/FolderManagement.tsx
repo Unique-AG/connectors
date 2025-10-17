@@ -8,10 +8,7 @@ import { useCallApi } from '@/hooks/use-call-api';
 import { useToast } from '@/hooks/use-toast';
 import { deleteAllUserData, syncFolders } from '../@generated/sync/sync';
 import { db } from '../lib/powersync/database';
-import {
-  UserProfile,
-  userProfiles as userProfilesTable,
-} from '../lib/powersync/schema';
+import { UserProfile, userProfiles as userProfilesTable } from '../lib/powersync/schema';
 
 export default function FolderManagement() {
   const [isRefreshing, setIsRefreshing] = useState(false);

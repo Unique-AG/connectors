@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { Context, context, propagation, Span, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
+import {
+  Context,
+  context,
+  propagation,
+  Span,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from '@opentelemetry/api';
 import { ConsumeMessage } from 'amqplib';
 
 @Injectable()
@@ -84,4 +92,3 @@ export class TracePropagationService {
     });
   }
 }
-

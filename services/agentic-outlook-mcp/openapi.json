@@ -29,9 +29,7 @@
           }
         ],
         "summary": "Batch process Powersync write operations for the authenticated user",
-        "tags": [
-          "batch"
-        ]
+        "tags": ["batch"]
       }
     },
     "/sync": {
@@ -52,9 +50,7 @@
           }
         ],
         "summary": "Sync folders for the authenticated user",
-        "tags": [
-          "sync"
-        ]
+        "tags": ["sync"]
       },
       "delete": {
         "operationId": "deleteAllUserData",
@@ -73,9 +69,7 @@
           }
         ],
         "summary": "Delete all user data for the authenticated user",
-        "tags": [
-          "sync"
-        ]
+        "tags": ["sync"]
       }
     },
     "/sync/folder/{folderId}": {
@@ -105,9 +99,7 @@
           }
         ],
         "summary": "Resync emails in a specific folder for the authenticated user",
-        "tags": [
-          "sync"
-        ]
+        "tags": ["sync"]
       }
     }
   },
@@ -144,19 +136,11 @@
                 },
                 "op": {
                   "type": "string",
-                  "enum": [
-                    "PUT",
-                    "PATCH",
-                    "DELETE"
-                  ]
+                  "enum": ["PUT", "PATCH", "DELETE"]
                 },
                 "type": {
                   "type": "string",
-                  "enum": [
-                    "user_profiles",
-                    "folders",
-                    "emails"
-                  ]
+                  "enum": ["user_profiles", "folders", "emails"]
                 },
                 "id": {
                   "type": "string"
@@ -182,19 +166,11 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "op_id",
-                "op",
-                "type",
-                "id"
-              ]
+              "required": ["op_id", "op", "type", "id"]
             }
           }
         },
-        "required": [
-          "clientId",
-          "data"
-        ]
+        "required": ["clientId", "data"]
       }
     }
   }

@@ -18,6 +18,7 @@ export const folders = pgTable('folders', {
   folderId: varchar().notNull().unique(),
   parentFolderId: varchar(),
   childFolderCount: integer().notNull().default(0),
+  totalItemCount: integer().notNull().default(0),
 
   // Sync
   syncToken: varchar(),

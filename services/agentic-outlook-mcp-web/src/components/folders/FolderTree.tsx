@@ -111,13 +111,7 @@ export const FolderTree = ({
               <p>No folders found. Click resync to sync with Outlook.</p>
             </div>
           ) : (
-            folderTree.map((folder) => (
-              <FolderItem
-                key={folder.id}
-                folder={folder}
-                level={0}
-              />
-            ))
+            folderTree.map((folder) => <FolderItem key={folder.id} folder={folder} level={0} />)
           )}
         </CardContent>
       </Card>

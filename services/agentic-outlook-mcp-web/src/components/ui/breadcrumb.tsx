@@ -52,6 +52,8 @@ BreadcrumbLink.displayName = 'BreadcrumbLink';
 
 const BreadcrumbPage = React.forwardRef<HTMLSpanElement, React.ComponentPropsWithoutRef<'span'>>(
   ({ className, ...props }, ref) => (
+    // biome-ignore lint/a11y/useFocusableInteractive: We don't want to change the component's behavior.
+    // biome-ignore lint/a11y/useSemanticElements: We don't want to change the component's behavior.
     <span
       ref={ref}
       role="link"
