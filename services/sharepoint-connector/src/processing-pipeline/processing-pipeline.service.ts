@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { FieldValueSet } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
-import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
+import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
+import { normalizeError } from '../utils/normalize-error';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
+import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
 import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
@@ -15,18 +17,20 @@ import type { PipelineResult, ProcessingContext } from './types/processing-conte
 @Injectable()
 export class ProcessingPipelineService {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly fileProcessingSteps: IPipelineStep[];
+  private readonly pipelineSteps: IPipelineStep[];
   private readonly stepTimeoutMs: number;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly contentFetchingStep: ContentFetchingStep,
+    private readonly aspxProcessingStep: AspxProcessingStep,
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly storageUploadStep: StorageUploadStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
   ) {
-    this.fileProcessingSteps = [
+    this.pipelineSteps = [
       this.contentFetchingStep,
+      this.aspxProcessingStep,
       this.contentRegistrationStep,
       this.storageUploadStep,
       this.ingestionFinalizationStep,
@@ -35,35 +39,23 @@ export class ProcessingPipelineService {
       this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
   }
 
-  public async processFile(file: EnrichedDriveItem): Promise<PipelineResult> {
-    const correlationId = randomUUID();
+  public async processItem(pipelineItem: SharepointContentItem): Promise<PipelineResult> {
     const startTime = new Date();
+    const correlationId = randomUUID();
+
     const context: ProcessingContext = {
       correlationId,
-      fileId: file.id,
-      fileName: file.name,
-      fileSize: file.size,
-      siteUrl: file.siteWebUrl,
-      libraryName: file.driveId,
-      knowledgeBaseUrl: buildKnowledgeBaseUrl(file),
+      pipelineItem,
       startTime,
-      metadata: {
-        mimeType: file.file?.mimeType ?? undefined,
-        isFolder: Boolean(file.folder),
-        listItemFields: file.listItem?.fields as Record<string, FieldValueSet>,
-        driveId: file.driveId,
-        siteId: file.siteId,
-        driveName: file.driveName,
-        folderPath: file.folderPath,
-        lastModifiedDateTime: file.lastModifiedDateTime,
-      },
+      knowledgeBaseUrl: buildKnowledgeBaseUrl(pipelineItem),
+      mimeType: this.resolveMimeType(pipelineItem),
     };
 
     this.logger.log(
-      `[${correlationId}] Starting processing pipeline for file: ${file.name} (${file.id})`,
+      `[${correlationId}] Starting processing pipeline for item: ${pipelineItem.item.id}`,
     );
 
-    for (const step of this.fileProcessingSteps) {
+    for (const step of this.pipelineSteps) {
       try {
         await Promise.race([step.execute(context), this.timeoutPromise(step)]);
 
@@ -71,9 +63,9 @@ export class ProcessingPipelineService {
         if (step.cleanup) await step.cleanup(context);
       } catch (error) {
         const totalDuration = Date.now() - startTime.getTime();
+        const normalizedError = normalizeError(error);
         this.logger.error(
-          `[${correlationId}] Pipeline failed at step: ${step.stepName} after ${totalDuration}ms`,
-          error instanceof Error ? error.stack : String(error),
+          `[${correlationId}] Pipeline failed at step: ${step.stepName} after ${totalDuration}ms: ${normalizedError.message}`,
         );
 
         if (step.cleanup) await step.cleanup(context);
@@ -86,10 +78,16 @@ export class ProcessingPipelineService {
     this.finalCleanup(context);
     const totalDuration = Date.now() - startTime.getTime();
     this.logger.log(
-      `[${correlationId}] Pipeline completed successfully in ${totalDuration}ms for file name: ${file.name} file id:${file.id}`,
+      `[${correlationId}] Pipeline completed successfully in ${totalDuration}ms for file id:${pipelineItem.item.id}`,
     );
 
     return { success: true };
+  }
+
+  private resolveMimeType(pipelineItem: SharepointContentItem): string {
+    const isDriveItem = pipelineItem.itemType === 'driveItem';
+    const mimeType = isDriveItem ? pipelineItem.item.file?.mimeType : undefined;
+    return mimeType ?? DEFAULT_MIME_TYPE;
   }
 
   private timeoutPromise(step: IPipelineStep) {
@@ -104,6 +102,5 @@ export class ProcessingPipelineService {
       context.contentBuffer = undefined;
       delete context.contentBuffer;
     }
-    context.metadata = {} as never;
   }
 }

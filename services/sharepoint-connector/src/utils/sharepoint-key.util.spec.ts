@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSharepointFileKey, buildSharepointPartialKey } from './sharepoint-key.util';
+import { buildSharepointFileKey, buildSharepointPartialKey } from './sharepoint.util';
 
 describe('buildSharepointFileKey', () => {
   it('should build scope-based key when scopeId is provided', () => {

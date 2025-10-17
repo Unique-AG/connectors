@@ -1,22 +1,18 @@
-import type { ProcessingMetadata } from './processing-metadata';
+import type { SharepointContentItem } from '../../msgraph/types/sharepoint-content-item.interface';
+import type { IngestionApiResponse } from '../../unique-api/unique-api.types';
 
 export interface ProcessingContext {
   correlationId: string;
-  fileId: string;
-  fileName: string;
-  fileSize: number;
-
-  siteUrl: string;
-  libraryName: string;
-  knowledgeBaseUrl?: string;
-
+  pipelineItem: SharepointContentItem;
+  knowledgeBaseUrl: string;
   uploadUrl?: string;
   uniqueContentId?: string;
-  contentBuffer?: Buffer | undefined;
+  contentBuffer?: Buffer;
+  fileSize?: number;
 
   startTime: Date;
-
-  metadata: ProcessingMetadata;
+  mimeType?: string;
+  registrationResponse?: IngestionApiResponse;
 }
 
 export interface PipelineResult {
@@ -25,6 +21,7 @@ export interface PipelineResult {
 
 export const PipelineStep = {
   ContentFetching: 'ContentFetching',
+  AspxProcessing: 'AspxProcessing',
   ContentRegistration: 'ContentRegistration',
   StorageUpload: 'StorageUpload',
   IngestionFinalization: 'IngestionFinalization',

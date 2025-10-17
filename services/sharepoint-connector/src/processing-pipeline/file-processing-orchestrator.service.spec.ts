@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { FileProcessingOrchestratorService } from './file-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
@@ -9,27 +9,59 @@ import { ProcessingPipelineService } from './processing-pipeline.service';
 describe('FileProcessingOrchestratorService', () => {
   let service: FileProcessingOrchestratorService;
   let mockPipelineService: {
-    processFile: ReturnType<typeof vi.fn>;
+    processItem: ReturnType<typeof vi.fn>;
   };
 
-  const createMockFile = (id: string, siteId: string): EnrichedDriveItem => ({
-    id,
-    name: `file-${id}.pdf`,
-    size: 1024,
-    webUrl: `https://sharepoint.example.com/sites/test/file-${id}.pdf`,
-    parentReference: { siteId, driveId: 'drive-1' },
-    file: { mimeType: 'application/pdf' },
+  const createMockFile = (id: string, siteId: string): SharepointContentItem => ({
+    itemType: 'driveItem',
+    item: {
+      '@odata.etag': 'etag1',
+      id,
+      name: `file-${id}.pdf`,
+      webUrl: `https://sharepoint.example.com/sites/test/file-${id}.pdf`,
+      size: 1024,
+      lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      parentReference: {
+        driveType: 'documentLibrary',
+        driveId: 'drive-1',
+        id: 'parent1',
+        name: 'Documents',
+        path: '/drive/root:/test/folder',
+        siteId,
+      },
+      file: { mimeType: 'application/pdf', hashes: { quickXorHash: 'hash1' } },
+      listItem: {
+        '@odata.etag': 'etag1',
+        id: `item-${id}`,
+        eTag: 'etag1',
+        createdDateTime: '2024-01-01T00:00:00Z',
+        lastModifiedDateTime: '2024-01-01T00:00:00Z',
+        webUrl: `https://sharepoint.example.com/sites/test/file-${id}.pdf`,
+        fields: {
+          '@odata.etag': 'etag1',
+          FinanceGPTKnowledge: false,
+          FileLeafRef: `file-${id}.pdf`,
+          Modified: '2024-01-01T00:00:00Z',
+          Created: '2024-01-01T00:00:00Z',
+          ContentType: 'Document',
+          AuthorLookupId: '1',
+          EditorLookupId: '1',
+          ItemChildCount: '0',
+          FolderChildCount: '0',
+        },
+      },
+    },
     siteId,
     siteWebUrl: 'https://sharepoint.example.com/sites/test',
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: '/test/folder',
-    lastModifiedDateTime: '2024-01-01T00:00:00Z',
+    fileName: `file-${id}.pdf`,
   });
 
   beforeEach(async () => {
     mockPipelineService = {
-      processFile: vi.fn().mockResolvedValue({ success: true }),
+      processItem: vi.fn().mockResolvedValue({ success: true }),
     };
 
     const { unit } = await TestBed.solitary(FileProcessingOrchestratorService)
@@ -61,11 +93,11 @@ describe('FileProcessingOrchestratorService', () => {
       movedFiles: [],
     };
 
-    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
+    await service.processSiteItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
-    expect(mockPipelineService.processFile).toHaveBeenCalledTimes(2);
-    expect(mockPipelineService.processFile).toHaveBeenCalledWith(files[0]);
-    expect(mockPipelineService.processFile).toHaveBeenCalledWith(files[2]);
+    expect(mockPipelineService.processItem).toHaveBeenCalledTimes(2);
+    expect(mockPipelineService.processItem).toHaveBeenCalledWith(files[0]);
+    expect(mockPipelineService.processItem).toHaveBeenCalledWith(files[2]);
   });
 
   it('filters files by drive ID', async () => {
@@ -80,10 +112,10 @@ describe('FileProcessingOrchestratorService', () => {
       movedFiles: [],
     };
 
-    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
+    await service.processSiteItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
-    expect(mockPipelineService.processFile).toHaveBeenCalledTimes(1);
-    expect(mockPipelineService.processFile).toHaveBeenCalledWith(files[0]);
+    expect(mockPipelineService.processItem).toHaveBeenCalledTimes(1);
+    expect(mockPipelineService.processItem).toHaveBeenCalledWith(files[0]);
   });
 
   it('handles empty file list gracefully', async () => {
@@ -93,9 +125,9 @@ describe('FileProcessingOrchestratorService', () => {
       movedFiles: [],
     };
 
-    await service.processFilesForSite('site-1', [], diffResult);
+    await service.processSiteItems('site-1', [], diffResult);
 
-    expect(mockPipelineService.processFile).not.toHaveBeenCalled();
+    expect(mockPipelineService.processItem).not.toHaveBeenCalled();
   });
 
   it('processes files with configured concurrency', async () => {
@@ -104,7 +136,7 @@ describe('FileProcessingOrchestratorService', () => {
     );
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: files.map((f) => `${f.id}`),
+      newAndUpdatedFiles: files.map((f) => f.item.id),
       deletedFiles: [],
       movedFiles: [],
     };
@@ -112,7 +144,7 @@ describe('FileProcessingOrchestratorService', () => {
     let concurrentCalls = 0;
     let maxConcurrentCalls = 0;
 
-    mockPipelineService.processFile.mockImplementation(async () => {
+    mockPipelineService.processItem.mockImplementation(async () => {
       concurrentCalls++;
       maxConcurrentCalls = Math.max(maxConcurrentCalls, concurrentCalls);
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -120,9 +152,9 @@ describe('FileProcessingOrchestratorService', () => {
       return { success: true };
     });
 
-    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
+    await service.processSiteItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
-    expect(mockPipelineService.processFile).toHaveBeenCalledTimes(10);
+    expect(mockPipelineService.processItem).toHaveBeenCalledTimes(10);
     expect(maxConcurrentCalls).toBeLessThanOrEqual(3);
   });
 
@@ -134,19 +166,19 @@ describe('FileProcessingOrchestratorService', () => {
     ];
 
     const diffResult: FileDiffResponse = {
-      newAndUpdatedFiles: files.map((f) => `${f.id}`),
+      newAndUpdatedFiles: files.map((f) => f.item.id),
       deletedFiles: [],
       movedFiles: [],
     };
 
-    mockPipelineService.processFile
+    mockPipelineService.processItem
       .mockResolvedValueOnce({ success: true })
       .mockRejectedValueOnce(new Error('Processing failed'))
       .mockResolvedValueOnce({ success: true });
 
-    await service.processFilesForSite('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
+    await service.processSiteItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files, diffResult);
 
-    expect(mockPipelineService.processFile).toHaveBeenCalledTimes(3);
+    expect(mockPipelineService.processItem).toHaveBeenCalledTimes(3);
   });
 
   it('does nothing when no files match diff result', async () => {
@@ -158,8 +190,8 @@ describe('FileProcessingOrchestratorService', () => {
       movedFiles: [],
     };
 
-    await service.processFilesForSite('site-1', files, diffResult);
+    await service.processSiteItems('site-1', files, diffResult);
 
-    expect(mockPipelineService.processFile).not.toHaveBeenCalled();
+    expect(mockPipelineService.processItem).not.toHaveBeenCalled();
   });
 });

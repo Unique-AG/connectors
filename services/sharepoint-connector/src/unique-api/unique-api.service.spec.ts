@@ -30,7 +30,6 @@ describe('UniqueApiService', () => {
           if (key === 'unique.fileDiffUrl') return 'https://ingestion.example.com/api';
           if (key === 'unique.ingestionGraphQLUrl') return 'https://ingestion.example.com/graphql';
           if (key === 'unique.scopeId') return 'scope-1';
-          if (key === 'unique.fileDiffBasePath') return 'https://app.example.com/';
           return undefined;
         }),
       }))

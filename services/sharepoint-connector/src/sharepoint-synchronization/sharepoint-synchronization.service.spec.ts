@@ -1,13 +1,14 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ModerationStatus } from '../constants/moderation-status.constants';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
 describe('SharepointSynchronizationService', () => {
@@ -20,23 +21,58 @@ describe('SharepointSynchronizationService', () => {
     performFileDiff: ReturnType<typeof vi.fn>;
   };
   let mockOrchestrator: {
-    processFilesForSite: ReturnType<typeof vi.fn>;
+    processSiteItems: ReturnType<typeof vi.fn>;
   };
 
-  const mockFile: EnrichedDriveItem = {
-    id: '01JWNC3IKFO6XBRCRFWRHKJ77NAYYM3NTX',
-    name: '1173246.pdf',
-    webUrl:
-      'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
-    listItem: { lastModifiedDateTime: '2025-10-10T13:59:12Z' },
-    size: 2178118,
+  const mockFile: SharepointContentItem = {
+    itemType: 'driveItem',
+    item: {
+      '@odata.etag': 'etag1',
+      id: '01JWNC3IKFO6XBRCRFWRHKJ77NAYYM3NTX',
+      name: '1173246.pdf',
+      webUrl:
+        'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
+      size: 2178118,
+      lastModifiedDateTime: '2025-10-10T13:59:12Z',
+      parentReference: {
+        driveType: 'documentLibrary',
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+        id: 'parent1',
+        name: 'Documents',
+        path: '/drive/root:/Freigegebene Dokumente/test-sharepoint-connector-v2',
+      },
+      file: { mimeType: 'application/pdf', hashes: { quickXorHash: 'hash1' } },
+      listItem: {
+        '@odata.etag': 'etag1',
+        id: 'item1',
+        eTag: 'etag1',
+        createdDateTime: '2025-10-10T13:59:12Z',
+        lastModifiedDateTime: '2025-10-10T13:59:12Z',
+        webUrl:
+          'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
+        fields: {
+          '@odata.etag': 'etag1',
+          FinanceGPTKnowledge: false,
+          FileLeafRef: '1173246.pdf',
+          Modified: '2025-10-10T13:59:12Z',
+          Created: '2025-10-02T00:00:00Z',
+          ContentType: 'Document',
+          AuthorLookupId: '1',
+          EditorLookupId: '1',
+          ItemChildCount: '0',
+          FolderChildCount: '0',
+          _ModerationStatus: ModerationStatus.Approved,
+          FileSizeDisplay: '2178118',
+        },
+      },
+    },
     siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
     siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG',
     driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     driveName: 'Documents',
     folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
-    lastModifiedDateTime: '2025-10-10T13:59:12Z',
-    file: { mimeType: 'application/pdf' },
+    fileName: '1173246.pdf',
   };
 
   const mockDiffResult: FileDiffResponse = {
@@ -47,7 +83,7 @@ describe('SharepointSynchronizationService', () => {
 
   beforeEach(async () => {
     mockGraphApiService = {
-      getAllFilesForSite: vi.fn().mockResolvedValue([mockFile]),
+      getAllSiteItems: vi.fn().mockResolvedValue([mockFile]),
     };
 
     mockUniqueAuthService = {
@@ -59,7 +95,7 @@ describe('SharepointSynchronizationService', () => {
     };
 
     mockOrchestrator = {
-      processFilesForSite: vi.fn().mockResolvedValue(undefined),
+      processSiteItems: vi.fn().mockResolvedValue(undefined),
     };
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
@@ -87,8 +123,8 @@ describe('SharepointSynchronizationService', () => {
   it('synchronizes files from all configured sites', async () => {
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledTimes(1);
-    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledWith(
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
     );
   });
@@ -102,7 +138,7 @@ describe('SharepointSynchronizationService', () => {
   it('processes files through orchestrator', async () => {
     await service.synchronize();
 
-    expect(mockOrchestrator.processFilesForSite).toHaveBeenCalledWith(
+    expect(mockOrchestrator.processSiteItems).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [mockFile],
       mockDiffResult,
@@ -110,7 +146,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('handles sites with no files', async () => {
-    mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue([]);
+    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([]);
     const emptyDiffResult = {
       newAndUpdatedFiles: [],
       movedFiles: [],
@@ -125,7 +161,7 @@ describe('SharepointSynchronizationService', () => {
       'test-token',
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
     );
-    expect(mockOrchestrator.processFilesForSite).toHaveBeenCalledWith(
+    expect(mockOrchestrator.processSiteItems).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [],
       emptyDiffResult,
@@ -133,7 +169,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('prevents overlapping scans', async () => {
-    mockGraphApiService.getAllFilesForSite = vi
+    mockGraphApiService.getAllSiteItems = vi
       .fn()
       .mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve([mockFile]), 100)),
@@ -144,18 +180,18 @@ describe('SharepointSynchronizationService', () => {
 
     await Promise.all([firstScan, secondScan]);
 
-    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledTimes(1);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
   });
 
   it('releases scan lock after completion', async () => {
     await service.synchronize();
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledTimes(2);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
   });
 
   it('releases scan lock on error', async () => {
-    mockGraphApiService.getAllFilesForSite = vi
+    mockGraphApiService.getAllSiteItems = vi
       .fn()
       .mockRejectedValueOnce(new Error('API failure'))
       .mockResolvedValue([mockFile]);
@@ -163,7 +199,7 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllFilesForSite).toHaveBeenCalledTimes(2);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
   });
 
   it.skip('continues processing other sites after site error', async () => {
@@ -183,23 +219,58 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('transforms files to diff items correctly', async () => {
-    const fileWithAllFields: EnrichedDriveItem = {
-      id: '01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI',
-      name: '2019-BMW-Maintenance.pdf',
-      webUrl:
-        'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
-      listItem: { lastModifiedDateTime: '2025-10-10T13:59:11Z' },
-      size: 1027813,
+    const fileWithAllFields: SharepointContentItem = {
+      itemType: 'driveItem',
+      item: {
+        '@odata.etag': 'etag2',
+        id: '01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI',
+        name: '2019-BMW-Maintenance.pdf',
+        webUrl:
+          'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+        size: 1027813,
+        lastModifiedDateTime: '2025-10-10T13:59:11Z',
+        parentReference: {
+          driveType: 'documentLibrary',
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+          id: 'parent1',
+          name: 'Documents',
+          path: '/drive/root:/Freigegebene Dokumente/test-sharepoint-connector-v2',
+        },
+        file: { mimeType: 'application/pdf', hashes: { quickXorHash: 'hash2' } },
+        listItem: {
+          '@odata.etag': 'etag2',
+          id: 'item2',
+          eTag: 'etag2',
+          createdDateTime: '2025-10-10T13:59:11Z',
+          lastModifiedDateTime: '2025-10-10T13:59:11Z',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+          fields: {
+            '@odata.etag': 'etag2',
+            FinanceGPTKnowledge: false,
+            FileLeafRef: '2019-BMW-Maintenance.pdf',
+            Modified: '2025-10-10T13:59:11Z',
+            Created: '2025-10-02T00:00:00Z',
+            ContentType: 'Document',
+            AuthorLookupId: '1',
+            EditorLookupId: '1',
+            ItemChildCount: '0',
+            FolderChildCount: '0',
+            _ModerationStatus: ModerationStatus.Approved,
+            FileSizeDisplay: '1027813',
+          },
+        },
+      },
       siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG',
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
-      lastModifiedDateTime: '2025-10-10T13:59:11Z',
-      file: { mimeType: 'application/pdf' },
+      fileName: '2019-BMW-Maintenance.pdf',
     };
 
-    mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue([fileWithAllFields]);
+    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([fileWithAllFields]);
     mockUniqueApiService.performFileDiff = vi.fn().mockResolvedValue(mockDiffResult);
 
     await service.synchronize();
@@ -218,23 +289,58 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('handles missing lastModifiedDateTime gracefully', async () => {
-    const fileWithoutTimestamp: EnrichedDriveItem = {
-      id: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV',
-      name: '6034030.pdf',
-      webUrl:
-        'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
-      listItem: {},
-      size: 932986,
+    const fileWithoutTimestamp: SharepointContentItem = {
+      itemType: 'driveItem',
+      item: {
+        '@odata.etag': 'etag3',
+        id: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV',
+        name: '6034030.pdf',
+        webUrl:
+          'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+        size: 932986,
+        lastModifiedDateTime: '2025-10-10T13:59:12Z',
+        parentReference: {
+          driveType: 'documentLibrary',
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+          id: 'parent1',
+          name: 'Documents',
+          path: '/drive/root:/Freigegebene Dokumente/test-sharepoint-connector-v2',
+        },
+        file: { mimeType: 'application/pdf', hashes: { quickXorHash: 'hash3' } },
+        listItem: {
+          '@odata.etag': 'etag3',
+          id: 'item3',
+          eTag: 'etag3',
+          createdDateTime: '2025-10-10T13:59:12Z',
+          lastModifiedDateTime: '2025-10-10T13:59:12Z',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+          fields: {
+            '@odata.etag': 'etag3',
+            FinanceGPTKnowledge: false,
+            FileLeafRef: '6034030.pdf',
+            Modified: '2025-10-10T13:59:12Z',
+            Created: '2025-10-02T00:00:00Z',
+            ContentType: 'Document',
+            AuthorLookupId: '1',
+            EditorLookupId: '1',
+            ItemChildCount: '0',
+            FolderChildCount: '0',
+            _ModerationStatus: ModerationStatus.Approved,
+            FileSizeDisplay: '932986',
+          },
+        },
+      },
       siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG',
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
-      lastModifiedDateTime: '2025-10-10T13:59:12Z',
-      file: { mimeType: 'application/pdf' },
+      fileName: '6034030.pdf',
     };
 
-    mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue([fileWithoutTimestamp]);
+    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([fileWithoutTimestamp]);
     mockUniqueApiService.performFileDiff = vi.fn().mockResolvedValue(mockDiffResult);
 
     await service.synchronize();
@@ -244,7 +350,7 @@ describe('SharepointSynchronizationService', () => {
         {
           key: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV',
           url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
-          updatedAt: '2025-10-10T13:59:12Z', // Falls back to file.lastModifiedDateTime
+          updatedAt: '2025-10-10T13:59:12Z',
         },
       ],
       'test-token',
@@ -253,13 +359,160 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('processes multiple files from same site', async () => {
-    const files = [
-      { ...mockFile, id: '01JWNC3IKFO6XBRCRFWRHKJ77NAYYM3NTX', name: '1173246.pdf' },
-      { ...mockFile, id: '01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI', name: '2019-BMW-Maintenance.pdf' },
-      { ...mockFile, id: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV', name: '6034030.pdf' },
-    ];
+    const file1: SharepointContentItem = {
+      itemType: 'driveItem',
+      item: {
+        '@odata.etag': 'etag1',
+        id: '01JWNC3IKFO6XBRCRFWRHKJ77NAYYM3NTX',
+        name: '1173246.pdf',
+        webUrl:
+          'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
+        size: 2178118,
+        lastModifiedDateTime: '2025-10-10T13:59:12Z',
+        parentReference: {
+          driveType: 'documentLibrary',
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+          id: 'parent1',
+          name: 'Documents',
+          path: '/drive/root:/Freigegebene Dokumente/test-sharepoint-connector-v2',
+        },
+        file: { mimeType: 'application/pdf', hashes: { quickXorHash: 'hash1' } },
+        listItem: {
+          '@odata.etag': 'etag1',
+          id: 'item1',
+          eTag: 'etag1',
+          createdDateTime: '2025-10-10T13:59:12Z',
+          lastModifiedDateTime: '2025-10-10T13:59:12Z',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
+          fields: {
+            '@odata.etag': 'etag1',
+            FinanceGPTKnowledge: false,
+            FileLeafRef: '1173246.pdf',
+            Modified: '2025-10-10T13:59:12Z',
+            Created: '2025-10-02T00:00:00Z',
+            ContentType: 'Document',
+            AuthorLookupId: '1',
+            EditorLookupId: '1',
+            ItemChildCount: '0',
+            FolderChildCount: '0',
+            _ModerationStatus: ModerationStatus.Approved,
+            FileSizeDisplay: '2178118',
+          },
+        },
+      },
+      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG',
+      driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+      driveName: 'Documents',
+      folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
+      fileName: '1173246.pdf',
+    };
 
-    mockGraphApiService.getAllFilesForSite = vi.fn().mockResolvedValue(files);
+    const file2: SharepointContentItem = {
+      itemType: 'driveItem',
+      item: {
+        '@odata.etag': 'etag2',
+        id: '01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI',
+        name: '2019-BMW-Maintenance.pdf',
+        webUrl:
+          'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+        size: 1027813,
+        lastModifiedDateTime: '2025-10-10T13:59:11Z',
+        parentReference: {
+          driveType: 'documentLibrary',
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+          id: 'parent1',
+          name: 'Documents',
+          path: '/drive/root:/Freigegebene Dokumente/test-sharepoint-connector-v2',
+        },
+        file: { mimeType: 'application/pdf', hashes: { quickXorHash: 'hash2' } },
+        listItem: {
+          '@odata.etag': 'etag2',
+          id: 'item2',
+          eTag: 'etag2',
+          createdDateTime: '2025-10-10T13:59:11Z',
+          lastModifiedDateTime: '2025-10-10T13:59:11Z',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+          fields: {
+            '@odata.etag': 'etag2',
+            FinanceGPTKnowledge: false,
+            FileLeafRef: '2019-BMW-Maintenance.pdf',
+            Modified: '2025-10-10T13:59:11Z',
+            Created: '2025-10-02T00:00:00Z',
+            ContentType: 'Document',
+            AuthorLookupId: '1',
+            EditorLookupId: '1',
+            ItemChildCount: '0',
+            FolderChildCount: '0',
+            _ModerationStatus: ModerationStatus.Approved,
+            FileSizeDisplay: '1027813',
+          },
+        },
+      },
+      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG',
+      driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+      driveName: 'Documents',
+      folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
+      fileName: '2019-BMW-Maintenance.pdf',
+    };
+
+    const file3: SharepointContentItem = {
+      itemType: 'driveItem',
+      item: {
+        '@odata.etag': 'etag3',
+        id: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV',
+        name: '6034030.pdf',
+        webUrl:
+          'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+        size: 932986,
+        lastModifiedDateTime: '2025-10-10T13:59:10Z',
+        parentReference: {
+          driveType: 'documentLibrary',
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+          id: 'parent1',
+          name: 'Documents',
+          path: '/drive/root:/Freigegebene Dokumente/test-sharepoint-connector-v2',
+        },
+        file: { mimeType: 'application/pdf', hashes: { quickXorHash: 'hash3' } },
+        listItem: {
+          '@odata.etag': 'etag3',
+          id: 'item3',
+          eTag: 'etag3',
+          createdDateTime: '2025-10-10T13:59:10Z',
+          lastModifiedDateTime: '2025-10-10T13:59:10Z',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+          fields: {
+            '@odata.etag': 'etag3',
+            FinanceGPTKnowledge: false,
+            FileLeafRef: '6034030.pdf',
+            Modified: '2025-10-10T13:59:10Z',
+            Created: '2025-10-02T00:00:00Z',
+            ContentType: 'Document',
+            AuthorLookupId: '1',
+            EditorLookupId: '1',
+            ItemChildCount: '0',
+            FolderChildCount: '0',
+            _ModerationStatus: ModerationStatus.Approved,
+            FileSizeDisplay: '932986',
+          },
+        },
+      },
+      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG',
+      driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
+      driveName: 'Documents',
+      folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
+      fileName: '6034030.pdf',
+    };
+
+    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([file1, file2, file3]);
 
     await service.synchronize();
 
@@ -279,7 +532,7 @@ describe('SharepointSynchronizationService', () => {
 
     await service.synchronize();
 
-    expect(mockOrchestrator.processFilesForSite).not.toHaveBeenCalled();
+    expect(mockOrchestrator.processSiteItems).not.toHaveBeenCalled();
   });
 
   it('handles file diff errors', async () => {
@@ -287,25 +540,61 @@ describe('SharepointSynchronizationService', () => {
 
     await service.synchronize();
 
-    expect(mockOrchestrator.processFilesForSite).not.toHaveBeenCalled();
+    expect(mockOrchestrator.processSiteItems).not.toHaveBeenCalled();
   });
 
   describe('buildSharePointUrl', () => {
     it('should build proper SharePoint URL for file in subfolder', () => {
-      const file: EnrichedDriveItem = {
-        id: 'file123',
-        name: 'document.docx',
-        size: 1024,
-        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+      const file: SharepointContentItem = {
+        itemType: 'driveItem',
+        item: {
+          '@odata.etag': 'etag1',
+          id: 'file123',
+          name: 'document.docx',
+          size: 1024,
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          lastModifiedDateTime: '2023-01-01T00:00:00Z',
+          parentReference: {
+            driveType: 'documentLibrary',
+            driveId: 'drive789',
+            id: 'parent1',
+            name: 'Documents',
+            path: '/drive/root:/folder/subfolder',
+            siteId: 'site456',
+          },
+          listItem: {
+            '@odata.etag': 'etag1',
+            id: 'item1',
+            eTag: 'etag1',
+            createdDateTime: '2023-01-01T00:00:00Z',
+            lastModifiedDateTime: '2023-01-01T00:00:00Z',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            fields: {
+              '@odata.etag': 'etag1',
+              FinanceGPTKnowledge: false,
+              FileLeafRef: 'document.docx',
+              Modified: '2023-01-01T00:00:00Z',
+              Created: '2023-01-01T00:00:00Z',
+              ContentType: 'Document',
+              AuthorLookupId: '1',
+              EditorLookupId: '1',
+              ItemChildCount: '0',
+              FolderChildCount: '0',
+            },
+          },
+          file: {
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            hashes: { quickXorHash: 'hash1' },
+          },
+        },
         siteId: 'site456',
         siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
         driveId: 'drive789',
         driveName: 'Documents',
         folderPath: '/folder/subfolder',
-        lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: {
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        },
+        fileName: 'document.docx',
       };
 
       const result = buildKnowledgeBaseUrl(file);
@@ -316,20 +605,56 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should build proper SharePoint URL for file in root folder', () => {
-      const file: EnrichedDriveItem = {
-        id: 'file123',
-        name: 'document.docx',
-        size: 1024,
-        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+      const file: SharepointContentItem = {
+        itemType: 'driveItem',
+        item: {
+          '@odata.etag': 'etag1',
+          id: 'file123',
+          name: 'document.docx',
+          size: 1024,
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          lastModifiedDateTime: '2023-01-01T00:00:00Z',
+          parentReference: {
+            driveType: 'documentLibrary',
+            driveId: 'drive789',
+            id: 'parent1',
+            name: 'Documents',
+            path: '/drive/root:/',
+            siteId: 'site456',
+          },
+          listItem: {
+            '@odata.etag': 'etag1',
+            id: 'item1',
+            eTag: 'etag1',
+            createdDateTime: '2023-01-01T00:00:00Z',
+            lastModifiedDateTime: '2023-01-01T00:00:00Z',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            fields: {
+              '@odata.etag': 'etag1',
+              FinanceGPTKnowledge: false,
+              FileLeafRef: 'document.docx',
+              Modified: '2023-01-01T00:00:00Z',
+              Created: '2023-01-01T00:00:00Z',
+              ContentType: 'Document',
+              AuthorLookupId: '1',
+              EditorLookupId: '1',
+              ItemChildCount: '0',
+              FolderChildCount: '0',
+            },
+          },
+          file: {
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            hashes: { quickXorHash: 'hash1' },
+          },
+        },
         siteId: 'site456',
         siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
         driveId: 'drive789',
         driveName: 'Documents',
         folderPath: '/',
-        lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: {
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        },
+        fileName: 'document.docx',
       };
 
       const result = buildKnowledgeBaseUrl(file);
@@ -338,20 +663,56 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should build proper SharePoint URL for file in root folder with empty path', () => {
-      const file: EnrichedDriveItem = {
-        id: 'file123',
-        name: 'document.docx',
-        size: 1024,
-        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+      const file: SharepointContentItem = {
+        itemType: 'driveItem',
+        item: {
+          '@odata.etag': 'etag1',
+          id: 'file123',
+          name: 'document.docx',
+          size: 1024,
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          lastModifiedDateTime: '2023-01-01T00:00:00Z',
+          parentReference: {
+            driveType: 'documentLibrary',
+            driveId: 'drive789',
+            id: 'parent1',
+            name: 'Documents',
+            path: '/drive/root:/',
+            siteId: 'site456',
+          },
+          listItem: {
+            '@odata.etag': 'etag1',
+            id: 'item1',
+            eTag: 'etag1',
+            createdDateTime: '2023-01-01T00:00:00Z',
+            lastModifiedDateTime: '2023-01-01T00:00:00Z',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            fields: {
+              '@odata.etag': 'etag1',
+              FinanceGPTKnowledge: false,
+              FileLeafRef: 'document.docx',
+              Modified: '2023-01-01T00:00:00Z',
+              Created: '2023-01-01T00:00:00Z',
+              ContentType: 'Document',
+              AuthorLookupId: '1',
+              EditorLookupId: '1',
+              ItemChildCount: '0',
+              FolderChildCount: '0',
+            },
+          },
+          file: {
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            hashes: { quickXorHash: 'hash1' },
+          },
+        },
         siteId: 'site456',
         siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
         driveId: 'drive789',
         driveName: 'Documents',
         folderPath: '',
-        lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: {
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        },
+        fileName: 'document.docx',
       };
 
       const result = buildKnowledgeBaseUrl(file);
@@ -360,20 +721,56 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should handle siteWebUrl with trailing slash', () => {
-      const file: EnrichedDriveItem = {
-        id: 'file123',
-        name: 'document.docx',
-        size: 1024,
-        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+      const file: SharepointContentItem = {
+        itemType: 'driveItem',
+        item: {
+          '@odata.etag': 'etag1',
+          id: 'file123',
+          name: 'document.docx',
+          size: 1024,
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          lastModifiedDateTime: '2023-01-01T00:00:00Z',
+          parentReference: {
+            driveType: 'documentLibrary',
+            driveId: 'drive789',
+            id: 'parent1',
+            name: 'Documents',
+            path: '/drive/root:/folder',
+            siteId: 'site456',
+          },
+          listItem: {
+            '@odata.etag': 'etag1',
+            id: 'item1',
+            eTag: 'etag1',
+            createdDateTime: '2023-01-01T00:00:00Z',
+            lastModifiedDateTime: '2023-01-01T00:00:00Z',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            fields: {
+              '@odata.etag': 'etag1',
+              FinanceGPTKnowledge: false,
+              FileLeafRef: 'document.docx',
+              Modified: '2023-01-01T00:00:00Z',
+              Created: '2023-01-01T00:00:00Z',
+              ContentType: 'Document',
+              AuthorLookupId: '1',
+              EditorLookupId: '1',
+              ItemChildCount: '0',
+              FolderChildCount: '0',
+            },
+          },
+          file: {
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            hashes: { quickXorHash: 'hash1' },
+          },
+        },
         siteId: 'site456',
         siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site/',
         driveId: 'drive789',
         driveName: 'Documents',
         folderPath: '/folder',
-        lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: {
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        },
+        fileName: 'document.docx',
       };
 
       const result = buildKnowledgeBaseUrl(file);
@@ -382,20 +779,56 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should handle folderPath with leading slash', () => {
-      const file: EnrichedDriveItem = {
-        id: 'file123',
-        name: 'document.docx',
-        size: 1024,
-        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+      const file: SharepointContentItem = {
+        itemType: 'driveItem',
+        item: {
+          '@odata.etag': 'etag1',
+          id: 'file123',
+          name: 'document.docx',
+          size: 1024,
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          lastModifiedDateTime: '2023-01-01T00:00:00Z',
+          parentReference: {
+            driveType: 'documentLibrary',
+            driveId: 'drive789',
+            id: 'parent1',
+            name: 'Documents',
+            path: '/drive/root:/folder/subfolder',
+            siteId: 'site456',
+          },
+          listItem: {
+            '@odata.etag': 'etag1',
+            id: 'item1',
+            eTag: 'etag1',
+            createdDateTime: '2023-01-01T00:00:00Z',
+            lastModifiedDateTime: '2023-01-01T00:00:00Z',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            fields: {
+              '@odata.etag': 'etag1',
+              FinanceGPTKnowledge: false,
+              FileLeafRef: 'document.docx',
+              Modified: '2023-01-01T00:00:00Z',
+              Created: '2023-01-01T00:00:00Z',
+              ContentType: 'Document',
+              AuthorLookupId: '1',
+              EditorLookupId: '1',
+              ItemChildCount: '0',
+              FolderChildCount: '0',
+            },
+          },
+          file: {
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            hashes: { quickXorHash: 'hash1' },
+          },
+        },
         siteId: 'site456',
         siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
         driveId: 'drive789',
         driveName: 'Documents',
         folderPath: '/folder/subfolder',
-        lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: {
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        },
+        fileName: 'document.docx',
       };
 
       const result = buildKnowledgeBaseUrl(file);
@@ -406,20 +839,56 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should handle folderPath without leading slash', () => {
-      const file: EnrichedDriveItem = {
-        id: 'file123',
-        name: 'document.docx',
-        size: 1024,
-        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+      const file: SharepointContentItem = {
+        itemType: 'driveItem',
+        item: {
+          '@odata.etag': 'etag1',
+          id: 'file123',
+          name: 'document.docx',
+          size: 1024,
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          lastModifiedDateTime: '2023-01-01T00:00:00Z',
+          parentReference: {
+            driveType: 'documentLibrary',
+            driveId: 'drive789',
+            id: 'parent1',
+            name: 'Documents',
+            path: '/drive/root:/folder/subfolder',
+            siteId: 'site456',
+          },
+          listItem: {
+            '@odata.etag': 'etag1',
+            id: 'item1',
+            eTag: 'etag1',
+            createdDateTime: '2023-01-01T00:00:00Z',
+            lastModifiedDateTime: '2023-01-01T00:00:00Z',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            fields: {
+              '@odata.etag': 'etag1',
+              FinanceGPTKnowledge: false,
+              FileLeafRef: 'document.docx',
+              Modified: '2023-01-01T00:00:00Z',
+              Created: '2023-01-01T00:00:00Z',
+              ContentType: 'Document',
+              AuthorLookupId: '1',
+              EditorLookupId: '1',
+              ItemChildCount: '0',
+              FolderChildCount: '0',
+            },
+          },
+          file: {
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            hashes: { quickXorHash: 'hash1' },
+          },
+        },
         siteId: 'site456',
         siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
         driveId: 'drive789',
         driveName: 'Documents',
         folderPath: 'folder/subfolder',
-        lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: {
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        },
+        fileName: 'document.docx',
       };
 
       const result = buildKnowledgeBaseUrl(file);
@@ -430,20 +899,56 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should URL encode special characters in folder names', () => {
-      const file: EnrichedDriveItem = {
-        id: 'file123',
-        name: 'document.docx',
-        size: 1024,
-        webUrl: 'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+      const file: SharepointContentItem = {
+        itemType: 'driveItem',
+        item: {
+          '@odata.etag': 'etag1',
+          id: 'file123',
+          name: 'document.docx',
+          size: 1024,
+          webUrl:
+            'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+          lastModifiedDateTime: '2023-01-01T00:00:00Z',
+          parentReference: {
+            driveType: 'documentLibrary',
+            driveId: 'drive789',
+            id: 'parent1',
+            name: 'Documents',
+            path: '/drive/root:/folder with spaces/sub folder',
+            siteId: 'site456',
+          },
+          listItem: {
+            '@odata.etag': 'etag1',
+            id: 'item1',
+            eTag: 'etag1',
+            createdDateTime: '2023-01-01T00:00:00Z',
+            lastModifiedDateTime: '2023-01-01T00:00:00Z',
+            webUrl:
+              'https://tenant.sharepoint.com/sites/test-site/_layouts/15/Doc.aspx?sourcedoc=...',
+            fields: {
+              '@odata.etag': 'etag1',
+              FinanceGPTKnowledge: false,
+              FileLeafRef: 'document.docx',
+              Modified: '2023-01-01T00:00:00Z',
+              Created: '2023-01-01T00:00:00Z',
+              ContentType: 'Document',
+              AuthorLookupId: '1',
+              EditorLookupId: '1',
+              ItemChildCount: '0',
+              FolderChildCount: '0',
+            },
+          },
+          file: {
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            hashes: { quickXorHash: 'hash1' },
+          },
+        },
         siteId: 'site456',
         siteWebUrl: 'https://tenant.sharepoint.com/sites/test-site',
         driveId: 'drive789',
         driveName: 'Documents',
         folderPath: '/folder with spaces/sub folder',
-        lastModifiedDateTime: '2023-01-01T00:00:00Z',
-        file: {
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        },
+        fileName: 'document.docx',
       };
 
       const result = buildKnowledgeBaseUrl(file);

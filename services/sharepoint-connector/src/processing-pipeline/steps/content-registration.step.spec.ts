@@ -2,7 +2,9 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { INGESTION_SOURCE_KIND } from '../../constants/ingestion.constants';
+import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import type { ListItem } from '../../msgraph/types/sharepoint.types';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';
@@ -16,7 +18,11 @@ describe('ContentRegistrationStep', () => {
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
-        get: vi.fn((k: string) => (k === 'uniqueApi.scopeId' ? 'scope-1' : undefined)),
+        get: vi.fn((k: string) => {
+          if (k === 'unique.scopeId') return 'scope-1';
+          if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
+          return undefined;
+        }),
       }))
       .mock(UniqueAuthService)
       .impl(() => ({ getToken: vi.fn().mockResolvedValue('unique-token') }))
@@ -41,25 +47,45 @@ describe('ContentRegistrationStep', () => {
   });
 
   it('registers content and updates context', async () => {
-    const context: ProcessingContext = {
-      correlationId: 'c1',
-      fileId: 'f1',
-      fileName: 'n',
-      fileSize: 0,
-      siteUrl: 'https://contoso.sharepoint.com/sites/Engineering',
-      libraryName: 'lib',
-      startTime: new Date(),
-      metadata: {
-        siteId: 'site',
-        driveId: 'drive',
-        mimeType: 'application/pdf',
-        isFolder: false,
-        listItemFields: {},
-        driveName: 'Documents',
-        folderPath: '/test',
-        lastModifiedDateTime: '2024-01-01T00:00:00Z',
+    const listItem: ListItem = {
+      id: 'f1',
+      webUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+      lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      createdDateTime: '2024-01-01T00:00:00Z',
+      createdBy: {
+        user: {
+          email: 'user@example.com',
+          id: 'user1',
+          displayName: 'Test User',
+        },
+      },
+      fields: {
+        '@odata.etag': 'etag1',
+        FinanceGPTKnowledge: false,
+        _ModerationStatus: ModerationStatus.Approved,
+        Title: 'Test Title',
+        FileSizeDisplay: '1024',
+        FileLeafRef: 'test.aspx',
       },
     };
+
+    const context: ProcessingContext = {
+      correlationId: 'c1',
+      startTime: new Date(),
+      knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+      mimeType: 'application/pdf',
+      pipelineItem: {
+        itemType: 'listItem',
+        item: listItem,
+        siteId: 'site',
+        siteWebUrl: 'https://contoso.sharepoint.com/sites/Engineering',
+        driveId: 'drive',
+        driveName: 'Documents',
+        folderPath: '/test',
+        fileName: 'file.pdf',
+      },
+    };
+
     const result = await step.execute(context);
     expect(result.uploadUrl).toBe('https://upload');
     expect(result.uniqueContentId).toBe('cid');

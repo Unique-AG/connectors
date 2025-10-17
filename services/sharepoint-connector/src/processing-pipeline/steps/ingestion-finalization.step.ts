@@ -27,30 +27,29 @@ export class IngestionFinalizationStep implements IPipelineStep {
   ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
-    const registrationResponse = context.metadata.registration;
     const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const isPathBasedIngestion = !scopeId;
     const stepStartTime = Date.now();
 
     assert.ok(
-      registrationResponse,
+      context.registrationResponse,
       `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
     );
 
-    const fileKey = `${context.metadata.siteId}/${context.fileId}`;
+    const fileKey = `${context.pipelineItem.siteId}/${context.pipelineItem.item.id}`;
 
     const ingestionFinalizationRequest = {
       key: fileKey,
-      title: context.fileName,
-      mimeType: registrationResponse.mimeType,
-      ownerType: registrationResponse.ownerType,
-      byteSize: registrationResponse.byteSize,
+      title: context.pipelineItem.fileName,
+      mimeType: context.registrationResponse.mimeType,
+      ownerType: context.registrationResponse.ownerType,
+      byteSize: context.registrationResponse.byteSize,
       scopeId: isPathBasedIngestion ? PATH_BASED_INGESTION : scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceName: INGESTION_SOURCE_NAME,
       sourceKind: INGESTION_SOURCE_KIND,
-      fileUrl: registrationResponse.readUrl,
+      fileUrl: context.registrationResponse.readUrl,
       ...(isPathBasedIngestion && {
         url: context.knowledgeBaseUrl,
         baseUrl: sharepointBaseUrl,
@@ -59,9 +58,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();
-      this.logger.debug(
-        `[${context.correlationId}] Ingestion finalization request payload: ${JSON.stringify(ingestionFinalizationRequest, null, 2)}`,
-      );
+
       await this.uniqueApiService.finalizeIngestion(ingestionFinalizationRequest, uniqueToken);
       const _stepDuration = Date.now() - stepStartTime;
 

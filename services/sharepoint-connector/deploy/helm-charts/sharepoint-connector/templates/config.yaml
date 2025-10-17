@@ -14,8 +14,8 @@ data:
   {{- end }}
   SHAREPOINT_GRAPH_API_URL: {{ .Values.connectorConfig.sharepoint.graph.apiUrl | quote }}
   SHAREPOINT_GRAPH_TENANT_ID: {{ .Values.connectorConfig.sharepoint.graph.tenantId | quote }}
-  {{- if .Values.connectorConfig.sharepoint.graph.rateLimitPer10Seconds | quote }}
-  SHAREPOINT_GRAPH_RATE_LIMIT_PER_10_SECONDS: {{ .Values.connectorConfig.sharepoint.graph.rateLimitPer10Seconds | quote }}
+  {{- if .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute | quote }}
+  SHAREPOINT_GRAPH_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute | quote }}
   {{- end }}
   SHAREPOINT_BASE_URL: {{ .Values.connectorConfig.sharepoint.baseUrl | quote }}
   SHAREPOINT_SITE_IDS: {{ .Values.connectorConfig.sharepoint.siteIds | join "," | quote }}
@@ -24,12 +24,14 @@ data:
   {{- if .Values.connectorConfig.unique.scopeId }}
   UNIQUE_SCOPE_ID: {{ .Values.connectorConfig.unique.scopeId | quote }}
   {{- end }}
-  UNIQUE_FILE_DIFF_BASE_PATH: {{ .Values.connectorConfig.unique.fileDiffBasePath | quote }}
   UNIQUE_FILE_DIFF_URL: {{ .Values.connectorConfig.unique.fileDiffUrl | quote }}
   UNIQUE_INGESTION_GRAPHQL_URL: {{ .Values.connectorConfig.unique.ingestionGraphqlUrl | quote }}
   UNIQUE_ZITADEL_CLIENT_ID: {{ .Values.connectorConfig.unique.zitadel.clientId | quote }}
   UNIQUE_ZITADEL_OAUTH_TOKEN_URL: {{ .Values.connectorConfig.unique.zitadel.oauthTokenUrl | quote }}
   UNIQUE_ZITADEL_PROJECT_ID: {{ .Values.connectorConfig.unique.zitadel.projectId | quote }}
+  {{- if .Values.connectorConfig.unique.apiRateLimitPerMinute }}
+  UNIQUE_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.unique.apiRateLimitPerMinute | quote }}
+  {{- end }}
   # Processing config
   PROCESSING_STEP_TIMEOUT_SECONDS: {{ .Values.connectorConfig.processing.stepTimeoutSeconds | quote }}
   PROCESSING_ALLOWED_MIME_TYPES: {{ .Values.connectorConfig.processing.allowedMimeTypes | join "," }}

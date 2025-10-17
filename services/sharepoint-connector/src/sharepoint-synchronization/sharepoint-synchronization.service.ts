@@ -2,13 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type { EnrichedDriveItem } from '../msgraph/types/enriched-drive-item';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import { buildKnowledgeBaseUrl } from '../shared/sharepoint-url.util';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { normalizeError } from '../utils/normalize-error';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -39,18 +39,22 @@ export class SharepointSynchronizationService {
     for (const siteId of siteIdsToScan) {
       const siteStartTime = Date.now();
       try {
-        const files = await this.graphApiService.getAllFilesForSite(siteId);
+        const items = await this.graphApiService.getAllSiteItems(siteId);
 
-        const diffResult = await this.calculateDiffForSite(files, siteId);
         this.logger.log(
-          `File Diff Result: Site ${siteId}: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
+          `Finished scanning site id ${siteId} in ${((Date.now() - siteStartTime) / 1000).toFixed(2)} seconds`,
         );
 
-        await this.orchestrator.processFilesForSite(siteId, files, diffResult);
-
-        const siteScanDurationSeconds = (Date.now() - siteStartTime) / 1000;
+        const diffResult = await this.calculateDiffForSite(items, siteId);
         this.logger.log(
-          `Finished processing site ${siteId} in ${siteScanDurationSeconds.toFixed(2)}s`,
+          `File Diff Results: Site ${siteId}: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
+        );
+
+        const processStartTime = Date.now();
+        await this.orchestrator.processSiteItems(siteId, items, diffResult);
+
+        this.logger.log(
+          `Finished processing site ${siteId} in ${((Date.now() - processStartTime) / 1000).toFixed(2)} seconds`,
         );
       } catch (rawError) {
         const error = normalizeError(rawError);
@@ -71,18 +75,19 @@ export class SharepointSynchronizationService {
   /*
     This step also triggers file deletion in node-ingestion service when a file is missing.
    */
-
   private async calculateDiffForSite(
-    files: EnrichedDriveItem[],
+    sharepointContentItems: SharepointContentItem[],
     siteId: string,
   ): Promise<FileDiffResponse> {
-    const fileDiffItems: FileDiffItem[] = files.map((file: EnrichedDriveItem) => {
-      return {
-        key: file.id,
-        url: buildKnowledgeBaseUrl(file), // SharePoint URL for location
-        updatedAt: file.listItem?.lastModifiedDateTime ?? file.lastModifiedDateTime,
-      };
-    });
+    const fileDiffItems: FileDiffItem[] = sharepointContentItems.map(
+      (sharepointContentItem: SharepointContentItem) => {
+        return {
+          key: sharepointContentItem.item.id,
+          url: buildKnowledgeBaseUrl(sharepointContentItem),
+          updatedAt: sharepointContentItem.item.lastModifiedDateTime,
+        };
+      },
+    );
 
     const uniqueToken = await this.uniqueAuthService.getToken();
     return await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, siteId);
