@@ -118,6 +118,10 @@ connectorConfig:
     concurrency: 1
     allowedMimeTypes:
       - application/pdf
+      - text/plain
+      - text/html
+      - application/x-asp
       - application/vnd.openxmlformats-officedocument.wordprocessingml.document
-    maxFilesToScan: 2
+      - application/vnd.ms-excel
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
     maxFileSizeBytes: null
