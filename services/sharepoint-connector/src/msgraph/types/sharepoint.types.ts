@@ -62,7 +62,7 @@ export interface ListItem {
   lastModifiedDateTime: string;
   createdDateTime: string;
   webUrl: string;
-  createdBy: {
+  createdBy?: {
     user: {
       email: string;
       id: string;

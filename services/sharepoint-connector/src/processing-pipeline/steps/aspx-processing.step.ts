@@ -55,7 +55,7 @@ export class AspxProcessingStep implements IPipelineStep {
   }
 
   private buildAuthorHtml(createdBy: ListItem['createdBy']): string {
-    return `<h4>${createdBy.user.displayName}</h4>`;
+    return `<h4>${createdBy?.user.displayName || 'unknown-author'}</h4>`;
   }
 
   private buildHtmlStructure(title: string, authorHtml: string, content: string): string {
