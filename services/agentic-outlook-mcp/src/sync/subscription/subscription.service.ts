@@ -5,14 +5,12 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
-  OnApplicationBootstrap,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
-import { AppEvents } from '../../app.events';
 import { AppConfig, AppSettings } from '../../app-settings';
 import { DRIZZLE, DrizzleDatabase, Folder, Subscription, subscriptions } from '../../drizzle';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
