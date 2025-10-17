@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Config } from '../config';
 import { getTitle } from '../utils/list-item.util';
+import { normalizeError } from '../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 import {
@@ -313,9 +314,10 @@ export class GraphApiService {
     driveName: string,
     maxFiles?: number,
   ): Promise<SharepointContentItem[]> {
+    const sharepointContentItemsToSync: SharepointContentItem[] = [];
+
     try {
       const allItems = await this.fetchAllDriveItemsInDrive(driveId, itemId);
-      const sharepointContentItemsToSync: SharepointContentItem[] = [];
 
       for (const driveItem of allItems) {
         // Check if we've reached the file limit for local testing
@@ -355,9 +357,11 @@ export class GraphApiService {
 
       return sharepointContentItemsToSync;
     } catch (error) {
-      this.logger.error(`Failed to fetch items for drive ${driveId}, item ${itemId}:`, error);
-      // TODO: probably we should not throw here, we want to continue scanning (add retry mechanism) - check implications with file-diffing
-      throw error;
+      this.logger.error(
+        `Failed to fetch items for drive ${driveId}, item ${itemId}: ${normalizeError(error).message}`,
+      );
+      this.logger.warn(`Continuing scan with results collected so far from ${itemId}`);
+      return sharepointContentItemsToSync;
     }
   }
 
