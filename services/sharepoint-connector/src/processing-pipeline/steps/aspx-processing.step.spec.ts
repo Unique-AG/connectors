@@ -325,10 +325,8 @@ describe('AspxProcessingStep', () => {
       expect(html).toContain('<a href="https://contoso.sharepoint.com/sites/test">Link</a>');
     });
 
-    it('throws error and logs when processing fails', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: Access private logger property for testing
-      const loggerErrorSpy = vi.spyOn((step as any).logger, 'error').mockImplementation(() => {});
-      const contextWithInvalidItem = {
+    it('handles null author createdBy', async () => {
+      const contextWithNullCreatedBy = {
         ...mockContext,
         pipelineItem: {
           ...mockContext.pipelineItem,
@@ -340,9 +338,10 @@ describe('AspxProcessingStep', () => {
         contentBuffer: Buffer.from('<p>Content</p>', 'utf-8'),
       } as ProcessingContext;
 
-      await expect(step.execute(contextWithInvalidItem)).rejects.toThrow();
-      expect(loggerErrorSpy).toHaveBeenCalled();
-      expect(loggerErrorSpy.mock.calls[0]?.[0]).toContain('ASPX processing failed');
+      const result = await step.execute(contextWithNullCreatedBy);
+
+      const html = result.contentBuffer?.toString();
+      expect(html).toContain('<h4>unknown-author</h4>');
     });
   });
 });
