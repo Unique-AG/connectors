@@ -32,6 +32,7 @@ bucket_definitions:
           folder_id,
           parent_folder_id,
           child_folder_count,
+          total_item_count,
           subscription_id,
           activated_at,
           deactivated_at,
