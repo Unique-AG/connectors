@@ -1,7 +1,7 @@
 import { ConfigType } from '@nestjs/config';
 import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
-import { DEFAULT_GRAPH_RATE_LIMIT_PER_10_SECONDS } from '../constants/defaults.constants';
+import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import { Redacted } from '../utils/redacted';
 
 const SharepointConfig = z
@@ -30,12 +30,12 @@ const SharepointConfig = z
       .url()
       .prefault('https://graph.microsoft.com')
       .describe('Microsoft Graph API base URL'),
-    graphRateLimitPer10Seconds: z.coerce
+    graphApiRateLimitPerMinute: z.coerce
       .number()
       .int()
       .positive()
-      .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_10_SECONDS)
-      .describe('Number of MS Graph API requests allowed per 10 seconds'),
+      .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE)
+      .describe('Number of MS Graph API requests allowed per minute'),
     baseUrl: z.url().describe("Your company's sharepoint URL"),
     siteIds: z
       .string()

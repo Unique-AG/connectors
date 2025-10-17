@@ -1,6 +1,7 @@
 import { ConfigType } from '@nestjs/config';
 import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
+import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import { Redacted } from '../utils/redacted';
 
 const UniqueConfig = z.object({
@@ -19,6 +20,12 @@ const UniqueConfig = z.object({
     .string()
     .transform((val) => new Redacted(val))
     .describe('Zitadel client secret'),
+  apiRateLimitPerMinute: z.coerce
+    .number()
+    .int()
+    .positive()
+    .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
+    .describe('Number of Unique API requests allowed per minute'),
 });
 
 export const uniqueConfig = registerConfig('unique', UniqueConfig);

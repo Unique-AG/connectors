@@ -31,7 +31,15 @@ export class UniqueApiService {
     private readonly configService: ConfigService<Config, true>,
     @Inject(UNIQUE_HTTP_CLIENT) private readonly httpClient: Client,
   ) {
-    this.limiter = new Bottleneck({ maxConcurrent: 1, minTime: 50 });
+    const rateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
+      infer: true,
+    });
+
+    this.limiter = new Bottleneck({
+      reservoir: rateLimitPerMinute,
+      reservoirRefreshAmount: rateLimitPerMinute,
+      reservoirRefreshInterval: 60000,
+    });
   }
 
   public async registerContent(

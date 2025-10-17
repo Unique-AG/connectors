@@ -89,7 +89,7 @@ connectorConfig:
       # example: 12345678-1234-1234-1234-123456789012
       tenantId: unset_default_value
       apiUrl: https://graph.microsoft.com
-      rateLimitPer10Seconds: null
+      apiRateLimitPerMinute: 780000
       clientId: null
       # clientSecret would need to be presented from a secret as well
 
@@ -104,6 +104,7 @@ connectorConfig:
     # -- scope id for the scope based ingestion
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion
+    apiRateLimitPerMinute: 100
     zitadel:
       clientId: unset_default_value
       # clientSecret is presented from a secret, see connector.extraEnvSecrets

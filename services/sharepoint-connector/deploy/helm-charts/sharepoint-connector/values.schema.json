@@ -74,9 +74,9 @@
                   "type": "string",
                   "description": "Microsoft Graph API URL"
                 },
-                "rateLimitPer10Seconds": {
+                "apiRateLimitPerMinute": {
                   "type": ["number", "null"],
-                  "description": "Rate limiting for Graph API requests"
+                  "description": "Rate limiting for Graph API requests per minute"
                 },
                 "clientId": {
                   "type": ["string", "null"],
@@ -108,6 +108,10 @@
             "scopeId": {
               "type": ["string", "null"],
               "description": "Scope ID for scope based ingestion"
+            },
+            "apiRateLimitPerMinute": {
+              "type": "integer",
+              "description": "Rate limiting for Unique API requests per minute"
             },
             "zitadel": {
               "type": "object",
