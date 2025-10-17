@@ -49,7 +49,7 @@ export class ProcessService {
         'email.id': emailId,
         'user.id': userProfileId,
         'pipeline.step': 'process',
-        'attempt': attempt,
+        attempt: attempt,
       },
       async (span) => {
         if (attempt > 1) {
@@ -144,7 +144,7 @@ export class ProcessService {
   }
 
   // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Currently unused in favor of LLM email cleanup.
-    private async purifyBody(email: Email) {
+  private async purifyBody(email: Email) {
     const { uniqueBodyText, uniqueBodyHtml } = email;
 
     let cleanHtml: string | null = null;
