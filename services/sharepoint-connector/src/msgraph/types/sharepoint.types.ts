@@ -20,6 +20,12 @@ export function isGraphApiError(error: unknown): error is GraphApiErrorResponse 
   );
 }
 
+export interface GraphApiResponse<T> {
+  '@odata.context'?: string;
+  '@odata.nextLink'?: string;
+  value: T[];
+}
+
 // Typing built from the response of the MS Graph API
 export interface ListItemDetailsResponse {
   id: string;
@@ -74,13 +80,6 @@ export interface ListItem {
     FileLeafRef: string;
     [key: string]: unknown;
   };
-}
-
-// Typing built from the response of the MS Graph API
-export interface GraphListItemsResponse {
-  '@odata.context': string;
-  '@odata.nextLink'?: string;
-  value: ListItem[];
 }
 
 // Typing built from the response of the MS Graph API
@@ -142,11 +141,4 @@ export interface DriveItemFields {
   ItemChildCount: string;
   FolderChildCount: string;
   [key: string]: unknown;
-}
-//
-// Typing built from the response of the MS Graph API
-export interface GraphDriveItemsResponse {
-  '@odata.context': string;
-  '@odata.nextLink'?: string;
-  value: DriveItem[];
 }

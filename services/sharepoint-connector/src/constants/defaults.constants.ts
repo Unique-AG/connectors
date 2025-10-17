@@ -6,6 +6,8 @@ export const DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE = 780000 as const; // this is t
 
 export const DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE = 100 as const;
 
+export const GRAPH_API_PAGE_SIZE = 300 as const;
+
 export const HTTP_STATUS_OK_MAX = 299 as const;
 
 export const DEFAULT_MIME_TYPE = 'application/octet-stream' as const;

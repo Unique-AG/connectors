@@ -1,18 +1,19 @@
 import assert from 'node:assert';
-import { Client, GraphRequest } from '@microsoft/microsoft-graph-client';
+import { Client } from '@microsoft/microsoft-graph-client';
 import type { Drive, List } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Config } from '../config';
+import { GRAPH_API_PAGE_SIZE } from '../constants/defaults.constants';
 import { getTitle } from '../utils/list-item.util';
 import { normalizeError } from '../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 import {
   DriveItem,
-  GraphDriveItemsResponse,
-  GraphListItemsResponse,
+  GraphApiResponse,
+  ListItem,
   ListItemDetailsResponse,
   SitePageContent,
 } from './types/sharepoint.types';
@@ -181,11 +182,10 @@ export class GraphApiService {
 
   public async getSiteLists(siteId: string): Promise<List[]> {
     try {
-      const lists = await this.makeRateLimitedRequest(() =>
-        this.graphClient.api(`/sites/${siteId}/lists`).select('system,name,id').top(500).get(),
+      const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId}/lists`, (url) =>
+        this.graphClient.api(url).select('system,name,id').top(GRAPH_API_PAGE_SIZE).get(),
       );
 
-      const allLists = lists?.value || [];
       this.logger.log(`Found ${allLists.length} lists for site ${siteId}`);
 
       return allLists;
@@ -203,41 +203,34 @@ export class GraphApiService {
     try {
       const aspxItems: SharepointContentItem[] = [];
 
-      let nextPageRequest: GraphRequest | null = this.graphClient
-        .api(`/sites/${siteId}/lists/${listId}/items`)
-        .select('id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy')
-        .expand(
-          'fields($select=FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus,Title)',
-        )
-        .top(500);
+      const items = await this.paginateGraphApiRequest<ListItem>(
+        `/sites/${siteId}/lists/${listId}/items`,
+        (url) =>
+          this.graphClient
+            .api(url)
+            .select('id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy')
+            .expand(
+              'fields($select=FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus,Title)',
+            )
+            .top(GRAPH_API_PAGE_SIZE)
+            .get(),
+      );
 
-      while (nextPageRequest !== null) {
-        const response = await this.makeRateLimitedRequest<GraphListItemsResponse>(() =>
-          (nextPageRequest as GraphRequest).get(),
-        );
+      for (const item of items) {
+        if (!this.fileFilterService.isListItemValidForIngestion(item.fields)) continue;
 
-        const items = response.value || [];
+        const aspxSharepointContentItem: SharepointContentItem = {
+          itemType: 'listItem',
+          item,
+          siteId,
+          siteWebUrl,
+          driveId: listId,
+          driveName: 'SitePages',
+          folderPath: item.webUrl,
+          fileName: getTitle(item.fields),
+        };
 
-        for (const item of items) {
-          if (!this.fileFilterService.isListItemValidForIngestion(item.fields)) continue;
-
-          const aspxSharepointContentItem: SharepointContentItem = {
-            itemType: 'listItem',
-            item,
-            siteId,
-            siteWebUrl,
-            driveId: listId,
-            driveName: 'SitePages',
-            folderPath: item.webUrl,
-            fileName: getTitle(item.fields),
-          };
-
-          aspxItems.push(aspxSharepointContentItem);
-        }
-
-        nextPageRequest = response['@odata.nextLink']
-          ? this.graphClient.api(response['@odata.nextLink']).top(500)
-          : null;
+        aspxItems.push(aspxSharepointContentItem);
       }
 
       this.logger.log(`Found ${aspxItems.length} ASPX files in SitePages list`);
@@ -292,11 +285,11 @@ export class GraphApiService {
 
   private async getDrivesForSite(siteId: string): Promise<Drive[]> {
     try {
-      const drives = await this.makeRateLimitedRequest(() =>
-        this.graphClient.api(`/sites/${siteId}/drives`).top(500).get(),
+      const allDrives = await this.paginateGraphApiRequest<Drive>(
+        `/sites/${siteId}/drives`,
+        (url) => this.graphClient.api(url).top(GRAPH_API_PAGE_SIZE).get(),
       );
 
-      const allDrives = drives?.value || [];
       this.logger.log(`Found ${allDrives.length} drives for site ${siteId}`);
 
       return allDrives;
@@ -379,7 +372,6 @@ export class GraphApiService {
   }
 
   private async fetchAllDriveItemsInDrive(driveId: string, itemId: string): Promise<DriveItem[]> {
-    const itemsInFolder: DriveItem[] = [];
     const selectFields = [
       'id',
       'name',
@@ -391,29 +383,44 @@ export class GraphApiService {
       'listItem',
       'parentReference',
     ];
-    let nextPageUrl: string | undefined = `/drives/${driveId}/items/${itemId}/children`;
 
-    while (nextPageUrl) {
-      const response = await this.makeRateLimitedRequest<GraphDriveItemsResponse>(() =>
+    return this.paginateGraphApiRequest<DriveItem>(
+      `/drives/${driveId}/items/${itemId}/children`,
+      (url) =>
         this.graphClient
-          .api(nextPageUrl as string)
+          .api(url)
           .select(selectFields)
           .expand('listItem($expand=fields)')
-          .top(500)
+          .top(GRAPH_API_PAGE_SIZE)
           .get(),
-      );
-
-      const items: DriveItem[] = response?.value || [];
-      itemsInFolder.push(...items);
-
-      nextPageUrl = response['@odata.nextLink'];
-    }
-
-    return itemsInFolder;
+    );
   }
 
   private async makeRateLimitedRequest<T>(requestFn: () => Promise<T>): Promise<T> {
     return await this.limiter.schedule(async () => await requestFn());
+  }
+
+  private async paginateGraphApiRequest<T>(
+    initialUrl: string,
+    requestBuilder: (url: string) => Promise<GraphApiResponse<T>>,
+  ): Promise<T[]> {
+    const allItems: T[] = [];
+    let nextPageUrl = initialUrl;
+
+    while (true) {
+      const response = await this.makeRateLimitedRequest(() => requestBuilder(nextPageUrl));
+      const items = response?.value || [];
+
+      allItems.push(...items);
+
+      if (!response['@odata.nextLink']) {
+        break;
+      }
+
+      nextPageUrl = response['@odata.nextLink'];
+    }
+
+    return allItems;
   }
 
   private isFolder(driveItem: DriveItem): boolean {
