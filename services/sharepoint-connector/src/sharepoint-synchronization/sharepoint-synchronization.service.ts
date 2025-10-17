@@ -79,13 +79,15 @@ export class SharepointSynchronizationService {
     sharepointContentItems: SharepointContentItem[],
     siteId: string,
   ): Promise<FileDiffResponse> {
-    const fileDiffItems: FileDiffItem[] = sharepointContentItems.map((sharepointContentItem: SharepointContentItem) => {
-      return {
-        key: sharepointContentItem.item.id,
-        url: buildKnowledgeBaseUrl(sharepointContentItem),
-        updatedAt: sharepointContentItem.item.lastModifiedDateTime,
-      };
-    });
+    const fileDiffItems: FileDiffItem[] = sharepointContentItems.map(
+      (sharepointContentItem: SharepointContentItem) => {
+        return {
+          key: sharepointContentItem.item.id,
+          url: buildKnowledgeBaseUrl(sharepointContentItem),
+          updatedAt: sharepointContentItem.item.lastModifiedDateTime,
+        };
+      },
+    );
 
     const uniqueToken = await this.uniqueAuthService.getToken();
     return await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, siteId);

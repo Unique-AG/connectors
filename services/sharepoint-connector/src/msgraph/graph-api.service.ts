@@ -168,7 +168,9 @@ export class GraphApiService {
         sitePagesList.id,
         siteWebUrl,
       );
-      this.logger.log(`Found ${aspxSharepointContentItems.length} ASPX files from SitePages for site ${siteId}`);
+      this.logger.log(
+        `Found ${aspxSharepointContentItems.length} ASPX files from SitePages for site ${siteId}`,
+      );
       return aspxSharepointContentItems;
     } catch (error) {
       this.logger.warn(`Failed to scan ASPX files from SitePages for site ${siteId}: ${error}`);
@@ -323,7 +325,9 @@ export class GraphApiService {
         }
 
         if (this.isFolder(driveItem)) {
-          const remainingLimit = maxFiles ? maxFiles - sharepointContentItemsToSync.length : undefined;
+          const remainingLimit = maxFiles
+            ? maxFiles - sharepointContentItemsToSync.length
+            : undefined;
           const filesInNestedDrive = await this.recursivelyFetchDriveItems(
             driveId,
             driveItem.id,

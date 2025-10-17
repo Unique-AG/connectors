@@ -40,7 +40,7 @@ describe('AspxProcessingStep', () => {
     knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/test/test.aspx',
     mimeType: 'application/octet-stream',
     pipelineItem: {
-      itemType: 'listItem',
+      itemType: 'listItem' as const,
       item: mockListItem,
       siteId: 'site-1',
       siteWebUrl: 'https://contoso.sharepoint.com',
@@ -48,7 +48,7 @@ describe('AspxProcessingStep', () => {
       driveName: 'SitePages',
       folderPath: '/',
       fileName: 'test.aspx',
-    },
+    } as const,
   };
 
   beforeEach(async () => {
@@ -71,8 +71,12 @@ describe('AspxProcessingStep', () => {
     it('returns context unchanged for non-listItem files', async () => {
       const contextWithDriveItem = {
         ...mockContext,
-        pipelineItem: { ...mockContext.pipelineItem, itemType: 'driveItem' as const },
-      };
+        pipelineItem: {
+          ...mockContext.pipelineItem,
+          itemType: 'driveItem' as const,
+          item: mockContext.pipelineItem.item,
+        },
+      } as ProcessingContext;
 
       const result = await step.execute(contextWithDriveItem);
 
@@ -118,7 +122,9 @@ describe('AspxProcessingStep', () => {
       const result = await step.execute(contextWithContent);
 
       const html = result.contentBuffer?.toString();
-      expect(html).toContain('<a href="https://contoso.sharepoint.com/sites/test/page.aspx">Link</a>');
+      expect(html).toContain(
+        '<a href="https://contoso.sharepoint.com/sites/test/page.aspx">Link</a>',
+      );
     });
 
     it('converts multiple relative links in same content', async () => {
@@ -146,7 +152,9 @@ describe('AspxProcessingStep', () => {
       const result = await step.execute(contextWithContent);
 
       const html = result.contentBuffer?.toString();
-      expect(html).toContain('<a href="https://contoso.sharepoint.com/page.aspx?id=123&type=test">Link</a>');
+      expect(html).toContain(
+        '<a href="https://contoso.sharepoint.com/page.aspx?id=123&type=test">Link</a>',
+      );
     });
 
     it('handles links with fragments', async () => {
@@ -176,10 +184,7 @@ describe('AspxProcessingStep', () => {
     it('preserves absolute links', async () => {
       const contextWithContent = {
         ...mockContext,
-        contentBuffer: Buffer.from(
-          '<a href="https://external.com/page">External</a>',
-          'utf-8',
-        ),
+        contentBuffer: Buffer.from('<a href="https://external.com/page">External</a>', 'utf-8'),
       };
 
       const result = await step.execute(contextWithContent);
@@ -274,7 +279,7 @@ describe('AspxProcessingStep', () => {
           },
         },
         contentBuffer: Buffer.from('<p>Content</p>', 'utf-8'),
-      };
+      } as ProcessingContext;
 
       const result = await step.execute(contextWithMissingTitle);
 
@@ -295,7 +300,7 @@ describe('AspxProcessingStep', () => {
           },
         },
         contentBuffer: Buffer.from('<p>Content</p>', 'utf-8'),
-      };
+      } as ProcessingContext;
 
       const result = await step.execute(contextWithEmptyAuthor);
 
@@ -322,7 +327,7 @@ describe('AspxProcessingStep', () => {
 
     it('throws error and logs when processing fails', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private logger property for testing
-      const loggerErrorSpy = vi.spyOn(step['logger'] as any, 'error').mockImplementation(() => {});
+      const loggerErrorSpy = vi.spyOn((step as any).logger, 'error').mockImplementation(() => {});
       const contextWithInvalidItem = {
         ...mockContext,
         pipelineItem: {
@@ -333,7 +338,7 @@ describe('AspxProcessingStep', () => {
           },
         },
         contentBuffer: Buffer.from('<p>Content</p>', 'utf-8'),
-      };
+      } as ProcessingContext;
 
       await expect(step.execute(contextWithInvalidItem)).rejects.toThrow();
       expect(loggerErrorSpy).toHaveBeenCalled();

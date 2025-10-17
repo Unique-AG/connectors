@@ -8,11 +8,14 @@ interface BaseItem {
   folderPath: string;
   fileName: string;
 }
-export type SharepointContentItem = BaseItem & (
-  {
-    itemType: 'driveItem';
-    item: DriveItem;
-  } | {
-    itemType: 'listItem';
-    item: ListItem;
-  })
+export type SharepointContentItem = BaseItem &
+  (
+    | {
+        itemType: 'driveItem';
+        item: DriveItem;
+      }
+    | {
+        itemType: 'listItem';
+        item: ListItem;
+      }
+  );

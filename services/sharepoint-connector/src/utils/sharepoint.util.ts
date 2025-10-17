@@ -1,4 +1,4 @@
-import assert from 'assert';
+import assert from 'node:assert';
 import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 
 interface SharepointFileKeyParams {
@@ -61,14 +61,18 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
 
 export function buildKnowledgeBaseUrl(sharepointContentItem: SharepointContentItem): string {
   // we cannot use webUrl for driveItems as they are not using the real path but proxy _layouts hidden folders in their web url.
-  if (sharepointContentItem.itemType === 'driveItem') { 
-    return buildUrl(sharepointContentItem.siteWebUrl, sharepointContentItem.folderPath, sharepointContentItem.item.name);
+  if (sharepointContentItem.itemType === 'driveItem') {
+    return buildUrl(
+      sharepointContentItem.siteWebUrl,
+      sharepointContentItem.folderPath,
+      sharepointContentItem.item.name,
+    );
   }
 
   // for listItems we can use directly the webUrl property
   if (sharepointContentItem.itemType === 'listItem') {
     return sharepointContentItem.item.webUrl;
-  } 
+  }
   assert.fail('Invalid pipeline item type');
 }
 

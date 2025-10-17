@@ -10,7 +10,7 @@ export class FileFilterService {
 
   public isListItemValidForIngestion(fields: ListItem['fields']) {
     return Boolean(
-        fields.FileLeafRef?.toLowerCase().endsWith('.aspx') &&
+      fields.FileLeafRef?.toLowerCase().endsWith('.aspx') &&
         fields.FinanceGPTKnowledge === true &&
         isModerationStatusApproved(fields._ModerationStatus),
     );
