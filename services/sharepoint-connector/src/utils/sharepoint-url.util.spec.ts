@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
-import { buildKnowledgeBaseUrl } from './sharepoint-url.util';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
+import { buildKnowledgeBaseUrl } from './sharepoint.util';
 
 describe('buildKnowledgeBaseUrl', () => {
   it('should build proper SharePoint URL for file in subfolder', () => {
-    const file: PipelineItem = {
+    const file: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag1',
@@ -55,7 +55,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should build proper SharePoint URL for file in root folder', () => {
-    const file: PipelineItem = {
+    const file: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag1',
@@ -106,7 +106,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should build proper SharePoint URL for file in root folder with empty path', () => {
-    const file: PipelineItem = {
+    const file: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag1',
@@ -157,7 +157,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should handle siteWebUrl with trailing slash', () => {
-    const file: PipelineItem = {
+    const file: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag1',
@@ -208,7 +208,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should handle folderPath with leading slash', () => {
-    const file: PipelineItem = {
+    const file: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag1',
@@ -259,7 +259,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should handle folderPath without leading slash', () => {
-    const file: PipelineItem = {
+    const file: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag1',
@@ -310,7 +310,7 @@ describe('buildKnowledgeBaseUrl', () => {
   });
 
   it('should URL encode special characters in folder names', () => {
-    const file: PipelineItem = {
+    const file: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag1',

@@ -1,9 +1,9 @@
-import type { PipelineItem } from '../../msgraph/types/pipeline-item.interface';
+import type { SharepointContentItem } from '../../msgraph/types/sharepoint-content-item.interface';
 import type { IngestionApiResponse } from '../../unique-api/unique-api.types';
 
 export interface ProcessingContext {
   correlationId: string;
-  pipelineItem: PipelineItem;
+  pipelineItem: SharepointContentItem;
   knowledgeBaseUrl: string;
   uploadUrl?: string;
   uniqueContentId?: string;

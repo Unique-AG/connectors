@@ -2,12 +2,12 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
-import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
 describe('SharepointSynchronizationService', () => {
@@ -23,7 +23,7 @@ describe('SharepointSynchronizationService', () => {
     processSiteItems: ReturnType<typeof vi.fn>;
   };
 
-  const mockFile: PipelineItem = {
+  const mockFile: SharepointContentItem = {
     itemType: 'driveItem',
     item: {
       '@odata.etag': 'etag1',
@@ -218,7 +218,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('transforms files to diff items correctly', async () => {
-    const fileWithAllFields: PipelineItem = {
+    const fileWithAllFields: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag2',
@@ -288,7 +288,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('handles missing lastModifiedDateTime gracefully', async () => {
-    const fileWithoutTimestamp: PipelineItem = {
+    const fileWithoutTimestamp: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag3',
@@ -358,7 +358,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('processes multiple files from same site', async () => {
-    const file1: PipelineItem = {
+    const file1: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag1',
@@ -409,7 +409,7 @@ describe('SharepointSynchronizationService', () => {
       fileName: '1173246.pdf',
     };
 
-    const file2: PipelineItem = {
+    const file2: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag2',
@@ -460,7 +460,7 @@ describe('SharepointSynchronizationService', () => {
       fileName: '2019-BMW-Maintenance.pdf',
     };
 
-    const file3: PipelineItem = {
+    const file3: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag3',
@@ -544,7 +544,7 @@ describe('SharepointSynchronizationService', () => {
 
   describe('buildSharePointUrl', () => {
     it('should build proper SharePoint URL for file in subfolder', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -604,7 +604,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should build proper SharePoint URL for file in root folder', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -662,7 +662,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should build proper SharePoint URL for file in root folder with empty path', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -720,7 +720,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should handle siteWebUrl with trailing slash', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -778,7 +778,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should handle folderPath with leading slash', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -838,7 +838,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should handle folderPath without leading slash', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -898,7 +898,7 @@ describe('SharepointSynchronizationService', () => {
     });
 
     it('should URL encode special characters in folder names', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',

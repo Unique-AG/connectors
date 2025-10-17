@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { FileProcessingOrchestratorService } from './file-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
@@ -12,7 +12,7 @@ describe('FileProcessingOrchestratorService', () => {
     processItem: ReturnType<typeof vi.fn>;
   };
 
-  const createMockFile = (id: string, siteId: string): PipelineItem => ({
+  const createMockFile = (id: string, siteId: string): SharepointContentItem => ({
     itemType: 'driveItem',
     item: {
       '@odata.etag': 'etag1',

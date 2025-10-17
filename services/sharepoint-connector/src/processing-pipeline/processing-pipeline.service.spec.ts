@@ -1,8 +1,8 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
-import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -22,7 +22,7 @@ describe('ProcessingPipelineService', () => {
     ingestionFinalization: IPipelineStep;
   };
 
-  const mockFile: PipelineItem = {
+  const mockFile: SharepointContentItem = {
     itemType: 'driveItem',
     item: {
       '@odata.etag': '"82009a9a-6cb2-4fe2-88fa-37d935120df6,7"',
@@ -224,7 +224,7 @@ describe('ProcessingPipelineService', () => {
 
   describe('buildSharePointUrl', () => {
     it('should build proper SharePoint URL for file in subfolder', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -284,7 +284,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should build proper SharePoint URL for file in root folder', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -342,7 +342,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should build proper SharePoint URL for file in root folder with empty path', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -400,7 +400,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should handle siteWebUrl with trailing slash', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -458,7 +458,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should handle folderPath with leading slash', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -518,7 +518,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should handle folderPath without leading slash', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',
@@ -578,7 +578,7 @@ describe('ProcessingPipelineService', () => {
     });
 
     it('should URL encode special characters in folder names', () => {
-      const file: PipelineItem = {
+      const file: SharepointContentItem = {
         itemType: 'driveItem',
         item: {
           '@odata.etag': 'etag1',

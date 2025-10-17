@@ -2,13 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { normalizeError } from '../utils/normalize-error';
-import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -76,14 +76,14 @@ export class SharepointSynchronizationService {
     This step also triggers file deletion in node-ingestion service when a file is missing.
    */
   private async calculateDiffForSite(
-    pipelineItems: PipelineItem[],
+    sharepointContentItems: SharepointContentItem[],
     siteId: string,
   ): Promise<FileDiffResponse> {
-    const fileDiffItems: FileDiffItem[] = pipelineItems.map((pipelineItem: PipelineItem) => {
+    const fileDiffItems: FileDiffItem[] = sharepointContentItems.map((sharepointContentItem: SharepointContentItem) => {
       return {
-        key: pipelineItem.item.id,
-        url: buildKnowledgeBaseUrl(pipelineItem),
-        updatedAt: pipelineItem.item.lastModifiedDateTime,
+        key: sharepointContentItem.item.id,
+        url: buildKnowledgeBaseUrl(sharepointContentItem),
+        updatedAt: sharepointContentItem.item.lastModifiedDateTime,
       };
     });
 

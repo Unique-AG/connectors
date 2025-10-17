@@ -3,9 +3,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
-import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import { isDriveItem } from '../msgraph/types/type-guards.util';
-import { buildKnowledgeBaseUrl } from '../utils/sharepoint-url.util';
+import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
@@ -39,7 +39,7 @@ export class ProcessingPipelineService {
       this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
   }
 
-  public async processItem(pipelineItem: PipelineItem): Promise<PipelineResult> {
+  public async processItem(pipelineItem: SharepointContentItem): Promise<PipelineResult> {
     const startTime = new Date();
     const correlationId = randomUUID();
 

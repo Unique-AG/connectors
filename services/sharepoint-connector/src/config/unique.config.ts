@@ -14,9 +14,9 @@ const UniqueConfig = z.object({
   ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
   fileDiffUrl: z.url().describe('Unique file diff service URL'),
   zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
-  zitadelProjectId: z.coerce.string().describe('Zitadel project ID'),
-  zitadelClientId: z.coerce.string().describe('Zitadel client ID'),
-  zitadelClientSecret: z.coerce
+  zitadelProjectId: z.string().describe('Zitadel project ID'),
+  zitadelClientId: z.string().describe('Zitadel client ID'),
+  zitadelClientSecret: z
     .string()
     .transform((val) => new Redacted(val))
     .describe('Zitadel client secret'),

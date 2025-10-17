@@ -1,7 +1,6 @@
 import { DriveItem, ListItem } from './sharepoint.types';
 
-// This can be named something like ItemToProcess
-export interface PipelineItem {
+export interface SharepointContentItem {
   itemType: 'listItem' | 'driveItem';
   item: DriveItem | ListItem;
   siteId: string;

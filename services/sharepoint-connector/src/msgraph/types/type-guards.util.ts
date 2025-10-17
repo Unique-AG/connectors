@@ -1,11 +1,11 @@
-import { PipelineItem } from './pipeline-item.interface';
+import { SharepointContentItem } from './sharepoint-content-item.interface';
 import { DriveItem, ListItem } from './sharepoint.types';
 
-export function isDriveItem(item: PipelineItem): item is PipelineItem & { item: DriveItem } {
+export function isDriveItem(item: SharepointContentItem): item is SharepointContentItem & { item: DriveItem } {
   return item.itemType === 'driveItem';
 }
 
-export function isListItem(item: PipelineItem): item is PipelineItem & { item: ListItem } {
+export function isListItem(item: SharepointContentItem): item is SharepointContentItem & { item: ListItem } {
   return item.itemType === 'listItem';
 }
 

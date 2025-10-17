@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
 import { Config } from '../config';
-import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
@@ -17,7 +17,7 @@ export class FileProcessingOrchestratorService {
 
   public async processSiteItems(
     siteId: string,
-    items: PipelineItem[],
+    items: SharepointContentItem[],
     diffResult: FileDiffResponse,
   ): Promise<void> {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });

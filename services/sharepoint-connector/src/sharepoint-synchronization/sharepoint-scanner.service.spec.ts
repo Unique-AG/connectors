@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type { PipelineItem } from '../msgraph/types/pipeline-item.interface';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import type { DriveItem } from '../msgraph/types/sharepoint.types';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
@@ -53,7 +53,7 @@ describe('SharepointSynchronizationService', () => {
     },
   };
 
-  const mockFile: PipelineItem = {
+  const mockFile: SharepointContentItem = {
     itemType: 'driveItem',
     item: mockDriveItem,
     siteId: 'site-1',

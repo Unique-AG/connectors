@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileFilterService } from './file-filter.service';
 import { GraphApiService } from './graph-api.service';
 import { GraphClientFactory } from './graph-client.factory';
-import type { PipelineItem } from './types/pipeline-item.interface';
+import type { SharepointContentItem } from './types/sharepoint-content-item.interface';
 import type { DriveItem } from './types/sharepoint.types';
 import { isDriveItem } from './types/type-guards.util';
 
@@ -88,7 +88,7 @@ describe('GraphApiService', () => {
   });
 
   describe('getAllFilesAndPagesForSite', () => {
-    const mockEnrichedFile: PipelineItem = {
+    const mockSharepointContentItem: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
         '@odata.etag': 'etag1',
@@ -158,7 +158,7 @@ describe('GraphApiService', () => {
 
     it('finds syncable files across multiple drives', async () => {
       vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockEnrichedFile]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockSharepointContentItem]);
 
       const files = await service.getAllSiteItems('site-1');
 
@@ -169,7 +169,7 @@ describe('GraphApiService', () => {
 
     it('skips drives without IDs', async () => {
       vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockEnrichedFile]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockSharepointContentItem]);
 
       const files = await service.getAllSiteItems('site-1');
 
@@ -181,7 +181,7 @@ describe('GraphApiService', () => {
     it('handles pagination correctly', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: File variant for pagination test
       const file2: any = {
-        ...mockEnrichedFile,
+        ...mockSharepointContentItem,
         id: 'file-2',
         name: 'test2.pdf',
       };
@@ -211,7 +211,7 @@ describe('GraphApiService', () => {
 
     it('recursively scans folders', async () => {
       vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockEnrichedFile]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockSharepointContentItem]);
 
       const files = await service.getAllSiteItems('site-1');
 
@@ -228,7 +228,7 @@ describe('GraphApiService', () => {
         ) as unknown as FileFilterService['isFileValidForIngestion'];
 
       vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockEnrichedFile]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockSharepointContentItem]);
 
       const files = await service.getAllSiteItems('site-1');
 
