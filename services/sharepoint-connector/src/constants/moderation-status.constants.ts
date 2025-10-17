@@ -6,6 +6,6 @@ export const ModerationStatus = {
 
 export type ModerationStatusValue = (typeof ModerationStatus)[keyof typeof ModerationStatus];
 
-export function isModerationStatusApproved(status: unknown): status is 0 {
+export function isModerationStatusApproved(status: unknown): boolean {
   return status === ModerationStatus.Approved;
 }

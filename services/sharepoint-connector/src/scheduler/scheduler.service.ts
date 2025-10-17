@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 import { CRON_EVERY_15_MINUTES } from '../constants/defaults.constants';
 import { SharepointSynchronizationService } from '../sharepoint-synchronization/sharepoint-synchronization.service';
+import { normalizeError } from '../utils/normalize-error';
 
 @Injectable()
 export class SchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -40,9 +41,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
 
       this.logger.log('SharePoint scan completed successfully.');
     } catch (error) {
+      const normalizedError = normalizeError(error);
       this.logger.error(
-        'An unexpected error occurred during the scheduled scan.',
-        error instanceof Error ? error.stack : String(error),
+        `An unexpected error occurred during the scheduled scan: ${normalizedError.message}`,
       );
     }
   }
@@ -55,10 +56,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
         job.stop();
       });
     } catch (error) {
-      this.logger.error(
-        'Error stopping cron jobs:',
-        error instanceof Error ? error.stack : String(error),
-      );
+      const normalizedError = normalizeError(error);
+      this.logger.error(`Error stopping cron jobs: ${normalizedError.message}`);
     }
   }
 }

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
+import { normalizeError } from '../utils/normalize-error';
 import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -62,9 +63,9 @@ export class ProcessingPipelineService {
         if (step.cleanup) await step.cleanup(context);
       } catch (error) {
         const totalDuration = Date.now() - startTime.getTime();
+        const normalizedError = normalizeError(error);
         this.logger.error(
-          `[${correlationId}] Pipeline failed at step: ${step.stepName} after ${totalDuration}ms`,
-          error instanceof Error ? error.stack : String(error),
+          `[${correlationId}] Pipeline failed at step: ${step.stepName} after ${totalDuration}ms: ${normalizedError.message}`,
         );
 
         if (step.cleanup) await step.cleanup(context);
