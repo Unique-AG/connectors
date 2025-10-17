@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ModerationStatus } from '../constants/moderation-status.constants';
 import { FileFilterService } from './file-filter.service';
 import type { DriveItem as CustomDriveItem } from './types/sharepoint.types';
 
@@ -173,7 +174,7 @@ describe('FileFilterService', () => {
     const createFieldsObject = (overrides?: Record<string, unknown>) => ({
       '@odata.etag': 'etag1',
       FinanceGPTKnowledge: true,
-      _ModerationStatus: 0,
+      _ModerationStatus: ModerationStatus.Approved,
       Title: 'test.aspx',
       FileSizeDisplay: '1024',
       FileLeafRef: 'test.aspx',
@@ -201,12 +202,12 @@ describe('FileFilterService', () => {
     });
 
     it('returns false for ASPX file that is not approved', () => {
-      const fields = createFieldsObject({ _ModerationStatus: 1 });
+      const fields = createFieldsObject({ _ModerationStatus: ModerationStatus.Rejected });
       expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
 
     it('returns false for ASPX file with pending moderation status', () => {
-      const fields = createFieldsObject({ _ModerationStatus: 2 });
+      const fields = createFieldsObject({ _ModerationStatus: ModerationStatus.Pending });
       expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
 

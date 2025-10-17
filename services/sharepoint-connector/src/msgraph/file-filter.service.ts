@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
+import { isModerationStatusApproved } from '../constants/moderation-status.constants';
 import { DriveItem, ListItem } from './types/sharepoint.types';
 
 @Injectable()
@@ -13,7 +14,7 @@ export class FileFilterService {
         typeof fields.FileLeafRef === 'string' &&
         fields.FileLeafRef.toLowerCase().endsWith('.aspx') &&
         fields.FinanceGPTKnowledge === true &&
-        fields._ModerationStatus === 0,
+        isModerationStatusApproved(fields._ModerationStatus),
     );
   }
 

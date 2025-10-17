@@ -36,7 +36,12 @@ const SharepointConfig = z
       .positive()
       .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE)
       .describe('Number of MS Graph API requests allowed per minute'),
-    baseUrl: z.url().describe("Your company's sharepoint URL"),
+    baseUrl: z
+      .url()
+      .refine((url) => !url.endsWith('/'), {
+        message: 'Base URL must not end with a trailing slash',
+      })
+      .describe("Your company's sharepoint URL"),
     siteIds: z
       .string()
       .prefault('')

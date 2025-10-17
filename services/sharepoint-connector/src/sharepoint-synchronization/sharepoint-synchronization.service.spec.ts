@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ModerationStatus } from '../constants/moderation-status.constants';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
@@ -61,7 +62,7 @@ describe('SharepointSynchronizationService', () => {
           EditorLookupId: '1',
           ItemChildCount: '0',
           FolderChildCount: '0',
-          _ModerationStatus: 0,
+          _ModerationStatus: ModerationStatus.Approved,
           FileSizeDisplay: '2178118',
         },
       },
@@ -256,7 +257,7 @@ describe('SharepointSynchronizationService', () => {
             EditorLookupId: '1',
             ItemChildCount: '0',
             FolderChildCount: '0',
-            _ModerationStatus: 0,
+            _ModerationStatus: ModerationStatus.Approved,
             FileSizeDisplay: '1027813',
           },
         },
@@ -326,7 +327,7 @@ describe('SharepointSynchronizationService', () => {
             EditorLookupId: '1',
             ItemChildCount: '0',
             FolderChildCount: '0',
-            _ModerationStatus: 0,
+            _ModerationStatus: ModerationStatus.Approved,
             FileSizeDisplay: '932986',
           },
         },
@@ -396,7 +397,7 @@ describe('SharepointSynchronizationService', () => {
             EditorLookupId: '1',
             ItemChildCount: '0',
             FolderChildCount: '0',
-            _ModerationStatus: 0,
+            _ModerationStatus: ModerationStatus.Approved,
             FileSizeDisplay: '2178118',
           },
         },
@@ -447,7 +448,7 @@ describe('SharepointSynchronizationService', () => {
             EditorLookupId: '1',
             ItemChildCount: '0',
             FolderChildCount: '0',
-            _ModerationStatus: 0,
+            _ModerationStatus: ModerationStatus.Approved,
             FileSizeDisplay: '1027813',
           },
         },
@@ -498,7 +499,7 @@ describe('SharepointSynchronizationService', () => {
             EditorLookupId: '1',
             ItemChildCount: '0',
             FolderChildCount: '0',
-            _ModerationStatus: 0,
+            _ModerationStatus: ModerationStatus.Approved,
             FileSizeDisplay: '932986',
           },
         },

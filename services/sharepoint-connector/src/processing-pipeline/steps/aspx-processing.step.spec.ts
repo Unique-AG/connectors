@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ModerationStatus } from '../../constants/moderation-status.constants';
 import type { ListItem } from '../../msgraph/types/sharepoint.types';
 import type { ProcessingContext } from '../types/processing-context';
 import { AspxProcessingStep } from './aspx-processing.step';
@@ -46,7 +47,7 @@ describe('AspxProcessingStep', () => {
         fields: {
           '@odata.etag': 'etag1',
           FinanceGPTKnowledge: false,
-          _ModerationStatus: 0,
+          _ModerationStatus: ModerationStatus.Approved,
           Title: 'Test Page',
           FileSizeDisplay: '512',
           FileLeafRef: 'test.aspx',
@@ -96,7 +97,7 @@ describe('AspxProcessingStep', () => {
           fields: {
             '@odata.etag': 'etag1',
             FinanceGPTKnowledge: false,
-            _ModerationStatus: 0,
+            _ModerationStatus: ModerationStatus.Approved,
             FileSizeDisplay: '512',
             FileLeafRef: 'test.aspx',
           },

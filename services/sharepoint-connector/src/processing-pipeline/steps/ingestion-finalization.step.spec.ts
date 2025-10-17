@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { INGESTION_SOURCE_KIND } from '../../constants/ingestion.constants';
+import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import type { ListItem } from '../../msgraph/types/sharepoint.types';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
@@ -47,7 +48,7 @@ describe('IngestionFinalizationStep', () => {
       fields: {
         '@odata.etag': 'etag1',
         FinanceGPTKnowledge: false,
-        _ModerationStatus: 0,
+        _ModerationStatus: ModerationStatus.Approved,
         Title: 'Test Title',
         FileSizeDisplay: '512',
         FileLeafRef: 'test.aspx',

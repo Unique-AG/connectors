@@ -1,3 +1,5 @@
+import { ModerationStatusValue } from '../../constants/moderation-status.constants';
+
 export interface GraphApiErrorResponse {
   statusCode?: number;
   code?: string;
@@ -18,6 +20,7 @@ export function isGraphApiError(error: unknown): error is GraphApiErrorResponse 
   );
 }
 
+// Typing built from the response of the MS Graph API
 export interface ListItemDetailsResponse {
   id: string;
   webUrl?: string;
@@ -47,6 +50,7 @@ export interface SitePageContent {
   title: string;
 }
 
+// Typing built from the response of the MS Graph API
 export interface ListItem {
   id: string;
   lastModifiedDateTime: string;
@@ -62,7 +66,7 @@ export interface ListItem {
   fields: {
     '@odata.etag': string;
     FinanceGPTKnowledge: boolean;
-    _ModerationStatus: number;
+    _ModerationStatus: ModerationStatusValue;
     CanvasContent1?: string;
     WikiField?: string;
     Title: string;
@@ -72,12 +76,14 @@ export interface ListItem {
   };
 }
 
+// Typing built from the response of the MS Graph API
 export interface GraphListItemsResponse {
   '@odata.context': string;
   '@odata.nextLink'?: string;
   value: ListItem[];
 }
 
+// Typing built from the response of the MS Graph API
 export interface DriveItem {
   '@odata.etag': string;
   id: string;
@@ -123,6 +129,7 @@ export interface DriveItem {
   };
 }
 
+// Typing built from the response of the MS Graph API
 export interface DriveItemFields {
   '@odata.etag': string;
   FinanceGPTKnowledge: boolean;
@@ -136,6 +143,8 @@ export interface DriveItemFields {
   FolderChildCount: string;
   [key: string]: unknown;
 }
+//
+// Typing built from the response of the MS Graph API
 export interface GraphDriveItemsResponse {
   '@odata.context': string;
   '@odata.nextLink'?: string;

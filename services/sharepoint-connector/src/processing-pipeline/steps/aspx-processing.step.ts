@@ -50,8 +50,9 @@ export class AspxProcessingStep implements IPipelineStep {
       return content;
     }
 
-    // adds base url to strings that start with href=/
-    return content.replace(/href="\/(.*?)"/g, `href="${baseUrl}$1"`);
+    // adds base url to strings that start with href=/ and ensures single slash between baseUrl and path
+    const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    return content.replace(/href="\/(.*?)"/g, `href="${normalizedBaseUrl}/$1"`);
   }
 
   private buildAuthorHtml(createdBy: ListItem['createdBy']): string {
