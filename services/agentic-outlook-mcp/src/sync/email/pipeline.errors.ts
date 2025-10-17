@@ -5,4 +5,3 @@ export class FatalPipelineError extends Error {
     this.cause = cause;
   }
 }
-

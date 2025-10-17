@@ -33,6 +33,7 @@ export const folders = sqliteTable('folders', {
   folderId: text('folder_id'),
   parentFolderId: text('parent_folder_id'),
   childFolderCount: integer('child_folder_count'),
+  totalItemCount: integer('total_item_count'),
   subscriptionId: text('subscription_id'),
   syncToken: text('sync_token'),
   activatedAt: text('activated_at'),
