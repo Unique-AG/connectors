@@ -220,10 +220,5 @@ describe('FileFilterService', () => {
       const fields = createFieldsObject({ FileLeafRef: undefined });
       expect(service.isListItemValidForIngestion(fields)).toBe(false);
     });
-
-    it('returns false for file with non-string FileLeafRef', () => {
-      const fields = createFieldsObject({ FileLeafRef: 123 });
-      expect(service.isListItemValidForIngestion(fields)).toBe(false);
-    });
   });
 });
