@@ -73,16 +73,16 @@ export class ProcessService {
             return;
           }
 
-          if (email.processedBody && email.language) {
-            this.logger.log({
-              msg: 'Email already processed, skipping',
-              emailId,
-              userProfileId,
-            });
-            span.addEvent('email.already_processed');
-            span.setStatus({ code: SpanStatusCode.OK });
-            return;
-          }
+          // if (email.processedBody && email.language) {
+          //   this.logger.log({
+          //     msg: 'Email already processed, skipping',
+          //     emailId,
+          //     userProfileId,
+          //   });
+          //   span.addEvent('email.already_processed');
+          //   span.setStatus({ code: SpanStatusCode.OK });
+          //   return;
+          // }
 
           const {
             cleanMarkdown,
