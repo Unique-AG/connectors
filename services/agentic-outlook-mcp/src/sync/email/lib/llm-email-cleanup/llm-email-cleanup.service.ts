@@ -2,14 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { compile } from 'handlebars';
-import {
-  Response,
-  ResponseOutputMessage,
-  ResponseOutputText,
-} from 'openai/resources/responses/responses';
 import { serializeError } from 'serialize-error-cjs';
 import * as z from 'zod';
 import { Email } from '../../../../drizzle';
+import { parseCompletionOutput, parseModelDataFromResponse, parseUsageDetailsFromResponse } from '../../../../llm';
 import { LLMService } from '../../../../llm/llm.service';
 import { normalizeError } from '../../../../utils/normalize-error';
 import { FEW_SHOT_EXAMPLES } from './few-shot.examples';
@@ -109,15 +105,37 @@ export class LLMEmailCleanupService {
       const systemPrompt = this.buildSystemPrompt();
       const userPrompt = this.buildUserPrompt(email);
 
-      const response = await this.callLLMAPI(systemPrompt, userPrompt);
+      const response = await this.llmService.client.chat.completions.create({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'email_cleanup_output',
+            schema: z.toJSONSchema(emailCleanupOutputSchema),
+          },
+        },
+      });
+
+      const testOutput = parseCompletionOutput(response);
+      const usageDetails = parseUsageDetailsFromResponse(response);
+      const modelData = parseModelDataFromResponse(response);
 
       this.logger.debug({
         msg: 'LLM email cleanup response received',
         emailId: email.id,
-        hasOutput: !!response.output?.length,
+        response,
+        testOutput,
+        usageDetails,
+        modelData,
       });
 
-      const rawOutput = this.extractOutputText(response);
+      const rawOutput = response.choices[0]?.message.content;
+      if (!rawOutput) throw new EmailCleanupParseError('No output message in response');
+      
       const parsedOutput = this.parseAndValidateOutput(rawOutput);
 
       this.logger.debug({
@@ -164,7 +182,7 @@ export class LLMEmailCleanupService {
   private buildUserPrompt(email: Email): string {
     try {
       const template = fs.readFileSync(
-        path.join(__dirname, 'claude-3-5-haiku-20241022.user-prompt.handlebars'),
+        path.join(__dirname, `${MODEL}.user-prompt.handlebars`),
         'utf8',
       );
       return compile(template)({
@@ -186,54 +204,11 @@ export class LLMEmailCleanupService {
     }
   }
 
-  private async callLLMAPI(systemPrompt: string, userPrompt: string): Promise<Response> {
-    try {
-      return await this.llmService.client.responses.create({
-        model: MODEL,
-        input: [
-          {
-            role: 'developer',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: userPrompt,
-          },
-          {
-            role: 'assistant',
-            content: '{',
-          },
-        ],
-      });
-    } catch (error) {
-      throw new EmailCleanupAPIError('LLM API call failed', error);
-    }
-  }
-
-  private extractOutputText(response: Response): string {
-    try {
-      const outputMessage = response.output?.[0] as ResponseOutputMessage | undefined;
-      if (!outputMessage) throw new EmailCleanupParseError('No output message in response');
-
-      const outputText = (outputMessage.content?.[0] as ResponseOutputText | undefined)?.text;
-      if (!outputText || typeof outputText !== 'string')
-        throw new EmailCleanupParseError('No text content in output message');
-
-      return outputText;
-    } catch (error) {
-      throw new EmailCleanupParseError(
-        'Failed to extract text from response',
-        JSON.stringify(response),
-        error,
-      );
-    }
-  }
-
   private parseAndValidateOutput(rawOutput: string): EmailCleanupOutput {
     let jsonOutput: unknown;
 
     try {
-      jsonOutput = JSON.parse(`{${rawOutput}`);
+      jsonOutput = JSON.parse(rawOutput);
     } catch (error) {
       this.logger.error({
         msg: 'Failed to parse LLM output as JSON',
