@@ -44,7 +44,6 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
 
     this.schedulerRegistry.addCronJob('sharepoint-scan', job);
     job.start();
-
   }
 
   public async runScheduledScan(): Promise<void> {
