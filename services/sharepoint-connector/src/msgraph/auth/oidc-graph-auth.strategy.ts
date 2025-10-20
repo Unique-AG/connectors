@@ -100,7 +100,7 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
       iss: payload.iss,
       aud: payload.aud,
       tenantId: payload.tid,
-      appId: payload.appid || payload.azp || payload.aio, // azp/appid vary by flow
+      appId: payload.appid || payload.azp, // azp/appid vary by flow
       appDisplayName: payload.app_displayname,
       tokenUse: payload?.typ || 'access',
 
