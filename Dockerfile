@@ -3,7 +3,7 @@
 FROM node:22-bookworm AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-ARG PNPM_VERSION=10.15.1
+ARG PNPM_VERSION=10.18.3
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 
 FROM base AS pruner
@@ -50,7 +50,7 @@ RUN set -eux; \
 
 FROM node:22-bookworm-slim AS runner
 ARG APP_NAME
-ARG PNPM_VERSION=10.15.1
+ARG PNPM_VERSION=10.18.3
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -74,9 +74,9 @@ ENV NODE_ENV=production
 COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/@generated ./@generated
 COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/public ./public
+COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/prisma ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/out/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/out/package.json ./package.json
-COPY --from=builder --chown=nestjs:nodejs /app/out/prisma ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/_engines /prisma/engines
 
 # Create symlink to the correct schema engine binary for the current platform
