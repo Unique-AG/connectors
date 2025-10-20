@@ -17,6 +17,7 @@
     "db:migrate": "echo \"No database for this server\"",
     "db:push": "echo \"No database for this server\"",
     "db:migrate:deploy": "echo \"No database for this server\"",
+    "codegen": "echo \"No codegen needed for this server\"",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "format": "biome format .",
