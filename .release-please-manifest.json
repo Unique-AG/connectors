@@ -1,5 +1,5 @@
 {
   "services/factset-mcp": "0.2.3",
   "services/outlook-mcp": "0.5.1",
-  "services/sharepoint-connector": "2.0.0-alpha.6"
+  "services/sharepoint-connector": "2.0.0-alpha.7"
 }

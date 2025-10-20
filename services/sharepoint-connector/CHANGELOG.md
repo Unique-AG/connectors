@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0-alpha.7](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.6...sharepoint-connector@v2.0.0-alpha.7) (2025-10-20)
+
+
+### Features
+
+* **sharepoint-connector:** Test OIDC token eligibility for SP REST V1 API ([#67](https://github.com/Unique-AG/connectors/issues/67)) ([c76a2d6](https://github.com/Unique-AG/connectors/commit/c76a2d655add7d863ae6414fdb1bac1aa92549b6))
+
+
+### Bug Fixes
+
+* **factset:** upgrade Prisma to fix incompatible Prisma versions ([#69](https://github.com/Unique-AG/connectors/issues/69)) ([2586805](https://github.com/Unique-AG/connectors/commit/2586805e33fcbf810a1b7d8e588288b2fbc4d76f))
+
 ## [2.0.0-alpha.6](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.5...sharepoint-connector@v2.0.0-alpha.6) (2025-10-17)
 
 
