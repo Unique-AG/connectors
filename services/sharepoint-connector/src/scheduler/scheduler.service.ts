@@ -19,7 +19,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly sharepointScanner: SharepointSynchronizationService,
     private readonly schedulerRegistry: SchedulerRegistry,
     @Inject(SHAREPOINT_V1_HTTP_CLIENT) private readonly sharepointV1HttpClient: Client,
-    private readonly configService: ConfigService<Config, true>
+    private readonly configService: ConfigService<Config, true>,
   ) {
     this.logger.log('SchedulerService initialized with distributed locking');
   }
@@ -75,8 +75,11 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     const useOidc = this.configService.get('sharepoint.graphUseOidcAuth', { infer: true });
 
     const scope = 'https://uniqueapp.sharepoint.com/.default';
-    const newAccessToken = await (useOidc ? new OidcGraphAuthStrategy(this.configService) : new ClientSecretGraphAuthStrategy(this.configService)).getAccessToken(scope);
-    
+    const newAccessToken = await (useOidc
+      ? new OidcGraphAuthStrategy(this.configService)
+      : new ClientSecretGraphAuthStrategy(this.configService)
+    ).getAccessToken(scope);
+
     const { statusCode, body } = await this.sharepointV1HttpClient.request({
       method: 'GET',
       path: '/sites/UniqueAG/_api/web/sitegroups',
@@ -85,7 +88,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
         Authorization: `Bearer ${newAccessToken}`,
       },
     });
-    
+
     if (200 <= statusCode && statusCode < 300) {
       const bodyData = await body.text();
       this.logger.log(

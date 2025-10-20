@@ -86,7 +86,9 @@ describe('OidcGraphAuthStrategy', () => {
   it('clears cached token on authentication error', async () => {
     mockCredential.getToken.mockRejectedValue(new Error('Authentication failed'));
 
-    await expect(strategy.getAccessToken('https://graph.microsoft.com/.default')).rejects.toThrow('Authentication failed');
+    await expect(strategy.getAccessToken('https://graph.microsoft.com/.default')).rejects.toThrow(
+      'Authentication failed',
+    );
 
     const expiresOnTimestamp = Date.now() + 3600 * 1000;
     mockCredential.getToken.mockResolvedValue({
