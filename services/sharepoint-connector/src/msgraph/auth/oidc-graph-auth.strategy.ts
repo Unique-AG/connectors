@@ -25,7 +25,7 @@ const TokenResponseSchema = z.object({
 export class OidcGraphAuthStrategy implements GraphAuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly credential: DefaultAzureCredential;
-  private cachedToken: CachedToken | null = null;
+  private cachedToken: Record<string, CachedToken> = {};
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
     const tenantId = this.configService.get('sharepoint.graphTenantId', { infer: true });
@@ -38,8 +38,8 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
   }
 
   public async getAccessToken(scope: string): Promise<string> {
-    if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
-      return this.cachedToken.accessToken;
+    if (this.cachedToken[scope] && this.isTokenValid(this.cachedToken[scope])) {
+      return this.cachedToken[scope].accessToken;
     }
 
     return await this.acquireNewToken(scope);
@@ -55,7 +55,7 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
       const tokenResponse = await this.credential.getToken(scope);
       const validatedResponse = TokenResponseSchema.parse(tokenResponse);
 
-      this.cachedToken = {
+      this.cachedToken[scope] = {
         accessToken: validatedResponse.token,
         expiresAt: validatedResponse.expiresOnTimestamp,
       };
@@ -67,7 +67,7 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
         error: serializeError(normalizeError(error)),
       });
 
-      this.cachedToken = null;
+      delete this.cachedToken[scope];
       throw error;
     }
   }
