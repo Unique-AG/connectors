@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/Unique-AG/connectors/compare/factset-mcp@v0.2.2...factset-mcp@v0.2.3) (2025-10-20)
+
+
+### Bug Fixes
+
+* **factset:** upgrade Prisma to fix incompatible Prisma versions ([#69](https://github.com/Unique-AG/connectors/issues/69)) ([2586805](https://github.com/Unique-AG/connectors/commit/2586805e33fcbf810a1b7d8e588288b2fbc4d76f))
+
 ## [0.2.2](https://github.com/Unique-AG/connectors/compare/factset-mcp@v0.2.1...factset-mcp@v0.2.2) (2025-10-18)
 
 
