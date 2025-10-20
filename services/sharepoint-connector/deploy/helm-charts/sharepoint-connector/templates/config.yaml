@@ -36,8 +36,13 @@ data:
   PROCESSING_STEP_TIMEOUT_SECONDS: {{ .Values.connectorConfig.processing.stepTimeoutSeconds | quote }}
   PROCESSING_ALLOWED_MIME_TYPES: {{ .Values.connectorConfig.processing.allowedMimeTypes | join "," }}
   PROCESSING_CONCURRENCY: {{ .Values.connectorConfig.processing.concurrency | quote }}
+  {{- if .Values.connectorConfig.processing.maxFilesToScan }}
   PROCESSING_MAX_FILES_TO_SCAN: {{ .Values.connectorConfig.processing.maxFilesToScan | quote }}
+  {{-end }}
   {{- if .Values.connectorConfig.processing.maxFileSizeBytes }}
   PROCESSING_MAX_FILE_SIZE_BYTES: {{ .Values.connectorConfig.processing.maxFileSizeBytes | quote }}
+  {{- end }}
+  {{- if .Values.connectorConfig.processing.scanIntervalCron }}
+  PROCESSING_SCAN_INTERVAL_CRON: {{ .Values.connectorConfig.processing.scanIntervalCron | quote }}
   {{- end }}
 {{- end }}

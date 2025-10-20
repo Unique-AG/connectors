@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Cron, SchedulerRegistry } from '@nestjs/schedule';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronJob } from 'cron';
 import { Client } from 'undici';
 import { Config } from '../config';
-import { CRON_EVERY_15_MINUTES } from '../constants/defaults.constants';
 import { SHAREPOINT_V1_HTTP_CLIENT } from '../http-client.tokens';
 import { ClientSecretGraphAuthStrategy } from '../msgraph/auth/client-secret-graph-auth.strategy';
 import { OidcGraphAuthStrategy } from '../msgraph/auth/oidc-graph-auth.strategy';
@@ -20,14 +20,12 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly schedulerRegistry: SchedulerRegistry,
     @Inject(SHAREPOINT_V1_HTTP_CLIENT) private readonly sharepointV1HttpClient: Client,
     private readonly configService: ConfigService<Config, true>,
-  ) {
-    this.logger.log('SchedulerService initialized with distributed locking');
-  }
+  ) {}
 
   public onModuleInit() {
     this.logger.log('Triggering initial scan on service startup...');
     this.tryCallingSharePointApiV1();
-    this.runScheduledScan();
+    this.setupScheduledScan();
   }
 
   public onModuleDestroy() {
@@ -36,7 +34,19 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     this.destroyCronJobs();
   }
 
-  @Cron(CRON_EVERY_15_MINUTES)
+  private setupScheduledScan(): void {
+    const cronExpression = this.configService.get('processing.scanIntervalCron', { infer: true });
+
+    const job = new CronJob(cronExpression, () => {
+      this.runScheduledScan();
+    });
+
+    this.schedulerRegistry.addCronJob('sharepoint-scan', job);
+    job.start();
+
+    this.logger.log(`Scheduled scan configured with cron expression: ${cronExpression}`);
+  }
+
   public async runScheduledScan(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log('Skipping scheduled scan due to shutdown');
