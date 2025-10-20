@@ -1,3 +1,3 @@
 export interface GraphAuthStrategy {
-  getAccessToken(): Promise<string>;
+  getAccessToken(scope: string): Promise<string>;
 }

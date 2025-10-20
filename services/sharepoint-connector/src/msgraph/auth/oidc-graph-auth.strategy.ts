@@ -37,12 +37,12 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
     });
   }
 
-  public async getAccessToken(): Promise<string> {
+  public async getAccessToken(scope: string): Promise<string> {
     if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
       return this.cachedToken.accessToken;
     }
 
-    return await this.acquireNewToken();
+    return await this.acquireNewToken(scope);
   }
 
   private isTokenValid(token: CachedToken): boolean {
@@ -50,9 +50,9 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
     return token.expiresAt > now;
   }
 
-  private async acquireNewToken(): Promise<string> {
+  private async acquireNewToken(scope: string): Promise<string> {
     try {
-      const tokenResponse = await this.credential.getToken('https://graph.microsoft.com/.default');
+      const tokenResponse = await this.credential.getToken(scope);
       const validatedResponse = TokenResponseSchema.parse(tokenResponse);
 
       this.cachedToken = {
