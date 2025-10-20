@@ -140,7 +140,9 @@ describe('ClientSecretGraphAuthStrategy', () => {
       new Error('Authentication failed'),
     );
 
-    await expect(strategy.getAccessToken('https://graph.microsoft.com/.default')).rejects.toThrow('Authentication failed');
+    await expect(strategy.getAccessToken('https://graph.microsoft.com/.default')).rejects.toThrow(
+      'Authentication failed',
+    );
 
     mockMsalClient.acquireTokenByClientCredential.mockResolvedValue({
       accessToken: 'new-token',
