@@ -38,7 +38,7 @@ data:
   PROCESSING_CONCURRENCY: {{ .Values.connectorConfig.processing.concurrency | quote }}
   {{- if .Values.connectorConfig.processing.maxFilesToScan }}
   PROCESSING_MAX_FILES_TO_SCAN: {{ .Values.connectorConfig.processing.maxFilesToScan | quote }}
-  {{-end }}
+  {{- end }}
   {{- if .Values.connectorConfig.processing.maxFileSizeBytes }}
   PROCESSING_MAX_FILE_SIZE_BYTES: {{ .Values.connectorConfig.processing.maxFileSizeBytes | quote }}
   {{- end }}
