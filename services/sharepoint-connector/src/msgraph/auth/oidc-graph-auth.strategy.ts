@@ -60,6 +60,7 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
         expiresAt: validatedResponse.expiresOnTimestamp,
       };
 
+      this.logTokenInternalForDebugging(validatedResponse.token);
       return validatedResponse.token;
     } catch (error) {
       this.logger.error({
@@ -70,5 +71,49 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
       delete this.cachedToken[scope];
       throw error;
     }
+  }
+
+  // Purely for debugging the OIDC token that fail in an unexpcted way
+  private logTokenInternalForDebugging(token: string): void {
+    const parts = token.split('.');
+
+    const b64urlToJson = (str: string): Record<string, unknown> => {
+      const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+      const buf = Buffer.from(b64, 'base64');
+      try {
+        return JSON.parse(buf.toString('utf8'));
+      } catch {
+        return {};
+      }
+    };
+
+    const header = b64urlToJson(parts[0] ?? '');
+    const payload = b64urlToJson(parts[1] ?? '');
+
+    const tokenSafeProperties = {
+      // Header
+      alg: header.alg,
+      kid: header.kid,
+      typ: header.typ,
+
+      // Issuance context
+      iss: payload.iss,
+      aud: payload.aud,
+      tenantId: payload.tid,
+      appId: payload.appid || payload.azp, // azp/appid vary by flow
+      appDisplayName: payload.app_displayname,
+      tokenUse: payload?.typ || 'access',
+
+      // Permissions
+      scopes: typeof payload.scp === 'string' ? payload.scp.split(' ') : undefined,
+      roles: payload.roles,
+
+      // Timing (convert to ISO for readability)
+      iat: typeof payload.iat === 'number' ? new Date(payload.iat * 1000).toISOString() : undefined,
+      nbf: typeof payload.nbf === 'number' ? new Date(payload.nbf * 1000).toISOString() : undefined,
+      exp: typeof payload.exp === 'number' ? new Date(payload.exp * 1000).toISOString() : undefined,
+    };
+
+    this.logger.log(JSON.stringify(tokenSafeProperties, null, 4));
   }
 }
