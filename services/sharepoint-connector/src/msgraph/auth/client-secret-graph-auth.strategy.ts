@@ -20,8 +20,7 @@ interface CachedToken {
 export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
-  private readonly scopes = ['https://graph.microsoft.com/.default'];
-  private cachedToken: CachedToken | null = null;
+  private cachedToken: Record<string, CachedToken> = {};
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
     const tenantId = this.configService.get('sharepoint.graphTenantId', { infer: true });
@@ -44,12 +43,12 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
     this.msalClient = new ConfidentialClientApplication(msalConfig);
   }
 
-  public async getAccessToken(): Promise<string> {
-    if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
-      return this.cachedToken.accessToken;
+  public async getAccessToken(scope: string): Promise<string> {
+    if (this.cachedToken[scope] && this.isTokenValid(this.cachedToken[scope])) {
+      return this.cachedToken[scope].accessToken;
     }
 
-    return await this.acquireNewToken();
+    return await this.acquireNewToken(scope);
   }
 
   private isTokenValid(token: CachedToken): boolean {
@@ -57,9 +56,9 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
     return token.expiresAt > now;
   }
 
-  private async acquireNewToken(): Promise<string> {
+  private async acquireNewToken(scope: string): Promise<string> {
     const tokenRequest: ClientCredentialRequest = {
-      scopes: this.scopes,
+      scopes: [scope],
     };
 
     try {
@@ -74,7 +73,7 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
         'Failed to acquire Graph API token: no expiration time in response',
       );
 
-      this.cachedToken = {
+      this.cachedToken[scope] = {
         accessToken: response.accessToken,
         expiresAt: response.expiresOn.getTime(),
       };
@@ -86,7 +85,7 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
         error: serializeError(normalizeError(error)),
       });
 
-      this.cachedToken = null;
+      delete this.cachedToken[scope];
       throw error;
     }
   }
