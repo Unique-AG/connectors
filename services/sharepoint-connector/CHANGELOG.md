@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-alpha.8](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.7...sharepoint-connector@v2.0.0-alpha.8) (2025-10-20)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** fix caching for OIDC auth strategy ([#71](https://github.com/Unique-AG/connectors/issues/71)) ([82aed89](https://github.com/Unique-AG/connectors/commit/82aed89c14d644c3021d614a690dc7cb51b3bd17))
+
 ## [2.0.0-alpha.7](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.6...sharepoint-connector@v2.0.0-alpha.7) (2025-10-20)
 
 
