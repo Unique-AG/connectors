@@ -36,6 +36,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
 
   private setupScheduledScan(): void {
     const cronExpression = this.configService.get('processing.scanIntervalCron', { infer: true });
+    this.logger.log(`Scheduled scan configured with cron expression: ${cronExpression}`);
 
     const job = new CronJob(cronExpression, () => {
       this.runScheduledScan();
@@ -44,7 +45,6 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     this.schedulerRegistry.addCronJob('sharepoint-scan', job);
     job.start();
 
-    this.logger.log(`Scheduled scan configured with cron expression: ${cronExpression}`);
   }
 
   public async runScheduledScan(): Promise<void> {
