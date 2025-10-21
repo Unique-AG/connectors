@@ -65,6 +65,8 @@ export const emails = pgTable(
     uniqueBodyHtml: text(),
 
     processedBody: text(),
+    summarizedBody: text(),
+    threadSummary: text(),
 
     isRead: boolean().notNull().default(true),
     isDraft: boolean().notNull().default(false),
