@@ -1,4 +1,4 @@
-name: "[mcp/server/sharepoint-connector] Warm Docker Build Cache (nightly)"
+name: "[sharepoint-connector] Warm Docker Build Cache (nightly)"
 
 on:
   schedule:
