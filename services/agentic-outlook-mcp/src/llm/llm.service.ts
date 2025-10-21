@@ -1,28 +1,33 @@
-import { LangfuseConfig, observeOpenAI } from "@langfuse/openai";
-import { startObservation } from "@langfuse/tracing";
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import OpenAI from "openai";
-import { ChatCompletionCreateParamsNonStreaming } from "openai/resources/index";
-import { serializeError } from "serialize-error-cjs";
-import { z } from "zod";
-import { AppConfig, AppSettings } from "../app-settings";
-import { normalizeError } from "../utils/normalize-error";
+import { LangfuseConfig, observeOpenAI } from '@langfuse/openai';
+import { startObservation } from '@langfuse/tracing';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import OpenAI from 'openai';
+import { ChatCompletionCreateParamsNonStreaming } from 'openai/resources/index';
+import { serializeError } from 'serialize-error-cjs';
+import { z } from 'zod';
+import { AppConfig, AppSettings } from '../app-settings';
+import { normalizeError } from '../utils/normalize-error';
 import {
   parseCompletionOutput,
   parseInputArgs,
   parseModelDataFromResponse,
   parseUsageDetailsFromResponse,
-} from "./parse-openai.util";
+} from './parse-openai.util';
 
 export class LLMError extends Error {
-  public constructor(message: string, public readonly cause?: unknown) {
+  public constructor(
+    message: string,
+    public readonly cause?: unknown,
+  ) {
     super(message);
   }
 }
 
 @Injectable()
 export class LLMService {
+  private readonly logger = new Logger(this.constructor.name);
+
   public readonly client: OpenAI;
 
   public constructor(configService: ConfigService<AppConfig, true>) {
@@ -30,7 +35,7 @@ export class LLMService {
       new OpenAI({
         apiKey: configService.get(AppSettings.LITELLM_API_KEY),
         baseURL: configService.get(AppSettings.LITELLM_BASE_URL),
-      })
+      }),
     );
     this.client = client;
   }
@@ -46,33 +51,31 @@ export class LLMService {
       schema: T;
       schemaName?: string;
     },
-    config?: LangfuseConfig
+    config?: LangfuseConfig,
   ): Promise<z.infer<T>> {
     const { schema, schemaName, ...rest } = options;
 
     const inputArgs = {
       ...rest,
       response_format: {
-        type: "json_schema" as const,
+        type: 'json_schema' as const,
         json_schema: {
-          name: schemaName ?? "Output",
+          name: schemaName ?? 'Output',
           schema: z.toJSONSchema(schema),
         },
       },
     };
 
     const { model, input, modelParameters } = parseInputArgs(inputArgs);
-    const finalModelParams = { ...modelParameters, response_format: "" };
+    const finalModelParams = { ...modelParameters, response_format: '' };
     const finalMetadata = {
       ...config?.generationMetadata,
       response_format:
-        "response_format" in modelParameters
-          ? modelParameters.response_format
-          : undefined,
+        'response_format' in modelParameters ? modelParameters.response_format : undefined,
     };
 
     const generation = startObservation(
-      config?.generationName ?? "OpenAI-completion",
+      config?.generationName ?? 'OpenAI-completion',
       {
         model,
         input,
@@ -81,9 +84,9 @@ export class LLMService {
         metadata: finalMetadata,
       },
       {
-        asType: "generation",
+        asType: 'generation',
         parentSpanContext: config?.parentSpanContext,
-      }
+      },
     ).updateTrace({
       userId: config?.userId,
       sessionId: config?.sessionId,
@@ -99,6 +102,7 @@ export class LLMService {
 
         output = parseCompletionOutput(response);
         const usageDetails = parseUsageDetailsFromResponse(response);
+        this.logger.log({ msg: 'Usage details', usageDetails });
         const {
           model: modelFromResponse,
           modelParameters: modelParametersFromResponse,
@@ -108,7 +112,8 @@ export class LLMService {
         generation
           .update({
             output,
-            usageDetails,
+            // biome-ignore lint/suspicious/noExplicitAny: The langfuse sdk types are broken!
+            usageDetails: usageDetails as any,
             model: modelFromResponse,
             modelParameters: modelParametersFromResponse,
             metadata: metadataFromResponse,
@@ -118,7 +123,7 @@ export class LLMService {
         generation
           .update({
             statusMessage: String(error),
-            level: "ERROR",
+            level: 'ERROR',
             costDetails: {
               input: 0,
               output: 0,
@@ -127,30 +132,27 @@ export class LLMService {
           })
           .end();
         throw new LLMError(
-          "Failed to get response from LLM",
-          serializeError(normalizeError(error))
+          'Failed to get response from LLM',
+          serializeError(normalizeError(error)),
         );
       }
 
       // If the parsing fails, throw an error, but don't null the costs, as we already paid for it.
       const content =
-        typeof output === "object" && output && "content" in output
-          ? output.content
-          : output;
-      if (typeof content !== "string")
-        throw new LLMError("Output content is not a string");
+        typeof output === 'object' && output && 'content' in output ? output.content : output;
+      if (typeof content !== 'string') throw new LLMError('Output content is not a string');
       const json = JSON.parse(content);
       return schema.parse(json);
     } catch (error) {
       generation
         .update({
           statusMessage: String(error),
-          level: "ERROR",
+          level: 'ERROR',
         })
         .end();
       throw new LLMError(
-        "Failed to generate object with schema",
-        serializeError(normalizeError(error))
+        'Failed to generate object with schema',
+        serializeError(normalizeError(error)),
       );
     }
   }

@@ -1,7 +1,6 @@
-import { RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
+import { AmqpConnection, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import { Message } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SpanStatusCode } from '@opentelemetry/api';
 import { ConsumeMessage } from 'amqplib';
 import { snakeCase } from 'lodash';
@@ -9,8 +8,8 @@ import { TypeID } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, EmailInput } from '../../../drizzle';
 import { EmailService } from '../email.service';
 import { DeletedItem } from '../email-sync.service';
-import { IngestCompletedEvent, IngestFailedEvent, PipelineEvents } from '../pipeline.events';
-import { PipelineRetryService } from '../pipeline-retry.service';
+import { OrchestratorEventType } from '../orchestrator.messages';
+import { RetryService } from '../retry.service';
 import { TracePropagationService } from '../trace-propagation.service';
 
 interface IngestMessage {
@@ -26,10 +25,10 @@ export class IngestService {
   private readonly foldersMap = new Map<string, string>();
 
   public constructor(
+    private readonly amqpConnection: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly emailService: EmailService,
-    private readonly eventEmitter: EventEmitter2,
-    private readonly pipelineRetryService: PipelineRetryService,
+    private readonly retryService: RetryService,
     private readonly tracePropagation: TracePropagationService,
   ) {}
 
@@ -91,14 +90,17 @@ export class IngestService {
           span.setStatus({ code: SpanStatusCode.OK });
 
           const traceHeaders = this.tracePropagation.extractTraceHeaders(amqpMessage);
-          this.eventEmitter.emit(
-            PipelineEvents.IngestCompleted,
-            new IngestCompletedEvent(
-              TypeID.fromString(userProfileId, 'user_profile'),
+          await this.amqpConnection.publish(
+            'email.orchestrator',
+            'orchestrator',
+            {
+              eventType: OrchestratorEventType.IngestCompleted,
+              userProfileId,
               folderId,
-              savedId,
-              traceHeaders,
-            ),
+              emailId: savedId.toString(),
+              timestamp: new Date().toISOString(),
+            },
+            { headers: traceHeaders },
           );
 
           return;
@@ -108,20 +110,28 @@ export class IngestService {
             message: error instanceof Error ? error.message : String(error),
           });
           span.recordException(error as Error);
-          await this.pipelineRetryService.handlePipelineError({
+          await this.retryService.handleError({
             message: ingestMessage,
             amqpMessage,
             error,
             retryExchange: 'email.pipeline.retry',
             retryRoutingKey: 'email.ingest.retry',
-            failedEventName: PipelineEvents.IngestFailed,
-            createFailedEvent: (serializedError) =>
-              new IngestFailedEvent(
-                TypeID.fromString(userProfileId, 'user_profile'),
-                folderId,
-                messageId,
-                serializedError,
-              ),
+            onMaxRetriesExceeded: async (_msg, errorStr, traceHeaders) => {
+              await this.amqpConnection.publish(
+                'email.orchestrator',
+                'orchestrator',
+                {
+                  eventType: OrchestratorEventType.IngestFailed,
+                  userProfileId,
+                  emailId: ingestMessage.emailId,
+                  folderId,
+                  messageId,
+                  timestamp: new Date().toISOString(),
+                  error: errorStr,
+                },
+                { headers: traceHeaders },
+              );
+            },
           });
           return;
         }
