@@ -18,6 +18,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
 
   public onModuleInit() {
     this.logger.log('Triggering initial scan on service startup...');
+    void this.runScheduledScan();
     this.setupScheduledScan();
   }
 
