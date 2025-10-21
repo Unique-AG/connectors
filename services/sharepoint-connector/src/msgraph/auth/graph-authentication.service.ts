@@ -27,6 +27,6 @@ export class GraphAuthenticationService implements AuthenticationProvider {
   }
 
   public async getAccessToken(): Promise<string> {
-    return await this.strategy.getAccessToken('https://graph.microsoft.com/.default');
+    return await this.strategy.getAccessToken();
   }
 }

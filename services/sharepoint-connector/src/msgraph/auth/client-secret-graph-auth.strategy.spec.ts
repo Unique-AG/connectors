@@ -46,7 +46,7 @@ describe('ClientSecretGraphAuthStrategy', () => {
       expiresOn: expirationDate,
     });
 
-    const token = await strategy.getAccessToken('https://graph.microsoft.com/.default');
+    const token = await strategy.getAccessToken();
 
     expect(token).toBe('test-token-123');
     expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledWith({
@@ -61,8 +61,8 @@ describe('ClientSecretGraphAuthStrategy', () => {
       expiresOn: expirationDate,
     });
 
-    await strategy.getAccessToken('https://graph.microsoft.com/.default');
-    const secondToken = await strategy.getAccessToken('https://graph.microsoft.com/.default');
+    await strategy.getAccessToken();
+    const secondToken = await strategy.getAccessToken();
 
     expect(secondToken).toBe('test-token-123');
     expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledTimes(1);
@@ -82,8 +82,8 @@ describe('ClientSecretGraphAuthStrategy', () => {
         expiresOn: newExpirationDate,
       });
 
-    await strategy.getAccessToken('https://graph.microsoft.com/.default');
-    const newToken = await strategy.getAccessToken('https://graph.microsoft.com/.default');
+    await strategy.getAccessToken();
+    const newToken = await strategy.getAccessToken();
 
     expect(newToken).toBe('new-token');
     expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledTimes(2);
@@ -95,7 +95,7 @@ describe('ClientSecretGraphAuthStrategy', () => {
       expiresOn: new Date(),
     });
 
-    await expect(strategy.getAccessToken('https://graph.microsoft.com/.default')).rejects.toThrow(
+    await expect(strategy.getAccessToken()).rejects.toThrow(
       'Failed to acquire Graph API token: no access token in response',
     );
   });
@@ -106,7 +106,7 @@ describe('ClientSecretGraphAuthStrategy', () => {
       expiresOn: null,
     });
 
-    await expect(strategy.getAccessToken('https://graph.microsoft.com/.default')).rejects.toThrow(
+    await expect(strategy.getAccessToken()).rejects.toThrow(
       'Failed to acquire Graph API token: no expiration time in response',
     );
   });
@@ -118,8 +118,8 @@ describe('ClientSecretGraphAuthStrategy', () => {
       expiresOn: expirationDate,
     });
 
-    await strategy.getAccessToken('https://graph.microsoft.com/.default');
-    await strategy.getAccessToken('https://graph.microsoft.com/.default');
+    await strategy.getAccessToken();
+    await strategy.getAccessToken();
 
     expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledTimes(1);
   });
@@ -140,16 +140,14 @@ describe('ClientSecretGraphAuthStrategy', () => {
       new Error('Authentication failed'),
     );
 
-    await expect(strategy.getAccessToken('https://graph.microsoft.com/.default')).rejects.toThrow(
-      'Authentication failed',
-    );
+    await expect(strategy.getAccessToken()).rejects.toThrow('Authentication failed');
 
     mockMsalClient.acquireTokenByClientCredential.mockResolvedValue({
       accessToken: 'new-token',
       expiresOn: new Date(Date.now() + 3600000),
     });
 
-    const token = await strategy.getAccessToken('https://graph.microsoft.com/.default');
+    const token = await strategy.getAccessToken();
     expect(token).toBe('new-token');
   });
 });

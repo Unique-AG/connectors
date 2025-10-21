@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-alpha.9](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.8...sharepoint-connector@v2.0.0-alpha.9) (2025-10-20)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** log properties from JWT via OIDC for QA debugging ([#73](https://github.com/Unique-AG/connectors/issues/73)) ([3711446](https://github.com/Unique-AG/connectors/commit/3711446fca4614c7476c518d4b1bc68a26d8cc0a))
+
 ## [2.0.0-alpha.8](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.7...sharepoint-connector@v2.0.0-alpha.8) (2025-10-20)
 
 

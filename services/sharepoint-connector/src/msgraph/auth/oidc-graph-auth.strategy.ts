@@ -25,7 +25,7 @@ const TokenResponseSchema = z.object({
 export class OidcGraphAuthStrategy implements GraphAuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly credential: DefaultAzureCredential;
-  private cachedToken: Record<string, CachedToken> = {};
+  private cachedToken: CachedToken | null = null;
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
     const tenantId = this.configService.get('sharepoint.graphTenantId', { infer: true });
@@ -37,12 +37,12 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
     });
   }
 
-  public async getAccessToken(scope: string): Promise<string> {
-    if (this.cachedToken[scope] && this.isTokenValid(this.cachedToken[scope])) {
-      return this.cachedToken[scope].accessToken;
+  public async getAccessToken(): Promise<string> {
+    if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
+      return this.cachedToken.accessToken;
     }
 
-    return await this.acquireNewToken(scope);
+    return await this.acquireNewToken();
   }
 
   private isTokenValid(token: CachedToken): boolean {
@@ -50,12 +50,12 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
     return token.expiresAt > now;
   }
 
-  private async acquireNewToken(scope: string): Promise<string> {
+  private async acquireNewToken(): Promise<string> {
     try {
-      const tokenResponse = await this.credential.getToken(scope);
+      const tokenResponse = await this.credential.getToken('https://graph.microsoft.com/.default');
       const validatedResponse = TokenResponseSchema.parse(tokenResponse);
 
-      this.cachedToken[scope] = {
+      this.cachedToken = {
         accessToken: validatedResponse.token,
         expiresAt: validatedResponse.expiresOnTimestamp,
       };
@@ -67,7 +67,7 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
         error: serializeError(normalizeError(error)),
       });
 
-      delete this.cachedToken[scope];
+      this.cachedToken = null;
       throw error;
     }
   }

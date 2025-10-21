@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/sharepoint-connector",
   "description": "Take content from SharePoint and send it to Unique AI for RAG ingestion..",
-  "version": "2.0.0-alpha.8",
+  "version": "2.0.0-alpha.9",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -17,6 +17,7 @@
     "db:migrate": "echo \"No database for this server\"",
     "db:push": "echo \"No database for this server\"",
     "db:migrate:deploy": "echo \"No database for this server\"",
+    "codegen": "echo \"No codegen needed for this server\"",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "format": "biome format .",
