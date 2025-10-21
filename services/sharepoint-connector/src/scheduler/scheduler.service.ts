@@ -1,10 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronJob } from 'cron';
+import { Config } from '../config';
 import { SharepointSynchronizationService } from '../sharepoint-synchronization/sharepoint-synchronization.service';
 import { normalizeError } from '../utils/normalize-error';
-import { Config } from '../config';
-import { CronJob } from 'cron';
 @Injectable()
 export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
