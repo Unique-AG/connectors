@@ -9,5 +9,5 @@ jobs:
   warm:
     uses: ./.github/workflows/_template-cache.yaml
     with:
-      service-name: factset
+      service-name: factset-mcp
       service-path: services/factset-mcp

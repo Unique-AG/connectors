@@ -1,10 +1,10 @@
-name: "[TEMPLATE] MCP Server Cache Warming"
+name: "[TEMPLATE] Cache Warming"
 
 on:
   workflow_call:
     inputs:
       service-name:
-        description: "Name of the service (e.g., factset, outlook)"
+        description: "Name of the service (e.g., factset-mcp, sharepoint-connector)"
         required: true
         type: string
       service-path:
@@ -23,8 +23,8 @@ permissions:
 
 env:
   SERVICE_PATH: ${{ inputs.service-path }}
-  CHART_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}-mcp
-  GHA_CACHE_SCOPE: ${{ inputs.service-name }}-mcp
+  CHART_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}
+  GHA_CACHE_SCOPE: ${{ inputs.service-name }}
 
 jobs:
   warm:
@@ -71,5 +71,5 @@ jobs:
             type=gha,scope=${{ env.GHA_CACHE_SCOPE }},mode=max,ignore-error=true
 
           build-args: |
-            APP_NAME=${{ inputs.service-name }}-mcp
+            APP_NAME=${{ inputs.service-name }}
             PNPM_VERSION=${{ steps.pnpm-version.outputs.version }}

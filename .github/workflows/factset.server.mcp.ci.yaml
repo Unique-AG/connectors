@@ -12,5 +12,5 @@ jobs:
   validate:
     uses: ./.github/workflows/_template-ci.yaml
     with:
-      service-name: factset
+      service-name: factset-mcp
       service-path: services/factset-mcp

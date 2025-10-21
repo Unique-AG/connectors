@@ -12,6 +12,6 @@ jobs:
   validate:
     uses: ./.github/workflows/_template-ci.yaml
     with:
-      service-name: outlook
+      service-name: outlook-mcp
       service-path: services/outlook-mcp
       orm: drizzle
