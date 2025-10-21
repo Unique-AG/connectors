@@ -6,11 +6,7 @@ import { z } from 'zod';
 import { Config } from '../../config';
 import { normalizeError } from '../../utils/normalize-error';
 import { GraphAuthStrategy } from './graph-auth-strategy.interface';
-
-interface CachedToken {
-  accessToken: string;
-  expiresAt: number;
-}
+import { TokenAcquisitionResult, TokenCache } from './token-cache';
 
 const TokenResponseSchema = z.object({
   token: z.string().min(1),
@@ -25,7 +21,7 @@ const TokenResponseSchema = z.object({
 export class OidcGraphAuthStrategy implements GraphAuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly credential: DefaultAzureCredential;
-  private cachedToken: CachedToken | null = null;
+  private readonly tokenCache = new TokenCache();
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
     const tenantId = this.configService.get('sharepoint.graphTenantId', { infer: true });
@@ -38,36 +34,26 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
   }
 
   public async getAccessToken(): Promise<string> {
-    if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
-      return this.cachedToken.accessToken;
-    }
-
-    return await this.acquireNewToken();
+    return this.tokenCache.getToken(() => this.acquireNewToken());
   }
 
-  private isTokenValid(token: CachedToken): boolean {
-    const now = Date.now();
-    return token.expiresAt > now;
-  }
+  private async acquireNewToken(): Promise<TokenAcquisitionResult> {
+    this.logger.log('Acquiring new Graph API token using OIDC');
 
-  private async acquireNewToken(): Promise<string> {
     try {
       const tokenResponse = await this.credential.getToken('https://graph.microsoft.com/.default');
       const validatedResponse = TokenResponseSchema.parse(tokenResponse);
 
-      this.cachedToken = {
-        accessToken: validatedResponse.token,
+      return {
+        token: validatedResponse.token,
         expiresAt: validatedResponse.expiresOnTimestamp,
       };
-
-      return validatedResponse.token;
     } catch (error) {
       this.logger.error({
         msg: 'Failed to acquire Graph API token using OIDC',
         error: serializeError(normalizeError(error)),
       });
 
-      this.cachedToken = null;
       throw error;
     }
   }
