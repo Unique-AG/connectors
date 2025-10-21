@@ -1,9 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Cron, SchedulerRegistry } from '@nestjs/schedule';
-import { CRON_EVERY_15_MINUTES } from '../constants/defaults.constants';
+import { ConfigService } from '@nestjs/config';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronJob } from 'cron';
+import { Config } from '../config';
 import { SharepointSynchronizationService } from '../sharepoint-synchronization/sharepoint-synchronization.service';
 import { normalizeError } from '../utils/normalize-error';
-
 @Injectable()
 export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
@@ -12,13 +13,13 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   public constructor(
     private readonly sharepointScanner: SharepointSynchronizationService,
     private readonly schedulerRegistry: SchedulerRegistry,
-  ) {
-    this.logger.log('SchedulerService initialized with distributed locking');
-  }
+    private readonly configService: ConfigService<Config, true>,
+  ) {}
 
   public onModuleInit() {
     this.logger.log('Triggering initial scan on service startup...');
     void this.runScheduledScan();
+    this.setupScheduledScan();
   }
 
   public onModuleDestroy() {
@@ -27,7 +28,18 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     this.destroyCronJobs();
   }
 
-  @Cron(CRON_EVERY_15_MINUTES)
+  private setupScheduledScan(): void {
+    const cronExpression = this.configService.get('processing.scanIntervalCron', { infer: true });
+    this.logger.log(`Scheduled scan configured with cron expression: ${cronExpression}`);
+
+    const job = new CronJob(cronExpression, () => {
+      void this.runScheduledScan();
+    });
+
+    this.schedulerRegistry.addCronJob('sharepoint-scan', job);
+    job.start();
+  }
+
   public async runScheduledScan(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log('Skipping scheduled scan due to shutdown');
