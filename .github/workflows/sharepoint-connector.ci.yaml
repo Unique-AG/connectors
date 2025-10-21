@@ -14,7 +14,7 @@ on:
 
 jobs:
   validate:
-    uses: ./.github/workflows/_template-mcp-ci.yaml
+    uses: ./.github/workflows/_template-ci.yaml
     with:
       service-name: sharepoint-connector
       service-path: services/sharepoint-connector
