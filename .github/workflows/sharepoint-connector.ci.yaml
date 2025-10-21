@@ -13,6 +13,12 @@ on:
       - .github/workflows/sharepoint-connector.ci.yaml
 
 jobs:
+  validate:
+    uses: ./.github/workflows/_template-ci.yaml
+    with:
+      service-name: sharepoint-connector
+      service-path: services/sharepoint-connector
+
   check_chart:
     runs-on: ubuntu-latest # TODO: can we use singularity here?
     steps:

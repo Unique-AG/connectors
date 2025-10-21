@@ -1,0 +1,14 @@
+name: "[sharepoint-connector] Warm Docker Build Cache (nightly)"
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  warm:
+    uses: ./.github/workflows/_template-cache.yaml
+    with:
+      service-name: sharepoint-connector
+      service-path: services/sharepoint-connector
+      dockerfile: services/sharepoint-connector/deploy/Dockerfile
