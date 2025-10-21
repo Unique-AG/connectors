@@ -157,11 +157,12 @@ export class McpStreamableHttpService {
     res: HttpResponse,
     body: unknown,
   ): Promise<void> {
-    this.logger.debug(
-      `Handling stateful MCP request at ${req.url} with body: ${JSON.stringify(body)}`,
-    );
     // Check for existing session ID
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
+    this.logger.debug({
+      msg: `Handling stateful MCP request at ${req.url} with body: ${JSON.stringify(body)}`,
+      sessionId,
+    });
     let transport: StreamableHTTPServerTransport;
 
     if (sessionId && this.transports[sessionId]) {
@@ -210,6 +211,7 @@ export class McpStreamableHttpService {
       this.logger.log(`Initialized new session with ID: ${transport.sessionId}`);
       return;
     } else if (sessionId && !this.transports[sessionId]) {
+      this.logger.warn(`Session ID ${sessionId} not found`);
       // Provided session ID but no matching session exists
       res.status(404).json({
         jsonrpc: '2.0',

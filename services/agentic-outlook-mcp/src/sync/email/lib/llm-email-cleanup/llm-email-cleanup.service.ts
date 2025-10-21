@@ -5,7 +5,6 @@ import { compile } from 'handlebars';
 import { serializeError } from 'serialize-error-cjs';
 import * as z from 'zod';
 import { Email } from '../../../../drizzle';
-import { parseCompletionOutput, parseModelDataFromResponse, parseUsageDetailsFromResponse } from '../../../../llm';
 import { LLMService } from '../../../../llm/llm.service';
 import { normalizeError } from '../../../../utils/normalize-error';
 import { FEW_SHOT_EXAMPLES } from './few-shot.examples';
@@ -105,51 +104,27 @@ export class LLMEmailCleanupService {
       const systemPrompt = this.buildSystemPrompt();
       const userPrompt = this.buildUserPrompt(email);
 
-      const response = await this.llmService.client.chat.completions.create({
+      const response = await this.llmService.generateObject({
         model: MODEL,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'email_cleanup_output',
-            schema: z.toJSONSchema(emailCleanupOutputSchema),
-          },
-        },
+        schema: emailCleanupOutputSchema,
       });
-
-      const testOutput = parseCompletionOutput(response);
-      const usageDetails = parseUsageDetailsFromResponse(response);
-      const modelData = parseModelDataFromResponse(response);
-
-      this.logger.debug({
-        msg: 'LLM email cleanup response received',
-        emailId: email.id,
-        response,
-        testOutput,
-        usageDetails,
-        modelData,
-      });
-
-      const rawOutput = response.choices[0]?.message.content;
-      if (!rawOutput) throw new EmailCleanupParseError('No output message in response');
-      
-      const parsedOutput = this.parseAndValidateOutput(rawOutput);
 
       this.logger.debug({
         msg: 'Email cleanup successful',
         emailId: email.id,
-        removedBlocksCount: parsedOutput.removed_blocks.length,
-        meta: parsedOutput.meta,
+        removedBlocksCount: response.removed_blocks.length,
+        meta: response.meta,
       });
 
       return {
-        cleanMarkdown: parsedOutput.clean_markdown,
-        cleanText: parsedOutput.clean_text,
-        removedBlocks: parsedOutput.removed_blocks,
-        meta: parsedOutput.meta,
+        cleanMarkdown: response.clean_markdown,
+        cleanText: response.clean_text,
+        removedBlocks: response.removed_blocks,
+        meta: response.meta,
       };
     } catch (error) {
       if (error instanceof EmailCleanupError) throw error;
@@ -201,36 +176,6 @@ export class LLMEmailCleanupService {
       });
     } catch (error) {
       throw new EmailCleanupError('Failed to load user prompt template', error);
-    }
-  }
-
-  private parseAndValidateOutput(rawOutput: string): EmailCleanupOutput {
-    let jsonOutput: unknown;
-
-    try {
-      jsonOutput = JSON.parse(rawOutput);
-    } catch (error) {
-      this.logger.error({
-        msg: 'Failed to parse LLM output as JSON',
-        rawOutput: rawOutput.substring(0, 500),
-      });
-      throw new EmailCleanupParseError('Invalid JSON in LLM response', rawOutput, error);
-    }
-
-    try {
-      const parsedOutput = emailCleanupOutputSchema.parse(jsonOutput);
-      return parsedOutput;
-    } catch (error) {
-      this.logger.error({
-        msg: 'LLM output validation failed',
-        jsonOutput,
-        validationError: error instanceof z.ZodError ? error.issues : error,
-      });
-      throw new EmailCleanupParseError(
-        'LLM output does not match expected schema',
-        JSON.stringify(jsonOutput),
-        error,
-      );
     }
   }
 }
