@@ -1,6 +1,8 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Fork from langfuse/openai */
 /** biome-ignore-all lint/complexity/useLiteralKeys: Fork from langfuse/openai */
-import type OpenAI from "openai";
+import type OpenAI from 'openai';
+import { CompletionUsage } from 'openai/resources/completions';
+import { Response, ResponseUsage } from 'openai/resources/responses/responses';
 
 type ParsedOpenAIArguments = {
   model: string;
@@ -8,9 +10,20 @@ type ParsedOpenAIArguments = {
   modelParameters: Record<string, any>;
 };
 
-export const parseInputArgs = (
-  args: Record<string, any>,
-): ParsedOpenAIArguments => {
+interface UsageDetails {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  prompt_tokens_details?: {
+    cached_tokens?: number;
+    audio_tokens?: number;
+  };
+  completion_tokens_details?: {
+    reasoning_tokens?: number;
+  };
+}
+
+export const parseInputArgs = (args: Record<string, any>): ParsedOpenAIArguments => {
   let params: Record<string, any> = {};
   params = {
     frequency_penalty: args.frequency_penalty,
@@ -31,25 +44,20 @@ export const parseInputArgs = (
 
   let input: Record<string, any> | string = args.input;
 
-  if (
-    args &&
-    typeof args === "object" &&
-    !Array.isArray(args) &&
-    "messages" in args
-  ) {
+  if (args && typeof args === 'object' && !Array.isArray(args) && 'messages' in args) {
     input = {};
     input.messages = args.messages;
-    if ("function_call" in args) {
+    if ('function_call' in args) {
       input.function_call = args.function_call;
     }
-    if ("functions" in args) {
+    if ('functions' in args) {
       input.functions = args.functions;
     }
-    if ("tools" in args) {
+    if ('tools' in args) {
       input.tools = args.tools;
     }
 
-    if ("tool_choice" in args) {
+    if ('tool_choice' in args) {
       input.tool_choice = args.tool_choice;
     }
   } else if (!input) {
@@ -64,21 +72,12 @@ export const parseInputArgs = (
 };
 
 export const parseCompletionOutput = (res: unknown): unknown => {
-  if (
-    res instanceof Object &&
-    "output_text" in res &&
-    res["output_text"] !== ""
-  ) {
-    return res["output_text"] as string;
+  if (res instanceof Object && 'output_text' in res && res['output_text'] !== '') {
+    return res['output_text'] as string;
   }
 
-  if (
-    typeof res === "object" &&
-    res &&
-    "output" in res &&
-    Array.isArray(res["output"])
-  ) {
-    const output = res["output"];
+  if (typeof res === 'object' && res && 'output' in res && Array.isArray(res['output'])) {
+    const output = res['output'];
 
     if (output.length > 1) {
       return output;
@@ -90,21 +89,34 @@ export const parseCompletionOutput = (res: unknown): unknown => {
     return null;
   }
 
-  if (
-    !(res instanceof Object && "choices" in res && Array.isArray(res.choices))
-  ) {
-    return "";
+  if (!(res instanceof Object && 'choices' in res && Array.isArray(res.choices))) {
+    return '';
   }
 
-  return "message" in res.choices[0]
-    ? res.choices[0].message
-    : (res.choices[0].text ?? "");
+  return 'message' in res.choices[0] ? res.choices[0].message : (res.choices[0].text ?? '');
+};
+
+export const getFirstTextFromResponse = (response: Response): string | undefined => {
+  if (response.output_text) return response.output_text;
+  if (response.output.length > 0) {
+    const firstOutput = response.output[0];
+    if (firstOutput && firstOutput.type === 'message' && 'content' in firstOutput) {
+      if (Array.isArray(firstOutput.content)) {
+        const textContent = firstOutput.content.find(
+          (c) => c.type === 'output_text' && 'text' in c,
+        );
+        if (textContent && 'text' in textContent && typeof textContent.text === 'string') {
+          return textContent.text;
+        }
+      }
+    }
+  }
 };
 
 export const parseUsageDetails = (
-  completionUsage: OpenAI.CompletionUsage,
-): Record<string, number> | undefined => {
-  if ("prompt_tokens" in completionUsage) {
+  completionUsage: CompletionUsage | ResponseUsage,
+): UsageDetails | undefined => {
+  if ('prompt_tokens' in completionUsage) {
     const {
       prompt_tokens,
       completion_tokens,
@@ -114,23 +126,22 @@ export const parseUsageDetails = (
     } = completionUsage;
 
     return {
-      input: prompt_tokens,
-      output: completion_tokens,
-      total: total_tokens,
-      ...Object.fromEntries(
-        Object.entries(prompt_tokens_details ?? {}).map(([key, value]) => [
-          `input_${key}`,
-          value as number,
-        ]),
-      ),
-      ...Object.fromEntries(
-        Object.entries(completion_tokens_details ?? {}).map(([key, value]) => [
-          `output_${key}`,
-          value as number,
-        ]),
-      ),
+      prompt_tokens,
+      completion_tokens,
+      total_tokens,
+      prompt_tokens_details: prompt_tokens_details
+        ? {
+            cached_tokens: prompt_tokens_details.cached_tokens,
+            audio_tokens: prompt_tokens_details.audio_tokens,
+          }
+        : undefined,
+      completion_tokens_details: completion_tokens_details
+        ? {
+            reasoning_tokens: completion_tokens_details.reasoning_tokens,
+          }
+        : undefined,
     };
-  } else if ("input_tokens" in completionUsage) {
+  } else if ('input_tokens' in completionUsage) {
     const {
       input_tokens,
       output_tokens,
@@ -139,48 +150,26 @@ export const parseUsageDetails = (
       output_tokens_details,
     } = completionUsage;
 
-    let finalInputTokens = input_tokens as number;
-    Object.keys(input_tokens_details ?? {}).forEach((key) => {
-      finalInputTokens = Math.max(
-        finalInputTokens -
-          input_tokens_details[key as keyof typeof input_tokens_details],
-        0,
-      );
-    });
-
-    let finalOutputTokens = output_tokens as number;
-    Object.keys(output_tokens_details ?? {}).forEach((key) => {
-      finalOutputTokens = Math.max(
-        finalOutputTokens -
-          output_tokens_details[key as keyof typeof output_tokens_details],
-        0,
-      );
-    });
-
     return {
-      input: finalInputTokens,
-      output: finalOutputTokens,
-      total: total_tokens,
-      ...Object.fromEntries(
-        Object.entries(input_tokens_details ?? {}).map(([key, value]) => [
-          `input_${key}`,
-          value as number,
-        ]),
-      ),
-      ...Object.fromEntries(
-        Object.entries(output_tokens_details ?? {}).map(([key, value]) => [
-          `output_${key}`,
-          value as number,
-        ]),
-      ),
+      prompt_tokens: input_tokens,
+      completion_tokens: output_tokens,
+      total_tokens: total_tokens,
+      prompt_tokens_details: input_tokens_details
+        ? {
+            cached_tokens: input_tokens_details.cached_tokens,
+          }
+        : undefined,
+      completion_tokens_details: output_tokens_details
+        ? {
+            reasoning_tokens: output_tokens_details.reasoning_tokens,
+          }
+        : undefined,
     };
   }
 };
 
-export const parseUsageDetailsFromResponse = (
-  res: unknown,
-): Record<string, number> | undefined => {
-  if (hasCompletionUsage(res)) {
+export const parseUsageDetailsFromResponse = (res: unknown): UsageDetails | undefined => {
+  if (hasAnyUsage(res)) {
     return parseUsageDetails(res.usage);
   }
 };
@@ -194,16 +183,14 @@ export const parseChunk = (
       data: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta.ToolCall;
     } => {
   let isToolCall = false;
-  const _chunk = rawChunk as
-    | OpenAI.ChatCompletionChunk
-    | OpenAI.Completions.Completion;
+  const _chunk = rawChunk as OpenAI.ChatCompletionChunk | OpenAI.Completions.Completion;
   const chunkData = _chunk?.choices?.[0];
-  if (!chunkData) return { isToolCall: false, data: "" };
+  if (!chunkData) return { isToolCall: false, data: '' };
 
   try {
     if (
-      "delta" in chunkData &&
-      "tool_calls" in chunkData.delta &&
+      'delta' in chunkData &&
+      'tool_calls' in chunkData.delta &&
       Array.isArray(chunkData.delta.tool_calls)
     ) {
       isToolCall = true;
@@ -211,35 +198,48 @@ export const parseChunk = (
       // biome-ignore lint/style/noNonNullAssertion: tool_calls is always present
       return { isToolCall, data: chunkData.delta.tool_calls[0]! };
     }
-    if ("delta" in chunkData) {
-      return { isToolCall, data: chunkData.delta?.content || "" };
+    if ('delta' in chunkData) {
+      return { isToolCall, data: chunkData.delta?.content || '' };
     }
 
-    if ("text" in chunkData) {
-      return { isToolCall, data: chunkData.text || "" };
+    if ('text' in chunkData) {
+      return { isToolCall, data: chunkData.text || '' };
     }
   } catch {}
 
-  return { isToolCall: false, data: "" };
+  return { isToolCall: false, data: '' };
 };
 
-// Type guard to check if an unknown object is a UsageResponse
-function hasCompletionUsage(
-  obj: any,
-): obj is { usage: OpenAI.CompletionUsage } {
+export function hasCompletionUsage(obj: unknown): obj is { usage: CompletionUsage } {
   return (
     obj instanceof Object &&
-    "usage" in obj &&
+    'usage' in obj &&
     obj.usage instanceof Object &&
-    // Completion API Usage format
-    ((typeof obj.usage.prompt_tokens === "number" &&
-      typeof obj.usage.completion_tokens === "number" &&
-      typeof obj.usage.total_tokens === "number") ||
-      // Response API Usage format
-      (typeof obj.usage.input_tokens === "number" &&
-        typeof obj.usage.output_tokens === "number" &&
-        typeof obj.usage.total_tokens === "number"))
+    'prompt_tokens' in obj.usage &&
+    'completion_tokens' in obj.usage &&
+    'total_tokens' in obj.usage &&
+    typeof obj.usage.prompt_tokens === 'number' &&
+    typeof obj.usage.completion_tokens === 'number' &&
+    typeof obj.usage.total_tokens === 'number'
   );
+}
+
+export function hasResponseUsage(obj: unknown): obj is { usage: ResponseUsage } {
+  return (
+    obj instanceof Object &&
+    'usage' in obj &&
+    obj.usage instanceof Object &&
+    'input_tokens' in obj.usage &&
+    'output_tokens' in obj.usage &&
+    'total_tokens' in obj.usage &&
+    typeof obj.usage.input_tokens === 'number' &&
+    typeof obj.usage.output_tokens === 'number' &&
+    typeof obj.usage.total_tokens === 'number'
+  );
+}
+
+export function hasAnyUsage(obj: unknown): obj is { usage: CompletionUsage | ResponseUsage } {
+  return hasCompletionUsage(obj) || hasResponseUsage(obj);
 }
 
 export const getToolCallOutput = (
@@ -252,12 +252,12 @@ export const getToolCallOutput = (
     };
   }[];
 } => {
-  let name = "";
-  let toolArguments = "";
+  let name = '';
+  let toolArguments = '';
 
   for (const toolCall of toolCallChunks) {
     name = toolCall.function?.name || name;
-    toolArguments += toolCall.function?.arguments || "";
+    toolArguments += toolCall.function?.arguments || '';
   }
 
   return {
@@ -279,7 +279,7 @@ export const parseModelDataFromResponse = (
   modelParameters: Record<string, string | number> | undefined;
   metadata: Record<string, unknown> | undefined;
 } => {
-  if (typeof res !== "object" || res === null) {
+  if (typeof res !== 'object' || res === null) {
     return {
       model: undefined,
       modelParameters: undefined,
@@ -287,42 +287,40 @@ export const parseModelDataFromResponse = (
     };
   }
 
-  const model = "model" in res ? (res["model"] as string) : undefined;
+  const model = 'model' in res ? (res['model'] as string) : undefined;
   const modelParameters: Record<string, string | number> = {};
   const modelParamKeys = [
-    "max_output_tokens",
-    "parallel_tool_calls",
-    "store",
-    "temperature",
-    "tool_choice",
-    "top_p",
-    "truncation",
-    "user",
+    'max_output_tokens',
+    'parallel_tool_calls',
+    'store',
+    'temperature',
+    'tool_choice',
+    'top_p',
+    'truncation',
+    'user',
   ];
 
   const metadata: Record<string, unknown> = {};
   const metadataKeys = [
-    "reasoning",
-    "incomplete_details",
-    "instructions",
-    "previous_response_id",
-    "tools",
-    "metadata",
-    "status",
-    "error",
+    'reasoning',
+    'incomplete_details',
+    'instructions',
+    'previous_response_id',
+    'tools',
+    'metadata',
+    'status',
+    'error',
   ];
 
   for (const key of modelParamKeys) {
-    const val =
-      key in res ? (res[key as keyof typeof res] as string | number) : null;
+    const val = key in res ? (res[key as keyof typeof res] as string | number) : null;
     if (val !== null && val !== undefined) {
       modelParameters[key as keyof typeof modelParameters] = val;
     }
   }
 
   for (const key of metadataKeys) {
-    const val =
-      key in res ? (res[key as keyof typeof res] as string | number) : null;
+    const val = key in res ? (res[key as keyof typeof res] as string | number) : null;
     if (val) {
       metadata[key as keyof typeof metadata] = val;
     }
@@ -330,8 +328,7 @@ export const parseModelDataFromResponse = (
 
   return {
     model,
-    modelParameters:
-      Object.keys(modelParameters).length > 0 ? modelParameters : undefined,
+    modelParameters: Object.keys(modelParameters).length > 0 ? modelParameters : undefined,
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
   };
 };

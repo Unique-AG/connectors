@@ -10,19 +10,15 @@ import {
 } from '@opentelemetry/api';
 import { ConsumeMessage } from 'amqplib';
 
+const TRACER_NAME = 'email-pipeline';
+
 @Injectable()
 export class TracePropagationService {
-  public injectTraceContext(headers: Record<string, unknown> = {}): Record<string, unknown> {
+  public injectTraceContext(pipelineId: string): Record<string, unknown> {
     const carrier: Record<string, string> = {};
+    // This mutates the carrier object and adds `traceparent` and `tracestate` headers.
     propagation.inject(context.active(), carrier);
-    return { ...headers, ...carrier };
-  }
-
-  public injectSpecificTraceHeaders(
-    traceHeaders: Record<string, unknown>,
-    additionalHeaders: Record<string, unknown> = {},
-  ): Record<string, unknown> {
-    return { ...additionalHeaders, ...traceHeaders };
+    return { 'x-pipeline-id': pipelineId, ...carrier };
   }
 
   public extractTraceContext(amqpMessage: ConsumeMessage): Context {
@@ -34,7 +30,11 @@ export class TracePropagationService {
     const headers = amqpMessage.properties.headers || {};
     const traceHeaders: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(headers)) {
-      if (key.startsWith('traceparent') || key.startsWith('tracestate')) {
+      if (
+        key.startsWith('traceparent') ||
+        key.startsWith('tracestate') ||
+        key === 'x-pipeline-id'
+      ) {
         traceHeaders[key] = value;
       }
     }
@@ -42,7 +42,7 @@ export class TracePropagationService {
   }
 
   public startPipelineRootSpan(emailId: string, userProfileId: string): Span {
-    const tracer = trace.getTracer('email-pipeline');
+    const tracer = trace.getTracer(TRACER_NAME);
     return tracer.startSpan('email.pipeline', {
       kind: SpanKind.PRODUCER,
       root: true,
@@ -62,7 +62,7 @@ export class TracePropagationService {
     fn: (span: Span) => Promise<T>,
   ): Promise<T> {
     const extractedContext = this.extractTraceContext(amqpMessage);
-    const tracer = trace.getTracer('email-pipeline');
+    const tracer = trace.getTracer(TRACER_NAME);
 
     return context.with(extractedContext, async () => {
       const span = tracer.startSpan(spanName, {

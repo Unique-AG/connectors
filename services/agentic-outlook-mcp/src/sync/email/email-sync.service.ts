@@ -1,7 +1,7 @@
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Message } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { OnEvent } from '@nestjs/event-emitter';
 import { and, eq } from 'drizzle-orm';
 import { debounce } from 'lodash';
 import { serializeError } from 'serialize-error-cjs';
@@ -16,12 +16,12 @@ import {
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import { normalizeError } from '../../utils/normalize-error';
 import { SubscriptionEvent } from '../subscription/subscription.events';
+import { AmqpOrchestratorService } from './amqp-orchestrator.service';
 import {
   EmailDeltaSyncRequestedEvent,
   EmailEvents,
   EmailFullSyncRequestedEvent,
 } from './email.events';
-import { IngestRequestedEvent, PipelineEvents } from './pipeline.events';
 
 interface DeltaResponse {
   '@odata.context'?: string;
@@ -74,7 +74,7 @@ export class EmailSyncService {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
-    private readonly eventEmitter: EventEmitter2,
+    private readonly amqpOrchestrator: AmqpOrchestratorService,
   ) {}
 
   @OnEvent(EmailEvents.EmailFullSyncRequested)
@@ -298,9 +298,11 @@ export class EmailSyncService {
           emailId = TypeID.fromString(savedEmail.id, 'email');
         }
 
-        this.eventEmitter.emit(
-          PipelineEvents.IngestRequested,
-          new IngestRequestedEvent(userProfileId, folder.id, emailId, message),
+        await this.amqpOrchestrator.startPipeline(
+          userProfileId.toString(),
+          folder.id,
+          emailId.toString(),
+          message,
         );
 
         totalEmailsProcessed++;
