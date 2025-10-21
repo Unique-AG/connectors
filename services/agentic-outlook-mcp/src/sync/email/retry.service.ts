@@ -1,24 +1,26 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConsumeMessage } from 'amqplib';
 import { serializeError } from 'serialize-error-cjs';
 import { normalizeError } from '../../utils/normalize-error';
 import { FatalPipelineError } from './pipeline.errors';
 import { TracePropagationService } from './trace-propagation.service';
 
-export interface RetryHandlerOptions<TMessage, TFailedEvent> {
+export interface RetryOptions<TMessage> {
   message: TMessage;
   amqpMessage: ConsumeMessage;
   error: unknown;
   retryExchange: string;
   retryRoutingKey: string;
-  failedEventName: string;
-  createFailedEvent: (serializedError: string) => TFailedEvent;
+  onMaxRetriesExceeded?: (
+    message: TMessage,
+    error: string,
+    traceHeaders: Record<string, unknown>,
+  ) => Promise<void>;
 }
 
 @Injectable()
-export class PipelineRetryService {
+export class RetryService {
   private readonly logger = new Logger(this.constructor.name);
 
   private readonly MAX_ATTEMPTS = 6;
@@ -29,28 +31,19 @@ export class PipelineRetryService {
 
   public constructor(
     private readonly amqpConnection: AmqpConnection,
-    private readonly eventEmitter: EventEmitter2,
     private readonly tracePropagation: TracePropagationService,
   ) {}
 
-  public async handlePipelineError<TMessage, TFailedEvent>(
-    options: RetryHandlerOptions<TMessage, TFailedEvent>,
-  ): Promise<void> {
-    const {
-      message,
-      amqpMessage,
-      error,
-      retryExchange,
-      retryRoutingKey,
-      failedEventName,
-      createFailedEvent,
-    } = options;
+  public async handleError<TMessage>(options: RetryOptions<TMessage>): Promise<void> {
+    const { message, amqpMessage, error, retryExchange, retryRoutingKey, onMaxRetriesExceeded } =
+      options;
+    const traceHeaders = this.tracePropagation.extractTraceHeaders(amqpMessage);
 
     const attempt = Number(amqpMessage.properties.headers?.['x-attempt'] ?? 1);
     const serializedError = serializeError(normalizeError(error));
 
     this.logger.error({
-      msg: 'Pipeline step failed',
+      msg: 'Operation failed',
       message,
       attempt,
       error: serializedError,
@@ -61,17 +54,32 @@ export class PipelineRetryService {
         msg: 'Fatal error encountered, not retrying',
         error: serializedError,
       });
-      this.eventEmitter.emit(failedEventName, createFailedEvent(JSON.stringify(serializedError)));
+      if (onMaxRetriesExceeded)
+        await onMaxRetriesExceeded(message, JSON.stringify(serializedError), traceHeaders);
       return;
     }
 
     if (attempt >= this.MAX_ATTEMPTS) {
-      this.eventEmitter.emit(failedEventName, createFailedEvent(JSON.stringify(serializedError)));
+      this.logger.error({
+        msg: 'Max attempts reached',
+        attempt,
+        maxAttempts: this.MAX_ATTEMPTS,
+        error: serializedError,
+      });
+      if (onMaxRetriesExceeded)
+        await onMaxRetriesExceeded(message, JSON.stringify(serializedError), traceHeaders);
       return;
     }
 
     const delayMs = this.computeDelayMs(attempt);
-    const traceHeaders = this.tracePropagation.extractTraceHeaders(amqpMessage);
+
+    this.logger.log({
+      msg: 'Retrying operation',
+      nextAttempt: attempt + 1,
+      delayMs,
+      retryRoutingKey,
+    });
+
     await this.amqpConnection.publish(retryExchange, retryRoutingKey, message, {
       expiration: delayMs,
       headers: { ...traceHeaders, 'x-attempt': attempt + 1 },

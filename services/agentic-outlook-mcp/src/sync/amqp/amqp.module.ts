@@ -14,8 +14,10 @@ import { AppConfig, AppSettings } from '../../app-settings';
         exchanges: [
           { name: 'email.pipeline', type: 'topic', options: { durable: true } },
           { name: 'email.pipeline.retry', type: 'topic', options: { durable: true } },
+          { name: 'email.orchestrator', type: 'direct', options: { durable: true } },
         ],
         queues: [
+          // Pipeline queues
           {
             name: 'q.email.ingest',
             exchange: 'email.pipeline',
@@ -46,6 +48,23 @@ import { AppConfig, AppSettings } from '../../app-settings';
               durable: true,
               deadLetterExchange: 'email.pipeline',
               deadLetterRoutingKey: 'email.process',
+            },
+          },
+          // Single orchestrator queue for all events
+          {
+            name: 'q.orchestrator',
+            exchange: 'email.orchestrator',
+            routingKey: 'orchestrator',
+            options: { durable: true },
+          },
+          {
+            name: 'q.orchestrator.retry',
+            exchange: 'email.orchestrator',
+            routingKey: 'orchestrator.retry',
+            options: {
+              durable: true,
+              deadLetterExchange: 'email.orchestrator',
+              deadLetterRoutingKey: 'orchestrator',
             },
           },
           // { name: 'q.email.embed' },
