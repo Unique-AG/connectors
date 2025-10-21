@@ -45,7 +45,7 @@ describe('OidcGraphAuthStrategy', () => {
       expiresOnTimestamp,
     });
 
-    const token = await strategy.getAccessToken('https://graph.microsoft.com/.default');
+    const token = await strategy.getAccessToken();
 
     expect(token).toBe('test-token-123');
     expect(mockCredential.getToken).toHaveBeenCalledWith('https://graph.microsoft.com/.default');
@@ -58,8 +58,8 @@ describe('OidcGraphAuthStrategy', () => {
       expiresOnTimestamp,
     });
 
-    await strategy.getAccessToken('https://graph.microsoft.com/.default');
-    const secondToken = await strategy.getAccessToken('https://graph.microsoft.com/.default');
+    await strategy.getAccessToken();
+    const secondToken = await strategy.getAccessToken();
 
     expect(secondToken).toBe('test-token-123');
     expect(mockCredential.getToken).toHaveBeenCalledTimes(1);
@@ -71,7 +71,7 @@ describe('OidcGraphAuthStrategy', () => {
       expiresOnTimestamp: Date.now() + 3600 * 1000,
     });
 
-    await expect(strategy.getAccessToken('https://graph.microsoft.com/.default')).rejects.toThrow();
+    await expect(strategy.getAccessToken()).rejects.toThrow();
   });
 
   it('throws error when no expiration time in response', async () => {
@@ -80,15 +80,13 @@ describe('OidcGraphAuthStrategy', () => {
       expiresOnTimestamp: null,
     });
 
-    await expect(strategy.getAccessToken('https://graph.microsoft.com/.default')).rejects.toThrow();
+    await expect(strategy.getAccessToken()).rejects.toThrow();
   });
 
   it('clears cached token on authentication error', async () => {
     mockCredential.getToken.mockRejectedValue(new Error('Authentication failed'));
 
-    await expect(strategy.getAccessToken('https://graph.microsoft.com/.default')).rejects.toThrow(
-      'Authentication failed',
-    );
+    await expect(strategy.getAccessToken()).rejects.toThrow('Authentication failed');
 
     const expiresOnTimestamp = Date.now() + 3600 * 1000;
     mockCredential.getToken.mockResolvedValue({
@@ -96,7 +94,7 @@ describe('OidcGraphAuthStrategy', () => {
       expiresOnTimestamp,
     });
 
-    const token = await strategy.getAccessToken('https://graph.microsoft.com/.default');
+    const token = await strategy.getAccessToken();
     expect(token).toBe('new-token');
   });
 });
