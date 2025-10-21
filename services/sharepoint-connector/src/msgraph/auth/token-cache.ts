@@ -4,7 +4,13 @@ export interface TokenAcquisitionResult {
 }
 
 export class TokenCache {
-  private tokenCachePromise: Promise<TokenAcquisitionResult> | null = null;
+  // We keep the promise and cached value separately to avoid race condition when the token expires.
+  //    With cached value we're sure that within the script execution we either have a valid token
+  //    or request new one and populate promise cache. It is more problematic with just the promise,
+  //    because we have to await it to check if token didn't expire, yielding control and possibly
+  //    introduce race condition.
+  private cachedToken: TokenAcquisitionResult | null = null;
+  private tokenPromise: Promise<string> | null = null;
   private readonly bufferTimeMs: number;
 
   public constructor(bufferTimeMs = 5 * 60 * 1000) {
@@ -12,18 +18,31 @@ export class TokenCache {
   }
 
   public async getToken(acquireToken: () => Promise<TokenAcquisitionResult>): Promise<string> {
-    if (!this.tokenCachePromise) {
-      this.tokenCachePromise = acquireToken();
+    if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
+      return this.cachedToken.token;
     }
 
-    let cachedToken = await this.tokenCachePromise;
-
-    if (!this.isTokenValid(cachedToken)) {
-      this.tokenCachePromise = acquireToken();
-      cachedToken = await this.tokenCachePromise;
+    if (this.tokenPromise) {
+      return this.tokenPromise;
     }
 
-    return cachedToken.token;
+    this.tokenPromise = this.acquireAndCache(acquireToken).finally(() => {
+      this.tokenPromise = null;
+    });
+
+    return this.tokenPromise;
+  }
+
+  private async acquireAndCache(
+    acquireToken: () => Promise<TokenAcquisitionResult>,
+  ): Promise<string> {
+    try {
+      this.cachedToken = await acquireToken();
+      return this.cachedToken.token;
+    } catch (error) {
+      this.cachedToken = null;
+      throw error;
+    }
   }
 
   private isTokenValid(token: TokenAcquisitionResult): boolean {
