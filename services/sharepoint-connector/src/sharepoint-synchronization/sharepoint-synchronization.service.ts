@@ -79,11 +79,12 @@ export class SharepointSynchronizationService {
     sharepointContentItems: SharepointContentItem[],
     siteId: string,
   ): Promise<FileDiffResponse> {
+    const rootFolder = this.configService.get('unique.rootFolder', { infer: true });
     const fileDiffItems: FileDiffItem[] = sharepointContentItems.map(
       (sharepointContentItem: SharepointContentItem) => {
         return {
           key: sharepointContentItem.item.id,
-          url: buildKnowledgeBaseUrl(sharepointContentItem),
+          url: buildKnowledgeBaseUrl(sharepointContentItem, rootFolder),
           updatedAt: sharepointContentItem.item.lastModifiedDateTime,
         };
       },

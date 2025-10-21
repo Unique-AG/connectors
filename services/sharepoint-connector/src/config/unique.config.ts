@@ -11,6 +11,12 @@ const UniqueConfig = z.object({
     .describe(
       'Controls if you are using path based ingestion or scope based ingestion. Leave undefined for PATH based ingestion. Add your scope id for scope based ingestion.',
     ),
+  rootFolder: z
+    .string()
+    .optional()
+    .describe(
+      'Name of the manually created root folder in the knowledge base where SharePoint content should be synced. When provided all content will be synced to this folder.',
+    ),
   ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
   fileDiffUrl: z.url().describe('Unique file diff service URL'),
   zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
