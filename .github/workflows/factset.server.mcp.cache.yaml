@@ -7,7 +7,7 @@ on:
 
 jobs:
   warm:
-    uses: ./.github/workflows/_template-mcp-cache.yaml
+    uses: ./.github/workflows/_template-cache.yaml
     with:
       service-name: factset
       service-path: services/factset-mcp

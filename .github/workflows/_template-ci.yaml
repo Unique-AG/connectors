@@ -95,3 +95,7 @@ jobs:
       - name: Build project
         working-directory: ${{ env.SERVICE_PATH }}
         run: pnpm build
+        
+      - name: Run tests
+        working-directory: ${{ env.SERVICE_PATH }}
+        run: pnpm test

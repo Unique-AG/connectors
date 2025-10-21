@@ -10,7 +10,7 @@ on:
 
 jobs:
   validate:
-    uses: ./.github/workflows/_template-mcp-ci.yaml
+    uses: ./.github/workflows/_template-ci.yaml
     with:
       service-name: factset
       service-path: services/factset-mcp
