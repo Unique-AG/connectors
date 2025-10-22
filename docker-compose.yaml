@@ -77,13 +77,13 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 4444
-      LITELLM_LOG: "DEBUG"
       LITELLM_MODE: "DEVELOPMENT"
       LITELLM_MASTER_KEY: "sk-1234"
       LITELLM_SALT_KEY: "sk-1234"
       DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/litellm"
       REDIS_URL: "redis://redis:6379/7"
       ANTHROPHIC_API_KEY: "${ANTHROPHIC_API_KEY}" # To inject this API key run `docker-compose --profile agentic-outlook-mcp up -d --env-file services/agentic-outlook-mcp/.env up -d`
+      VOYAGE_API_KEY: "${VOYAGE_API_KEY}" # To inject this API key run `docker-compose --profile agentic-outlook-mcp up -d --env-file services/agentic-outlook-mcp/.env up -d`
     ports:
       - 9012:4444
     volumes:
