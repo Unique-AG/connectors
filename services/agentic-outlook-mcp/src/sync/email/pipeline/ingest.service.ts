@@ -6,6 +6,7 @@ import { ConsumeMessage } from 'amqplib';
 import { snakeCase } from 'lodash';
 import { TypeID } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, EmailInput } from '../../../drizzle';
+import { addSpanEvent } from '../../../utils/add-span-event';
 import { EmailService } from '../email.service';
 import { DeletedItem } from '../email-sync.service';
 import { OrchestratorEventType } from '../orchestrator.messages';
@@ -64,13 +65,13 @@ export class IngestService {
             messageId,
             attempt,
           });
-          span.addEvent('retry', { attempt });
+          addSpanEvent(span, 'retry', { attempt });
         }
 
         try {
           const isDeleted = (message as unknown as DeletedItem)['@removed'] !== undefined;
           if (isDeleted) {
-            span.addEvent('email.deleted');
+            addSpanEvent(span, 'email.deleted');
             await this.emailService.deleteEmails(TypeID.fromString(userProfileId, 'user_profile'), [
               messageId,
             ]);
@@ -86,7 +87,7 @@ export class IngestService {
             mappedEmail,
           );
 
-          span.addEvent('email.saved', { 'email.id': savedId.toString() });
+          addSpanEvent(span, 'email.saved', { 'email.id': savedId.toString() });
           span.setStatus({ code: SpanStatusCode.OK });
 
           const traceHeaders = this.tracePropagation.extractTraceHeaders(amqpMessage);

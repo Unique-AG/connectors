@@ -5,6 +5,7 @@ import { context, ROOT_CONTEXT, SpanStatusCode, trace } from '@opentelemetry/api
 import { ConsumeMessage } from 'amqplib';
 import { eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDatabase, emails as emailsTable } from '../../drizzle';
+import { addSpanEvent } from '../../utils/add-span-event';
 import {
   EmbeddingCompletedMessage,
   EmbeddingFailedMessage,
@@ -61,7 +62,7 @@ export class AmqpOrchestratorService {
           { headers },
         );
 
-        rootSpan.addEvent('pipeline.started');
+        addSpanEvent(rootSpan, 'pipeline.started');
       } finally {
         rootSpan.end();
       }
@@ -95,7 +96,7 @@ export class AmqpOrchestratorService {
             emailId: message.emailId,
             attempt,
           });
-          span.addEvent('retry', { attempt });
+          addSpanEvent(span, 'retry', { attempt });
         }
 
         try {

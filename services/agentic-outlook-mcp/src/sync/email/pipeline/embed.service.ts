@@ -9,6 +9,7 @@ import { encodingForModel } from 'js-tiktoken';
 import { DRIZZLE, DrizzleDatabase, Email, emails as emailsTable, Vector, VectorInput } from '../../../drizzle';
 import { vectors as vectorsTable } from '../../../drizzle/schema/sync/vectors.table';
 import { LLMService } from '../../../llm/llm.service';
+import { addSpanEvent } from '../../../utils/add-span-event';
 import { OrchestratorEventType } from '../orchestrator.messages';
 import { FatalPipelineError } from '../pipeline.errors';
 import { RetryService } from '../retry.service';
@@ -59,12 +60,7 @@ export class EmbedService {
             emailId,
             attempt,
           });
-          span.addEvent('retry', { attempt });
-          startObservation(
-            'retry',
-            { metadata: { attempt } },
-            { asType: 'event', parentSpanContext: span.spanContext() },
-          ).end();
+          addSpanEvent(span, 'retry', { attempt });
         }
 
         try {
@@ -77,12 +73,7 @@ export class EmbedService {
 
           if (!email) {
             this.logger.warn('Email not found, skipping embed');
-            span.addEvent('email.not_found');
-            startObservation(
-              'email.not_found',
-              { metadata: { emailId, userProfileId } },
-              { asType: 'event', parentSpanContext: span.spanContext() },
-            ).end();
+            addSpanEvent(span, 'email.not_found', { emailId, userProfileId });
             span.setStatus({ code: SpanStatusCode.OK });
             return;
           }
@@ -92,12 +83,7 @@ export class EmbedService {
 
           if (email.vectors.length > 0) {
             this.logger.warn('Email already has vectors, skipping embed');
-            span.addEvent('email.already_has_vectors');
-            startObservation(
-              'email.already_has_vectors',
-              { metadata: { emailId, userProfileId } },
-              { asType: 'event', parentSpanContext: span.spanContext() },
-            ).end();
+            addSpanEvent(span, 'email.already_has_vectors', { emailId, userProfileId });
           }
 
           const vectors = await this.createVectors(email, chunks, { span });
@@ -213,12 +199,10 @@ export class EmbedService {
         emailId: email.id,
         userProfileId: email.userProfileId,
       });
-      options.span.addEvent('email.no_documents_to_embed');
-      startObservation(
-        'email.no_documents_to_embed',
-        { metadata: { emailId: email.id, userProfileId: email.userProfileId } },
-        { asType: 'event', parentSpanContext: options.span.spanContext() },
-      ).end();
+      addSpanEvent(options.span, 'email.no_documents_to_embed', {
+        emailId: email.id,
+        userProfileId: email.userProfileId,
+      });
       return [];
     }
 
