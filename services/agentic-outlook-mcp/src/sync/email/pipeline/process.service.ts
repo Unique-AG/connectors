@@ -1,5 +1,4 @@
 import { AmqpConnection, RabbitSubscribe } from "@golevelup/nestjs-rabbitmq";
-import { startObservation } from "@langfuse/tracing";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Span, SpanStatusCode } from "@opentelemetry/api";
 import { ConsumeMessage } from "amqplib";
@@ -16,6 +15,7 @@ import { LLMSummarizationService } from "../lib/llm-summarization-service/llm-su
 import { OrchestratorEventType } from "../orchestrator.messages";
 import { RetryService } from "../retry.service";
 import { TracePropagationService } from "../trace-propagation.service";
+import { PipelineStageBase, PipelineStageConfig } from "./pipeline-stage.base";
 
 interface ProcessMessage {
   userProfileId: string;
@@ -31,17 +31,25 @@ interface ProcessMetadata {
 const SUMMARIZATION_THRESHOLD_CHARS = 1_600;
 
 @Injectable()
-export class ProcessService {
-  private readonly logger = new Logger(this.constructor.name);
+export class ProcessService extends PipelineStageBase<ProcessMessage> {
+  protected readonly logger = new Logger(this.constructor.name);
+  protected readonly config: PipelineStageConfig = {
+    spanName: "email.pipeline.process",
+    retryRoutingKey: "email.process.retry",
+    successEvent: OrchestratorEventType.ProcessingCompleted,
+    failureEvent: OrchestratorEventType.ProcessingFailed,
+  };
 
   public constructor(
-    private readonly amqpConnection: AmqpConnection,
+    amqpConnection: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    private readonly retryService: RetryService,
+    retryService: RetryService,
     private readonly llmEmailCleanupService: LLMEmailCleanupService,
     private readonly llmSummarizationService: LLMSummarizationService,
-    private readonly tracePropagation: TracePropagationService
-  ) {}
+    tracePropagation: TracePropagationService
+  ) {
+    super(amqpConnection, retryService, tracePropagation);
+  }
 
   @RabbitSubscribe({
     exchange: "email.pipeline",
@@ -52,140 +60,99 @@ export class ProcessService {
     processMessage: ProcessMessage,
     amqpMessage: ConsumeMessage
   ) {
-    const { userProfileId, emailId } = processMessage;
-    const attempt = Number(amqpMessage.properties.headers?.["x-attempt"] ?? 1);
-
-    return this.tracePropagation.withExtractedContext(
+    return this.executeStage(
+      processMessage,
       amqpMessage,
-      "email.pipeline.process",
       {
-        "email.id": emailId,
-        "user.id": userProfileId,
+        "email.id": processMessage.emailId,
+        "user.id": processMessage.userProfileId,
         "pipeline.step": "process",
-        attempt: attempt,
       },
-      async (span) => {
-        if (attempt > 1) {
-          this.logger.log({
-            msg: "Retrying process for email",
-            emailId,
-            attempt,
-          });
-          addSpanEvent(span, "retry", { attempt });
-        }
+    );
+  }
 
-        try {
-          const email = await this.db.query.emails.findFirst({
-            where: and(
-              eq(emailsTable.id, emailId),
-              eq(emailsTable.userProfileId, userProfileId)
-            ),
-          });
+  protected getMessageIdentifiers(message: ProcessMessage) {
+    return {
+      userProfileId: message.userProfileId,
+      emailId: message.emailId,
+    };
+  }
 
-          if (!email) {
-            this.logger.warn("Email not found, skipping processing");
-            addSpanEvent(span, "email.not_found", { emailId, userProfileId });
-            span.setStatus({ code: SpanStatusCode.OK });
-            return;
-          }
+  protected buildSuccessPayload(message: ProcessMessage, _additionalData?: unknown) {
+    return {
+      userProfileId: message.userProfileId,
+      emailId: message.emailId,
+    };
+  }
 
-          const { processedBody, language } = await this.cleanupBody(email, {
-            span,
-            emailId,
-            userProfileId,
-          });
-          const summarizedBody = await this.summarizeBody(
-            email,
-            processedBody,
-            {
-              span,
-              emailId,
-              userProfileId,
-            }
-          );
-          const threadSummary = await this.summarizeThread(email, {
-            span,
-            emailId,
-            userProfileId,
-          });
+  protected buildFailurePayload(message: ProcessMessage, _error: string) {
+    return {
+      userProfileId: message.userProfileId,
+      emailId: message.emailId,
+    };
+  }
 
-          this.logger.debug({
-            msg: "Email processed",
-            emailId: emailId,
-            userProfileId: userProfileId,
-          });
+  protected async processMessage(
+    message: ProcessMessage,
+    _amqpMessage: ConsumeMessage,
+    span: Span,
+  ): Promise<void> {
+    const { userProfileId, emailId } = message;
+    
+    const email = await this.db.query.emails.findFirst({
+      where: and(
+        eq(emailsTable.id, emailId),
+        eq(emailsTable.userProfileId, userProfileId)
+      ),
+    });
 
-          addSpanEvent(
-            span,
-            "email.processed",
-            { emailId, userProfileId },
-            { language },
-            {
-              input: { body: email.uniqueBodyHtml },
-              output: {
-                language,
-                processedBody,
-                summarizedBody,
-                threadSummary,
-              },
-            },
-          );
-          span.setStatus({ code: SpanStatusCode.OK });
+    if (!email) {
+      this.logger.warn("Email not found, skipping processing");
+      addSpanEvent(span, "email.not_found", { emailId, userProfileId });
+      span.setStatus({ code: SpanStatusCode.OK });
+      return;
+    }
 
-          const traceHeaders =
-            this.tracePropagation.extractTraceHeaders(amqpMessage);
-          await this.amqpConnection.publish(
-            "email.orchestrator",
-            "orchestrator",
-            {
-              eventType: OrchestratorEventType.ProcessingCompleted,
-              userProfileId,
-              emailId,
-              timestamp: new Date().toISOString(),
-            },
-            { headers: traceHeaders }
-          );
-
-          return;
-        } catch (error) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: error instanceof Error ? error.message : String(error),
-          });
-          span.recordException(error as Error);
-          startObservation(
-            "error",
-            {
-              statusMessage:
-                error instanceof Error ? error.message : String(error),
-              level: "ERROR",
-            },
-            { asType: "event", parentSpanContext: span.spanContext() }
-          ).end();
-          await this.retryService.handleError({
-            message: processMessage,
-            amqpMessage,
-            error,
-            retryExchange: "email.pipeline.retry",
-            retryRoutingKey: "email.process.retry",
-            onMaxRetriesExceeded: async (_msg, errorStr, traceHeaders) => {
-              await this.amqpConnection.publish(
-                "email.orchestrator",
-                "orchestrator",
-                {
-                  eventType: OrchestratorEventType.ProcessingFailed,
-                  userProfileId,
-                  emailId,
-                  timestamp: new Date().toISOString(),
-                  error: errorStr,
-                },
-                { headers: traceHeaders }
-              );
-            },
-          });
-          return;
-        }
+    const { processedBody, language } = await this.cleanupBody(email, {
+      span,
+      emailId,
+      userProfileId,
+    });
+    const summarizedBody = await this.summarizeBody(
+      email,
+      processedBody,
+      {
+        span,
+        emailId,
+        userProfileId,
       }
+    );
+    const threadSummary = await this.summarizeThread(email, {
+      span,
+      emailId,
+      userProfileId,
+    });
+
+    this.logger.debug({
+      msg: "Email processed",
+      emailId: emailId,
+      userProfileId: userProfileId,
+    });
+
+    addSpanEvent(
+      span,
+      "email.processed",
+      { emailId, userProfileId },
+      { language },
+      {
+        input: { body: email.uniqueBodyHtml },
+        output: {
+          language,
+          processedBody,
+          summarizedBody,
+          threadSummary,
+        },
+      },
     );
   }
 

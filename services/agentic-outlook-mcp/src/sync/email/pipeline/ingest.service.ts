@@ -1,7 +1,7 @@
 import { AmqpConnection, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import { Message } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { SpanStatusCode } from '@opentelemetry/api';
+import { Span } from '@opentelemetry/api';
 import { ConsumeMessage } from 'amqplib';
 import { snakeCase } from 'lodash';
 import { TypeID } from 'typeid-js';
@@ -12,6 +12,7 @@ import { DeletedItem } from '../email-sync.service';
 import { OrchestratorEventType } from '../orchestrator.messages';
 import { RetryService } from '../retry.service';
 import { TracePropagationService } from '../trace-propagation.service';
+import { PipelineStageBase, PipelineStageConfig } from './pipeline-stage.base';
 
 interface IngestMessage {
   message: Message;
@@ -21,17 +22,25 @@ interface IngestMessage {
 }
 
 @Injectable()
-export class IngestService {
-  private readonly logger = new Logger(this.constructor.name);
+export class IngestService extends PipelineStageBase<IngestMessage> {
+  protected readonly logger = new Logger(this.constructor.name);
+  protected readonly config: PipelineStageConfig = {
+    spanName: 'email.pipeline.ingest',
+    retryRoutingKey: 'email.ingest.retry',
+    successEvent: OrchestratorEventType.IngestCompleted,
+    failureEvent: OrchestratorEventType.IngestFailed,
+  };
   private readonly foldersMap = new Map<string, string>();
 
   public constructor(
-    private readonly amqpConnection: AmqpConnection,
+    amqpConnection: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly emailService: EmailService,
-    private readonly retryService: RetryService,
-    private readonly tracePropagation: TracePropagationService,
-  ) {}
+    retryService: RetryService,
+    tracePropagation: TracePropagationService,
+  ) {
+    super(amqpConnection, retryService, tracePropagation);
+  }
 
   @RabbitSubscribe({
     exchange: 'email.pipeline',
@@ -39,105 +48,79 @@ export class IngestService {
     queue: 'q.email.ingest',
   })
   public async ingest(ingestMessage: IngestMessage, amqpMessage: ConsumeMessage) {
-    const { message, userProfileId, folderId } = ingestMessage;
-    const attempt = Number(amqpMessage.properties.headers?.['x-attempt'] ?? 1);
-
-    // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
-    const messageId = message.id!;
-
-    return this.tracePropagation.withExtractedContext(
+    return this.executeStage(
+      ingestMessage,
       amqpMessage,
-      'email.pipeline.ingest',
       {
         'email.id': ingestMessage.emailId,
-        'user.id': userProfileId,
-        'folder.id': folderId,
+        'user.id': ingestMessage.userProfileId,
+        'folder.id': ingestMessage.folderId,
         'pipeline.step': 'ingest',
-        attempt: attempt,
-      },
-      async (span) => {
-        // This can cause data inconsistency if a folder is changed while ingesting.
-        await this.ensureFoldersMap();
-
-        if (attempt > 1) {
-          this.logger.log({
-            msg: 'Retrying ingest for message',
-            messageId,
-            attempt,
-          });
-          addSpanEvent(span, 'retry', { attempt });
-        }
-
-        try {
-          const isDeleted = (message as unknown as DeletedItem)['@removed'] !== undefined;
-          if (isDeleted) {
-            addSpanEvent(span, 'email.deleted');
-            await this.emailService.deleteEmails(TypeID.fromString(userProfileId, 'user_profile'), [
-              messageId,
-            ]);
-            span.setStatus({ code: SpanStatusCode.OK });
-            return;
-          }
-
-          const mappedEmail = this.mapMessageToEmail({ message, userProfileId, folderId });
-
-          const savedId = await this.emailService.upsertEmail(
-            TypeID.fromString(userProfileId, 'user_profile'),
-            folderId,
-            mappedEmail,
-          );
-
-          addSpanEvent(span, 'email.saved', { 'email.id': savedId.toString() });
-          span.setStatus({ code: SpanStatusCode.OK });
-
-          const traceHeaders = this.tracePropagation.extractTraceHeaders(amqpMessage);
-          await this.amqpConnection.publish(
-            'email.orchestrator',
-            'orchestrator',
-            {
-              eventType: OrchestratorEventType.IngestCompleted,
-              userProfileId,
-              folderId,
-              emailId: savedId.toString(),
-              timestamp: new Date().toISOString(),
-            },
-            { headers: traceHeaders },
-          );
-
-          return;
-        } catch (error) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: error instanceof Error ? error.message : String(error),
-          });
-          span.recordException(error as Error);
-          await this.retryService.handleError({
-            message: ingestMessage,
-            amqpMessage,
-            error,
-            retryExchange: 'email.pipeline.retry',
-            retryRoutingKey: 'email.ingest.retry',
-            onMaxRetriesExceeded: async (_msg, errorStr, traceHeaders) => {
-              await this.amqpConnection.publish(
-                'email.orchestrator',
-                'orchestrator',
-                {
-                  eventType: OrchestratorEventType.IngestFailed,
-                  userProfileId,
-                  emailId: ingestMessage.emailId,
-                  folderId,
-                  messageId,
-                  timestamp: new Date().toISOString(),
-                  error: errorStr,
-                },
-                { headers: traceHeaders },
-              );
-            },
-          });
-          return;
-        }
       },
     );
+  }
+
+  protected getMessageIdentifiers(message: IngestMessage) {
+    return {
+      userProfileId: message.userProfileId,
+      emailId: message.emailId,
+      folderId: message.folderId,
+      // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
+      messageId: message.message.id!,
+    };
+  }
+
+  protected buildSuccessPayload(message: IngestMessage, additionalData?: unknown) {
+    const data = additionalData as { savedId?: string } | undefined;
+    return {
+      userProfileId: message.userProfileId,
+      folderId: message.folderId,
+      emailId: data?.savedId || message.emailId,
+    };
+  }
+
+  protected buildFailurePayload(message: IngestMessage, _error: string) {
+    return {
+      userProfileId: message.userProfileId,
+      emailId: message.emailId,
+      folderId: message.folderId,
+      // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
+      messageId: message.message.id!,
+    };
+  }
+
+  protected async processMessage(
+    message: IngestMessage,
+    _amqpMessage: ConsumeMessage,
+    span: Span,
+  ): Promise<{ savedId: string } | undefined> {
+    const { message: graphMessage, userProfileId, folderId } = message;
+    // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
+    const messageId = graphMessage.id!;
+    
+    // This can cause data inconsistency if a folder is changed while ingesting.
+    await this.ensureFoldersMap();
+
+    const isDeleted = (graphMessage as unknown as DeletedItem)['@removed'] !== undefined;
+    if (isDeleted) {
+      addSpanEvent(span, 'email.deleted');
+      await this.emailService.deleteEmails(TypeID.fromString(userProfileId, 'user_profile'), [
+        messageId,
+      ]);
+      return;
+    }
+
+    const mappedEmail = this.mapMessageToEmail({ message: graphMessage, userProfileId, folderId });
+
+    const savedId = await this.emailService.upsertEmail(
+      TypeID.fromString(userProfileId, 'user_profile'),
+      folderId,
+      mappedEmail,
+    );
+
+    addSpanEvent(span, 'email.saved', { 'email.id': savedId.toString() });
+    
+    return { savedId: savedId.toString() };
   }
 
   private async ensureFoldersMap(): Promise<void> {
