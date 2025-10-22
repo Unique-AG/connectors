@@ -30,6 +30,7 @@
   "dependencies": {
     "@golevelup/nestjs-discovery": "^5.0.0",
     "@golevelup/nestjs-rabbitmq": "^6.0.2",
+    "@langchain/textsplitters": "^1.0.0",
     "@langfuse/openai": "^4.2.0",
     "@langfuse/tracing": "^4.2.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
@@ -60,6 +61,7 @@
     "drizzle-zod": "^0.8.3",
     "email-reply-parser": "^2.0.1",
     "handlebars": "^4.7.8",
+    "js-tiktoken": "^1.0.21",
     "jsdom": "^27.0.0",
     "jsonwebtoken": "^9.0.2",
     "lodash": "^4.17.21",
@@ -76,6 +78,7 @@
     "serialize-error-cjs": "^0.2.0",
     "turndown": "^7.2.1",
     "typeid-js": "^1.2.0",
+    "voyageai": "^0.0.8",
     "zod": "^4.1.5"
   },
   "devDependencies": {

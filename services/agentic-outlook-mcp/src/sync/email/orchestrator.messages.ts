@@ -7,6 +7,9 @@ export enum OrchestratorEventType {
   ProcessingRequested = 'processing_requested',
   ProcessingCompleted = 'processing_completed',
   ProcessingFailed = 'processing_failed',
+  EmbeddingRequested = 'embedding_requested',
+  EmbeddingCompleted = 'embedding_completed',
+  EmbeddingFailed = 'embedding_failed',
 }
 
 export interface BaseOrchestratorMessage {
@@ -47,10 +50,26 @@ export interface ProcessingFailedMessage extends BaseOrchestratorMessage {
   error: string;
 }
 
+export interface EmbeddingRequestedMessage extends BaseOrchestratorMessage {
+  eventType: OrchestratorEventType.EmbeddingRequested;
+}
+
+export interface EmbeddingCompletedMessage extends BaseOrchestratorMessage {
+  eventType: OrchestratorEventType.EmbeddingCompleted;
+}
+
+export interface EmbeddingFailedMessage extends BaseOrchestratorMessage {
+  eventType: OrchestratorEventType.EmbeddingFailed;
+  error: string;
+}
+
 export type OrchestratorMessage =
   | IngestRequestedMessage
   | IngestCompletedMessage
   | IngestFailedMessage
   | ProcessingRequestedMessage
   | ProcessingCompletedMessage
-  | ProcessingFailedMessage;
+  | ProcessingFailedMessage
+  | EmbeddingRequestedMessage
+  | EmbeddingCompletedMessage
+  | EmbeddingFailedMessage;

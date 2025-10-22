@@ -50,6 +50,24 @@ import { AppConfig, AppSettings } from '../../app-settings';
               deadLetterRoutingKey: 'email.process',
             },
           },
+          {
+            name: 'q.email.embed',
+            exchange: 'email.pipeline',
+            routingKey: 'email.embed',
+            options: { durable: true },
+          },
+          {
+            name: 'q.email.embed.retry',
+            exchange: 'email.pipeline.retry',
+            routingKey: 'email.embed.retry',
+            options: {
+              durable: true,
+              deadLetterExchange: 'email.pipeline',
+              deadLetterRoutingKey: 'email.embed',
+            },
+          },
+          // { name: 'q.email.index' },
+          // { name: 'q.email.index.retry' },
           // Single orchestrator queue for all events
           {
             name: 'q.orchestrator',
@@ -67,12 +85,6 @@ import { AppConfig, AppSettings } from '../../app-settings';
               deadLetterRoutingKey: 'orchestrator',
             },
           },
-          // { name: 'q.email.embed' },
-          // { name: 'q.email.embed.retry' },
-          // { name: 'q.email.embed.dlx' },
-          // { name: 'q.email.index' },
-          // { name: 'q.email.index.retry' },
-          // { name: 'q.email.index.dlx' },
         ],
         channels: {
           pipeline: {

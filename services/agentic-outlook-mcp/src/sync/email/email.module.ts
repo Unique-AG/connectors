@@ -8,6 +8,7 @@ import { EmailService } from './email.service';
 import { EmailSyncService } from './email-sync.service';
 import { LLMEmailCleanupService } from './lib/llm-email-cleanup/llm-email-cleanup.service';
 import { LLMSummarizationService } from './lib/llm-summarization-service/llm-summarization.service';
+import { EmbedService } from './pipeline/embed.service';
 import { IngestService } from './pipeline/ingest.service';
 import { ProcessService } from './pipeline/process.service';
 import { RetryService } from './retry.service';
@@ -23,6 +24,7 @@ import { TracePropagationService } from './trace-propagation.service';
     TracePropagationService,
     IngestService,
     ProcessService,
+    EmbedService,
     LLMEmailCleanupService,
     LLMSummarizationService,
   ],

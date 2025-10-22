@@ -238,9 +238,6 @@ export class IngestService {
         value: header.value,
       })),
 
-      // These values must be updated in post-processing.
-      sizeBytes: 0,
-
       userProfileId,
       folderId,
     };

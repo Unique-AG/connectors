@@ -1,10 +1,11 @@
 import { LangfuseConfig, observeOpenAI } from '@langfuse/openai';
 import { startObservation } from '@langfuse/tracing';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { ChatCompletionCreateParamsNonStreaming } from 'openai/resources/index';
 import { serializeError } from 'serialize-error-cjs';
+import { VoyageAIClient } from 'voyageai';
 import { z } from 'zod';
 import { AppConfig, AppSettings } from '../app-settings';
 import { normalizeError } from '../utils/normalize-error';
@@ -26,9 +27,8 @@ export class LLMError extends Error {
 
 @Injectable()
 export class LLMService {
-  private readonly logger = new Logger(this.constructor.name);
-
   public readonly client: OpenAI;
+  public readonly voyageClient: VoyageAIClient;
 
   public constructor(configService: ConfigService<AppConfig, true>) {
     const client = observeOpenAI(
@@ -38,6 +38,9 @@ export class LLMService {
       }),
     );
     this.client = client;
+    this.voyageClient = new VoyageAIClient({
+      apiKey: configService.get(AppSettings.VOYAGE_API_KEY),
+    });
   }
 
   /**
@@ -102,7 +105,7 @@ export class LLMService {
 
         output = parseCompletionOutput(response);
         const usageDetails = parseUsageDetailsFromResponse(response);
-        this.logger.log({ msg: 'Usage details', usageDetails });
+
         const {
           model: modelFromResponse,
           modelParameters: modelParametersFromResponse,
@@ -152,6 +155,74 @@ export class LLMService {
         .end();
       throw new LLMError(
         'Failed to generate object with schema',
+        serializeError(normalizeError(error)),
+      );
+    }
+  }
+
+  /**
+   * Embed the input using the Voyage contextualized embed model.
+   * @param input - The input to embed.
+   * @param config - The configuration for the embedding.
+   * @returns The embeddings as a triple-nested array where:
+   *   - First level: Array of document groups (matches input structure)
+   *   - Second level: Array of chunks within each document group
+   *   - Third level: Array of numbers representing the embedding vector for each chunk
+   */
+  public async contextualizedEmbed(
+    input: string[][],
+    config?: LangfuseConfig,
+  ): Promise<number[][][]> {
+    const span = startObservation(
+      config?.generationName ?? 'Voyage-contextualized-embed',
+      {
+        model: 'voyage-context-3',
+        input,
+        modelParameters: {
+          input_type: 'document',
+        },
+      },
+      {
+        asType: 'embedding',
+        parentSpanContext: config?.parentSpanContext,
+      },
+    ).updateTrace({
+      userId: config?.userId,
+      sessionId: config?.sessionId,
+      tags: config?.tags,
+      name: config?.traceName,
+    });
+
+    try {
+      const response = await this.voyageClient.contextualizedEmbed({
+        model: 'voyage-context-3',
+        inputs: input,
+        inputType: 'document',
+      });
+
+      span
+        .update({
+          output: response.data,
+          usageDetails: response.usage,
+          model: response.model,
+        })
+        .end();
+
+      return response.data?.map((data) => data.data?.map((d) => d.embedding ?? []) ?? []) ?? [];
+    } catch (error) {
+      span
+        .update({
+          statusMessage: String(error),
+          level: 'ERROR',
+          costDetails: {
+            input: 0,
+            output: 0,
+            total: 0,
+          },
+        })
+        .end();
+      throw new LLMError(
+        'Failed to get contextualized embed',
         serializeError(normalizeError(error)),
       );
     }

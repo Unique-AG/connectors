@@ -14,6 +14,7 @@ import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 import { folders } from './folders.table';
+import { vectors } from './vectors.table';
 
 export const ingestionStatus = pgEnum('ingestion_status', [
   'pending',
@@ -115,7 +116,7 @@ export const emails = pgTable(
   ],
 );
 
-export const emailRelations = relations(emails, ({ one }) => ({
+export const emailRelations = relations(emails, ({ one, many }) => ({
   userProfile: one(userProfiles, {
     fields: [emails.userProfileId],
     references: [userProfiles.id],
@@ -124,6 +125,7 @@ export const emailRelations = relations(emails, ({ one }) => ({
     fields: [emails.folderId],
     references: [folders.id],
   }),
+  vectors: many(vectors),
 }));
 
 export type Email = typeof emails.$inferSelect;

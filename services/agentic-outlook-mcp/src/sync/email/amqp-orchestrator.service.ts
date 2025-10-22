@@ -6,6 +6,9 @@ import { ConsumeMessage } from 'amqplib';
 import { eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDatabase, emails as emailsTable } from '../../drizzle';
 import {
+  EmbeddingCompletedMessage,
+  EmbeddingFailedMessage,
+  EmbeddingRequestedMessage,
   IngestCompletedMessage,
   IngestFailedMessage,
   IngestRequestedMessage,
@@ -114,6 +117,15 @@ export class AmqpOrchestratorService {
               break;
             case OrchestratorEventType.ProcessingFailed:
               await this.handleProcessingFailed(message, traceHeaders);
+              break;
+            case OrchestratorEventType.EmbeddingRequested:
+              await this.handleEmbeddingRequested(message, traceHeaders);
+              break;
+            case OrchestratorEventType.EmbeddingCompleted:
+              await this.handleEmbeddingCompleted(message, traceHeaders);
+              break;
+            case OrchestratorEventType.EmbeddingFailed:
+              await this.handleEmbeddingFailed(message, traceHeaders);
               break;
           }
 
@@ -227,9 +239,9 @@ export class AmqpOrchestratorService {
 
   private async handleProcessingCompleted(
     message: ProcessingCompletedMessage,
-    _traceHeaders: Record<string, unknown>,
+    traceHeaders: Record<string, unknown>,
   ) {
-    const { emailId } = message;
+    const { userProfileId, emailId } = message;
 
     await this.db
       .update(emailsTable)
@@ -239,11 +251,70 @@ export class AmqpOrchestratorService {
       })
       .where(eq(emailsTable.id, emailId));
 
-    // For now, this is the end of the pipeline
+    await this.publishEvent(
+      {
+        eventType: OrchestratorEventType.EmbeddingRequested,
+        userProfileId,
+        emailId,
+        timestamp: new Date().toISOString(),
+      },
+      traceHeaders,
+    );
   }
 
   private async handleProcessingFailed(
     message: ProcessingFailedMessage,
+    _traceHeaders: Record<string, unknown>,
+  ) {
+    const { emailId, error } = message;
+
+    await this.db
+      .update(emailsTable)
+      .set({
+        ingestionStatus: 'failed',
+        ingestionLastError: error,
+        ingestionLastAttemptAt: new Date().toISOString(),
+        ingestionCompletedAt: new Date().toISOString(),
+      })
+      .where(eq(emailsTable.id, emailId));
+  }
+
+  private async handleEmbeddingRequested(
+    message: EmbeddingRequestedMessage,
+    traceHeaders: Record<string, unknown>,
+  ) {
+    const { userProfileId, emailId } = message;
+
+    await this.amqpConnection.publish(
+      'email.pipeline',
+      'email.embed',
+      {
+        userProfileId,
+        emailId,
+      },
+      { headers: traceHeaders },
+    );
+  }
+
+  private async handleEmbeddingCompleted(
+    message: EmbeddingCompletedMessage,
+    _traceHeaders: Record<string, unknown>,
+  ) {
+    const { emailId } = message;
+
+    await this.db
+      .update(emailsTable)
+      .set({
+        ingestionStatus: 'embedded',
+        ingestionLastAttemptAt: new Date().toISOString(),
+      })
+      .where(eq(emailsTable.id, emailId));
+
+    // For now, this is the end of the pipeline
+  }
+
+  private async handleEmbeddingFailed(
+    message: EmbeddingFailedMessage,
     _traceHeaders: Record<string, unknown>,
   ) {
     const { emailId, error } = message;
