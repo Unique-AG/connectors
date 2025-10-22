@@ -1,8 +1,7 @@
 import { AmqpConnection, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { startObservation } from '@langfuse/tracing';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Span, SpanStatusCode } from '@opentelemetry/api';
+import { Span } from '@opentelemetry/api';
 import { ConsumeMessage } from 'amqplib';
 import { and, eq } from 'drizzle-orm';
 import { encodingForModel } from 'js-tiktoken';
@@ -14,6 +13,7 @@ import { OrchestratorEventType } from '../orchestrator.messages';
 import { FatalPipelineError } from '../pipeline.errors';
 import { RetryService } from '../retry.service';
 import { TracePropagationService } from '../trace-propagation.service';
+import { PipelineStageBase, PipelineStageConfig } from './pipeline-stage.base';
 
 interface EmbedMessage {
   userProfileId: string;
@@ -24,128 +24,97 @@ const CHUNK_SIZE = 3_200;
 const MAX_TOKENS = 32_000;
 
 @Injectable()
-export class EmbedService {
-  private readonly logger = new Logger(this.constructor.name);
+export class EmbedService extends PipelineStageBase<EmbedMessage> {
+  protected readonly logger = new Logger(this.constructor.name);
+  protected readonly config: PipelineStageConfig = {
+    spanName: 'email.pipeline.embed',
+    retryRoutingKey: 'email.embed.retry',
+    successEvent: OrchestratorEventType.EmbeddingCompleted,
+    failureEvent: OrchestratorEventType.EmbeddingFailed,
+  };
 
   public constructor(
-    private readonly amqpConnection: AmqpConnection,
+    amqpConnection: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    private readonly retryService: RetryService,
-    private readonly tracePropagation: TracePropagationService,
+    retryService: RetryService,
+    tracePropagation: TracePropagationService,
     private readonly llmService: LLMService,
-  ) {}
+  ) {
+    super(amqpConnection, retryService, tracePropagation);
+  }
 
   @RabbitSubscribe({
     exchange: 'email.pipeline',
     routingKey: 'email.embed',
     queue: 'q.email.embed',
   })
-  public async chunking(message: EmbedMessage, amqpMessage: ConsumeMessage) {
-    const { userProfileId, emailId } = message;
-    const attempt = Number(amqpMessage.properties.headers?.['x-attempt'] ?? 1);
-
-    return this.tracePropagation.withExtractedContext(
+  public async embed(message: EmbedMessage, amqpMessage: ConsumeMessage) {
+    return this.executeStage(
+      message,
       amqpMessage,
-      'email.pipeline.embed',
       {
-        'email.id': emailId,
-        'user.id': userProfileId,
+        'email.id': message.emailId,
+        'user.id': message.userProfileId,
         'pipeline.step': 'embed',
-        attempt: attempt,
-      },
-      async (span) => {
-        if (attempt > 1) {
-          this.logger.log({
-            msg: 'Retrying embed for email',
-            emailId,
-            attempt,
-          });
-          addSpanEvent(span, 'retry', { attempt });
-        }
-
-        try {
-          const email = await this.db.query.emails.findFirst({
-            where: and(eq(emailsTable.id, emailId), eq(emailsTable.userProfileId, userProfileId)),
-            with: {
-              vectors: true,
-            },
-          });
-
-          if (!email) {
-            this.logger.warn('Email not found, skipping embed');
-            addSpanEvent(span, 'email.not_found', { emailId, userProfileId });
-            span.setStatus({ code: SpanStatusCode.OK });
-            return;
-          }
-
-          if (!email.processedBody) throw new FatalPipelineError('Email processed body is missing');
-          const chunks = await this.createChunks(email.processedBody);
-
-          if (email.vectors.length > 0) {
-            this.logger.warn('Email already has vectors, skipping embed');
-            addSpanEvent(span, 'email.already_has_vectors', { emailId, userProfileId });
-          }
-
-          const vectors = await this.createVectors(email, chunks, { span });
-
-          this.logger.debug({
-            msg: 'Generated embeddings',
-            vectorsCreated: vectors.length,
-          });
-
-          span.setStatus({ code: SpanStatusCode.OK });
-
-          await this.amqpConnection.publish(
-            'email.orchestrator',
-            'orchestrator',
-            {
-              eventType: OrchestratorEventType.EmbeddingCompleted,
-              userProfileId,
-              emailId,
-            },
-            { headers: this.tracePropagation.extractTraceHeaders(amqpMessage) },
-          );
-
-          return;
-        } catch (error) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: error instanceof Error ? error.message : String(error),
-          });
-          span.recordException(error as Error);
-          startObservation(
-            'error',
-            {
-              statusMessage: error instanceof Error ? error.message : String(error),
-              level: 'ERROR',
-            },
-            { asType: 'event', parentSpanContext: span.spanContext() },
-          ).end();
-          await this.retryService.handleError({
-            message,
-            amqpMessage,
-            error,
-            retryExchange: 'email.pipeline.retry',
-            retryRoutingKey: 'email.embed.retry',
-            onMaxRetriesExceeded: async (_msg, errorStr, traceHeaders) => {
-              await this.amqpConnection.publish(
-                'email.orchestrator',
-                'orchestrator',
-                {
-                  eventType: OrchestratorEventType.EmbeddingFailed,
-                  userProfileId,
-                  emailId,
-                  timestamp: new Date().toISOString(),
-                  error: errorStr,
-                },
-                { headers: traceHeaders },
-              );
-            },
-          });
-          return;
-        }
       },
     );
+  }
+
+  protected getMessageIdentifiers(message: EmbedMessage) {
+    return {
+      userProfileId: message.userProfileId,
+      emailId: message.emailId,
+    };
+  }
+
+  protected buildSuccessPayload(message: EmbedMessage, _additionalData?: unknown) {
+    return {
+      userProfileId: message.userProfileId,
+      emailId: message.emailId,
+    };
+  }
+
+  protected buildFailurePayload(message: EmbedMessage, _error: string) {
+    return {
+      userProfileId: message.userProfileId,
+      emailId: message.emailId,
+    };
+  }
+
+  protected async processMessage(
+    message: EmbedMessage,
+    _amqpMessage: ConsumeMessage,
+    span: Span,
+  ): Promise<void> {
+    const { userProfileId, emailId } = message;
+    
+    const email = await this.db.query.emails.findFirst({
+      where: and(eq(emailsTable.id, emailId), eq(emailsTable.userProfileId, userProfileId)),
+      with: {
+        vectors: true,
+      },
+    });
+
+    if (!email) {
+      this.logger.warn('Email not found, skipping embed');
+      addSpanEvent(span, 'email.not_found', { emailId, userProfileId });
+      return;
+    }
+
+    if (!email.processedBody) throw new FatalPipelineError('Email processed body is missing');
+    const chunks = await this.createChunks(email.processedBody);
+
+    if (email.vectors.length > 0) {
+      this.logger.warn('Email already has vectors, skipping embed');
+      addSpanEvent(span, 'email.already_has_vectors', { emailId, userProfileId });
+    }
+
+    const vectors = await this.createVectors(email, chunks, { span });
+
+    this.logger.debug({
+      msg: 'Generated embeddings',
+      vectorsCreated: vectors.length,
+    });
   }
 
   private async createChunks(body: string): Promise<string[]> {
