@@ -1,19 +1,29 @@
 # Port Map
 # 9001 - postgres
-# 9002 - otel-lgtm
 # 9003 - otel-lgtm
 # 9004 - otel-lgtm
-# 9005 - minio
-# 9006 - minio console
 # 9007 - langfuse-worker
 # 9008 - langfuse-web
-# 9009 - powersync
 # 9010 - rabbitmq
-# 9011 - rabbitmq management
 # 9012 - litellm
-
 name: connectors-monorepo
 services:
+  traefik:
+    image: traefik:v3.5
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - 80:80
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik.rule=Host(`traefik.localhost`)
+      - traefik.http.routers.traefik.service=api@internal
+
   postgres:
     image: postgres:17
     restart: always
@@ -50,10 +60,13 @@ services:
       - rabbitmq:/var/lib/rabbitmq
     ports:
       - 9010:5672
-      - 9011:15672
     environment:
       RABBITMQ_DEFAULT_USER: rabbitmq
       RABBITMQ_DEFAULT_PASS: rabbitmq
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.rabbitmq.rule=Host(`rabbitmq.localhost`)
+      - traefik.http.services.rabbitmq.loadbalancer.server.port=15672
 
   powersync:
     profiles: ["agentic-outlook-mcp"] # To run this profile `docker-compose --profile agentic-outlook-mcp up -d`
@@ -70,6 +83,10 @@ services:
       POWERSYNC_CONFIG_PATH: /config/config.yaml
     ports:
       - 9009:8080
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.powersync.rule=Host(`powersync.localhost`)
+      - traefik.http.services.powersync.loadbalancer.server.port=8080
 
   litellm:
     profiles: ["agentic-outlook-mcp"] # To run this profile `docker-compose --profile agentic-outlook-mcp up -d`
@@ -89,14 +106,25 @@ services:
     volumes:
       - ./services/agentic-outlook-mcp/litellm/config.yaml:/etc/litellm/config.yaml
     command: "--config /etc/litellm/config.yaml --detailed_debug"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.litellm.rule=Host(`litellm.localhost`)
+      - traefik.http.services.litellm.loadbalancer.server.port=4444
 
   otel-lgtm:
     image: grafana/otel-lgtm
+    restart: always
     ports:
-      - '9002:3000'
       - '9003:4317'
       - '9004:4318'
-    restart: always
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.grafana.rule=Host(`grafana.localhost`)
+      - traefik.http.routers.grafana.service=grafana
+      - traefik.http.services.grafana.loadbalancer.server.port=3000
+      - traefik.http.routers.otlp.rule=Host(`otlp.localhost`)
+      - traefik.http.routers.otlp.service=otlp
+      - traefik.http.services.otlp.loadbalancer.server.port=4318
 
   rabbitmq:
     image: rabbitmq:4-management
@@ -125,9 +153,6 @@ services:
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: miniosecret
-    ports:
-      - 9005:9000
-      - 9006:9001
     volumes:
       - minio:/data
     healthcheck:
@@ -136,6 +161,14 @@ services:
       timeout: 5s
       retries: 5
       start_period: 1s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.minio.rule=Host(`minio.localhost`)
+      - traefik.http.routers.minio.service=minio
+      - traefik.http.services.minio.loadbalancer.server.port=9000
+      - traefik.http.routers.minio-console.rule=Host(`minio-console.localhost`)
+      - traefik.http.routers.minio-console.service=minio-console
+      - traefik.http.services.minio-console.loadbalancer.server.port=9001
 
   clickhouse:
     image: clickhouse/clickhouse-server
@@ -170,7 +203,7 @@ services:
     ports:
       - 9007:3030
     environment: &langfuse-worker-env
-      NEXTAUTH_URL: http://localhost:9008
+      NEXTAUTH_URL: http://langfuse.localhost
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/langfuse
       SALT: "12345678"
       ENCRYPTION_KEY: "a77fd5b995975c2252899f21e6fd0cd7d346c01ef3300a11eff75f9a33c045c1"
@@ -193,7 +226,7 @@ services:
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
       LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
       LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
-      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:9090
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: true
       LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
       LANGFUSE_S3_BATCH_EXPORT_ENABLED: false
@@ -201,7 +234,7 @@ services:
       LANGFUSE_S3_BATCH_EXPORT_PREFIX: exports/
       LANGFUSE_S3_BATCH_EXPORT_REGION: auto
       LANGFUSE_S3_BATCH_EXPORT_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_BATCH_EXPORT_EXTERNAL_ENDPOINT: http://localhost:9005
+      LANGFUSE_S3_BATCH_EXPORT_EXTERNAL_ENDPOINT: http://minio.localhost
       LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID: minio
       LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY: miniosecret
       LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE: true
@@ -213,6 +246,10 @@ services:
     depends_on: *langfuse-depends-on
     ports:
       - 9008:3000
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.langfuse-web.rule=Host(`langfuse.localhost`)
+      - traefik.http.services.langfuse-web.loadbalancer.server.port=3000
     environment:
       <<: *langfuse-worker-env
       NEXTAUTH_SECRET: mysecret

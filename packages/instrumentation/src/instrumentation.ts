@@ -3,6 +3,7 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { addCleanupListener, exitAfterCleanup } from 'async-cleanup';
 import { parseOtelConfig } from './config';
+import { createLogRecordProcessor } from './log-record-processor';
 import { createMetricReader } from './metric-reader';
 import { createSpanProcessor } from './span-processor';
 
@@ -16,11 +17,13 @@ export function startInstrumentation(nodeAutoInstrumentationsConfig?: Instrument
 
   const config = parseOtelConfig();
   const spanProcessor = createSpanProcessor(config);
+  const logRecordProcessor = createLogRecordProcessor(config);
   const metricReader = createMetricReader(config);
 
   const otelSDK = new NodeSDK({
     spanProcessors: spanProcessor ? [spanProcessor] : undefined,
     metricReader: metricReader,
+    logRecordProcessors: logRecordProcessor ? [logRecordProcessor] : undefined,
     instrumentations: [getNodeAutoInstrumentations(nodeAutoInstrumentationsConfig)],
   });
 
