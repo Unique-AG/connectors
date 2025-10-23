@@ -9,8 +9,10 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const otelConfigSchema = z.object({
+  OTEL_SERVICE_NAME: z.string().optional().prefault('unknown_service:node'),
   OTEL_SPAN_PROCESSOR: z.enum(['otlp', 'langfuse', 'console', 'none']).prefault('otlp'),
   OTEL_METRICS_READER: z.enum(['otlp', 'console', 'none']).prefault('otlp'),
+  OTEL_LOGS_PROCESSOR: z.enum(['otlp', 'console', 'none']).prefault('none'),
 
   // Langfuse configuration
   LANGFUSE_PUBLIC_KEY: z.string().optional(),
