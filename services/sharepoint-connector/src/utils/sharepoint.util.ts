@@ -70,13 +70,15 @@ export function buildKnowledgeBaseUrl(
       sharepointContentItem.folderPath,
       sharepointContentItem.item.name,
     );
-    return rootFolder ? `${rootFolder}/${url}` : url;
+    const pathWithoutDomain = stripDomain(url);
+    return rootFolder ? `${rootFolder}/${pathWithoutDomain}` : pathWithoutDomain;
   }
 
   // for listItems we can use directly the webUrl property
   if (sharepointContentItem.itemType === 'listItem') {
     const url = sharepointContentItem.item.webUrl;
-    return rootFolder ? `${rootFolder}/${url}` : url;
+    const pathWithoutDomain = stripDomain(url);
+    return rootFolder ? `${rootFolder}/${pathWithoutDomain}` : pathWithoutDomain;
   }
   assert.fail('Invalid pipeline item type');
 }
@@ -96,4 +98,13 @@ function buildUrl(baseUrlRaw: string, folderPathRaw: string, itemName: string): 
   const encodedPath = encodedSegments.join('/');
 
   return `${baseUrl}/${encodedPath}/${itemName}`;
+}
+
+function stripDomain(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.pathname.replace(/^\//, '');
+  } catch {
+    return url;
+  }
 }

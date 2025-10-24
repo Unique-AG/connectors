@@ -104,6 +104,9 @@ connectorConfig:
     # -- scope id for the scope based ingestion
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion
+    # -- root scope id for path-based ingestion with existing scope
+    # example: existing-scope-id-for-path-based-ingestion
+    rootScopeId: null # null if creating new scopes per file structure
     apiRateLimitPerMinute: 100
     zitadel:
       clientId: unset_default_value

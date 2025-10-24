@@ -46,10 +46,12 @@ export interface FileDiffItem {
   key: string;
   url: string | null;
   updatedAt: string;
+  scopeStructure?: string;
 }
 
 export interface FileDiffRequest {
-  basePath: string;
+  basePath?: string;
+  rootScopeId?: string;
   partialKey: string;
   sourceKind: string;
   sourceName: string;

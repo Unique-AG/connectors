@@ -84,13 +84,14 @@ export class SharepointSynchronizationService {
       (sharepointContentItem: SharepointContentItem) => {
         return {
           key: sharepointContentItem.item.id,
-          url: buildKnowledgeBaseUrl(sharepointContentItem, rootFolder),
+          url: sharepointContentItem.item.webUrl,
           updatedAt: sharepointContentItem.item.lastModifiedDateTime,
+          scopeStructure: buildKnowledgeBaseUrl(sharepointContentItem, rootFolder),
         };
       },
     );
 
     const uniqueToken = await this.uniqueAuthService.getToken();
-    return await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, siteId);
+    return await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, siteId, rootFolder);
   }
 }
