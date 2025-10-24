@@ -5,13 +5,14 @@
  * It converts natural language queries into embeddings and searches for conceptually similar emails,
  * handling multiple vector types per email (full, summary, chunks) and applying sophisticated reranking strategies.
  *
- * The tool returns a list of email IDs ranked by semantic similarity, which can then be used to fetch
- * the full email details from the database.
+ * The tool returns comprehensive email data including all metadata, content summaries, folder information,
+ * and optionally the full email body text.
  */
 
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import {
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -19,11 +20,19 @@ import {
 } from '@nestjs/common';
 import { components } from '@qdrant/js-client-rest/dist/types/openapi/generated_schema';
 import dayjs from 'dayjs';
-import { MetricService, Span } from 'nestjs-otel';
+import { inArray } from 'drizzle-orm';
+import { MetricService, Span, TraceService } from 'nestjs-otel';
 import { serializeError } from 'serialize-error-cjs';
 import * as z from 'zod';
+import {
+  addressToString,
+  DRIZZLE,
+  type DrizzleDatabase,
+  emails as emailsTable,
+} from '../../../drizzle';
 import { LLMService } from '../../../llm/llm.service';
 import { QdrantService } from '../../../qdrant/qdrant.service';
+import { addSpanEvent } from '../../../utils/add-span-event';
 import { normalizeError } from '../../../utils/normalize-error';
 import { OTEL_ATTRIBUTES } from '../../../utils/otel-attributes';
 
@@ -48,6 +57,10 @@ const SemanticSearchEmailsInputSchema = z.object({
     .enum(['max_score', 'weighted', 'proximity'])
     .default('weighted')
     .describe('Strategy for combining scores from multiple vectors per email'),
+  includeFullBody: z
+    .boolean()
+    .default(false)
+    .describe('Whether to include full email body (bodyText and bodyHtml) in results'),
 });
 
 interface SearchResult {
@@ -70,9 +83,11 @@ export class SemanticSearchEmailsTool {
   private readonly semanticSearchFailureCounter;
 
   public constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly qdrantService: QdrantService,
     private readonly llmService: LLMService,
     metricService: MetricService,
+    private readonly traceService: TraceService,
   ) {
     this.semanticSearchCounter = metricService.getCounter('semantic_search_total', {
       description: 'Total number of semantic email searches',
@@ -86,7 +101,7 @@ export class SemanticSearchEmailsTool {
     name: 'semantic_search_emails',
     title: 'Semantic Search Emails',
     description:
-      'Search emails using AI-powered semantic understanding. Finds conceptually similar emails even if they don\'t contain exact keyword matches. Ideal for complex queries like "emails about project deadlines" or "messages discussing budget concerns".',
+      'Search emails using AI-powered semantic understanding. Finds conceptually similar emails even if they don\'t contain exact keyword matches. Ideal for complex queries like "emails about project deadlines" or "messages discussing budget concerns". Returns comprehensive email data including metadata, content, and folder information.',
     parameters: SemanticSearchEmailsInputSchema,
     annotations: {
       title: 'Semantic Search Emails',
@@ -98,7 +113,7 @@ export class SemanticSearchEmailsTool {
     _meta: {
       'unique.app/icon': 'brain',
       'unique.app/system-prompt':
-        'Use this for natural language queries where you want to find emails based on meaning and context rather than exact keywords. The AI understands concepts, so queries like "frustrated customers", "meeting scheduling", or "project updates" work well. Returns email IDs ranked by semantic similarity.',
+        'Use this for natural language queries where you want to find emails based on meaning and context rather than exact keywords. The AI understands concepts, so queries like "frustrated customers", "meeting scheduling", or "project updates" work well. Returns comprehensive email data with all metadata, content summaries, and folder information.',
     },
   })
   @Span((options, _context, _request) => ({
@@ -116,6 +131,7 @@ export class SemanticSearchEmailsTool {
       dateFrom,
       dateTo,
       rerankingStrategy,
+      includeFullBody,
     }: z.infer<typeof SemanticSearchEmailsInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
@@ -123,10 +139,21 @@ export class SemanticSearchEmailsTool {
     const userProfileId = request.user?.userProfileId;
     if (!userProfileId) throw new UnauthorizedException('User not authenticated');
 
+    const span = this.traceService.getSpan();
+    if (!span) this.logger.warn('No active span found');
+
     this.incrementSearchCounter();
 
     try {
       const queryEmbedding = await this.generateQueryEmbedding(query);
+
+      if (span) {
+        addSpanEvent(span, 'embedding.generated', {
+          query,
+          userProfileId,
+          embeddingSize: queryEmbedding.length,
+        });
+      }
 
       const queryRequest = await this.buildQueryRequest(
         queryEmbedding,
@@ -142,12 +169,22 @@ export class SemanticSearchEmailsTool {
         queryRequest,
       });
 
-      const queryResults = await this.qdrantService.client.query(this.collectionName, {
+      const queryResults = await this.qdrantService.query(this.collectionName, {
         ...queryRequest,
       });
 
       const rankedEmails = this.groupAndRerankResults(queryResults.points, rerankingStrategy);
       const topEmails = rankedEmails.slice(0, limit);
+
+      if (span)
+        addSpanEvent(span, 'emails.reranked', {
+          query,
+          userProfileId,
+          totalPoints: queryResults.points.length,
+          uniqueEmails: rankedEmails.length,
+          returnedEmails: topEmails.length,
+          rerankingStrategy,
+        });
 
       this.logger.debug({
         msg: 'Semantic search completed',
@@ -157,18 +194,61 @@ export class SemanticSearchEmailsTool {
         returnedEmails: topEmails.length,
       });
 
-      return {
-        emailIds: topEmails.map((result) => result.emailId),
-        results: topEmails.map((result) => ({
-          emailId: result.emailId,
+      const emailIds = topEmails.map((result) => result.emailId);
+
+      const emailRecords = await this.db.query.emails.findMany({
+        where: inArray(emailsTable.id, emailIds),
+        with: {
+          folder: true,
+        },
+      });
+
+      const enrichedResults = topEmails.map((result) => {
+        const emailRecord = emailRecords.find((e) => e.id === result.emailId);
+        if (!emailRecord) return null;
+
+        const baseResult = {
+          id: emailRecord.id,
+          messageId: emailRecord.messageId,
+          webLink: emailRecord.webLink,
+          from: addressToString(emailRecord.from),
+          to: emailRecord.to.map(addressToString),
+          cc: emailRecord.cc.map(addressToString),
+          bcc: emailRecord.bcc.map(addressToString),
+          sentAt: emailRecord.sentAt,
+          receivedAt: emailRecord.receivedAt,
+          subject: emailRecord.subject,
+          processedBody: emailRecord.processedBody,
+          summarizedBody: emailRecord.summarizedBody,
+          threadSummary: emailRecord.threadSummary,
+          language: emailRecord.language,
+          hasAttachments: emailRecord.hasAttachments,
+          attachmentNameList: emailRecord.attachments.map((a) => a.filename).filter(Boolean),
+          folderId: emailRecord.folder.folderId,
+          folderName: emailRecord.folder.name,
           score: result.aggregateScore,
           bestMatch: result.bestMatchType,
           matchCount: result.points.length,
-        })),
+        };
+
+        if (includeFullBody) {
+          return {
+            ...baseResult,
+            bodyText: emailRecord.bodyText,
+            bodyHtml: emailRecord.bodyHtml,
+          };
+        }
+
+        return baseResult;
+      });
+
+      const filteredResults = enrichedResults.filter((r) => r !== null);
+
+      return {
+        results: filteredResults,
         query,
         totalMatches: rankedEmails.length,
         rerankingStrategy,
-        message: `Found ${topEmails.length} semantically similar emails`,
       };
     } catch (error) {
       this.incrementSearchFailureCounter('query_processing_error');

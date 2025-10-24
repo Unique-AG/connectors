@@ -98,8 +98,8 @@ export class IndexService extends PipelineStageBase<IndexMessage> {
       return;
     }
 
-    // TODO: make this more dynamic, so we can test different strategies.
-    await this.qdrantService.ensureCollection({
+
+    const collection = await this.qdrantService.ensureCollection({
       name: 'emails',
       vectors: {
         content: {
@@ -107,6 +107,11 @@ export class IndexService extends PipelineStageBase<IndexMessage> {
           distance: 'Cosine',
         },
       },
+    });
+
+    addSpanEvent(span, 'collection.ensured', { emailId, userProfileId }, undefined, {
+      collectionName: 'emails',
+      configuredVectors: collection.config.params.vectors,
     });
 
     const points: components['schemas']['PointStruct'][] = [];
@@ -151,6 +156,13 @@ export class IndexService extends PipelineStageBase<IndexMessage> {
       points.push(pointStruct);
     }
 
-    await this.qdrantService.client.upsert('emails', { points });
+
+    await this.qdrantService.upsert('emails', points);
+
+    addSpanEvent(span, 'email.indexed', {
+      emailId,
+      userProfileId,
+      pointCount: points.length,
+    });
   }
 }
