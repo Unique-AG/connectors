@@ -171,6 +171,7 @@ export class LLMService {
    */
   public async contextualizedEmbed(
     input: string[][],
+    inputType: 'document' | 'query' = 'document',
     config?: LangfuseConfig,
   ): Promise<number[][][]> {
     const span = startObservation(
@@ -179,7 +180,7 @@ export class LLMService {
         model: 'voyage-context-3',
         input,
         modelParameters: {
-          input_type: 'document',
+          input_type: inputType,
         },
       },
       {
@@ -197,7 +198,7 @@ export class LLMService {
       const response = await this.voyageClient.contextualizedEmbed({
         model: 'voyage-context-3',
         inputs: input,
-        inputType: 'document',
+        inputType,
       });
 
       span
