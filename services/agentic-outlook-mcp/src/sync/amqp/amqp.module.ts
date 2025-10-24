@@ -66,8 +66,21 @@ import { AppConfig, AppSettings } from '../../app-settings';
               deadLetterRoutingKey: 'email.embed',
             },
           },
-          // { name: 'q.email.index' },
-          // { name: 'q.email.index.retry' },
+          {
+            name: 'q.email.index',
+            exchange: 'email.pipeline',
+            routingKey: 'email.index',
+            options: { durable: true },
+          },
+          { name: 'q.email.index.retry',
+            exchange: 'email.pipeline.retry',
+            routingKey: 'email.index.retry',
+            options: {
+              durable: true,
+              deadLetterExchange: 'email.pipeline',
+              deadLetterRoutingKey: 'email.index',
+            },
+          },
           // Single orchestrator queue for all events
           {
             name: 'q.orchestrator',

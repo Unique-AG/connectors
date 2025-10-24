@@ -14,6 +14,7 @@ const appSettingsSchema = z.object({
     .startsWith('postgresql://')
     .describe('The database url for Postgres. Must start with "postgresql://".'),
   AMQP_URL: z.url().describe('The URL of the RabbitMQ server. Must start with "amqp://".'),
+  QDRANT_URL: z.url().describe('The URL of the Qdrant server. Must start with "http://".'),
   ACCESS_TOKEN_EXPIRES_IN_SECONDS: z
     .string()
     .optional()
