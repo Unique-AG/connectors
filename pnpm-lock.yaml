@@ -375,6 +375,9 @@ importers:
       cache-manager:
         specifier: ^7.2.0
         version: 7.2.0
+      dayjs:
+        specifier: ^1.11.18
+        version: 1.11.18
       dompurify:
         specifier: ^3.3.0
         version: 3.3.0
