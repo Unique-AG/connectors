@@ -5,7 +5,7 @@ import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import { normalizeError } from '../utils/normalize-error';
-import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
+import { getItemUrl } from '../utils/sharepoint.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
@@ -47,7 +47,7 @@ export class ProcessingPipelineService {
       correlationId,
       pipelineItem,
       startTime,
-      knowledgeBaseUrl: buildKnowledgeBaseUrl(pipelineItem),
+      knowledgeBaseUrl: getItemUrl(pipelineItem),
       mimeType: this.resolveMimeType(pipelineItem),
     };
 

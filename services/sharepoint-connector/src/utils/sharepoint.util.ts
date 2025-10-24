@@ -59,6 +59,7 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
   return normalizeSlashes(siteId);
 }
 
+// deprecated(24.10.2025): will be reusing it again after ingestion splits url into webUrl and knowledgeBasePathUrl
 export function buildKnowledgeBaseUrl(sharepointContentItem: SharepointContentItem): string {
   // we cannot use webUrl for driveItems as they are not using the real path but proxy _layouts hidden folders in their web url.
   if (sharepointContentItem.itemType === 'driveItem') {
@@ -91,4 +92,20 @@ function buildUrl(baseUrlRaw: string, folderPathRaw: string, itemName: string): 
   const encodedPath = encodedSegments.join('/');
 
   return `${baseUrl}/${encodedPath}/${itemName}`;
+}
+
+export function getItemUrl(sharepointContentItem: SharepointContentItem): string {
+  if (sharepointContentItem.itemType === 'driveItem') {
+    const baseUrl = sharepointContentItem.item.listItem?.webUrl;
+    if (!baseUrl) {
+      throw new Error('DriveItem does not have listItem.webUrl');
+    }
+    return `${baseUrl}?web=1`;
+  }
+
+  if (sharepointContentItem.itemType === 'listItem') {
+    return `${sharepointContentItem.item.webUrl}?web=1`;
+  }
+
+  assert.fail('Invalid pipeline item type');
 }

@@ -59,7 +59,7 @@ export class UniqueApiService {
       sourceOwnerType: request.sourceOwnerType,
       sourceKind: request.sourceKind,
       sourceName: request.sourceName,
-      storeInternally: true,
+      storeInternally: false,
       baseUrl: request.baseUrl,
     };
 
@@ -141,7 +141,7 @@ export class UniqueApiService {
       sourceName: request.sourceName,
       sourceKind: request.sourceKind,
       fileUrl: request.fileUrl,
-      storeInternally: true,
+      storeInternally: false,
       baseUrl: request.baseUrl,
     };
 
