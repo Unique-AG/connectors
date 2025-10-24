@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { components } from '@qdrant/js-client-rest/dist/types/openapi/generated_schema';
+import { Span } from 'nestjs-otel';
 import { serializeError } from 'serialize-error-cjs';
 import { AppConfig, AppSettings } from '../app-settings';
 import { normalizeError } from '../utils/normalize-error';
@@ -15,6 +16,7 @@ export class QdrantService {
     this.client = new QdrantClient({ url: configService.get(AppSettings.QDRANT_URL) });
   }
 
+  @Span('qdrant.ensureCollection')
   public async ensureCollection({
     name,
     vectors,
@@ -83,7 +85,7 @@ export class QdrantService {
     // only for individual groups instead.
     // By adopting this strategy, Qdrant will index vectors for each user independently,
     // significantly accelerating the process.
-    const collection = await this.client.createCollection(name, {
+    await this.client.createCollection(name, {
       vectors,
       // see: https://qdrant.tech/documentation/guides/multiple-partitions/#calibrate-performance
       hnsw_config: {
@@ -101,6 +103,26 @@ export class QdrantService {
       },
     })
 
+    const collection = await this.client.getCollection(name);
+
     return collection;
+  }
+
+  @Span('qdrant.upsert')
+  public async upsert(
+    collectionName: string,
+    points: components['schemas']['PointStruct'][],
+  ) {
+    return this.client.upsert(collectionName, {
+      points,
+    });
+  }
+
+  @Span('qdrant.query')
+  public async query(
+    collectionName: string,
+    request: components['schemas']['QueryRequest'],
+  ) {
+    return this.client.query(collectionName, request);
   }
 }
