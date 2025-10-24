@@ -59,6 +59,7 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
   return normalizeSlashes(siteId);
 }
 
+// deprecated(24.10.2025): will be reusing it again after ingestion splits url into webUrl and knowledgeBasePathUrl
 export function buildKnowledgeBaseUrl(sharepointContentItem: SharepointContentItem): string {
   // we cannot use webUrl for driveItems as they are not using the real path but proxy _layouts hidden folders in their web url.
   if (sharepointContentItem.itemType === 'driveItem') {
@@ -91,4 +92,28 @@ function buildUrl(baseUrlRaw: string, folderPathRaw: string, itemName: string): 
   const encodedPath = encodedSegments.join('/');
 
   return `${baseUrl}/${encodedPath}/${itemName}`;
+}
+
+/*
+ * We are reading the webUrl from item.listItem because it contains the real path to the item.
+ * listItem.webUrl example: https://[tenant].sharepoint.com/sites/[site]/[library]/[path]/[filename]
+ * item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
+ * We are adding ?web=1 to the url to get the web view of the item.
+ */
+export function getItemUrl(sharepointContentItem: SharepointContentItem): string {
+  if (sharepointContentItem.itemType === 'driveItem') {
+    const baseUrl = sharepointContentItem.item.listItem?.webUrl;
+
+    // if webUrl from listItem is not present we fallback to webUrl from driveItem
+    if (!baseUrl) {
+      return sharepointContentItem.item.webUrl;
+    }
+    return `${baseUrl}?web=1`;
+  }
+
+  if (sharepointContentItem.itemType === 'listItem') {
+    return `${sharepointContentItem.item.webUrl}?web=1`;
+  }
+
+  assert.fail('Invalid pipeline item type');
 }

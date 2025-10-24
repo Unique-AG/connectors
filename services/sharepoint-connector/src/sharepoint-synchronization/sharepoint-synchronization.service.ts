@@ -8,7 +8,7 @@ import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { normalizeError } from '../utils/normalize-error';
-import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
+import { getItemUrl } from '../utils/sharepoint.util';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -83,7 +83,7 @@ export class SharepointSynchronizationService {
       (sharepointContentItem: SharepointContentItem) => {
         return {
           key: sharepointContentItem.item.id,
-          url: buildKnowledgeBaseUrl(sharepointContentItem),
+          url: getItemUrl(sharepointContentItem),
           updatedAt: sharepointContentItem.item.lastModifiedDateTime,
         };
       },
