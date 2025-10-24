@@ -95,18 +95,18 @@ function buildUrl(baseUrlRaw: string, folderPathRaw: string, itemName: string): 
 }
 
 /*
-* We are reading the webUrl from item.listItem because it contains the real path to the item.
-* listItem.webUrl example: https://[tenant].sharepoint.com/sites/[site]/[library]/[path]/[filename]
-* item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
-* We are adding ?web=1 to the url to get the web view of the item.
-*/
+ * We are reading the webUrl from item.listItem because it contains the real path to the item.
+ * listItem.webUrl example: https://[tenant].sharepoint.com/sites/[site]/[library]/[path]/[filename]
+ * item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
+ * We are adding ?web=1 to the url to get the web view of the item.
+ */
 export function getItemUrl(sharepointContentItem: SharepointContentItem): string {
   if (sharepointContentItem.itemType === 'driveItem') {
     const baseUrl = sharepointContentItem.item.listItem?.webUrl;
-    
+
     // if webUrl from listItem is not present we fallback to webUrl from driveItem
     if (!baseUrl) {
-      return sharepointContentItem.item.webUrl; 
+      return sharepointContentItem.item.webUrl;
     }
     return `${baseUrl}?web=1`;
   }
