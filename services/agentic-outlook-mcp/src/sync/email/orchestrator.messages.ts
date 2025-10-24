@@ -10,6 +10,9 @@ export enum OrchestratorEventType {
   EmbeddingRequested = 'embedding_requested',
   EmbeddingCompleted = 'embedding_completed',
   EmbeddingFailed = 'embedding_failed',
+  IndexingRequested = 'indexing_requested',
+  IndexingCompleted = 'indexing_completed',
+  IndexingFailed = 'indexing_failed',
 }
 
 export interface BaseOrchestratorMessage {
@@ -63,6 +66,19 @@ export interface EmbeddingFailedMessage extends BaseOrchestratorMessage {
   error: string;
 }
 
+export interface IndexingRequestedMessage extends BaseOrchestratorMessage {
+  eventType: OrchestratorEventType.IndexingRequested;
+}
+
+export interface IndexingCompletedMessage extends BaseOrchestratorMessage {
+  eventType: OrchestratorEventType.IndexingCompleted;
+}
+
+export interface IndexingFailedMessage extends BaseOrchestratorMessage {
+  eventType: OrchestratorEventType.IndexingFailed;
+  error: string;
+}
+
 export type OrchestratorMessage =
   | IngestRequestedMessage
   | IngestCompletedMessage
@@ -72,4 +88,7 @@ export type OrchestratorMessage =
   | ProcessingFailedMessage
   | EmbeddingRequestedMessage
   | EmbeddingCompletedMessage
-  | EmbeddingFailedMessage;
+  | EmbeddingFailedMessage
+  | IndexingRequestedMessage
+  | IndexingCompletedMessage
+  | IndexingFailedMessage;

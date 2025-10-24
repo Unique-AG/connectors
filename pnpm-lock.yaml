@@ -345,6 +345,9 @@ importers:
       '@proventuslabs/nestjs-zod':
         specifier: ^1.2.0
         version: 1.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.1.5)
+      '@qdrant/js-client-rest':
+        specifier: ^1.15.1
+        version: 1.15.1(typescript@5.9.2)
       '@unique-ag/aes-gcm-encryption':
         specifier: workspace:*
         version: link:../../packages/aes-gcm-encryption
@@ -3617,6 +3620,16 @@ packages:
       '@nestjs/config': ^3.0.0 || ^4.0.0
       zod: ^3.25.0 || ^4.0.0
 
+  '@qdrant/js-client-rest@1.15.1':
+    resolution: {integrity: sha512-FAPMz6Z7RFj9vUun8R9e8SYcX6EkZtdfYfnh5lFXWcjEaat9q/jce1baAJCWAr3k8yHh62HpzCRYOatLVII28g==}
+    engines: {node: '>=18.17.0', pnpm: '>=8'}
+    peerDependencies:
+      typescript: '>=4.7'
+
+  '@qdrant/openapi-typescript-fetch@1.2.6':
+    resolution: {integrity: sha512-oQG/FejNpItrxRHoyctYvT3rwGZOnK4jr3JdppO/c78ktDvkWiPXPHNsrDf33K9sZdRb6PR7gi4noIapu5q4HA==}
+    engines: {node: '>=18.0.0', pnpm: '>=8'}
+
   '@radix-ui/number@1.1.1':
     resolution: {integrity: sha512-MkKCwxlXTgz6CFoJx3pCwn07GKp36+aZyu/u2Ln2VrA5DcdyCZkASEDBTd8x5whTQQL5CiYf4prXKLcgQdv29g==}
 
@@ -4374,6 +4387,9 @@ packages:
 
   '@scarf/scarf@1.4.0':
     resolution: {integrity: sha512-xxeapPiUXdZAE3che6f3xogoJPeZgig6omHEy1rIY5WVsB3H2BHNnZH+gHG6x91SCWyQCzWGsuL2Hh3ClO5/qQ==}
+
+  '@sevinf/maybe@0.5.0':
+    resolution: {integrity: sha512-ARhyoYDnY1LES3vYI0fiG6e9esWfTNcXcO6+MPJJXcnyMV3bim4lnFt45VXouV7y82F4x3YH8nOQ6VztuvUiWg==}
 
   '@shikijs/engine-oniguruma@3.12.0':
     resolution: {integrity: sha512-IfDl3oXPbJ/Jr2K8mLeQVpnF+FxjAc7ZPDkgr38uEw/Bg3u638neSrpwqOTnTHXt1aU0Fk1/J+/RBdst1kVqLg==}
@@ -11460,6 +11476,15 @@ snapshots:
       lodash: 4.17.21
       zod: 4.1.5
 
+  '@qdrant/js-client-rest@1.15.1(typescript@5.9.2)':
+    dependencies:
+      '@qdrant/openapi-typescript-fetch': 1.2.6
+      '@sevinf/maybe': 0.5.0
+      typescript: 5.9.2
+      undici: 6.22.0
+
+  '@qdrant/openapi-typescript-fetch@1.2.6': {}
+
   '@radix-ui/number@1.1.1': {}
 
   '@radix-ui/primitive@1.1.3': {}
@@ -12214,6 +12239,8 @@ snapshots:
 
   '@scarf/scarf@1.4.0': {}
 
+  '@sevinf/maybe@0.5.0': {}
+
   '@shikijs/engine-oniguruma@3.12.0':
     dependencies:
       '@shikijs/types': 3.12.0
@@ -12856,6 +12883,14 @@ snapshots:
       '@vitest/utils': 3.2.4
       chai: 5.3.3
       tinyrainbow: 2.0.0
+
+  '@vitest/mocker@3.2.4(vite@7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))':
+    dependencies:
+      '@vitest/spy': 3.2.4
+      estree-walker: 3.0.3
+      magic-string: 0.30.17
+    optionalDependencies:
+      vite: 7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1)
 
   '@vitest/mocker@3.2.4(vite@7.1.4(@types/node@24.4.0)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))':
     dependencies:
@@ -16966,7 +17001,7 @@ snapshots:
     dependencies:
       '@types/chai': 5.2.2
       '@vitest/expect': 3.2.4
-      '@vitest/mocker': 3.2.4(vite@7.1.4(@types/node@24.4.0)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))
+      '@vitest/mocker': 3.2.4(vite@7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))
       '@vitest/pretty-format': 3.2.4
       '@vitest/runner': 3.2.4
       '@vitest/snapshot': 3.2.4

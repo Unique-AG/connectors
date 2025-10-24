@@ -5,8 +5,15 @@ import { Span } from '@opentelemetry/api';
 import { ConsumeMessage } from 'amqplib';
 import { and, eq } from 'drizzle-orm';
 import { encodingForModel } from 'js-tiktoken';
-import { DRIZZLE, DrizzleDatabase, Email, emails as emailsTable, Vector, VectorInput } from '../../../drizzle';
-import { vectors as vectorsTable } from '../../../drizzle/schema/sync/vectors.table';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  Email,
+  emails as emailsTable,
+  Point,
+  PointInput,
+  points as pointsTable,
+} from '../../../drizzle';
 import { LLMService } from '../../../llm/llm.service';
 import { addSpanEvent } from '../../../utils/add-span-event';
 import { OrchestratorEventType } from '../orchestrator.messages';
@@ -49,15 +56,11 @@ export class EmbedService extends PipelineStageBase<EmbedMessage> {
     queue: 'q.email.embed',
   })
   public async embed(message: EmbedMessage, amqpMessage: ConsumeMessage) {
-    return this.executeStage(
-      message,
-      amqpMessage,
-      {
-        'email.id': message.emailId,
-        'user.id': message.userProfileId,
-        'pipeline.step': 'embed',
-      },
-    );
+    return this.executeStage(message, amqpMessage, {
+      'email.id': message.emailId,
+      'user.id': message.userProfileId,
+      'pipeline.step': 'embed',
+    });
   }
 
   protected getMessageIdentifiers(message: EmbedMessage) {
@@ -87,11 +90,11 @@ export class EmbedService extends PipelineStageBase<EmbedMessage> {
     span: Span,
   ): Promise<void> {
     const { userProfileId, emailId } = message;
-    
+
     const email = await this.db.query.emails.findFirst({
       where: and(eq(emailsTable.id, emailId), eq(emailsTable.userProfileId, userProfileId)),
       with: {
-        vectors: true,
+        points: true,
       },
     });
 
@@ -101,14 +104,14 @@ export class EmbedService extends PipelineStageBase<EmbedMessage> {
       return;
     }
 
-    if (!email.processedBody) throw new FatalPipelineError('Email processed body is missing');
-    const chunks = await this.createChunks(email.processedBody);
-
-    if (email.vectors.length > 0) {
+    if (email.points.length > 0) {
       this.logger.warn('Email already has vectors, skipping embed');
       addSpanEvent(span, 'email.already_has_vectors', { emailId, userProfileId });
+      return;
     }
 
+    if (!email.processedBody) throw new FatalPipelineError('Email processed body is missing');
+    const chunks = await this.createChunks(email.processedBody);
     const vectors = await this.createVectors(email, chunks, { span });
 
     this.logger.debug({
@@ -138,30 +141,48 @@ export class EmbedService extends PipelineStageBase<EmbedMessage> {
     email: Email,
     chunks: string[],
     options: { span: Span },
-  ): Promise<Vector[]> {
-    const vectorInputs: VectorInput[] = [];
+  ): Promise<Point[]> {
+    const pointInputs: PointInput[] = [];
     const documents = [];
-    const documentNames = [];
 
     // We do not prefix or add the subject to the chunks as we have other vectors that will include the subject.
     // We're trying to not duplicate information in the vectors to avoid an overweight.
-    // In total we create up to 3 vectors per email:
-    // 1. The chunks vector
-    // 2. The summarized body vector
-    // 3. The processed body vector
-    if (chunks.length > 1) {
-      documents.push(chunks);
-      documentNames.push('chunks');
-    }
+    // We will ingest multiple points per email, each with a different point type.
+    // 1. Either the summarized body or the full email body with the subject
+    // 2. If we chunked the email, we will ingest one point per chunk.
     if (email.summarizedBody) {
       documents.push([`Subject: ${email.subject}\n\nSummary: ${email.summarizedBody}`]);
-      documentNames.push('summary');
+      pointInputs.push({
+        emailId: email.id,
+        pointType: 'summary',
+        vector: [],
+        index: 0,
+      });
+    } else {
+      const content = `Subject: ${email.subject}\n\nBody: ${email.processedBody}`;
+      if (this.countTokens(content) >= MAX_TOKENS - 50)
+        throw new FatalPipelineError('Processed body is too long. Should have summarized');
+      documents.push([content]);
+      pointInputs.push({
+        emailId: email.id,
+        pointType: 'full',
+        vector: [],
+        index: 0,
+      });
     }
-    if (email.processedBody && this.countTokens(email.processedBody) < MAX_TOKENS) {
-      documents.push([`Subject: ${email.subject}\n\nBody: ${email.processedBody}`]);
-      documentNames.push('full');
+
+    if (chunks.length > 1) {
+      documents.push(chunks);
+      for (let index = 0; index < chunks.length; index++) {
+        pointInputs.push({
+          emailId: email.id,
+          pointType: 'chunk',
+          vector: [],
+          index,
+        });
+      }
     }
-    
+
     if (documents.length === 0) {
       this.logger.warn({
         msg: 'Email has no documents to embed, skipping',
@@ -176,22 +197,26 @@ export class EmbedService extends PipelineStageBase<EmbedMessage> {
     }
 
     const embeddedDocuments = await this.llmService.contextualizedEmbed(documents);
-    
-    for (let index = 0; index < embeddedDocuments.length; index++) {
-      const embeddedDocument = embeddedDocuments[index];
-      if (!embeddedDocument || !embeddedDocument[0]) continue;
-      const name = documentNames[index];
-      const dimension = embeddedDocument[0].length;
+    const fullOrSummaryVector = embeddedDocuments[0];
+    if (!fullOrSummaryVector || !fullOrSummaryVector[0]) {
+      throw new Error('Failed to get full or summary vector');
+    }
+    // biome-ignore lint/style/noNonNullAssertion: We know that pointInput exists.
+    pointInputs[0]!.vector = fullOrSummaryVector[0];
 
-      vectorInputs.push({
-        emailId: email.id,
-        // biome-ignore lint/style/noNonNullAssertion: Unnecessary typescript check
-        name: name!,
-        dimension,
-        embeddings: embeddedDocument,
-      });
+    if (chunks.length > 1) {
+      const chunkVectors = embeddedDocuments[1];
+      if (chunkVectors) {
+        for (let i = 0; i < chunkVectors.length; i++) {
+          const vector = chunkVectors[i];
+          if (!vector) continue;
+          // Map to correct position in pointInputs: position 0 is summary/full, chunks start at position 1
+          // biome-ignore lint/style/noNonNullAssertion: We know that pointInput exists.
+          pointInputs[1 + i]!.vector = vector;
+        }
+      }
     }
 
-    return this.db.insert(vectorsTable).values(vectorInputs).returning();
+    return this.db.insert(pointsTable).values(pointInputs).returning();
   }
 }

@@ -47,6 +47,7 @@
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/instrumentation-express": "^0.55.0",
     "@proventuslabs/nestjs-zod": "^1.2.0",
+    "@qdrant/js-client-rest": "^1.15.1",
     "@unique-ag/aes-gcm-encryption": "workspace:*",
     "@unique-ag/instrumentation": "workspace:*",
     "@unique-ag/logger": "workspace:*",

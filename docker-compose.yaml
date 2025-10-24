@@ -6,6 +6,8 @@
 # 9008 - langfuse-web
 # 9010 - rabbitmq
 # 9012 - litellm
+# 9013 - qdrant rest
+# 9014 - qdrant grpc
 name: connectors-monorepo
 services:
   traefik:
@@ -262,6 +264,20 @@ services:
       LANGFUSE_INIT_USER_EMAIL: admin@example.com
       LANGFUSE_INIT_USER_NAME: admin
       LANGFUSE_INIT_USER_PASSWORD: RootPassword1!
+
+  qdrant:
+    image: ghcr.io/qdrant/qdrant/qdrant:v1.15.5
+    volumes:
+      - qdrant:/qdrant/storage
+    restart: always
+    ports:
+      - 9013:6333
+      - 9014:6334
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.qdrant.rule=Host(`qdrant.localhost`)
+      - traefik.http.routers.qdrant.service=qdrant
+      - traefik.http.services.qdrant.loadbalancer.server.port=6333
 
 volumes:
   postgres:
