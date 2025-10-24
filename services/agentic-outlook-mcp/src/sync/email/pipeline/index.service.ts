@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Span } from '@opentelemetry/api';
 import { components } from '@qdrant/js-client-rest/dist/types/openapi/generated_schema';
 import { ConsumeMessage } from 'amqplib';
+import dayjs from 'dayjs';
 import { and, eq } from 'drizzle-orm';
 import { addressToString, DRIZZLE, DrizzleDatabase, emails as emailsTable } from '../../../drizzle';
 import { QdrantService } from '../../../qdrant/qdrant.service';
@@ -116,13 +117,14 @@ export class IndexService extends PipelineStageBase<IndexMessage> {
       subject: email.subject,
       language: email.language,
       attachment_count: email.attachmentCount,
+      attachments: email.attachments?.map((a) => a.filename).join(','),
       tags: email.tags?.join(','),
       from: addressToString(email.from),
       to: email.to?.map(addressToString).join(','),
       cc: email.cc?.map(addressToString).join(','),
       bcc: email.bcc?.map(addressToString).join(','),
-      sent_at: email.sentAt,
-      received_at: email.receivedAt,
+      sent_at: dayjs(email.sentAt).unix(),
+      received_at: dayjs(email.receivedAt).unix(),
     };
 
     for (const point of email.points) {
