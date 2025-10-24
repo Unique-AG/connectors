@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.0.0-alpha.10](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.9...sharepoint-connector@v2.0.0-alpha.10) (2025-10-24)
+
+
+### Features
+
+* **sharepoint-connector:** added workflow actions from template-mcp-ci to sharepoint-connector ([#76](https://github.com/Unique-AG/connectors/issues/76)) ([c883fbe](https://github.com/Unique-AG/connectors/commit/c883fbe6e908797d2919306f9d4692e8da3808e1))
+* **sharepoint-connector:** expose cron job on env variable ([#75](https://github.com/Unique-AG/connectors/issues/75)) ([40ddc11](https://github.com/Unique-AG/connectors/commit/40ddc11c05fc747b8b3698a532f02ed4482cfac5))
+* **sharepoint-connector:** revert OIDC token debugging changes ([#77](https://github.com/Unique-AG/connectors/issues/77)) ([72f647f](https://github.com/Unique-AG/connectors/commit/72f647f24007c583ffe11af1e80dd42a7d534ab0))
+* **spc:** read drive item web url from listItem instead of item so we have a nice file path for knowledgebase ([#80](https://github.com/Unique-AG/connectors/issues/80)) ([c695267](https://github.com/Unique-AG/connectors/commit/c6952671290c06eef32019b4b95a439aa40f94e4))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** do not request Graph API token multiple times ([#79](https://github.com/Unique-AG/connectors/issues/79)) ([528b6a2](https://github.com/Unique-AG/connectors/commit/528b6a226c736a4f7119778915309e896248e2db))
+
 ## [2.0.0-alpha.9](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.8...sharepoint-connector@v2.0.0-alpha.9) (2025-10-20)
 
 
