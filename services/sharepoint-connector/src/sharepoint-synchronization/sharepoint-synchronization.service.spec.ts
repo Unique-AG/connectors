@@ -279,7 +279,7 @@ describe('SharepointSynchronizationService', () => {
       [
         {
           key: '01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI',
-          url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+          url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf?web=1',
           updatedAt: '2025-10-10T13:59:11Z',
         },
       ],
@@ -349,7 +349,7 @@ describe('SharepointSynchronizationService', () => {
       [
         {
           key: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV',
-          url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+          url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf?web=1',
           updatedAt: '2025-10-10T13:59:12Z',
         },
       ],
