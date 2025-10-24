@@ -10,6 +10,9 @@ import {
   EmbeddingCompletedMessage,
   EmbeddingFailedMessage,
   EmbeddingRequestedMessage,
+  IndexingCompletedMessage,
+  IndexingFailedMessage,
+  IndexingRequestedMessage,
   IngestCompletedMessage,
   IngestFailedMessage,
   IngestRequestedMessage,
@@ -127,6 +130,15 @@ export class AmqpOrchestratorService {
               break;
             case OrchestratorEventType.EmbeddingFailed:
               await this.handleEmbeddingFailed(message, traceHeaders);
+              break;
+            case OrchestratorEventType.IndexingRequested:
+              await this.handleIndexingRequested(message, traceHeaders);
+              break;
+            case OrchestratorEventType.IndexingCompleted:
+              await this.handleIndexingCompleted(message, traceHeaders);
+              break;
+            case OrchestratorEventType.IndexingFailed:
+              await this.handleIndexingFailed(message, traceHeaders);
               break;
           }
 
@@ -299,9 +311,9 @@ export class AmqpOrchestratorService {
 
   private async handleEmbeddingCompleted(
     message: EmbeddingCompletedMessage,
-    _traceHeaders: Record<string, unknown>,
+    traceHeaders: Record<string, unknown>,
   ) {
-    const { emailId } = message;
+    const { userProfileId, emailId } = message;
 
     await this.db
       .update(emailsTable)
@@ -311,11 +323,70 @@ export class AmqpOrchestratorService {
       })
       .where(eq(emailsTable.id, emailId));
 
-    // For now, this is the end of the pipeline
+    await this.publishEvent(
+      {
+        eventType: OrchestratorEventType.IndexingRequested,
+        userProfileId,
+        emailId,
+        timestamp: new Date().toISOString(),
+      },
+      traceHeaders,
+    );
   }
 
   private async handleEmbeddingFailed(
     message: EmbeddingFailedMessage,
+    _traceHeaders: Record<string, unknown>,
+  ) {
+    const { emailId, error } = message;
+
+    await this.db
+      .update(emailsTable)
+      .set({
+        ingestionStatus: 'failed',
+        ingestionLastError: error,
+        ingestionLastAttemptAt: new Date().toISOString(),
+        ingestionCompletedAt: new Date().toISOString(),
+      })
+      .where(eq(emailsTable.id, emailId));
+  }
+
+  private async handleIndexingRequested(
+    message: IndexingRequestedMessage,
+    traceHeaders: Record<string, unknown>,
+  ) {
+    const { userProfileId, emailId } = message;
+
+    await this.amqpConnection.publish(
+      'email.pipeline',
+      'email.index',
+      {
+        userProfileId,
+        emailId,
+      },
+      { headers: traceHeaders },
+    );
+  }
+
+  private async handleIndexingCompleted(
+    message: IndexingCompletedMessage,
+    _traceHeaders: Record<string, unknown>,
+  ) {
+    const { emailId } = message;
+
+    await this.db
+      .update(emailsTable)
+      .set({
+        ingestionStatus: 'completed',
+        ingestionLastAttemptAt: new Date().toISOString(),
+      })
+      .where(eq(emailsTable.id, emailId));
+
+    // Done! Congratulations, you've indexed your email!
+  }
+
+  private async handleIndexingFailed(
+    message: IndexingFailedMessage,
     _traceHeaders: Record<string, unknown>,
   ) {
     const { emailId, error } = message;

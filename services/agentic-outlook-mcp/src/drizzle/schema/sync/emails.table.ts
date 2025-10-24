@@ -14,7 +14,7 @@ import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 import { folders } from './folders.table';
-import { vectors } from './vectors.table';
+import { points } from './points.table';
 
 export const ingestionStatus = pgEnum('ingestion_status', [
   'pending',
@@ -55,8 +55,8 @@ export const emails = pgTable(
       .notNull()
       .default(sql`'[]'::jsonb`),
 
-    sentAt: timestamp({ mode: "string" }),
-    receivedAt: timestamp({ mode: "string" }),
+    sentAt: timestamp({ mode: 'string' }),
+    receivedAt: timestamp({ mode: 'string' }),
 
     subject: text(),
     preview: text(),
@@ -103,8 +103,8 @@ export const emails = pgTable(
     // Ingestion Status
     ingestionStatus: ingestionStatus().notNull().default('pending'),
     ingestionLastError: text(),
-    ingestionLastAttemptAt: timestamp({ mode: "string" }),
-    ingestionCompletedAt: timestamp({ mode: "string" }),
+    ingestionLastAttemptAt: timestamp({ mode: 'string' }),
+    ingestionCompletedAt: timestamp({ mode: 'string' }),
 
     ...timestamps,
   },
@@ -125,8 +125,13 @@ export const emailRelations = relations(emails, ({ one, many }) => ({
     fields: [emails.folderId],
     references: [folders.id],
   }),
-  vectors: many(vectors),
+  points: many(points),
 }));
 
 export type Email = typeof emails.$inferSelect;
 export type EmailInput = typeof emails.$inferInsert;
+
+export function addressToString(address: { name: string | null; address: string } | null) {
+  if (!address) return null;
+  return address.name ? `${address.name} <${address.address}>` : address.address;
+}
