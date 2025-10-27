@@ -52,6 +52,11 @@ const ProcessingConfigSchema = z.object({
     .string()
     .default(CRON_EVERY_15_MINUTES)
     .describe('Cron expression for the scheduled file scan interval'),
+  permissionsSyncEnabled: z
+    .string()
+    .transform((val) => val.toLowerCase() === 'true')
+    .default(false)
+    .describe('Enable permissions synchronization from SharePoint to Unique'),
 });
 
 export const processingConfig = registerConfig('processing', ProcessingConfigSchema);

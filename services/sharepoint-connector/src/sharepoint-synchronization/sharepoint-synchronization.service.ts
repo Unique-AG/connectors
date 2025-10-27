@@ -54,13 +54,18 @@ export class SharepointSynchronizationService {
         continue;
       }
 
-      try {
-        await this.permissionsSyncService.syncPermissionsForSite(siteId, items);
-      } catch (error) {
-        this.logger.error({
-          msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,
-          err: error,
-        });
+      const permissionsSyncEnabled = this.configService.get('processing.permissionsSyncEnabled', {
+        infer: true,
+      });
+      if (permissionsSyncEnabled) {
+        try {
+          await this.permissionsSyncService.syncPermissionsForSite(siteId, items);
+        } catch (error) {
+          this.logger.error({
+            msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,
+            err: error,
+          });
+        }
       }
     }
 
