@@ -76,7 +76,7 @@ describe('SharepointSynchronizationService', () => {
   };
 
   const mockDiffResult: FileDiffResponse = {
-    newAndUpdatedFiles: ['1173246.pdf'],
+    newAndUpdatedFiles: ['01JWNC3IKFO6XBRCRFWRHKJ77NAYYM3NTX'],
     deletedFiles: [],
     movedFiles: [],
   };
@@ -955,6 +955,56 @@ describe('SharepointSynchronizationService', () => {
 
       expect(result).toBe(
         'https://tenant.sharepoint.com/sites/test-site/folder%20with%20spaces/sub%20folder/document.docx',
+      );
+    });
+  });
+
+  describe('list items (ASPX pages)', () => {
+    it('generates correct key format for list items with siteId/listId/itemId', async () => {
+      const listItem: SharepointContentItem = {
+        itemType: 'listItem',
+        item: {
+          '@odata.etag': 'etag-list',
+          id: 'list-item-123',
+          eTag: 'etag-list',
+          createdDateTime: '2025-10-10T13:59:12Z',
+          lastModifiedDateTime: '2025-10-10T13:59:12Z',
+          webUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/SitePages/Page1.aspx',
+          fields: {
+            '@odata.etag': 'etag-list',
+            FinanceGPTKnowledge: true,
+            FileLeafRef: 'Page1.aspx',
+            Title: 'Page 1',
+          },
+        },
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG',
+        driveId: 'list-id-456',
+        driveName: 'SitePages',
+        folderPath: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/SitePages/Page1.aspx',
+        fileName: 'Page 1',
+      };
+
+      mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([listItem]);
+      const diffResultForListItem = {
+        newAndUpdatedFiles: ['bd9c85ee-998f-4665-9c44-577cf5a08a66/list-id-456/list-item-123'],
+        deletedFiles: [],
+        movedFiles: [],
+      };
+      mockUniqueApiService.performFileDiff = vi.fn().mockResolvedValue(diffResultForListItem);
+
+      await service.synchronize();
+
+      expect(mockUniqueApiService.performFileDiff).toHaveBeenCalledWith(
+        [
+          {
+            key: 'bd9c85ee-998f-4665-9c44-577cf5a08a66/list-id-456/list-item-123',
+            url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/SitePages/Page1.aspx?web=1',
+            updatedAt: '2025-10-10T13:59:12Z',
+          },
+        ],
+        'test-token',
+        'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       );
     });
   });
