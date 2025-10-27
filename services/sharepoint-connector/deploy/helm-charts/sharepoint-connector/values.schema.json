@@ -105,9 +105,22 @@
               "type": "string",
               "description": "GraphQL URL for data ingestion"
             },
+            "syncMode": {
+              "type": "string",
+              "enum": ["FLAT", "RECURSIVE"],
+              "description": "Synchronization mode: FLAT or RECURSIVE"
+            },
+            "rootScopeName": {
+              "type": ["string", "null"],
+              "description": "Name of the root scope/folder in the knowledge base where SharePoint content should be synced"
+            },
             "scopeId": {
               "type": ["string", "null"],
               "description": "Scope ID for scope based ingestion"
+            },
+            "rootScopeId": {
+              "type": ["string", "null"],
+              "description": "Root scope ID for path-based ingestion with existing scope"
             },
             "apiRateLimitPerMinute": {
               "type": "integer",

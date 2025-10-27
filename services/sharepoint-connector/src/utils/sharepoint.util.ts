@@ -61,7 +61,7 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
 
 export function buildKnowledgeBaseUrl(
   sharepointContentItem: SharepointContentItem,
-  rootFolder?: string,
+  rootScopeName?: string,
 ): string {
   // we cannot use webUrl for driveItems as they are not using the real path but proxy _layouts hidden folders in their web url.
   if (sharepointContentItem.itemType === 'driveItem') {
@@ -71,14 +71,14 @@ export function buildKnowledgeBaseUrl(
       sharepointContentItem.item.name,
     );
     const pathWithoutDomain = stripDomain(url);
-    return rootFolder ? `${rootFolder}/${pathWithoutDomain}` : pathWithoutDomain;
+    return rootScopeName ? `${rootScopeName}/${pathWithoutDomain}` : pathWithoutDomain;
   }
 
   // for listItems we can use directly the webUrl property
   if (sharepointContentItem.itemType === 'listItem') {
     const url = sharepointContentItem.item.webUrl;
     const pathWithoutDomain = stripDomain(url);
-    return rootFolder ? `${rootFolder}/${pathWithoutDomain}` : pathWithoutDomain;
+    return rootScopeName ? `${rootScopeName}/${pathWithoutDomain}` : pathWithoutDomain;
   }
   assert.fail('Invalid pipeline item type');
 }

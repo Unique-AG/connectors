@@ -101,6 +101,13 @@ connectorConfig:
     # TODO: should use only public urls!
     # example: https://api.unique.app/ingestion/graphql
     ingestionGraphqlUrl: unset_default_value
+    # -- synchronization mode: FLAT or RECURSIVE
+    # FLAT: sync all files to a single root scope/folder
+    # RECURSIVE: maintain the folder hierarchy
+    syncMode: RECURSIVE
+    # -- name of the root scope/folder in the knowledge base where SharePoint content should be synced
+    # example: SharePoint Content
+    rootScopeName: null # TODO make this scopeId?
     # -- scope id for the scope based ingestion
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion

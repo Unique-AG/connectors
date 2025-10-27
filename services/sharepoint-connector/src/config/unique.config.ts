@@ -5,17 +5,29 @@ import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.
 import { Redacted } from '../utils/redacted';
 
 const UniqueConfig = z.object({
+  uniqueApiVersion: z
+    .enum(['v44', 'v46'])
+    .prefault('v46')
+    .describe(
+      'Unique API version. V44 does not support rootScope and structuredPath. V46 and later support these features for proper scope and path-based ingestion.',
+    ),
+  syncMode: z
+    .enum(['FLAT', 'RECURSIVE'])
+    .prefault('RECURSIVE')
+    .describe(
+      'Synchronization mode: FLAT syncs all files to a single root scope/folder, RECURSIVE maintains the folder hierarchy.',
+    ),
   scopeId: z
     .string()
     .optional()
     .describe(
       'Controls if you are using path based ingestion or scope based ingestion. Leave undefined for PATH based ingestion. Add your scope id for scope based ingestion.',
     ),
-  rootFolder: z
+  rootScopeName: z
     .string()
     .optional()
     .describe(
-      'Name of the manually created root folder in the knowledge base where SharePoint content should be synced. When provided all content will be synced to this folder.',
+      'Name of the root scope/folder in the knowledge base where SharePoint content should be synced. Used with both FLAT and RECURSIVE sync modes.',
     ),
   rootScopeId: z
     .string()

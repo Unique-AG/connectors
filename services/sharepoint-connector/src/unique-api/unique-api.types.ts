@@ -44,7 +44,7 @@ export interface IngestionFinalizationRequest {
 
 export interface FileDiffItem {
   key: string;
-  url: string | null;
+  url: string;
   updatedAt: string;
   scopeStructure?: string;
 }

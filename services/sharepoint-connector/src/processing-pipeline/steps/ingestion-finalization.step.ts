@@ -28,7 +28,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
   ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
-    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const isPathBasedIngestion = !scopeId;
     const stepStartTime = Date.now();
@@ -53,7 +53,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
       fileUrl: context.registrationResponse.readUrl,
       ...(isPathBasedIngestion && {
         url: context.knowledgeBaseUrl,
-        baseUrl: sharepointBaseUrl,
+        baseUrl: rootScopeName, // TODO BIG idea set base url to custom root name and keep url as web url with no prefix
       }),
     };
 

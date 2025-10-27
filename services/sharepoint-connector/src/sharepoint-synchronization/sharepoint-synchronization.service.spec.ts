@@ -104,6 +104,8 @@ describe('SharepointSynchronizationService', () => {
         ...stub(),
         get: vi.fn((key: string) => {
           if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
+          if (key === 'unique.uniqueApiVersion') return 'v44';
+          if (key === 'unique.rootScopeName') return undefined;
           return undefined;
         }),
       }))
@@ -160,6 +162,7 @@ describe('SharepointSynchronizationService', () => {
       [],
       'test-token',
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      undefined,
     );
     expect(mockOrchestrator.processSiteItems).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
@@ -215,6 +218,7 @@ describe('SharepointSynchronizationService', () => {
       expect.anything(),
       'test-token',
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      undefined,
     );
   });
 
@@ -279,12 +283,14 @@ describe('SharepointSynchronizationService', () => {
       [
         {
           key: '01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI',
-          url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+          url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf?web=1',
           updatedAt: '2025-10-10T13:59:11Z',
+          scopeStructure: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
         },
       ],
       'test-token',
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      undefined,
     );
   });
 
@@ -349,12 +355,14 @@ describe('SharepointSynchronizationService', () => {
       [
         {
           key: '01JWNC3IOG5BABTPS62RAZ7T2L6R36MOBV',
-          url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+          url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf?web=1',
           updatedAt: '2025-10-10T13:59:12Z',
+          scopeStructure: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
         },
       ],
       'test-token',
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      undefined,
     );
   });
 
@@ -524,6 +532,7 @@ describe('SharepointSynchronizationService', () => {
       ]),
       'test-token',
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      undefined,
     );
   });
 
@@ -1001,10 +1010,12 @@ describe('SharepointSynchronizationService', () => {
             key: 'bd9c85ee-998f-4665-9c44-577cf5a08a66/list-id-456/list-item-123',
             url: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/SitePages/Page1.aspx?web=1',
             updatedAt: '2025-10-10T13:59:12Z',
+            scopeStructure: 'https://uniqueapp.sharepoint.com/sites/UniqueAG/SitePages/Page1.aspx',
           },
         ],
         'test-token',
         'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        undefined,
       );
     });
   });

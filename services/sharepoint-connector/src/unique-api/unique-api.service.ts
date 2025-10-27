@@ -79,16 +79,16 @@ export class UniqueApiService {
     fileList: FileDiffItem[],
     uniqueToken: string,
     partialKey: string,
-    basePath?: string,
   ): Promise<FileDiffResponse> {
+    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
+    
     const url = new URL(fileDiffUrl);
     const path = url.pathname + url.search;
 
     const diffRequest: FileDiffRequest = {
-      basePath,
-      rootScopeId: this.configService.get('unique.rootScopeId', { infer: true }),
+      basePath: rootScopeName,
       partialKey,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,

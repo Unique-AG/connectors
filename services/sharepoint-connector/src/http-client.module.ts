@@ -14,7 +14,7 @@ import { SHAREPOINT_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.tokens
         const url = new URL(fileDiffUrl);
         return new Client(`${url.protocol}//${url.host}`, {
           bodyTimeout: 30000,
-          headersTimeout: 5000,
+          headersTimeout: 30000,
         });
       },
       inject: [ConfigService],
@@ -25,7 +25,7 @@ import { SHAREPOINT_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.tokens
         const apiUrl = configService.get('sharepoint.graphApiUrl', { infer: true });
         return new Client(apiUrl, {
           bodyTimeout: 30000,
-          headersTimeout: 5000,
+          headersTimeout: 30000,
         });
       },
       inject: [ConfigService],

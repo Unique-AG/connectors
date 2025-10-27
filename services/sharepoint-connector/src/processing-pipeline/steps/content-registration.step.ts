@@ -32,7 +32,8 @@ export class ContentRegistrationStep implements IPipelineStep {
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
-    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
+
     const isPathBasedIngestion = !scopeId;
 
     const itemKey = buildFileDiffKey(context.pipelineItem);
@@ -47,7 +48,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       sourceName: INGESTION_SOURCE_NAME,
       ...(isPathBasedIngestion && {
         url: context.knowledgeBaseUrl,
-        baseUrl: sharepointBaseUrl,
+        baseUrl: rootScopeName,
       }),
     };
 
