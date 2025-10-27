@@ -15,6 +15,7 @@ import {
   GraphApiResponse,
   ListItem,
   ListItemDetailsResponse,
+  SimplePermission,
   SitePageContent,
 } from './types/sharepoint.types';
 import { SharepointContentItem } from './types/sharepoint-content-item.interface';
@@ -269,6 +270,38 @@ export class GraphApiService {
       this.logger.error(`Failed to fetch site page content for item ${itemId}:`, error);
       throw error;
     }
+  }
+
+  public async getDriveItemPermissions(
+    driveId: string,
+    itemId: string,
+  ): Promise<SimplePermission[]> {
+    return await this.paginateGraphApiRequest<SimplePermission>(
+      `/drives/${driveId}/items/${itemId}/permissions`,
+      (url) =>
+        this.graphClient
+          .api(url)
+          .select('id,grantedToV2,grantedToIdentitiesV2')
+          .top(GRAPH_API_PAGE_SIZE)
+          .get(),
+    );
+  }
+
+  public async getListItemPermissions(
+    siteId: string,
+    listId: string,
+    itemId: string,
+  ): Promise<SimplePermission[]> {
+    return await this.paginateGraphApiRequest<SimplePermission>(
+      `/sites/${siteId}/lists/${listId}/items/${itemId}/permissions`,
+      (url) =>
+        this.graphClient
+          .api(url)
+          .select('id,grantedToV2,grantedToIdentitiesV2')
+          .version('beta')
+          .top(GRAPH_API_PAGE_SIZE)
+          .get(),
+    );
   }
 
   private async getSiteWebUrl(siteId: string): Promise<string> {

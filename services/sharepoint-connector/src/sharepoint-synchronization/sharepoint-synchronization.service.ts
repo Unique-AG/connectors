@@ -5,6 +5,7 @@ import { GraphApiService } from '../msgraph/graph-api.service';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
+import { PermissionsSyncService } from './permissions-sync.service';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -15,6 +16,7 @@ export class SharepointSynchronizationService {
     private readonly configService: ConfigService<Config, true>,
     private readonly graphApiService: GraphApiService,
     private readonly contentSyncService: ContentSyncService,
+    private readonly permissionsSyncService: PermissionsSyncService,
   ) {}
 
   public async synchronize(): Promise<void> {
@@ -50,6 +52,15 @@ export class SharepointSynchronizationService {
           err: error,
         });
         continue;
+      }
+
+      try {
+        await this.permissionsSyncService.syncPermissionsForSite(siteId, items);
+      } catch (error) {
+        this.logger.error({
+          msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,
+          err: error,
+        });
       }
     }
 
