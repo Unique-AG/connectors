@@ -45,6 +45,7 @@ export class GraphApiService {
   }
 
   public async getAllSiteItems(siteId: string): Promise<SharepointContentItem[]> {
+    const logPrefix = `[SiteId: ${siteId}] `;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
       this.getAspxPagesForSite(siteId),
       this.getAllFilesForSite(siteId),
@@ -55,17 +56,17 @@ export class GraphApiService {
     if (aspxPagesResult.status === 'fulfilled') {
       sharepointContentItemsToSync.push(...aspxPagesResult.value);
     } else {
-      this.logger.error(`Failed to scan pages for site ${siteId}:`, aspxPagesResult.reason);
+      this.logger.error(`${logPrefix} Failed to scan pages:`, aspxPagesResult.reason);
     }
 
     if (filesResult.status === 'fulfilled') {
       sharepointContentItemsToSync.push(...filesResult.value);
     } else {
-      this.logger.error(`Failed to scan drive files for site ${siteId}:`, filesResult.reason);
+      this.logger.error(`${logPrefix} Failed to scan drive files:`, filesResult.reason);
     }
 
     this.logger.log(
-      `Completed scan for site ${siteId}. Found ${sharepointContentItemsToSync.length} total files marked for synchronizing.`,
+      `${logPrefix} Completed scan. Found ${sharepointContentItemsToSync.length} total items marked for synchronization.`,
     );
     return sharepointContentItemsToSync;
   }
