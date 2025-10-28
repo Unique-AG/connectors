@@ -48,14 +48,16 @@ describe('ClientSecretAuthStrategy', () => {
 
   it('acquires a new token successfully', async () => {
     const expirationDate = new Date(Date.now() + 3600000);
-    mockMsalClient.acquireTokenByClientCredential.mockResolvedValue({
+    const getTokenResult = {
       accessToken: 'test-token-123',
       expiresOn: expirationDate,
-    });
+    };
+    mockMsalClient.acquireTokenByClientCredential.mockResolvedValue(getTokenResult);
 
-    const token = await strategy.acquireNewToken(testScopes);
+    const acquisitionResult = await strategy.acquireNewToken(testScopes);
 
-    expect(token).toBe('test-token-123');
+    expect(acquisitionResult.token).toEqual(getTokenResult.accessToken);
+    expect(acquisitionResult.expiresAt).toEqual(getTokenResult.expiresOn.getTime());
     expect(mockMsalClient.acquireTokenByClientCredential).toHaveBeenCalledWith({
       scopes: testScopes,
     });

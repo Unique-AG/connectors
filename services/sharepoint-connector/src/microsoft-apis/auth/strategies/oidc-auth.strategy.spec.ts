@@ -45,14 +45,16 @@ describe('OidcAuthStrategy', () => {
 
   it('acquires a new token successfully', async () => {
     const expiresOnTimestamp = Date.now() + 3600 * 1000; // 1 hour from now in milliseconds
-    mockCredential.getToken.mockResolvedValue({
+    const getTokenResult = {
       token: 'test-token-123',
       expiresOnTimestamp,
-    });
+    };
+    mockCredential.getToken.mockResolvedValue(getTokenResult);
 
-    const token = await strategy.acquireNewToken(testScopes);
+    const acquisitionResult = await strategy.acquireNewToken(testScopes);
 
-    expect(token).toBe('test-token-123');
+    expect(acquisitionResult.token).toEqual(getTokenResult.token);
+    expect(acquisitionResult.expiresAt).toEqual(getTokenResult.expiresOnTimestamp);
     expect(mockCredential.getToken).toHaveBeenCalledWith(testScopes);
   });
 

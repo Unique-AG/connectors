@@ -3,7 +3,7 @@ import { Redacted } from '../../utils/redacted';
 import { MicrosoftAuthenticationService } from './microsoft-authentication.service';
 import { ClientSecretAuthStrategy } from './strategies/client-secret-auth.strategy';
 import { OidcAuthStrategy } from './strategies/oidc-auth.strategy';
-import { AuthenticationScope } from './types';
+import { AuthenticationScope, TokenAcquisitionResult } from './types';
 
 vi.mock('@azure/msal-node', () => ({
   ConfidentialClientApplication: vi.fn().mockImplementation(() => ({
@@ -70,7 +70,10 @@ describe('MicrosoftAuthenticationService', () => {
 
   it('delegates getAccessToken to the selected strategy', async () => {
     const mockStrategy = {
-      getAccessToken: vi.fn().mockResolvedValue('mock-token'),
+      acquireNewToken: vi.fn().mockResolvedValue({
+        token: 'test-token-123',
+        expiresAt: Date.now() + 3600000,
+      }),
     };
 
     mockConfigService.get.mockImplementation((key: string) => {
@@ -92,7 +95,7 @@ describe('MicrosoftAuthenticationService', () => {
 
     const token = await service.getAccessToken(AuthenticationScope.GRAPH);
 
-    expect(token).toBe('mock-token');
-    expect(mockStrategy.getAccessToken).toHaveBeenCalledTimes(1);
+    expect(token).toBe('test-token-123');
+    expect(mockStrategy.acquireNewToken).toHaveBeenCalledTimes(1);
   });
 });
