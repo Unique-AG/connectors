@@ -53,10 +53,6 @@ const certificateAuthModeConfig = z
 
 const baseConfig = z.object({
   authTenantId: z.string().min(1).describe('Azure AD tenant ID'),
-  graphApiUrl: z
-    .url()
-    .prefault('https://graph.microsoft.com')
-    .describe('Microsoft Graph API base URL'),
   graphApiRateLimitPerMinute: z.coerce
     .number()
     .int()

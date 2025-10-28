@@ -16,6 +16,8 @@ describe('OidcAuthStrategy', () => {
     getToken: ReturnType<typeof vi.fn>;
   };
 
+  const testScopes = ['https://graph.microsoft.com/.default'];
+
   const mockSharepointConfig = {
     authMode: 'oidc' as const,
     authTenantId: 'tenant-123',
@@ -48,24 +50,10 @@ describe('OidcAuthStrategy', () => {
       expiresOnTimestamp,
     });
 
-    const token = await strategy.getAccessToken();
+    const token = await strategy.acquireNewToken(testScopes);
 
     expect(token).toBe('test-token-123');
-    expect(mockCredential.getToken).toHaveBeenCalledWith('https://graph.microsoft.com/.default');
-  });
-
-  it('returns cached token when still valid', async () => {
-    const expiresOnTimestamp = Date.now() + 3600 * 1000; // 1 hour from now in milliseconds
-    mockCredential.getToken.mockResolvedValue({
-      token: 'test-token-123',
-      expiresOnTimestamp,
-    });
-
-    await strategy.getAccessToken();
-    const secondToken = await strategy.getAccessToken();
-
-    expect(secondToken).toBe('test-token-123');
-    expect(mockCredential.getToken).toHaveBeenCalledTimes(1);
+    expect(mockCredential.getToken).toHaveBeenCalledWith(testScopes);
   });
 
   it('throws error when no access token in response', async () => {
@@ -74,7 +62,7 @@ describe('OidcAuthStrategy', () => {
       expiresOnTimestamp: Date.now() + 3600 * 1000,
     });
 
-    await expect(strategy.getAccessToken()).rejects.toThrow();
+    await expect(strategy.acquireNewToken(testScopes)).rejects.toThrow();
   });
 
   it('throws error when no expiration time in response', async () => {
@@ -83,21 +71,6 @@ describe('OidcAuthStrategy', () => {
       expiresOnTimestamp: null,
     });
 
-    await expect(strategy.getAccessToken()).rejects.toThrow();
-  });
-
-  it('clears cached token on authentication error', async () => {
-    mockCredential.getToken.mockRejectedValue(new Error('Authentication failed'));
-
-    await expect(strategy.getAccessToken()).rejects.toThrow('Authentication failed');
-
-    const expiresOnTimestamp = Date.now() + 3600 * 1000;
-    mockCredential.getToken.mockResolvedValue({
-      token: 'new-token',
-      expiresOnTimestamp,
-    });
-
-    const token = await strategy.getAccessToken();
-    expect(token).toBe('new-token');
+    await expect(strategy.acquireNewToken(testScopes)).rejects.toThrow();
   });
 });

@@ -27,7 +27,6 @@ data:
   {{- end }}
   {{- end }}
   # General SharePoint config
-  SHAREPOINT_GRAPH_API_URL: {{ .Values.connectorConfig.sharepoint.graph.apiUrl | quote }}
   {{- if .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute }}
   SHAREPOINT_GRAPH_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute | quote }}
   {{- end }}

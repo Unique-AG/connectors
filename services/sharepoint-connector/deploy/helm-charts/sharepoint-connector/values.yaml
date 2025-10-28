@@ -94,7 +94,6 @@ connectorConfig:
       thumbprintSha1: null
       thumbprintSha256: null
     graph:
-      apiUrl: https://graph.microsoft.com
       apiRateLimitPerMinute: 780000
 
   unique:

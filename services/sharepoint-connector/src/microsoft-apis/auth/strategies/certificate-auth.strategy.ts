@@ -1,25 +1,19 @@
 import assert from 'node:assert';
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import {
-  type ClientCredentialRequest,
-  ConfidentialClientApplication,
-  type Configuration,
-} from '@azure/msal-node';
+import { ConfidentialClientApplication, type Configuration } from '@azure/msal-node';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { serializeError } from 'serialize-error-cjs';
-import { Config } from '../../config';
-import { normalizeError } from '../../utils/normalize-error';
+import { Config } from '../../../config';
+import { normalizeError } from '../../../utils/normalize-error';
+import { TokenAcquisitionResult } from '../types';
 import { AuthStrategy } from './auth-strategy.interface';
-import { TokenAcquisitionResult, TokenCache } from './token-cache';
 
 @Injectable()
 export class CertificateAuthStrategy implements AuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
-  private readonly scopes = ['https://graph.microsoft.com/.default'];
-  private readonly tokenCache = new TokenCache();
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
     const sharePointConfig = this.configService.get('sharepoint', { infer: true });
@@ -67,19 +61,11 @@ export class CertificateAuthStrategy implements AuthStrategy {
     this.msalClient = new ConfidentialClientApplication(msalConfig);
   }
 
-  public async getAccessToken(): Promise<string> {
-    return this.tokenCache.getToken(() => this.acquireNewToken());
-  }
-
-  private async acquireNewToken(): Promise<TokenAcquisitionResult> {
-    const tokenRequest: ClientCredentialRequest = {
-      scopes: this.scopes,
-    };
-
+  public async acquireNewToken(scopes: string[]): Promise<TokenAcquisitionResult> {
     this.logger.log('Acquiring new Graph API token using client certificate');
 
     try {
-      const response = await this.msalClient.acquireTokenByClientCredential(tokenRequest);
+      const response = await this.msalClient.acquireTokenByClientCredential({ scopes });
 
       assert.ok(
         response?.accessToken,
