@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { DefaultAzureCredential } from '@azure/identity';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -24,13 +25,15 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
   private readonly tokenCache = new TokenCache();
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
-    const tenantId = this.configService.get('sharepoint.graphTenantId', { infer: true });
-    // const clientId = this.configService.get('sharepoint.graphClientId', { infer: true });
+    const sharePointConfig = this.configService.get('sharepoint', { infer: true });
 
-    this.credential = new DefaultAzureCredential({
-      tenantId,
-      // managedIdentityClientId: clientId, // only if using user-assigned identity
-    });
+    assert.strictEqual(
+      sharePointConfig.authMode,
+      'oidc',
+      'OidcGraphAuthStrategy called but authentication mode is not "oidc"',
+    );
+
+    this.credential = new DefaultAzureCredential({ tenantId: sharePointConfig.authTenantId });
   }
 
   public async getAccessToken(): Promise<string> {

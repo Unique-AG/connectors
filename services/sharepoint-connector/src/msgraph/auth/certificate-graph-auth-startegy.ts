@@ -1,4 +1,6 @@
 import assert from 'node:assert';
+import crypto from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
   type ClientCredentialRequest,
   ConfidentialClientApplication,
@@ -13,7 +15,7 @@ import { GraphAuthStrategy } from './graph-auth-strategy.interface';
 import { TokenAcquisitionResult, TokenCache } from './token-cache';
 
 @Injectable()
-export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
+export class CertificateGraphAuthStrategy implements GraphAuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
   private readonly scopes = ['https://graph.microsoft.com/.default'];
@@ -24,21 +26,41 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
 
     assert.strictEqual(
       sharePointConfig.authMode,
-      'client-secret',
-      'ClientSecretGraphAuthStrategy called but authentication mode is not "client-secret"',
+      'certificate',
+      'CertificateGraphAuthStrategy called but authentication mode is not "certificate"',
     );
 
     const {
       authTenantId: tenantId,
       authClientId: clientId,
-      authClientSecret: clientSecret,
+      authPrivateKeyPath: privateKeyPath,
+      authThumbprintSha1: thumbprint,
+      authThumbprintSha256: thumbprintSha256,
+      authPrivateKeyPassword: privateKeyPassword,
     } = sharePointConfig;
+
+    const privateKeyRaw = readFileSync(privateKeyPath, 'utf8').trim();
+
+    let privateKey: string;
+    if (privateKeyPassword) {
+      const privateKeyObject = crypto.createPrivateKey({
+        key: privateKeyRaw,
+        passphrase: privateKeyPassword,
+        format: 'pem',
+      });
+      privateKey = privateKeyObject.export({ format: 'pem', type: 'pkcs8' }).toString();
+    } else {
+      privateKey = privateKeyRaw;
+    }
 
     const msalConfig: Configuration = {
       auth: {
         clientId,
         authority: `https://login.microsoftonline.com/${tenantId}`,
-        clientSecret: clientSecret.value,
+        clientCertificate: {
+          privateKey,
+          ...(thumbprintSha256 ? { thumbprintSha256 } : { thumbprint }),
+        },
       },
     };
 
@@ -54,7 +76,7 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
       scopes: this.scopes,
     };
 
-    this.logger.log('Acquiring new Graph API token using client secret');
+    this.logger.log('Acquiring new Graph API token using client certificate');
 
     try {
       const response = await this.msalClient.acquireTokenByClientCredential(tokenRequest);
@@ -74,7 +96,7 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
       };
     } catch (error) {
       this.logger.error({
-        msg: 'Failed to acquire Graph API token using client secret',
+        msg: 'Failed to acquire Graph API token using client certificate',
         error: serializeError(normalizeError(error)),
       });
 
