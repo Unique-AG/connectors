@@ -83,3 +83,18 @@ export interface ZitadelLoginResponse {
   token_type: string;
   id_token: string;
 }
+
+export interface RootScopeData {
+  id: string;
+  name: string;
+  externalId?: string | null;
+  parentId?: string | null;
+}
+
+export interface RootScopeQueryResponse {
+  scopes: RootScopeData[];
+}
+
+export interface UpdateScopeResponse {
+  updateScope: RootScopeData;
+}

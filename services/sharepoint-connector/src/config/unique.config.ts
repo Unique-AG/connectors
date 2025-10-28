@@ -5,11 +5,23 @@ import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.
 import { Redacted } from '../utils/redacted';
 
 const UniqueConfig = z.object({
+  syncMode: z
+    .enum(['FLAT', 'RECURSIVE'])
+    .optional()
+    .describe(
+      'Synchronization mode: FLAT syncs all files to a single root scope/folder, RECURSIVE maintains the folder hierarchy.',
+    ),
   scopeId: z
     .string()
     .optional()
     .describe(
       'Controls if you are using path based ingestion or scope based ingestion. Leave undefined for PATH based ingestion. Add your scope id for scope based ingestion.',
+    ),
+  rootScopeName: z
+    .string()
+    .optional()
+    .describe(
+      'Name of the root scope/folder in the knowledge base where SharePoint content should be synced. Used with both FLAT and RECURSIVE sync modes.',
     ),
   ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
   fileDiffUrl: z.url().describe('Unique file diff service URL'),

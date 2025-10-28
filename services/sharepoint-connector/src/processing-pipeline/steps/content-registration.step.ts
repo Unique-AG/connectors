@@ -31,10 +31,12 @@ export class ContentRegistrationStep implements IPipelineStep {
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
+    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const isPathBasedIngestion = !scopeId;
 
     const itemKey = `${context.pipelineItem.siteId}/${context.pipelineItem.item.id}`;
+    const basePath = rootScopeName ?? sharepointBaseUrl;
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: itemKey,
       title: context.pipelineItem.fileName,
@@ -46,10 +48,11 @@ export class ContentRegistrationStep implements IPipelineStep {
       sourceName: INGESTION_SOURCE_NAME,
       ...(isPathBasedIngestion && {
         url: context.knowledgeBaseUrl,
-        baseUrl: sharepointBaseUrl,
+        baseUrl: basePath,
       }),
     };
 
+    this.logger.debug(JSON.stringify(contentRegistrationRequest, null, 2));
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();
       const registrationResponse = await this.uniqueApiService.registerContent(

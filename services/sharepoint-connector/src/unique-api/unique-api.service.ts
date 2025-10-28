@@ -20,6 +20,9 @@ import {
   type FileDiffResponse,
   type IngestionApiResponse,
   type IngestionFinalizationRequest,
+  type RootScopeData,
+  type RootScopeQueryResponse,
+  type UpdateScopeResponse,
 } from './unique-api.types';
 
 @Injectable()
@@ -81,13 +84,18 @@ export class UniqueApiService {
     partialKey: string,
   ): Promise<FileDiffResponse> {
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
+    const rootScopeName = this.configService.get(
+      'unique.rootScopeName',
+      { infer: true },
+    );
     const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
     const url = new URL(fileDiffUrl);
     const path = url.pathname + url.search;
 
+    const basePath = rootScopeName ?? sharepointBaseUrl;
     const diffRequest: FileDiffRequest = {
-      basePath: sharepointBaseUrl,
+      basePath,
       partialKey,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
@@ -160,6 +168,58 @@ export class UniqueApiService {
     });
   }
 
+  public async queryRootScopeByName(scopeName: string, uniqueToken: string): Promise<RootScopeData | null> {
+    const client = this.createGraphqlClient(uniqueToken);
+    const errorMessage = `Failed to query root scope by name '${scopeName}'`;
+
+    return await this.makeRateLimitedRequest(errorMessage, async () => {
+      this.logger.debug(`Querying root scope by name: '${scopeName}'`);
+
+      const response = await client.request<RootScopeQueryResponse>(
+        this.getRootScopeQuery(),
+        { name: scopeName },
+      );
+
+      this.logger.debug(`Root scope query response: ${JSON.stringify(response, null, 2)}`);
+
+      const scopes = response.scopes ?? [];
+      const rootScope = scopes[0];
+
+      if (!rootScope) {
+        this.logger.debug(`No root scope found with name '${scopeName}'`);
+        return null;
+      }
+
+      if (scopes.length > 1) {
+        this.logger.warn(
+          `Found ${scopes.length} root scopes with name '${scopeName}'. Using the first one.`,
+        );
+      }
+
+      this.logger.debug(`Selected root scope: id='${rootScope.id}', externalId='${rootScope.externalId ?? 'null'}'`);
+      return rootScope;
+    });
+  }
+
+  public async updateScopeExternalId(scopeId: string, externalId: string, uniqueToken: string): Promise<void> {
+    const client = this.createGraphqlClient(uniqueToken);
+    const errorMessage = `Failed to update scope external ID for scope '${scopeId}'`;
+
+    await this.makeRateLimitedRequest(errorMessage, async () => {
+      this.logger.debug(`Updating scope external ID: scopeId='${scopeId}', externalId='${externalId}'`);
+
+      const response = await client.request<UpdateScopeResponse>(
+        this.getUpdateScopeExternalIdMutation(),
+        {
+          id: scopeId,
+          input: { externalId },
+        },
+      );
+
+      this.logger.debug(`Scope external ID update response: ${JSON.stringify(response, null, 2)}`);
+    });
+  }
+
   private async makeRateLimitedRequest<T>(
     errorMessage: string,
     requestFn: () => Promise<T>,
@@ -227,5 +287,31 @@ export class UniqueApiService {
       }
     }
   `;
+  }
+
+  private getRootScopeQuery(): string {
+    return `query GetRootScopeByName($name: String!) {
+  scopes(where: {
+    name: { equals: $name }
+    parentId: null
+  }) {
+    id
+    name
+    externalId
+    parentId
+  }
+}`;
+  }
+
+  private getUpdateScopeExternalIdMutation(): string {
+    return `
+      mutation UpdateScopeExternalId($id: String!, $input: ScopeUpdateInput!) {
+        updateScope(id: $id, input: $input) {
+          id
+          name
+          externalId
+        }
+      }
+    `;
   }
 }

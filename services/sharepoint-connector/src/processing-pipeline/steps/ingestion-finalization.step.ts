@@ -27,6 +27,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
   ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
+    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const isPathBasedIngestion = !scopeId;
@@ -38,6 +39,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
     );
 
     const fileKey = `${context.pipelineItem.siteId}/${context.pipelineItem.item.id}`;
+    const basePath = rootScopeName ?? sharepointBaseUrl;
 
     const ingestionFinalizationRequest = {
       key: fileKey,
@@ -52,9 +54,11 @@ export class IngestionFinalizationStep implements IPipelineStep {
       fileUrl: context.registrationResponse.readUrl,
       ...(isPathBasedIngestion && {
         url: context.knowledgeBaseUrl,
-        baseUrl: sharepointBaseUrl,
+        baseUrl: basePath,
       }),
     };
+
+    this.logger.debug(JSON.stringify(ingestionFinalizationRequest, null, 2));
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();
