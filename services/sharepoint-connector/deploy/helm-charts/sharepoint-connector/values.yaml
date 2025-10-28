@@ -83,15 +83,19 @@ connectorConfig:
     # -- column name against which the files are synced
     # example: FinanceGPTKnowledge
     syncColumnName: unset_default_value
-    graph:
-      useOidcAuth: true
+    auth:
+      mode: oidc # oidc, client-secret, certificate
       # -- tenant id against which the graph api calls are made
       # example: 12345678-1234-1234-1234-123456789012
       tenantId: unset_default_value
+      clientId: null
+      privateKeyPath: null
+      privateKeyPassword: null
+      thumbprintSha1: null
+      thumbprintSha256: null
+    graph:
       apiUrl: https://graph.microsoft.com
       apiRateLimitPerMinute: 780000
-      clientId: null
-      # clientSecret would need to be presented from a secret as well
 
   unique:
     # -- url for the file diff
