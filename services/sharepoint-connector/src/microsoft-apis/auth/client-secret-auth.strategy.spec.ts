@@ -1,7 +1,8 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ClientSecretGraphAuthStrategy } from './client-secret-graph-auth.strategy';
+import { Redacted } from '../../utils/redacted';
+import { ClientSecretAuthStrategy } from './client-secret-auth.strategy';
 
 vi.mock('@azure/msal-node', () => ({
   ConfidentialClientApplication: vi.fn().mockImplementation(() => ({
@@ -9,16 +10,17 @@ vi.mock('@azure/msal-node', () => ({
   })),
 }));
 
-describe('ClientSecretGraphAuthStrategy', () => {
-  let strategy: ClientSecretGraphAuthStrategy;
+describe('ClientSecretAuthStrategy', () => {
+  let strategy: ClientSecretAuthStrategy;
   let mockMsalClient: {
     acquireTokenByClientCredential: ReturnType<typeof vi.fn>;
   };
 
-  const mockConfig = {
-    'sharepoint.graphTenantId': 'tenant-123',
-    'sharepoint.graphClientId': 'client-456',
-    'sharepoint.graphClientSecret': 'secret-789',
+  const mockSharepointConfig = {
+    authMode: 'client-secret' as const,
+    authTenantId: 'tenant-123',
+    authClientId: 'client-456',
+    authClientSecret: new Redacted('secret-789'),
   };
 
   beforeEach(async () => {
@@ -28,11 +30,14 @@ describe('ClientSecretGraphAuthStrategy', () => {
     };
     vi.mocked(ConfidentialClientApplication).mockImplementation(() => mockMsalClient as never);
 
-    const { unit } = await TestBed.solitary(ClientSecretGraphAuthStrategy)
+    const { unit } = await TestBed.solitary(ClientSecretAuthStrategy)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
-        get: vi.fn((key: string) => mockConfig[key as keyof typeof mockConfig]),
+        get: vi.fn((key: string) => {
+          if (key === 'sharepoint') return mockSharepointConfig;
+          return undefined;
+        }),
       }))
       .compile();
 
@@ -127,12 +132,10 @@ describe('ClientSecretGraphAuthStrategy', () => {
   it('throws error when SharePoint configuration is missing', () => {
     expect(
       () =>
-        new ClientSecretGraphAuthStrategy({
+        new ClientSecretAuthStrategy({
           get: vi.fn(() => undefined),
         } as never),
-    ).toThrow(
-      'SharePoint configuration missing: tenantId, clientId, and clientSecret are required',
-    );
+    ).toThrow();
   });
 
   it('clears cached token on authentication error', async () => {

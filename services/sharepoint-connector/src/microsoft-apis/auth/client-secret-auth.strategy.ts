@@ -9,11 +9,11 @@ import { ConfigService } from '@nestjs/config';
 import { serializeError } from 'serialize-error-cjs';
 import { Config } from '../../config';
 import { normalizeError } from '../../utils/normalize-error';
-import { GraphAuthStrategy } from './graph-auth-strategy.interface';
+import { AuthStrategy } from './auth-strategy.interface';
 import { TokenAcquisitionResult, TokenCache } from './token-cache';
 
 @Injectable()
-export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
+export class ClientSecretAuthStrategy implements AuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
   private readonly scopes = ['https://graph.microsoft.com/.default'];
@@ -25,7 +25,7 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
     assert.strictEqual(
       sharePointConfig.authMode,
       'client-secret',
-      'ClientSecretGraphAuthStrategy called but authentication mode is not "client-secret"',
+      'ClientSecretAuthStrategy called but authentication mode is not "client-secret"',
     );
 
     const {

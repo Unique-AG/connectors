@@ -1,13 +1,15 @@
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
-import { normalizeError } from '../../utils/normalize-error';
-import { GraphAuthenticationService } from '../auth/graph-authentication.service';
+import { normalizeError } from '../../../utils/normalize-error';
+import { MicrosoftAuthenticationService } from '../../auth/microsoft-authentication.service';
 
 export class TokenRefreshMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
   private nextMiddleware: Middleware | undefined;
 
-  public constructor(private readonly graphAuthenticationService: GraphAuthenticationService) {}
+  public constructor(
+    private readonly microsoftAuthenticationService: MicrosoftAuthenticationService,
+  ) {}
 
   public async execute(context: Context): Promise<void> {
     if (!this.nextMiddleware) throw new Error('Next middleware not set');
@@ -18,7 +20,7 @@ export class TokenRefreshMiddleware implements Middleware {
     if (!isExpired) return;
 
     try {
-      const newAccessToken = await this.graphAuthenticationService.getAccessToken();
+      const newAccessToken = await this.microsoftAuthenticationService.getAccessToken();
 
       const clonedRequest = this.cloneRequest(context.request, context.options);
       const updatedOptions = this.updateAuthorizationHeader(context.options, newAccessToken);

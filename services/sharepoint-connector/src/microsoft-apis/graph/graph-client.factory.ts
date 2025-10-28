@@ -12,8 +12,8 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Config } from '../config';
-import { GraphAuthenticationService } from './auth/graph-authentication.service';
+import { Config } from '../../config';
+import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { MetricsMiddleware } from './middlewares/metrics.middleware';
 import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
 
@@ -23,12 +23,12 @@ export class GraphClientFactory {
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
-    private readonly graphAuthenticationService: GraphAuthenticationService,
+    private readonly microsoftAuthenticationService: MicrosoftAuthenticationService,
   ) {}
 
   public createClient(): Client {
-    const authenticationHandler = new AuthenticationHandler(this.graphAuthenticationService);
-    const tokenRefreshMiddleware = new TokenRefreshMiddleware(this.graphAuthenticationService);
+    const authenticationHandler = new AuthenticationHandler(this.microsoftAuthenticationService);
+    const tokenRefreshMiddleware = new TokenRefreshMiddleware(this.microsoftAuthenticationService);
     const retryHandler = new RetryHandler(new RetryHandlerOptions());
     const redirectHandler = new RedirectHandler(new RedirectHandlerOptions());
     const telemetryHandler = new TelemetryHandler();

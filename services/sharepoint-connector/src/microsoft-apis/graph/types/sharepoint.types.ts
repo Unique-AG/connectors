@@ -1,4 +1,4 @@
-import { ModerationStatusValue } from '../../constants/moderation-status.constants';
+import { ModerationStatusValue } from '../../../constants/moderation-status.constants';
 
 export interface GraphApiErrorResponse {
   statusCode?: number;

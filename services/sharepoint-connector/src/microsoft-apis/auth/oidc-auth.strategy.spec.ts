@@ -2,7 +2,7 @@ import { DefaultAzureCredential } from '@azure/identity';
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { OidcGraphAuthStrategy } from './oidc-graph-auth.strategy';
+import { OidcAuthStrategy } from './oidc-auth.strategy';
 
 vi.mock('@azure/identity', () => ({
   DefaultAzureCredential: vi.fn().mockImplementation(() => ({
@@ -10,15 +10,15 @@ vi.mock('@azure/identity', () => ({
   })),
 }));
 
-describe('OidcGraphAuthStrategy', () => {
-  let strategy: OidcGraphAuthStrategy;
+describe('OidcAuthStrategy', () => {
+  let strategy: OidcAuthStrategy;
   let mockCredential: {
     getToken: ReturnType<typeof vi.fn>;
   };
 
-  const mockConfig = {
-    'sharepoint.tenantId': 'tenant-123',
-    'sharepoint.clientId': 'client-456',
+  const mockSharepointConfig = {
+    authMode: 'oidc' as const,
+    authTenantId: 'tenant-123',
   };
 
   beforeEach(async () => {
@@ -27,11 +27,14 @@ describe('OidcGraphAuthStrategy', () => {
     };
     vi.mocked(DefaultAzureCredential).mockImplementation(() => mockCredential as never);
 
-    const { unit } = await TestBed.solitary(OidcGraphAuthStrategy)
+    const { unit } = await TestBed.solitary(OidcAuthStrategy)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
-        get: vi.fn((key: string) => mockConfig[key as keyof typeof mockConfig]),
+        get: vi.fn((key: string) => {
+          if (key === 'sharepoint') return mockSharepointConfig;
+          return undefined;
+        }),
       }))
       .compile();
 

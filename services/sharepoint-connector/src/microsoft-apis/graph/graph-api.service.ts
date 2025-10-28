@@ -4,10 +4,10 @@ import type { Drive, List } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
-import { Config } from '../config';
-import { GRAPH_API_PAGE_SIZE } from '../constants/defaults.constants';
-import { getTitle } from '../utils/list-item.util';
-import { normalizeError } from '../utils/normalize-error';
+import { Config } from '../../config';
+import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
+import { getTitle } from '../../utils/list-item.util';
+import { normalizeError } from '../../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 import {

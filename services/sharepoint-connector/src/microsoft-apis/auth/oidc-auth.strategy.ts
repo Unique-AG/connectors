@@ -6,7 +6,7 @@ import { serializeError } from 'serialize-error-cjs';
 import { z } from 'zod';
 import { Config } from '../../config';
 import { normalizeError } from '../../utils/normalize-error';
-import { GraphAuthStrategy } from './graph-auth-strategy.interface';
+import { AuthStrategy } from './auth-strategy.interface';
 import { TokenAcquisitionResult, TokenCache } from './token-cache';
 
 const TokenResponseSchema = z.object({
@@ -14,12 +14,8 @@ const TokenResponseSchema = z.object({
   expiresOnTimestamp: z.number().positive(),
 });
 
-/**
- * OIDC/Workload Identity authentication strategy for Microsoft Graph API.
- * Used in AKS environments with Azure Workload Identity enabled.
- */
 @Injectable()
-export class OidcGraphAuthStrategy implements GraphAuthStrategy {
+export class OidcAuthStrategy implements AuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly credential: DefaultAzureCredential;
   private readonly tokenCache = new TokenCache();
@@ -30,7 +26,7 @@ export class OidcGraphAuthStrategy implements GraphAuthStrategy {
     assert.strictEqual(
       sharePointConfig.authMode,
       'oidc',
-      'OidcGraphAuthStrategy called but authentication mode is not "oidc"',
+      'OidcAuthStrategy called but authentication mode is not "oidc"',
     );
 
     this.credential = new DefaultAzureCredential({ tenantId: sharePointConfig.authTenantId });
