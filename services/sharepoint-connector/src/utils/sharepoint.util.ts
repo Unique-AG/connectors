@@ -59,6 +59,7 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
   return normalizeSlashes(siteId);
 }
 
+// deprecated(24.10.2025): will be reusing it again after ingestion splits url into webUrl and knowledgeBasePathUrl
 export function buildKnowledgeBaseUrl(
   sharepointContentItem: SharepointContentItem,
   rootScopeName?: string,

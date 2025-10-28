@@ -136,3 +136,5 @@ connectorConfig:
       - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
       - application/vnd.openxmlformats-officedocument.presentationml.presentation
     maxFileSizeBytes: null
+    # -- cron expression for the scheduled SharePoint scan interval default: every 15 minutes
+    scanIntervalCron: "*/15 * * * *"

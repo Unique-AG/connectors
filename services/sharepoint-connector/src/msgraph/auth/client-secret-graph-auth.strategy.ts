@@ -10,18 +10,14 @@ import { serializeError } from 'serialize-error-cjs';
 import { Config } from '../../config';
 import { normalizeError } from '../../utils/normalize-error';
 import { GraphAuthStrategy } from './graph-auth-strategy.interface';
-
-interface CachedToken {
-  accessToken: string;
-  expiresAt: number;
-}
+import { TokenAcquisitionResult, TokenCache } from './token-cache';
 
 @Injectable()
 export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
   private readonly scopes = ['https://graph.microsoft.com/.default'];
-  private cachedToken: CachedToken | null = null;
+  private readonly tokenCache = new TokenCache();
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
     const tenantId = this.configService.get('sharepoint.graphTenantId', { infer: true });
@@ -45,22 +41,15 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
   }
 
   public async getAccessToken(): Promise<string> {
-    if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
-      return this.cachedToken.accessToken;
-    }
-
-    return await this.acquireNewToken();
+    return this.tokenCache.getToken(() => this.acquireNewToken());
   }
 
-  private isTokenValid(token: CachedToken): boolean {
-    const now = Date.now();
-    return token.expiresAt > now;
-  }
-
-  private async acquireNewToken(): Promise<string> {
+  private async acquireNewToken(): Promise<TokenAcquisitionResult> {
     const tokenRequest: ClientCredentialRequest = {
       scopes: this.scopes,
     };
+
+    this.logger.log('Acquiring new Graph API token using client secret');
 
     try {
       const response = await this.msalClient.acquireTokenByClientCredential(tokenRequest);
@@ -74,19 +63,16 @@ export class ClientSecretGraphAuthStrategy implements GraphAuthStrategy {
         'Failed to acquire Graph API token: no expiration time in response',
       );
 
-      this.cachedToken = {
-        accessToken: response.accessToken,
+      return {
+        token: response.accessToken,
         expiresAt: response.expiresOn.getTime(),
       };
-
-      return response.accessToken;
     } catch (error) {
       this.logger.error({
         msg: 'Failed to acquire Graph API token',
         error: serializeError(normalizeError(error)),
       });
 
-      this.cachedToken = null;
       throw error;
     }
   }

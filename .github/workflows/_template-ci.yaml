@@ -1,23 +1,23 @@
-name: "[TEMPLATE] MCP Server CI"
+name: "[TEMPLATE] CI"
 
 on:
   workflow_call:
     inputs:
       service-name:
-        description: "Name of the MCP server (e.g., factset, outlook)"
+        description: "Name of the service (e.g., factset-mcp, sharepoint-connector)"
         required: true
         type: string
       service-path:
-        description: "Path to the server directory (e.g., services/factset-mcp)"
+        description: "Path to the service directory (e.g., services/factset-mcp)"
         required: true
         type: string
       orm:
-        description: "ORM in use (e.g., prisma, drizzle)"
+        description: "ORM in use (e.g., prisma, drizzle, none)"
         type: string
         default: "prisma"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: _template-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

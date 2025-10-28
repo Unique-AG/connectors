@@ -2,6 +2,7 @@ import { ConfigType } from '@nestjs/config';
 import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
 import {
+  CRON_EVERY_15_MINUTES,
   DEFAULT_MAX_FILE_SIZE_BYTES,
   DEFAULT_PROCESSING_CONCURRENCY,
   DEFAULT_STEP_TIMEOUT_SECONDS,
@@ -41,12 +42,16 @@ const ProcessingConfigSchema = z.object({
         : [],
     )
     .describe('Comma-separated list of allowed MIME types for files to sync'),
-  maxFilesToScan: z.coerce
-    .number()
-    .int()
-    .positive()
-    .optional()
+  maxFilesToScan: z
+    .preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.coerce.number().int().positive().optional(),
+    )
     .describe('For testing purpose. Maximum number of files to scan. Unlimited if not set'),
+  scanIntervalCron: z
+    .string()
+    .default(CRON_EVERY_15_MINUTES)
+    .describe('Cron expression for the scheduled file scan interval'),
 });
 
 export const processingConfig = registerConfig('processing', ProcessingConfigSchema);

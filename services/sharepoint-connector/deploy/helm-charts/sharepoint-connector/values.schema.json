@@ -180,6 +180,10 @@
             "maxFileSizeBytes": {
               "type": ["integer", "null"],
               "description": "Maximum number of files to scan"
+            },
+            "scanIntervalCron": {
+              "type": "string",
+              "description": "Cron expression for the scheduled SharePoint scan interval"
             }
           },
           "additionalProperties": false

@@ -9,6 +9,6 @@ jobs:
   warm:
     uses: ./.github/workflows/_template-cache.yaml
     with:
-      service-name: outlook
+      service-name: outlook-mcp
       service-path: services/outlook-mcp
       dockerfile: services/outlook-mcp/deploy/Dockerfile

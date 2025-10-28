@@ -18,6 +18,7 @@ jobs:
     with:
       service-name: sharepoint-connector
       service-path: services/sharepoint-connector
+      orm: none
 
   check_chart:
     runs-on: ubuntu-latest # TODO: can we use singularity here?
