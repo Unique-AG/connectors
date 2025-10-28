@@ -126,12 +126,16 @@ export function getItemUrl(sharepointContentItem: SharepointContentItem, rootSco
   return rootScopeName ? `${rootScopeName}/${urlWithNoProtocol}` : url
 }
 
-export function buildKnowledgeBaseFileKey(sharepointContentItem: SharepointContentItem): string {
+export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): string {
+  return sharepointContentItem.item.id;
+}
+
+export function buildIngetionItemKey(sharepointContentItem: SharepointContentItem): string {
   if (sharepointContentItem.itemType === 'listItem') {
-    return `${sharepointContentItem.siteId}${sharepointContentItem.driveId}-${sharepointContentItem.item.id}`; // TODO check if they always are reingested
+    return `${sharepointContentItem.siteId}/${sharepointContentItem.driveId}/${sharepointContentItem.item.id}`; // TODO check if they always are reingested
   }
 
-  return sharepointContentItem.item.id;
+  return sharepointContentItem.siteId + '/' + sharepointContentItem.item.id;
 }
 
 

@@ -13,7 +13,7 @@ import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { normalizeError } from '../../utils/normalize-error';
-import { buildKnowledgeBaseFileKey } from '../../utils/sharepoint.util';
+import { buildIngetionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -37,7 +37,7 @@ export class ContentRegistrationStep implements IPipelineStep {
 
     const isPathBasedIngestion = !scopeId;
 
-    const itemKey = buildKnowledgeBaseFileKey(context.pipelineItem);
+    const itemKey = buildIngetionItemKey(context.pipelineItem);
     const baseUrl = rootScopeName || sharepointBaseUrl;
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
@@ -54,6 +54,7 @@ export class ContentRegistrationStep implements IPipelineStep {
         baseUrl,
       }),
     };
+    this.logger.debug(`contentRegistrationRequest: ${JSON.stringify(contentRegistrationRequest, null, 4)}`);
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
-import { buildKnowledgeBaseFileKey, buildKnowledgeBaseUrl } from './sharepoint.util';
+import { buildIngetionItemKey, buildKnowledgeBaseUrl } from './sharepoint.util';
 
 describe('buildKnowledgeBaseUrl', () => {
   it('should build proper SharePoint URL for file in subfolder', () => {
@@ -387,7 +387,7 @@ describe('buildFileDiffKey', () => {
       fileName: 'Page 1',
     };
 
-    const result = buildKnowledgeBaseFileKey(listItem);
+    const result = buildIngetionItemKey(listItem);
     expect(result).toBe('site-id-456/list-id-789/list-item-123');
   });
 
@@ -418,7 +418,7 @@ describe('buildFileDiffKey', () => {
       fileName: 'document.pdf',
     };
 
-    const result = buildKnowledgeBaseFileKey(driveItem);
+    const result = buildIngetionItemKey(driveItem);
     expect(result).toBe('drive-item-id-xyz');
   });
 
@@ -445,7 +445,7 @@ describe('buildFileDiffKey', () => {
       fileName: 'Analytics Dashboard',
     };
 
-    const result = buildKnowledgeBaseFileKey(listItem);
+    const result = buildIngetionItemKey(listItem);
     expect(result).toBe(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66/b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq/01JWNC3IPYIDGEOH52ABAZMI7436JQOOJI',
     );
