@@ -2,13 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { GraphApiService } from '../msgraph/graph-api.service';
-import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
-import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import { UniqueApiService } from '../unique-api/unique-api.service';
-import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
-import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { normalizeError } from '../utils/normalize-error';
-import { getItemUrl } from '../utils/sharepoint.util';
+import { elapsedSecondsLog } from '../utils/timing.util';
+import { ContentSyncService } from './content-sync.service';
+import { PermissionsSyncService } from './permissions-sync.service';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -17,10 +14,9 @@ export class SharepointSynchronizationService {
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
-    private readonly uniqueAuthService: UniqueAuthService,
     private readonly graphApiService: GraphApiService,
-    private readonly orchestrator: FileProcessingOrchestratorService,
-    private readonly uniqueApiService: UniqueApiService,
+    private readonly contentSyncService: ContentSyncService,
+    private readonly permissionsSyncService: PermissionsSyncService,
   ) {}
 
   public async synchronize(): Promise<void> {
@@ -31,65 +27,47 @@ export class SharepointSynchronizationService {
       return;
     }
     this.isScanning = true;
-    const scanStartTime = Date.now();
+    const syncStartTime = Date.now();
     const siteIdsToScan = this.configService.get('sharepoint.siteIds', { infer: true });
 
     this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
 
     for (const siteId of siteIdsToScan) {
+      const logPrefix = `[SiteId: ${siteId}] `;
+
       const siteStartTime = Date.now();
+      const items = await this.graphApiService.getAllSiteItems(siteId);
+      this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
+
+      if (items.length === 0) {
+        this.logger.warn(`${logPrefix} Found no items marked for synchronization.`);
+        continue;
+      }
+
       try {
-        const items = await this.graphApiService.getAllSiteItems(siteId);
-
-        this.logger.log(
-          `Finished scanning site id ${siteId} in ${((Date.now() - siteStartTime) / 1000).toFixed(2)} seconds`,
-        );
-
-        const diffResult = await this.calculateDiffForSite(items, siteId);
-        this.logger.log(
-          `File Diff Results: Site ${siteId}: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
-        );
-
-        const processStartTime = Date.now();
-        await this.orchestrator.processSiteItems(siteId, items, diffResult);
-
-        this.logger.log(
-          `Finished processing site ${siteId} in ${((Date.now() - processStartTime) / 1000).toFixed(2)} seconds`,
-        );
-      } catch (rawError) {
-        const error = normalizeError(rawError);
+        await this.contentSyncService.syncContentForSite(siteId, items);
+      } catch (error) {
         this.logger.error({
-          msg: `Failed during processing of site ${siteId}: ${error.message}`,
-          err: rawError,
+          msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
+          err: error,
         });
+        continue;
+      }
+
+      const syncMode = this.configService.get('processing.syncMode', { infer: true });
+      if (syncMode === 'content-and-permissions') {
+        try {
+          await this.permissionsSyncService.syncPermissionsForSite(siteId, items);
+        } catch (error) {
+          this.logger.error({
+            msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,
+            err: error,
+          });
+        }
       }
     }
 
-    const scanDurationSeconds = (Date.now() - scanStartTime) / 1000;
-    this.logger.log(
-      `SharePoint scan finished scanning all sites in ${scanDurationSeconds.toFixed(2)}s`,
-    );
+    this.logger.log(`SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`);
     this.isScanning = false;
-  }
-
-  /*
-    This step also triggers file deletion in node-ingestion service when a file is missing.
-   */
-  private async calculateDiffForSite(
-    sharepointContentItems: SharepointContentItem[],
-    siteId: string,
-  ): Promise<FileDiffResponse> {
-    const fileDiffItems: FileDiffItem[] = sharepointContentItems.map(
-      (sharepointContentItem: SharepointContentItem) => {
-        return {
-          key: sharepointContentItem.item.id,
-          url: getItemUrl(sharepointContentItem),
-          updatedAt: sharepointContentItem.item.lastModifiedDateTime,
-        };
-      },
-    );
-
-    const uniqueToken = await this.uniqueAuthService.getToken();
-    return await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, siteId);
   }
 }

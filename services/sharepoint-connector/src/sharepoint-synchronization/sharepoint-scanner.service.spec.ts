@@ -4,15 +4,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphApiService } from '../msgraph/graph-api.service';
 import type { DriveItem } from '../msgraph/types/sharepoint.types';
 import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
-import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import { UniqueApiService } from '../unique-api/unique-api.service';
-import { UniqueAuthService } from '../unique-api/unique-auth.service';
+import { ContentSyncService } from './content-sync.service';
+import { PermissionsSyncService } from './permissions-sync.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
 describe('SharepointSynchronizationService', () => {
   let service: SharepointSynchronizationService;
-  let mockOrchestrator: {
-    processSiteItems: ReturnType<typeof vi.fn>;
+  let mockContentSyncService: {
+    syncContentForSite: ReturnType<typeof vi.fn>;
+  };
+  let mockPermissionsSyncService: {
+    syncPermissionsForSite: ReturnType<typeof vi.fn>;
   };
 
   const mockDriveItem: DriveItem = {
@@ -65,30 +67,30 @@ describe('SharepointSynchronizationService', () => {
   };
 
   beforeEach(async () => {
-    mockOrchestrator = {
-      processSiteItems: vi.fn().mockResolvedValue(undefined),
+    mockContentSyncService = {
+      syncContentForSite: vi.fn().mockResolvedValue(undefined),
+    };
+
+    mockPermissionsSyncService = {
+      syncPermissionsForSite: vi.fn().mockResolvedValue(undefined),
     };
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
-        get: vi.fn((k: string) => (k === 'sharepoint.siteIds' ? ['site-1'] : undefined)),
-      }))
-      .mock(UniqueAuthService)
-      .impl(() => ({ getToken: vi.fn().mockResolvedValue('unique-token') }))
-      .mock(GraphApiService)
-      .impl(() => ({ getAllSiteItems: vi.fn().mockResolvedValue([mockFile]) }))
-      .mock(UniqueApiService)
-      .impl(() => ({
-        performFileDiff: vi.fn().mockResolvedValue({
-          newAndUpdatedFiles: ['1'],
-          deletedFiles: [],
-          movedFiles: [],
+        get: vi.fn((k: string) => {
+          if (k === 'sharepoint.siteIds') return ['site-1'];
+          if (k === 'processing.permissionsSyncEnabled') return false;
+          return undefined;
         }),
       }))
-      .mock(FileProcessingOrchestratorService)
-      .impl(() => mockOrchestrator)
+      .mock(GraphApiService)
+      .impl(() => ({ getAllSiteItems: vi.fn().mockResolvedValue([mockFile]) }))
+      .mock(ContentSyncService)
+      .impl(() => mockContentSyncService)
+      .mock(PermissionsSyncService)
+      .impl(() => mockPermissionsSyncService)
       .compile();
 
     service = unit;
@@ -96,11 +98,12 @@ describe('SharepointSynchronizationService', () => {
 
   it('scans and triggers processing', async () => {
     await service.synchronize();
-    expect(mockOrchestrator.processSiteItems).toHaveBeenCalledTimes(1);
+    expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledTimes(1);
+    expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith('site-1', [mockFile]);
   });
 
   it('prevents overlapping scans', async () => {
-    mockOrchestrator.processSiteItems.mockImplementation(
+    mockContentSyncService.syncContentForSite.mockImplementation(
       () => new Promise((resolve) => setTimeout(resolve, 100)),
     );
 
@@ -109,6 +112,6 @@ describe('SharepointSynchronizationService', () => {
 
     await Promise.all([scan1, scan2]);
 
-    expect(mockOrchestrator.processSiteItems).toHaveBeenCalledTimes(1);
+    expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledTimes(1);
   });
 });
