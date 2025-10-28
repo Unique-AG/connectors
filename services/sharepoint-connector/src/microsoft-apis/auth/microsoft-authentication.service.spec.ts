@@ -3,7 +3,7 @@ import { Redacted } from '../../utils/redacted';
 import { MicrosoftAuthenticationService } from './microsoft-authentication.service';
 import { ClientSecretAuthStrategy } from './strategies/client-secret-auth.strategy';
 import { OidcAuthStrategy } from './strategies/oidc-auth.strategy';
-import { AuthenticationScope, TokenAcquisitionResult } from './types';
+import { AuthenticationScope } from './types';
 
 vi.mock('@azure/msal-node', () => ({
   ConfidentialClientApplication: vi.fn().mockImplementation(() => ({

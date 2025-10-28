@@ -101,12 +101,8 @@
             "graph": {
               "type": "object",
               "description": "Microsoft Graph API configuration",
-              "required": ["apiUrl"],
+              "required": [],
               "properties": {
-                "apiUrl": {
-                  "type": "string",
-                  "description": "Microsoft Graph API URL"
-                },
                 "apiRateLimitPerMinute": {
                   "type": "integer",
                   "description": "Rate limiting for Graph API requests per minute"
