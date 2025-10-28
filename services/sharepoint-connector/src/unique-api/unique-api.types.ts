@@ -51,7 +51,6 @@ export interface FileDiffItem {
 
 export interface FileDiffRequest {
   basePath?: string;
-  rootScopeId?: string;
   partialKey: string;
   sourceKind: string;
   sourceName: string;

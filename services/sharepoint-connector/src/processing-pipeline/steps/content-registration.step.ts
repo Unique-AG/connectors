@@ -13,7 +13,7 @@ import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { normalizeError } from '../../utils/normalize-error';
-import { buildFileDiffKey } from '../../utils/sharepoint.util';
+import { buildKnowledgeBaseFileKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -33,10 +33,13 @@ export class ContentRegistrationStep implements IPipelineStep {
     const stepStartTime = Date.now();
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
+    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
 
     const isPathBasedIngestion = !scopeId;
 
-    const itemKey = buildFileDiffKey(context.pipelineItem);
+    const itemKey = buildKnowledgeBaseFileKey(context.pipelineItem);
+    const baseUrl = rootScopeName || sharepointBaseUrl;
+
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: itemKey,
       title: context.pipelineItem.fileName,
@@ -48,7 +51,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       sourceName: INGESTION_SOURCE_NAME,
       ...(isPathBasedIngestion && {
         url: context.knowledgeBaseUrl,
-        baseUrl: rootScopeName,
+        baseUrl,
       }),
     };
 

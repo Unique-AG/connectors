@@ -48,7 +48,7 @@ export class ProcessingPipelineService {
       correlationId,
       pipelineItem,
       startTime,
-      knowledgeBaseUrl: getItemUrl(pipelineItem),
+      knowledgeBaseUrl: getItemUrl(pipelineItem, rootScopeName),
       // knowledgeBaseUrl: buildKnowledgeBaseUrl(pipelineItem, rootScopeName),
       mimeType: this.resolveMimeType(pipelineItem),
     };

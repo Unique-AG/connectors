@@ -8,7 +8,7 @@ import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { normalizeError } from '../utils/normalize-error';
-import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
+import { buildKnowledgeBaseFileKey, getItemUrl } from '../utils/sharepoint.util';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -79,13 +79,14 @@ export class SharepointSynchronizationService {
     sharepointContentItems: SharepointContentItem[],
     siteId: string,
   ): Promise<FileDiffResponse> {
+    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     const fileDiffItems: FileDiffItem[] = sharepointContentItems.map(
       (sharepointContentItem: SharepointContentItem) => {
-        const key = buildFileDiffKey(sharepointContentItem);
+        const key = buildKnowledgeBaseFileKey(sharepointContentItem);
 
         return {
           key,
-          url: getItemUrl(sharepointContentItem),
+          url: getItemUrl(sharepointContentItem, rootScopeName),
           updatedAt: sharepointContentItem.item.lastModifiedDateTime,
         };
       },

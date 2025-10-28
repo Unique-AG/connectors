@@ -107,27 +107,28 @@ function buildUrl(baseUrlRaw: string, folderPathRaw: string, itemName: string): 
 * item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
 * We are adding ?web=1 to the url to get the web view of the item.
 */
-export function getItemUrl(sharepointContentItem: SharepointContentItem): string {
+export function getItemUrl(sharepointContentItem: SharepointContentItem, rootScopeName?: string): string {
+  let url: string;
+
   if (sharepointContentItem.itemType === 'driveItem') {
     const baseUrl = sharepointContentItem.item.listItem?.webUrl;
-
     // if webUrl from listItem is not present we fallback to webUrl from driveItem
-    if (!baseUrl) {
-      return sharepointContentItem.item.webUrl;
-    }
-    return `${baseUrl}?web=1`;
+    url = baseUrl ? `${baseUrl}?web=1` : sharepointContentItem.item.webUrl
+  } else if (sharepointContentItem.itemType === 'listItem') {
+    url = `${sharepointContentItem.item.webUrl}?web=1`;
+  } else {
+    assert.fail('Invalid pipeline item type');
   }
 
-  if (sharepointContentItem.itemType === 'listItem') {
-    return `${sharepointContentItem.item.webUrl}?web=1`;
-  }
+  // if we do not remove the protocol ingestion will create a scope with the name: my-scope/https://uniqueapp.sharepoint.com instead of my-scope
+  const urlWithNoProtocol = stripProtocol(url);
 
-  assert.fail('Invalid pipeline item type');
+  return rootScopeName ? `${rootScopeName}/${urlWithNoProtocol}` : url
 }
 
-export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): string {
+export function buildKnowledgeBaseFileKey(sharepointContentItem: SharepointContentItem): string {
   if (sharepointContentItem.itemType === 'listItem') {
-    return `${sharepointContentItem.siteId}${sharepointContentItem.driveId}-${sharepointContentItem.item.id}`;
+    return `${sharepointContentItem.siteId}${sharepointContentItem.driveId}-${sharepointContentItem.item.id}`; // TODO check if they always are reingested
   }
 
   return sharepointContentItem.item.id;
@@ -141,4 +142,8 @@ function stripDomain(url: string): string {
   } catch {
     return url;
   }
+}
+
+function stripProtocol(url: string): string {
+  return url.replace(/^https?:\/\//, '');
 }

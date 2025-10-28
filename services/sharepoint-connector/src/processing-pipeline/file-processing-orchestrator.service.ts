@@ -4,7 +4,7 @@ import pLimit from 'p-limit';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import type { FileDiffResponse } from '../unique-api/unique-api.types';
-import { buildFileDiffKey } from '../utils/sharepoint.util';
+import { buildKnowledgeBaseFileKey } from '../utils/sharepoint.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
 @Injectable()
@@ -26,7 +26,7 @@ export class FileProcessingOrchestratorService {
 
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);
     const filteredItems = items.filter((item) => {
-      const key = buildFileDiffKey(item);
+      const key = buildKnowledgeBaseFileKey(item);
       return newFileKeys.has(key);
     });
     if (filteredItems.length === 0) {

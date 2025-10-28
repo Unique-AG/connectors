@@ -83,17 +83,20 @@ export class UniqueApiService {
     const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
+    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     
     const url = new URL(fileDiffUrl);
     const path = url.pathname + url.search;
 
+    const basePath = rootScopeName || sharepointBaseUrl;
+
     const diffRequest: FileDiffRequest = {
-      basePath: rootScopeName,
+      basePath,
       partialKey,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       fileList,
-      scope: scopeId ?? PATH_BASED_INGESTION,
+      scope: scopeId ?? PATH_BASED_INGESTION, // todo change to check the SYNC_MODE env variable it can be FLAT or RECURSIVE
     };
 
     this.logger.debug(`File diff request payload: ${JSON.stringify(diffRequest, null, 2)}`);
