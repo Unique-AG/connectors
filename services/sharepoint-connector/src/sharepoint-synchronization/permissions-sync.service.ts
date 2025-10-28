@@ -5,6 +5,8 @@ import { SimpleIdentitySet, SimplePermission } from '../msgraph/types/sharepoint
 import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import { elapsedSecondsLog } from '../utils/timing.util';
 
+const OWNERS_SUFFIX = '_o';
+
 type ItemPermission =
   | {
       type: 'user';
@@ -77,45 +79,9 @@ export class PermissionsSyncService {
   private mapSimplePermissionsToItemPermissions(
     simplePermissions: SimplePermission[],
   ): ItemPermission[] {
-    const mapSimpleIdentitySetToItemPermission = (
-      simpleIdentitySet: SimpleIdentitySet,
-    ): ItemPermission | null => {
-      if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
-        return {
-          // Login name of the group looks like
-          // c:0o.c|federateddirectoryclaimprovider|838f7d2d-BBBB-AAAA-DDDD-7dd9d399aff7_o
-          // or
-          // c:0o.c|federateddirectoryclaimprovider|838f7d2d-BBBB-AAAA-DDDD-7dd9d399aff7
-          // Presence of _o suffix indicates the owners of the group as opposed to the members
-          type: `group${simpleIdentitySet.siteUser.loginName?.endsWith('_o') ? 'Owners' : 'Members'}`,
-          id: simpleIdentitySet.group.id,
-          name: simpleIdentitySet.group.displayName,
-        };
-      }
-
-      if (isNonNullish(simpleIdentitySet.siteGroup)) {
-        return {
-          type: 'siteGroup',
-          id: simpleIdentitySet.siteGroup.id,
-          name: simpleIdentitySet.siteGroup.displayName,
-        };
-      }
-
-      if (isNonNullish(simpleIdentitySet.user) && isNonNullish(simpleIdentitySet.siteUser)) {
-        return {
-          type: 'user',
-          id: simpleIdentitySet.user.id,
-          email: simpleIdentitySet.user.email,
-        };
-      }
-
-      this.logger.warn(`Unknown identity set: ${Object.keys(simpleIdentitySet).join(', ')}`);
-      return null;
-    };
-
     return simplePermissions.flatMap((permission) => {
       if (isNonNullish(permission.grantedToV2)) {
-        const itemPermission = mapSimpleIdentitySetToItemPermission(permission.grantedToV2);
+        const itemPermission = this.mapSimpleIdentitySetToItemPermission(permission.grantedToV2);
         if (isNonNullish(itemPermission)) {
           return [itemPermission];
         }
@@ -128,7 +94,7 @@ export class PermissionsSyncService {
         }
 
         const itemPermissions = permission.grantedToIdentitiesV2
-          .map(mapSimpleIdentitySetToItemPermission)
+          .map(this.mapSimpleIdentitySetToItemPermission.bind(this))
           .filter(isNonNullish);
         if (itemPermissions.length > 0) {
           return itemPermissions;
@@ -140,5 +106,42 @@ export class PermissionsSyncService {
       );
       return [];
     });
+  }
+
+  private mapSimpleIdentitySetToItemPermission(
+    simpleIdentitySet: SimpleIdentitySet,
+  ): ItemPermission | null {
+    if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
+      const isOwners = simpleIdentitySet.siteUser.loginName?.endsWith(OWNERS_SUFFIX);
+      return {
+        // Login name of the group looks like
+        // c:0o.c|federateddirectoryclaimprovider|838f7d2d-BBBB-AAAA-DDDD-7dd9d399aff7_o
+        // or
+        // c:0o.c|federateddirectoryclaimprovider|838f7d2d-BBBB-AAAA-DDDD-7dd9d399aff7
+        // Presence of _o suffix indicates the owners of the group as opposed to the members
+        type: `group${isOwners ? 'Owners' : 'Members'}`,
+        id: simpleIdentitySet.group.id,
+        name: simpleIdentitySet.group.displayName,
+      };
+    }
+
+    if (isNonNullish(simpleIdentitySet.siteGroup)) {
+      return {
+        type: 'siteGroup',
+        id: simpleIdentitySet.siteGroup.id,
+        name: simpleIdentitySet.siteGroup.displayName,
+      };
+    }
+
+    if (isNonNullish(simpleIdentitySet.user) && isNonNullish(simpleIdentitySet.siteUser)) {
+      return {
+        type: 'user',
+        id: simpleIdentitySet.user.id,
+        email: simpleIdentitySet.user.email,
+      };
+    }
+
+    this.logger.warn(`Unknown identity set: ${Object.keys(simpleIdentitySet).join(', ')}`);
+    return null;
   }
 }

@@ -67,8 +67,7 @@ export class SharepointSynchronizationService {
       }
     }
 
-    const syncDurationSeconds = (Date.now() - syncStartTime) / 1000;
-    this.logger.log(`SharePoint synchronization completed in ${syncDurationSeconds.toFixed(2)}s`);
+    this.logger.log(`SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`);
     this.isScanning = false;
   }
 }
