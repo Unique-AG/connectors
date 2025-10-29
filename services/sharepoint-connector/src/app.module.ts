@@ -11,7 +11,7 @@ import { processingConfig } from './config/processing.config';
 import { sharepointConfig } from './config/sharepoint.config';
 import { uniqueConfig } from './config/unique.config';
 import { HttpClientModule } from './http-client.module';
-import { MicrosoftApisModule } from './microsoft-apis/microsoft-apis.module';
+import { MsGraphModule } from './msgraph/msgraph.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { SharepointSynchronizationModule } from './sharepoint-synchronization/sharepoint-synchronization.module';
 import { UniqueApiModule } from './unique-api/unique-api.module';
@@ -59,7 +59,7 @@ import { Redacted } from './utils/redacted';
     HttpClientModule,
     SchedulerModule,
     SharepointSynchronizationModule,
-    MicrosoftApisModule,
+    MsGraphModule,
     UniqueApiModule,
   ],
   controllers: [],

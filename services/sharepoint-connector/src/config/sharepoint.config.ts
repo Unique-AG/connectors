@@ -4,92 +4,75 @@ import { z } from 'zod';
 import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import { Redacted } from '../utils/redacted';
 
-const oidcAuthModeConfig = z.object({
-  authMode: z.literal('oidc').describe('Authentication mode to use for Microsoft APIs'),
-});
-
-const clientSecretAuthModeConfig = z.object({
-  authMode: z.literal('client-secret').describe('Authentication mode to use for Microsoft APIs'),
-  authClientId: z.string().nonempty().describe('Azure AD application client ID'),
-  authClientSecret: z
-    .string()
-    .nonempty()
-    .transform((val) => new Redacted(val))
-    .describe('Azure AD application client secret for Microsoft APIs'),
-});
-
-const certificateAuthModeConfig = z
-  .object({
-    authMode: z.literal('certificate').describe('Authentication mode to use for Microsoft APIs'),
-    authClientId: z.string().nonempty().describe('Azure AD application client ID'),
-    authThumbprintSha1: z
-      .hex()
-      .nonempty()
-      .optional()
-      .describe('SHA1 thumbprint of the Azure AD application certificate'),
-    authThumbprintSha256: z
-      .hex()
-      .nonempty()
-      .optional()
-      .describe('SHA256 thumbprint of the Azure AD application certificate'),
-    authPrivateKeyPath: z
-      .string()
-      .nonempty()
-      .describe(
-        'Path to the private key file of the Azure AD application certificate in PEM format',
-      ),
-    authPrivateKeyPassword: z
-      .string()
-      .nonempty()
-      .optional()
-      .describe(
-        'Password for the private key file of the Azure AD application certificate (if the key is encrypted)',
-      ),
-  })
-  .refine((config) => config.authThumbprintSha1 || config.authThumbprintSha256, {
-    message:
-      'Either SHAREPOUNT_AUTH_THUMBPRINT_SHA1 or SHAREPOUNT_AUTH_THUMBPRINT_SHA256 has to be provided for certificate authentication mode',
-  });
-
-const baseConfig = z.object({
-  authTenantId: z.string().min(1).describe('Azure AD tenant ID'),
-  graphApiRateLimitPerMinute: z.coerce
-    .number()
-    .int()
-    .positive()
-    .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE)
-    .describe('Number of MS Graph API requests allowed per minute'),
-  baseUrl: z
-    .url()
-    .refine((url) => !url.endsWith('/'), {
-      message: 'Base URL must not end with a trailing slash',
-    })
-    .describe("Your company's sharepoint URL"),
-  siteIds: z
-    .string()
-    .prefault('')
-    .transform((val) =>
-      val
-        ? val
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [],
-    )
-    .describe('Comma-separated list of SharePoint site IDs to scan'),
-  syncColumnName: z
-    .string()
-    .prefault('FinanceGPTKnowledge')
-    .describe('Name of the SharePoint column indicating sync flag'),
-});
-
 const SharepointConfig = z
-  .discriminatedUnion('authMode', [
-    oidcAuthModeConfig,
-    clientSecretAuthModeConfig,
-    certificateAuthModeConfig,
-  ])
-  .and(baseConfig);
+  .object({
+    // We do not use standard boolean coercion because any non-empty string is true, while we would
+    // like any string different from "true" to be false
+    graphUseOidcAuth: z
+      .string()
+      .transform((val) => val.toLowerCase() === 'true')
+      .default(false)
+      .describe('Use OIDC/Workload Identity authentication instead of client secret'),
+    graphClientId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Azure AD application client ID for Microsoft Graph (optional when using OIDC)'),
+    graphClientSecret: z
+      .string()
+      .optional()
+      .transform((val) => (val ? new Redacted(val) : undefined))
+      .describe(
+        'Azure AD application client secret for Microsoft Graph (not required when using OIDC)',
+      ),
+    graphTenantId: z.string().min(1).describe('Azure AD tenant ID'),
+    graphApiUrl: z
+      .url()
+      .prefault('https://graph.microsoft.com')
+      .describe('Microsoft Graph API base URL'),
+    graphApiRateLimitPerMinute: z.coerce
+      .number()
+      .int()
+      .positive()
+      .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE)
+      .describe('Number of MS Graph API requests allowed per minute'),
+    baseUrl: z
+      .url()
+      .refine((url) => !url.endsWith('/'), {
+        message: 'Base URL must not end with a trailing slash',
+      })
+      .describe("Your company's sharepoint URL"),
+    siteIds: z
+      .string()
+      .prefault('')
+      .transform((val) =>
+        val
+          ? val
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : [],
+      )
+      .describe('Comma-separated list of SharePoint site IDs to scan'),
+    syncColumnName: z
+      .string()
+      .prefault('FinanceGPTKnowledge')
+      .describe('Name of the SharePoint column indicating sync flag'),
+  })
+  .refine(
+    (config) => {
+      // When not using OIDC, client credentials are required
+      if (!config.graphUseOidcAuth) {
+        return config.graphClientId && config.graphClientSecret;
+      }
+      // When using OIDC, only tenant ID is required
+      return true;
+    },
+    {
+      message:
+        'GRAPH_CLIENT_ID and GRAPH_CLIENT_SECRET are required when GRAPH_USE_OIDC_AUTH is false',
+    },
+  );
 
 export const sharepointConfig = registerConfig('sharepoint', SharepointConfig);
 

@@ -622,7 +622,7 @@ importers:
         version: 3.0.7(@azure/identity@4.12.0)
       '@microsoft/microsoft-graph-types':
         specifier: ^2.40.0
-        version: 2.43.1
+        version: 2.40.0
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -683,9 +683,6 @@ importers:
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
-      remeda:
-        specifier: ^2.32.0
-        version: 2.32.0
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
@@ -693,7 +690,7 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0
       undici:
-        specifier: ^7.16.0
+        specifier: ^7.15.0
         version: 7.16.0
       zod:
         specifier: ^4.1.5
@@ -1521,9 +1518,6 @@ packages:
 
   '@microsoft/microsoft-graph-types@2.40.0':
     resolution: {integrity: sha512-1fcPVrB/NkbNcGNfCy+Cgnvwxt6/sbIEEFgZHFBJ670zYLegENYJF8qMo7x3LqBjWX2/Eneq5BVVRCLTmlJN+g==}
-
-  '@microsoft/microsoft-graph-types@2.43.1':
-    resolution: {integrity: sha512-7r3FiJYW2qTWnl+Li8GV5MzJqPiJp27hvY98kH5V/ZMzGuIOkcJqOfIpusoIQrskLDfYk5kFT8AjpeW713qcIg==}
 
   '@microsoft/tsdoc@0.15.1':
     resolution: {integrity: sha512-4aErSrCR/On/e5G2hDP0wjooqDdauzEbIq8hIkIe5pXV0rtWJZvdCEKL0ykZxex+IxIwBp0eGeV48hQN07dXtw==}
@@ -5286,9 +5280,6 @@ packages:
     resolution: {integrity: sha512-dYqgNSZbDwkaJ2ceRd9ojCGjBq+mOm9LmtXnAnEGyHhN/5R7iDW2TRw3h+o/jCFxus3P2LfWIIiwowAjANm7IA==}
     engines: {node: '>= 0.4'}
 
-  remeda@2.32.0:
-    resolution: {integrity: sha512-BZx9DsT4FAgXDTOdgJIc5eY6ECIXMwtlSPQoPglF20ycSWigttDDe88AozEsPPT4OWk5NujroGSBC1phw5uU+w==}
-
   repeat-string@1.6.1:
     resolution: {integrity: sha512-PV0dzCYDNfRi1jCDbJzpW7jNNDRuCOG/jI5ctQcGKt/clZD+YcPS3yIlWuTJMmESC8aevCFmWJy5wjAFgNqN6w==}
     engines: {node: '>=0.10'}
@@ -5893,10 +5884,6 @@ packages:
   type-fest@0.21.3:
     resolution: {integrity: sha512-t0rzBq87m3fVcduHDUFhKmyyX+9eo6WQjZvf51Ea/M0Q7+T374Jp1aUiyUl0GKxp8M/OETVHSDvmkyPgvX+X2w==}
     engines: {node: '>=10'}
-
-  type-fest@4.41.0:
-    resolution: {integrity: sha512-TeTSQ6H5YHvpqVwBRcnLDCBnDOHWYu7IvGbHT6N8AOymcr9PJGjc1GTtiWZTYg0NCgYwvnYWEkVChQAr9bjfwA==}
-    engines: {node: '>=16'}
 
   type-is@1.6.18:
     resolution: {integrity: sha512-TkRKr9sUTxEH8MdfuCSP7VizJyzRNMjj2J2do2Jr3Kym598JVdEksuzPQCnlFPW4ky9Q+iA+ma9BGm06XQBy8g==}
@@ -6937,8 +6924,6 @@ snapshots:
       '@azure/identity': 4.12.0
 
   '@microsoft/microsoft-graph-types@2.40.0': {}
-
-  '@microsoft/microsoft-graph-types@2.43.1': {}
 
   '@microsoft/tsdoc@0.15.1': {}
 
@@ -11333,10 +11318,6 @@ snapshots:
       gopd: 1.2.0
       set-function-name: 2.0.2
 
-  remeda@2.32.0:
-    dependencies:
-      type-fest: 4.41.0
-
   repeat-string@1.6.1: {}
 
   require-directory@2.1.1: {}
@@ -11999,8 +11980,6 @@ snapshots:
       turbo-windows-arm64: 2.5.6
 
   type-fest@0.21.3: {}
-
-  type-fest@4.41.0: {}
 
   type-is@1.6.18:
     dependencies:

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Client } from 'undici';
 import { Config } from './config';
-import { SHAREPOINT_REST_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.tokens';
+import { SHAREPOINT_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.tokens';
 
 @Module({
   imports: [ConfigModule],
@@ -20,10 +20,10 @@ import { SHAREPOINT_REST_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.t
       inject: [ConfigService],
     },
     {
-      provide: SHAREPOINT_REST_HTTP_CLIENT,
+      provide: SHAREPOINT_HTTP_CLIENT,
       useFactory: (configService: ConfigService<Config, true>) => {
-        const sharePointBaseUrl = configService.get('sharepoint.baseUrl', { infer: true });
-        return new Client(sharePointBaseUrl, {
+        const apiUrl = configService.get('sharepoint.graphApiUrl', { infer: true });
+        return new Client(apiUrl, {
           bodyTimeout: 30000,
           headersTimeout: 30000,
         });
@@ -31,6 +31,6 @@ import { SHAREPOINT_REST_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.t
       inject: [ConfigService],
     },
   ],
-  exports: [UNIQUE_HTTP_CLIENT, SHAREPOINT_REST_HTTP_CLIENT],
+  exports: [UNIQUE_HTTP_CLIENT, SHAREPOINT_HTTP_CLIENT],
 })
 export class HttpClientModule {}

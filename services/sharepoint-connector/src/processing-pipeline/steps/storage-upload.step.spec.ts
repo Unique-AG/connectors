@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
+import type { DriveItem } from '../../msgraph/types/sharepoint.types';
 import type { ProcessingContext } from '../types/processing-context';
 import { StorageUploadStep } from './storage-upload.step';
 

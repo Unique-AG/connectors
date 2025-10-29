@@ -1,4 +1,4 @@
-import type { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type { SharepointContentItem } from '../../msgraph/types/sharepoint-content-item.interface';
 import type { IngestionApiResponse } from '../../unique-api/unique-api.types';
 
 export interface ProcessingContext {

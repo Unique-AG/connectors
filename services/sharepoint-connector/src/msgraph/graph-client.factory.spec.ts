@@ -1,12 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
+import { GraphAuthenticationService } from './auth/graph-authentication.service';
 import { GraphClientFactory } from './graph-client.factory';
 
 describe('GraphClientFactory', () => {
   let factory: GraphClientFactory;
-  let mockAuthProvider: MicrosoftAuthenticationService;
+  let mockAuthProvider: GraphAuthenticationService;
 
   beforeEach(async () => {
     mockAuthProvider = {
@@ -22,7 +22,7 @@ describe('GraphClientFactory', () => {
           return undefined;
         },
       }))
-      .mock(MicrosoftAuthenticationService)
+      .mock(GraphAuthenticationService)
       .impl(() => mockAuthProvider)
       .compile();
 
@@ -52,7 +52,7 @@ describe('GraphClientFactory', () => {
           return undefined;
         },
       }))
-      .mock(MicrosoftAuthenticationService)
+      .mock(GraphAuthenticationService)
       .impl(() => mockAuthProvider)
       .compile();
 
@@ -71,7 +71,7 @@ describe('GraphClientFactory', () => {
           return undefined;
         },
       }))
-      .mock(MicrosoftAuthenticationService)
+      .mock(GraphAuthenticationService)
       .impl(() => mockAuthProvider)
       .compile();
 

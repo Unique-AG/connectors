@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
-import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { AspxProcessingStep } from './steps/aspx-processing.step';

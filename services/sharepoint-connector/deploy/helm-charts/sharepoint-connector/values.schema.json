@@ -57,57 +57,35 @@
               "type": "string",
               "description": "Column name for synchronization"
             },
-            "auth": {
+            "graph": {
               "type": "object",
-              "description": "SharePoint authentication configuration",
-              "required": ["mode", "tenantId"],
+              "description": "Microsoft Graph API configuration for Sharepoint",
+              "required": ["tenantId", "apiUrl"],
               "properties": {
-                "mode": {
-                  "type": "string",
-                  "description": "Authentication mode",
-                  "enum": ["oidc", "client-secret", "certificate"]
-                },
                 "tenantId": {
                   "type": "string",
                   "description": "Azure AD tenant ID"
                 },
-                "clientId": {
-                  "type": ["string", "null"],
-                  "description": "Azure AD application client ID"
+                "useOidcAuth": {
+                  "type": "boolean",
+                  "description": "Enable OIDC authentication"
                 },
-                "clientSecret": {
-                  "type": ["string", "null"],
-                  "description": "Azure AD application client secret"
+                "apiUrl": {
+                  "type": "string",
+                  "description": "Microsoft Graph API URL"
                 },
-                "privateKeyPath": {
-                  "type": ["string", "null"],
-                  "description": "Path to the private key file of the Azure AD application certificate in PEM format"
-                },
-                "privateKeyPassword": {
-                  "type": ["string", "null"],
-                  "description": "Password for the private key file of the Azure AD application certificate (if the key is encrypted)"
-                },
-                "thumbprintSha1": {
-                  "type": ["string", "null"],
-                  "description": "SHA1 thumbprint of the Azure AD application certificate"
-                },
-                "thumbprintSha256": {
-                  "type": ["string", "null"],
-                  "description": "SHA256 thumbprint of the Azure AD application certificate"
-                }
-              },
-              "additionalProperties": false
-            },
-            "graph": {
-              "type": "object",
-              "description": "Microsoft Graph API configuration",
-              "required": [],
-              "properties": {
                 "apiRateLimitPerMinute": {
                   "type": "integer",
                   "description": "Rate limiting for Graph API requests per minute"
                 },
-                "additionalProperties": false
+                "clientId": {
+                  "type": ["string", "null"],
+                  "description": "Microsoft Graph client ID"
+                },
+                "clientSecret": {
+                  "type": ["string", "null"],
+                  "description": "Microsoft Graph client secret"
+                }
               },
               "additionalProperties": false
             }

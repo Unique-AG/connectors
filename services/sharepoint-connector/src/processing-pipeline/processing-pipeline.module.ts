@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { MicrosoftApisModule } from '../microsoft-apis/microsoft-apis.module';
+import { MsGraphModule } from '../msgraph/msgraph.module';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { FileProcessingOrchestratorService } from './file-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
@@ -11,7 +11,7 @@ import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
 import { StorageUploadStep } from './steps/storage-upload.step';
 
 @Module({
-  imports: [ConfigModule, MicrosoftApisModule, UniqueApiModule],
+  imports: [ConfigModule, MsGraphModule, UniqueApiModule],
   providers: [
     ProcessingPipelineService,
     FileProcessingOrchestratorService,

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
-import { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
+import { ListItem } from '../../msgraph/types/sharepoint.types';
 import { getTitle } from '../../utils/list-item.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';

@@ -1,4 +1,4 @@
-import { ModerationStatusValue } from '../../../constants/moderation-status.constants';
+import { ModerationStatusValue } from '../../constants/moderation-status.constants';
 
 export interface GraphApiErrorResponse {
   statusCode?: number;
@@ -141,34 +141,4 @@ export interface DriveItemFields {
   ItemChildCount: string;
   FolderChildCount: string;
   [key: string]: unknown;
-}
-
-// SimpleIdentitySet and SimplePermission types are built based on the response of the MS Graph API.
-// We couldn't use the type from @microsoft/microsoft-graph-types because it seems to be incomplete.
-// We need email of user the permission belongs to and while it is present in the response, it seems
-// to be entirely omitted in the typings.
-export interface SimpleIdentitySet {
-  group?: {
-    id: string;
-    displayName: string;
-  };
-  siteGroup?: {
-    id: string;
-    displayName: string;
-  };
-  user?: {
-    id: string;
-    email: string;
-  };
-  siteUser?: {
-    id: string;
-    email: string;
-    loginName: string;
-  };
-}
-
-export interface SimplePermission {
-  id: string;
-  grantedToV2?: SimpleIdentitySet;
-  grantedToIdentitiesV2?: SimpleIdentitySet[];
 }

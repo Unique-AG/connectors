@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
-import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
 import { normalizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
