@@ -8,11 +8,11 @@ import { Config } from '../config';
 import {
   INGESTION_SOURCE_KIND,
   INGESTION_SOURCE_NAME,
-  PATH_BASED_INGESTION,
 } from '../constants/ingestion.constants';
 import { UniqueOwnerType } from '../constants/unique-owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
 import { normalizeError } from '../utils/normalize-error';
+import { getScopeIdForIngestion } from './ingestion.util';
 import {
   type ContentRegistrationRequest,
   type FileDiffItem,
@@ -80,8 +80,9 @@ export class UniqueApiService {
     uniqueToken: string,
     partialKey: string,
   ): Promise<FileDiffResponse> {
-    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
+    const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
+    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     const fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
     const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
 
@@ -89,6 +90,7 @@ export class UniqueApiService {
     const path = url.pathname + url.search;
 
     const basePath = rootScopeName || sharepointBaseUrl;
+    const scopeForRequest = getScopeIdForIngestion(ingestionMode, scopeId);
 
     const diffRequest: FileDiffRequest = {
       basePath,
@@ -96,7 +98,7 @@ export class UniqueApiService {
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       fileList,
-      scope: scopeId ?? PATH_BASED_INGESTION, // todo change to check the SYNC_MODE env variable it can be FLAT or RECURSIVE
+      scope: scopeForRequest,
     };
 
     this.logger.debug(`File diff request payload: ${JSON.stringify(diffRequest, null, 2)}`);

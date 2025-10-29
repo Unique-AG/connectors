@@ -6,9 +6,10 @@ import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import {
   INGESTION_SOURCE_KIND,
   INGESTION_SOURCE_NAME,
-  PATH_BASED_INGESTION,
+  IngestionMode,
 } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import { getScopeIdForIngestion } from '../../unique-api/ingestion.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
@@ -31,11 +32,12 @@ export class ContentRegistrationStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
+    const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
 
-    const isPathBasedIngestion = !scopeId;
+    const scopeIdForRequest = getScopeIdForIngestion(ingestionMode, scopeId);
 
     const itemKey = buildIngetionItemKey(context.pipelineItem);
     const baseUrl = rootScopeName || sharepointBaseUrl;
@@ -45,11 +47,11 @@ export class ContentRegistrationStep implements IPipelineStep {
       title: context.pipelineItem.fileName,
       mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
       ownerType: UniqueOwnerType.Scope,
-      scopeId: isPathBasedIngestion ? PATH_BASED_INGESTION : scopeId,
+      scopeId: scopeIdForRequest,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
-      ...(isPathBasedIngestion && {
+      ...(ingestionMode === IngestionMode.Recursive && {
         url: context.knowledgeBaseUrl,
         baseUrl,
       }),

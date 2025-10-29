@@ -5,9 +5,10 @@ import { Config } from '../../config';
 import {
   INGESTION_SOURCE_KIND,
   INGESTION_SOURCE_NAME,
-  PATH_BASED_INGESTION,
+  IngestionMode,
 } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import { getScopeIdForIngestion } from '../../unique-api/ingestion.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { normalizeError } from '../../utils/normalize-error';
@@ -28,10 +29,10 @@ export class IngestionFinalizationStep implements IPipelineStep {
   ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
-    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
+    const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
+    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
-    const isPathBasedIngestion = !scopeId;
     const stepStartTime = Date.now();
 
     assert.ok(
@@ -42,6 +43,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
     const fileKey = buildIngetionItemKey(context.pipelineItem);
 
     const baseUrl = rootScopeName || sharepointBaseUrl;
+    const scopeIdForRequest = getScopeIdForIngestion(ingestionMode, scopeId);
 
     const ingestionFinalizationRequest = {
       key: fileKey,
@@ -49,12 +51,12 @@ export class IngestionFinalizationStep implements IPipelineStep {
       mimeType: context.registrationResponse.mimeType,
       ownerType: context.registrationResponse.ownerType,
       byteSize: context.registrationResponse.byteSize,
-      scopeId: isPathBasedIngestion ? PATH_BASED_INGESTION : scopeId,
+      scopeId: scopeIdForRequest,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceName: INGESTION_SOURCE_NAME,
       sourceKind: INGESTION_SOURCE_KIND,
       fileUrl: context.registrationResponse.readUrl,
-      ...(isPathBasedIngestion && {
+      ...(ingestionMode === IngestionMode.Recursive && {
         url: context.knowledgeBaseUrl,
         baseUrl,
       }),
