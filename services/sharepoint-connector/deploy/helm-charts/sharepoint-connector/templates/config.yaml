@@ -7,14 +7,27 @@ metadata:
   labels:
     {{- include "chart.labels" . | nindent 4 }}
 data:
-  # Sharepoint config
-  SHAREPOINT_GRAPH_USE_OIDC_AUTH: {{ .Values.connectorConfig.sharepoint.graph.useOidcAuth | quote }}
-  {{- if .Values.connectorConfig.sharepoint.graph.clientId | quote }}
-  SHAREPOINT_GRAPH_CLIENT_ID: {{ .Values.connectorConfig.sharepoint.graph.clientId | quote }}
+  # Sharepoint authentication config
+  SHAREPOINT_AUTH_MODE: {{ .Values.connectorConfig.sharepoint.auth.mode | quote }}
+  SHAREPOINT_AUTH_TENANT_ID: {{ .Values.connectorConfig.sharepoint.auth.tenantId | quote }}
+  {{- if eq .Values.connectorConfig.sharepoint.auth.mode "client-secret" }}
+  SHAREPOINT_AUTH_CLIENT_ID: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
   {{- end }}
-  SHAREPOINT_GRAPH_API_URL: {{ .Values.connectorConfig.sharepoint.graph.apiUrl | quote }}
-  SHAREPOINT_GRAPH_TENANT_ID: {{ .Values.connectorConfig.sharepoint.graph.tenantId | quote }}
-  {{- if .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute | quote }}
+  {{- if eq .Values.connectorConfig.sharepoint.auth.mode "certificate" }}
+  SHAREPOINT_AUTH_CLIENT_ID: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
+  SHAREPOINT_AUTH_PRIVATE_KEY_PATH: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPath | quote }}
+  {{- if .Values.connectorConfig.sharepoint.auth.privateKeyPassword }}
+  SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPassword | quote }}
+  {{- end }}
+  {{- if .Values.connectorConfig.sharepoint.auth.thumbprintSha1 }}
+  SHAREPOINT_AUTH_THUMBPRINT_SHA1: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha1 | quote }}
+  {{- end }}
+  {{- if .Values.connectorConfig.sharepoint.auth.thumbprintSha256 }}
+  SHAREPOINT_AUTH_THUMBPRINT_SHA256: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha256 | quote }}
+  {{- end }}
+  {{- end }}
+  # General SharePoint config
+  {{- if .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute }}
   SHAREPOINT_GRAPH_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute | quote }}
   {{- end }}
   SHAREPOINT_BASE_URL: {{ .Values.connectorConfig.sharepoint.baseUrl | quote }}

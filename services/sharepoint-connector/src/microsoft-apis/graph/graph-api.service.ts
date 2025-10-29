@@ -4,10 +4,10 @@ import type { Drive, List } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
-import { Config } from '../config';
-import { GRAPH_API_PAGE_SIZE } from '../constants/defaults.constants';
-import { getTitle } from '../utils/list-item.util';
-import { normalizeError } from '../utils/normalize-error';
+import { Config } from '../../config';
+import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
+import { getTitle } from '../../utils/list-item.util';
+import { normalizeError } from '../../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 import {
@@ -15,6 +15,7 @@ import {
   GraphApiResponse,
   ListItem,
   ListItemDetailsResponse,
+  SimplePermission,
   SitePageContent,
 } from './types/sharepoint.types';
 import { SharepointContentItem } from './types/sharepoint-content-item.interface';
@@ -45,6 +46,7 @@ export class GraphApiService {
   }
 
   public async getAllSiteItems(siteId: string): Promise<SharepointContentItem[]> {
+    const logPrefix = `[SiteId: ${siteId}] `;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
       this.getAspxPagesForSite(siteId),
       this.getAllFilesForSite(siteId),
@@ -55,17 +57,17 @@ export class GraphApiService {
     if (aspxPagesResult.status === 'fulfilled') {
       sharepointContentItemsToSync.push(...aspxPagesResult.value);
     } else {
-      this.logger.error(`Failed to scan pages for site ${siteId}:`, aspxPagesResult.reason);
+      this.logger.error(`${logPrefix} Failed to scan pages:`, aspxPagesResult.reason);
     }
 
     if (filesResult.status === 'fulfilled') {
       sharepointContentItemsToSync.push(...filesResult.value);
     } else {
-      this.logger.error(`Failed to scan drive files for site ${siteId}:`, filesResult.reason);
+      this.logger.error(`${logPrefix} Failed to scan drive files:`, filesResult.reason);
     }
 
     this.logger.log(
-      `Completed scan for site ${siteId}. Found ${sharepointContentItemsToSync.length} total files marked for synchronizing.`,
+      `${logPrefix} Completed scan. Found ${sharepointContentItemsToSync.length} total items marked for synchronization.`,
     );
     return sharepointContentItemsToSync;
   }
@@ -268,6 +270,38 @@ export class GraphApiService {
       this.logger.error(`Failed to fetch site page content for item ${itemId}:`, error);
       throw error;
     }
+  }
+
+  public async getDriveItemPermissions(
+    driveId: string,
+    itemId: string,
+  ): Promise<SimplePermission[]> {
+    return await this.paginateGraphApiRequest<SimplePermission>(
+      `/drives/${driveId}/items/${itemId}/permissions`,
+      (url) =>
+        this.graphClient
+          .api(url)
+          .select('id,grantedToV2,grantedToIdentitiesV2')
+          .top(GRAPH_API_PAGE_SIZE)
+          .get(),
+    );
+  }
+
+  public async getListItemPermissions(
+    siteId: string,
+    listId: string,
+    itemId: string,
+  ): Promise<SimplePermission[]> {
+    return await this.paginateGraphApiRequest<SimplePermission>(
+      `/sites/${siteId}/lists/${listId}/items/${itemId}/permissions`,
+      (url) =>
+        this.graphClient
+          .api(url)
+          .select('id,grantedToV2,grantedToIdentitiesV2')
+          .version('beta')
+          .top(GRAPH_API_PAGE_SIZE)
+          .get(),
+    );
   }
 
   private async getSiteWebUrl(siteId: string): Promise<string> {

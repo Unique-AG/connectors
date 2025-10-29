@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { INGESTION_SOURCE_KIND } from '../../constants/ingestion.constants';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import type { ListItem } from '../../msgraph/types/sharepoint.types';
+import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import type { ProcessingContext } from '../types/processing-context';

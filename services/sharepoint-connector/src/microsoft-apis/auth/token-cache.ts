@@ -1,7 +1,4 @@
-export interface TokenAcquisitionResult {
-  token: string;
-  expiresAt: number;
-}
+import { TokenAcquisitionResult } from './types';
 
 export class TokenCache {
   // We keep the promise and cached value separately to avoid race condition when the token expires.

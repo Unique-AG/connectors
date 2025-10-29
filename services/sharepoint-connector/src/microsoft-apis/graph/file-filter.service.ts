@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Config } from '../config';
-import { isModerationStatusApproved } from '../constants/moderation-status.constants';
+import { Config } from '../../config';
+import { isModerationStatusApproved } from '../../constants/moderation-status.constants';
 import { DriveItem, ListItem } from './types/sharepoint.types';
 
 @Injectable()
