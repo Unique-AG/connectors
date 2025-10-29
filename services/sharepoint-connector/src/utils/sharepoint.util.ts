@@ -102,7 +102,7 @@ export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): 
 
 export function buildIngetionItemKey(sharepointContentItem: SharepointContentItem): string {
   if (sharepointContentItem.itemType === 'listItem') {
-    return `${sharepointContentItem.siteId}/${sharepointContentItem.driveId}/${sharepointContentItem.item.id}`; // TODO check if they always are reingested
+    return `${sharepointContentItem.siteId}/${sharepointContentItem.driveId}/${sharepointContentItem.item.id}`;
   }
 
   return `${sharepointContentItem.siteId}/${sharepointContentItem.item.id}`;
