@@ -84,7 +84,7 @@ export class UniqueApiService {
     const scopeId = this.configService.get('unique.scopeId', { infer: true });
     const fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
     const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
-    
+
     const url = new URL(fileDiffUrl);
     const path = url.pathname + url.search;
 

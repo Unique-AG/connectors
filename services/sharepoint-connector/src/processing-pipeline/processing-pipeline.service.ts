@@ -49,7 +49,6 @@ export class ProcessingPipelineService {
       pipelineItem,
       startTime,
       knowledgeBaseUrl: getItemUrl(pipelineItem, rootScopeName),
-      // knowledgeBaseUrl: buildKnowledgeBaseUrl(pipelineItem, rootScopeName),
       mimeType: this.resolveMimeType(pipelineItem),
     };
 

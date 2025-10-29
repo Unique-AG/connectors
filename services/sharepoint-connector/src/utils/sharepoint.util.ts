@@ -102,18 +102,21 @@ function buildUrl(baseUrlRaw: string, folderPathRaw: string, itemName: string): 
 }
 
 /*
-* We are reading the webUrl from item.listItem because it contains the real path to the item.
-* listItem.webUrl example: https://[tenant].sharepoint.com/sites/[site]/[library]/[path]/[filename]
-* item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
-* We are adding ?web=1 to the url to get the web view of the item.
-*/
-export function getItemUrl(sharepointContentItem: SharepointContentItem, rootScopeName?: string): string {
+ * We are reading the webUrl from item.listItem because it contains the real path to the item.
+ * listItem.webUrl example: https://[tenant].sharepoint.com/sites/[site]/[library]/[path]/[filename]
+ * item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
+ * We are adding ?web=1 to the url to get the web view of the item.
+ */
+export function getItemUrl(
+  sharepointContentItem: SharepointContentItem,
+  rootScopeName?: string,
+): string {
   let url: string;
 
   if (sharepointContentItem.itemType === 'driveItem') {
     const baseUrl = sharepointContentItem.item.listItem?.webUrl;
     // if webUrl from listItem is not present we fallback to webUrl from driveItem
-    url = baseUrl ? `${baseUrl}?web=1` : sharepointContentItem.item.webUrl
+    url = baseUrl ? `${baseUrl}?web=1` : sharepointContentItem.item.webUrl;
   } else if (sharepointContentItem.itemType === 'listItem') {
     url = `${sharepointContentItem.item.webUrl}?web=1`;
   } else {
@@ -123,7 +126,7 @@ export function getItemUrl(sharepointContentItem: SharepointContentItem, rootSco
   // if we do not remove the protocol ingestion will create a scope with the name: my-scope/https://uniqueapp.sharepoint.com instead of my-scope
   const urlWithNoProtocol = stripProtocol(url);
 
-  return rootScopeName ? `${rootScopeName}/${urlWithNoProtocol}` : url
+  return rootScopeName ? `${rootScopeName}/${urlWithNoProtocol}` : url;
 }
 
 export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): string {
@@ -135,9 +138,8 @@ export function buildIngetionItemKey(sharepointContentItem: SharepointContentIte
     return `${sharepointContentItem.siteId}/${sharepointContentItem.driveId}/${sharepointContentItem.item.id}`; // TODO check if they always are reingested
   }
 
-  return sharepointContentItem.siteId + '/' + sharepointContentItem.item.id;
+  return `${sharepointContentItem.siteId}/${sharepointContentItem.item.id}`;
 }
-
 
 function stripDomain(url: string): string {
   try {
