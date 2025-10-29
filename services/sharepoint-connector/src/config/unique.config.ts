@@ -7,12 +7,6 @@ import { Redacted } from '../utils/redacted';
 
 const UniqueConfig = z
   .object({
-    uniqueApiVersion: z
-      .enum(['v44', 'v46'])
-      .prefault('v46')
-      .describe(
-        'Unique API version. V44 does not support rootScope and structuredPath. V46 and later support these features for proper scope and path-based ingestion.',
-      ),
     ingestionMode: z
       .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
       .default(IngestionMode.Recursive)
@@ -56,7 +50,7 @@ const UniqueConfig = z
   .refine(
     (config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId,
     {
-      message: 'scopeId is required when ingestionMode is FLAT',
+      message: 'scopeId is required for FLAT ingestion mode',
       path: ['scopeId'],
     },
   );

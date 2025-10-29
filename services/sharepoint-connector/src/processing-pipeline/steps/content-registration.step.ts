@@ -42,7 +42,7 @@ export class ContentRegistrationStep implements IPipelineStep {
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
 
-    const scopeIdForRequest = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
+    const scopeId = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
 
     const itemKey = buildIngetionItemKey(context.pipelineItem);
     const baseUrl = this.rootScopeName || this.sharepointBaseUrl;
@@ -52,7 +52,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       title: context.pipelineItem.fileName,
       mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
       ownerType: UniqueOwnerType.Scope,
-      scopeId: scopeIdForRequest,
+      scopeId: scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,

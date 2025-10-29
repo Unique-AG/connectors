@@ -59,32 +59,41 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
   return normalizeSlashes(siteId);
 }
 
-/*
+/**
+ * Gets the web URL for a SharePoint item, with optional scope prefix.
+ *
  * We are reading the webUrl from item.listItem because it contains the real path to the item.
  * listItem.webUrl example: https://[tenant].sharepoint.com/sites/[site]/[library]/[path]/[filename]
  * item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
  * We are adding ?web=1 to the url to get the web view of the item.
+ *
+ * When rootScopeName is provided, the protocol is stripped from the URL to prevent
+ * creating scopes like "my-scope/https://uniqueapp.sharepoint.com" instead of "my-scope"
  */
 export function getItemUrl(
   sharepointContentItem: SharepointContentItem,
   rootScopeName?: string,
 ): string {
-  let url: string;
+  const url = getBaseUrl(sharepointContentItem);
 
-  if (sharepointContentItem.itemType === 'driveItem') {
-    const baseUrl = sharepointContentItem.item.listItem?.webUrl;
-    // if webUrl from listItem is not present we fallback to webUrl from driveItem
-    url = baseUrl ? `${baseUrl}?web=1` : sharepointContentItem.item.webUrl;
-  } else if (sharepointContentItem.itemType === 'listItem') {
-    url = `${sharepointContentItem.item.webUrl}?web=1`;
-  } else {
-    assert.fail('Invalid pipeline item type');
+  return rootScopeName
+    ? `${rootScopeName}/${stripProtocol(url)}`
+    : url;
+}
+
+function getBaseUrl(item: SharepointContentItem): string {
+  if (item.itemType === 'driveItem') {
+    const listItemUrl = item.item.listItem?.webUrl;
+    return listItemUrl
+      ? `${listItemUrl}?web=1`
+      : item.item.webUrl;
   }
 
-  // if we do not remove the protocol ingestion will create a scope with the name: my-scope/https://uniqueapp.sharepoint.com instead of my-scope
-  const urlWithNoProtocol = stripProtocol(url);
+  if (item.itemType === 'listItem') {
+    return `${item.item.webUrl}?web=1`;
+  }
 
-  return rootScopeName ? `${rootScopeName}/${urlWithNoProtocol}` : url;
+  assert.fail('Invalid pipeline item type');
 }
 
 export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): string {

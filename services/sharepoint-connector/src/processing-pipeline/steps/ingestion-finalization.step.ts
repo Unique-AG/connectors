@@ -48,7 +48,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
     const fileKey = buildIngetionItemKey(context.pipelineItem);
 
     const baseUrl = this.rootScopeName || this.sharepointBaseUrl;
-    const scopeIdForRequest = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
+    const scopeId = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
 
     const ingestionFinalizationRequest = {
       key: fileKey,
@@ -56,7 +56,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
       mimeType: context.registrationResponse.mimeType,
       ownerType: context.registrationResponse.ownerType,
       byteSize: context.registrationResponse.byteSize,
-      scopeId: scopeIdForRequest,
+      scopeId: scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceName: INGESTION_SOURCE_NAME,
       sourceKind: INGESTION_SOURCE_KIND,
