@@ -62,12 +62,16 @@ export class ContentRegistrationStep implements IPipelineStep {
       }),
     };
     this.logger.debug(
-      `contentRegistrationRequest: ${JSON.stringify({
-        url: contentRegistrationRequest.url,
-        baseUrl: contentRegistrationRequest.baseUrl,
-        key: contentRegistrationRequest.key,
-        sourceName: contentRegistrationRequest.sourceName,
-      }, null, 4)}`,
+      `contentRegistrationRequest: ${JSON.stringify(
+        {
+          url: contentRegistrationRequest.url,
+          baseUrl: contentRegistrationRequest.baseUrl,
+          key: contentRegistrationRequest.key,
+          sourceName: contentRegistrationRequest.sourceName,
+        },
+        null,
+        4,
+      )}`,
     );
 
     try {

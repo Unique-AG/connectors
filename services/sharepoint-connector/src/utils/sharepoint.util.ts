@@ -76,17 +76,13 @@ export function getItemUrl(
 ): string {
   const url = getBaseUrl(sharepointContentItem);
 
-  return rootScopeName
-    ? `${rootScopeName}/${stripProtocol(url)}`
-    : url;
+  return rootScopeName ? `${rootScopeName}/${stripProtocol(url)}` : url;
 }
 
 function getBaseUrl(item: SharepointContentItem): string {
   if (item.itemType === 'driveItem') {
     const listItemUrl = item.item.listItem?.webUrl;
-    return listItemUrl
-      ? `${listItemUrl}?web=1`
-      : item.item.webUrl;
+    return listItemUrl ? `${listItemUrl}?web=1` : item.item.webUrl;
   }
 
   if (item.itemType === 'listItem') {

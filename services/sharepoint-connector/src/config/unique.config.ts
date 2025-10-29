@@ -47,13 +47,10 @@ const UniqueConfig = z
       .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
       .describe('Number of Unique API requests allowed per minute'),
   })
-  .refine(
-    (config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId,
-    {
-      message: 'scopeId is required for FLAT ingestion mode',
-      path: ['scopeId'],
-    },
-  );
+  .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {
+    message: 'scopeId is required for FLAT ingestion mode',
+    path: ['scopeId'],
+  });
 
 export const uniqueConfig = registerConfig('unique', UniqueConfig);
 
