@@ -11,11 +11,10 @@ const UniqueConfig = z.object({
     .describe(
       'Unique API version. V44 does not support rootScope and structuredPath. V46 and later support these features for proper scope and path-based ingestion.',
     ),
-  syncMode: z
+  ingestionMode: z
     .enum(['FLAT', 'RECURSIVE'])
-    .prefault('RECURSIVE')
     .describe(
-      'Synchronization mode: FLAT syncs all files to a single root scope/folder, RECURSIVE maintains the folder hierarchy.',
+      'Ingestion mode: FLAT ingests all files to a single root scope/folder, RECURSIVE maintains the folder hierarchy.',
     ),
   scopeId: z
     .string()

@@ -37,7 +37,7 @@ data:
   {{- if .Values.connectorConfig.unique.scopeId }}
   UNIQUE_SCOPE_ID: {{ .Values.connectorConfig.unique.scopeId | quote }}
   {{- end }}
-  UNIQUE_SYNC_MODE: {{ .Values.connectorConfig.unique.syncMode | quote }}
+  UNIQUE_INGESTION_MODE: {{ .Values.connectorConfig.unique.ingestionMode | quote }}
   {{- if .Values.connectorConfig.unique.rootScopeName }}
   UNIQUE_ROOT_SCOPE_NAME: {{ .Values.connectorConfig.unique.rootScopeName | quote }}
   {{- end }}

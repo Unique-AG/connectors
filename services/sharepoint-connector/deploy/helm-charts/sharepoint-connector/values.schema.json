@@ -117,7 +117,7 @@
         "unique": {
           "type": "object",
           "description": "Unique platform configuration",
-          "required": ["fileDiffUrl", "ingestionGraphqlUrl", "zitadel"],
+          "required": ["fileDiffUrl", "ingestionGraphqlUrl", "ingestionMode", "zitadel"],
           "properties": {
             "fileDiffUrl": {
               "type": "string",
@@ -127,7 +127,7 @@
               "type": "string",
               "description": "GraphQL URL for data ingestion"
             },
-            "syncMode": {
+            "ingestionMode": {
               "type": "string",
               "enum": ["FLAT", "RECURSIVE"],
               "description": "Synchronization mode: FLAT or RECURSIVE"
