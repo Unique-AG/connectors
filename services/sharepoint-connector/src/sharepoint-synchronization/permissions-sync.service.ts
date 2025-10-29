@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { isNonNullish } from 'remeda';
-import { GraphApiService } from '../msgraph/graph-api.service';
-import { SimpleIdentitySet, SimplePermission } from '../msgraph/types/sharepoint.types';
-import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
+import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
+import {
+  SimpleIdentitySet,
+  SimplePermission,
+} from '../microsoft-apis/graph/types/sharepoint.types';
+import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { elapsedSecondsLog } from '../utils/timing.util';
 
 const OWNERS_SUFFIX = '_o';

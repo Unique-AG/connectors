@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ModerationStatus } from '../constants/moderation-status.constants';
+import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { FileFilterService } from './file-filter.service';
 import type { DriveItem as CustomDriveItem } from './types/sharepoint.types';
 

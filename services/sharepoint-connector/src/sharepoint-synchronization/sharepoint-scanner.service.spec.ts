@@ -1,9 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GraphApiService } from '../msgraph/graph-api.service';
-import type { DriveItem } from '../msgraph/types/sharepoint.types';
-import type { SharepointContentItem } from '../msgraph/types/sharepoint-content-item.interface';
+import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
+import type { DriveItem } from '../microsoft-apis/graph/types/sharepoint.types';
+import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ContentSyncService } from './content-sync.service';
 import { PermissionsSyncService } from './permissions-sync.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
