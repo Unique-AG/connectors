@@ -23,6 +23,7 @@ resource "azuread_application" "sharepoint_connector" {
 }
 
 resource "azuread_service_principal" "sharepoint_connector" {
+  count        = var.service_principal_configuration_enabled ? 1 : 0
   client_id    = azuread_application.sharepoint_connector.client_id
   use_existing = true
 }
@@ -33,9 +34,9 @@ resource "time_sleep" "wait_for_graph_propagation" {
 }
 
 resource "azuread_app_role_assignment" "grant_admin_consent" {
-  for_each            = toset(var.graph_roles)
+  for_each            = var.service_principal_configuration_enabled ? toset(var.graph_roles) : toset([])
   app_role_id         = azuread_service_principal.msgraph.app_role_ids[each.value]
-  principal_object_id = azuread_service_principal.sharepoint_connector.object_id
+  principal_object_id = azuread_service_principal.sharepoint_connector[0].object_id
   resource_object_id  = azuread_service_principal.msgraph.object_id
 
   depends_on = [time_sleep.wait_for_graph_propagation]
@@ -50,4 +51,15 @@ resource "azuread_application_federated_identity_credential" "sharepoint_connect
   audiences      = each.value.audiences
   issuer         = each.value.issuer
   subject        = each.value.subject
+}
+
+resource "azuread_application_certificate" "sharepoint_connector_certificate" {
+  for_each = var.certificates
+
+  application_id = azuread_application.sharepoint_connector.id
+  type           = "AsymmetricX509Cert"
+  encoding       = "hex"
+  value          = each.value.certificate
+  end_date       = each.value.end_date
+  start_date     = each.value.start_date
 }

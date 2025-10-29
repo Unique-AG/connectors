@@ -10,6 +10,12 @@ variable "sign_in_audience" {
   default     = "AzureADMultipleOrgs"
 }
 
+variable "service_principal_configuration_enabled" {
+  description = "Whether to configure a service principal for the Azure AD application. Might get disabled in certain cross-tenant scenarios where the counter-tenant creates the service principal."
+  default     = true
+  type        = bool
+}
+
 variable "graph_roles" {
   description = "A list of Graph API roles to assign to the application."
   type        = list(string)
@@ -30,4 +36,14 @@ variable "federated_identity_credentials" {
   #  issuer      = "https://switzerlandnorth.oic.prod-aks.azure.com/<my_entra_tenant_id>/<my_aks_cluster_guid>/"
   #  subject     = "system:serviceaccount:<namespace>:<serviceaccount-name>"
   # }
+}
+
+variable "certificates" {
+  description = "A map of Entra application certificates for the Azure AD application. Each key is the display name and the value contains the certificate configuration."
+  type = map(object({
+    certificate = string
+    end_date    = string
+    start_date  = string
+  }))
+  default = {}
 }
