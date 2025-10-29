@@ -25,12 +25,6 @@ const UniqueConfig = z
       .describe(
         'Name of the root scope/folder in the knowledge base where SharePoint content should be synced. Used with both FLAT and RECURSIVE ingestion modes.',
       ),
-    rootScopeId: z
-      .string()
-      .optional()
-      .describe(
-        'Existing scope ID for RECURSIVE (path-based) ingestion. When provided, all files will be ingested in this scope instead of creating new scopes.',
-      ),
     ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
     fileDiffUrl: z.url().describe('Unique file diff service URL'),
     zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
