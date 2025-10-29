@@ -17,3 +17,18 @@ variable "secrets_placeholders" {
     spc-zitadel-client-secret = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
   }
 }
+
+variable "entra_application_certificate_0" {
+  description = "Whether to create an Entra certificate for the SharePoint connector. Null disables the creation. If no key vault id is provided, the certificate will be created in the key_vault_id key vault."
+  type = object({
+    name               = optional(string)
+    key_vault_id       = optional(string)
+    common_name        = optional(string)
+    validity_in_months = optional(number)
+  })
+  default = {
+    name               = "spc-entra-app-certificate-0"
+    common_name        = "spc-entra-app-certificate-0"
+    validity_in_months = 12
+  }
+}
