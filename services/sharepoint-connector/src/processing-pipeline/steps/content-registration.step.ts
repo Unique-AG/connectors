@@ -54,7 +54,14 @@ export class ContentRegistrationStep implements IPipelineStep {
         baseUrl,
       }),
     };
-    this.logger.debug(`contentRegistrationRequest: ${JSON.stringify(contentRegistrationRequest, null, 4)}`);
+    this.logger.debug(
+      `contentRegistrationRequest: ${JSON.stringify({
+        url: contentRegistrationRequest.url,
+        baseUrl: contentRegistrationRequest.baseUrl,
+        key: contentRegistrationRequest.key,
+        sourceName: contentRegistrationRequest.sourceName,
+      }, null, 4)}`,
+    );
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();
