@@ -14,11 +14,11 @@ export class SharepointRestClientService {
   ) {
     // TODO: Add metrics middleware with some logging once we start implementing proper metrics
     const interceptorsInCallingOrder = [
-      interceptors.retry({
-        maxRetries: 3,
-      }),
       interceptors.redirect({
         maxRedirections: 10,
+      }),
+      interceptors.retry({
+        maxRetries: 3,
       }),
       createTokenRefreshInterceptor(async () =>
         this.microsoftAuthenticationService.getAccessToken('sharepoint-rest'),
