@@ -12,8 +12,8 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Config } from '../config';
-import { GraphAuthenticationService } from './auth/graph-authentication.service';
+import { Config } from '../../config';
+import { GraphAuthenticationService } from './middlewares/graph-authentication.service';
 import { MetricsMiddleware } from './middlewares/metrics.middleware';
 import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
 

@@ -1,4 +1,4 @@
-import { ListItem } from '../msgraph/types/sharepoint.types';
+import { ListItem } from '../microsoft-apis/graph/types/sharepoint.types';
 
 export function getTitle(fields: ListItem['fields']): string {
   const title = fields.Title?.trim();

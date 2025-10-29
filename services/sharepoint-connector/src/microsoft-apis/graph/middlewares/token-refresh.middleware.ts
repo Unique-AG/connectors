@@ -1,7 +1,7 @@
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
-import { normalizeError } from '../../utils/normalize-error';
-import { GraphAuthenticationService } from '../auth/graph-authentication.service';
+import { normalizeError } from '../../../utils/normalize-error';
+import { GraphAuthenticationService } from './graph-authentication.service';
 
 export class TokenRefreshMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);

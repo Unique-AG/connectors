@@ -26,7 +26,7 @@ export class MetricsMiddleware implements Middleware {
       const statusClass = this.getStatusClass(statusCode);
 
       this.logger.debug({
-        msg: 'SharePoint Graph API request completed',
+        msg: 'Graph API request completed',
         endpoint,
         method,
         statusCode,
@@ -38,7 +38,7 @@ export class MetricsMiddleware implements Middleware {
         const policy = this.getThrottlePolicy(context.response);
 
         this.logger.warn({
-          msg: 'SharePoint Graph API request throttled',
+          msg: 'Graph API request throttled',
           endpoint,
           method,
           statusCode,
@@ -49,7 +49,7 @@ export class MetricsMiddleware implements Middleware {
 
       if (duration > 5000) {
         this.logger.warn({
-          msg: 'Slow SharePoint Graph API request detected',
+          msg: 'Slow Graph API request detected',
           endpoint,
           method,
           duration,
@@ -62,7 +62,7 @@ export class MetricsMiddleware implements Middleware {
       const errorDetails = this.extractGraphErrorDetails(error);
 
       this.logger.error({
-        msg: 'SharePoint Graph API request failed',
+        msg: 'Graph API request failed',
         endpoint,
         method,
         duration,

@@ -1,8 +1,8 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GraphApiService } from '../../msgraph/graph-api.service';
-import type { DriveItem } from '../../msgraph/types/sharepoint.types';
+import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
+import type { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import type { ProcessingContext } from '../types/processing-context';
 import { ContentFetchingStep } from './content-fetching.step';
 
