@@ -23,24 +23,29 @@ import type { IPipelineStep } from './pipeline-step.interface';
 export class ContentRegistrationStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.ContentRegistration;
+  private readonly ingestionMode: IngestionMode;
+  private readonly scopeId: string | undefined;
+  private readonly rootScopeName: string | undefined;
+  private readonly sharepointBaseUrl: string;
 
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly uniqueApiService: UniqueApiService,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+    this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
+    this.scopeId = this.configService.get('unique.scopeId', { infer: true });
+    this.rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
+    this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+  }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
-    const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-    const scopeId = this.configService.get('unique.scopeId', { infer: true });
-    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
-    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
 
-    const scopeIdForRequest = getScopeIdForIngestion(ingestionMode, scopeId);
+    const scopeIdForRequest = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
 
     const itemKey = buildIngetionItemKey(context.pipelineItem);
-    const baseUrl = rootScopeName || sharepointBaseUrl;
+    const baseUrl = this.rootScopeName || this.sharepointBaseUrl;
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: itemKey,
@@ -51,7 +56,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
-      ...(ingestionMode === IngestionMode.Recursive && {
+      ...(this.ingestionMode === IngestionMode.Recursive && {
         url: context.knowledgeBaseUrl,
         baseUrl,
       }),

@@ -8,6 +8,7 @@ import { Config } from '../config';
 import {
   INGESTION_SOURCE_KIND,
   INGESTION_SOURCE_NAME,
+  IngestionMode,
 } from '../constants/ingestion.constants';
 import { UniqueOwnerType } from '../constants/unique-owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
@@ -26,18 +27,33 @@ import {
 export class UniqueApiService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly limiter: Bottleneck;
+  private readonly ingestionMode: IngestionMode;
+  private readonly scopeId: string | undefined;
+  private readonly rootScopeName: string | undefined;
+  private readonly fileDiffUrl: string;
+  private readonly sharepointBaseUrl: string;
+  private readonly ingestionGraphqlUrl: string;
+  private readonly apiRateLimitPerMinute: number;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     @Inject(UNIQUE_HTTP_CLIENT) private readonly httpClient: Client,
   ) {
-    const rateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
+    this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
+    this.scopeId = this.configService.get('unique.scopeId', { infer: true });
+    this.rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
+    this.fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
+    this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    this.ingestionGraphqlUrl = this.configService.get('unique.ingestionGraphqlUrl', {
+      infer: true,
+    });
+    this.apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
       infer: true,
     });
 
     this.limiter = new Bottleneck({
-      reservoir: rateLimitPerMinute,
-      reservoirRefreshAmount: rateLimitPerMinute,
+      reservoir: this.apiRateLimitPerMinute,
+      reservoirRefreshAmount: this.apiRateLimitPerMinute,
       reservoirRefreshInterval: 60000,
     });
   }
@@ -80,17 +96,11 @@ export class UniqueApiService {
     uniqueToken: string,
     partialKey: string,
   ): Promise<FileDiffResponse> {
-    const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-    const scopeId = this.configService.get('unique.scopeId', { infer: true });
-    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
-    const fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
-    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
-
-    const url = new URL(fileDiffUrl);
+    const url = new URL(this.fileDiffUrl);
     const path = url.pathname + url.search;
 
-    const basePath = rootScopeName || sharepointBaseUrl;
-    const scopeForRequest = getScopeIdForIngestion(ingestionMode, scopeId);
+    const basePath = this.rootScopeName || this.sharepointBaseUrl;
+    const scopeForRequest = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
 
     const diffRequest: FileDiffRequest = {
       basePath,
@@ -182,8 +192,7 @@ export class UniqueApiService {
   }
 
   private createGraphqlClient(uniqueToken: string): GraphQLClient {
-    const graphqlUrl = this.configService.get('unique.ingestionGraphqlUrl', { infer: true });
-    return new GraphQLClient(graphqlUrl, {
+    return new GraphQLClient(this.ingestionGraphqlUrl, {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${uniqueToken}`,

@@ -21,18 +21,23 @@ import type { IPipelineStep } from './pipeline-step.interface';
 export class IngestionFinalizationStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.IngestionFinalization;
+  private readonly ingestionMode: IngestionMode;
+  private readonly scopeId: string | undefined;
+  private readonly rootScopeName: string | undefined;
+  private readonly sharepointBaseUrl: string;
 
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly uniqueApiService: UniqueApiService,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+    this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
+    this.scopeId = this.configService.get('unique.scopeId', { infer: true });
+    this.rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
+    this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+  }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
-    const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-    const scopeId = this.configService.get('unique.scopeId', { infer: true });
-    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
-    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const stepStartTime = Date.now();
 
     assert.ok(
@@ -42,8 +47,8 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
     const fileKey = buildIngetionItemKey(context.pipelineItem);
 
-    const baseUrl = rootScopeName || sharepointBaseUrl;
-    const scopeIdForRequest = getScopeIdForIngestion(ingestionMode, scopeId);
+    const baseUrl = this.rootScopeName || this.sharepointBaseUrl;
+    const scopeIdForRequest = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
 
     const ingestionFinalizationRequest = {
       key: fileKey,
@@ -56,7 +61,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
       sourceName: INGESTION_SOURCE_NAME,
       sourceKind: INGESTION_SOURCE_KIND,
       fileUrl: context.registrationResponse.readUrl,
-      ...(ingestionMode === IngestionMode.Recursive && {
+      ...(this.ingestionMode === IngestionMode.Recursive && {
         url: context.knowledgeBaseUrl,
         baseUrl,
       }),
