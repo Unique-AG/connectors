@@ -13,7 +13,7 @@ resource "azurerm_key_vault_secret" "manual_secret" {
 resource "azurerm_key_vault_certificate" "entra_certificate_0" {
   count        = var.entra_application_certificate_0 != null ? 1 : 0
   name         = try(var.entra_application_certificate_0.name, "spc-entra-app-certificate-0")
-  key_vault_id = try(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
+  key_vault_id = var.entra_application_certificate_0 != null && var.entra_application_certificate_0.key_vault_id != null ? var.entra_application_certificate_0.key_vault_id : var.key_vault_id
 
   certificate_policy {
     issuer_parameters {
