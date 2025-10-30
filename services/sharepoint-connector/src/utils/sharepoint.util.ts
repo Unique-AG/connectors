@@ -92,11 +92,23 @@ function getBaseUrl(item: SharepointContentItem): string {
   assert.fail('Invalid pipeline item type');
 }
 
+/**
+ * Builds a key for file-diff comparison.
+ *
+ * File-diff only compares the last segment of a path (e.g., in "key1/key2/key3", only "key3" is compared).
+ * Therefore, we use only the item ID as the key. For a full hierarchical key, see buildIngestionItemKey.
+ */
 export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): string {
   return sharepointContentItem.item.id;
 }
 
-export function buildIngetionItemKey(sharepointContentItem: SharepointContentItem): string {
+/**
+ * Builds a unique hierarchical key for ingestion.
+ *
+ * Ingestion requires a complete hierarchical key (e.g., "siteId/itemId") to ensure uniqueness of the stored key
+ * across different scopes and drives. This differs from buildFileDiffKey which only uses the item ID.
+ */
+export function buildIngestionItemKey(sharepointContentItem: SharepointContentItem): string {
   if (sharepointContentItem.itemType === 'listItem') {
     return `${sharepointContentItem.siteId}/${sharepointContentItem.driveId}/${sharepointContentItem.item.id}`;
   }

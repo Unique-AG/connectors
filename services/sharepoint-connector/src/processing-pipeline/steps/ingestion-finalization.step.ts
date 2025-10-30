@@ -12,7 +12,7 @@ import { getScopeIdForIngestion } from '../../unique-api/ingestion.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { normalizeError } from '../../utils/normalize-error';
-import { buildIngetionItemKey } from '../../utils/sharepoint.util';
+import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -45,7 +45,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
       `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
     );
 
-    const fileKey = buildIngetionItemKey(context.pipelineItem);
+    const fileKey = buildIngestionItemKey(context.pipelineItem);
 
     const baseUrl = this.rootScopeName || this.sharepointBaseUrl;
     const scopeId = getScopeIdForIngestion(this.ingestionMode, this.scopeId);

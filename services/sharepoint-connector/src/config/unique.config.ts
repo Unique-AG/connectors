@@ -9,7 +9,6 @@ const UniqueConfig = z
   .object({
     ingestionMode: z
       .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
-      .default(IngestionMode.Recursive)
       .describe(
         'Ingestion mode: FLAT ingests all files to a single root scope, RECURSIVE maintains the folder hierarchy (path-based ingestion).',
       ),
@@ -23,7 +22,7 @@ const UniqueConfig = z
       .string()
       .optional()
       .describe(
-        'Name of the root scope/folder in the knowledge base where SharePoint content should be synced. Used with both FLAT and RECURSIVE ingestion modes.',
+        'Used only in case of Recursive ingestion mode. Indicates the name of the root scope/folder in the knowledge base where SharePoint content should be synced.',
       ),
     ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
     fileDiffUrl: z.url().describe('Unique file diff service URL'),

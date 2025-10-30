@@ -14,7 +14,7 @@ import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { normalizeError } from '../../utils/normalize-error';
-import { buildIngetionItemKey } from '../../utils/sharepoint.util';
+import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -44,7 +44,7 @@ export class ContentRegistrationStep implements IPipelineStep {
 
     const scopeId = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
 
-    const itemKey = buildIngetionItemKey(context.pipelineItem);
+    const itemKey = buildIngestionItemKey(context.pipelineItem);
     const baseUrl = this.rootScopeName || this.sharepointBaseUrl;
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
