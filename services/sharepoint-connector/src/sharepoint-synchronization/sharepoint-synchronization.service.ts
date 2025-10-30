@@ -2,10 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
+import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
-import { PermissionsSyncService } from './permissions-sync.service';
 
 @Injectable()
 export class SharepointSynchronizationService {

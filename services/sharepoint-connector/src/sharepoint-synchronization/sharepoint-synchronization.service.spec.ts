@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { buildKnowledgeBaseUrl } from '../utils/sharepoint.util';
 import { ContentSyncService } from './content-sync.service';
-import { PermissionsSyncService } from './permissions-sync.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
 describe('SharepointSynchronizationService', () => {
