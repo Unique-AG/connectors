@@ -60,7 +60,7 @@ resource "azurerm_key_vault_secret" "entra_certificate_pem" {
   count           = var.entra_application_certificate_0 != null ? 1 : 0
   name            = try(var.entra_application_certificate_0.name, "spc-entra-app-certificate-0")
   value           = tls_self_signed_cert.entra_certificate_0[0].cert_pem
-  key_vault_id    = try(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
+  key_vault_id    = coalesce(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
   content_type    = "application/x-pem-file"
   expiration_date = tls_self_signed_cert.entra_certificate_0[0].validity_end_time
 
@@ -77,7 +77,7 @@ resource "azurerm_key_vault_secret" "entra_certificate_key" {
   name             = "${try(var.entra_application_certificate_0.name, "spc-entra-app-certificate-0")}-key"
   value_wo         = tls_private_key.entra_certificate_0[0].private_key_pem
   value_wo_version = var.entra_application_certificate_0.version
-  key_vault_id     = try(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
+  key_vault_id     = coalesce(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
   content_type     = "application/x-pem-file"
   expiration_date  = tls_self_signed_cert.entra_certificate_0[0].validity_end_time
 
