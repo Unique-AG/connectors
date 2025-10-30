@@ -14,7 +14,7 @@ resource "azurerm_key_vault_secret" "manual_secret" {
 resource "random_id" "certificate_rotation" {
   count = var.entra_application_certificate_0 != null ? 1 : 0
   keepers = {
-    version = try(var.entra_application_certificate_0.version, 0)
+    version = var.entra_application_certificate_0.version
   }
   byte_length = 8
 }
@@ -38,8 +38,8 @@ resource "tls_self_signed_cert" "entra_certificate_0" {
   private_key_pem = tls_private_key.entra_certificate_0[0].private_key_pem
 
   subject {
-    common_name  = try(var.entra_application_certificate_0.common_name, "spc-entra-app-certificate-0")
-    organization = try(var.entra_application_certificate_0.organization, "Unique AI")
+    common_name  = var.entra_application_certificate_0.common_name
+    organization = var.entra_application_certificate_0.organization
   }
 
   validity_period_hours = try(var.entra_application_certificate_0.validity_in_months, 12) * 30 * 24
@@ -58,7 +58,7 @@ resource "tls_self_signed_cert" "entra_certificate_0" {
 # Store the PEM certificate in Key Vault
 resource "azurerm_key_vault_secret" "entra_certificate_pem" {
   count           = var.entra_application_certificate_0 != null ? 1 : 0
-  name            = try(var.entra_application_certificate_0.name, "spc-entra-app-certificate-0")
+  name            = var.entra_application_certificate_0.name
   value           = tls_self_signed_cert.entra_certificate_0[0].cert_pem
   key_vault_id    = coalesce(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
   content_type    = "application/x-pem-file"
@@ -74,7 +74,7 @@ resource "azurerm_key_vault_secret" "entra_certificate_pem" {
 # Store the private key in Key Vault (needed for PFX export)
 resource "azurerm_key_vault_secret" "entra_certificate_key" {
   count            = var.entra_application_certificate_0 != null ? 1 : 0
-  name             = "${try(var.entra_application_certificate_0.name, "spc-entra-app-certificate-0")}-key"
+  name             = "${var.entra_application_certificate_0.name}-key"
   value_wo         = tls_private_key.entra_certificate_0[0].private_key_pem
   value_wo_version = var.entra_application_certificate_0.version
   key_vault_id     = coalesce(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)

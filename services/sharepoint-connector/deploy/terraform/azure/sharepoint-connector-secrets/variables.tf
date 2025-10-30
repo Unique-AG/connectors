@@ -21,12 +21,12 @@ variable "secrets_placeholders" {
 variable "entra_application_certificate_0" {
   description = "Whether to create an Entra certificate for the SharePoint connector. Null disables the creation. If no key vault id is provided, the certificate will be created in the key_vault_id key vault."
   type = object({
-    name               = optional(string)
+    name               = optional(string, "spc-entra-app-certificate-0")
     key_vault_id       = optional(string)
-    common_name        = optional(string)
-    organization       = optional(string)
-    validity_in_months = optional(number)
-    version            = optional(number)
+    common_name        = optional(string, "spc-entra-app-certificate-0")
+    organization       = optional(string, "Unique AI")
+    validity_in_months = optional(number, 12)
+    version            = optional(number, 1)
   })
   default = {
     name               = "spc-entra-app-certificate-0"
