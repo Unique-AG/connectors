@@ -20,7 +20,7 @@ ephemeral "tls_private_key" "entra_certificate_0" {
 # Self-signed certificate
 resource "tls_self_signed_cert" "entra_certificate_0" {
   count           = var.entra_application_certificate_0 != null ? 1 : 0
-  private_key_pem = tls_private_key.entra_certificate_0[0].private_key_pem
+  private_key_pem = ephemeral.tls_private_key.entra_certificate_0[0].private_key_pem
 
   subject {
     common_name  = var.entra_application_certificate_0.common_name
@@ -48,7 +48,7 @@ resource "azurerm_key_vault_secret" "entra_certificate_pem" {
 resource "azurerm_key_vault_secret" "entra_certificate_key" {
   count            = var.entra_application_certificate_0 != null ? 1 : 0
   name             = "${var.entra_application_certificate_0.name}-key"
-  value_wo         = tls_private_key.entra_certificate_0[0].private_key_pem
+  value_wo         = ephemeral.tls_private_key.entra_certificate_0[0].private_key_pem
   value_wo_version = var.entra_application_certificate_0.version
   key_vault_id     = coalesce(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
   content_type     = "application/x-pem-file"
