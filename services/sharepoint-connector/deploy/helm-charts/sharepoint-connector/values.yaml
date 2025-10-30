@@ -109,7 +109,7 @@ connectorConfig:
     ingestionMode: RECURSIVE
     # -- name of the root scope/folder in the knowledge base where SharePoint content should be synced
     # example: SharePoint Content
-    rootScopeName: unset_default_value
+    rootScopeName: null
     # -- scope id for the scope based ingestion
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion
