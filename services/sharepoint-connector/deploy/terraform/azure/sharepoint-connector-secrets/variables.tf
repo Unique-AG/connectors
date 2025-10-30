@@ -19,7 +19,7 @@ variable "secrets_placeholders" {
 }
 
 variable "entra_application_certificate_0" {
-  description = "Whether to create an Entra certificate for the SharePoint connector. Null disables the creation. If no key vault id is provided, the certificate will be created in the key_vault_id key vault."
+  description = "Whether to create an Entra certificate for the SharePoint connector. Null disables the creation. If no key vault id is provided, the certificate will be created in the key_vault_id key vault. ⚠️ Automatic rotation is not supported yet. You must taint the ephemeral resource yourself to trigger a in-place (downtime) rotation."
   type = object({
     name               = optional(string, "spc-entra-app-certificate-0")
     key_vault_id       = optional(string)
