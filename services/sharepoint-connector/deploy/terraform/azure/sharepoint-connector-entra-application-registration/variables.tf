@@ -20,6 +20,8 @@ variable "roles_mode" {
   }
 }
 
+// TODO: Ask Dominik - if we have roles mode and these permissions should be tailored to our app,
+// shouldn't these permissions be declared in locals block in main.tf based on roles_mode?
 variable "graph_roles_content" {
   description = "A list of Graph API roles to assign to the application."
   type        = list(string)

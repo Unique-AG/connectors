@@ -1,7 +1,23 @@
 data "azuread_application_published_app_ids" "well_known" {}
 
+locals {
+  graph_app_id = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
+  sharepoint_app_id = data.azuread_application_published_app_ids.well_known.result["Office365SharePointOnline"]
+  
+  graph_roles = toset(concat(
+    var.graph_roles_content, 
+    var.roles_mode == "permissions" ? var.graph_roles_permissions : []
+  ))
+  sharepoint_roles = toset(var.roles_mode == "permissions" ? var.sharepoint_roles_permissions : [])
+}
+
 resource "azuread_service_principal" "msgraph" {
-  client_id    = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
+  client_id    = local.graph_app_id
+  use_existing = true
+}
+
+resource "azuread_service_principal" "sharepoint" {
+  client_id    = local.sharepoint_app_id
   use_existing = true
 }
 
@@ -10,15 +26,24 @@ resource "azuread_application" "sharepoint_connector" {
   sign_in_audience = var.sign_in_audience
 
   required_resource_access {
-    resource_app_id = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
+    resource_app_id = local.graph_app_id
 
     dynamic "resource_access" {
-      for_each = toset(concat(
-        var.graph_roles_content, 
-        var.roles_mode == "permissions" ? var.graph_roles_permissions : []
-      ))
+      for_each = local.graph_roles
       content {
         id   = azuread_service_principal.msgraph.app_role_ids[resource_access.value]
+        type = "Role"
+      }
+    }
+  }
+
+  required_resource_access {
+    resource_app_id = local.sharepoint_app_id
+
+    dynamic "resource_access" {
+      for_each = local.sharepoint_roles
+      content {
+        id   = azuread_service_principal.sharepoint.app_role_ids[resource_access.value]
         type = "Role"
       }
     }
@@ -35,14 +60,20 @@ resource "time_sleep" "wait_for_graph_propagation" {
   create_duration = "15s"
 }
 
-resource "azuread_app_role_assignment" "grant_admin_consent" {
-  for_each            = toset(concat(
-    var.graph_roles_content,
-    var.roles_mode == "permissions" ? var.graph_roles_permissions : []
-  ))
+resource "azuread_app_role_assignment" "grant_graph_admin_consent" {
+  for_each            = local.graph_roles
   app_role_id         = azuread_service_principal.msgraph.app_role_ids[each.value]
   principal_object_id = azuread_service_principal.sharepoint_connector.object_id
   resource_object_id  = azuread_service_principal.msgraph.object_id
+
+  depends_on = [time_sleep.wait_for_graph_propagation]
+}
+
+resource "azuread_app_role_assignment" "grant_sharepoint_admin_consent" {
+  for_each            = local.sharepoint_roles
+  app_role_id         = azuread_service_principal.sharepoint.app_role_ids[each.value]
+  principal_object_id = azuread_service_principal.sharepoint_connector.object_id
+  resource_object_id  = azuread_service_principal.sharepoint.object_id
 
   depends_on = [time_sleep.wait_for_graph_propagation]
 }
