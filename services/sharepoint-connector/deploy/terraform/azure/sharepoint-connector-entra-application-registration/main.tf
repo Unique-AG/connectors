@@ -13,7 +13,10 @@ resource "azuread_application" "sharepoint_connector" {
     resource_app_id = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
 
     dynamic "resource_access" {
-      for_each = toset(var.graph_roles)
+      for_each = toset(concat(
+        var.graph_roles_content, 
+        var.roles_mode == "permissions" ? var.graph_roles_permissions : []
+      ))
       content {
         id   = azuread_service_principal.msgraph.app_role_ids[resource_access.value]
         type = "Role"
@@ -33,7 +36,10 @@ resource "time_sleep" "wait_for_graph_propagation" {
 }
 
 resource "azuread_app_role_assignment" "grant_admin_consent" {
-  for_each            = toset(var.graph_roles)
+  for_each            = toset(concat(
+    var.graph_roles_content,
+    var.roles_mode == "permissions" ? var.graph_roles_permissions : []
+  ))
   app_role_id         = azuread_service_principal.msgraph.app_role_ids[each.value]
   principal_object_id = azuread_service_principal.sharepoint_connector.object_id
   resource_object_id  = azuread_service_principal.msgraph.object_id

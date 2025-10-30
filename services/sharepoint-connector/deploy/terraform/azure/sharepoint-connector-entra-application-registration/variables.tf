@@ -10,10 +10,32 @@ variable "sign_in_audience" {
   default     = "AzureADMultipleOrgs"
 }
 
-variable "graph_roles" {
+variable "roles_mode" {
+  description = "The mode to assign roles to the application. Valid values are 'content-only' or 'permissions'."
+  type        = string
+  default     = "content-only"
+  validation {
+    condition     = contains(["content-only", "permissions"], var.roles_mode)
+    error_message = "Invalid roles mode. Valid values are 'content-only' or 'permissions'."
+  }
+}
+
+variable "graph_roles_content" {
   description = "A list of Graph API roles to assign to the application."
   type        = list(string)
-  default     = ["Files.Read.All", "Sites.Read.All"]
+  default     = ["Files.Read.All", "Sites.Selected"]
+}
+
+variable "graph_roles_permissions" {
+  description = "A list of Graph API roles to assign to the application for permissions sync."
+  type        = list(string)
+  default     = ["Group.Read.All", "GroupMember.Read.All", "User.ReadBasic.All"]
+}
+
+variable "sharepoint_roles_permissions" {
+  description = "A list of SharePoint API roles to assign to the application for permissions sync."
+  type        = list(string)
+  default     = ["Sites.Selected"]
 }
 
 variable "federated_identity_credentials" {
