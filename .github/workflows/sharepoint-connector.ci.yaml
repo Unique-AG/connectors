@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest # TODO: can we use singularity here?
     steps:
       - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v4
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.4
       - working-directory: services/sharepoint-connector/deploy/terraform/azure/sharepoint-connector-entra-application
