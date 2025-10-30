@@ -57,10 +57,19 @@ connector:
   volumes:
     - name: tmp
       emptyDir: {}
+    - name: sharepoint-connector-certificate
+      secret:
+        secretName: sharepoint-connector-certificate
+        items:
+          - key: key.pem
+            path: key.pem
   volumeMounts:
     - name: tmp
       mountPath: /tmp
-
+    - name: sharepoint-connector-certificate
+      mountPath: /app/key.pem
+      subPath: key.pem
+      readOnly: true
 grafana:
   dashboard:
     enabled: false # TODO: Not yet implemented, template will fail on purpose if enabled
@@ -84,12 +93,15 @@ connectorConfig:
     # example: FinanceGPTKnowledge
     syncColumnName: unset_default_value
     auth:
-      mode: oidc # oidc, client-secret, certificate
+      mode: certificate # oidc, client-secret, certificate
       # -- tenant id against which the graph api calls are made
       # example: 12345678-1234-1234-1234-123456789012
       tenantId: unset_default_value
       clientId: null
-      privateKeyPath: null
+      # -- path to the private key file of the Azure AD application certificate in PEM format
+      # this closely relates to the volumeMounts and volume definitions in the connector section
+      # users wanting to use another path can override this value and unset the volumeMounts and volume definitions
+      privateKeyPath: /app/key.pem
       privateKeyPassword: null
       thumbprintSha1: null
       thumbprintSha256: null

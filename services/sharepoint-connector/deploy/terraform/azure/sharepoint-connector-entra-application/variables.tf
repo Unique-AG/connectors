@@ -19,7 +19,7 @@ variable "service_principal_configuration_enabled" {
 variable "sync_mode_role_preset" {
   description = "The sync mode preset to assign roles to the application. Valid values are 'content-only' or 'content-and-permissions'."
   type        = string
-  default     = "content-only"
+  default     = "content-and-permissions"
   validation {
     condition     = contains(["content-only", "content-and-permissions"], var.sync_mode_role_preset)
     error_message = "Invalid sync mode preset. Valid values are 'content-only' or 'content-and-permissions'."
