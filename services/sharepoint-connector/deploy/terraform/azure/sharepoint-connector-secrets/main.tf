@@ -10,49 +10,46 @@ resource "azurerm_key_vault_secret" "manual_secret" {
   }
 }
 
-resource "azurerm_key_vault_certificate" "entra_certificate_0" {
-  count        = var.entra_application_certificate_0 != null ? 1 : 0
-  name         = try(var.entra_application_certificate_0.name, "spc-entra-app-certificate-0")
-  key_vault_id = var.entra_application_certificate_0 != null && var.entra_application_certificate_0.key_vault_id != null ? var.entra_application_certificate_0.key_vault_id : var.key_vault_id
+# Private key for the certificate
+resource "tls_private_key" "entra_certificate_0" {
+  count     = var.entra_application_certificate_0 != null ? 1 : 0
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
 
-  certificate_policy {
-    issuer_parameters {
-      name = "Self"
-    }
+# Self-signed certificate
+resource "tls_self_signed_cert" "entra_certificate_0" {
+  count           = var.entra_application_certificate_0 != null ? 1 : 0
+  private_key_pem = tls_private_key.entra_certificate_0[0].private_key_pem
 
-    key_properties {
-      exportable = true
-      key_size   = 2048
-      key_type   = "RSA"
-      reuse_key  = true
-    }
-
-    lifetime_action {
-      action {
-        action_type = "AutoRenew"
-      }
-
-      trigger {
-        days_before_expiry = 30
-      }
-    }
-
-    secret_properties {
-      content_type = "application/x-pkcs12"
-    }
-
-    x509_certificate_properties {
-      extended_key_usage = ["1.3.6.1.5.5.7.3.2"]
-
-      key_usage = [
-        "dataEncipherment",
-        "digitalSignature",
-        "keyCertSign",
-        "keyEncipherment",
-      ]
-
-      subject            = "CN=${try(var.entra_application_certificate_0.common_name, "spc-entra-app-certificate-0")}"
-      validity_in_months = try(var.entra_application_certificate_0.validity_in_months, 12)
-    }
+  subject {
+    common_name  = try(var.entra_application_certificate_0.common_name, "spc-entra-app-certificate-0")
+    organization = try(var.entra_application_certificate_0.organization, "Unique AI")
   }
+
+  validity_period_hours = try(var.entra_application_certificate_0.validity_in_months, 12) * 30 * 24
+
+  allowed_uses = [
+    "digital_signature",
+  ]
+}
+
+# Store the PEM certificate in Key Vault
+resource "azurerm_key_vault_secret" "entra_certificate_pem" {
+  count           = var.entra_application_certificate_0 != null ? 1 : 0
+  name            = try(var.entra_application_certificate_0.name, "spc-entra-app-certificate-0")
+  value           = tls_self_signed_cert.entra_certificate_0[0].cert_pem
+  key_vault_id    = try(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
+  content_type    = "application/x-pem-file"
+  expiration_date = tls_self_signed_cert.entra_certificate_0[0].validity_end_date
+}
+
+# Store the private key in Key Vault (needed for PFX export)
+resource "azurerm_key_vault_secret" "entra_certificate_key" {
+  count           = var.entra_application_certificate_0 != null ? 1 : 0
+  name            = "${try(var.entra_application_certificate_0.name, "spc-entra-app-certificate-0")}-key"
+  value           = tls_private_key.entra_certificate_0[0].private_key_pem
+  key_vault_id    = try(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
+  content_type    = "application/x-pem-file"
+  expiration_date = tls_self_signed_cert.entra_certificate_0[0].validity_end_date
 }

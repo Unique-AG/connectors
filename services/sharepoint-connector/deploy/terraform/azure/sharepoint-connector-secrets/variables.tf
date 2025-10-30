@@ -24,11 +24,13 @@ variable "entra_application_certificate_0" {
     name               = optional(string)
     key_vault_id       = optional(string)
     common_name        = optional(string)
+    organization       = optional(string)
     validity_in_months = optional(number)
   })
   default = {
     name               = "spc-entra-app-certificate-0"
     common_name        = "spc-entra-app-certificate-0"
+    organization       = "Unique AI"
     validity_in_months = 12
   }
 }

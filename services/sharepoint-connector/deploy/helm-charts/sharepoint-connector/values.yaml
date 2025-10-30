@@ -14,13 +14,13 @@ connector:
   extraEnvCM:
     - sharepoint-connector-config
   extraEnvSecrets:
-    # -- by default the chart expects the ZITADEL Client Secret from a secret named sharepoint-connector-secret
-    # This is just for convenience. Users can supersed this with their own secret that contains ZITADEL_CLIENT_SECRET
-    # or use https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load completely
-    # arbitrary secret mappings.
-    # See also below in connectorConfig.zitadel.clientSecret.
-    #
-    # The same would apply for a potentially required GRAPH_CLIENT_SECRET.
+    # -- default the chart expects the ZITADEL Client Secret from a secret named
+    # sharepoint-connector-secret, but this is just for convenience. Users can supersede this with
+    # their own secret that contains UNIQUE_ZITADEL_CLIENT_SECRET or use
+    # https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load
+    # completely arbitrary secret mappings.
+    # See also below in connectorConfig.unique.zitadel.clientSecret.
+    # The same would apply for a potentially required SHAREPOINT_AUTH_CLIENT_SECRET.
     - sharepoint-connector-secret
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector

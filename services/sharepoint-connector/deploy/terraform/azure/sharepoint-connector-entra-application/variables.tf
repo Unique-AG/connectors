@@ -16,10 +16,14 @@ variable "service_principal_configuration_enabled" {
   type        = bool
 }
 
-variable "graph_roles" {
-  description = "A list of Graph API roles to assign to the application."
-  type        = list(string)
-  default     = ["Files.Read.All", "Sites.Read.All"]
+variable "sync_mode_role_preset" {
+  description = "The sync mode preset to assign roles to the application. Valid values are 'content-only' or 'content-and-permissions'."
+  type        = string
+  default     = "content-only"
+  validation {
+    condition     = contains(["content-only", "content-and-permissions"], var.sync_mode_role_preset)
+    error_message = "Invalid sync mode preset. Valid values are 'content-only' or 'content-and-permissions'."
+  }
 }
 
 variable "federated_identity_credentials" {
@@ -30,6 +34,7 @@ variable "federated_identity_credentials" {
     issuer      = string
     subject     = string
   }))
+  default = {}
   # Example
   # {
   #  "my-first-kuberentes-cluster" = {
