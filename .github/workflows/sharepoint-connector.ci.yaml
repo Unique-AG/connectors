@@ -39,11 +39,14 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.4
-      - working-directory: services/sharepoint-connector/deploy/terraform/azure/sharepoint-connector-entra-application
+      - name: validate sharepoint-connector-entra-application
+        working-directory: services/sharepoint-connector/deploy/terraform/azure/sharepoint-connector-entra-application
         run: |
           terraform init
           terraform validate
-      - working-directory: services/sharepoint-connector/deploy/terraform/azure/sharepoint-connector-secrets
+      - name: validate sharepoint-connector-secrets
+        working-directory: services/sharepoint-connector/deploy/terraform/azure/sharepoint-connector-secrets
         run: |
           terraform init
           terraform validate
+      # TODO: Add trivy before 2.0.0 GA

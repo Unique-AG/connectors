@@ -41,7 +41,7 @@ resource "azurerm_key_vault_secret" "entra_certificate_pem" {
   value           = tls_self_signed_cert.entra_certificate_0[0].cert_pem
   key_vault_id    = try(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
   content_type    = "application/x-pem-file"
-  expiration_date = tls_self_signed_cert.entra_certificate_0[0].validity_end_date
+  expiration_date = tls_self_signed_cert.entra_certificate_0[0].validity_end_time
 }
 
 # Store the private key in Key Vault (needed for PFX export)
@@ -51,5 +51,5 @@ resource "azurerm_key_vault_secret" "entra_certificate_key" {
   value           = tls_private_key.entra_certificate_0[0].private_key_pem
   key_vault_id    = try(var.entra_application_certificate_0.key_vault_id, var.key_vault_id)
   content_type    = "application/x-pem-file"
-  expiration_date = tls_self_signed_cert.entra_certificate_0[0].validity_end_date
+  expiration_date = tls_self_signed_cert.entra_certificate_0[0].validity_end_time
 }
