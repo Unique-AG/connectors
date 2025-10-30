@@ -15,24 +15,8 @@ variable "secrets_placeholders" {
       Users preferring to manage the Zitadel Client ID via terraform can still do so by superseding this variables default.
     */
     spc-zitadel-client-secret = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
-  }
-}
-
-variable "entra_application_certificate_0" {
-  description = "Whether to create an Entra certificate for the SharePoint connector. Null disables the creation. If no key vault id is provided, the certificate will be created in the key_vault_id key vault. ⚠️ Automatic rotation is not supported yet. You must taint the ephemeral resource yourself to trigger a in-place (downtime) rotation."
-  type = object({
-    name               = optional(string, "spc-entra-app-certificate-0")
-    key_vault_id       = optional(string)
-    common_name        = optional(string, "spc-entra-app-certificate-0")
-    organization       = optional(string, "Unique AI")
-    validity_in_months = optional(number, 12)
-    version            = optional(number, 1)
-  })
-  default = {
-    name               = "spc-entra-app-certificate-0"
-    common_name        = "spc-entra-app-certificate-0"
-    organization       = "Unique AI"
-    validity_in_months = 12
-    version            = 1 # TODO: Current rotation leads to downtime, two certificates are needed for a seamless rotation (rotate unused, add to app, move workload, rotate unused)
+    # Until clarified how we handle certificate auto-renewal and secure storage and usage, users must supply the private key manually.
+    # The key is a file and must be put into the KV with the CLI: az keyvault secret set --name spc-certificate-private-key --vault-name <vault> -f <private-key.pem> --expires <Expiration UTC datetime (Y-m-d'T'H:M:S'Z')>
+    spc-certificate-private-key = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
   }
 }
