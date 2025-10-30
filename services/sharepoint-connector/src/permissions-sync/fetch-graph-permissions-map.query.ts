@@ -6,30 +6,9 @@ import {
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { ItemPermission } from './types';
 
 const OWNERS_SUFFIX = '_o';
-
-type ItemPermission =
-  | {
-      type: 'user';
-      id: string;
-      email: string;
-    }
-  | {
-      type: 'siteGroup';
-      id: string;
-      name: string;
-    }
-  | {
-      type: 'groupMembers';
-      id: string;
-      name: string;
-    }
-  | {
-      type: 'groupOwners';
-      id: string;
-      name: string;
-    };
 
 @Injectable()
 export class FetchGraphPermissionsMapQuery {
