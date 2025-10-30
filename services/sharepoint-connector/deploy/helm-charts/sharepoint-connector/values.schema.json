@@ -140,10 +140,6 @@
               "type": ["string", "null"],
               "description": "Scope ID for scope based ingestion"
             },
-            "rootScopeId": {
-              "type": ["string", "null"],
-              "description": "Root scope ID for path-based ingestion with existing scope"
-            },
             "apiRateLimitPerMinute": {
               "type": "integer",
               "description": "Rate limiting for Unique API requests per minute"
