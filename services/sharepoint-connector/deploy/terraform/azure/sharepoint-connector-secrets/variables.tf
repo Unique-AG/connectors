@@ -26,11 +26,13 @@ variable "entra_application_certificate_0" {
     common_name        = optional(string)
     organization       = optional(string)
     validity_in_months = optional(number)
+    version            = optional(number)
   })
   default = {
     name               = "spc-entra-app-certificate-0"
     common_name        = "spc-entra-app-certificate-0"
     organization       = "Unique AI"
     validity_in_months = 12
+    version            = 0 # TODO: Current rotation leads to downtime, two certificates are needed for a seamless rotation (rotate unused, add to app, move workload, rotate unused)
   }
 }

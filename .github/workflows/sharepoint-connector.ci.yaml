@@ -49,4 +49,3 @@ jobs:
         run: |
           terraform init
           terraform validate
-      # TODO: Add trivy before 2.0.0 GA
