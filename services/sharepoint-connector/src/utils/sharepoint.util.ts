@@ -59,61 +59,63 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
   return normalizeSlashes(siteId);
 }
 
-// deprecated(24.10.2025): will be reusing it again after ingestion splits url into webUrl and knowledgeBasePathUrl
-export function buildKnowledgeBaseUrl(sharepointContentItem: SharepointContentItem): string {
-  // we cannot use webUrl for driveItems as they are not using the real path but proxy _layouts hidden folders in their web url.
-  if (sharepointContentItem.itemType === 'driveItem') {
-    return buildUrl(
-      sharepointContentItem.siteWebUrl,
-      sharepointContentItem.folderPath,
-      sharepointContentItem.item.name,
-    );
-  }
-
-  // for listItems we can use directly the webUrl property
-  if (sharepointContentItem.itemType === 'listItem') {
-    return sharepointContentItem.item.webUrl;
-  }
-  assert.fail('Invalid pipeline item type');
-}
-
-function buildUrl(baseUrlRaw: string, folderPathRaw: string, itemName: string): string {
-  const baseUrl = baseUrlRaw.replace(/\/$/, '');
-  const normalizedFolderPath = normalizeSlashes(folderPathRaw);
-
-  // Handle root folder case
-  if (!normalizedFolderPath) {
-    return `${baseUrl}/${itemName}`;
-  }
-
-  // URL-encode each segment
-  const pathSegments = normalizedFolderPath.split('/');
-  const encodedSegments = pathSegments.map((segment) => encodeURIComponent(segment));
-  const encodedPath = encodedSegments.join('/');
-
-  return `${baseUrl}/${encodedPath}/${itemName}`;
-}
-
-/*
+/**
+ * Gets the web URL for a SharePoint item, with optional scope prefix.
+ *
  * We are reading the webUrl from item.listItem because it contains the real path to the item.
  * listItem.webUrl example: https://[tenant].sharepoint.com/sites/[site]/[library]/[path]/[filename]
  * item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
  * We are adding ?web=1 to the url to get the web view of the item.
+ *
+ * When rootScopeName is provided, the protocol is stripped from the URL to prevent
+ * creating scopes like "my-scope/https://uniqueapp.sharepoint.com" instead of "my-scope"
  */
-export function getItemUrl(sharepointContentItem: SharepointContentItem): string {
-  if (sharepointContentItem.itemType === 'driveItem') {
-    const baseUrl = sharepointContentItem.item.listItem?.webUrl;
+export function getItemUrl(
+  sharepointContentItem: SharepointContentItem,
+  rootScopeName?: string,
+): string {
+  const url = getBaseUrl(sharepointContentItem);
 
-    // if webUrl from listItem is not present we fallback to webUrl from driveItem
-    if (!baseUrl) {
-      return sharepointContentItem.item.webUrl;
-    }
-    return `${baseUrl}?web=1`;
+  return rootScopeName ? `${rootScopeName}/${stripProtocol(url)}` : url;
+}
+
+function getBaseUrl(item: SharepointContentItem): string {
+  if (item.itemType === 'driveItem') {
+    const listItemUrl = item.item.listItem?.webUrl;
+    return listItemUrl ? `${listItemUrl}?web=1` : item.item.webUrl;
   }
 
-  if (sharepointContentItem.itemType === 'listItem') {
-    return `${sharepointContentItem.item.webUrl}?web=1`;
+  if (item.itemType === 'listItem') {
+    return `${item.item.webUrl}?web=1`;
   }
 
   assert.fail('Invalid pipeline item type');
+}
+
+/**
+ * Builds a key for file-diff comparison.
+ *
+ * File-diff only compares the last segment of a path (e.g., in "key1/key2/key3", only "key3" is compared).
+ * Therefore, we use only the item ID as the key. For a full hierarchical key, see buildIngestionItemKey.
+ */
+export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): string {
+  return sharepointContentItem.item.id;
+}
+
+/**
+ * Builds a unique hierarchical key for ingestion.
+ *
+ * Ingestion requires a complete hierarchical key (e.g., "siteId/itemId") to ensure uniqueness of the stored key
+ * across different scopes and drives. This differs from buildFileDiffKey which only uses the item ID.
+ */
+export function buildIngestionItemKey(sharepointContentItem: SharepointContentItem): string {
+  if (sharepointContentItem.itemType === 'listItem') {
+    return `${sharepointContentItem.siteId}/${sharepointContentItem.driveId}/${sharepointContentItem.item.id}`;
+  }
+
+  return `${sharepointContentItem.siteId}/${sharepointContentItem.item.id}`;
+}
+
+function stripProtocol(url: string): string {
+  return url.replace(/^https?:\/\//, '');
 }

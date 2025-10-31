@@ -42,12 +42,13 @@ export class ProcessingPipelineService {
   public async processItem(pipelineItem: SharepointContentItem): Promise<PipelineResult> {
     const startTime = new Date();
     const correlationId = randomUUID();
+    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
 
     const context: ProcessingContext = {
       correlationId,
       pipelineItem,
       startTime,
-      knowledgeBaseUrl: getItemUrl(pipelineItem),
+      knowledgeBaseUrl: getItemUrl(pipelineItem, rootScopeName),
       mimeType: this.resolveMimeType(pipelineItem),
     };
 
