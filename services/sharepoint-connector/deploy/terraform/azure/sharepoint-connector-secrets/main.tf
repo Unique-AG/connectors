@@ -6,6 +6,6 @@ resource "azurerm_key_vault_secret" "manual_secret" {
   name            = "manual-${each.key}"
   value           = "<TO BE SET MANUALLY>"
   lifecycle {
-    ignore_changes = [value, tags, content_type]
+    ignore_changes = [value, tags, content_type, expiration_date]
   }
 }
