@@ -31,3 +31,21 @@ jobs:
         run: |
           helm dependency build
           helm template .
+
+  check_terraform:
+    runs-on: ubuntu-latest # TODO: can we use singularity here?
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.4
+      - name: validate sharepoint-connector-entra-application
+        working-directory: services/sharepoint-connector/deploy/terraform/azure/sharepoint-connector-entra-application
+        run: |
+          terraform init
+          terraform validate
+      - name: validate sharepoint-connector-secrets
+        working-directory: services/sharepoint-connector/deploy/terraform/azure/sharepoint-connector-secrets
+        run: |
+          terraform init
+          terraform validate
