@@ -129,8 +129,8 @@
             },
             "ingestionMode": {
               "type": "string",
-              "enum": ["FLAT", "RECURSIVE"],
-              "description": "Synchronization mode: FLAT or RECURSIVE"
+              "enum": ["flat", "recursive"],
+              "description": "Synchronization mode: flat or recursive"
             },
             "rootScopeName": {
               "type": ["string", "null"],
