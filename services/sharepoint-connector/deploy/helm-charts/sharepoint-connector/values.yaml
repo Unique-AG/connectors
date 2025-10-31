@@ -115,6 +115,15 @@ connectorConfig:
       # -- project id for the zitadel project
       # example: 225317577440629999
       projectId: unset_default_value
+      # -- JSON string of extra HTTP headers for Zitadel OAuth requests
+      # example: '{"x-zitadel-instance-host": "id.example.com"}'
+      httpExtraHeaders: null
+
+    ingestion:
+      # -- JSON string of extra HTTP headers for ingestion API requests (GraphQL and file diff)
+      # Used for service-to-service authentication when using internal cluster URLs
+      # example: '{"x-client-id": "sharepoint-connector", "x-company-id": "...", "x-user-id": "..."}'
+      httpExtraHeaders: null
 
   processing:
     stepTimeoutSeconds: 300

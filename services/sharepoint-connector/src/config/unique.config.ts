@@ -26,6 +26,22 @@ const UniqueConfig = z.object({
     .positive()
     .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
     .describe('Number of Unique API requests allowed per minute'),
+  zitadelHttpExtraHeaders: z
+    .string()
+    .optional()
+    .prefault('')
+    .transform((val) => (val ? JSON.parse(val) : {}))
+    .describe(
+      'JSON string of extra HTTP headers for Zitadel requests (e.g., {"x-zitadel-instance-host": "id.example.com"})',
+    ),
+  ingestionHttpExtraHeaders: z
+    .string()
+    .optional()
+    .prefault('')
+    .transform((val) => (val ? JSON.parse(val) : {}))
+    .describe(
+      'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-client-id": "sharepoint-connector", "x-company-id": "...", "x-user-id": "..."})',
+    ),
 });
 
 export const uniqueConfig = registerConfig('unique', UniqueConfig);

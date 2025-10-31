@@ -26,6 +26,7 @@ import {
 export class UniqueApiService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly limiter: Bottleneck;
+  private readonly ingestionHttpExtraHeaders: Record<string, string>;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -34,6 +35,8 @@ export class UniqueApiService {
     const rateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
       infer: true,
     });
+    this.ingestionHttpExtraHeaders =
+      this.configService.get('unique.ingestionHttpExtraHeaders', { infer: true }) || {};
 
     this.limiter = new Bottleneck({
       reservoir: rateLimitPerMinute,
@@ -105,6 +108,7 @@ export class UniqueApiService {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${uniqueToken}`,
+          ...this.ingestionHttpExtraHeaders,
         },
         body: JSON.stringify(diffRequest),
       });
@@ -181,6 +185,7 @@ export class UniqueApiService {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${uniqueToken}`,
+        ...this.ingestionHttpExtraHeaders,
       },
     });
   }
