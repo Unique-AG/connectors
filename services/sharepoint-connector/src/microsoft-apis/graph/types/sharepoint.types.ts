@@ -172,3 +172,11 @@ export interface SimplePermission {
   grantedToV2?: SimpleIdentitySet;
   grantedToIdentitiesV2?: SimpleIdentitySet[];
 }
+
+export interface GroupMember {
+  '@odata.type': '#microsoft.graph.user' | '#microsoft.graph.group';
+  id: string;
+  displayName: string;
+  mail: string | null;
+  userPrincipalName?: string;
+}

@@ -78,6 +78,7 @@ export class FetchGraphPermissionsMapQuery {
   private mapSimpleIdentitySetToItemPermission(
     simpleIdentitySet: SimpleIdentitySet,
   ): ItemPermission | null {
+    // TODO: Are we missing case of "Everyone except external users"?
     if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
       const isOwners = simpleIdentitySet.siteUser.loginName?.endsWith(OWNERS_SUFFIX);
       return {
@@ -103,7 +104,6 @@ export class FetchGraphPermissionsMapQuery {
     if (isNonNullish(simpleIdentitySet.user) && isNonNullish(simpleIdentitySet.siteUser)) {
       return {
         type: 'user',
-        id: simpleIdentitySet.user.id,
         email: simpleIdentitySet.user.email,
       };
     }
