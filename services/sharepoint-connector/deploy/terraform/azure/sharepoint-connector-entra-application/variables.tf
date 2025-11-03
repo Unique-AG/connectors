@@ -48,7 +48,8 @@ variable "certificates" {
   type = map(object({
     certificate = string
     end_date    = string
-    start_date  = string
+    start_date  = optional(string)
+    type        = optional(string, "AsymmetricX509Cert")
   }))
   default = {}
 }
