@@ -1,3 +1,6 @@
+// TODO: Consider using name Access instead of Membership or Permission. It encompasses both
+//       permissions on files/folders and memberships of groups.
+
 export type UserMembership = {
   type: 'user';
   email: string;
