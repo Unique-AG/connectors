@@ -11,17 +11,19 @@ connector:
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
+  envVars:
+    # -- loading of Zitadel Secret, Users can supersede this with
+    # their own secret that contains UNIQUE_ZITADEL_CLIENT_SECRET or use
+    # https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load
+    # completely arbitrary secret mappings.
+    # See also below in connectorConfig.unique.zitadel.clientSecret.
+    - name: UNIQUE_ZITADEL_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: sharepoint-connector-secret
+          key: UNIQUE_ZITADEL_CLIENT_SECRET
   extraEnvCM:
     - sharepoint-connector-config
-  extraEnvSecrets:
-    # -- by default the chart expects the ZITADEL Client Secret from a secret named sharepoint-connector-secret
-    # This is just for convenience. Users can supersed this with their own secret that contains ZITADEL_CLIENT_SECRET
-    # or use https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load completely
-    # arbitrary secret mappings.
-    # See also below in connectorConfig.zitadel.clientSecret.
-    #
-    # The same would apply for a potentially required GRAPH_CLIENT_SECRET.
-    - sharepoint-connector-secret
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
     tag: 2.0.0-alpha.9 # x-release-please-version
@@ -57,10 +59,23 @@ connector:
   volumes:
     - name: tmp
       emptyDir: {}
+      # -- Graph/SharePoint Certificate Secret
+      # by default the chart expects the certificate to be in a secret named sharepoint-connector-secret under the key key.pem
+      # Users can supersede this with their own secret that contains the certificate under a different key or use
+      # Users must also set the connectorConfig.sharepoint.auth.privateKeyPath to the path of the certificate in the secret
+    - name: sharepoint-connector-secret
+      secret:
+        secretName: sharepoint-connector-secret
+        items:
+          - key: key.pem
+            path: key.pem
   volumeMounts:
     - name: tmp
       mountPath: /tmp
-
+    - name: sharepoint-connector-secret
+      mountPath: /app/key.pem
+      subPath: key.pem
+      readOnly: true
 grafana:
   dashboard:
     enabled: false # TODO: Not yet implemented, template will fail on purpose if enabled
@@ -84,12 +99,15 @@ connectorConfig:
     # example: FinanceGPTKnowledge
     syncColumnName: unset_default_value
     auth:
-      mode: oidc # oidc, client-secret, certificate
+      mode: certificate # oidc, client-secret, certificate
       # -- tenant id against which the graph api calls are made
       # example: 12345678-1234-1234-1234-123456789012
       tenantId: unset_default_value
       clientId: null
-      privateKeyPath: null
+      # -- path to the private key file of the Azure AD application certificate in PEM format
+      # this closely relates to the volumeMounts and volume definitions in the connector section
+      # users wanting to use another path can override this value and unset the volumeMounts and volume definitions
+      privateKeyPath: /app/key.pem
       privateKeyPassword: null
       thumbprintSha1: null
       thumbprintSha256: null
