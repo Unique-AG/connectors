@@ -7,6 +7,7 @@ import { GraphApiService } from './graph/graph-api.service';
 import { GraphClientFactory } from './graph/graph-client.factory';
 import { GraphAuthenticationService } from './graph/middlewares/graph-authentication.service';
 import { SharepointRestClientService } from './sharepoint-rest/sharepoint-rest-client.service';
+import { SharepointRestHttpService } from './sharepoint-rest/sharepoint-rest-http.service';
 
 @Module({
   imports: [ConfigModule, HttpClientModule],
@@ -16,7 +17,7 @@ import { SharepointRestClientService } from './sharepoint-rest/sharepoint-rest-c
     FileFilterService,
     GraphAuthenticationService,
     GraphApiService,
-    SharepointRestClientService,
+    SharepointRestHttpService,
   ],
   exports: [GraphApiService, SharepointRestClientService],
 })

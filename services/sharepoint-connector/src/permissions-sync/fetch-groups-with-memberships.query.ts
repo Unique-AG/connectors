@@ -7,6 +7,8 @@ import {
   fromEntries,
   last,
   map,
+  mapKeys,
+  mapValues,
   partition,
   pick,
   pipe,
@@ -18,7 +20,11 @@ import {
 } from 'remeda';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { GroupMember } from '../microsoft-apis/graph/types/sharepoint.types';
-import { SharepointRestClientService } from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
+import {
+  PrincipalType,
+  SharepointRestClientService,
+  SiteGroupMembership,
+} from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
 import {
   GroupMembership,
   GroupUniqueId,
@@ -173,22 +179,11 @@ export class FetchGroupsWithMembershipsQuery {
     siteName: string,
     siteGroupIds: string[],
   ): Promise<Record<GroupUniqueId, ItemPermission[]>> {
-    const responses =
-      await this.sharepointRestClientService.requestBatch<SiteGroupMembershipResponse>(
-        siteName,
-        siteGroupIds.map((id) => `/sitegroups/getById(${id})/users`),
-      );
-
-    const siteGroupsUniqueIds = siteGroupIds.map((id) => groupUniqueId({ type: 'siteGroup', id }));
     return pipe(
-      responses,
-      map(prop('value')),
-      map(map(this.mapRestApiMembershipToGroupMembership.bind(this))),
-      (membershipsLists) => zip(siteGroupsUniqueIds, membershipsLists),
-      fromEntries(),
-      // We need type forcing because GroupUniqueId type forces weird result on
-      // fromEntries - ItemPermission[] | undefined instead of just ItemPermission[].
-    ) as Record<GroupUniqueId, ItemPermission[]>;
+      await this.sharepointRestClientService.getSiteGroupsMemberships(siteName, siteGroupIds),
+      mapKeys((id) => groupUniqueId({ type: 'siteGroup', id })),
+      mapValues(map(this.mapRestApiMembershipToGroupMembership.bind(this))),
+    );
   }
 
   private mapRestApiMembershipToGroupMembership({
@@ -196,7 +191,7 @@ export class FetchGroupsWithMembershipsQuery {
     LoginName: loginName,
     Email: email,
     Title: title,
-  }: SiteGroupMembershipResponse['value'][number]): ItemPermission {
+  }: SiteGroupMembership): ItemPermission {
     const principalTypeMapper: Record<PrincipalType, () => ItemPermission> = {
       [PrincipalType.User]: () => ({ type: 'user', email }),
       [PrincipalType.DistributionList]: () => ({
@@ -224,25 +219,6 @@ export class FetchGroupsWithMembershipsQuery {
     );
   }
 }
-
-interface SiteGroupMembershipResponse {
-  value: {
-    Id: number;
-    PrincipalType: PrincipalType;
-    LoginName: string;
-    Email: string;
-    Title: string;
-  }[];
-}
-
-const PrincipalType = {
-  User: 1,
-  DistributionList: 2,
-  SecurityGroup: 4,
-  SharePointGroup: 8,
-} as const;
-
-type PrincipalType = (typeof PrincipalType)[keyof typeof PrincipalType];
 
 const OWNERS_SUFFIX = '_o';
 
