@@ -1,11 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
+import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
+import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { PermissionsSyncService } from './permissions-sync.service';
+import { ScopeManagementService } from './scope-management.service';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -17,6 +20,7 @@ export class SharepointSynchronizationService {
     private readonly graphApiService: GraphApiService,
     private readonly contentSyncService: ContentSyncService,
     private readonly permissionsSyncService: PermissionsSyncService,
+    private readonly scopeManagementService: ScopeManagementService,
   ) {}
 
   public async synchronize(): Promise<void> {
@@ -44,8 +48,17 @@ export class SharepointSynchronizationService {
         continue;
       }
 
+      // Batch create scopes for recursive-advanced mode
+      let scopeCache: Map<string, string> | undefined;
+      const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
+      
+      if (ingestionMode === IngestionMode.RecursiveAdvanced) {
+        scopeCache = await this.createScopesForRecursiveAdvanced(items, logPrefix);
+        if (!scopeCache) continue;
+      }
+
       try {
-        await this.contentSyncService.syncContentForSite(siteId, items);
+        await this.contentSyncService.syncContentForSite(siteId, items, scopeCache);
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
@@ -69,5 +82,22 @@ export class SharepointSynchronizationService {
 
     this.logger.log(`SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`);
     this.isScanning = false;
+  }
+
+  private async createScopesForRecursiveAdvanced(
+    items: SharepointContentItem[],
+    logPrefix: string,
+  ): Promise<Map<string, string> | undefined> {
+    try {
+      const scopeCache = await this.scopeManagementService.batchCreateScopes(items);
+      this.logger.log(`${logPrefix} Created scopes for ${scopeCache.size} unique folders`);
+      return scopeCache;
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}`,
+        err: error,
+      });
+      return undefined;
+    }
   }
 }

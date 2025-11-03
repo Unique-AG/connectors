@@ -77,6 +77,12 @@ export interface IngestionApiResponse {
   source: string;
 }
 
+export interface Scope {
+  id: string;
+  name: string;
+  parentId: string | null;
+}
+
 export interface ZitadelLoginResponse {
   access_token: string;
   expires_in: number;

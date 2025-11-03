@@ -9,15 +9,15 @@ import { Redacted } from '../utils/redacted';
 const UniqueConfig = z
   .object({
     ingestionMode: z
-      .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
+      .enum([IngestionMode.Flat, IngestionMode.Recursive, IngestionMode.RecursiveAdvanced] as const)
       .describe(
-        'Ingestion mode: FLAT ingests all files to a single root scope, RECURSIVE maintains the folder hierarchy (path-based ingestion).',
+        'Ingestion mode: FLAT ingests all files to a single root scope, RECURSIVE maintains the folder hierarchy (path-based ingestion), RECURSIVE_ADVANCED creates explicit scope hierarchy via Scope Management service.',
       ),
     scopeId: z
       .string()
       .optional()
       .describe(
-        'Scope ID for FLAT ingestion mode. Required when ingestionMode is FLAT. Leave undefined for RECURSIVE mode (path-based ingestion).',
+        'Scope ID for FLAT ingestion mode. Required when ingestionMode is FLAT. Leave undefined for RECURSIVE or RECURSIVE_ADVANCED modes.',
       ),
     rootScopeName: z
       .string()
@@ -25,7 +25,20 @@ const UniqueConfig = z
       .describe(
         'Used only in case of Recursive ingestion mode. Indicates the name of the root scope/folder in the knowledge base where SharePoint content should be synced.',
       ),
+    ingestionScopeLocation: z
+      .string()
+      .optional()
+      .describe(
+        'Required for RECURSIVE_ADVANCED mode. Base scope path where files will be ingested (e.g., "Company/SharePoint" or "SharePoint").',
+      ),
     ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
+    scopeManagementGraphqlUrl: z
+      .string()
+      .url()
+      .optional()
+      .describe(
+        'Required for RECURSIVE_ADVANCED mode. GraphQL endpoint for Scope Management service.',
+      ),
     fileDiffUrl: z.url().describe('Unique file diff service URL'),
     zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
     zitadelProjectId: z.string().describe('Zitadel project ID'),
@@ -57,10 +70,20 @@ const UniqueConfig = z
         'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-client-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
       ),
   })
-  .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {
+  .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.ingestionMode === IngestionMode.RecursiveAdvanced || config.scopeId, {
     message: 'scopeId is required for FLAT ingestion mode',
     path: ['scopeId'],
-  });
+  })
+  .refine(
+    (config) =>
+      config.ingestionMode !== IngestionMode.RecursiveAdvanced ||
+      (config.ingestionScopeLocation && config.scopeManagementGraphqlUrl),
+    {
+      message:
+        'ingestionScopeLocation and scopeManagementGraphqlUrl are required for RECURSIVE_ADVANCED ingestion mode',
+      path: ['ingestionScopeLocation'],
+    },
+  );
 
 export const uniqueConfig = registerConfig('unique', UniqueConfig);
 

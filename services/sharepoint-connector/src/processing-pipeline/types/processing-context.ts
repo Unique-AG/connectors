@@ -9,6 +9,7 @@ export interface ProcessingContext {
   uniqueContentId?: string;
   contentBuffer?: Buffer;
   fileSize?: number;
+  scopeId?: string;
 
   startTime: Date;
   mimeType?: string;

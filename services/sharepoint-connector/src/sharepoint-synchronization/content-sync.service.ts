@@ -17,18 +17,27 @@ export class ContentSyncService {
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly orchestrator: FileProcessingOrchestratorService,
     private readonly uniqueApiService: UniqueApiService,
-    private readonly configService: ConfigService<Config>,
+    private readonly configService: ConfigService<Config, true>,
   ) {}
 
-  public async syncContentForSite(siteId: string, items: SharepointContentItem[]): Promise<void> {
+  public async syncContentForSite(
+    siteId: string,
+    items: SharepointContentItem[],
+    scopeCache?: Map<string, string>,
+  ): Promise<void> {
     const logPrefix = `[SiteId: ${siteId}] `;
     const diffResult = await this.calculateDiffForSite(items, siteId);
     this.logger.log(
       `${logPrefix} File Diff Results: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
     );
 
+    // Filter items to process (only new and updated files)
+    const itemsToProcess = items.filter((item) =>
+      diffResult.newAndUpdatedFiles.some((key) => buildFileDiffKey(item) === key),
+    );
+
     const processStartTime = Date.now();
-    await this.orchestrator.processSiteItems(siteId, items, diffResult);
+    await this.orchestrator.processSiteItems(siteId, itemsToProcess, diffResult, scopeCache);
 
     this.logger.log(
       `${logPrefix} Finished processing content in ${elapsedSecondsLog(processStartTime)}`,

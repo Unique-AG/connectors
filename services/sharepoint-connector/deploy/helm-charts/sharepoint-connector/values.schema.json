@@ -131,14 +131,22 @@
               "type": "string",
               "description": "GraphQL URL for data ingestion"
             },
+            "scopeManagementGraphqlUrl": {
+              "type": ["string", "null"],
+              "description": "GraphQL URL for Scope Management service (required for recursive-advanced mode)"
+            },
             "ingestionMode": {
               "type": "string",
-              "enum": ["flat", "recursive"],
-              "description": "Synchronization mode: flat or recursive"
+              "enum": ["flat", "recursive", "recursive-advanced"],
+              "description": "Synchronization mode: flat, recursive, or recursive-advanced"
             },
             "rootScopeName": {
               "type": ["string", "null"],
-              "description": "Name of the root scope/folder in the knowledge base where SharePoint content should be synced"
+              "description": "Name of the root scope/folder in the knowledge base where SharePoint content should be synced (only for recursive mode)"
+            },
+            "ingestionScopeLocation": {
+              "type": ["string", "null"],
+              "description": "Base scope path where files will be ingested (required for recursive-advanced mode)"
             },
             "scopeId": {
               "type": ["string", "null"],

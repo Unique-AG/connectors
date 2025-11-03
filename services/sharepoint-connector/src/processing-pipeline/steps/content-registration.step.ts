@@ -9,7 +9,7 @@ import {
   IngestionMode,
 } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import { getScopeIdForIngestion } from '../../unique-api/ingestion.util';
+import { getBaseUrl, getScopeIdForIngestion } from '../../unique-api/ingestion.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
@@ -26,6 +26,7 @@ export class ContentRegistrationStep implements IPipelineStep {
   private readonly ingestionMode: IngestionMode;
   private readonly scopeId: string | undefined;
   private readonly rootScopeName: string | undefined;
+  private readonly ingestionScopeLocation: string | undefined;
   private readonly sharepointBaseUrl: string;
 
   public constructor(
@@ -36,16 +37,17 @@ export class ContentRegistrationStep implements IPipelineStep {
     this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
     this.scopeId = this.configService.get('unique.scopeId', { infer: true });
     this.rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
+    this.ingestionScopeLocation = this.configService.get('unique.ingestionScopeLocation', { infer: true });
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
 
-    const scopeId = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
+    const scopeId = getScopeIdForIngestion(this.ingestionMode, this.scopeId, context.scopeId);
 
     const itemKey = buildIngestionItemKey(context.pipelineItem);
-    const baseUrl = this.rootScopeName || this.sharepointBaseUrl;
+    const baseUrl = getBaseUrl(this.ingestionMode, this.ingestionScopeLocation, this.rootScopeName, this.sharepointBaseUrl);
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: itemKey,

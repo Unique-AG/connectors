@@ -21,6 +21,7 @@ import {
   type FileDiffResponse,
   type IngestionApiResponse,
   type IngestionFinalizationRequest,
+  type Scope,
 } from './unique-api.types';
 
 @Injectable()
@@ -33,6 +34,7 @@ export class UniqueApiService {
   private readonly fileDiffUrl: string;
   private readonly sharepointBaseUrl: string;
   private readonly ingestionGraphqlUrl: string;
+  private readonly scopeManagementGraphqlUrl: string | undefined;
   private readonly apiRateLimitPerMinute: number;
   private readonly ingestionHttpExtraHeaders: Record<string, string>;
 
@@ -46,6 +48,9 @@ export class UniqueApiService {
     this.fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     this.ingestionGraphqlUrl = this.configService.get('unique.ingestionGraphqlUrl', {
+      infer: true,
+    });
+    this.scopeManagementGraphqlUrl = this.configService.get('unique.scopeManagementGraphqlUrl', {
       infer: true,
     });
     this.apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
@@ -180,6 +185,32 @@ export class UniqueApiService {
     });
   }
 
+  public async generateScopesBasedOnPaths(
+    paths: string[],
+    uniqueToken: string,
+  ): Promise<Scope[]> {
+    if (!this.scopeManagementGraphqlUrl) {
+      this.logger.warn('Scope management GraphQL URL not configured, skipping scope generation.');
+      return [];
+    }
+
+    const client = this.createScopeManagementGraphqlClient(uniqueToken);
+    const variables = {
+      paths,
+    };
+
+    const errorMessage = 'Failed to generate scopes based on paths';
+    return await this.makeRateLimitedRequest(errorMessage, async () => {
+      const result = await client.request<{ generateScopesBasedOnPaths?: Scope[] }>(
+        this.getGenerateScopesMutation(),
+        variables,
+      );
+
+      assert.ok(result?.generateScopesBasedOnPaths, 'Invalid response from Scope Management API scope generation');
+      return result.generateScopesBasedOnPaths;
+    });
+  }
+
   private async makeRateLimitedRequest<T>(
     errorMessage: string,
     requestFn: () => Promise<T>,
@@ -197,6 +228,16 @@ export class UniqueApiService {
 
   private createGraphqlClient(uniqueToken: string): GraphQLClient {
     return new GraphQLClient(this.ingestionGraphqlUrl, {
+      headers: {
+        ...this.ingestionHttpExtraHeaders,
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${uniqueToken}`,
+      },
+    });
+  }
+
+  private createScopeManagementGraphqlClient(uniqueToken: string): GraphQLClient {
+    return new GraphQLClient(this.scopeManagementGraphqlUrl, {
       headers: {
         ...this.ingestionHttpExtraHeaders,
         'Content-Type': 'application/json',
@@ -244,6 +285,18 @@ export class UniqueApiService {
           kind
           name
         }
+      }
+    }
+  `;
+  }
+
+  private getGenerateScopesMutation(): string {
+    return `
+    mutation GenerateScopesBasedOnPaths($paths: [String!]!) {
+      generateScopesBasedOnPaths(paths: $paths) {
+        id
+        name
+        parentId
       }
     }
   `;

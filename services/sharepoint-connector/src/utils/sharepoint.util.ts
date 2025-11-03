@@ -119,3 +119,64 @@ export function buildIngestionItemKey(sharepointContentItem: SharepointContentIt
 function stripProtocol(url: string): string {
   return url.replace(/^https?:\/\//, '');
 }
+
+export function extractFolderPathFromUrl(fileUrl: string): string {
+  try {
+    const urlObj = new URL(fileUrl);
+    const pathName = urlObj.pathname;
+
+    // Extract site name: /sites/siteName or /sites/siteName/
+    const siteMatch = pathName.match(/\/sites\/([^/]+)/);
+    assert(siteMatch, 'Unable to extract site name from URL');
+    const siteName = siteMatch[1];
+    assert(siteName, 'Site name is empty');
+
+    // Extract path after site name
+    const afterSite = pathName.substring(siteMatch[0].length);
+    if (!afterSite || afterSite === '/') {
+      return siteName;
+    }
+
+    // Remove leading slash and trailing filename
+    let path = afterSite.replace(/^\//, '');
+    if (!path) {
+      return siteName;
+    }
+    
+    // Remove filename (last segment after last slash)
+    const lastSlashIndex = path.lastIndexOf('/');
+    if (lastSlashIndex > 0) {
+      const folderPath = path.substring(0, lastSlashIndex);
+      assert(folderPath, 'Folder path is empty');
+      path = folderPath;
+    } else {
+      // No folder, file is in root
+      return siteName;
+    }
+
+    // Normalize slashes and combine
+    const normalizedPath = normalizeSlashes(path);
+    assert(normalizedPath, 'Normalized path is empty');
+    return `${siteName}/${normalizedPath}`;
+  } catch (error) {
+    throw new Error(`Failed to extract folder path from URL "${fileUrl}": ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export function buildScopePathFromItem(
+  item: SharepointContentItem,
+  ingestionScopeLocation: string,
+): string {
+  const getFileUrl = (contentItem: SharepointContentItem): string => {
+    if (contentItem.itemType === 'driveItem') {
+      return contentItem.item.listItem?.webUrl || contentItem.item.webUrl || '';
+    }
+    return contentItem.item.webUrl || '';
+  };
+
+  const fileUrl = getFileUrl(item);
+  assert(fileUrl, 'Unable to determine file URL from item');
+
+  const folderPath = extractFolderPathFromUrl(fileUrl);
+  return `${ingestionScopeLocation}/${folderPath}`;
+}
