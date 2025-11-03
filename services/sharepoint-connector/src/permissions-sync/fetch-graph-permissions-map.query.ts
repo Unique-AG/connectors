@@ -6,9 +6,13 @@ import {
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { ItemPermission } from './types';
+import { Membership } from './types';
+import { OWNERS_SUFFIX } from './utils';
 
-const OWNERS_SUFFIX = '_o';
+// We rename the type for clarity. we use the same stucture for permissions on files/folders as well
+// as memberships of groups. These are the same structures, so for the ease of code reading we ranem
+// the local type name.
+type Permission = Membership;
 
 @Injectable()
 export class FetchGraphPermissionsMapQuery {
@@ -19,8 +23,8 @@ export class FetchGraphPermissionsMapQuery {
   public async run(
     siteId: string,
     items: SharepointContentItem[],
-  ): Promise<Record<string, ItemPermission[]>> {
-    const permissionsMap: Record<string, ItemPermission[]> = {};
+  ): Promise<Record<string, Permission[]>> {
+    const permissionsMap: Record<string, Permission[]> = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
       if (item.itemType === 'driveItem') {
@@ -45,7 +49,7 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSimplePermissionsToItemPermissions(
     simplePermissions: SimplePermission[],
-  ): ItemPermission[] {
+  ): Permission[] {
     return simplePermissions.flatMap((permission) => {
       if (isNonNullish(permission.grantedToV2)) {
         const itemPermission = this.mapSimpleIdentitySetToItemPermission(permission.grantedToV2);
@@ -77,7 +81,7 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSimpleIdentitySetToItemPermission(
     simpleIdentitySet: SimpleIdentitySet,
-  ): ItemPermission | null {
+  ): Permission | null {
     // TODO: Are we missing case of "Everyone except external users"?
     if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
       const isOwners = simpleIdentitySet.siteUser.loginName?.endsWith(OWNERS_SUFFIX);

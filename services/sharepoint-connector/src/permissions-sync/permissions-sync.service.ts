@@ -4,7 +4,7 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
-import { groupUniqueId } from './types';
+import { groupUniqueId } from './utils';
 
 @Injectable()
 export class PermissionsSyncService {
@@ -28,15 +28,16 @@ export class PermissionsSyncService {
     );
     this.logger.log(`${logPrefix} Permissions map length: ${Object.keys(permissionsMap).length}`);
 
+    const uniqueGroupPermissions = pipe(
+      permissionsMap,
+      values(),
+      flat(),
+      filter((permission) => permission.type !== 'user'),
+      uniqueBy(groupUniqueId),
+    );
     const groupsWithMemberships = await this.fetchGroupsWithMembershipsQuery.run(
       siteId,
-      pipe(
-        permissionsMap,
-        values(),
-        flat(),
-        filter((permission) => permission.type !== 'user'),
-        uniqueBy(groupUniqueId),
-      ),
+      uniqueGroupPermissions,
     );
 
     this.logger.log(`${logPrefix} Groups found: ${Object.keys(groupsWithMemberships).length}`);

@@ -25,13 +25,8 @@ import {
   SharepointRestClientService,
   SiteGroupMembership,
 } from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
-import {
-  GroupMembership,
-  GroupUniqueId,
-  groupUniqueId,
-  ItemPermission,
-  PermissionType,
-} from './types';
+import type { GroupMembership, GroupUniqueId, Membership } from './types';
+import { groupUniqueId, isGroupType, OWNERS_SUFFIX } from './utils';
 
 interface GroupWithMembers {
   id: GroupUniqueId;
@@ -48,7 +43,7 @@ export class FetchGroupsWithMembershipsQuery {
 
   public async run(
     siteId: string,
-    permissions: ItemPermission[],
+    permissions: Membership[],
   ): Promise<Record<string, GroupWithMembers>> {
     const siteWebUrl = await this.graphApiService.getSiteWebUrl(siteId);
     const siteName = siteWebUrl.split('/').pop();
@@ -102,7 +97,7 @@ export class FetchGroupsWithMembershipsQuery {
 
   private mapItemPermissionToGroupWithMembers(
     group: GroupMembership,
-    groupsMembershipsMap: Record<string, ItemPermission[]>,
+    groupsMembershipsMap: Record<string, Membership[]>,
   ): GroupWithMembers {
     const groupId = groupUniqueId(group);
     const groupName = group.name;
@@ -132,12 +127,12 @@ export class FetchGroupsWithMembershipsQuery {
 
   private async fetchGroupMemberships(
     groups: { id: string; type: 'groupMembers' | 'groupOwners' }[],
-  ): Promise<[GroupUniqueId, ItemPermission[]][]> {
+  ): Promise<[GroupUniqueId, Membership[]][]> {
     // TODO: Once we have batch requests for Graph API implemented, change this method to take
     // advantage of that instead of chunking manually.
 
     const chunkedGroups = chunk(groups, 20);
-    const groupMembershipsMappings: [GroupUniqueId, ItemPermission[]][] = [];
+    const groupMembershipsMappings: [GroupUniqueId, Membership[]][] = [];
     for (const groupChunk of chunkedGroups) {
       const groupMemberships = await Promise.all(
         groupChunk.map((group) =>
@@ -155,7 +150,7 @@ export class FetchGroupsWithMembershipsQuery {
     return groupMembershipsMappings;
   }
 
-  private mapGroupMembershipToItemPermission(membership: GroupMember): ItemPermission {
+  private mapGroupMembershipToItemPermission(membership: GroupMember): Membership {
     if (membership['@odata.type'] === '#microsoft.graph.user') {
       return {
         type: 'user',
@@ -178,7 +173,7 @@ export class FetchGroupsWithMembershipsQuery {
   private async fetchSiteGroupsMembershipsMap(
     siteName: string,
     siteGroupIds: string[],
-  ): Promise<Record<GroupUniqueId, ItemPermission[]>> {
+  ): Promise<Record<GroupUniqueId, Membership[]>> {
     return pipe(
       await this.sharepointRestClientService.getSiteGroupsMemberships(siteName, siteGroupIds),
       mapKeys((id) => groupUniqueId({ type: 'siteGroup', id })),
@@ -191,8 +186,8 @@ export class FetchGroupsWithMembershipsQuery {
     LoginName: loginName,
     Email: email,
     Title: title,
-  }: SiteGroupMembership): ItemPermission {
-    const principalTypeMapper: Record<PrincipalType, () => ItemPermission> = {
+  }: SiteGroupMembership): Membership {
+    const principalTypeMapper: Record<PrincipalType, () => Membership> = {
       [PrincipalType.User]: () => ({ type: 'user', email }),
       [PrincipalType.DistributionList]: () => ({
         type: 'groupMembers',
@@ -219,10 +214,3 @@ export class FetchGroupsWithMembershipsQuery {
     );
   }
 }
-
-const OWNERS_SUFFIX = '_o';
-
-const isGroupType = <T extends { type: PermissionType }>(
-  item: T,
-): item is T & { type: 'groupMembers' | 'groupOwners' } =>
-  item.type === 'groupMembers' || item.type === 'groupOwners';
