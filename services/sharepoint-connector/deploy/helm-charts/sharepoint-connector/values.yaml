@@ -11,17 +11,19 @@ connector:
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
-  extraEnvCM:
-    - sharepoint-connector-config
-  extraEnvSecrets:
-    # -- default the chart expects the ZITADEL Client Secret from a secret named
-    # sharepoint-connector-secret, but this is just for convenience. Users can supersede this with
+  envVars:
+    # -- loading of Zitadel Secret, Users can supersede this with
     # their own secret that contains UNIQUE_ZITADEL_CLIENT_SECRET or use
     # https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load
     # completely arbitrary secret mappings.
     # See also below in connectorConfig.unique.zitadel.clientSecret.
-    # The same would apply for a potentially required SHAREPOINT_AUTH_CLIENT_SECRET.
-    - sharepoint-connector-secret
+    - name: UNIQUE_ZITADEL_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: sharepoint-connector-secret
+          key: UNIQUE_ZITADEL_CLIENT_SECRET
+  extraEnvCM:
+    - sharepoint-connector-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
     tag: 2.0.0-alpha.9 # x-release-please-version
@@ -57,16 +59,20 @@ connector:
   volumes:
     - name: tmp
       emptyDir: {}
-    - name: sharepoint-connector-certificate
+      # -- Graph/SharePoint Certificate Secret
+      # by default the chart expects the certificate to be in a secret named sharepoint-connector-secret under the key key.pem
+      # Users can supersede this with their own secret that contains the certificate under a different key or use
+      # Users must also set the connectorConfig.sharepoint.auth.privateKeyPath to the path of the certificate in the secret
+    - name: sharepoint-connector-secret
       secret:
-        secretName: sharepoint-connector-certificate
+        secretName: sharepoint-connector-secret
         items:
           - key: key.pem
             path: key.pem
   volumeMounts:
     - name: tmp
       mountPath: /tmp
-    - name: sharepoint-connector-certificate
+    - name: sharepoint-connector-secret
       mountPath: /app/key.pem
       subPath: key.pem
       readOnly: true
