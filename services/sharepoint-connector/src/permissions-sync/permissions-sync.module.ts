@@ -7,7 +7,11 @@ import { PermissionsSyncService } from './permissions-sync.service';
 
 @Module({
   imports: [MicrosoftApisModule, UniqueApiModule],
-  providers: [FetchGraphPermissionsMapQuery, FetchGroupsWithMembershipsQuery],
+  providers: [
+    PermissionsSyncService,
+    FetchGraphPermissionsMapQuery,
+    FetchGroupsWithMembershipsQuery,
+  ],
   exports: [PermissionsSyncService],
 })
 export class PermissionsSyncModule {}

@@ -47,7 +47,7 @@ export class GraphApiService {
   }
 
   public async getAllSiteItems(siteId: string): Promise<SharepointContentItem[]> {
-    const logPrefix = `[SiteId: ${siteId}] `;
+    const logPrefix = `[SiteId: ${siteId}]`;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
       this.getAspxPagesForSite(siteId),
       this.getAllFilesForSite(siteId),
@@ -466,7 +466,7 @@ export class GraphApiService {
       const response = await this.makeRateLimitedRequest(() => requestBuilder(nextPageUrl));
       const items = response?.value || [];
 
-      allItems.concat(items);
+      allItems.push(...items);
 
       if (!response['@odata.nextLink']) {
         break;

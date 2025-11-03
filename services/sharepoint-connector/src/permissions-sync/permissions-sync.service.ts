@@ -19,7 +19,7 @@ export class PermissionsSyncService {
     siteId: string,
     items: SharepointContentItem[],
   ): Promise<void> {
-    const logPrefix = `[SiteId: ${siteId}] `;
+    const logPrefix = `[SiteId: ${siteId}]`;
     this.logger.log(`${logPrefix} Starting permissions fetching for ${items.length} items`);
     const permissionsFetchStartTime = Date.now();
     const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(siteId, items);

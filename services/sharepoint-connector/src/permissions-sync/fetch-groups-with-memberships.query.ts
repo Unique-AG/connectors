@@ -111,8 +111,8 @@ export class FetchGroupsWithMembershipsQuery {
           groupsMembershipsMap[currentGroupId] ?? [],
           (membership) => membership.type === 'user',
         );
-        groupMembers.concat(currentGroupUserMembers.map(prop('email')));
-        newProcessedGroupIds.concat(currentGroupGroupMembers.map(groupUniqueId));
+        groupMembers.push(...currentGroupUserMembers.map(prop('email')));
+        newProcessedGroupIds.push(...currentGroupGroupMembers.map(groupUniqueId));
       }
       processedGroupIds = newProcessedGroupIds;
     } while (processedGroupIds.length > 0);

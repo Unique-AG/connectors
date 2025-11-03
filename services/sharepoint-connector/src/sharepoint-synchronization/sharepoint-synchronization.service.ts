@@ -33,7 +33,7 @@ export class SharepointSynchronizationService {
     this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
 
     for (const siteId of siteIdsToScan) {
-      const logPrefix = `[SiteId: ${siteId}] `;
+      const logPrefix = `[SiteId: ${siteId}]`;
 
       const siteStartTime = Date.now();
       const items = await this.graphApiService.getAllSiteItems(siteId);

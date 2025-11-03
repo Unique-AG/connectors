@@ -18,6 +18,7 @@ import { SharepointRestHttpService } from './sharepoint-rest/sharepoint-rest-htt
     GraphAuthenticationService,
     GraphApiService,
     SharepointRestHttpService,
+    SharepointRestClientService,
   ],
   exports: [GraphApiService, SharepointRestClientService],
 })
