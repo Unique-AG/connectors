@@ -3,6 +3,7 @@ import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod'
 import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import { IngestionMode } from '../constants/ingestion.constants';
+import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { Redacted } from '../utils/redacted';
 
 const UniqueConfig = z
@@ -39,6 +40,22 @@ const UniqueConfig = z
       .positive()
       .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
       .describe('Number of Unique API requests allowed per minute'),
+    zitadelHttpExtraHeaders: z
+      .string()
+      .optional()
+      .prefault('')
+      .pipe(parseJsonEnvironmentVariable('zitadelHttpExtraHeaders'))
+      .describe(
+        'JSON string of extra HTTP headers for Zitadel requests (e.g., {"x-zitadel-instance-host": "<zitadel-host>"})',
+      ),
+    httpExtraHeaders: z
+      .string()
+      .optional()
+      .prefault('')
+      .pipe(parseJsonEnvironmentVariable('httpExtraHeaders'))
+      .describe(
+        'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-client-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
+      ),
   })
   .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {
     message: 'scopeId is required for FLAT ingestion mode',

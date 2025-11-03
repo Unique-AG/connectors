@@ -123,6 +123,10 @@
               "type": "string",
               "description": "URL for file differences"
             },
+            "httpExtraHeaders": {
+              "type": ["object"],
+              "description": "HTTP extra headers for ingestion API requests"
+            },
             "ingestionGraphqlUrl": {
               "type": "string",
               "description": "GraphQL URL for data ingestion"
@@ -164,6 +168,10 @@
                 "projectId": {
                   "type": "string",
                   "description": "Zitadel project ID"
+                },
+                "httpExtraHeaders": {
+                  "type": ["object"],
+                  "description": "HTTP extra headers for Zitadel OAuth requests"
                 }
               },
               "additionalProperties": false

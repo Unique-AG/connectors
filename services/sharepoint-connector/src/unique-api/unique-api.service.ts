@@ -34,6 +34,7 @@ export class UniqueApiService {
   private readonly sharepointBaseUrl: string;
   private readonly ingestionGraphqlUrl: string;
   private readonly apiRateLimitPerMinute: number;
+  private readonly ingestionHttpExtraHeaders: Record<string, string>;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -50,6 +51,8 @@ export class UniqueApiService {
     this.apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
       infer: true,
     });
+    this.ingestionHttpExtraHeaders =
+      this.configService.get('unique.httpExtraHeaders', { infer: true }) || {};
 
     this.limiter = new Bottleneck({
       reservoir: this.apiRateLimitPerMinute,
@@ -119,6 +122,7 @@ export class UniqueApiService {
         method: 'POST',
         path,
         headers: {
+          ...this.ingestionHttpExtraHeaders,
           'Content-Type': 'application/json',
           Authorization: `Bearer ${uniqueToken}`,
         },
@@ -194,6 +198,7 @@ export class UniqueApiService {
   private createGraphqlClient(uniqueToken: string): GraphQLClient {
     return new GraphQLClient(this.ingestionGraphqlUrl, {
       headers: {
+        ...this.ingestionHttpExtraHeaders,
         'Content-Type': 'application/json',
         Authorization: `Bearer ${uniqueToken}`,
       },
