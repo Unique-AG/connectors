@@ -12,5 +12,4 @@ export const parseJsonEnvironmentVariable = (fieldName: string) =>
           `Invalid JSON for ${fieldName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
       }
-    })
-    .catch(() => ({}));
+    });
