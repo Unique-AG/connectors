@@ -117,7 +117,7 @@
         "unique": {
           "type": "object",
           "description": "Unique platform configuration",
-          "required": ["fileDiffUrl", "ingestionGraphqlUrl", "zitadel"],
+          "required": ["fileDiffUrl", "ingestionGraphqlUrl", "ingestionMode", "zitadel"],
           "properties": {
             "fileDiffUrl": {
               "type": "string",
@@ -126,6 +126,15 @@
             "ingestionGraphqlUrl": {
               "type": "string",
               "description": "GraphQL URL for data ingestion"
+            },
+            "ingestionMode": {
+              "type": "string",
+              "enum": ["flat", "recursive"],
+              "description": "Synchronization mode: flat or recursive"
+            },
+            "rootScopeName": {
+              "type": ["string", "null"],
+              "description": "Name of the root scope/folder in the knowledge base where SharePoint content should be synced"
             },
             "scopeId": {
               "type": ["string", "null"],
