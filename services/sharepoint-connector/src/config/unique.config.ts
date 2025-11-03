@@ -2,6 +2,7 @@ import { ConfigType } from '@nestjs/config';
 import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
+import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { Redacted } from '../utils/redacted';
 
 const UniqueConfig = z.object({
@@ -30,15 +31,15 @@ const UniqueConfig = z.object({
     .string()
     .optional()
     .prefault('')
-    .transform((val) => (val ? JSON.parse(val) : {}))
+    .pipe(parseJsonEnvironmentVariable('zitadelHttpExtraHeaders'))
     .describe(
       'JSON string of extra HTTP headers for Zitadel requests (e.g., {"x-zitadel-instance-host": "id.example.com"})',
     ),
-  ingestionHttpExtraHeaders: z
+  httpExtraHeaders: z
     .string()
     .optional()
     .prefault('')
-    .transform((val) => (val ? JSON.parse(val) : {}))
+    .pipe(parseJsonEnvironmentVariable('httpExtraHeaders'))
     .describe(
       'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-client-id": "sharepoint-connector", "x-company-id": "...", "x-user-id": "..."})',
     ),

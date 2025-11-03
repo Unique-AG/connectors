@@ -36,7 +36,7 @@ export class UniqueApiService {
       infer: true,
     });
     this.ingestionHttpExtraHeaders =
-      this.configService.get('unique.ingestionHttpExtraHeaders', { infer: true }) || {};
+      this.configService.get('unique.httpExtraHeaders', { infer: true }) || {};
 
     this.limiter = new Bottleneck({
       reservoir: rateLimitPerMinute,

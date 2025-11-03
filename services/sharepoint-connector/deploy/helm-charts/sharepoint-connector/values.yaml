@@ -108,6 +108,10 @@ connectorConfig:
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion
     apiRateLimitPerMinute: 100
+    # -- JSON string of extra HTTP headers for ingestion API requests (GraphQL and file diff)
+    # Used for service-to-service authentication when using internal cluster URLs
+    # example: '{"x-client-id": "sharepoint-connector", "x-company-id": "...", "x-user-id": "..."}'
+    httpExtraHeaders: null
     zitadel:
       clientId: unset_default_value
       # clientSecret is presented from a secret, see connector.extraEnvSecrets
@@ -118,13 +122,6 @@ connectorConfig:
       # -- JSON string of extra HTTP headers for Zitadel OAuth requests
       # example: '{"x-zitadel-instance-host": "id.example.com"}'
       httpExtraHeaders: null
-
-    ingestion:
-      # -- JSON string of extra HTTP headers for ingestion API requests (GraphQL and file diff)
-      # Used for service-to-service authentication when using internal cluster URLs
-      # example: '{"x-client-id": "sharepoint-connector", "x-company-id": "...", "x-user-id": "..."}'
-      httpExtraHeaders: null
-
   processing:
     stepTimeoutSeconds: 300
     concurrency: 1

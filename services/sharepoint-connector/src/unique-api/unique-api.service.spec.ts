@@ -31,7 +31,7 @@ describe('UniqueApiService', () => {
           if (key === 'unique.ingestionGraphQLUrl') return 'https://ingestion.example.com/graphql';
           if (key === 'unique.ingestionGraphqlUrl') return 'https://ingestion.example.com/graphql';
           if (key === 'unique.scopeId') return 'scope-1';
-          if (key === 'unique.ingestionHttpExtraHeaders') return {};
+          if (key === 'unique.httpExtraHeaders') return {};
           return undefined;
         }),
       }))
@@ -79,7 +79,7 @@ describe('UniqueApiService', () => {
           if (key === 'unique.fileDiffUrl') return 'https://ingestion.example.com/api';
           if (key === 'unique.ingestionGraphqlUrl') return 'https://ingestion.example.com/graphql';
           if (key === 'unique.scopeId') return 'scope-1';
-          if (key === 'unique.ingestionHttpExtraHeaders') return { 'x-client-id': 'test-client' };
+          if (key === 'unique.httpExtraHeaders') return { 'x-client-id': 'test-client' };
           return undefined;
         }),
       }))
