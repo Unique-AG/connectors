@@ -7,7 +7,7 @@ import {
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { Membership } from './types';
-import { OWNERS_SUFFIX } from './utils';
+import { normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
 
 // We rename the type for clarity. we use the same stucture for permissions on files/folders as well
 // as memberships of groups. These are the same structures, so for the ease of code reading we ranem
@@ -92,7 +92,7 @@ export class FetchGraphPermissionsMapQuery {
         // c:0o.c|federateddirectoryclaimprovider|838f7d2d-BBBB-AAAA-DDDD-7dd9d399aff7
         // Presence of _o suffix indicates the owners of the group as opposed to the members
         type: `group${isOwners ? 'Owners' : 'Members'}`,
-        id: simpleIdentitySet.group.id,
+        id: normalizeMsGroupId(simpleIdentitySet.group.id),
         name: simpleIdentitySet.group.displayName,
       };
     }

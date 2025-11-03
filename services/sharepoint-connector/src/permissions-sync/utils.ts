@@ -9,3 +9,7 @@ export const isGroupType = <T extends { type: MembershipType }>(
   item: T,
 ): item is T & { type: 'groupMembers' | 'groupOwners' } =>
   item.type === 'groupMembers' || item.type === 'groupOwners';
+
+export function normalizeMsGroupId(groupId: string): string {
+  return groupId.replace(new RegExp(`${OWNERS_SUFFIX}$`), '');
+}

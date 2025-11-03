@@ -1,11 +1,13 @@
 import assert from 'node:assert';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   chunk,
   filter,
   flat,
   fromEntries,
+  isNonNullish,
   last,
+  length,
   map,
   mapKeys,
   mapValues,
@@ -13,6 +15,7 @@ import {
   pick,
   pipe,
   prop,
+  sum,
   unique,
   uniqueBy,
   values,
@@ -26,7 +29,7 @@ import {
   SiteGroupMembership,
 } from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
 import type { GroupMembership, GroupUniqueId, Membership } from './types';
-import { groupUniqueId, isGroupType, OWNERS_SUFFIX } from './utils';
+import { groupUniqueId, isGroupType, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
 
 interface GroupWithMembers {
   id: GroupUniqueId;
@@ -36,6 +39,8 @@ interface GroupWithMembers {
 
 @Injectable()
 export class FetchGroupsWithMembershipsQuery {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(
     private readonly graphApiService: GraphApiService,
     private readonly sharepointRestClientService: SharepointRestClientService,
@@ -45,6 +50,10 @@ export class FetchGroupsWithMembershipsQuery {
     siteId: string,
     permissions: Membership[],
   ): Promise<Record<string, GroupWithMembers>> {
+    const logPrefix = `[SiteId: ${siteId}]`;
+    this.logger.log(
+      `${logPrefix} Fetching groups with memberships for ${permissions.length} unique permissions`,
+    );
     const siteWebUrl = await this.graphApiService.getSiteWebUrl(siteId);
     const siteName = siteWebUrl.split('/').pop();
     assert.ok(siteName, `Site name not found for site ${siteId}`);
@@ -56,7 +65,11 @@ export class FetchGroupsWithMembershipsQuery {
     );
 
     const siteGroupIds = siteGroupsPermissions.map((permission) => permission.id);
+    this.logger.log(
+      `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
+    );
     const groupMembershipsMap = await this.fetchSiteGroupsMembershipsMap(siteName, siteGroupIds);
+    this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
 
     let msGroupsToProcess = pipe(
       [...permissions, ...pipe(groupMembershipsMap, values(), flat())],
@@ -65,7 +78,11 @@ export class FetchGroupsWithMembershipsQuery {
       map(pick(['id', 'type'])),
     );
 
+    this.logger.log(`${logPrefix} Fetching MS groups memberships map`);
     while (msGroupsToProcess.length > 0) {
+      this.logger.debug(
+        `${logPrefix} Fetching MS groups memberships for ${msGroupsToProcess.length} groups`,
+      );
       const responseMappings = await this.fetchGroupMemberships(msGroupsToProcess);
       responseMappings.forEach(([groupId, itemPermissions]) => {
         groupMembershipsMap[groupId] = itemPermissions;
@@ -79,7 +96,15 @@ export class FetchGroupsWithMembershipsQuery {
         uniqueBy(groupUniqueId),
         map(pick(['id', 'type'])),
       );
+      this.logger.debug(`${logPrefix} Found ${msGroupsToProcess.length} groups to process next`);
     }
+
+    const fetchedGroupsTotal = Object.keys(groupMembershipsMap).length;
+    const fetchedMembershipsTotal = pipe(groupMembershipsMap, mapValues(length()), values(), sum());
+    this.logger.log(
+      `${logPrefix} Done fetching MS groups memberships. Fetched ${fetchedGroupsTotal} groups ` +
+        `with total ${fetchedMembershipsTotal} memberships`,
+    );
 
     return pipe(
       permissions,
@@ -136,16 +161,16 @@ export class FetchGroupsWithMembershipsQuery {
     for (const groupChunk of chunkedGroups) {
       const groupMemberships = await Promise.all(
         groupChunk.map((group) =>
-          group.type === 'groupMembers'
-            ? this.graphApiService.getGroupMembers(group.id)
-            : this.graphApiService.getGroupOwners(group.id),
+          group.type === 'groupOwners'
+            ? this.graphApiService.getGroupOwners(group.id)
+            : this.graphApiService.getGroupMembers(group.id),
         ),
       );
       const chunkIds = groupChunk.map(groupUniqueId);
       const chunkItemPermissions = groupMemberships.map(
         map(this.mapGroupMembershipToItemPermission.bind(this)),
       );
-      groupMembershipsMappings.concat(zip(chunkIds, chunkItemPermissions));
+      groupMembershipsMappings.push(...zip(chunkIds, chunkItemPermissions));
     }
     return groupMembershipsMappings;
   }
@@ -178,6 +203,7 @@ export class FetchGroupsWithMembershipsQuery {
       await this.sharepointRestClientService.getSiteGroupsMemberships(siteName, siteGroupIds),
       mapKeys((id) => groupUniqueId({ type: 'siteGroup', id })),
       mapValues(map(this.mapRestApiMembershipToGroupMembership.bind(this))),
+      mapValues(filter(isNonNullish)),
     );
   }
 
@@ -186,21 +212,23 @@ export class FetchGroupsWithMembershipsQuery {
     LoginName: loginName,
     Email: email,
     Title: title,
-  }: SiteGroupMembership): Membership {
-    const principalTypeMapper: Record<PrincipalType, () => Membership> = {
-      [PrincipalType.User]: () => ({ type: 'user', email }),
-      [PrincipalType.DistributionList]: () => ({
-        type: 'groupMembers',
-        name: title,
-        id: this.extractGroupId(loginName),
-      }),
+  }: SiteGroupMembership): Membership | null {
+    const principalTypeMapper: Record<PrincipalType, () => Membership | null> = {
+      [PrincipalType.User]: () => {
+        const userEmail = email || loginName.split('|').pop() || '';
+        // We check if the value resembles an email because of cases like SHAREPOINT\\system
+        return userEmail?.includes('@') ? { type: 'user', email: userEmail } : null;
+      },
+      [PrincipalType.DistributionList]: () => {
+        const groupId = this.extractGroupId(loginName);
+        return groupId ? { type: 'groupMembers', id: groupId, name: title } : null;
+      },
       [PrincipalType.SecurityGroup]: () => {
         const groupId = this.extractGroupId(loginName);
-        return {
-          type: `group${groupId.endsWith(OWNERS_SUFFIX) ? 'Owners' : 'Members'}`,
-          id: groupId,
-          name: title,
-        };
+        const groupType = groupId?.endsWith(OWNERS_SUFFIX) ? 'Owners' : 'Members';
+        return groupId
+          ? { type: `group${groupType}`, id: normalizeMsGroupId(groupId), name: title }
+          : null;
       },
       [PrincipalType.SharePointGroup]: () =>
         assert.fail(`SharePoint site groups nesting is not supported in SharePoint`),
@@ -208,9 +236,7 @@ export class FetchGroupsWithMembershipsQuery {
     return principalTypeMapper[principalType]();
   }
 
-  private extractGroupId(loginName: string): string {
-    return (
-      loginName.split('|').pop() ?? assert.fail(`Invalid login name for a group: ${loginName}`)
-    );
+  private extractGroupId(loginName: string): string | null {
+    return loginName.split('|').pop() ?? null;
   }
 }

@@ -26,7 +26,6 @@ export class PermissionsSyncService {
     this.logger.log(
       `${logPrefix} Fetched permissions for ${items.length} items in ${elapsedSecondsLog(permissionsFetchStartTime)}`,
     );
-    this.logger.log(`${logPrefix} Permissions map length: ${Object.keys(permissionsMap).length}`);
 
     const uniqueGroupPermissions = pipe(
       permissionsMap,
@@ -35,11 +34,18 @@ export class PermissionsSyncService {
       filter((permission) => permission.type !== 'user'),
       uniqueBy(groupUniqueId),
     );
+    this.logger.log(
+      `${logPrefix} Fetching groups with memberships from SharePoint & Graph APIs for ` +
+        `${uniqueGroupPermissions.length} unique group permissions`,
+    );
     const groupsWithMemberships = await this.fetchGroupsWithMembershipsQuery.run(
       siteId,
       uniqueGroupPermissions,
     );
+    this.logger.log(`${logPrefix} Groups with memberships fetched successfully`);
 
-    this.logger.log(`${logPrefix} Groups found: ${Object.keys(groupsWithMemberships).length}`);
+    this.logger.log(
+      `${logPrefix} Found ${Object.keys(groupsWithMemberships).length} groups with memberships`,
+    );
   }
 }
