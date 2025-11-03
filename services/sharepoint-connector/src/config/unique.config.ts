@@ -33,7 +33,7 @@ const UniqueConfig = z.object({
     .prefault('')
     .pipe(parseJsonEnvironmentVariable('zitadelHttpExtraHeaders'))
     .describe(
-      'JSON string of extra HTTP headers for Zitadel requests (e.g., {"x-zitadel-instance-host": "id.example.com"})',
+      'JSON string of extra HTTP headers for Zitadel requests (e.g., {"x-zitadel-instance-host": "<zitadel-host>"})',
     ),
   httpExtraHeaders: z
     .string()
@@ -41,7 +41,7 @@ const UniqueConfig = z.object({
     .prefault('')
     .pipe(parseJsonEnvironmentVariable('httpExtraHeaders'))
     .describe(
-      'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-client-id": "sharepoint-connector", "x-company-id": "...", "x-user-id": "..."})',
+      'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-client-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
     ),
 });
 

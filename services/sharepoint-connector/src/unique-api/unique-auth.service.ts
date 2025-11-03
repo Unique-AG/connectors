@@ -39,9 +39,9 @@ export class UniqueAuthService {
       const { statusCode, body } = await request(oAuthTokenUrl, {
         method: 'POST',
         headers: {
+          ...this.zitadelHttpExtraHeaders,
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret.value}`).toString('base64')}`,
-          ...this.zitadelHttpExtraHeaders,
         },
         body: params.toString(),
       });

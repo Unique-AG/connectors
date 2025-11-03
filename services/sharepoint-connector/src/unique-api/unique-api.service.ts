@@ -106,9 +106,9 @@ export class UniqueApiService {
         method: 'POST',
         path,
         headers: {
+          ...this.ingestionHttpExtraHeaders,
           'Content-Type': 'application/json',
           Authorization: `Bearer ${uniqueToken}`,
-          ...this.ingestionHttpExtraHeaders,
         },
         body: JSON.stringify(diffRequest),
       });
@@ -183,9 +183,9 @@ export class UniqueApiService {
     const graphqlUrl = this.configService.get('unique.ingestionGraphqlUrl', { infer: true });
     return new GraphQLClient(graphqlUrl, {
       headers: {
+        ...this.ingestionHttpExtraHeaders,
         'Content-Type': 'application/json',
         Authorization: `Bearer ${uniqueToken}`,
-        ...this.ingestionHttpExtraHeaders,
       },
     });
   }
