@@ -60,7 +60,6 @@ const UniqueConfig = z
   .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {
     message: 'scopeId is required for FLAT ingestion mode',
     path: ['scopeId'],
-
   });
 
 export const uniqueConfig = registerConfig('unique', UniqueConfig);
