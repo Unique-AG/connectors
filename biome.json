@@ -8,7 +8,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/dist", "!**/.turbo", "!**/@generated", "!**/coverage", "!**/drizzle"]
+    "includes": ["**", "!**/dist", "!**/.turbo", "!**/@generated", "!**/coverage", "!**/drizzle", "!**/helm-charts/**/values.schema.json"]
   },
   "formatter": {
     "enabled": true,
