@@ -14,7 +14,7 @@ import { SHAREPOINT_REST_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.t
         const url = new URL(fileDiffUrl);
         return new Client(`${url.protocol}//${url.host}`, {
           bodyTimeout: 30000,
-          headersTimeout: 5000,
+          headersTimeout: 30000,
         });
       },
       inject: [ConfigService],
@@ -25,7 +25,7 @@ import { SHAREPOINT_REST_HTTP_CLIENT, UNIQUE_HTTP_CLIENT } from './http-client.t
         const sharePointBaseUrl = configService.get('sharepoint.baseUrl', { infer: true });
         return new Client(sharePointBaseUrl, {
           bodyTimeout: 30000,
-          headersTimeout: 5000,
+          headersTimeout: 30000,
         });
       },
       inject: [ConfigService],

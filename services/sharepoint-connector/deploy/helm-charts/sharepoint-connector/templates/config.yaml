@@ -37,6 +37,10 @@ data:
   {{- if .Values.connectorConfig.unique.scopeId }}
   UNIQUE_SCOPE_ID: {{ .Values.connectorConfig.unique.scopeId | quote }}
   {{- end }}
+  UNIQUE_INGESTION_MODE: {{ .Values.connectorConfig.unique.ingestionMode | quote }}
+  {{- if .Values.connectorConfig.unique.rootScopeName }}
+  UNIQUE_ROOT_SCOPE_NAME: {{ .Values.connectorConfig.unique.rootScopeName | quote }}
+  {{- end }}
   UNIQUE_FILE_DIFF_URL: {{ .Values.connectorConfig.unique.fileDiffUrl | quote }}
   UNIQUE_INGESTION_GRAPHQL_URL: {{ .Values.connectorConfig.unique.ingestionGraphqlUrl | quote }}
   UNIQUE_ZITADEL_CLIENT_ID: {{ .Values.connectorConfig.unique.zitadel.clientId | quote }}
