@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.0.0-alpha.10](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.9...sharepoint-connector@v2.0.0-alpha.10) (2025-11-03)
+
+
+### Features
+
+* **sharepoint-connector:** add certificate support ([#84](https://github.com/Unique-AG/connectors/issues/84)) ([a789694](https://github.com/Unique-AG/connectors/commit/a7896948047ec292f4c6f9105921358e5cdadb17))
+* **sharepoint-connector:** added workflow actions from template-mcp-ci to sharepoint-connector ([#76](https://github.com/Unique-AG/connectors/issues/76)) ([c883fbe](https://github.com/Unique-AG/connectors/commit/c883fbe6e908797d2919306f9d4692e8da3808e1))
+* **sharepoint-connector:** expose cron job on env variable ([#75](https://github.com/Unique-AG/connectors/issues/75)) ([40ddc11](https://github.com/Unique-AG/connectors/commit/40ddc11c05fc747b8b3698a532f02ed4482cfac5))
+* **sharepoint-connector:** fixed hairpinning ([#87](https://github.com/Unique-AG/connectors/issues/87)) ([1b98d5d](https://github.com/Unique-AG/connectors/commit/1b98d5d7ea3409ddd9774a5925b4cd79437e2a9e))
+* **sharepoint-connector:** implement certificate authentication for SharePoint ([#82](https://github.com/Unique-AG/connectors/issues/82)) ([56e3e44](https://github.com/Unique-AG/connectors/commit/56e3e4496f846044e74f3db274807b9ac9c3c096))
+* **sharepoint-connector:** implement configurable ingestion folder ([#83](https://github.com/Unique-AG/connectors/issues/83)) ([492f9e0](https://github.com/Unique-AG/connectors/commit/492f9e039d205c23a2e23cacc7621f69d4163ae9))
+* **sharepoint-connector:** permissions fetching ([#81](https://github.com/Unique-AG/connectors/issues/81)) ([dd124f5](https://github.com/Unique-AG/connectors/commit/dd124f5400d96924ee2b8b030bb1a8c8b265e463))
+* **sharepoint-connector:** revert OIDC token debugging changes ([#77](https://github.com/Unique-AG/connectors/issues/77)) ([72f647f](https://github.com/Unique-AG/connectors/commit/72f647f24007c583ffe11af1e80dd42a7d534ab0))
+* **spc:** read drive item web url from listItem instead of item so we have a nice file path for knowledgebase ([#80](https://github.com/Unique-AG/connectors/issues/80)) ([c695267](https://github.com/Unique-AG/connectors/commit/c6952671290c06eef32019b4b95a439aa40f94e4))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** add certificate resources ([#88](https://github.com/Unique-AG/connectors/issues/88)) ([1b2c844](https://github.com/Unique-AG/connectors/commit/1b2c844487801592f9757d1e05f59205c90793e4))
+* **sharepoint-connector:** do not request Graph API token multiple times ([#79](https://github.com/Unique-AG/connectors/issues/79)) ([528b6a2](https://github.com/Unique-AG/connectors/commit/528b6a226c736a4f7119778915309e896248e2db))
+
 ## [2.0.0-alpha.9](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.8...sharepoint-connector@v2.0.0-alpha.9) (2025-10-20)
 
 
