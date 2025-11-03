@@ -43,10 +43,10 @@ data:
   UNIQUE_ZITADEL_OAUTH_TOKEN_URL: {{ .Values.connectorConfig.unique.zitadel.oauthTokenUrl | quote }}
   UNIQUE_ZITADEL_PROJECT_ID: {{ .Values.connectorConfig.unique.zitadel.projectId | quote }}
   {{- if .Values.connectorConfig.unique.zitadel.httpExtraHeaders }}
-  UNIQUE_ZITADEL_HTTP_EXTRA_HEADERS: {{ .Values.connectorConfig.unique.zitadel.httpExtraHeaders | quote }}
+  UNIQUE_ZITADEL_HTTP_EXTRA_HEADERS: {{ .Values.connectorConfig.unique.zitadel.httpExtraHeaders | toJson | quote }}
   {{- end }}
   {{- if .Values.connectorConfig.unique.httpExtraHeaders }}
-  UNIQUE_INGESTION_HTTP_EXTRA_HEADERS: {{ .Values.connectorConfig.unique.httpExtraHeaders | quote }}
+  UNIQUE_INGESTION_HTTP_EXTRA_HEADERS: {{ .Values.connectorConfig.unique.httpExtraHeaders | toJson | quote }}
   {{- end }}
   {{- if .Values.connectorConfig.unique.apiRateLimitPerMinute }}
   UNIQUE_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.unique.apiRateLimitPerMinute | quote }}
