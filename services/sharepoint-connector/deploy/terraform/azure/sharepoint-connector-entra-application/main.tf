@@ -112,3 +112,14 @@ resource "azuread_application_federated_identity_credential" "sharepoint_connect
   issuer         = each.value.issuer
   subject        = each.value.subject
 }
+
+
+resource "azuread_application_certificate" "sharepoint_connector_cert" {
+  for_each = var.certificates
+
+  application_id = azuread_application.sharepoint_connector.id
+  end_date       = each.value.end_date
+  start_date     = each.value.start_date
+  type           = each.value.type
+  value          = each.value.certificate
+}
