@@ -17,6 +17,7 @@ export class SharepointRestClientService {
       siteGroupIds.map((id) => `/sitegroups/getById(${id})/users`),
     );
 
+    // TODO: Handle pagination - group may have multiple pages and we should return all entries.
     return pipe(
       responses,
       map(prop('value')),
