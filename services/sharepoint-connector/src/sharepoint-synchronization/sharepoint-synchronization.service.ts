@@ -51,7 +51,7 @@ export class SharepointSynchronizationService {
       // Batch create scopes for recursive-advanced mode
       let scopeCache: Map<string, string> | undefined;
       const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-      
+
       if (ingestionMode === IngestionMode.RecursiveAdvanced) {
         scopeCache = await this.createScopesForRecursiveAdvanced(items, logPrefix);
         if (!scopeCache) continue;

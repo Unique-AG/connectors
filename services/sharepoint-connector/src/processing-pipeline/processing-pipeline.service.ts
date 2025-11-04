@@ -39,7 +39,10 @@ export class ProcessingPipelineService {
       this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
   }
 
-  public async processItem(pipelineItem: SharepointContentItem, scopeId?: string): Promise<PipelineResult> {
+  public async processItem(
+    pipelineItem: SharepointContentItem,
+    scopeId?: string,
+  ): Promise<PipelineResult> {
     const startTime = new Date();
     const correlationId = randomUUID();
     const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });

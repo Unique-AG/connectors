@@ -37,7 +37,9 @@ export class ContentRegistrationStep implements IPipelineStep {
     this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
     this.scopeId = this.configService.get('unique.scopeId', { infer: true });
     this.rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
-    this.ingestionScopeLocation = this.configService.get('unique.ingestionScopeLocation', { infer: true });
+    this.ingestionScopeLocation = this.configService.get('unique.ingestionScopeLocation', {
+      infer: true,
+    });
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
   }
 
@@ -47,7 +49,12 @@ export class ContentRegistrationStep implements IPipelineStep {
     const scopeId = getScopeIdForIngestion(this.ingestionMode, this.scopeId, context.scopeId);
 
     const itemKey = buildIngestionItemKey(context.pipelineItem);
-    const baseUrl = getBaseUrl(this.ingestionMode, this.ingestionScopeLocation, this.rootScopeName, this.sharepointBaseUrl);
+    const baseUrl = getBaseUrl(
+      this.ingestionMode,
+      this.ingestionScopeLocation,
+      this.rootScopeName,
+      this.sharepointBaseUrl,
+    );
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: itemKey,

@@ -142,7 +142,7 @@ export function extractFolderPathFromUrl(fileUrl: string): string {
     if (!path) {
       return siteName;
     }
-    
+
     // Remove filename (last segment after last slash)
     const lastSlashIndex = path.lastIndexOf('/');
     if (lastSlashIndex > 0) {
@@ -159,7 +159,9 @@ export function extractFolderPathFromUrl(fileUrl: string): string {
     assert(normalizedPath, 'Normalized path is empty');
     return `${siteName}/${normalizedPath}`;
   } catch (error) {
-    throw new Error(`Failed to extract folder path from URL "${fileUrl}": ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to extract folder path from URL "${fileUrl}": ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 

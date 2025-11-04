@@ -28,7 +28,9 @@ export class FileProcessingOrchestratorService {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
     const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-    const ingestionScopeLocation = this.configService.get('unique.ingestionScopeLocation', { infer: true });
+    const ingestionScopeLocation = this.configService.get('unique.ingestionScopeLocation', {
+      infer: true,
+    });
 
     const newFileKeys = new Set(diffResult.newAndUpdatedFiles);
     const filteredItems = items.filter((item) => {
@@ -43,13 +45,14 @@ export class FileProcessingOrchestratorService {
     this.logger.log(`Processing ${filteredItems.length} files for site ${siteId}`);
 
     // Build item scope ID map for recursive-advanced mode
-    const itemScopeIdMap = ingestionMode === IngestionMode.RecursiveAdvanced
-      ? this.scopeManagementService.buildItemScopeIdMap(
-          filteredItems,
-          ingestionScopeLocation,
-          scopeCache,
-        )
-      : undefined;
+    const itemScopeIdMap =
+      ingestionMode === IngestionMode.RecursiveAdvanced
+        ? this.scopeManagementService.buildItemScopeIdMap(
+            filteredItems,
+            ingestionScopeLocation,
+            scopeCache,
+          )
+        : undefined;
 
     const results = await Promise.allSettled(
       filteredItems.map((item) =>

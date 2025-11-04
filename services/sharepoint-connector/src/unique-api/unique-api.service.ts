@@ -108,7 +108,7 @@ export class UniqueApiService {
     const path = url.pathname + url.search;
 
     const basePath = this.rootScopeName || this.sharepointBaseUrl;
-    const scopeForRequest = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
+    const scopeForRequest = getScopeIdForIngestion(this.ingestionMode, this.scopeId, undefined);
 
     const diffRequest: FileDiffRequest = {
       basePath,
@@ -185,10 +185,7 @@ export class UniqueApiService {
     });
   }
 
-  public async generateScopesBasedOnPaths(
-    paths: string[],
-    uniqueToken: string,
-  ): Promise<Scope[]> {
+  public async generateScopesBasedOnPaths(paths: string[], uniqueToken: string): Promise<Scope[]> {
     if (!this.scopeManagementGraphqlUrl) {
       this.logger.warn('Scope management GraphQL URL not configured, skipping scope generation.');
       return [];
@@ -206,7 +203,10 @@ export class UniqueApiService {
         variables,
       );
 
-      assert.ok(result?.generateScopesBasedOnPaths, 'Invalid response from Scope Management API scope generation');
+      assert.ok(
+        result?.generateScopesBasedOnPaths,
+        'Invalid response from Scope Management API scope generation',
+      );
       return result.generateScopesBasedOnPaths;
     });
   }
@@ -237,6 +237,7 @@ export class UniqueApiService {
   }
 
   private createScopeManagementGraphqlClient(uniqueToken: string): GraphQLClient {
+    assert(this.scopeManagementGraphqlUrl, 'Scope management GraphQL URL is not configured');
     return new GraphQLClient(this.scopeManagementGraphqlUrl, {
       headers: {
         ...this.ingestionHttpExtraHeaders,

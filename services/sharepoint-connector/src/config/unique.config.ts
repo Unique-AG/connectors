@@ -70,10 +70,16 @@ const UniqueConfig = z
         'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-client-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
       ),
   })
-  .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.ingestionMode === IngestionMode.RecursiveAdvanced || config.scopeId, {
-    message: 'scopeId is required for FLAT ingestion mode',
-    path: ['scopeId'],
-  })
+  .refine(
+    (config) =>
+      config.ingestionMode === IngestionMode.Recursive ||
+      config.ingestionMode === IngestionMode.RecursiveAdvanced ||
+      config.scopeId,
+    {
+      message: 'scopeId is required for FLAT ingestion mode',
+      path: ['scopeId'],
+    },
+  )
   .refine(
     (config) =>
       config.ingestionMode !== IngestionMode.RecursiveAdvanced ||

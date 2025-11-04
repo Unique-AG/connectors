@@ -17,7 +17,9 @@ export class ScopeManagementService {
   ) {}
 
   public async batchCreateScopes(items: SharepointContentItem[]): Promise<Map<string, string>> {
-    const ingestionScopeLocation = this.configService.get('unique.ingestionScopeLocation', { infer: true });
+    const ingestionScopeLocation = this.configService.get('unique.ingestionScopeLocation', {
+      infer: true,
+    });
     assert(ingestionScopeLocation, 'ingestionScopeLocation must be configured');
 
     // Extract unique folder paths
