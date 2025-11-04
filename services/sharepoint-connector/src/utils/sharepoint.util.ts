@@ -108,7 +108,7 @@ function appendWebParameter(url: string): string {
 
 /**
  * Strips the SharePoint domain and 'sites' prefix from a URL.
- * 
+ *
  * Examples:
  * - "https://company.sharepoint.com/sites/mysite/Shared Documents/folder/file.pdf"
  *   becomes "mysite/Shared Documents/folder/file.pdf"
@@ -118,13 +118,13 @@ function appendWebParameter(url: string): string {
 function stripSharepointPathPrefixes(url: string): string {
   // Remove protocol
   let path = url.replace(/^https?:\/\//, '');
-  
+
   // Remove domain (e.g., "uniqueapp.sharepoint.com/")
   path = path.replace(/^[^/]+\//, '');
-  
+
   // Remove "sites/" prefix if present
   path = path.replace(/^sites\//, '');
-  
+
   return path;
 }
 

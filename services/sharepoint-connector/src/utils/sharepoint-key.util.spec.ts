@@ -144,14 +144,17 @@ describe('getItemUrl', () => {
       item: {
         id: 'file1',
         listItem: {
-          webUrl: 'https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf',
         },
       },
     };
 
     const result = getItemUrl(item);
 
-    expect(result).toBe('https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf?web=1');
+    expect(result).toBe(
+      'https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf?web=1',
+    );
   });
 
   it('simplifies path structure with custom scope for driveItem', () => {
@@ -160,7 +163,8 @@ describe('getItemUrl', () => {
       item: {
         id: 'file1',
         listItem: {
-          webUrl: 'https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf',
+          webUrl:
+            'https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf',
         },
       },
     };
