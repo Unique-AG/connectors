@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSharepointFileKey, buildSharepointPartialKey } from './sharepoint.util';
+import { buildSharepointFileKey, buildSharepointPartialKey, getItemUrl } from './sharepoint.util';
 
 describe('buildSharepointFileKey', () => {
   it('should build scope-based key when scopeId is provided', () => {
@@ -134,5 +134,115 @@ describe('buildSharepointPartialKey', () => {
     });
 
     expect(result).toBe('site456');
+  });
+});
+
+describe('getItemUrl', () => {
+  it('returns full URL when no rootScopeName is provided for driveItem', () => {
+    const item = {
+      itemType: 'driveItem' as const,
+      item: {
+        id: 'file1',
+        listItem: {
+          webUrl: 'https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf',
+        },
+      },
+    };
+
+    const result = getItemUrl(item);
+
+    expect(result).toBe('https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf?web=1');
+  });
+
+  it('simplifies path structure with custom scope for driveItem', () => {
+    const item = {
+      itemType: 'driveItem' as const,
+      item: {
+        id: 'file1',
+        listItem: {
+          webUrl: 'https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf',
+        },
+      },
+    };
+
+    const result = getItemUrl(item, 'my-custom-scope');
+
+    expect(result).toBe('my-custom-scope/project/Shared Documents/folder/report.pdf?web=1');
+  });
+
+  it('simplifies path structure with custom scope for listItem', () => {
+    const item = {
+      itemType: 'listItem' as const,
+      item: {
+        id: 'list1',
+        webUrl: 'https://contoso.sharepoint.com/sites/Engineering/SitePages/home.aspx',
+      },
+    };
+
+    const result = getItemUrl(item, 'knowledge-base');
+
+    expect(result).toBe('knowledge-base/Engineering/SitePages/home.aspx?web=1');
+  });
+
+  it('handles different SharePoint domains correctly', () => {
+    const item = {
+      itemType: 'driveItem' as const,
+      item: {
+        id: 'file1',
+        listItem: {
+          webUrl: 'https://company-dev.sharepoint.com/sites/team/Documents/budget.xlsx',
+        },
+      },
+    };
+
+    const result = getItemUrl(item, 'finance-scope');
+
+    expect(result).toBe('finance-scope/team/Documents/budget.xlsx?web=1');
+  });
+
+  it('preserves query parameters when simplifying path', () => {
+    const item = {
+      itemType: 'listItem' as const,
+      item: {
+        id: 'list1',
+        webUrl: 'https://company.sharepoint.com/sites/marketing/news/article.aspx?id=123',
+      },
+    };
+
+    const result = getItemUrl(item, 'content-root');
+
+    expect(result).toBe('content-root/marketing/news/article.aspx?id=123&web=1');
+  });
+
+  it('handles special characters in folder paths', () => {
+    const item = {
+      itemType: 'driveItem' as const,
+      item: {
+        id: 'file1',
+        listItem: {
+          webUrl: 'https://company.sharepoint.com/sites/team/Shared Documents/2024 Q1/report.pdf',
+        },
+      },
+    };
+
+    const result = getItemUrl(item, 'archive');
+
+    expect(result).toBe('archive/team/Shared Documents/2024 Q1/report.pdf?web=1');
+  });
+
+  it('removes sites prefix correctly', () => {
+    const item = {
+      itemType: 'driveItem' as const,
+      item: {
+        id: 'file1',
+        listItem: {
+          webUrl: 'https://tenant.sharepoint.com/sites/site-name/library/path/file.txt',
+        },
+      },
+    };
+
+    const result = getItemUrl(item, 'root');
+
+    expect(result).toBe('root/site-name/library/path/file.txt?web=1');
   });
 });
