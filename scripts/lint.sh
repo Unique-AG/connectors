@@ -14,7 +14,7 @@ echo -e "\n-- Linting all Helm Charts --\n"
 docker run --rm \
      -v "$REPO_ROOT:/workdir" \
      --entrypoint /bin/sh \
-     quay.io/helmpack/chart-testing:v3.11.0 \
+     quay.io/helmpack/chart-testing:v3.14.0 \
      -c cd /workdir \
      ct lint \
      --config .github/configs/ct-lint.yaml \

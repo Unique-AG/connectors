@@ -11,7 +11,7 @@ echo -e "\n-- Installing necessary CRDs --\n"
 
 # Install Prometheus Operator CRDs (includes ServiceMonitor, PrometheusRule, etc.)
 echo "Installing Prometheus Operator CRDs (monitoring.coreos.com/v1)..."
-kubectl apply --server-side -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.84.1/stripped-down-crds.yaml
+kubectl apply --server-side -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.86.1/stripped-down-crds.yaml
 
 # Get Kubernetes version and extract the major.minor version
 version=$(kubectl version -o json | jq -r '.serverVersion.major + "." + .serverVersion.minor' | tr -d '+')
@@ -21,7 +21,7 @@ minor_version=$(echo $version | cut -d. -f2)
 # Compare version with 1.23. The gateway CRDs use x-kubernetes-validations, which is only supported from 1.23 onwards.
 if [ "$major_version" -eq 1 ] && [ "$minor_version" -ge 23 ] || [ "$major_version" -gt 1 ]; then
   echo "Kubernetes version $version >= 1.23, applying Gateway API CRDs"
-  kubectl apply -k https://github.com/kubernetes-sigs/gateway-api/config/crd
+kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
 else
   echo "Kubernetes version $version < 1.23, skipping Gateway API CRDs installation"
   echo "Please use an older version of Gateway API CRDs or upgrade your Kubernetes version"
