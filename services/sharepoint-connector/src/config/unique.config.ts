@@ -26,6 +26,7 @@ const UniqueConfig = z
         'Used only in case of Recursive ingestion mode. Indicates the name of the root scope/folder in the knowledge base where SharePoint content should be synced.',
       ),
     ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
+    scopeManagementGraphqlUrl: z.url().describe('Unique graphql scope management service URL'),
     fileDiffUrl: z.url().describe('Unique file diff service URL'),
     zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
     zitadelProjectId: z.string().describe('Zitadel project ID'),
