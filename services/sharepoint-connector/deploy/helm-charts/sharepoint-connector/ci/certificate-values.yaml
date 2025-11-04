@@ -1,0 +1,50 @@
+connector:
+  networkPolicy:
+    ingress:
+      - from:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/managed-by: prometheus-operator
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: system
+  prometheus:
+    defaultAlerts:
+      additionalLabels:
+        team: my-team
+  serviceAccount:
+    workloadIdentity:
+      clientId: 00000000-0000-0000-0000-000000000000
+  # Secret only added for testing and demonstration
+  extraObjects:
+    - apiVersion: v1
+      kind: Secret
+      metadata:
+        name: sharepoint-connector-secret
+      type: Opaque
+      stringData:
+        UNIQUE_ZITADEL_CLIENT_SECRET: fake-client-secret-value
+        key.pem: |
+          -----BEGIN PRIVATE KEY-----
+          -----END PRIVATE KEY-----
+connectorConfig:
+  sharepoint:
+    baseUrl: https://uniqueapp.sharepoint.com
+    siteIds:
+      - bd9c85ee-998f-4665-9c44-577cf5a08a66
+    syncColumnName: FinanceGPTKnowledge
+    auth:
+      clientId: ff140e75-f52d-4312-b7ba-64d436895676 # https://www.uuidgenerator.net/version4
+      tenantId: d4a04d87-966a-4e28-a0d6-dcf7ce92490a # https://www.uuidgenerator.net/version4
+      thumbprintSha1: 2fd4e1c67a2d28fced849ee1bb76e7391b93eb12
+  unique:
+    fileDiffUrl: http://ingestion.unique:8091/v1/content/file-diff
+    ingestionGraphqlUrl: http://ingestion.unique:8091/graphql
+    httpExtraHeaders:
+      x-service-id: sharepoint-connector
+      x-company-id: "123456789101112131"
+      x-user-id: "123456789101112131"
+    zitadel:
+      clientId: sharepoint-connector@localhost
+      oauthTokenUrl: http://zitadel.system:8080/oauth/v2/token
+      projectId: "123456789101112131"

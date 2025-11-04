@@ -6,13 +6,15 @@ import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import {
   INGESTION_SOURCE_KIND,
   INGESTION_SOURCE_NAME,
-  PATH_BASED_INGESTION,
+  IngestionMode,
 } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import { getScopeIdForIngestion } from '../../unique-api/ingestion.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { normalizeError } from '../../utils/normalize-error';
+import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -21,34 +23,56 @@ import type { IPipelineStep } from './pipeline-step.interface';
 export class ContentRegistrationStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.ContentRegistration;
+  private readonly ingestionMode: IngestionMode;
+  private readonly scopeId: string | undefined;
+  private readonly rootScopeName: string | undefined;
+  private readonly sharepointBaseUrl: string;
 
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly uniqueApiService: UniqueApiService,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+    this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
+    this.scopeId = this.configService.get('unique.scopeId', { infer: true });
+    this.rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
+    this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+  }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
-    const scopeId = this.configService.get('unique.scopeId', { infer: true });
-    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
-    const isPathBasedIngestion = !scopeId;
 
-    const itemKey = `${context.pipelineItem.siteId}/${context.pipelineItem.item.id}`;
+    const scopeId = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
+
+    const itemKey = buildIngestionItemKey(context.pipelineItem);
+    const baseUrl = this.rootScopeName || this.sharepointBaseUrl;
+
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: itemKey,
       title: context.pipelineItem.fileName,
       mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
       ownerType: UniqueOwnerType.Scope,
-      scopeId: isPathBasedIngestion ? PATH_BASED_INGESTION : scopeId,
+      scopeId: scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
-      ...(isPathBasedIngestion && {
+      ...(this.ingestionMode === IngestionMode.Recursive && {
         url: context.knowledgeBaseUrl,
-        baseUrl: sharepointBaseUrl,
+        baseUrl,
       }),
     };
+    this.logger.debug(
+      `contentRegistrationRequest: ${JSON.stringify(
+        {
+          url: contentRegistrationRequest.url,
+          baseUrl: contentRegistrationRequest.baseUrl,
+          key: contentRegistrationRequest.key,
+          sourceName: contentRegistrationRequest.sourceName,
+        },
+        null,
+        4,
+      )}`,
+    );
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();

@@ -12,8 +12,12 @@ export class UniqueAuthService {
   // used protected to allow use of typeguard isTokenValid
   protected cachedToken?: string;
   private tokenExpirationTime?: number;
+  private readonly zitadelHttpExtraHeaders: Record<string, string>;
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {}
+  public constructor(private readonly configService: ConfigService<Config, true>) {
+    this.zitadelHttpExtraHeaders =
+      this.configService.get('unique.zitadelHttpExtraHeaders', { infer: true }) || {};
+  }
 
   public async getToken(): Promise<string> {
     if (this.isTokenValid()) {
@@ -35,6 +39,7 @@ export class UniqueAuthService {
       const { statusCode, body } = await request(oAuthTokenUrl, {
         method: 'POST',
         headers: {
+          ...this.zitadelHttpExtraHeaders,
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret.value}`).toString('base64')}`,
         },

@@ -35,6 +35,7 @@ describe('UniqueAuthService', () => {
           if (key === 'unique.zitadelClientId') return 'client';
           if (key === 'unique.zitadelClientSecret') return new Redacted('secret');
           if (key === 'unique.zitadelProjectId') return 'proj-123';
+          if (key === 'unique.zitadelHttpExtraHeaders') return {};
           return undefined;
         }),
       }))
@@ -52,6 +53,48 @@ describe('UniqueAuthService', () => {
         method: 'POST',
         headers: expect.objectContaining({
           'Content-Type': 'application/x-www-form-urlencoded',
+        }),
+      }),
+    );
+  });
+
+  it('includes extra headers in Zitadel request', async () => {
+    const { request } = await import('undici');
+    vi.mocked(request).mockResolvedValue({
+      statusCode: 200,
+      body: {
+        text: vi.fn().mockResolvedValue(''),
+        json: vi.fn().mockResolvedValue({
+          access_token: 'jwt-token-with-headers',
+          expires_in: 600,
+          token_type: 'Bearer',
+          id_token: 'id',
+        }),
+      },
+    } as never);
+
+    const { unit } = await TestBed.solitary(UniqueAuthService)
+      .mock(ConfigService)
+      .impl((stub) => ({
+        ...stub(),
+        get: vi.fn((key: string) => {
+          if (key === 'unique.zitadelOauthTokenUrl') return 'https://auth.example.com/oauth/token';
+          if (key === 'unique.zitadelClientId') return 'client';
+          if (key === 'unique.zitadelClientSecret') return new Redacted('secret');
+          if (key === 'unique.zitadelProjectId') return 'proj-123';
+          if (key === 'unique.zitadelHttpExtraHeaders')
+            return { 'x-zitadel-instance-host': 'id.example.com' };
+          return undefined;
+        }),
+      }))
+      .compile();
+
+    await unit.getToken();
+    expect(request).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'x-zitadel-instance-host': 'id.example.com',
         }),
       }),
     );

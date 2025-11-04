@@ -10,10 +10,20 @@ variable "sign_in_audience" {
   default     = "AzureADMultipleOrgs"
 }
 
-variable "graph_roles" {
-  description = "A list of Graph API roles to assign to the application."
-  type        = list(string)
-  default     = ["Files.Read.All", "Sites.Read.All"]
+variable "service_principal_configuration_enabled" {
+  description = "Whether to configure a service principal for the Azure AD application. Might get disabled in certain cross-tenant scenarios where the counter-tenant creates the service principal."
+  default     = true
+  type        = bool
+}
+
+variable "sync_mode_role_preset" {
+  description = "The sync mode preset to assign roles to the application. Valid values are 'content-only' or 'content-and-permissions'."
+  type        = string
+  default     = "content-and-permissions"
+  validation {
+    condition     = contains(["content-only", "content-and-permissions"], var.sync_mode_role_preset)
+    error_message = "Invalid sync mode preset. Valid values are 'content-only' or 'content-and-permissions'."
+  }
 }
 
 variable "federated_identity_credentials" {
@@ -24,10 +34,22 @@ variable "federated_identity_credentials" {
     issuer      = string
     subject     = string
   }))
+  default = {}
   # Example
   # {
   #  "my-first-kuberentes-cluster" = {
   #  issuer      = "https://switzerlandnorth.oic.prod-aks.azure.com/<my_entra_tenant_id>/<my_aks_cluster_guid>/"
   #  subject     = "system:serviceaccount:<namespace>:<serviceaccount-name>"
   # }
+}
+
+variable "certificates" {
+  description = "A map of Entra application certificates for the Azure AD application. Each key is the display name and the value contains the certificate configuration."
+  type = map(object({
+    certificate = string
+    end_date    = string
+    start_date  = optional(string)
+    type        = optional(string, "AsymmetricX509Cert")
+  }))
+  default = {}
 }
