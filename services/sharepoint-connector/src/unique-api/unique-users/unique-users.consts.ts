@@ -1,3 +1,5 @@
+import { gql } from 'graphql-request';
+
 export interface ListUsersQueryInput {
   skip: number;
   take: number;
@@ -14,7 +16,7 @@ export interface ListUsersQueryResult {
   };
 }
 
-export const LIST_USERS_QUERY = `
+export const LIST_USERS_QUERY = gql`
   query ListUsers($skip: Int!, $take: Int!) {
     listUsers: paginatedUsers(skip: $skip, take: $take) {
       totalCount

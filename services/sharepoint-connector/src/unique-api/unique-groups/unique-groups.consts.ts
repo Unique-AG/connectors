@@ -1,3 +1,5 @@
+import { gql } from 'graphql-request';
+
 export const SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX = 'SPC-';
 export const SHAREPOINT_CONNECTOR_GROUP_CREATED_BY = 'sharepoint-connector';
 
@@ -16,7 +18,7 @@ export interface ListGroupsQueryResult {
   }[];
 }
 
-export const LIST_GROUPS_QUERY = `
+export const LIST_GROUPS_QUERY = gql`
   query ListGroups($externalIdPrefix: String!, $skip: Int!, $take: Int!) {
     listGroups: allGroups(where: { externalId: { startsWith: $externalIdPrefix } }, skip: $skip, take: $take) {
       id
@@ -43,7 +45,7 @@ export interface CreateGroupMutationResult {
   };
 }
 
-export const CREATE_GROUP_MUTATION = `
+export const CREATE_GROUP_MUTATION = gql`
   mutation CreateGroup($name: String!, $externalId: String!, $createdBy: String!) {
     createGroup(input: { name: $name, externalId: $externalId, createdBy: $createdBy }) {
       id
@@ -66,7 +68,7 @@ export interface UpdateGroupMutationResult {
   };
 }
 
-export const UPDATE_GROUP_MUTATION = `
+export const UPDATE_GROUP_MUTATION = gql`
   mutation UpdateGroup($groupId: String!, $name: String!) {
     updateGroup(id: $groupId, input: { name: $name }) {
       id
@@ -86,7 +88,7 @@ export interface DeleteGroupMutationResult {
   };
 }
 
-export const DELETE_GROUP_MUTATION = `
+export const DELETE_GROUP_MUTATION = gql`
   mutation DeleteGroup($groupId: String!) {
     deleteGroup(id: $groupId) {
       id
@@ -106,7 +108,7 @@ export interface AddGroupMembersMutationResult {
   }[];
 }
 
-export const ADD_GROUP_MEMBERS_MUTATION = `
+export const ADD_GROUP_MEMBERS_MUTATION = gql`
   mutation AddGroupMembers($groupId: String!, $userIds: [String!]!) {
     addGroupMembers: createMemberships(groupId: $groupId, userIds: $userIds) {
       entityId
@@ -122,7 +124,7 @@ export interface RemoveGroupMemberMutationInput {
 
 export type RemoveGroupMemberMutationResult = boolean;
 
-export const REMOVE_GROUP_MEMBER_MUTATION = `
+export const REMOVE_GROUP_MEMBER_MUTATION = gql`
   mutation RemoveGroupMember($groupId: String!, $userId: String!) {
     removeGroupMember: deleteMemberships(groupIds: [$groupId], userId: $userId)
   }

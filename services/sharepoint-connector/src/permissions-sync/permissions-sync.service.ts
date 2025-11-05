@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { filter, flat, pipe, uniqueBy, values } from 'remeda';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
+import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
@@ -13,6 +15,8 @@ export class PermissionsSyncService {
   public constructor(
     private readonly fetchGraphPermissionsMapQuery: FetchGraphPermissionsMapQuery,
     private readonly fetchGroupsWithMembershipsQuery: FetchGroupsWithMembershipsQuery,
+    private readonly uniqueGroupsService: UniqueGroupsService,
+    private readonly uniqueUsersService: UniqueUsersService,
   ) {}
 
   public async syncPermissionsForSite(
@@ -46,6 +50,13 @@ export class PermissionsSyncService {
 
     this.logger.log(
       `${logPrefix} Found ${Object.keys(groupsWithMemberships).length} groups with memberships`,
+    );
+
+    const uniqueGroups = await this.uniqueGroupsService.listAllGroups();
+    const uniqueUsers = await this.uniqueUsersService.listAllUsers();
+
+    this.logger.log(
+      `${logPrefix} Found ${uniqueGroups.length} unique groups and ${uniqueUsers.length} unique users`,
     );
   }
 }

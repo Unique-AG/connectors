@@ -19,15 +19,13 @@ export class IngestionClient {
     const clientUrl = this.configService.get('unique.ingestionGraphqlUrl', { infer: true });
     const clientHeaders = this.configService.get('unique.httpExtraHeaders', { infer: true });
     this.graphQlClient = new GraphQLClient(clientUrl, {
-      headers: {
-        ...clientHeaders,
-        'Content-Type': 'application/json',
-      },
       requestMiddleware: async (request) => {
         return {
           ...request,
           headers: {
             ...request.headers,
+            ...clientHeaders,
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${await this.uniqueAuthService.getToken()}`,
           },
         };
