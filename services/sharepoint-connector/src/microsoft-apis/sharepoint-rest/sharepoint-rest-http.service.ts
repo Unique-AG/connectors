@@ -88,6 +88,7 @@ export class SharepointRestHttpService {
 
       // Example: multipart/mixed; boundary=batchresponse_a1182996-c482-49d1-ac38-16ae3788d990
       const responseBoundary = headers['content-type']?.toString().split(';')[1]?.split('=')[1];
+      assert.ok(responseBoundary, 'Response boundary not found');
       const responseBody = await body.text();
       const responsesChunk = responseBody
         .split(`--${responseBoundary}`)
