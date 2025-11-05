@@ -27,7 +27,7 @@ export class UniqueUsersService {
           }),
       );
       users.push(...batchResult.listUsers.nodes.map(pick(['id', 'email'])));
-      batchCount = batchResult.listUsers.totalCount;
+      batchCount = batchResult.listUsers.nodes.length;
       skip += BATCH_SIZE;
     } while (batchCount === BATCH_SIZE);
 

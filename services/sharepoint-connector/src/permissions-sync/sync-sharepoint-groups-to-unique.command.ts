@@ -139,7 +139,7 @@ export class SyncSharepointGroupsToUniqueCommand {
     const memberIdsFromSharePoint = getUniqueMemberIds(sharePointGroup, uniqueUsersMap);
 
     if (memberIdsFromSharePoint.length === 0) {
-      this.uniqueGroupsService.deleteGroup(uniqueGroup.id);
+      await this.uniqueGroupsService.deleteGroup(uniqueGroup.id);
       return [true, null];
     }
 
