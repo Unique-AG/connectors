@@ -39,13 +39,16 @@ export class SyncSharepointGroupsToUniqueCommand {
 
     const sharePointGroups = Object.values(sharePointGroupsMap);
     this.logger.log(`Syncing ${sharePointGroups.length} sharepoint groups`);
-    const groupsSyncStats: { created: number; updated: number; deleted: number; skipped: number } =
-      {
-        created: 0,
-        updated: 0,
-        deleted: 0,
-        skipped: 0,
-      };
+    const groupsSyncStats: Record<
+      'created' | 'updated' | 'deleted' | 'skipped' | 'unchanged',
+      number
+    > = {
+      created: 0,
+      updated: 0,
+      deleted: 0,
+      skipped: 0,
+      unchanged: 0,
+    };
 
     for (const sharePointGroup of sharePointGroups) {
       const logPrefix = `[Group: ${sharePointGroup.id}]`;
@@ -82,6 +85,7 @@ export class SyncSharepointGroupsToUniqueCommand {
         continue;
       }
 
+      groupsSyncStats.unchanged++;
       this.logger.debug(`${logPrefix} No changes to Unique Group`);
       updatedUniqueGroupsMap[sharePointGroup.id] = correspondingUniqueGroup;
     }
@@ -99,10 +103,11 @@ export class SyncSharepointGroupsToUniqueCommand {
 
     this.logger.log(
       `Synced ${sharePointGroups.length} sharepoint groups:\n` +
-        `    Created: ${groupsSyncStats.created} groups\n` +
-        `    Updated: ${groupsSyncStats.updated} groups\n` +
-        `    Deleted: ${groupsSyncStats.deleted} groups\n` +
-        `    Skipped: ${groupsSyncStats.skipped} groups`,
+        `    Created:   ${groupsSyncStats.created} groups\n` +
+        `    Updated:   ${groupsSyncStats.updated} groups\n` +
+        `    Deleted:   ${groupsSyncStats.deleted} groups\n` +
+        `    Skipped:   ${groupsSyncStats.skipped} groups\n` +
+        `    Unchanged: ${groupsSyncStats.unchanged} groups`,
     );
 
     return {
