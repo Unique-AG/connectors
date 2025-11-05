@@ -122,16 +122,20 @@ export class UniqueGroupsService {
     );
   }
 
-  public async removeGroupMember(groupId: string, userId: string): Promise<void> {
-    await this.scopeManagementClient.get(
-      async (client) =>
-        await client.request<RemoveGroupMemberMutationResult, RemoveGroupMemberMutationInput>(
-          REMOVE_GROUP_MEMBER_MUTATION,
-          {
-            groupId,
-            userId,
-          },
-        ),
-    );
+  public async removeGroupMembers(groupId: string, userIds: string[]): Promise<void> {
+    // It seems removal is done from the other side - you can remove single user from multiple
+    // groups, so we need to remove each user from the group separately.
+    for (const userId of userIds) {
+      await this.scopeManagementClient.get(
+        async (client) =>
+          await client.request<RemoveGroupMemberMutationResult, RemoveGroupMemberMutationInput>(
+            REMOVE_GROUP_MEMBER_MUTATION,
+            {
+              groupId,
+              userId,
+            },
+          ),
+      );
+    }
   }
 }

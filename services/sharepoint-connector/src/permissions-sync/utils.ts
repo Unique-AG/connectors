@@ -1,8 +1,8 @@
-import { GroupMembership, GroupUniqueId, MembershipType } from './types';
+import { GroupDistinctId, GroupMembership, MembershipType } from './types';
 
 export const OWNERS_SUFFIX = '_o';
 
-export const groupUniqueId = (group: Pick<GroupMembership, 'type' | 'id'>): GroupUniqueId =>
+export const groupDistinctId = (group: Pick<GroupMembership, 'type' | 'id'>): GroupDistinctId =>
   `${group.type}:${group.id}`;
 
 export const isGroupType = <T extends { type: MembershipType }>(
