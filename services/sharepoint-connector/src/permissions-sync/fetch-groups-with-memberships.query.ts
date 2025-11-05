@@ -14,9 +14,7 @@ import {
   partition,
   pick,
   pipe,
-  prop,
   sum,
-  unique,
   uniqueBy,
   values,
   zip,
@@ -123,18 +121,26 @@ export class FetchGroupsWithMembershipsQuery {
   ): SharepointGroupWithMembers {
     const groupId = groupDistinctId(group);
     const groupName = group.name;
-    const groupMembers: string[] = [];
+    const groupMembers: Set<string> = new Set();
 
+    // We need to track encountered group ids to avoid infinite loops due to circular dependencies.
+    const encounteredGroupIds = new Set<GroupDistinctId>();
     let processedGroupIds: GroupDistinctId[] = [groupId];
     do {
       const newProcessedGroupIds: GroupDistinctId[] = [];
       for (const currentGroupId of processedGroupIds) {
+        if (encounteredGroupIds.has(currentGroupId)) {
+          continue;
+        }
         const [currentGroupUserMembers, currentGroupGroupMembers] = partition(
           groupsMembershipsMap[currentGroupId] ?? [],
           (membership) => membership.type === 'user',
         );
-        groupMembers.push(...currentGroupUserMembers.map(prop('email')));
+        currentGroupUserMembers.forEach((userMembership) => {
+          groupMembers.add(userMembership.email);
+        });
         newProcessedGroupIds.push(...currentGroupGroupMembers.map(groupDistinctId));
+        encounteredGroupIds.add(currentGroupId);
       }
       processedGroupIds = newProcessedGroupIds;
     } while (processedGroupIds.length > 0);
@@ -142,7 +148,7 @@ export class FetchGroupsWithMembershipsQuery {
     return {
       id: groupId,
       displayName: groupName,
-      members: unique(groupMembers),
+      members: Array.from(groupMembers),
     };
   }
   // ===== Helper methods for fetching groups from Microsoft Graph API =====
