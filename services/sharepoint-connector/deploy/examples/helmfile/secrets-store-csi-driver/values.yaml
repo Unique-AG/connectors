@@ -1,0 +1,14 @@
+# This example is not complete and outlines only the relevant parts for the secrets-store-csi-driver.
+# Refer to the helm-chart itself for all configuration options.
+connector:
+  secretProvider:
+    tenantId: 00000000-0000-0000-0000-000000000000
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: 00000000-0000-0000-0000-000000000000
+    vaults:
+      vault-with-secrets:
+        UNIQUE_ZITADEL_CLIENT_SECRET: manual-spc-zitadel-client-secret
+      vault-with-private-key:
+        ENTRA_PRIVATE_KEY: manual-spc-certificate-private-key # ENTRA_PRIVATE_KEY doesn't matter, it won't be used
+  env:
+    SHAREPOINT_AUTH_PRIVATE_KEY_PATH: /xxx
