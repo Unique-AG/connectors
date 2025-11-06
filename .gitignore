@@ -42,6 +42,8 @@ factset-auth.json
 
 .terraform
 .terraform.lock.hcl
+**/*.tfstate
+**/*.tfstate.backup
 
 **/helm-charts/**/charts
 
