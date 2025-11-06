@@ -7,6 +7,7 @@ repositories:
 releases:
   - name: sharepoint-connector
     chart: spc/sharepoint-connector
+    version: 2.0.0-alpha.10
     namespace: sharepoint-connector
     values:
       - values.yaml
