@@ -100,7 +100,9 @@ export class SharepointRestHttpService {
           const responseLine = lines[lines.length - 1];
           // TODO: Add proper handling for retrying on 429 / 5XX errors
           // TODO: Add some errors handling in general - currently we just swallow errors
-          return statusCode === 200 ? JSON.parse(responseLine ?? '{}') : {};
+          return statusCode === 200
+            ? JSON.parse(responseLine ?? '{}')
+            : assert.fail(`Non-200 response ${responseCodeLine} from Batch Request`);
         });
       responses.push(...responsesChunk);
     }
