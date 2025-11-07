@@ -44,30 +44,47 @@ export class FetchGroupsWithMembershipsQuery {
     private readonly sharepointRestClientService: SharepointRestClientService,
   ) {}
 
-  public async run(siteId: string, permissions: Membership[]): Promise<SharePointGroupsMap> {
+  // For given list of group permissions from files/lists, fetch all the present sharepoint group
+  // members from SharePoint and Graph APIs. Result is a map from GroupDistinctId to
+  // SharepointGroupWithMembers.
+  // Stages of this process are as follows:
+  // 1. Fetch all the site groups from SharePoint REST API and add them to the cache. One call is
+  //    enough because we know that SharePoint site groups are not nested.
+  // 2. Fetch all the group members and owners from Graph API and add them to the cache. Here we
+  //    have to query Graph API as long as we see groups that we've not encountered yet, because
+  //    Security Groups can be nested.
+  // 3. Go through group permissions passed to the service and map them to
+  //    SharepointGroupWithMembers using the built cache of group memberships.
+  public async run(siteId: string, groupPermissions: GroupMembership[]): Promise<SharePointGroupsMap> {
     const logPrefix = `[SiteId: ${siteId}]`;
+    const uniqueGroupPermissions = uniqueBy(groupPermissions, groupDistinctId);
+
     this.logger.log(
-      `${logPrefix} Fetching groups with memberships for ${permissions.length} unique permissions`,
+      `${logPrefix} Fetching groups with memberships for ${uniqueGroupPermissions.length} unique ` +
+      `group permissions`,
     );
     const siteWebUrl = await this.graphApiService.getSiteWebUrl(siteId);
     const siteName = siteWebUrl.split('/').pop();
     assert.ok(siteName, `Site name not found for site ${siteId}`);
 
     const siteGroupsPermissions = pipe(
-      permissions,
+      uniqueGroupPermissions,
       filter((permission) => permission.type === 'siteGroup'),
-      uniqueBy(groupDistinctId),
     );
 
     const siteGroupIds = siteGroupsPermissions.map((permission) => permission.id);
     this.logger.log(
       `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
     );
-    const groupMembershipsMap = await this.fetchSiteGroupsMembershipsMap(siteName, siteGroupIds);
+    const groupMembershipsCache: Record<GroupDistinctId, Membership[]> = {};
+    // We have to call 
+    const siteGroupsMembershipsMap = await this.fetchSiteGroupsMembershipsMap(siteName, siteGroupIds);
+    Object.assign(groupMembershipsCache, siteGroupsMembershipsMap);
     this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
 
+    const allMembershipsFromSiteGroups = pipe(siteGroupsMembershipsMap, values(), flat());
     let msGroupsToProcess = pipe(
-      [...permissions, ...pipe(groupMembershipsMap, values(), flat())],
+      [...uniqueGroupPermissions, ...allMembershipsFromSiteGroups],
       filter(isGroupType),
       uniqueBy(groupDistinctId),
       map(pick(['id', 'type'])),
@@ -80,34 +97,32 @@ export class FetchGroupsWithMembershipsQuery {
       );
       const responseMappings = await this.fetchGroupMemberships(msGroupsToProcess);
       responseMappings.forEach(([groupId, itemPermissions]) => {
-        groupMembershipsMap[groupId] = itemPermissions;
+        groupMembershipsCache[groupId] = itemPermissions;
       });
       msGroupsToProcess = pipe(
         responseMappings,
         map(last()),
         flat(),
         filter(isGroupType),
-        filter((group) => !groupMembershipsMap[groupDistinctId(group)]),
+        filter((group) => !groupMembershipsCache[groupDistinctId(group)]),
         uniqueBy(groupDistinctId),
         map(pick(['id', 'type'])),
       );
       this.logger.debug(`${logPrefix} Found ${msGroupsToProcess.length} groups to process next`);
     }
 
-    const fetchedGroupsTotal = Object.keys(groupMembershipsMap).length;
-    const fetchedMembershipsTotal = pipe(groupMembershipsMap, mapValues(length()), values(), sum());
+    const fetchedGroupsTotal = Object.keys(groupMembershipsCache).length;
+    const fetchedMembershipsTotal = pipe(groupMembershipsCache, mapValues(length()), values(), sum());
     this.logger.log(
       `${logPrefix} Done fetching MS groups memberships. Fetched ${fetchedGroupsTotal} groups ` +
         `with total ${fetchedMembershipsTotal} memberships`,
     );
 
     return pipe(
-      permissions,
-      filter((permission) => permission.type !== 'user'),
-      uniqueBy(groupDistinctId),
+      uniqueGroupPermissions,
       map<GroupMembership[], [GroupDistinctId, SharepointGroupWithMembers]>((group) => [
         groupDistinctId(group),
-        this.mapItemPermissionToGroupWithMembers(group, groupMembershipsMap),
+        this.mapItemPermissionToGroupWithMembers(group, groupMembershipsCache),
       ]),
       fromEntries(),
       // We need type forcing because GroupDistinctId type forces weird result on fromEntries.
@@ -117,7 +132,7 @@ export class FetchGroupsWithMembershipsQuery {
 
   private mapItemPermissionToGroupWithMembers(
     group: GroupMembership,
-    groupsMembershipsMap: Record<string, Membership[]>,
+    groupsMembershipsCache: Record<GroupDistinctId, Membership[]>,
   ): SharepointGroupWithMembers {
     const groupId = groupDistinctId(group);
     const groupName = group.name;
@@ -125,25 +140,28 @@ export class FetchGroupsWithMembershipsQuery {
 
     // We need to track encountered group ids to avoid infinite loops due to circular dependencies.
     const encounteredGroupIds = new Set<GroupDistinctId>();
-    let processedGroupIds: GroupDistinctId[] = [groupId];
+    let groupIdsToProcess: GroupDistinctId[] = [groupId];
+    // We may have to to process groups multiple times because Entra groups (AFAIK only Security
+    // Groups) can be nested.
     do {
-      const newProcessedGroupIds: GroupDistinctId[] = [];
-      for (const currentGroupId of processedGroupIds) {
+      const groupIdsToProcessNext: GroupDistinctId[] = [];
+      for (const currentGroupId of groupIdsToProcess) {
+        // This check is necessary to avoid infinite loops due to circular dependencies.
         if (encounteredGroupIds.has(currentGroupId)) {
           continue;
         }
         const [currentGroupUserMembers, currentGroupGroupMembers] = partition(
-          groupsMembershipsMap[currentGroupId] ?? [],
+          groupsMembershipsCache[currentGroupId] ?? [],
           (membership) => membership.type === 'user',
         );
         currentGroupUserMembers.forEach((userMembership) => {
           groupMembers.add(userMembership.email);
         });
-        newProcessedGroupIds.push(...currentGroupGroupMembers.map(groupDistinctId));
+        groupIdsToProcessNext.push(...currentGroupGroupMembers.map(groupDistinctId));
         encounteredGroupIds.add(currentGroupId);
       }
-      processedGroupIds = newProcessedGroupIds;
-    } while (processedGroupIds.length > 0);
+      groupIdsToProcess = groupIdsToProcessNext;
+    } while (groupIdsToProcess.length > 0);
 
     return {
       id: groupId,
@@ -157,11 +175,13 @@ export class FetchGroupsWithMembershipsQuery {
     groups: { id: string; type: 'groupMembers' | 'groupOwners' }[],
   ): Promise<[GroupDistinctId, Membership[]][]> {
     // TODO: Once we have batch requests for Graph API implemented, change this method to take
-    // advantage of that instead of chunking manually.
+    //       advantage of that instead of chunking manually.
 
     const chunkedGroups = chunk(groups, 20);
     const groupMembershipsMappings: [GroupDistinctId, Membership[]][] = [];
     for (const groupChunk of chunkedGroups) {
+      // We use Promise.all instead of Promise.allSettled because GraphQL client has retrying
+      // already built in, so failure means that it's is the final result and we should abort.
       const groupMemberships = await Promise.all(
         groupChunk.map((group) =>
           group.type === 'groupOwners'
@@ -204,7 +224,8 @@ export class FetchGroupsWithMembershipsQuery {
   ): Promise<Record<GroupDistinctId, Membership[]>> {
     return pipe(
       await this.sharepointRestClientService.getSiteGroupsMemberships(siteName, siteGroupIds),
-      mapKeys((id) => groupDistinctId({ type: 'siteGroup', id })),
+      // We need to add site name to the id to make it unique across all sites.
+      mapKeys((id) => groupDistinctId({ type: 'siteGroup', id: `${siteName}|${id}` })),
       mapValues(map(this.mapRestApiMembershipToGroupMembership.bind(this))),
       mapValues(filter(isNonNullish)),
     );

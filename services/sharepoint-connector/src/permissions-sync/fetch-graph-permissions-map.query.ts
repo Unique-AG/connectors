@@ -33,7 +33,7 @@ export class FetchGraphPermissionsMapQuery {
           item.item.id,
         );
         permissionsMap[`${item.driveId}/${item.item.id}`] =
-          this.mapSimplePermissionsToItemPermissions(permissions);
+          this.mapSharePointPermissionsToOurPermissions(permissions);
       } else if (item.itemType === 'listItem') {
         const permissions = await this.graphApiService.getListItemPermissions(
           siteId,
@@ -41,18 +41,18 @@ export class FetchGraphPermissionsMapQuery {
           item.item.id,
         );
         permissionsMap[`${item.driveId}/${item.item.id}`] =
-          this.mapSimplePermissionsToItemPermissions(permissions);
+          this.mapSharePointPermissionsToOurPermissions(permissions);
       }
     }
     return permissionsMap;
   }
 
-  private mapSimplePermissionsToItemPermissions(
+  private mapSharePointPermissionsToOurPermissions(
     simplePermissions: SimplePermission[],
   ): Permission[] {
     return simplePermissions.flatMap((permission) => {
       if (isNonNullish(permission.grantedToV2)) {
-        const itemPermission = this.mapSimpleIdentitySetToItemPermission(permission.grantedToV2);
+        const itemPermission = this.mapSharePointIdentitySetToOurPermission(permission.grantedToV2);
         if (isNonNullish(itemPermission)) {
           return [itemPermission];
         }
@@ -65,7 +65,7 @@ export class FetchGraphPermissionsMapQuery {
         }
 
         const itemPermissions = permission.grantedToIdentitiesV2
-          .map(this.mapSimpleIdentitySetToItemPermission.bind(this))
+          .map(this.mapSharePointIdentitySetToOurPermission.bind(this))
           .filter(isNonNullish);
         if (itemPermissions.length > 0) {
           return itemPermissions;
@@ -79,7 +79,7 @@ export class FetchGraphPermissionsMapQuery {
     });
   }
 
-  private mapSimpleIdentitySetToItemPermission(
+  private mapSharePointIdentitySetToOurPermission(
     simpleIdentitySet: SimpleIdentitySet,
   ): Permission | null {
     // TODO: Are we missing case of "Everyone except external users"?
