@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["db:generate", "codegen", "^build"],
+      "outputs": ["dist/**/*"]
+    },
+    "codegen": {
+      "dependsOn": ["^codegen"],
+      "outputs": ["src/**/@generated/**/*"]
+    },
+    "db:generate": {
+      "dependsOn": ["^db:generate"],
+      "outputs": ["@generated/prisma/**/*"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    "dev": {
+      "inputs": ["$TURBO_DEFAULT$", "src/**/*"],
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true,
+      "interruptible": true
+    }
+  }
+}

@@ -11,17 +11,15 @@
   ],
   "scripts": {
     "build": "nest build",
-    "dev": "nodemon",
+    "dev": "nest start",
     "debug": "nest start --debug --watch",
     "codegen": "orval --config orval.config.ts && rm src/street-account-news/@generated/filters/filters.zod.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:migrate:deploy": "prisma migrate deploy",
-    "lint": "biome check .",
-    "lint:fix": "biome check . --write",
-    "format": "biome format .",
-    "format:fix": "biome format . --write",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
     "check-types": "tsc --noEmit",
     "test": "echo 'No test specified'"
   },
@@ -72,20 +70,9 @@
     "@types/passport": "^1.0.17",
     "@types/passport-strategy": "^0.2.38",
     "globals": "^16.3.0",
-    "nodemon": "^3.1.10",
     "orval": "^7.11.2",
     "pino-http-print": "^3.1.0",
     "source-map-support": "^0.5.21",
     "typescript": "^5.9.2"
-  },
-  "nodemonConfig": {
-    "watch": [
-      "../../packages/**/dist/index.js"
-    ],
-    "ignore": [
-      "../../packages/**/node_modules/**",
-      "../../packages/**/.turbo/**"
-    ],
-    "exec": "nest start --watch"
   }
 }
