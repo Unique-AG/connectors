@@ -38,8 +38,7 @@ export const defaultLoggerOptions: Params = {
       }
       return {};
     },
-    transport:
-      process.env.NODE_ENV !== 'production' ? developmentTarget : productionTarget,
+    transport: process.env.NODE_ENV !== 'production' ? developmentTarget : productionTarget,
   },
   exclude: [
     {
