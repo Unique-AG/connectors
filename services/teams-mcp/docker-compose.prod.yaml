@@ -1,0 +1,99 @@
+services:
+  teams-mcp-migration:
+    # image: ghcr.io/unique-ag/connectors/services/teams-mcp:0.1.0
+    build:
+      context: ../.. # Build from monorepo root
+      dockerfile: ./services/teams-mcp/deploy/Dockerfile
+      args:
+        - MAX_HEAP_MB=1024
+        - APP_NAME=teams-mcp
+        - PNPM_VERSION=10.15.1
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/outlook_mcp?schema=public
+    command: ["pnpm", "run", "db:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - teams-mcp-network
+    restart: "no"
+
+  teams-mcp:
+    # image: ghcr.io/unique-ag/connectors/services/teams-mcp:0.1.0
+    build:
+      context: ../.. # Build from monorepo root
+      dockerfile: ./services/teams-mcp/deploy/Dockerfile
+      args:
+        - MAX_HEAP_MB=1024
+        - APP_NAME=teams-mcp
+        - PNPM_VERSION=10.15.1
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SELF_URL=http://localhost:3000
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/outlook_mcp?schema=public
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
+      - HMAC_SECRET=${HMAC_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      teams-mcp-migration:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - teams-mcp-network
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=outlook_mcp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - teams-mcp-network
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    restart: always
+    hostname: rabbit1
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - 4369:4369
+      - 5671:5671
+      - 5672:5672
+      - 15671:15671
+      - 15672:15672
+      - 16691:16691
+      - 16692:16692
+      - 25672:25672
+    environment:
+      RABBITMQ_ERLANG_COOKIE: VHQXKTAQNDAZVACSQWMCTMJJ
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+    networks:
+      - teams-mcp-network
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+
+networks:
+  teams-mcp-network:
+    driver: bridge
