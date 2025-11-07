@@ -88,7 +88,7 @@ describe('SharepointSynchronizationService', () => {
         ...stub(),
         get: vi.fn((key: string) => {
           if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
-          if (key === 'processing.permissionsSyncEnabled') return false;
+          if (key === 'processing.syncMode') return 'content-only';
           return undefined;
         }),
       }))
@@ -221,7 +221,7 @@ describe('SharepointSynchronizationService', () => {
         ...stub(),
         get: vi.fn((key: string) => {
           if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
-          if (key === 'processing.permissionsSyncEnabled') return true;
+          if (key === 'processing.syncMode') return 'content-and-permissions';
           return undefined;
         }),
       }))
