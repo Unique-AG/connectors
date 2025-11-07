@@ -55,7 +55,7 @@ const UniqueConfig = z
       .prefault('')
       .pipe(parseJsonEnvironmentVariable('httpExtraHeaders'))
       .describe(
-        'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-client-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
+        'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-service-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
       ),
   })
   .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {

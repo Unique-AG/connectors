@@ -79,7 +79,7 @@ describe('UniqueApiService', () => {
           if (key === 'unique.fileDiffUrl') return 'https://ingestion.example.com/api';
           if (key === 'unique.ingestionGraphqlUrl') return 'https://ingestion.example.com/graphql';
           if (key === 'unique.scopeId') return 'scope-1';
-          if (key === 'unique.httpExtraHeaders') return { 'x-client-id': 'test-client' };
+          if (key === 'unique.httpExtraHeaders') return { 'x-service-id': 'test-client' };
           return undefined;
         }),
       }))
@@ -92,7 +92,7 @@ describe('UniqueApiService', () => {
     expect(customHttpClient.request).toHaveBeenCalledWith(
       expect.objectContaining({
         headers: expect.objectContaining({
-          'x-client-id': 'test-client',
+          'x-service-id': 'test-client',
         }),
       }),
     );
