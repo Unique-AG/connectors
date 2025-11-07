@@ -60,11 +60,8 @@ jobs:
       - name: Sync pack format and lint
         run: pnpm syncpack format --check && pnpm syncpack lint
 
-      - name: Run lint (all packages)
-        run: pnpm lint
-        
-      - name: Check formatting (all packages)
-        run: pnpm format
+      - name: Run style (all packages)
+        run: pnpm style
         
       - name: Type check (all packages)
         run: pnpm check-types --filter='./packages/*'
