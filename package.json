@@ -14,10 +14,8 @@
     "test:e2e": "turbo test:e2e",
     "test:e2e:watch": "turbo test:e2e:watch",
     "test:coverage": "turbo test:coverage",
-    "lint": "biome check .",
-    "lint:fix": "biome check . --write",
-    "format": "biome format .",
-    "format:fix": "biome format . --write",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
     "check-types": "turbo check-types",
     "syncpack": "syncpack",
     "clean:force": "rimraf -g \"**/node_modules\" \"**/.turbo\" \"**/dist\" \"**/.turbo\" \"**/coverage\" \"**/@generated\" \"**/*.tsbuildinfo\" && pnpm store prune && pnpm cache delete"
