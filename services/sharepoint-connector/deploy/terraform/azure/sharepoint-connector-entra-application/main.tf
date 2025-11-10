@@ -7,11 +7,11 @@ locals {
 
   # Define role mappings based on sync mode
   role_mappings = {
-    content-only = {
+    content_only = {
       graph_roles      = ["Files.Read.All"]
       sharepoint_roles = []
     }
-    content-and-permissions = {
+    content_and_permissions = {
       graph_roles      = ["Files.Read.All", "GroupMember.Read.All", "User.ReadBasic.All"]
       sharepoint_roles = ["Sites.Selected"]
     }
@@ -52,7 +52,7 @@ resource "azuread_application" "sharepoint_connector" {
     }
   }
 
-  # SharePoint API permissions (only when content-and-permissions mode)
+  # SharePoint API permissions (only when content_and_permissions mode)
   dynamic "required_resource_access" {
     for_each = length(local.sharepoint_roles) > 0 ? [1] : []
     content {

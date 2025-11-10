@@ -10,8 +10,8 @@ import {
 
 const ProcessingConfigSchema = z.object({
   syncMode: z
-    .enum(['content-only', 'content-and-permissions'])
-    .default('content-only')
+    .enum(['content_only', 'content_and_permissions'])
+    .default('content_only')
     .describe('Mode of synchronization from SharePoint to Unique'),
   stepTimeoutSeconds: z.coerce
     .number()
