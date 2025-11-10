@@ -126,15 +126,11 @@ connectorConfig:
     # example: https://api.unique.app/scope-management/graphql
     scopeManagementGraphqlUrl: unset_default_value
     # flat: sync all files to a single root scope/folder
-    # recursive: maintain the folder hierarchy
-    # recursive-advanced: create explicit scope hierarchy via Scope Management service
+    # recursive: maintain the folder hierarchy and create explicit scope hierarchy
     ingestionMode: recursive
     # -- name of the root scope/folder in the knowledge base where SharePoint content should be synced (only for recursive mode)
     # example: SharePoint Content
     rootScopeName: null
-    # -- base scope path where files will be ingested (required for recursive-advanced mode)
-    # example: Company/SharePoint
-    ingestionScopeLocation: null
     # -- scope id for the scope based ingestion (only for flat mode)
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion

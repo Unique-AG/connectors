@@ -48,13 +48,13 @@ export class SharepointSynchronizationService {
         continue;
       }
 
-      // Batch create scopes for recursive-advanced mode
+      // Batch create scopes for recursive mode when configured
       let scopeCache: Map<string, string> | undefined;
       const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
 
-      if (ingestionMode === IngestionMode.RecursiveAdvanced) {
-        scopeCache = await this.createScopesForRecursiveAdvanced(items, logPrefix);
-        if (!scopeCache) continue;
+      if (ingestionMode === IngestionMode.Recursive) {
+        scopeCache = await this.createScopesForRecursive(items, logPrefix);
+        if (!scopeCache) continue; // TODO: Handle this case
       }
 
       try {
@@ -84,7 +84,7 @@ export class SharepointSynchronizationService {
     this.isScanning = false;
   }
 
-  private async createScopesForRecursiveAdvanced(
+  private async createScopesForRecursive(
     items: SharepointContentItem[],
     logPrefix: string,
   ): Promise<Map<string, string> | undefined> {

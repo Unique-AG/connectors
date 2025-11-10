@@ -1,7 +1,6 @@
 export const IngestionMode = {
   Flat: 'flat',
   Recursive: 'recursive',
-  RecursiveAdvanced: 'recursive-advanced',
 } as const;
 
 export type IngestionMode = (typeof IngestionMode)[keyof typeof IngestionMode];

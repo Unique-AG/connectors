@@ -60,14 +60,14 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
 }
 
 /**
- * Gets the web URL for a SharePoint item, with optional scope prefix.
+ * Gets the web URL for a SharePoint item, with optional root scope name prefix and stripped path prefixes.
  *
  * We are reading the webUrl from item.listItem because it contains the real path to the item.
  * listItem.webUrl example: https://[tenant].sharepoint.com/sites/[site]/[library]/[path]/[filename]
  * item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
  * We are adding ?web=1 to the url to get the web view of the item.
  *
- * When rootScopeName is provided, unnecessary path prefixes are stripped from the URL.
+ * When rootScopeName is provided, unnecessary path prefixes are always stripped from the URL.
  * Instead of "my-scope/uniqueapp.sharepoint.com/sites/site-name/path/file.pdf",
  * the result is "my-scope/site-name/path/file.pdf".
  */
@@ -203,7 +203,7 @@ export function extractFolderPathFromUrl(fileUrl: string): string {
 
 export function buildScopePathFromItem(
   item: SharepointContentItem,
-  ingestionScopeLocation: string,
+  rootScopeName: string,
 ): string {
   const getFileUrl = (contentItem: SharepointContentItem): string => {
     if (contentItem.itemType === 'driveItem') {
@@ -216,5 +216,5 @@ export function buildScopePathFromItem(
   assert(fileUrl, 'Unable to determine file URL from item');
 
   const folderPath = extractFolderPathFromUrl(fileUrl);
-  return `${ingestionScopeLocation}/${folderPath}`;
+  return `${rootScopeName}/${folderPath}`;
 }

@@ -17,16 +17,16 @@ export class ScopeManagementService {
   ) {}
 
   public async batchCreateScopes(items: SharepointContentItem[]): Promise<Map<string, string>> {
-    const ingestionScopeLocation = this.configService.get('unique.ingestionScopeLocation', {
+    const rootScopeName = this.configService.get('unique.rootScopeName', {
       infer: true,
     });
-    assert(ingestionScopeLocation, 'ingestionScopeLocation must be configured');
+    assert(rootScopeName, 'rootScopeName must be configured');
 
     // Extract unique folder paths
     const uniqueFolderPaths = new Set<string>();
     for (const item of items) {
       try {
-        const fullScopePath = buildScopePathFromItem(item, ingestionScopeLocation);
+        const fullScopePath = buildScopePathFromItem(item, rootScopeName);
         uniqueFolderPaths.add(fullScopePath);
       } catch (error) {
         this.logger.warn(`Failed to build scope path for item: ${error}`);
@@ -54,17 +54,19 @@ export class ScopeManagementService {
 
   public buildItemScopeIdMap(
     items: SharepointContentItem[],
-    ingestionScopeLocation: string | undefined,
     scopeCache: Map<string, string> | undefined,
   ): Map<string, string> {
     const map = new Map<string, string>();
+    const rootScopeName = this.configService.get('unique.rootScopeName', {
+      infer: true,
+    });
 
-    if (!scopeCache || !ingestionScopeLocation) {
+    if (!scopeCache || !rootScopeName) {
       return map;
     }
 
     for (const item of items) {
-      const scopeId = this.resolveItemScopeId(item, ingestionScopeLocation, scopeCache);
+      const scopeId = this.getScopeIdOfItem(item, rootScopeName, scopeCache);
       if (scopeId) {
         map.set(item.item.id, scopeId);
       }
@@ -73,13 +75,13 @@ export class ScopeManagementService {
     return map;
   }
 
-  private resolveItemScopeId(
+  private getScopeIdOfItem(
     item: SharepointContentItem,
-    ingestionScopeLocation: string,
+    rootScopeName: string,
     scopeCache: Map<string, string>,
   ): string | undefined {
     try {
-      const itemScopePath = buildScopePathFromItem(item, ingestionScopeLocation);
+      const itemScopePath = buildScopePathFromItem(item, rootScopeName);
       const scopeId = scopeCache.get(itemScopePath);
 
       if (!scopeId) {
@@ -88,7 +90,7 @@ export class ScopeManagementService {
 
       return scopeId;
     } catch (error) {
-      this.logger.warn(`Failed to build scope path for item: ${error}`);
+      this.logger.warn(`Failed to get scope path for item: ${error}`);
       return undefined;
     }
   }

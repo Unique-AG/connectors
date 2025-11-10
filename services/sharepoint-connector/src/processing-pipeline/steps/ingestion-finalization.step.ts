@@ -24,7 +24,6 @@ export class IngestionFinalizationStep implements IPipelineStep {
   private readonly ingestionMode: IngestionMode;
   private readonly scopeId: string | undefined;
   private readonly rootScopeName: string | undefined;
-  private readonly ingestionScopeLocation: string | undefined;
   private readonly sharepointBaseUrl: string;
 
   public constructor(
@@ -35,9 +34,6 @@ export class IngestionFinalizationStep implements IPipelineStep {
     this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
     this.scopeId = this.configService.get('unique.scopeId', { infer: true });
     this.rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
-    this.ingestionScopeLocation = this.configService.get('unique.ingestionScopeLocation', {
-      infer: true,
-    });
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
   }
 
@@ -53,7 +49,6 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
     const baseUrl = getBaseUrl(
       this.ingestionMode,
-      this.ingestionScopeLocation,
       this.rootScopeName,
       this.sharepointBaseUrl,
     );

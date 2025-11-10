@@ -5,16 +5,11 @@ export function getScopeIdForIngestion(
   configScopeId: string | undefined,
   contextScopeId: string | undefined,
 ): string {
-  // Recursive Advanced uses dynamically created scope from context
-  if (ingestionMode === IngestionMode.RecursiveAdvanced) {
-    if (!contextScopeId) {
-      throw new Error('scopeId must be set in context for recursive-advanced mode');
-    }
-    return contextScopeId;
-  }
-
-  // Recursive uses PATH-based ingestion
+  // Recursive mode uses dynamically created scope from context or PATH-based ingestion
   if (ingestionMode === IngestionMode.Recursive) {
+    if (contextScopeId) {
+      return contextScopeId;
+    }
     return PATH_BASED_INGESTION;
   }
 
@@ -27,12 +22,11 @@ export function getScopeIdForIngestion(
 
 export function getBaseUrl(
   ingestionMode: IngestionMode,
-  ingestionScopeLocation: string | undefined,
   rootScopeName: string | undefined,
   sharepointBaseUrl: string,
 ): string {
-  if (ingestionMode === IngestionMode.RecursiveAdvanced) {
-    return ingestionScopeLocation || '';
+  if (ingestionMode === IngestionMode.Recursive) {
+    return rootScopeName || sharepointBaseUrl;
   }
-  return rootScopeName || sharepointBaseUrl;
+  return sharepointBaseUrl;
 }
