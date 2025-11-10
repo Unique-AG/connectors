@@ -1,5 +1,4 @@
 CREATE TYPE "public"."token_type" AS ENUM('ACCESS', 'REFRESH');--> statement-breakpoint
-CREATE TYPE "public"."subscription_for_type" AS ENUM('transcript');--> statement-breakpoint
 CREATE TABLE "authorization_codes" (
 	"id" varchar PRIMARY KEY NOT NULL,
 	"code" varchar NOT NULL,
@@ -88,20 +87,8 @@ CREATE TABLE "user_profiles" (
 	CONSTRAINT "user_profiles_provider_providerUserId_unique" UNIQUE("provider","provider_user_id")
 );
 --> statement-breakpoint
-CREATE TABLE "subscriptions" (
-	"id" varchar PRIMARY KEY NOT NULL,
-	"subscription_id" varchar,
-	"expires_at" timestamp,
-	"for_type" "subscription_for_type" NOT NULL,
-	"user_profile_id" varchar NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "subscriptions_subscriptionId_unique" UNIQUE("subscription_id")
-);
---> statement-breakpoint
 ALTER TABLE "authorization_codes" ADD CONSTRAINT "authorization_codes_user_profile_id_user_profiles_id_fk" FOREIGN KEY ("user_profile_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "tokens" ADD CONSTRAINT "tokens_user_profile_id_user_profiles_id_fk" FOREIGN KEY ("user_profile_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
-ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_user_profile_id_user_profiles_id_fk" FOREIGN KEY ("user_profile_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 CREATE INDEX "tokens_family_id_index" ON "tokens" USING btree ("family_id");--> statement-breakpoint
 CREATE INDEX "tokens_expires_at_index" ON "tokens" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "tokens_user_profile_id_index" ON "tokens" USING btree ("user_profile_id");
