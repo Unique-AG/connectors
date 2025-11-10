@@ -12,8 +12,8 @@ const ConfigSchema = z.object({
       .url()
       .transform((v) => new URL(v))
       .refine(
-        (u) => u.protocol === 'postgres:',
-        'The supplied URL must be using `postgres:` protocol',
+        (u) => u.protocol === 'postgresql:',
+        'The supplied URL must be using `postgresql:` protocol',
       )
       .describe('The postgres connection URL'),
   ),
