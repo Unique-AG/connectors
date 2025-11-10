@@ -111,7 +111,7 @@ import { serverInstructions } from './server.instructions';
       }),
     }),
     McpModule.forRoot({
-      name: 'outlook-mcp',
+      name: 'teams-mcp',
       version: packageJson.version,
       instructions: serverInstructions,
       streamableHttp: {
