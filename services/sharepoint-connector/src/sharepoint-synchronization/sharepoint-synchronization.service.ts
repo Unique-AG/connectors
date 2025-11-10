@@ -5,6 +5,7 @@ import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
+import type { Scope } from '../unique-api/unique-api.types';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
@@ -56,11 +57,13 @@ export class SharepointSynchronizationService {
       let scopePathToIdMap: ScopePathToIdMap | undefined;
 
       if (ingestionMode === IngestionMode.Recursive) {
-        scopePathToIdMap = await this.createIfNotExistingScopesForItemPaths(items, logPrefix);
-        if (!scopePathToIdMap) {
-          this.logger.error('');
+        const result = await this.getOrCreateScopesForPaths(items);
+        if (!result) {
+          this.logger.error(`${logPrefix} Failed to create scopes`);
           continue;
         }
+        scopePathToIdMap = result.scopePathToIdMap;
+        // TODO the scopes array will be useful for syncPermissionsForSite
       }
 
       try {
@@ -91,18 +94,16 @@ export class SharepointSynchronizationService {
     this.isScanning = false;
   }
 
-  private async createIfNotExistingScopesForItemPaths(
+  private async getOrCreateScopesForPaths(
     items: SharepointContentItem[],
-    logPrefix: string,
-  ): Promise<ScopePathToIdMap | undefined> {
+  ): Promise<{ scopes: Scope[]; scopePathToIdMap: ScopePathToIdMap } | undefined> {
+    const siteId = items[0]?.siteId || 'unknown siteId';
     try {
-      const scopePathToIdMap = await this.scopeManagementService.batchCreateScopes(items);
-      this.logger.log(`${logPrefix} Created scopes for ${scopePathToIdMap.size} unique folders`);
-      return scopePathToIdMap;
+      return await this.scopeManagementService.batchCreateScopes(items);
     } catch (error) {
       // TODO what happens if generating scopes fails? Do we stop the sync for this site?
       this.logger.error({
-        msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}`,
+        msg: `[SiteId: ${siteId}] Failed to create scopes: ${normalizeError(error).message}`,
         err: error,
       });
       return;

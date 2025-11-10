@@ -288,7 +288,11 @@ export class UniqueApiService {
       generateScopesBasedOnPaths(paths: $paths) {
         id
         name
-        parentId
+        scopeAccess {
+          entityId
+          type
+          entityType
+        }
       }
     }
   `;

@@ -77,10 +77,17 @@ export interface IngestionApiResponse {
   source: string;
 }
 
+export interface ScopeAccess {
+  entityId: string;
+  type: string;
+  entityType: string;
+}
+
 export interface Scope {
   id: string;
   name: string;
-  parentId: string | null;
+  parentId?: string | null;
+  scopeAccess?: ScopeAccess[];
 }
 
 export interface ZitadelLoginResponse {
