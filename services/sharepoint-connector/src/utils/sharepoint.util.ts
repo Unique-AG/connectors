@@ -152,10 +152,6 @@ export function buildIngestionItemKey(sharepointContentItem: SharepointContentIt
   return `${sharepointContentItem.siteId}/${sharepointContentItem.item.id}`;
 }
 
-function stripProtocol(url: string): string {
-  return url.replace(/^https?:\/\//, '');
-}
-
 export function extractFolderPathFromUrl(fileUrl: string): string {
   try {
     const urlObj = new URL(fileUrl);

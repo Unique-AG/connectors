@@ -7,8 +7,8 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
-import { PermissionsSyncService } from './permissions-sync.service';
 import { ScopeManagementService } from './scope-management.service';
+import {PermissionsSyncService} from "../permissions-sync/permissions-sync.service";
 
 @Injectable()
 export class SharepointSynchronizationService {
