@@ -91,7 +91,6 @@ export class FetchGroupsWithMembershipsQuery {
       siteName,
       siteGroupIds,
     );
-    console.log('siteGroupsMembershipsMap', JSON.stringify(siteGroupsMembershipsMap, null, 4));
     Object.assign(groupMembershipsCache, siteGroupsMembershipsMap);
     this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
 
@@ -102,8 +101,6 @@ export class FetchGroupsWithMembershipsQuery {
       uniqueBy(groupDistinctId),
       map(pick(['id', 'type'])),
     );
-
-    console.log('msGroupsToProcess', JSON.stringify(msGroupsToProcess, null, 4));
 
     this.logger.log(`${logPrefix} Fetching MS groups memberships map`);
     while (msGroupsToProcess.length > 0) {
