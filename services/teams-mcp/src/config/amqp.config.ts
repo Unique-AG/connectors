@@ -12,7 +12,7 @@ const ConfigSchema = z.object({
       .url()
       .transform((v) => new URL(v))
       .refine((u) => u.protocol === 'amqp:', 'The supplied URL must be using `amqp:` protocol'),
-  ).describe('The AMQP connection url'),
+  ).describe('The AMQP connection url.'),
 });
 
 export const amqpConfig = registerConfig('amqp', ConfigSchema);
