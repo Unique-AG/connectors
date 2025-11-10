@@ -10,7 +10,7 @@ services:
         - PNPM_VERSION=10.15.1
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/outlook_mcp?schema=public
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teams_mcp?schema=public
     command: ["pnpm", "run", "db:migrate"]
     depends_on:
       postgres:
@@ -34,11 +34,12 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - SELF_URL=http://localhost:3000
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/outlook_mcp?schema=public
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teams_mcp?schema=public
       - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
       - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
       - AUTH_HMAC_SECRET=${AUTH_HMAC_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - AMQP_URL=amqp://rabbitmq:rabbitmq@rabbitmq:5672
     depends_on:
       rabbitmq:
         condition: service_started
@@ -54,8 +55,8 @@ services:
     image: postgres:17-alpine
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=outlook_mcp
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=teams_mcp
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -71,7 +72,6 @@ services:
   rabbitmq:
     image: rabbitmq:4-management
     restart: always
-    hostname: rabbit1
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     ports:
