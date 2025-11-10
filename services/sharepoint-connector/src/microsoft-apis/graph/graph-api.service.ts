@@ -13,6 +13,7 @@ import { GraphClientFactory } from './graph-client.factory';
 import {
   DriveItem,
   GraphApiResponse,
+  GroupMember,
   ListItem,
   ListItemDetailsResponse,
   SimplePermission,
@@ -46,7 +47,7 @@ export class GraphApiService {
   }
 
   public async getAllSiteItems(siteId: string): Promise<SharepointContentItem[]> {
-    const logPrefix = `[SiteId: ${siteId}] `;
+    const logPrefix = `[SiteId: ${siteId}]`;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
       this.getAspxPagesForSite(siteId),
       this.getAllFilesForSite(siteId),
@@ -304,7 +305,27 @@ export class GraphApiService {
     );
   }
 
-  private async getSiteWebUrl(siteId: string): Promise<string> {
+  public async getGroupMembers(groupId: string): Promise<GroupMember[]> {
+    return await this.paginateGraphApiRequest<GroupMember>(`/groups/${groupId}/members`, (url) =>
+      this.graphClient
+        .api(url)
+        .select(['id', 'displayName', 'mail', 'userPrincipalName'])
+        .top(GRAPH_API_PAGE_SIZE)
+        .get(),
+    );
+  }
+
+  public async getGroupOwners(groupId: string): Promise<GroupMember[]> {
+    return await this.paginateGraphApiRequest<GroupMember>(`/groups/${groupId}/owners`, (url) =>
+      this.graphClient
+        .api(url)
+        .select(['id', 'displayName', 'mail', 'userPrincipalName'])
+        .top(GRAPH_API_PAGE_SIZE)
+        .get(),
+    );
+  }
+
+  public async getSiteWebUrl(siteId: string): Promise<string> {
     try {
       const site = await this.makeRateLimitedRequest(() =>
         this.graphClient.api(`/sites/${siteId}`).select('webUrl').get(),

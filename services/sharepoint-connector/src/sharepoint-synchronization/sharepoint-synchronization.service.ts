@@ -2,10 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
+import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
-import { PermissionsSyncService } from './permissions-sync.service';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -33,7 +33,7 @@ export class SharepointSynchronizationService {
     this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
 
     for (const siteId of siteIdsToScan) {
-      const logPrefix = `[SiteId: ${siteId}] `;
+      const logPrefix = `[SiteId: ${siteId}]`;
 
       const siteStartTime = Date.now();
       const items = await this.graphApiService.getAllSiteItems(siteId);

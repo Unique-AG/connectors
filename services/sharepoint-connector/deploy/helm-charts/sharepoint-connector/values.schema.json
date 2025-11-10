@@ -131,6 +131,7 @@
           "required": [
             "fileDiffUrl",
             "ingestionGraphqlUrl",
+            "scopeManagementGraphqlUrl",
             "ingestionMode",
             "zitadel"
           ],
@@ -160,6 +161,14 @@
               "examples": [
                 "http://node-ingestion.finance-gpt:8091/graphql",
                 "https://api.unique.app/ingestion/graphql"
+              ]
+            },
+            "scopeManagementGraphqlUrl": {
+              "type": "string",
+              "description": "GraphQL URL for scope management",
+              "examples": [
+                "http://node-scope-management.finance-gpt:8094/graphql",
+                "https://api.unique.app/scope-management/graphql"
               ]
             },
             "ingestionMode": {

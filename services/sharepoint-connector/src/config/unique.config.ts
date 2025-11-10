@@ -26,6 +26,9 @@ const UniqueConfig = z
         'Used only in case of Recursive ingestion mode. Indicates the name of the root scope/folder in the knowledge base where SharePoint content should be synced.',
       ),
     ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
+    // TODO: Right now scopeManagementGraphqlUrl is required, but in the future it should be
+    //       optional based on the sync mode, but it lives in processing config.
+    scopeManagementGraphqlUrl: z.url().describe('Unique graphql scope management service URL'),
     fileDiffUrl: z.url().describe('Unique file diff service URL'),
     zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
     zitadelProjectId: z.string().describe('Zitadel project ID'),
@@ -54,7 +57,7 @@ const UniqueConfig = z
       .prefault('')
       .pipe(parseJsonEnvironmentVariable('httpExtraHeaders'))
       .describe(
-        'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-client-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
+        'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-service-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
       ),
   })
   .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {

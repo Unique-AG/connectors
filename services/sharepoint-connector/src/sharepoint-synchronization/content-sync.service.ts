@@ -21,7 +21,7 @@ export class ContentSyncService {
   ) {}
 
   public async syncContentForSite(siteId: string, items: SharepointContentItem[]): Promise<void> {
-    const logPrefix = `[SiteId: ${siteId}] `;
+    const logPrefix = `[SiteId: ${siteId}]`;
     const diffResult = await this.calculateDiffForSite(items, siteId);
     this.logger.log(
       `${logPrefix} File Diff Results: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
