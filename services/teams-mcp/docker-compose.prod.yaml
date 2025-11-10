@@ -37,7 +37,7 @@ services:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/outlook_mcp?schema=public
       - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
       - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
-      - HMAC_SECRET=${HMAC_SECRET}
+      - AUTH_HMAC_SECRET=${AUTH_HMAC_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     depends_on:
       rabbitmq:
