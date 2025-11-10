@@ -26,7 +26,7 @@ connector:
     - sharepoint-connector-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
-    tag: 2.0.0-alpha.10 # x-release-please-version
+    tag: 2.0.0-alpha.11 # x-release-please-version
   networkPolicy:
     enabled: true
     policyTypes:
