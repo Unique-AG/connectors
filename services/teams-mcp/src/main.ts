@@ -22,7 +22,9 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
   const config = app.get<AppConfig>(appConfig.KEY);
-  await app.listen(config.port, () => logger.log(`Server is running on http://localhost:${config.port}`, 'bootstrap'));
+  await app.listen(config.port, () =>
+    logger.log(`Server is running on http://localhost:${config.port}`, 'bootstrap'),
+  );
 }
 
 initOpenTelemetry({
