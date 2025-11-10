@@ -108,7 +108,6 @@ export class UniqueApiService {
     const path = url.pathname + url.search;
 
     const basePath = this.rootScopeName || this.sharepointBaseUrl;
-    const scopeForRequest = getScopeIdForIngestion(this.ingestionMode, this.scopeId, undefined);
 
     const diffRequest: FileDiffRequest = {
       basePath,
@@ -116,7 +115,6 @@ export class UniqueApiService {
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       fileList,
-      scope: scopeForRequest,
     };
 
     this.logger.debug(`File diff request payload: ${JSON.stringify(diffRequest, null, 2)}`);
@@ -185,7 +183,7 @@ export class UniqueApiService {
     });
   }
 
-  public async generateScopesBasedOnPaths(paths: string[], uniqueToken: string): Promise<Scope[]> {
+  public async createScopesBasedOnPaths(paths: string[], uniqueToken: string): Promise<Scope[]> {
     if (!this.scopeManagementGraphqlUrl) {
       this.logger.warn('Scope management GraphQL URL not configured, skipping scope generation.');
       return [];

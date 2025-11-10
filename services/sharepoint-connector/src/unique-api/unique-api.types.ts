@@ -54,13 +54,13 @@ export interface FileDiffRequest {
   sourceKind: string;
   sourceName: string;
   fileList: FileDiffItem[];
-  scope: string;
 }
 
 export interface FileDiffResponse {
-  newAndUpdatedFiles: string[];
-  deletedFiles: string[];
+  newFiles: string[];
+  updatedFiles: string[];
   movedFiles: string[];
+  deletedFiles: string[];
 }
 
 export interface IngestionApiResponse {

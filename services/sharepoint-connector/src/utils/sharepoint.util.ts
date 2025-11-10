@@ -201,16 +201,16 @@ export function buildScopePathFromItem(
   item: SharepointContentItem,
   rootScopeName: string,
 ): string {
-  const getFileUrl = (contentItem: SharepointContentItem): string => {
-    if (contentItem.itemType === 'driveItem') {
-      return contentItem.item.listItem?.webUrl || contentItem.item.webUrl || '';
-    }
-    return contentItem.item.webUrl || '';
-  };
-
-  const fileUrl = getFileUrl(item);
+  const fileUrl = extractFileUrl(item);
   assert(fileUrl, 'Unable to determine file URL from item');
 
   const folderPath = extractFolderPathFromUrl(fileUrl);
   return `${rootScopeName}/${folderPath}`;
+}
+
+function extractFileUrl(item: SharepointContentItem): string {
+  if (item.itemType === 'driveItem') {
+    return item.item.listItem?.webUrl || item.item.webUrl;
+  }
+  return item.item.webUrl;
 }

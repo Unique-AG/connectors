@@ -41,7 +41,7 @@ export class ProcessingPipelineService {
 
   public async processItem(
     pipelineItem: SharepointContentItem,
-    scopeId?: string,
+    scopeId: string,
   ): Promise<PipelineResult> {
     const startTime = new Date();
     const correlationId = randomUUID();

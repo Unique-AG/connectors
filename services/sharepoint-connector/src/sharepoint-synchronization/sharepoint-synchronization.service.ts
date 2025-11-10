@@ -4,11 +4,11 @@ import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import {PermissionsSyncService} from "../permissions-sync/permissions-sync.service";
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
-import { ScopeManagementService } from './scope-management.service';
-import {PermissionsSyncService} from "../permissions-sync/permissions-sync.service";
+import { ScopeManagementService, type ScopePathToIdMap } from './scope-management.service';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -30,9 +30,11 @@ export class SharepointSynchronizationService {
       );
       return;
     }
+
     this.isScanning = true;
     const syncStartTime = Date.now();
     const siteIdsToScan = this.configService.get('sharepoint.siteIds', { infer: true });
+    const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
 
     this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
 
@@ -48,17 +50,21 @@ export class SharepointSynchronizationService {
         continue;
       }
 
-      // Batch create scopes for recursive mode when configured
-      let scopeCache: Map<string, string> | undefined;
-      const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
+      // TODO make sure that scope ingestion works now that we've changed to file-diff v2 
+      // TODO implement file deletion and file moving
+      // Create scopes for recursive mode
+      let scopePathToIdMap: ScopePathToIdMap | undefined;
 
       if (ingestionMode === IngestionMode.Recursive) {
-        scopeCache = await this.createScopesForRecursive(items, logPrefix);
-        if (!scopeCache) continue; // TODO: Handle this case
+        scopePathToIdMap = await this.createIfNotExistingScopesForItemPaths(items, logPrefix);
+        if (!scopePathToIdMap) {
+          this.logger.error('')
+          continue;
+        }
       }
 
-      try {
-        await this.contentSyncService.syncContentForSite(siteId, items, scopeCache);
+      try { // Start processing sitePages and files
+        await this.contentSyncService.syncContentForSite(siteId, items, scopePathToIdMap);
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
@@ -84,20 +90,21 @@ export class SharepointSynchronizationService {
     this.isScanning = false;
   }
 
-  private async createScopesForRecursive(
+  private async createIfNotExistingScopesForItemPaths(
     items: SharepointContentItem[],
     logPrefix: string,
-  ): Promise<Map<string, string> | undefined> {
+  ): Promise<ScopePathToIdMap | undefined> {
     try {
-      const scopeCache = await this.scopeManagementService.batchCreateScopes(items);
-      this.logger.log(`${logPrefix} Created scopes for ${scopeCache.size} unique folders`);
-      return scopeCache;
+      const scopePathToIdMap = await this.scopeManagementService.batchCreateScopes(items);
+      this.logger.log(`${logPrefix} Created scopes for ${scopePathToIdMap.size} unique folders`);
+      return scopePathToIdMap;
     } catch (error) {
+      // TODO what happens if generating scopes fails? Do we stop the sync for this site?
       this.logger.error({
         msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}`,
         err: error,
       });
-      return undefined;
+      return;
     }
   }
 }

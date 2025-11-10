@@ -14,9 +14,10 @@ describe('UniqueApiService', () => {
       request: vi.fn().mockResolvedValue({
         body: {
           json: vi.fn().mockResolvedValue({
-            newAndUpdatedFiles: ['sharepoint_file_1'],
-            deletedFiles: [],
+            newFiles: ['sharepoint_file_1'],
+            updatedFiles: [],
             movedFiles: [],
+            deletedFiles: [],
           }),
         },
       }),
@@ -54,7 +55,7 @@ describe('UniqueApiService', () => {
       'token-123',
       'test-partial-key',
     );
-    expect(result.newAndUpdatedFiles).toEqual(['sharepoint_file_1']);
+    expect(result.newFiles).toEqual(['sharepoint_file_1']);
   });
 
   it('includes extra headers in file diff request', async () => {
@@ -63,9 +64,10 @@ describe('UniqueApiService', () => {
         statusCode: 200,
         body: {
           json: vi.fn().mockResolvedValue({
-            newAndUpdatedFiles: [],
-            deletedFiles: [],
+            newFiles: [],
+            updatedFiles: [],
             movedFiles: [],
+            deletedFiles: [],
           }),
         },
       }),

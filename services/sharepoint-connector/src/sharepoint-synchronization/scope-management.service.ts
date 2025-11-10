@@ -6,6 +6,8 @@ import { UniqueApiService } from '../unique-api/unique-api.service';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { buildScopePathFromItem } from '../utils/sharepoint.util';
 
+export type ScopePathToIdMap = Record<string, string>;
+
 @Injectable()
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
@@ -16,82 +18,76 @@ export class ScopeManagementService {
     private readonly uniqueApiService: UniqueApiService,
   ) {}
 
-  public async batchCreateScopes(items: SharepointContentItem[]): Promise<Map<string, string>> {
-    const rootScopeName = this.configService.get('unique.rootScopeName', {
-      infer: true,
-    });
-    assert(rootScopeName, 'rootScopeName must be configured');
+  private buildItemIdToScopePathMap(
+    items: SharepointContentItem[],
+    rootScopeName: string,
+  ): Map<string, string> {
+    const itemIdToScopePathMap = new Map<string, string>();
 
-    // Extract unique folder paths
-    const uniqueFolderPaths = new Set<string>();
     for (const item of items) {
       try {
-        const fullScopePath = buildScopePathFromItem(item, rootScopeName);
-        uniqueFolderPaths.add(fullScopePath);
+        const scopePath = buildScopePathFromItem(item, rootScopeName);
+        itemIdToScopePathMap.set(item.item.id, scopePath);
       } catch (error) {
         this.logger.warn(`Failed to build scope path for item: ${error}`);
       }
     }
 
+    return itemIdToScopePathMap;
+  }
+
+  public async batchCreateScopes(items: SharepointContentItem[]): Promise<ScopePathToIdMap> {
+    const rootScopeName = this.configService.get('unique.rootScopeName', {
+      infer: true,
+    });
+    assert(rootScopeName, 'rootScopeName must be configured');
+
+    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
+    const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
+
     if (uniqueFolderPaths.size === 0) {
-      return new Map();
+      return {};
     }
 
-    // Call generateScopesBasedOnPaths to create all scopes
     const uniqueToken = await this.uniqueAuthService.getToken();
-    const scopes = await this.uniqueApiService.generateScopesBasedOnPaths(
+    const scopes = await this.uniqueApiService.createScopesBasedOnPaths(
       Array.from(uniqueFolderPaths),
       uniqueToken,
     );
 
-    const scopeCache = new Map<string, string>();
+    const scopePathToIdRecord: ScopePathToIdMap = {};
     for (const scope of scopes) {
-      scopeCache.set(scope.name, scope.id);
+      scopePathToIdRecord[scope.name] = scope.id;
     }
 
-    return scopeCache;
+    return scopePathToIdRecord;
   }
 
-  public buildItemScopeIdMap(
+  public buildItemIdToScopeIdMap(
     items: SharepointContentItem[],
-    scopeCache: Map<string, string> | undefined,
+    scopePathToIdMap: ScopePathToIdMap | undefined,
   ): Map<string, string> {
-    const map = new Map<string, string>();
+    const itemIdToScopeIdMap = new Map<string, string>();
     const rootScopeName = this.configService.get('unique.rootScopeName', {
       infer: true,
     });
 
-    if (!scopeCache || !rootScopeName) {
-      return map;
+    if (!scopePathToIdMap || !rootScopeName) {
+      return itemIdToScopeIdMap;
     }
 
-    for (const item of items) {
-      const scopeId = this.getScopeIdOfItem(item, rootScopeName, scopeCache);
+    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
+
+    for (const [itemId, scopePath] of itemIdToScopePathMap) {
+      const scopeId = scopePathToIdMap[scopePath];
+
       if (scopeId) {
-        map.set(item.item.id, scopeId);
+        itemIdToScopeIdMap.set(itemId, scopeId);
+      } else {
+        this.logger.warn(`Scope not found in cache for path: ${scopePath}`);
       }
     }
 
-    return map;
-  }
-
-  private getScopeIdOfItem(
-    item: SharepointContentItem,
-    rootScopeName: string,
-    scopeCache: Map<string, string>,
-  ): string | undefined {
-    try {
-      const itemScopePath = buildScopePathFromItem(item, rootScopeName);
-      const scopeId = scopeCache.get(itemScopePath);
-
-      if (!scopeId) {
-        this.logger.warn(`Scope not found in cache for path: ${itemScopePath}`);
-      }
-
-      return scopeId;
-    } catch (error) {
-      this.logger.warn(`Failed to get scope path for item: ${error}`);
-      return undefined;
-    }
+    return itemIdToScopeIdMap;
   }
 }

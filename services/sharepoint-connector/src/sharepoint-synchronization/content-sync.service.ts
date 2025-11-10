@@ -2,12 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
+import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
+import type { ScopePathToIdMap } from './scope-management.service';
 
 @Injectable()
 export class ContentSyncService {
@@ -15,7 +16,7 @@ export class ContentSyncService {
 
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
-    private readonly orchestrator: FileProcessingOrchestratorService,
+    private readonly orchestrator: ItemProcessingOrchestratorService,
     private readonly uniqueApiService: UniqueApiService,
     private readonly configService: ConfigService<Config, true>,
   ) {}
@@ -23,30 +24,27 @@ export class ContentSyncService {
   public async syncContentForSite(
     siteId: string,
     items: SharepointContentItem[],
-    scopeCache?: Map<string, string>,
+    scopePathToIdMap?: ScopePathToIdMap,
   ): Promise<void> {
     const logPrefix = `[SiteId: ${siteId}] `;
-    const diffResult = await this.calculateDiffForSite(items, siteId);
-    this.logger.log(
-      `${logPrefix} File Diff Results: ${diffResult.newAndUpdatedFiles.length} files need processing, ${diffResult.deletedFiles.length} deleted`,
-    );
-
-    // Filter items to process (only new and updated files)
-    const itemsToProcess = items.filter((item) =>
-      diffResult.newAndUpdatedFiles.some((key) => buildFileDiffKey(item) === key),
-    );
-
     const processStartTime = Date.now();
-    await this.orchestrator.processSiteItems(siteId, itemsToProcess, diffResult, scopeCache);
+
+    const diffResult = await this.calculateDiffForSite(items, siteId);
+
+    this.logger.log(
+      `${logPrefix} File Diff Results: ${diffResult.newFiles.length} new, ${diffResult.updatedFiles.length} updated, ${diffResult.movedFiles.length} moved, ${diffResult.deletedFiles.length} deleted`,
+    );
+
+    const fileKeysToSync = new Set([...diffResult.newFiles, ...diffResult.updatedFiles]);
+    const itemsToSync = items.filter((item) => fileKeysToSync.has(item.item.id));
+
+    await this.orchestrator.processItems(siteId, itemsToSync, scopePathToIdMap);
 
     this.logger.log(
       `${logPrefix} Finished processing content in ${elapsedSecondsLog(processStartTime)}`,
     );
   }
 
-  /*
-    This step also triggers file deletion in node-ingestion service when a file is missing.
-   */
   private async calculateDiffForSite(
     sharepointContentItems: SharepointContentItem[],
     siteId: string,
