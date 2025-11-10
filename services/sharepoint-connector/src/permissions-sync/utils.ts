@@ -1,6 +1,7 @@
 import { GroupDistinctId, GroupMembership, MembershipType } from './types';
 
 export const OWNERS_SUFFIX = '_o';
+export const ALL_USERS_GROUP_ID_PREFIX = 'spo-grid-all-users/';
 
 export const groupDistinctId = (group: Pick<GroupMembership, 'type' | 'id'>): GroupDistinctId =>
   `${group.type}:${group.id}`;

@@ -33,7 +33,13 @@ import type {
   SharePointGroupsMap,
   SharepointGroupWithMembers,
 } from './types';
-import { groupDistinctId, isGroupType, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
+import {
+  ALL_USERS_GROUP_ID_PREFIX,
+  groupDistinctId,
+  isGroupType,
+  normalizeMsGroupId,
+  OWNERS_SUFFIX,
+} from './utils';
 
 @Injectable()
 export class FetchGroupsWithMembershipsQuery {
@@ -85,6 +91,7 @@ export class FetchGroupsWithMembershipsQuery {
       siteName,
       siteGroupIds,
     );
+    console.log('siteGroupsMembershipsMap', JSON.stringify(siteGroupsMembershipsMap, null, 4));
     Object.assign(groupMembershipsCache, siteGroupsMembershipsMap);
     this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
 
@@ -95,6 +102,8 @@ export class FetchGroupsWithMembershipsQuery {
       uniqueBy(groupDistinctId),
       map(pick(['id', 'type'])),
     );
+
+    console.log('msGroupsToProcess', JSON.stringify(msGroupsToProcess, null, 4));
 
     this.logger.log(`${logPrefix} Fetching MS groups memberships map`);
     while (msGroupsToProcess.length > 0) {
@@ -260,6 +269,11 @@ export class FetchGroupsWithMembershipsQuery {
       },
       [PrincipalType.SecurityGroup]: () => {
         const groupId = this.extractGroupId(loginName);
+        // TODO: This is basically the case of "Everyone except external users". How are we supposed
+        //       to handle this case? For now we return null to skip it.
+        if (groupId?.startsWith(ALL_USERS_GROUP_ID_PREFIX)) {
+          return null;
+        }
         const groupType = groupId?.endsWith(OWNERS_SUFFIX) ? 'Owners' : 'Members';
         return groupId
           ? { type: `group${groupType}`, id: normalizeMsGroupId(groupId), name: title }

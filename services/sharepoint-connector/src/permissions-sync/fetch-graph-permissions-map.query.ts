@@ -7,7 +7,7 @@ import {
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { Membership } from './types';
-import { normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
+import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
 
 // We rename the type for clarity. we use the same stucture for permissions on files/folders as well
 // as memberships of groups. These are the same structures, so for the ease of code reading we ranem
@@ -82,8 +82,16 @@ export class FetchGraphPermissionsMapQuery {
   private mapSharePointIdentitySetToOurPermission(
     simpleIdentitySet: SimpleIdentitySet,
   ): Permission | null {
-    // TODO: Are we missing case of "Everyone except external users"?
     if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
+      const groupId = normalizeMsGroupId(simpleIdentitySet.group.id);
+      // TODO: This is basically the case of "Everyone except external users". How are we supposed
+      //       to handle this case? For now we return null to skip it. Does it happen outside of
+      //       SharePoint permissions visible in Site Groups? If it doesn't, we can safely ignore
+      //       it here.
+      if (groupId.startsWith(ALL_USERS_GROUP_ID_PREFIX)) {
+        return null;
+      }
+
       const isOwners = simpleIdentitySet.siteUser.loginName?.endsWith(OWNERS_SUFFIX);
       return {
         // Login name of the group looks like
@@ -92,7 +100,7 @@ export class FetchGraphPermissionsMapQuery {
         // c:0o.c|federateddirectoryclaimprovider|838f7d2d-BBBB-AAAA-DDDD-7dd9d399aff7
         // Presence of _o suffix indicates the owners of the group as opposed to the members
         type: `group${isOwners ? 'Owners' : 'Members'}`,
-        id: normalizeMsGroupId(simpleIdentitySet.group.id),
+        id: groupId,
         name: simpleIdentitySet.group.displayName,
       };
     }
