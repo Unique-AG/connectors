@@ -43,6 +43,7 @@ data:
   {{- end }}
   UNIQUE_FILE_DIFF_URL: {{ .Values.connectorConfig.unique.fileDiffUrl | quote }}
   UNIQUE_INGESTION_GRAPHQL_URL: {{ .Values.connectorConfig.unique.ingestionGraphqlUrl | quote }}
+  UNIQUE_SCOPE_MANAGEMENT_GRAPHQL_URL: {{ .Values.connectorConfig.unique.scopeManagementGraphqlUrl | quote }}
   UNIQUE_ZITADEL_CLIENT_ID: {{ .Values.connectorConfig.unique.zitadel.clientId | quote }}
   UNIQUE_ZITADEL_OAUTH_TOKEN_URL: {{ .Values.connectorConfig.unique.zitadel.oauthTokenUrl | quote }}
   UNIQUE_ZITADEL_PROJECT_ID: {{ .Values.connectorConfig.unique.zitadel.projectId | quote }}
