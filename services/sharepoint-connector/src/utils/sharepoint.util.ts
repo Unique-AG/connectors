@@ -67,8 +67,9 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
  * item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
  * We are adding ?web=1 to the url to get the web view of the item.
  *
- * When rootScopeName is provided, the protocol is stripped from the URL to prevent
- * creating scopes like "my-scope/https://uniqueapp.sharepoint.com" instead of "my-scope"
+ * When rootScopeName is provided, unnecessary path prefixes are stripped from the URL.
+ * Instead of "my-scope/uniqueapp.sharepoint.com/sites/site-name/path/file.pdf",
+ * the result is "my-scope/site-name/path/file.pdf".
  */
 export function getItemUrl(
   sharepointContentItem: SharepointContentItem,
@@ -76,20 +77,55 @@ export function getItemUrl(
 ): string {
   const url = getBaseUrl(sharepointContentItem);
 
-  return rootScopeName ? `${rootScopeName}/${stripProtocol(url)}` : url;
+  if (!rootScopeName) {
+    return url;
+  }
+
+  const simplifiedPath = stripSharepointPathPrefixes(url);
+  return `${rootScopeName}/${simplifiedPath}`;
 }
 
 function getBaseUrl(item: SharepointContentItem): string {
   if (item.itemType === 'driveItem') {
     const listItemUrl = item.item.listItem?.webUrl;
-    return listItemUrl ? `${listItemUrl}?web=1` : item.item.webUrl;
+    const url = listItemUrl || item.item.webUrl;
+    return appendWebParameter(url);
   }
 
   if (item.itemType === 'listItem') {
-    return `${item.item.webUrl}?web=1`;
+    return appendWebParameter(item.item.webUrl);
   }
 
   assert.fail('Invalid pipeline item type');
+}
+
+function appendWebParameter(url: string): string {
+  if (url.includes('?')) {
+    return `${url}&web=1`;
+  }
+  return `${url}?web=1`;
+}
+
+/**
+ * Strips the SharePoint domain and 'sites' prefix from a URL.
+ *
+ * Examples:
+ * - "https://company.sharepoint.com/sites/mysite/Shared Documents/folder/file.pdf"
+ *   becomes "mysite/Shared Documents/folder/file.pdf"
+ * - "https://company.sharepoint.com/sites/mysite/folder/file.pdf?web=1"
+ *   becomes "mysite/folder/file.pdf?web=1"
+ */
+function stripSharepointPathPrefixes(url: string): string {
+  // Remove protocol
+  let path = url.replace(/^https?:\/\//, '');
+
+  // Remove domain (e.g., "uniqueapp.sharepoint.com/")
+  path = path.replace(/^[^/]+\//, '');
+
+  // Remove "sites/" prefix if present
+  path = path.replace(/^sites\//, '');
+
+  return path;
 }
 
 /**

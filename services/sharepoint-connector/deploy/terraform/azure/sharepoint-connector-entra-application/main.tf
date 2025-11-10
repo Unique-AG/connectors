@@ -8,11 +8,11 @@ locals {
   # Define role mappings based on sync mode
   role_mappings = {
     content-only = {
-      graph_roles      = ["Files.Read.All", "Sites.Selected"]
+      graph_roles      = ["Files.Read.All"]
       sharepoint_roles = []
     }
     content-and-permissions = {
-      graph_roles      = ["Files.Read.All", "Sites.Selected", "Group.Read.All", "GroupMember.Read.All", "User.ReadBasic.All"]
+      graph_roles      = ["Files.Read.All", "GroupMember.Read.All", "User.ReadBasic.All"]
       sharepoint_roles = ["Sites.Selected"]
     }
   }

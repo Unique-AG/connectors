@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.0.0-alpha.11](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.10...sharepoint-connector@v2.0.0-alpha.11) (2025-11-09)
+
+
+### Features
+
+* **sharepoint-connector:** add helm chart install validations ([#89](https://github.com/Unique-AG/connectors/issues/89)) ([1f96305](https://github.com/Unique-AG/connectors/commit/1f963052c63f0c365bd8568dd7c492d13a34de00))
+* **sharepoint-connector:** clean unnecessary words from the ingested file paths ([#92](https://github.com/Unique-AG/connectors/issues/92)) ([d7890b6](https://github.com/Unique-AG/connectors/commit/d7890b6cd98e958c196a48ca7df3bb47a531377f))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** explanation for setting spc manual private key secret ([#98](https://github.com/Unique-AG/connectors/issues/98)) ([8bdd503](https://github.com/Unique-AG/connectors/commit/8bdd503fd2aac0bbb11b15c3daa531955fe9b112))
+
 ## [2.0.0-alpha.10](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.9...sharepoint-connector@v2.0.0-alpha.10) (2025-11-03)
 
 

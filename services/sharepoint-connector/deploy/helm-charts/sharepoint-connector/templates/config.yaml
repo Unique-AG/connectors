@@ -43,9 +43,7 @@ data:
   {{- end }}
   UNIQUE_FILE_DIFF_URL: {{ .Values.connectorConfig.unique.fileDiffUrl | quote }}
   UNIQUE_INGESTION_GRAPHQL_URL: {{ .Values.connectorConfig.unique.ingestionGraphqlUrl | quote }}
-  {{- if .Values.connectorConfig.unique.scopeManagementGraphqlUrl }}
   UNIQUE_SCOPE_MANAGEMENT_GRAPHQL_URL: {{ .Values.connectorConfig.unique.scopeManagementGraphqlUrl | quote }}
-  {{- end }}
   {{- if .Values.connectorConfig.unique.ingestionScopeLocation }}
   UNIQUE_INGESTION_SCOPE_LOCATION: {{ .Values.connectorConfig.unique.ingestionScopeLocation | quote }}
   {{- end }}

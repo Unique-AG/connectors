@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import type { DriveItem } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { ContentSyncService } from './content-sync.service';
-import { PermissionsSyncService } from './permissions-sync.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
 describe('SharepointSynchronizationService', () => {
@@ -81,7 +81,7 @@ describe('SharepointSynchronizationService', () => {
         ...stub(),
         get: vi.fn((k: string) => {
           if (k === 'sharepoint.siteIds') return ['site-1'];
-          if (k === 'processing.permissionsSyncEnabled') return false;
+          if (k === 'processing.syncMode') return 'content-only';
           return undefined;
         }),
       }))

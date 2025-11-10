@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { isNonNullish } from 'remeda';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
@@ -6,57 +7,29 @@ import {
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { elapsedSecondsLog } from '../utils/timing.util';
+import { Membership } from './types';
+import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
 
-const OWNERS_SUFFIX = '_o';
-
-type ItemPermission =
-  | {
-      type: 'user';
-      id: string;
-      email: string;
-    }
-  | {
-      type: 'siteGroup';
-      id: string;
-      name: string;
-    }
-  | {
-      type: 'groupMembers';
-      id: string;
-      name: string;
-    }
-  | {
-      type: 'groupOwners';
-      id: string;
-      name: string;
-    };
+// We rename the type for clarity. we use the same stucture for permissions on files/folders as well
+// as memberships of groups. These are the same structures, so for the ease of code reading we ranem
+// the local type name.
+type Permission = Membership;
 
 @Injectable()
-export class PermissionsSyncService {
+export class FetchGraphPermissionsMapQuery {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(private readonly graphApiService: GraphApiService) {}
 
-  public async syncPermissionsForSite(
+  public async run(
     siteId: string,
     items: SharepointContentItem[],
-  ): Promise<void> {
-    const logPrefix = `[SiteId: ${siteId}] `;
-    this.logger.log(`${logPrefix} Starting permissions fetching for ${items.length} items`);
-    const permissionsFetchStartTime = Date.now();
-    const permissionsMap = await this.getPermissionsMap(siteId, items);
-    this.logger.log(
-      `${logPrefix} Fetched permissions for ${items.length} items in ${elapsedSecondsLog(permissionsFetchStartTime)}`,
-    );
-    this.logger.log(`${logPrefix} Permissions map length: ${Object.keys(permissionsMap).length}`);
-  }
+  ): Promise<Record<string, Permission[]>> {
+    const siteWebUrl = await this.graphApiService.getSiteWebUrl(siteId);
+    const siteName = siteWebUrl.split('/').pop();
+    assert.ok(siteName, `Site name not found for site ${siteId}`);
 
-  private async getPermissionsMap(
-    siteId: string,
-    items: SharepointContentItem[],
-  ): Promise<Record<string, ItemPermission[]>> {
-    const permissionsMap: Record<string, ItemPermission[]> = {};
+    const permissionsMap: Record<string, Permission[]> = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
       if (item.itemType === 'driveItem') {
@@ -65,7 +38,7 @@ export class PermissionsSyncService {
           item.item.id,
         );
         permissionsMap[`${item.driveId}/${item.item.id}`] =
-          this.mapSimplePermissionsToItemPermissions(permissions);
+          this.mapSharePointPermissionsToOurPermissions(permissions, siteName);
       } else if (item.itemType === 'listItem') {
         const permissions = await this.graphApiService.getListItemPermissions(
           siteId,
@@ -73,18 +46,22 @@ export class PermissionsSyncService {
           item.item.id,
         );
         permissionsMap[`${item.driveId}/${item.item.id}`] =
-          this.mapSimplePermissionsToItemPermissions(permissions);
+          this.mapSharePointPermissionsToOurPermissions(permissions, siteName);
       }
     }
     return permissionsMap;
   }
 
-  private mapSimplePermissionsToItemPermissions(
+  private mapSharePointPermissionsToOurPermissions(
     simplePermissions: SimplePermission[],
-  ): ItemPermission[] {
+    siteName: string,
+  ): Permission[] {
     return simplePermissions.flatMap((permission) => {
       if (isNonNullish(permission.grantedToV2)) {
-        const itemPermission = this.mapSimpleIdentitySetToItemPermission(permission.grantedToV2);
+        const itemPermission = this.mapSharePointIdentitySetToOurPermission(
+          permission.grantedToV2,
+          siteName,
+        );
         if (isNonNullish(itemPermission)) {
           return [itemPermission];
         }
@@ -97,7 +74,9 @@ export class PermissionsSyncService {
         }
 
         const itemPermissions = permission.grantedToIdentitiesV2
-          .map(this.mapSimpleIdentitySetToItemPermission.bind(this))
+          .map((simpleIdentitySet) =>
+            this.mapSharePointIdentitySetToOurPermission(simpleIdentitySet, siteName),
+          )
           .filter(isNonNullish);
         if (itemPermissions.length > 0) {
           return itemPermissions;
@@ -111,10 +90,20 @@ export class PermissionsSyncService {
     });
   }
 
-  private mapSimpleIdentitySetToItemPermission(
+  private mapSharePointIdentitySetToOurPermission(
     simpleIdentitySet: SimpleIdentitySet,
-  ): ItemPermission | null {
+    siteName: string,
+  ): Permission | null {
     if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
+      const groupId = normalizeMsGroupId(simpleIdentitySet.group.id);
+      // TODO: This is basically the case of "Everyone except external users". How are we supposed
+      //       to handle this case? For now we return null to skip it. Does it happen outside of
+      //       SharePoint permissions visible in Site Groups? If it doesn't, we can safely ignore
+      //       it here.
+      if (groupId.startsWith(ALL_USERS_GROUP_ID_PREFIX)) {
+        return null;
+      }
+
       const isOwners = simpleIdentitySet.siteUser.loginName?.endsWith(OWNERS_SUFFIX);
       return {
         // Login name of the group looks like
@@ -123,7 +112,7 @@ export class PermissionsSyncService {
         // c:0o.c|federateddirectoryclaimprovider|838f7d2d-BBBB-AAAA-DDDD-7dd9d399aff7
         // Presence of _o suffix indicates the owners of the group as opposed to the members
         type: `group${isOwners ? 'Owners' : 'Members'}`,
-        id: simpleIdentitySet.group.id,
+        id: groupId,
         name: simpleIdentitySet.group.displayName,
       };
     }
@@ -131,7 +120,7 @@ export class PermissionsSyncService {
     if (isNonNullish(simpleIdentitySet.siteGroup)) {
       return {
         type: 'siteGroup',
-        id: simpleIdentitySet.siteGroup.id,
+        id: `${siteName}|${simpleIdentitySet.siteGroup.id}`,
         name: simpleIdentitySet.siteGroup.displayName,
       };
     }
@@ -139,7 +128,6 @@ export class PermissionsSyncService {
     if (isNonNullish(simpleIdentitySet.user) && isNonNullish(simpleIdentitySet.siteUser)) {
       return {
         type: 'user',
-        id: simpleIdentitySet.user.id,
         email: simpleIdentitySet.user.email,
       };
     }

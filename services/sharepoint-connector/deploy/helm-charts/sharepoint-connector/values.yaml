@@ -26,7 +26,7 @@ connector:
     - sharepoint-connector-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
-    tag: 2.0.0-alpha.10 # x-release-please-version
+    tag: 2.0.0-alpha.11 # x-release-please-version
   networkPolicy:
     enabled: true
     policyTypes:
@@ -122,9 +122,9 @@ connectorConfig:
     # TODO: should use only public urls!
     # example: https://api.unique.app/ingestion/graphql
     ingestionGraphqlUrl: unset_default_value
-    # -- url for the scope management graphql (required for recursive-advanced mode)
+    # -- url for the scope management graphql
     # example: https://api.unique.app/scope-management/graphql
-    scopeManagementGraphqlUrl: null
+    scopeManagementGraphqlUrl: unset_default_value
     # flat: sync all files to a single root scope/folder
     # recursive: maintain the folder hierarchy
     # recursive-advanced: create explicit scope hierarchy via Scope Management service
@@ -142,7 +142,7 @@ connectorConfig:
     # -- Object containing extra HTTP headers for ingestion API requests (GraphQL and file diff)
     # Used for service-to-service authentication when using internal cluster URLs
     httpExtraHeaders: {}
-      # x-client-id: sharepoint-connector
+      # x-service-id: sharepoint-connector
       # x-company-id: 1234567890
       # x-user-id: 1234567890
     zitadel:
