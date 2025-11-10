@@ -48,6 +48,7 @@ jobs:
           ./helm-docs.sh
           if [[ $(git diff --stat) != '' ]]; then
             echo -e '\033[0;31mDocumentation outdated!\033[0m ❌'
+            echo "Run 'make spc-helm-docs' in root directory to update the documentation. We automate that later away."
             git diff --color
             exit 1
           else
