@@ -27,8 +27,7 @@ describe('AppController (e2e)', () => {
       .expect((res) => {
         expect(res.body).toMatchObject({
           name: '@unique-ag/teams-mcp',
-          description:
-            'Teams MCP Server - Microsoft Graph integration for Model Context Protocol',
+          description: 'Teams MCP Server - Microsoft Graph integration for Model Context Protocol',
           type: 'mcp-server',
           endpoints: {
             mcp: '/mcp',
