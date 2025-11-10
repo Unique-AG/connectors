@@ -1,4 +1,4 @@
-import assert from 'assert';
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
 import { SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX } from '../unique-api/unique-groups/unique-groups.consts';

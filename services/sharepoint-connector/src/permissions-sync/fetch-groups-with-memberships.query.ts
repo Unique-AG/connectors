@@ -55,13 +55,16 @@ export class FetchGroupsWithMembershipsQuery {
   //    Security Groups can be nested.
   // 3. Go through group permissions passed to the service and map them to
   //    SharepointGroupWithMembers using the built cache of group memberships.
-  public async run(siteId: string, groupPermissions: GroupMembership[]): Promise<SharePointGroupsMap> {
+  public async run(
+    siteId: string,
+    groupPermissions: GroupMembership[],
+  ): Promise<SharePointGroupsMap> {
     const logPrefix = `[SiteId: ${siteId}]`;
     const uniqueGroupPermissions = uniqueBy(groupPermissions, groupDistinctId);
 
     this.logger.log(
       `${logPrefix} Fetching groups with memberships for ${uniqueGroupPermissions.length} unique ` +
-      `group permissions`,
+        `group permissions`,
     );
     const siteWebUrl = await this.graphApiService.getSiteWebUrl(siteId);
     const siteName = siteWebUrl.split('/').pop();
@@ -77,8 +80,11 @@ export class FetchGroupsWithMembershipsQuery {
       `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
     );
     const groupMembershipsCache: Record<GroupDistinctId, Membership[]> = {};
-    // We have to call 
-    const siteGroupsMembershipsMap = await this.fetchSiteGroupsMembershipsMap(siteName, siteGroupIds);
+    // We have to call
+    const siteGroupsMembershipsMap = await this.fetchSiteGroupsMembershipsMap(
+      siteName,
+      siteGroupIds,
+    );
     Object.assign(groupMembershipsCache, siteGroupsMembershipsMap);
     this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
 
@@ -112,7 +118,12 @@ export class FetchGroupsWithMembershipsQuery {
     }
 
     const fetchedGroupsTotal = Object.keys(groupMembershipsCache).length;
-    const fetchedMembershipsTotal = pipe(groupMembershipsCache, mapValues(length()), values(), sum());
+    const fetchedMembershipsTotal = pipe(
+      groupMembershipsCache,
+      mapValues(length()),
+      values(),
+      sum(),
+    );
     this.logger.log(
       `${logPrefix} Done fetching MS groups memberships. Fetched ${fetchedGroupsTotal} groups ` +
         `with total ${fetchedMembershipsTotal} memberships`,
