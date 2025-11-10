@@ -42,6 +42,18 @@ jobs:
           helm dependency build
           helm template .
 
+      - name: Validate (helm-docs)
+        working-directory: services/sharepoint-connector/deploy/helm-charts
+        run: |
+          ./helm-docs.sh
+          if [[ $(git diff --stat) != '' ]]; then
+            echo -e '\033[0;31mDocumentation outdated!\033[0m ❌'
+            git diff --color
+            exit 1
+          else
+            echo -e '\033[0;32mDocumentation up to date\033[0m ✔'
+          fi
+
       - name: List changed charts
         id: list-changed
         run: |
