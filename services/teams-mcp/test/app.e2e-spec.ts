@@ -26,9 +26,9 @@ describe('AppController (e2e)', () => {
       .expect(200)
       .expect((res) => {
         expect(res.body).toMatchObject({
-          name: '@unique-ag/outlook-mcp',
+          name: '@unique-ag/teams-mcp',
           description:
-            'Outlook MCP Server - Microsoft Graph integration for Model Context Protocol',
+            'Teams MCP Server - Microsoft Graph integration for Model Context Protocol',
           type: 'mcp-server',
           endpoints: {
             mcp: '/mcp',
@@ -39,14 +39,14 @@ describe('AppController (e2e)', () => {
           },
           features: [
             'Microsoft Graph integration',
-            'Outlook email management',
+            'Teams recordings management',
             'OAuth2 authentication',
             'Secure token handling',
             'RESTful API endpoints',
           ],
           documentation: {
             readme:
-              'https://github.com/Unique-AG/connectors/blob/main/services/outlook-mcp/README.md',
+              'https://github.com/Unique-AG/connectors/blob/main/services/teams-mcp/README.md',
             mcp: 'https://modelcontextprotocol.io/',
           },
           timestamp: expect.any(String),
