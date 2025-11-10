@@ -77,6 +77,7 @@ export class GraphApiService {
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
     const sharepointContentFilesToSync: SharepointContentItem[] = [];
     let totalScanned = 0;
+    const LOG_INTERVAL = 20;
 
     if (maxFilesToScan) {
       this.logger.warn(`File scan limit set to ${maxFilesToScan} files for testing purpose.`);
@@ -107,6 +108,11 @@ export class GraphApiService {
 
       sharepointContentFilesToSync.push(...filesInDrive);
       totalScanned += filesInDrive.length;
+
+      // Log progress every 20 files
+      if (totalScanned % LOG_INTERVAL === 0) {
+        this.logger.log(`Scanning in progress for site ${siteId}: ${totalScanned} files scanned so far`);
+      }
 
       // Stop scanning if we've reached the limit for testing
       if (maxFilesToScan && totalScanned >= maxFilesToScan) {
