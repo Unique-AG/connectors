@@ -1,5 +1,5 @@
 {
-  "id": "ed9f26c1-ee96-414b-a821-be6405fa50cf",
+  "id": "5366984e-a3e8-4b03-a8b1-3a83747f2b89",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -602,86 +602,6 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    },
-    "public.subscriptions": {
-      "name": "subscriptions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "varchar",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "for_type": {
-          "name": "for_type",
-          "type": "subscription_for_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_profile_id": {
-          "name": "user_profile_id",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "subscriptions_user_profile_id_user_profiles_id_fk": {
-          "name": "subscriptions_user_profile_id_user_profiles_id_fk",
-          "tableFrom": "subscriptions",
-          "tableTo": "user_profiles",
-          "columnsFrom": [
-            "user_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "subscriptions_subscriptionId_unique": {
-          "name": "subscriptions_subscriptionId_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "subscription_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -691,13 +611,6 @@
       "values": [
         "ACCESS",
         "REFRESH"
-      ]
-    },
-    "public.subscription_for_type": {
-      "name": "subscription_for_type",
-      "schema": "public",
-      "values": [
-        "transcript"
       ]
     }
   },

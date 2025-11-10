@@ -1,51 +1,46 @@
 {
-  "name": "Outlook MCP Server",
-  "short_name": "Outlook MCP",
-  "description": "Model Context Protocol server for Microsoft Outlook integration",
+  "name": "Teams MCP Server",
+  "short_name": "Teams MCP",
+  "description": "Model Context Protocol server for Microsoft Teams integration",
   "icons": [
     {
-      "src": "/icons/icon-48x48.png",
-      "sizes": "48x48",
+      "src": "/icons/favicon-32x32.png",
+      "sizes": "32x32",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-64x64.png",
-      "sizes": "64x64",
+      "src": "/icons/favicon-70x70.png",
+      "sizes": "70x70",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-128x128.png",
-      "sizes": "128x128",
+      "src": "/icons/favicon-114x114.png",
+      "sizes": "114x114",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-144x144.png",
+      "src": "/icons/favicon-144x144.png",
       "sizes": "144x144",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "/icons/favicon-192x192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-256x256.png",
-      "sizes": "256x256",
-      "type": "image/png"
-    },
-    {
-      "src": "/icons/icon-512x512.png",
-      "sizes": "512x512",
+      "src": "/icons/favicon-310x310.png",
+      "sizes": "310x310",
       "type": "image/png"
     },
     {
       "src": "/favicon.png",
-      "sizes": "48x48",
+      "sizes": "32x32",
       "type": "image/png"
     },
     {
       "src": "/favicon.ico",
-      "sizes": "48x48",
+      "sizes": "32x32",
       "type": "image/x-icon"
     }
   ],
