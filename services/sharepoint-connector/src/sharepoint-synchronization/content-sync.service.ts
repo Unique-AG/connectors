@@ -33,6 +33,11 @@ export class ContentSyncService {
     );
 
     const fileKeysToSync = new Set([...diffResult.newFiles, ...diffResult.updatedFiles]);
+    if (fileKeysToSync.size === 0) {
+      this.logger.log(`${logPrefix} No files to sync`);
+      return;
+    }
+
     const itemsToSync = items.filter((item) => fileKeysToSync.has(item.item.id));
 
     await this.orchestrator.processItems(siteId, itemsToSync, scopePathToIdMap);

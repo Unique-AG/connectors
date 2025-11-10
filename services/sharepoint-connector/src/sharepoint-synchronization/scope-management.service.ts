@@ -110,7 +110,8 @@ export class ScopeManagementService {
     // Build complete map: path -> scopeId
     const scopePathToIdRecord: ScopePathToIdMap = {};
     for (const scope of scopes) {
-      scopePathToIdRecord[scope.name] = scope.id;
+      const decodedName = decodeURIComponent(scope.name);
+      scopePathToIdRecord[decodedName] = scope.id;
     }
 
     this.logger.log(`[SiteId: ${siteId}] Created scopes for ${scopes.length} unique paths`);
