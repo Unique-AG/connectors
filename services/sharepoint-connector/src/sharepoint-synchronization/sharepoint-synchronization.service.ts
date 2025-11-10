@@ -4,7 +4,7 @@ import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import {PermissionsSyncService} from "../permissions-sync/permissions-sync.service";
+import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
@@ -50,7 +50,7 @@ export class SharepointSynchronizationService {
         continue;
       }
 
-      // TODO make sure that scope ingestion works now that we've changed to file-diff v2 
+      // TODO make sure that scope ingestion works now that we've changed to file-diff v2
       // TODO implement file deletion and file moving
       // Create scopes for recursive mode
       let scopePathToIdMap: ScopePathToIdMap | undefined;
@@ -58,12 +58,13 @@ export class SharepointSynchronizationService {
       if (ingestionMode === IngestionMode.Recursive) {
         scopePathToIdMap = await this.createIfNotExistingScopesForItemPaths(items, logPrefix);
         if (!scopePathToIdMap) {
-          this.logger.error('')
+          this.logger.error('');
           continue;
         }
       }
 
-      try { // Start processing sitePages and files
+      try {
+        // Start processing sitePages and files
         await this.contentSyncService.syncContentForSite(siteId, items, scopePathToIdMap);
       } catch (error) {
         this.logger.error({

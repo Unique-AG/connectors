@@ -60,6 +60,7 @@ describe('IngestionFinalizationStep', () => {
       startTime: new Date(),
       knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
       mimeType: 'application/pdf',
+      scopeId: 'scope-1',
       pipelineItem: {
         itemType: 'listItem',
         item: listItem,

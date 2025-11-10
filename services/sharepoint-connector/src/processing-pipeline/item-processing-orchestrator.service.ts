@@ -5,7 +5,10 @@ import pLimit from 'p-limit';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { ScopeManagementService, type ScopePathToIdMap } from '../sharepoint-synchronization/scope-management.service';
+import {
+  ScopeManagementService,
+  type ScopePathToIdMap,
+} from '../sharepoint-synchronization/scope-management.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
 @Injectable()

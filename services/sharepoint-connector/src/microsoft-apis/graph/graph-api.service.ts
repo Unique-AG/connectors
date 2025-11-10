@@ -111,7 +111,9 @@ export class GraphApiService {
 
       // Log progress every 20 files
       if (totalScanned % LOG_INTERVAL === 0) {
-        this.logger.log(`Scanning in progress for site ${siteId}: ${totalScanned} files scanned so far`);
+        this.logger.log(
+          `Scanning in progress for site ${siteId}: ${totalScanned} files scanned so far`,
+        );
       }
 
       // Stop scanning if we've reached the limit for testing

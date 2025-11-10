@@ -1,6 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
 import { UniqueApiService } from '../unique-api/unique-api.service';
@@ -18,7 +16,6 @@ export class ContentSyncService {
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly orchestrator: ItemProcessingOrchestratorService,
     private readonly uniqueApiService: UniqueApiService,
-    private readonly configService: ConfigService<Config, true>,
   ) {}
 
   public async syncContentForSite(
@@ -49,14 +46,13 @@ export class ContentSyncService {
     sharepointContentItems: SharepointContentItem[],
     siteId: string,
   ): Promise<FileDiffResponse> {
-    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     const fileDiffItems: FileDiffItem[] = sharepointContentItems.map(
       (sharepointContentItem: SharepointContentItem) => {
         const key = buildFileDiffKey(sharepointContentItem);
 
         return {
           key,
-          url: getItemUrl(sharepointContentItem, rootScopeName),
+          url: getItemUrl(sharepointContentItem),
           updatedAt: sharepointContentItem.item.lastModifiedDateTime,
         };
       },

@@ -5,6 +5,7 @@ import { PermissionsSyncModule } from '../permissions-sync/permissions-sync.modu
 import { ProcessingPipelineModule } from '../processing-pipeline/processing-pipeline.module';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ContentSyncService } from './content-sync.service';
+import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
 @Module({
@@ -15,7 +16,7 @@ import { SharepointSynchronizationService } from './sharepoint-synchronization.s
     ProcessingPipelineModule,
     PermissionsSyncModule,
   ],
-  providers: [SharepointSynchronizationService, ContentSyncService],
+  providers: [SharepointSynchronizationService, ContentSyncService, ScopeManagementService],
   exports: [SharepointSynchronizationService],
 })
 export class SharepointSynchronizationModule {}

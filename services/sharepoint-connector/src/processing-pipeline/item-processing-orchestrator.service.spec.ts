@@ -106,9 +106,7 @@ describe('ItemProcessingOrchestratorService', () => {
   });
 
   it('processes only files for specified site', async () => {
-    const files = [
-      createMockFile('file-1', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
-    ];
+    const files = [createMockFile('file-1', 'bd9c85ee-998f-4665-9c44-577cf5a08a66')];
 
     await service.processItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files);
 

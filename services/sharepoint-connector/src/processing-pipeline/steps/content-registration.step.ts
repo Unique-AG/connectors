@@ -3,13 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
-import {
-  INGESTION_SOURCE_KIND,
-  INGESTION_SOURCE_NAME,
-  IngestionMode,
-} from '../../constants/ingestion.constants';
+import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import { getBaseUrl, getScopeIdForIngestion } from '../../unique-api/ingestion.util';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
@@ -23,9 +18,6 @@ import type { IPipelineStep } from './pipeline-step.interface';
 export class ContentRegistrationStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.ContentRegistration;
-  private readonly ingestionMode: IngestionMode;
-  private readonly scopeId: string | undefined;
-  private readonly rootScopeName: string | undefined;
   private readonly sharepointBaseUrl: string;
 
   public constructor(
@@ -33,50 +25,39 @@ export class ContentRegistrationStep implements IPipelineStep {
     private readonly uniqueApiService: UniqueApiService,
     private readonly configService: ConfigService<Config, true>,
   ) {
-    this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-    this.scopeId = this.configService.get('unique.scopeId', { infer: true });
-    this.rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
 
-    const scopeId = getScopeIdForIngestion(this.ingestionMode, this.scopeId, context.scopeId);
+      const itemKey = buildIngestionItemKey(context.pipelineItem);
 
-    const itemKey = buildIngestionItemKey(context.pipelineItem);
-    const baseUrl = getBaseUrl(
-      this.ingestionMode,
-      this.rootScopeName,
-      this.sharepointBaseUrl,
-    );
-
-    const contentRegistrationRequest: ContentRegistrationRequest = {
-      key: itemKey,
-      title: context.pipelineItem.fileName,
-      mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
-      ownerType: UniqueOwnerType.Scope,
-      scopeId: scopeId,
-      sourceOwnerType: UniqueOwnerType.Company,
-      sourceKind: INGESTION_SOURCE_KIND,
-      sourceName: INGESTION_SOURCE_NAME,
-      ...(this.ingestionMode === IngestionMode.Recursive && {
+      const contentRegistrationRequest: ContentRegistrationRequest = {
+        key: itemKey,
+        title: context.pipelineItem.fileName,
+        mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
+        ownerType: UniqueOwnerType.Scope,
+        scopeId: context.scopeId,
+        sourceOwnerType: UniqueOwnerType.Company,
+        sourceKind: INGESTION_SOURCE_KIND,
+        sourceName: INGESTION_SOURCE_NAME,
         url: context.knowledgeBaseUrl,
-        baseUrl,
-      }),
-    };
-    this.logger.debug(
-      `contentRegistrationRequest: ${JSON.stringify(
-        {
-          url: contentRegistrationRequest.url,
-          baseUrl: contentRegistrationRequest.baseUrl,
-          key: contentRegistrationRequest.key,
-          sourceName: contentRegistrationRequest.sourceName,
-        },
-        null,
-        4,
-      )}`,
-    );
+        baseUrl: this.sharepointBaseUrl,
+      };
+
+      this.logger.debug(
+        `contentRegistrationRequest: ${JSON.stringify(
+          {
+            url: contentRegistrationRequest.url,
+            baseUrl: contentRegistrationRequest.baseUrl,
+            key: contentRegistrationRequest.key,
+            sourceName: contentRegistrationRequest.sourceName,
+          },
+          null,
+          4,
+        )}`,
+      );
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();

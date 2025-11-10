@@ -5,15 +5,10 @@ import Bottleneck from 'bottleneck';
 import { GraphQLClient } from 'graphql-request';
 import { Client } from 'undici';
 import { Config } from '../config';
-import {
-  INGESTION_SOURCE_KIND,
-  INGESTION_SOURCE_NAME,
-  IngestionMode,
-} from '../constants/ingestion.constants';
+import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../constants/ingestion.constants';
 import { UniqueOwnerType } from '../constants/unique-owner-type.enum';
 import { UNIQUE_HTTP_CLIENT } from '../http-client.tokens';
 import { normalizeError } from '../utils/normalize-error';
-import { getScopeIdForIngestion } from './ingestion.util';
 import {
   type ContentRegistrationRequest,
   type FileDiffItem,
@@ -28,7 +23,6 @@ import {
 export class UniqueApiService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly limiter: Bottleneck;
-  private readonly ingestionMode: IngestionMode;
   private readonly scopeId: string | undefined;
   private readonly rootScopeName: string | undefined;
   private readonly fileDiffUrl: string;
@@ -42,7 +36,6 @@ export class UniqueApiService {
     private readonly configService: ConfigService<Config, true>,
     @Inject(UNIQUE_HTTP_CLIENT) private readonly httpClient: Client,
   ) {
-    this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
     this.scopeId = this.configService.get('unique.scopeId', { infer: true });
     this.rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     this.fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });

@@ -60,72 +60,25 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
 }
 
 /**
- * Gets the web URL for a SharePoint item, with optional root scope name prefix and stripped path prefixes.
+ * Gets the web URL for a SharePoint item with ?web=1 parameter.
  *
  * We are reading the webUrl from item.listItem because it contains the real path to the item.
  * listItem.webUrl example: https://[tenant].sharepoint.com/sites/[site]/[library]/[path]/[filename]
  * item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
  * We are adding ?web=1 to the url to get the web view of the item.
- *
- * When rootScopeName is provided, unnecessary path prefixes are always stripped from the URL.
- * Instead of "my-scope/uniqueapp.sharepoint.com/sites/site-name/path/file.pdf",
- * the result is "my-scope/site-name/path/file.pdf".
  */
-export function getItemUrl(
-  sharepointContentItem: SharepointContentItem,
-  rootScopeName?: string,
-): string {
-  const url = getBaseUrl(sharepointContentItem);
+export function getItemUrl(sharepointContentItem: SharepointContentItem): string {
+  let url: string;
 
-  if (!rootScopeName) {
-    return url;
+  if (sharepointContentItem.itemType === 'driveItem') {
+    url = sharepointContentItem.item.listItem?.webUrl || sharepointContentItem.item.webUrl;
+  } else if (sharepointContentItem.itemType === 'listItem') {
+    url = sharepointContentItem.item.webUrl;
+  } else {
+    assert.fail('Invalid pipeline item type');
   }
 
-  const simplifiedPath = stripSharepointPathPrefixes(url);
-  return `${rootScopeName}/${simplifiedPath}`;
-}
-
-function getBaseUrl(item: SharepointContentItem): string {
-  if (item.itemType === 'driveItem') {
-    const listItemUrl = item.item.listItem?.webUrl;
-    const url = listItemUrl || item.item.webUrl;
-    return appendWebParameter(url);
-  }
-
-  if (item.itemType === 'listItem') {
-    return appendWebParameter(item.item.webUrl);
-  }
-
-  assert.fail('Invalid pipeline item type');
-}
-
-function appendWebParameter(url: string): string {
-  if (url.includes('?')) {
-    return `${url}&web=1`;
-  }
-  return `${url}?web=1`;
-}
-
-/**
- * Strips the SharePoint domain and 'sites' prefix from a URL.
- *
- * Examples:
- * - "https://company.sharepoint.com/sites/mysite/Shared Documents/folder/file.pdf"
- *   becomes "mysite/Shared Documents/folder/file.pdf"
- * - "https://company.sharepoint.com/sites/mysite/folder/file.pdf?web=1"
- *   becomes "mysite/folder/file.pdf?web=1"
- */
-function stripSharepointPathPrefixes(url: string): string {
-  // Remove protocol
-  let path = url.replace(/^https?:\/\//, '');
-
-  // Remove domain (e.g., "uniqueapp.sharepoint.com/")
-  path = path.replace(/^[^/]+\//, '');
-
-  // Remove "sites/" prefix if present
-  path = path.replace(/^sites\//, '');
-
-  return path;
+  return url.includes('?') ? `${url}&web=1` : `${url}?web=1`;
 }
 
 /**
@@ -197,10 +150,7 @@ export function extractFolderPathFromUrl(fileUrl: string): string {
   }
 }
 
-export function buildScopePathFromItem(
-  item: SharepointContentItem,
-  rootScopeName: string,
-): string {
+export function buildScopePathFromItem(item: SharepointContentItem, rootScopeName: string): string {
   const fileUrl = extractFileUrl(item);
   assert(fileUrl, 'Unable to determine file URL from item');
 

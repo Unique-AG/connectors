@@ -164,7 +164,7 @@ describe('getItemUrl', () => {
     );
   });
 
-  it('simplifies path structure with custom scope for driveItem', () => {
+  it('appends web=1 parameter for driveItem', () => {
     const item = {
       itemType: 'driveItem' as const,
       siteId: 'site123',
@@ -182,12 +182,14 @@ describe('getItemUrl', () => {
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'my-custom-scope');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('my-custom-scope/project/Shared Documents/folder/report.pdf?web=1');
+    expect(result).toBe(
+      'https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf?web=1',
+    );
   });
 
-  it('simplifies path structure with custom scope for listItem', () => {
+  it('appends web=1 parameter for listItem', () => {
     const item = {
       itemType: 'listItem' as const,
       siteId: 'site456',
@@ -202,9 +204,11 @@ describe('getItemUrl', () => {
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'knowledge-base');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('knowledge-base/Engineering/SitePages/home.aspx?web=1');
+    expect(result).toBe(
+      'https://contoso.sharepoint.com/sites/Engineering/SitePages/home.aspx?web=1',
+    );
   });
 
   it('handles different SharePoint domains correctly', () => {
@@ -224,12 +228,14 @@ describe('getItemUrl', () => {
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'finance-scope');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('finance-scope/team/Documents/budget.xlsx?web=1');
+    expect(result).toBe(
+      'https://company-dev.sharepoint.com/sites/team/Documents/budget.xlsx?web=1',
+    );
   });
 
-  it('preserves query parameters when simplifying path', () => {
+  it('handles URLs with existing query parameters', () => {
     const item = {
       itemType: 'listItem' as const,
       siteId: 'site999',
@@ -244,9 +250,11 @@ describe('getItemUrl', () => {
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'content-root');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('content-root/marketing/news/article.aspx?id=123&web=1');
+    expect(result).toBe(
+      'https://company.sharepoint.com/sites/marketing/news/article.aspx?id=123&web=1',
+    );
   });
 
   it('handles special characters in folder paths', () => {
@@ -266,12 +274,14 @@ describe('getItemUrl', () => {
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'archive');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('archive/team/Shared Documents/2024 Q1/report.pdf?web=1');
+    expect(result).toBe(
+      'https://company.sharepoint.com/sites/team/Shared Documents/2024 Q1/report.pdf?web=1',
+    );
   });
 
-  it('removes sites prefix correctly', () => {
+  it('handles URLs with existing query string', () => {
     const item = {
       itemType: 'driveItem' as const,
       siteId: 'site222',
@@ -283,13 +293,15 @@ describe('getItemUrl', () => {
       item: {
         id: 'file1',
         listItem: {
-          webUrl: 'https://tenant.sharepoint.com/sites/site-name/library/path/file.txt',
+          webUrl: 'https://tenant.sharepoint.com/sites/site-name/library/path/file.txt?param=value',
         },
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'root');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('root/site-name/library/path/file.txt?web=1');
+    expect(result).toBe(
+      'https://tenant.sharepoint.com/sites/site-name/library/path/file.txt?param=value&web=1',
+    );
   });
 });
