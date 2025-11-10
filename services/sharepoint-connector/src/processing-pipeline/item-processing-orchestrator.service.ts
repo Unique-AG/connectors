@@ -25,6 +25,7 @@ export class ItemProcessingOrchestratorService {
     siteId: string,
     items: SharepointContentItem[],
     scopePathToIdMap?: ScopePathToIdMap,
+    itemIdToScopePathMap?: Map<string, string>,
   ): Promise<void> {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
@@ -39,8 +40,11 @@ export class ItemProcessingOrchestratorService {
     const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
     const configuredScopeId = this.configService.get('unique.scopeId', { infer: true });
     const itemIdToScopeIdMap =
-      ingestionMode === IngestionMode.Recursive
-        ? this.scopeManagementService.buildItemIdToScopeIdMap(items, scopePathToIdMap)
+      ingestionMode === IngestionMode.Recursive && itemIdToScopePathMap && scopePathToIdMap
+        ? this.scopeManagementService.buildItemIdToScopeIdMap(
+            itemIdToScopePathMap,
+            scopePathToIdMap,
+          )
         : undefined;
 
     const results = await Promise.allSettled(

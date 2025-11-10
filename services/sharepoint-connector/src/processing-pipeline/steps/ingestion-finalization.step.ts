@@ -34,22 +34,22 @@ export class IngestionFinalizationStep implements IPipelineStep {
       `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
     );
 
-      const fileKey = buildIngestionItemKey(context.pipelineItem);
+    const fileKey = buildIngestionItemKey(context.pipelineItem);
 
-      const ingestionFinalizationRequest = {
-        key: fileKey,
-        title: context.pipelineItem.fileName,
-        mimeType: context.registrationResponse.mimeType,
-        ownerType: context.registrationResponse.ownerType,
-        byteSize: context.registrationResponse.byteSize,
-        scopeId: context.scopeId,
-        sourceOwnerType: UniqueOwnerType.Company,
-        sourceName: INGESTION_SOURCE_NAME,
-        sourceKind: INGESTION_SOURCE_KIND,
-        fileUrl: context.registrationResponse.readUrl,
-        url: context.knowledgeBaseUrl,
-        baseUrl: this.sharepointBaseUrl,
-      };
+    const ingestionFinalizationRequest = {
+      key: fileKey,
+      title: context.pipelineItem.fileName,
+      mimeType: context.registrationResponse.mimeType,
+      ownerType: context.registrationResponse.ownerType,
+      byteSize: context.registrationResponse.byteSize,
+      scopeId: context.scopeId,
+      sourceOwnerType: UniqueOwnerType.Company,
+      sourceName: INGESTION_SOURCE_NAME,
+      sourceKind: INGESTION_SOURCE_KIND,
+      fileUrl: context.registrationResponse.readUrl,
+      url: context.knowledgeBaseUrl,
+      baseUrl: this.sharepointBaseUrl,
+    };
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();

@@ -31,33 +31,33 @@ export class ContentRegistrationStep implements IPipelineStep {
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
 
-      const itemKey = buildIngestionItemKey(context.pipelineItem);
+    const itemKey = buildIngestionItemKey(context.pipelineItem);
 
-      const contentRegistrationRequest: ContentRegistrationRequest = {
-        key: itemKey,
-        title: context.pipelineItem.fileName,
-        mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
-        ownerType: UniqueOwnerType.Scope,
-        scopeId: context.scopeId,
-        sourceOwnerType: UniqueOwnerType.Company,
-        sourceKind: INGESTION_SOURCE_KIND,
-        sourceName: INGESTION_SOURCE_NAME,
-        url: context.knowledgeBaseUrl,
-        baseUrl: this.sharepointBaseUrl,
-      };
+    const contentRegistrationRequest: ContentRegistrationRequest = {
+      key: itemKey,
+      title: context.pipelineItem.fileName,
+      mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
+      ownerType: UniqueOwnerType.Scope,
+      scopeId: context.scopeId,
+      sourceOwnerType: UniqueOwnerType.Company,
+      sourceKind: INGESTION_SOURCE_KIND,
+      sourceName: INGESTION_SOURCE_NAME,
+      url: context.knowledgeBaseUrl,
+      baseUrl: this.sharepointBaseUrl,
+    };
 
-      this.logger.debug(
-        `contentRegistrationRequest: ${JSON.stringify(
-          {
-            url: contentRegistrationRequest.url,
-            baseUrl: contentRegistrationRequest.baseUrl,
-            key: contentRegistrationRequest.key,
-            sourceName: contentRegistrationRequest.sourceName,
-          },
-          null,
-          4,
-        )}`,
-      );
+    this.logger.debug(
+      `contentRegistrationRequest: ${JSON.stringify(
+        {
+          url: contentRegistrationRequest.url,
+          baseUrl: contentRegistrationRequest.baseUrl,
+          key: contentRegistrationRequest.key,
+          sourceName: contentRegistrationRequest.sourceName,
+        },
+        null,
+        4,
+      )}`,
+    );
 
     try {
       const uniqueToken = await this.uniqueAuthService.getToken();

@@ -108,7 +108,7 @@ export function buildIngestionItemKey(sharepointContentItem: SharepointContentIt
 export function extractFolderPathFromUrl(fileUrl: string): string {
   try {
     const urlObj = new URL(fileUrl);
-    const pathName = urlObj.pathname;
+    const pathName = decodeURIComponent(urlObj.pathname);
 
     // Extract site name: /sites/siteName or /sites/siteName/
     const siteMatch = pathName.match(/\/sites\/([^/]+)/);

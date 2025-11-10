@@ -55,6 +55,7 @@ export class SharepointSynchronizationService {
       // TODO implement file deletion and file moving
       // Create scopes for recursive mode
       let scopePathToIdMap: ScopePathToIdMap | undefined;
+      let itemIdToScopePathMap: Map<string, string> | undefined;
 
       if (ingestionMode === IngestionMode.Recursive) {
         const result = await this.getOrCreateScopesForPaths(items);
@@ -63,12 +64,18 @@ export class SharepointSynchronizationService {
           continue;
         }
         scopePathToIdMap = result.scopePathToIdMap;
+        itemIdToScopePathMap = result.itemIdToScopePathMap;
         // TODO the scopes array will be useful for syncPermissionsForSite
       }
 
       try {
         // Start processing sitePages and files
-        await this.contentSyncService.syncContentForSite(siteId, items, scopePathToIdMap);
+        await this.contentSyncService.syncContentForSite(
+          siteId,
+          items,
+          scopePathToIdMap,
+          itemIdToScopePathMap,
+        );
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
@@ -94,9 +101,14 @@ export class SharepointSynchronizationService {
     this.isScanning = false;
   }
 
-  private async getOrCreateScopesForPaths(
-    items: SharepointContentItem[],
-  ): Promise<{ scopes: Scope[]; scopePathToIdMap: ScopePathToIdMap } | undefined> {
+  private async getOrCreateScopesForPaths(items: SharepointContentItem[]): Promise<
+    | {
+        scopes: Scope[];
+        scopePathToIdMap: ScopePathToIdMap;
+        itemIdToScopePathMap: Map<string, string>;
+      }
+    | undefined
+  > {
     const siteId = items[0]?.siteId || 'unknown siteId';
     try {
       return await this.scopeManagementService.batchCreateScopes(items);

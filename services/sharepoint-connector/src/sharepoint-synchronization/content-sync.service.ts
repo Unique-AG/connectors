@@ -22,6 +22,7 @@ export class ContentSyncService {
     siteId: string,
     items: SharepointContentItem[],
     scopePathToIdMap?: ScopePathToIdMap,
+    itemIdToScopePathMap?: Map<string, string>,
   ): Promise<void> {
     const logPrefix = `[SiteId: ${siteId}] `;
     const processStartTime = Date.now();
@@ -40,7 +41,12 @@ export class ContentSyncService {
 
     const itemsToSync = items.filter((item) => fileKeysToSync.has(item.item.id));
 
-    await this.orchestrator.processItems(siteId, itemsToSync, scopePathToIdMap);
+    await this.orchestrator.processItems(
+      siteId,
+      itemsToSync,
+      scopePathToIdMap,
+      itemIdToScopePathMap,
+    );
 
     this.logger.log(
       `${logPrefix} Finished processing content in ${elapsedSecondsLog(processStartTime)}`,
