@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { isNonNullish } from 'remeda';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
@@ -24,6 +25,10 @@ export class FetchGraphPermissionsMapQuery {
     siteId: string,
     items: SharepointContentItem[],
   ): Promise<Record<string, Permission[]>> {
+    const siteWebUrl = await this.graphApiService.getSiteWebUrl(siteId);
+    const siteName = siteWebUrl.split('/').pop();
+    assert.ok(siteName, `Site name not found for site ${siteId}`);
+
     const permissionsMap: Record<string, Permission[]> = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
@@ -33,7 +38,7 @@ export class FetchGraphPermissionsMapQuery {
           item.item.id,
         );
         permissionsMap[`${item.driveId}/${item.item.id}`] =
-          this.mapSharePointPermissionsToOurPermissions(permissions);
+          this.mapSharePointPermissionsToOurPermissions(permissions, siteName);
       } else if (item.itemType === 'listItem') {
         const permissions = await this.graphApiService.getListItemPermissions(
           siteId,
@@ -41,7 +46,7 @@ export class FetchGraphPermissionsMapQuery {
           item.item.id,
         );
         permissionsMap[`${item.driveId}/${item.item.id}`] =
-          this.mapSharePointPermissionsToOurPermissions(permissions);
+          this.mapSharePointPermissionsToOurPermissions(permissions, siteName);
       }
     }
     return permissionsMap;
@@ -49,10 +54,14 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSharePointPermissionsToOurPermissions(
     simplePermissions: SimplePermission[],
+    siteName: string,
   ): Permission[] {
     return simplePermissions.flatMap((permission) => {
       if (isNonNullish(permission.grantedToV2)) {
-        const itemPermission = this.mapSharePointIdentitySetToOurPermission(permission.grantedToV2);
+        const itemPermission = this.mapSharePointIdentitySetToOurPermission(
+          permission.grantedToV2,
+          siteName,
+        );
         if (isNonNullish(itemPermission)) {
           return [itemPermission];
         }
@@ -65,7 +74,9 @@ export class FetchGraphPermissionsMapQuery {
         }
 
         const itemPermissions = permission.grantedToIdentitiesV2
-          .map(this.mapSharePointIdentitySetToOurPermission.bind(this))
+          .map((simpleIdentitySet) =>
+            this.mapSharePointIdentitySetToOurPermission(simpleIdentitySet, siteName),
+          )
           .filter(isNonNullish);
         if (itemPermissions.length > 0) {
           return itemPermissions;
@@ -81,6 +92,7 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSharePointIdentitySetToOurPermission(
     simpleIdentitySet: SimpleIdentitySet,
+    siteName: string,
   ): Permission | null {
     if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
       const groupId = normalizeMsGroupId(simpleIdentitySet.group.id);
@@ -108,7 +120,7 @@ export class FetchGraphPermissionsMapQuery {
     if (isNonNullish(simpleIdentitySet.siteGroup)) {
       return {
         type: 'siteGroup',
-        id: simpleIdentitySet.siteGroup.id,
+        id: `${siteName}|${simpleIdentitySet.siteGroup.id}`,
         name: simpleIdentitySet.siteGroup.displayName,
       };
     }
