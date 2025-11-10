@@ -86,7 +86,7 @@ export class FetchGroupsWithMembershipsQuery {
       `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
     );
     const groupMembershipsCache: Record<GroupDistinctId, Membership[]> = {};
-    // We have to call
+    // There's only one call for SharePoint site groups memberships because they are not nested.
     const siteGroupsMembershipsMap = await this.fetchSiteGroupsMembershipsMap(
       siteName,
       siteGroupIds,
