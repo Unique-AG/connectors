@@ -16,17 +16,20 @@ export class IngestionClient {
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
   ) {
-    const clientUrl = this.configService.get('unique.ingestionGraphqlUrl', { infer: true });
-    const clientHeaders = this.configService.get('unique.httpExtraHeaders', { infer: true });
-    this.graphQlClient = new GraphQLClient(clientUrl, {
+    const uniqueConfig = this.configService.get('unique', { infer: true });
+    this.graphQlClient = new GraphQLClient(uniqueConfig.ingestionGraphqlUrl, {
       requestMiddleware: async (request) => {
+        const clientExtraHeaders =
+          uniqueConfig.serviceAuthMode === 'cluster_local'
+            ? uniqueConfig.serviceExtraHeaders
+            : { Authorization: `Bearer ${await this.uniqueAuthService.getToken()}` };
+
         return {
           ...request,
           headers: {
             ...request.headers,
-            ...clientHeaders,
+            ...clientExtraHeaders,
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${await this.uniqueAuthService.getToken()}`,
           },
         };
       },

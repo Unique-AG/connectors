@@ -44,17 +44,20 @@ data:
   UNIQUE_FILE_DIFF_URL: {{ .Values.connectorConfig.unique.fileDiffUrl | quote }}
   UNIQUE_INGESTION_GRAPHQL_URL: {{ .Values.connectorConfig.unique.ingestionGraphqlUrl | quote }}
   UNIQUE_SCOPE_MANAGEMENT_GRAPHQL_URL: {{ .Values.connectorConfig.unique.scopeManagementGraphqlUrl | quote }}
-  UNIQUE_ZITADEL_CLIENT_ID: {{ .Values.connectorConfig.unique.zitadel.clientId | quote }}
-  UNIQUE_ZITADEL_OAUTH_TOKEN_URL: {{ .Values.connectorConfig.unique.zitadel.oauthTokenUrl | quote }}
-  UNIQUE_ZITADEL_PROJECT_ID: {{ .Values.connectorConfig.unique.zitadel.projectId | quote }}
-  {{- if .Values.connectorConfig.unique.zitadel.httpExtraHeaders }}
-  UNIQUE_ZITADEL_HTTP_EXTRA_HEADERS: {{ .Values.connectorConfig.unique.zitadel.httpExtraHeaders | toJson | quote }}
-  {{- end }}
-  {{- if .Values.connectorConfig.unique.httpExtraHeaders }}
-  UNIQUE_HTTP_EXTRA_HEADERS: {{ .Values.connectorConfig.unique.httpExtraHeaders | toJson | quote }}
-  {{- end }}
   {{- if .Values.connectorConfig.unique.apiRateLimitPerMinute }}
   UNIQUE_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.unique.apiRateLimitPerMinute | quote }}
+  {{- end }}
+  UNIQUE_SERVICE_AUTH_MODE: {{ .Values.connectorConfig.unique.authMode | quote }}
+  {{- if eq .Values.connectorConfig.unique.authMode "cluster_local" }}
+  UNIQUE_SERVICE_EXTRA_HEADERS: {{ .Values.connectorConfig.unique.serviceExtraHeaders | toJson | quote }}
+  {{- end }}
+  {{- if eq .Values.connectorConfig.unique.authMode "external" }}
+  ZITADEL_CLIENT_ID: {{ .Values.connectorConfig.unique.zitadel.clientId | quote }}
+  ZITADEL_OAUTH_TOKEN_URL: {{ .Values.connectorConfig.unique.zitadel.oauthTokenUrl | quote }}
+  ZITADEL_PROJECT_ID: {{ .Values.connectorConfig.unique.zitadel.projectId | quote }}
+  {{- if .Values.connectorConfig.unique.zitadel.serviceExtraHeaders }}
+  ZITADEL_SERVICE_EXTRA_HEADERS: {{ .Values.connectorConfig.unique.zitadel.serviceExtraHeaders | toJson | quote }}
+  {{- end }}
   {{- end }}
   # Processing config
   PROCESSING_STEP_TIMEOUT_SECONDS: {{ .Values.connectorConfig.processing.stepTimeoutSeconds | quote }}

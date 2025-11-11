@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { FileDiffResponse } from '../unique-api/unique-api.types';
+import type { FileDiffResponse } from '../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 import { FileProcessingOrchestratorService } from './file-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 

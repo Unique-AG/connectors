@@ -3,9 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
-import { UniqueApiService } from '../unique-api/unique-api.service';
-import type { FileDiffItem, FileDiffResponse } from '../unique-api/unique-api.types';
-import { UniqueAuthService } from '../unique-api/unique-auth.service';
+import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
+import type {
+  FileDiffItem,
+  FileDiffResponse,
+} from '../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
 
@@ -14,9 +16,8 @@ export class ContentSyncService {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly uniqueAuthService: UniqueAuthService,
     private readonly orchestrator: FileProcessingOrchestratorService,
-    private readonly uniqueApiService: UniqueApiService,
+    private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly configService: ConfigService<Config>,
   ) {}
 
@@ -55,7 +56,6 @@ export class ContentSyncService {
       },
     );
 
-    const uniqueToken = await this.uniqueAuthService.getToken();
-    return await this.uniqueApiService.performFileDiff(fileDiffItems, uniqueToken, siteId);
+    return await this.uniqueFileIngestionService.performFileDiff(fileDiffItems, siteId);
   }
 }

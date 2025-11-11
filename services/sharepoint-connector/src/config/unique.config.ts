@@ -6,7 +6,49 @@ import { IngestionMode } from '../constants/ingestion.constants';
 import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { Redacted } from '../utils/redacted';
 
-const UniqueConfig = z
+// ==== Config for local in-cluster communication with Unique API services ====
+
+const clusterLocalConfig = z.object({
+  serviceAuthMode: z
+    .literal('cluster_local')
+    .describe('Authentication mode to use for accessing Unique API services'),
+  serviceExtraHeaders: z
+    .string()
+    .optional()
+    .prefault('')
+    .pipe(parseJsonEnvironmentVariable('httpExtraHeaders'))
+    .describe(
+      'JSON string of extra HTTP headers for ingestion API requests ' +
+        '(e.g., {"x-service-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>", "x-user-roles": "chat.admin.all"})',
+    ),
+});
+
+// ==== Config for external communication with Unique API services via Zitadel authentication ====
+
+const externalConfig = z.object({
+  serviceAuthMode: z
+    .literal('external')
+    .describe('Authentication mode to use for accessing Unique API services'),
+  zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
+  zitadelProjectId: z.string().describe('Zitadel project ID'),
+  zitadelClientId: z.string().describe('Zitadel client ID'),
+  zitadelClientSecret: z
+    .string()
+    .transform((val) => new Redacted(val))
+    .describe('Zitadel client secret'),
+  zitadelServiceExtraHeaders: z
+    .string()
+    .optional()
+    .prefault('')
+    .pipe(parseJsonEnvironmentVariable('zitadelHttpExtraHeaders'))
+    .describe(
+      'JSON string of extra HTTP headers for Zitadel requests (e.g., {"x-zitadel-instance-host": "<zitadel-host>"})',
+    ),
+});
+
+// ==== Config common for both cluster_local and external authentication modes ====
+
+const baseConfig = z
   .object({
     ingestionMode: z
       .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
@@ -30,42 +72,31 @@ const UniqueConfig = z
     //       optional based on the sync mode, but it lives in processing config.
     scopeManagementGraphqlUrl: z.url().describe('Unique graphql scope management service URL'),
     fileDiffUrl: z.url().describe('Unique file diff service URL'),
-    zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
-    zitadelProjectId: z.string().describe('Zitadel project ID'),
-    zitadelClientId: z.string().describe('Zitadel client ID'),
-    zitadelClientSecret: z
-      .string()
-      .transform((val) => new Redacted(val))
-      .describe('Zitadel client secret'),
     apiRateLimitPerMinute: z.coerce
       .number()
       .int()
       .positive()
       .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
       .describe('Number of Unique API requests allowed per minute'),
-    zitadelHttpExtraHeaders: z
-      .string()
-      .optional()
-      .prefault('')
-      .pipe(parseJsonEnvironmentVariable('zitadelHttpExtraHeaders'))
-      .describe(
-        'JSON string of extra HTTP headers for Zitadel requests (e.g., {"x-zitadel-instance-host": "<zitadel-host>"})',
-      ),
-    httpExtraHeaders: z
-      .string()
-      .optional()
-      .prefault('')
-      .pipe(parseJsonEnvironmentVariable('httpExtraHeaders'))
-      .describe(
-        'JSON string of extra HTTP headers for ingestion API requests (e.g., {"x-service-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
-      ),
   })
   .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {
     message: 'scopeId is required for FLAT ingestion mode',
     path: ['scopeId'],
   });
 
-export const uniqueConfig = registerConfig('unique', UniqueConfig);
+const UniqueConfig = z
+  .discriminatedUnion('serviceAuthMode', [clusterLocalConfig, externalConfig])
+  .and(baseConfig);
+
+export const uniqueConfig = registerConfig('unique', UniqueConfig, {
+  whitelistKeys: new Set([
+    'ZITADEL_OAUTH_TOKEN_URL',
+    'ZITADEL_PROJECT_ID',
+    'ZITADEL_CLIENT_ID',
+    'ZITADEL_CLIENT_SECRET',
+    'ZITADEL_SERVICE_EXTRA_HEADERS',
+  ]),
+});
 
 export type UniqueConfigNamespaced = NamespacedConfigType<typeof uniqueConfig>;
 export type UniqueConfig = ConfigType<typeof uniqueConfig>;

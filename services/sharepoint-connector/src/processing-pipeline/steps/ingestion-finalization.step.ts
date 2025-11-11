@@ -9,8 +9,7 @@ import {
 } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { getScopeIdForIngestion } from '../../unique-api/ingestion.util';
-import { UniqueApiService } from '../../unique-api/unique-api.service';
-import { UniqueAuthService } from '../../unique-api/unique-auth.service';
+import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { normalizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
@@ -27,8 +26,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
   private readonly sharepointBaseUrl: string;
 
   public constructor(
-    private readonly uniqueAuthService: UniqueAuthService,
-    private readonly uniqueApiService: UniqueApiService,
+    private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly configService: ConfigService<Config, true>,
   ) {
     this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
@@ -68,9 +66,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
     };
 
     try {
-      const uniqueToken = await this.uniqueAuthService.getToken();
-
-      await this.uniqueApiService.finalizeIngestion(ingestionFinalizationRequest, uniqueToken);
+      await this.uniqueFileIngestionService.finalizeIngestion(ingestionFinalizationRequest);
       const _stepDuration = Date.now() - stepStartTime;
 
       return context;
