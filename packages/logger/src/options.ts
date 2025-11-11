@@ -1,18 +1,15 @@
 import { IncomingMessage } from 'node:http';
+import path from 'node:path';
 import { RequestMethod } from '@nestjs/common';
 import type { Params } from 'nestjs-pino';
-import type { PrettyOptions } from 'pino-pretty';
 
 export const productionTarget = {
   target: 'pino/file',
 };
 
 export const developmentTarget = {
-  target: 'pino-pretty',
-  options: {
-    translateTime: 'SYS:yyyy-mm-dd HH:MM:ss.l',
-    ignore: 'trace_flags,hostname,pid,req',
-  } satisfies PrettyOptions,
+  // https://github.com/pinojs/pino-pretty?tab=readme-ov-file#handling-non-serializable-options
+  target: path.resolve(__dirname, './development'),
 };
 
 export const defaultLoggerOptions: Params = {
