@@ -195,7 +195,8 @@ describe('ScopeManagementService', () => {
     });
 
     it('logs site identifier in success message', async () => {
-      const logSpy = vi.spyOn(service.logger, 'log');
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      const logSpy = vi.spyOn(service['logger'], 'log');
 
       await service.batchCreateScopes([createDriveContentItem('UniqueAG/SitePages')]);
 
@@ -210,7 +211,8 @@ describe('ScopeManagementService', () => {
 
       const result = service.buildItemIdToScopeIdMap(items, mockScopes);
 
-      expect(result.get(item.item.id)).toBe('scope_3');
+      // biome-ignore lint/style/noNonNullAssertion: Test data is guaranteed to exist
+      expect(result.get(item!.item.id)).toBe('scope_3');
     });
 
     it('decodes URL-encoded paths before lookup', () => {
@@ -219,7 +221,8 @@ describe('ScopeManagementService', () => {
 
       const result = service.buildItemIdToScopeIdMap(items, mockScopes);
 
-      expect(result.get(item.item.id)).toBe('scope_5');
+      // biome-ignore lint/style/noNonNullAssertion: Test data is guaranteed to exist
+      expect(result.get(item!.item.id)).toBe('scope_5');
     });
 
     it('returns empty map when scopes is empty', () => {
@@ -231,6 +234,7 @@ describe('ScopeManagementService', () => {
     });
 
     it('logs warning when scope is not present in cache', () => {
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       const warnSpy = vi.spyOn(service['logger'], 'warn');
       const items = [createDriveContentItem('UniqueAG/UnknownFolder')];
 

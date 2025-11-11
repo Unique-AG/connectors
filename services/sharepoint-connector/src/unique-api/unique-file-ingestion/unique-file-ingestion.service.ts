@@ -6,7 +6,6 @@ import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/in
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { IngestionClient } from '../clients/ingestion.client';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
-import { getScopeIdForIngestion } from '../ingestion.util';
 import {
   CONTENT_UPSERT_MUTATION,
   ContentUpsertMutationInput,
@@ -101,10 +100,6 @@ export class UniqueFileIngestionService {
     const fileDiffPath = fileDiffUrl.pathname + fileDiffUrl.search;
 
     const basePath = uniqueConfig.rootScopeName || sharepointBaseUrl;
-    const scopeForRequest = getScopeIdForIngestion(
-      uniqueConfig.ingestionMode,
-      uniqueConfig.scopeId,
-    );
 
     const diffRequest: FileDiffRequest = {
       basePath,
@@ -112,7 +107,6 @@ export class UniqueFileIngestionService {
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       fileList,
-      scope: scopeForRequest,
     };
 
     this.logger.debug(`File diff request payload: ${JSON.stringify(diffRequest, null, 2)}`);

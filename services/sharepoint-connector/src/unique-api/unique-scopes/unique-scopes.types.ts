@@ -3,6 +3,7 @@ export interface Scope {
   name: string;
   parentId: string | null;
   scopeAccess?: ScopeAccess[];
+  path?: string;
 }
 
 export interface ScopeAccess {
