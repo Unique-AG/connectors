@@ -1,0 +1,12 @@
+export interface Scope {
+  id: string;
+  name: string;
+  parentId: string | null;
+  scopeAccess?: ScopeAccess[];
+}
+
+export interface ScopeAccess {
+  entityId: string;
+  type: string;
+  entityType: string;
+}

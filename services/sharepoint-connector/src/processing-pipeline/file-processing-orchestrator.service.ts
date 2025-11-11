@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { FileDiffResponse } from '../unique-api/unique-api.types';
+import type { FileDiffResponse } from '../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 import { buildFileDiffKey } from '../utils/sharepoint.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
