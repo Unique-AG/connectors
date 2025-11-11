@@ -195,7 +195,7 @@ describe('ScopeManagementService', () => {
     });
 
     it('logs site identifier in success message', async () => {
-      const logSpy = vi.spyOn(service['logger'], 'log');
+      const logSpy = vi.spyOn(service.logger, 'log');
 
       await service.batchCreateScopes([createDriveContentItem('UniqueAG/SitePages')]);
 
@@ -206,7 +206,7 @@ describe('ScopeManagementService', () => {
   describe('buildItemIdToScopeIdMap', () => {
     it('maps item identifiers to scope identifiers', () => {
       const items = [createDriveContentItem('UniqueAG/SitePages')];
-      const item = items[0]!;
+      const item = items[0];
 
       const result = service.buildItemIdToScopeIdMap(items, mockScopes);
 
@@ -215,7 +215,7 @@ describe('ScopeManagementService', () => {
 
     it('decodes URL-encoded paths before lookup', () => {
       const items = [createDriveContentItem('UniqueAG/Freigegebene%20Dokumente/General')];
-      const item = items[0]!;
+      const item = items[0];
 
       const result = service.buildItemIdToScopeIdMap(items, mockScopes);
 
