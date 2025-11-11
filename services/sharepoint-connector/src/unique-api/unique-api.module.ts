@@ -6,6 +6,7 @@ import { ScopeManagementClient } from './clients/scope-management.client';
 import { UniqueAuthService } from './unique-auth.service';
 import { UniqueFileIngestionService } from './unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueGroupsService } from './unique-groups/unique-groups.service';
+import { UniqueScopesService } from './unique-scopes/unique-scopes.service';
 import { UniqueUsersService } from './unique-users/unique-users.service';
 
 @Module({
@@ -18,7 +19,14 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
     IngestionClient,
     IngestionHttpClient,
     UniqueFileIngestionService,
+    UniqueScopesService,
   ],
-  exports: [UniqueAuthService, UniqueGroupsService, UniqueUsersService, UniqueFileIngestionService],
+  exports: [
+    UniqueAuthService,
+    UniqueGroupsService,
+    UniqueScopesService,
+    UniqueUsersService,
+    UniqueFileIngestionService,
+  ],
 })
 export class UniqueApiModule {}
