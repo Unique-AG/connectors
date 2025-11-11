@@ -43,7 +43,6 @@ export class ContentSyncService {
 
     const itemsToSync = items.filter((item) => fileKeysToSync.has(item.item.id));
 
-    // Build itemIdToScopeIdMap from scopes if in recursive mode
     let itemIdToScopeIdMap: Map<string, string> | undefined;
     if (scopes && scopes.length > 0) {
       itemIdToScopeIdMap = this.scopeManagementService.buildItemIdToScopeIdMap(itemsToSync, scopes);

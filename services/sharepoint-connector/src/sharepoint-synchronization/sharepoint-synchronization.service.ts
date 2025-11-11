@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
+import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
 import { normalizeError } from '../utils/normalize-error';
@@ -40,8 +41,8 @@ export class SharepointSynchronizationService {
 
     for (const siteId of siteIdsToScan) {
       const logPrefix = `[SiteId: ${siteId}]`;
-
       const siteStartTime = Date.now();
+
       const items = await this.graphApiService.getAllSiteItems(siteId);
       this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
 
@@ -50,26 +51,13 @@ export class SharepointSynchronizationService {
         continue;
       }
 
-      // TODO make sure that scope ingestion works now that we've changed to file-diff v2
       // TODO implement file deletion and file moving
-      // Create scopes for recursive mode
-      let scopes: Scope[] | undefined;
-
-      if (ingestionMode === IngestionMode.Recursive) {
-        try {
-          scopes = await this.scopeManagementService.batchCreateScopes(items);
-        } catch (error) {
-          // TODO what happens if generating scopes fails? Do we stop the sync for this site?
-          this.logger.error({
-            msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}`,
-            err: error,
-          });
-          continue;
-        }
+      const scopes = await this.createScopesForRecursiveIngestion(items, ingestionMode, logPrefix);
+      if (scopes === undefined && ingestionMode === IngestionMode.Recursive) {
+        continue; // Scope creation failed for recursive ingestion, skip this site
       }
 
       try {
-        // Start processing sitePages and files
         await this.contentSyncService.syncContentForSite(siteId, items, scopes);
       } catch (error) {
         this.logger.error({
@@ -94,5 +82,33 @@ export class SharepointSynchronizationService {
 
     this.logger.log(`SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`);
     this.isScanning = false;
+  }
+
+  private async createScopesForRecursiveIngestion(
+    items: SharepointContentItem[],
+    ingestionMode: IngestionMode,
+    logPrefix: string,
+  ): Promise<Scope[] | undefined> {
+    if (ingestionMode !== IngestionMode.Recursive) {
+      return;
+    }
+
+    try {
+      const scopes = await this.scopeManagementService.batchCreateScopes(items);
+      if (!scopes || scopes.length === 0) {
+        this.logger.error(
+          `${logPrefix} No scopes created for recursive ingestion mode, skipping synchronization`,
+        );
+        return;
+      }
+      return scopes;
+    } catch (error) {
+      // If generating scopes fails, we stop the sync for this site
+      this.logger.error({
+        msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}`,
+        err: error,
+      });
+      return;
+    }
   }
 }
