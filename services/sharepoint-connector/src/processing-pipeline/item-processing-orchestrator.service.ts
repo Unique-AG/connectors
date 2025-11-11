@@ -5,10 +5,6 @@ import pLimit from 'p-limit';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import {
-  ScopeManagementService,
-  type ScopePathToIdMap,
-} from '../sharepoint-synchronization/scope-management.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
 @Injectable()
@@ -18,14 +14,12 @@ export class ItemProcessingOrchestratorService {
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly processingPipelineService: ProcessingPipelineService,
-    private readonly scopeManagementService: ScopeManagementService,
   ) {}
 
   public async processItems(
     siteId: string,
     items: SharepointContentItem[],
-    scopePathToIdMap?: ScopePathToIdMap,
-    itemIdToScopePathMap?: Map<string, string>,
+    itemIdToScopeIdMap?: Map<string, string>,
   ): Promise<void> {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
@@ -39,13 +33,6 @@ export class ItemProcessingOrchestratorService {
 
     const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
     const configuredScopeId = this.configService.get('unique.scopeId', { infer: true });
-    const itemIdToScopeIdMap =
-      ingestionMode === IngestionMode.Recursive && itemIdToScopePathMap && scopePathToIdMap
-        ? this.scopeManagementService.buildItemIdToScopeIdMap(
-            itemIdToScopePathMap,
-            scopePathToIdMap,
-          )
-        : undefined;
 
     const results = await Promise.allSettled(
       items.map((item) =>

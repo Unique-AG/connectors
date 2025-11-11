@@ -1,32 +1,30 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { FileProcessingOrchestratorService } from '../processing-pipeline/file-processing-orchestrator.service';
+import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import type {
   FileDiffItem,
   FileDiffResponse,
 } from '../unique-api/unique-file-ingestion/unique-file-ingestion.types';
-import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
-import { UniqueApiService } from '../unique-api/unique-api.service';
-import { UniqueAuthService } from '../unique-api/unique-auth.service';
+import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
 import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
-import type { ScopePathToIdMap } from './scope-management.service';
+import { ScopeManagementService } from './scope-management.service';
 
 @Injectable()
 export class ContentSyncService {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly orchestrator: FileProcessingOrchestratorService,
+    private readonly orchestrator: ItemProcessingOrchestratorService,
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
+    private readonly scopeManagementService: ScopeManagementService,
   ) {}
 
   public async syncContentForSite(
     siteId: string,
     items: SharepointContentItem[],
-    scopePathToIdMap?: ScopePathToIdMap,
-    itemIdToScopePathMap?: Map<string, string>,
+    scopes?: Scope[],
   ): Promise<void> {
     const logPrefix = `[SiteId: ${siteId}] `;
     const processStartTime = Date.now();
@@ -45,12 +43,13 @@ export class ContentSyncService {
 
     const itemsToSync = items.filter((item) => fileKeysToSync.has(item.item.id));
 
-    await this.orchestrator.processSiteItems(
-      siteId,
-      itemsToSync,
-      scopePathToIdMap,
-      itemIdToScopePathMap,
-    );
+    // Build itemIdToScopeIdMap from scopes if in recursive mode
+    let itemIdToScopeIdMap: Map<string, string> | undefined;
+    if (scopes && scopes.length > 0) {
+      itemIdToScopeIdMap = this.scopeManagementService.buildItemIdToScopeIdMap(itemsToSync, scopes);
+    }
+
+    await this.orchestrator.processItems(siteId, itemsToSync, itemIdToScopeIdMap);
 
     this.logger.log(
       `${logPrefix} Finished processing content in ${elapsedSecondsLog(processStartTime)}`,

@@ -3,13 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
-import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
-import type { Scope } from '../unique-api/unique-api.types';
+import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
-import { ScopeManagementService, type ScopePathToIdMap } from './scope-management.service';
+import { ScopeManagementService } from './scope-management.service';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -54,28 +53,24 @@ export class SharepointSynchronizationService {
       // TODO make sure that scope ingestion works now that we've changed to file-diff v2
       // TODO implement file deletion and file moving
       // Create scopes for recursive mode
-      let scopePathToIdMap: ScopePathToIdMap | undefined;
-      let itemIdToScopePathMap: Map<string, string> | undefined;
+      let scopes: Scope[] | undefined;
 
       if (ingestionMode === IngestionMode.Recursive) {
-        const result = await this.getOrCreateScopesForPaths(items);
-        if (!result) {
-          this.logger.error(`${logPrefix} Failed to create scopes`);
+        try {
+          scopes = await this.scopeManagementService.batchCreateScopes(items);
+        } catch (error) {
+          // TODO what happens if generating scopes fails? Do we stop the sync for this site?
+          this.logger.error({
+            msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}`,
+            err: error,
+          });
           continue;
         }
-        scopePathToIdMap = result.scopePathToIdMap;
-        itemIdToScopePathMap = result.itemIdToScopePathMap;
-        // TODO the scopes array will be useful for syncPermissionsForSite
       }
 
       try {
         // Start processing sitePages and files
-        await this.contentSyncService.syncContentForSite(
-          siteId,
-          items,
-          scopePathToIdMap,
-          itemIdToScopePathMap,
-        );
+        await this.contentSyncService.syncContentForSite(siteId, items, scopes);
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
@@ -99,26 +94,5 @@ export class SharepointSynchronizationService {
 
     this.logger.log(`SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`);
     this.isScanning = false;
-  }
-
-  private async getOrCreateScopesForPaths(items: SharepointContentItem[]): Promise<
-    | {
-        scopes: Scope[];
-        scopePathToIdMap: ScopePathToIdMap;
-        itemIdToScopePathMap: Map<string, string>;
-      }
-    | undefined
-  > {
-    const siteId = items[0]?.siteId || 'unknown siteId';
-    try {
-      return await this.scopeManagementService.batchCreateScopes(items);
-    } catch (error) {
-      // TODO what happens if generating scopes fails? Do we stop the sync for this site?
-      this.logger.error({
-        msg: `[SiteId: ${siteId}] Failed to create scopes: ${normalizeError(error).message}`,
-        err: error,
-      });
-      return;
-    }
   }
 }

@@ -2,12 +2,9 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { UniqueApiService } from '../unique-api/unique-api.service';
-import { Scope } from '../unique-api/unique-api.types';
-import { UniqueAuthService } from '../unique-api/unique-auth.service';
+import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
+import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
 import { buildScopePathFromItem } from '../utils/sharepoint.util';
-
-export type ScopePathToIdMap = Record<string, string>;
 
 @Injectable()
 export class ScopeManagementService {
@@ -15,8 +12,7 @@ export class ScopeManagementService {
 
   public constructor(
     private readonly configService: ConfigService,
-    private readonly uniqueAuthService: UniqueAuthService,
-    private readonly uniqueApiService: UniqueApiService,
+    private readonly uniqueScopesService: UniqueScopesService,
   ) {}
 
   private buildItemIdToScopePathMap(
@@ -77,11 +73,7 @@ export class ScopeManagementService {
     });
   }
 
-  public async batchCreateScopes(items: SharepointContentItem[]): Promise<{
-    scopes: Scope[];
-    scopePathToIdMap: ScopePathToIdMap;
-    itemIdToScopePathMap: Map<string, string>;
-  }> {
+  public async batchCreateScopes(items: SharepointContentItem[]): Promise<Scope[]> {
     const siteId = items[0]?.siteId || 'unknown siteId';
     const rootScopeName = this.configService.get('unique.rootScopeName', {
       infer: true,
@@ -92,57 +84,51 @@ export class ScopeManagementService {
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
 
     if (uniqueFolderPaths.size === 0) {
-      return {
-        scopes: [],
-        scopePathToIdMap: {},
-        itemIdToScopePathMap: new Map(),
-      };
+      this.logger.log(`[SiteId: ${siteId}] No folder paths to create scopes for`);
+      return [];
     }
 
     // Extract all parent paths from the folder paths
     const allPathsWithParents = this.extractAllParentPaths(Array.from(uniqueFolderPaths));
 
-    const uniqueToken = await this.uniqueAuthService.getToken();
-    const scopes = await this.uniqueApiService.createScopesBasedOnPaths(
-      allPathsWithParents,
-      uniqueToken,
-    );
+    const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
+      includePermissions: true,
+    });
 
-    // Build complete map: full path -> scopeId
-    const scopePathToIdRecord: ScopePathToIdMap = {};
-    for (let i = 0; i < scopes.length; i++) {
-      const scope = scopes[i];
-      const fullPath = allPathsWithParents[i];
-      if (scope && fullPath) {
-        scopePathToIdRecord[fullPath] = scope.id;
-      }
-    }
+    this.logger.log(`[SiteId: ${siteId}] Created ${scopes.length} scopes`);
 
-    this.logger.log(`[SiteId: ${siteId}] Touched ${scopes.length} scopes`);
-
-    return {
-      scopes,
-      scopePathToIdMap: scopePathToIdRecord,
-      itemIdToScopePathMap,
-    };
+    return scopes;
   }
 
   public buildItemIdToScopeIdMap(
-    itemIdToScopePathMap: Map<string, string>,
-    scopePathToIdMap: ScopePathToIdMap | undefined,
+    items: SharepointContentItem[],
+    scopes: Scope[],
   ): Map<string, string> {
     const itemIdToScopeIdMap = new Map<string, string>();
+    const rootScopeName = this.configService.get('unique.rootScopeName', {
+      infer: true,
+    });
 
-    if (!scopePathToIdMap) {
+    if (!rootScopeName || scopes.length === 0) {
       return itemIdToScopeIdMap;
     }
 
+    // Build path -> scopeId map from scopes
+    const scopePathToIdMap: Record<string, string> = {};
+    for (const scope of scopes) {
+      scopePathToIdMap[scope.name] = scope.id;
+    }
+
+    // Build item -> path map
+    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
+
     for (const [itemId, scopePath] of itemIdToScopePathMap) {
-      const scopeId = scopePathToIdMap[scopePath];
+      const decodedPath = decodeURIComponent(scopePath);
+      const scopeId = scopePathToIdMap[decodedPath];
       if (scopeId) {
         itemIdToScopeIdMap.set(itemId, scopeId);
       } else {
-        this.logger.warn(`Scope not found in cache for path: ${scopePath}`);
+        this.logger.warn(`Scope not found in cache for path: ${decodedPath}`);
       }
     }
     return itemIdToScopeIdMap;

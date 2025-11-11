@@ -2,10 +2,9 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { UniqueApiService } from '../unique-api/unique-api.service';
-import type { Scope } from '../unique-api/unique-api.types';
-import { UniqueAuthService } from '../unique-api/unique-auth.service';
-import { ScopeManagementService, type ScopePathToIdMap } from './scope-management.service';
+import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
+import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
+import { ScopeManagementService } from './scope-management.service';
 
 const createDriveContentItem = (path: string): SharepointContentItem => {
   const webUrl = `https://example.sharepoint.com/sites/test1/${path}/Page%201.aspx`;
@@ -65,25 +64,32 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
 
 describe('ScopeManagementService', () => {
   const mockScopes: Scope[] = [
-    { id: 'scope_1', name: '/test1' },
-    { id: 'scope_2', name: '/test1/UniqueAG' },
-    { id: 'scope_3', name: '/test1/UniqueAG/SitePages' },
-    { id: 'scope_4', name: '/test1/UniqueAG/Freigegebene%20Dokumente' },
-    { id: 'scope_5', name: '/test1/UniqueAG/Freigegebene%20Dokumente/General' },
+    { id: 'scope_1', name: 'test1', parentId: null },
+    {
+      id: 'scope_2',
+      name: 'UniqueAG',
+      parentId: 'scope_1',
+    },
+    {
+      id: 'scope_3',
+      name: 'SitePages',
+      parentId: 'scope_2',
+    },
+    {
+      id: 'scope_4',
+      name: 'Freigegebene Dokumente',
+      parentId: 'scope_2',
+    },
+    {
+      id: 'scope_5',
+      name: 'General',
+      parentId: 'scope_4',
+    },
   ];
-
-  const mockScopePathToIdMap: ScopePathToIdMap = {
-    '/test1': 'scope_1',
-    '/test1/UniqueAG': 'scope_2',
-    '/test1/UniqueAG/SitePages': 'scope_3',
-    '/test1/UniqueAG/Freigegebene Dokumente': 'scope_4',
-    '/test1/UniqueAG/Freigegebene Dokumente/General': 'scope_5',
-  };
 
   let service: ScopeManagementService;
   let configGetMock: ReturnType<typeof vi.fn>;
   let createScopesMock: ReturnType<typeof vi.fn>;
-  let getTokenMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     configGetMock = vi.fn((key: string) => {
@@ -93,8 +99,14 @@ describe('ScopeManagementService', () => {
       return undefined;
     });
 
-    createScopesMock = vi.fn().mockResolvedValue(mockScopes);
-    getTokenMock = vi.fn().mockResolvedValue('mock-token');
+    createScopesMock = vi.fn().mockResolvedValue(
+      mockScopes.map(({ id, name, parentId, scopeAccess }) => ({
+        id,
+        name,
+        parentId,
+        scopeAccess,
+      })),
+    );
 
     const { unit } = await TestBed.solitary(ScopeManagementService)
       .mock<ConfigService>(ConfigService)
@@ -102,15 +114,10 @@ describe('ScopeManagementService', () => {
         ...stubFn(),
         get: configGetMock,
       }))
-      .mock<UniqueApiService>(UniqueApiService)
+      .mock<UniqueScopesService>(UniqueScopesService)
       .impl((stubFn) => ({
         ...stubFn(),
         createScopesBasedOnPaths: createScopesMock,
-      }))
-      .mock<UniqueAuthService>(UniqueAuthService)
-      .impl((stubFn) => ({
-        ...stubFn(),
-        getToken: getTokenMock,
       }))
       .compile();
 
@@ -161,28 +168,29 @@ describe('ScopeManagementService', () => {
   });
 
   describe('batchCreateScopes', () => {
-    it('creates scopes and returns decoded scope map', async () => {
+    it('creates scopes and returns list', async () => {
       const items = [createDriveContentItem('UniqueAG/SitePages')];
 
       const result = await service.batchCreateScopes(items);
 
-      expect(result.scopes).toEqual(mockScopes);
-      expect(result.scopePathToIdMap['/test1/UniqueAG/SitePages']).toBe('scope_3');
-      expect(result.scopePathToIdMap['/test1/UniqueAG/Freigegebene Dokumente']).toBe('scope_4');
+      expect(result).toEqual(
+        expect.arrayContaining(mockScopes.map((scope) => expect.objectContaining(scope))),
+      );
 
-      const [paths, token] = createScopesMock.mock.calls[0] as [string[], string];
-      expect(token).toBe('mock-token');
+      const [paths, options] = createScopesMock.mock.calls[0] as [
+        string[],
+        { includePermissions: boolean },
+      ];
+      expect(options).toEqual({ includePermissions: true });
       expect(paths).toEqual(
         expect.arrayContaining(['/test1', '/test1/UniqueAG', '/test1/UniqueAG/SitePages']),
       );
-      expect(getTokenMock).toHaveBeenCalledTimes(1);
     });
 
-    it('returns empty result when no items provided', async () => {
+    it('returns empty list when no items provided', async () => {
       const result = await service.batchCreateScopes([]);
 
-      expect(result.scopes).toHaveLength(0);
-      expect(result.scopePathToIdMap).toEqual({});
+      expect(result).toHaveLength(0);
       expect(createScopesMock).not.toHaveBeenCalled();
     });
 
@@ -197,44 +205,38 @@ describe('ScopeManagementService', () => {
 
   describe('buildItemIdToScopeIdMap', () => {
     it('maps item identifiers to scope identifiers', () => {
-      const item = createDriveContentItem('UniqueAG/SitePages');
-      const itemIdToScopePathMap = new Map([[item.item.id, '/test1/UniqueAG/SitePages']]);
+      const items = [createDriveContentItem('UniqueAG/SitePages')];
+      const item = items[0]!;
 
-      const result = service.buildItemIdToScopeIdMap(itemIdToScopePathMap, mockScopePathToIdMap);
+      const result = service.buildItemIdToScopeIdMap(items, mockScopes);
 
       expect(result.get(item.item.id)).toBe('scope_3');
     });
 
     it('decodes URL-encoded paths before lookup', () => {
-      const item = createDriveContentItem('UniqueAG/Freigegebene%20Dokumente/General');
-      const itemIdToScopePathMap = new Map([
-        [item.item.id, '/test1/UniqueAG/Freigegebene Dokumente/General'],
-      ]);
+      const items = [createDriveContentItem('UniqueAG/Freigegebene%20Dokumente/General')];
+      const item = items[0]!;
 
-      const result = service.buildItemIdToScopeIdMap(itemIdToScopePathMap, mockScopePathToIdMap);
+      const result = service.buildItemIdToScopeIdMap(items, mockScopes);
 
       expect(result.get(item.item.id)).toBe('scope_5');
     });
 
-    it('returns empty map when scope map is undefined', () => {
-      const item = createDriveContentItem('UniqueAG/SitePages');
-      const itemIdToScopePathMap = new Map([[item.item.id, '/test1/UniqueAG/SitePages']]);
+    it('returns empty map when scopes is empty', () => {
+      const items = [createDriveContentItem('UniqueAG/SitePages')];
 
-      const result = service.buildItemIdToScopeIdMap(itemIdToScopePathMap, undefined);
+      const result = service.buildItemIdToScopeIdMap(items, []);
 
       expect(result.size).toBe(0);
     });
 
     it('logs warning when scope is not present in cache', () => {
       const warnSpy = vi.spyOn(service['logger'], 'warn');
-      const item = createDriveContentItem('UniqueAG/UnknownFolder');
-      const itemIdToScopePathMap = new Map([[item.item.id, '/test1/UniqueAG/UnknownFolder']]);
+      const items = [createDriveContentItem('UniqueAG/UnknownFolder')];
 
-      service.buildItemIdToScopeIdMap(itemIdToScopePathMap, mockScopePathToIdMap);
+      service.buildItemIdToScopeIdMap(items, mockScopes);
 
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('/test1/UniqueAG/UnknownFolder'),
-      );
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('UnknownFolder'));
     });
   });
 });
