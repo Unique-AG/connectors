@@ -81,7 +81,7 @@ describe('SharepointSynchronizationService', () => {
         ...stub(),
         get: vi.fn((k: string) => {
           if (k === 'sharepoint.siteIds') return ['site-1'];
-          if (k === 'processing.syncMode') return 'content-only';
+          if (k === 'processing.syncMode') return 'content_only';
           return undefined;
         }),
       }))

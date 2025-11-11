@@ -5,8 +5,9 @@ import { Config } from '../../config';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import { getScopeIdForIngestion } from '../../unique-api/ingestion.util';
+import { ContentRegistrationRequest } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
-import { ContentRegistrationRequest } from '../../unique-api/unique-api.types';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { normalizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
@@ -21,8 +22,7 @@ export class ContentRegistrationStep implements IPipelineStep {
   private readonly sharepointBaseUrl: string;
 
   public constructor(
-    private readonly uniqueAuthService: UniqueAuthService,
-    private readonly uniqueApiService: UniqueApiService,
+    private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly configService: ConfigService<Config, true>,
   ) {
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
@@ -60,10 +60,8 @@ export class ContentRegistrationStep implements IPipelineStep {
     );
 
     try {
-      const uniqueToken = await this.uniqueAuthService.getToken();
-      const registrationResponse = await this.uniqueApiService.registerContent(
+      const registrationResponse = await this.uniqueFileIngestionService.registerContent(
         contentRegistrationRequest,
-        uniqueToken,
       );
 
       assert.ok(

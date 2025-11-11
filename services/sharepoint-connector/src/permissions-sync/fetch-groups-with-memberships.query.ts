@@ -81,7 +81,9 @@ export class FetchGroupsWithMembershipsQuery {
       filter((permission) => permission.type === 'siteGroup'),
     );
 
-    const siteGroupIds = siteGroupsPermissions.map((permission) => permission.id);
+    const siteGroupIds = siteGroupsPermissions
+      .map((permission) => permission.id.split('|').pop())
+      .filter(isNonNullish);
     this.logger.log(
       `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
     );

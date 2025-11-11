@@ -85,7 +85,7 @@ export class SharepointSynchronizationService {
       }
 
       const syncMode = this.configService.get('processing.syncMode', { infer: true });
-      if (syncMode === 'content-and-permissions') {
+      if (syncMode === 'content_and_permissions') {
         try {
           await this.permissionsSyncService.syncPermissionsForSite(siteId, items);
         } catch (error) {

@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { HttpClientModule } from '../http-client.module';
 import { MicrosoftAuthenticationService } from './auth/microsoft-authentication.service';
 import { FileFilterService } from './graph/file-filter.service';
 import { GraphApiService } from './graph/graph-api.service';
@@ -10,7 +9,7 @@ import { SharepointRestClientService } from './sharepoint-rest/sharepoint-rest-c
 import { SharepointRestHttpService } from './sharepoint-rest/sharepoint-rest-http.service';
 
 @Module({
-  imports: [ConfigModule, HttpClientModule],
+  imports: [ConfigModule],
   providers: [
     MicrosoftAuthenticationService,
     GraphClientFactory,

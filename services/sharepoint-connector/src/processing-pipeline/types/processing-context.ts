@@ -1,5 +1,5 @@
 import type { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { IngestionApiResponse } from '../../unique-api/unique-api.types';
+import { IngestionApiResponse } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 
 export interface ProcessingContext {
   correlationId: string;

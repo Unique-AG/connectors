@@ -11,22 +11,6 @@ export interface ContentRegistrationRequest {
   baseUrl?: string;
 }
 
-export interface ContentRegistrationResponse {
-  id: string;
-  key: string;
-  byteSize: number;
-  mimeType: string;
-  ownerType: string;
-  ownerId: string;
-  writeUrl: string;
-  readUrl: string;
-  createdAt: string;
-  internallyStoredAt?: string;
-  source: {
-    kind: string;
-  };
-}
-
 export interface IngestionFinalizationRequest {
   key: string;
   title: string;
@@ -40,6 +24,20 @@ export interface IngestionFinalizationRequest {
   fileUrl: string;
   url?: string;
   baseUrl?: string;
+}
+
+export interface IngestionApiResponse {
+  id: string;
+  key: string;
+  byteSize: number;
+  mimeType: string;
+  ownerType: string;
+  ownerId: string;
+  writeUrl: string;
+  readUrl: string;
+  createdAt: string;
+  internallyStoredAt: string | null;
+  source: string;
 }
 
 export interface FileDiffItem {
@@ -75,24 +73,4 @@ export interface IngestionApiResponse {
   createdAt: string;
   internallyStoredAt: string | null;
   source: string;
-}
-
-export interface ScopeAccess {
-  entityId: string;
-  type: string;
-  entityType: string;
-}
-
-export interface Scope {
-  id: string;
-  name: string;
-  parentId?: string | null;
-  scopeAccess?: ScopeAccess[];
-}
-
-export interface ZitadelLoginResponse {
-  access_token: string;
-  expires_in: number;
-  token_type: string;
-  id_token: string;
 }

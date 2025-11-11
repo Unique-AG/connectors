@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import { getScopeIdForIngestion } from '../../unique-api/ingestion.util';
+import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueApiService } from '../../unique-api/unique-api.service';
 import { UniqueAuthService } from '../../unique-api/unique-auth.service';
 import { normalizeError } from '../../utils/normalize-error';
@@ -19,8 +21,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
   private readonly sharepointBaseUrl: string;
 
   public constructor(
-    private readonly uniqueAuthService: UniqueAuthService,
-    private readonly uniqueApiService: UniqueApiService,
+    private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly configService: ConfigService<Config, true>,
   ) {
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
@@ -52,8 +53,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
     };
 
     try {
-      const uniqueToken = await this.uniqueAuthService.getToken();
-      await this.uniqueApiService.finalizeIngestion(ingestionFinalizationRequest, uniqueToken);
+      await this.uniqueFileIngestionService.finalizeIngestion(ingestionFinalizationRequest);
       const _stepDuration = Date.now() - stepStartTime;
 
       return context;

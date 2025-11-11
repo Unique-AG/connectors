@@ -10,7 +10,6 @@ import { AppConfig, appConfig } from './config/app.config';
 import { processingConfig } from './config/processing.config';
 import { sharepointConfig } from './config/sharepoint.config';
 import { uniqueConfig } from './config/unique.config';
-import { HttpClientModule } from './http-client.module';
 import { MicrosoftApisModule } from './microsoft-apis/microsoft-apis.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { SharepointSynchronizationModule } from './sharepoint-synchronization/sharepoint-synchronization.module';
@@ -56,7 +55,6 @@ import { Redacted } from './utils/redacted';
         },
       },
     }),
-    HttpClientModule,
     SchedulerModule,
     SharepointSynchronizationModule,
     MicrosoftApisModule,

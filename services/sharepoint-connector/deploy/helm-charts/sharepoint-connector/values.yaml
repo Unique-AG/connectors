@@ -115,6 +115,11 @@ connectorConfig:
       apiRateLimitPerMinute: 780000
 
   unique:
+    # -- communication mode for the Unique Services
+    # possible values: cluster_local, external
+    # cluster_local: comunicates using in-cluster URLs and requires no authentication
+    # external: communicates using external URLs and requires authentication via Zitadel
+    authMode: cluster_local
     # -- url for the file diff
     # example: https://api.unique.app/ingestion/v1/content/file-diff
     fileDiffUrl: unset_default_value
@@ -137,10 +142,11 @@ connectorConfig:
     apiRateLimitPerMinute: 100
     # -- Object containing extra HTTP headers for ingestion API requests (GraphQL and file diff)
     # Used for service-to-service authentication when using internal cluster URLs
-    httpExtraHeaders: {}
+    serviceExtraHeaders: {}
       # x-service-id: sharepoint-connector
       # x-company-id: 1234567890
       # x-user-id: 1234567890
+      # x-user-roles: "chat.admin.all"
     zitadel:
       clientId: unset_default_value
       # clientSecret is presented from a secret, see connector.extraEnvSecrets
@@ -149,8 +155,9 @@ connectorConfig:
       # example: 225317577440629999
       projectId: unset_default_value
       # -- Object containing extra HTTP headers for Zitadel OAuth requests
-      httpExtraHeaders: {}
+      serviceExtraHeaders: {}
         # x-zitadel-instance-host: id.qa.unique.app
+
   processing:
     stepTimeoutSeconds: 300
     concurrency: 1

@@ -5,8 +5,7 @@ import { INGESTION_SOURCE_KIND } from '../../constants/ingestion.constants';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
-import { UniqueApiService } from '../../unique-api/unique-api.service';
-import { UniqueAuthService } from '../../unique-api/unique-auth.service';
+import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { ContentRegistrationStep } from './content-registration.step';
 
@@ -24,9 +23,7 @@ describe('ContentRegistrationStep', () => {
           return undefined;
         }),
       }))
-      .mock(UniqueAuthService)
-      .impl(() => ({ getToken: vi.fn().mockResolvedValue('unique-token') }))
-      .mock(UniqueApiService)
+      .mock(UniqueFileIngestionService)
       .impl(() => ({
         registerContent: vi.fn().mockResolvedValue({
           id: 'cid',

@@ -1,4 +1,4 @@
-.PHONY: quality ct-install
+.PHONY: quality ct-install spc-helm-docs
 
 .DEFAULT_GOAL := quality
 
@@ -9,3 +9,6 @@ quality:
 
 ct-install:
 	@ct install --config .github/configs/ct-install.yaml
+
+spc-helm-docs:
+	@services/sharepoint-connector/deploy/helm-charts/helm-docs.sh

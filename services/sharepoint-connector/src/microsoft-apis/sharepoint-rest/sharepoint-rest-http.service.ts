@@ -1,9 +1,10 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { chunk, identity } from 'remeda';
 import { Client, Dispatcher, interceptors } from 'undici';
-import { SHAREPOINT_REST_HTTP_CLIENT } from '../../http-client.tokens';
+import { Config } from '../../config';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { createTokenRefreshInterceptor } from './token-refresh.interceptor';
 
@@ -12,9 +13,15 @@ export class SharepointRestHttpService {
   private readonly client: Dispatcher;
 
   public constructor(
-    @Inject(SHAREPOINT_REST_HTTP_CLIENT) httpClient: Client,
     private readonly microsoftAuthenticationService: MicrosoftAuthenticationService,
+    private readonly configService: ConfigService<Config, true>,
   ) {
+    const sharePointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    const httpClient = new Client(sharePointBaseUrl, {
+      bodyTimeout: 30000,
+      headersTimeout: 30000,
+    });
+
     // TODO: Add metrics middleware with some logging once we start implementing proper metrics
     // TODO: Add middleware that logs the request headers and body on debug level
     const interceptorsInCallingOrder = [
