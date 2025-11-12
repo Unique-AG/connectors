@@ -7,7 +7,7 @@ variable "display_name" {
 variable "tags" {
   description = "Tags for the Azure AD application. These will be inherited by the service principal if not explicitly overridden."
   type        = list(string)
-  default     = []
+  default     = {}
 }
 
 variable "notes" {
