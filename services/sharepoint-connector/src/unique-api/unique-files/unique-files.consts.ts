@@ -49,6 +49,18 @@ export interface PaginatedContentQueryInput {
   };
 }
 
+export interface ContentByKeysQueryInput {
+  where: {
+    key: {
+      in: string[];
+    };
+  };
+}
+
+export interface ContentByKeysQueryResult {
+  contentByKeys: UniqueFile[];
+}
+
 export interface PaginatedContentQueryResult {
   paginatedContent: {
     nodes: UniqueFile[];
@@ -67,6 +79,17 @@ export const PAGINATED_CONTENT_QUERY = gql`
         ownerId
       }
       totalCount
+    }
+  }
+`;
+
+export const CONTENT_BY_KEYS_QUERY = gql`
+  query ContentByKeys($where: ContentWhereInput) {
+    contentByKeys(where: $where) {
+      id
+      key
+      ownerType
+      ownerId
     }
   }
 `;

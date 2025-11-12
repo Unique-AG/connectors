@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { IngestionClient } from '../clients/ingestion.client';
 import {
+  CONTENT_BY_KEYS_QUERY,
   CONTENT_DELETE_MUTATION,
   CONTENT_UPDATE_MUTATION,
+  ContentByKeysQueryInput,
+  ContentByKeysQueryResult,
   ContentDeleteMutationInput,
   ContentDeleteMutationResult,
   ContentUpdateMutationInput,
@@ -55,6 +58,28 @@ export class UniqueFilesService {
     );
 
     return result.contentDelete;
+  }
+
+  public async getFilesByKeys(keys: string[]): Promise<UniqueFile[]> {
+    if (keys.length === 0) {
+      return [];
+    }
+
+    const result = await this.ingestionClient.get(
+      async (client) =>
+        await client.request<ContentByKeysQueryResult, ContentByKeysQueryInput>(
+          CONTENT_BY_KEYS_QUERY,
+          {
+            where: {
+              key: {
+                in: keys,
+              },
+            },
+          },
+        ),
+    );
+
+    return result.contentByKeys;
   }
 
   public async getFilesForSite(siteId: string): Promise<UniqueFile[]> {

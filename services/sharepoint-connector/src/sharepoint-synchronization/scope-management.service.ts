@@ -150,7 +150,7 @@ export class ScopeManagementService {
     }
 
     this.logger.debug(
-      `Built scopePathToIdMap with ${Object.keys(scopePathToIdMap).length} entries. Sample keys: ${JSON.stringify(Object.keys(scopePathToIdMap).slice(0, 5))}`,
+      `${items[0]?.siteId} Built scopePathToIdMap with ${Object.keys(scopePathToIdMap).length} entries`,
     );
 
     // Build item -> path map

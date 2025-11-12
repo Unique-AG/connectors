@@ -61,16 +61,28 @@ export interface FileDiffResponse {
   deletedFiles: string[];
 }
 
-export interface IngestionApiResponse {
+export interface ContentNode {
   id: string;
   key: string;
-  byteSize: number;
-  mimeType: string;
+}
+
+export interface PaginatedContentResult {
+  nodes: ContentNode[];
+  totalCount: number;
+}
+
+export interface PaginatedContentQueryResult {
+  paginatedContent: PaginatedContentResult;
+}
+
+export interface ContentDeleteByKeyInput {
+  key: string;
   ownerType: string;
-  ownerId: string;
-  writeUrl: string;
-  readUrl: string;
-  createdAt: string;
-  internallyStoredAt: string | null;
-  source: string;
+  scopeId?: string;
+  url?: string;
+  baseUrl?: string;
+}
+
+export interface ContentDeleteByKeyResult {
+  contentDeleteByKey: boolean;
 }

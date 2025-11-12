@@ -65,3 +65,58 @@ export const CONTENT_UPSERT_MUTATION = gql`
     }
   }
 `;
+
+export interface ContentQueryInput {
+  skip?: number;
+  take?: number;
+  orderBy?: Array<{
+    key?: 'asc' | 'desc';
+  }>;
+  where?: {
+    ownerId?: { equals: string };
+    byteSize?: { gt: number };
+    key?: { in: string[] };
+  };
+}
+
+export const PAGINATED_CONTENT_QUERY = gql`
+  query PaginatedContent(
+    $skip: Int
+    $take: Int
+    $orderBy: [ContentOrderByWithRelationInput!]
+    $where: ContentWhereInput
+    $chatId: String
+  ) {
+    paginatedContent(
+      skip: $skip
+      take: $take
+      orderBy: $orderBy
+      where: $where
+      chatId: $chatId
+    ) {
+      nodes {
+        id
+        key
+      }
+      totalCount
+    }
+  }
+`;
+
+export const CONTENT_DELETE_BY_KEY_MUTATION = gql`
+  mutation ContentDeleteByKey(
+    $key: String!
+    $ownerType: String!
+    $scopeId: String
+    $url: String
+    $baseUrl: String
+  ) {
+    contentDeleteByKey(
+      key: $key
+      ownerType: $ownerType
+      scopeId: $scopeId
+      url: $url
+      baseUrl: $baseUrl
+    )
+  }
+`;

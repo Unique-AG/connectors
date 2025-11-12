@@ -7,10 +7,19 @@ import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { IngestionClient } from '../clients/ingestion.client';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
 import {
+  CONTENT_DELETE_BY_KEY_MUTATION,
   CONTENT_UPSERT_MUTATION,
+  ContentQueryInput,
   ContentUpsertMutationInput,
   ContentUpsertMutationResult,
+  PAGINATED_CONTENT_QUERY,
 } from './unique-file-ingestion.consts';
+import type {
+  ContentDeleteByKeyInput,
+  ContentDeleteByKeyResult,
+  ContentNode,
+  PaginatedContentQueryResult,
+} from './unique-file-ingestion.types';
 import {
   ContentRegistrationRequest,
   FileDiffItem,
@@ -88,6 +97,62 @@ export class UniqueFileIngestionService {
 
     assert.ok(result?.contentUpsert?.id, 'Invalid response from Unique API ingestion finalization');
     return { id: result.contentUpsert.id };
+  }
+
+  /**
+   * Queries existing content by scope ID and specific keys for deletion
+   */
+  public async queryContentByScopeAndKeys(scopeId: string, keys: string[]): Promise<ContentNode[]> {
+    if (keys.length === 0) {
+      return [];
+    }
+
+    const variables: ContentQueryInput = {
+      where: {
+        ownerId: { equals: scopeId },
+        key: { in: keys },
+      },
+      take: keys.length, // Only expect as many results as keys we requested
+    };
+
+    const result = await this.ingestionClient.get(
+      async (client) =>
+        await client.request<PaginatedContentQueryResult, ContentQueryInput>(
+          PAGINATED_CONTENT_QUERY,
+          variables,
+        ),
+    );
+
+    return result?.paginatedContent?.nodes || [];
+  }
+
+  /**
+   * Deletes a content item by its key, ownerType, and scopeId
+   */
+  public async deleteContentByKey(
+    key: string,
+    ownerType: string,
+    scopeId?: string,
+    url?: string,
+    baseUrl?: string,
+  ): Promise<boolean> {
+    const variables: ContentDeleteByKeyInput = {
+      key,
+      ownerType,
+      scopeId,
+      url,
+      baseUrl,
+    };
+
+    const result = await this.ingestionClient.get(
+      async (client) =>
+        await client.request<ContentDeleteByKeyResult, ContentDeleteByKeyInput>(
+          CONTENT_DELETE_BY_KEY_MUTATION,
+          variables,
+        ),
+    );
+
+    return result?.contentDeleteByKey || false;
   }
 
   public async performFileDiff(

@@ -50,8 +50,6 @@ export class SharepointSynchronizationService {
         continue;
       }
 
-      // TODO make sure that scope ingestion works now that we've changed to file-diff v2
-      // TODO implement file deletion and file moving
       // Create scopes for recursive mode
       let scopes: Scope[] | undefined;
 
@@ -59,9 +57,8 @@ export class SharepointSynchronizationService {
         try {
           scopes = await this.scopeManagementService.batchCreateScopes(items);
         } catch (error) {
-          // TODO what happens if generating scopes fails? Do we stop the sync for this site?
           this.logger.error({
-            msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}`,
+            msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}. Skipping site.`,
             err: error,
           });
           continue;
@@ -69,7 +66,6 @@ export class SharepointSynchronizationService {
       }
 
       try {
-        // Start processing sitePages and files
         await this.contentSyncService.syncContentForSite(siteId, items, scopes);
       } catch (error) {
         this.logger.error({
