@@ -20,3 +20,15 @@ variable "secrets_placeholders" {
     spc-certificate-private-key = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
   }
 }
+
+variable "tls_certificate" {
+  description = "Configuration for automatic TLS certificate generation. Pass null to disable."
+  type = object({
+    secret_name      = string
+    subject          = optional(string)
+    key_vault_id     = optional(string)
+    expiration_date  = optional(string, "2099-12-31T23:59:59Z")
+    rotation_trigger = optional(string)
+  })
+  default = null # For now we leave it to the user to either use the manual secret or the automatic one
+}
