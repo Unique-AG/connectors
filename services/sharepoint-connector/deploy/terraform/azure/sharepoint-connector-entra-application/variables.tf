@@ -4,12 +4,6 @@ variable "display_name" {
   default     = "Unique AI SharePoint Connector"
 }
 
-variable "tags" {
-  description = "Tags for the Azure AD application. These will be inherited by the service principal if not explicitly overridden."
-  type        = list(string)
-  default     = {}
-}
-
 variable "notes" {
   description = "Notes for the Azure AD application. These will be inherited by the service principal if not explicitly overridden."
   type        = string

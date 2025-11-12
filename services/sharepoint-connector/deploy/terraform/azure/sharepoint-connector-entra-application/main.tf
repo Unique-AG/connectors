@@ -38,7 +38,6 @@ resource "azuread_service_principal" "sharepoint" {
 resource "azuread_application" "sharepoint_connector" {
   display_name     = var.display_name
   sign_in_audience = var.sign_in_audience
-  tags             = var.tags
   notes            = var.notes
 
   # Microsoft Graph API permissions
@@ -77,7 +76,6 @@ resource "azuread_service_principal" "sharepoint_connector" {
 
   client_id    = azuread_application.sharepoint_connector.client_id
   use_existing = true
-  tags         = var.service_principal_configuration.tags != null ? var.service_principal_configuration.tags : var.tags
   notes        = var.service_principal_configuration.notes != null ? var.service_principal_configuration.notes : var.notes
 }
 
