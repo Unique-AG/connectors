@@ -104,54 +104,24 @@ export class ScopeManagementService {
       `[SiteId: ${siteId}] Received ${scopes.length} scopes from API. First scope: ${JSON.stringify({ id: scopes[0]?.id, name: scopes[0]?.name, parentId: scopes[0]?.parentId })}`,
     );
 
-    this.logger.log(`[SiteId: ${siteId}] Created ${scopes.length} scopes`);
+    // Add the full path to each scope object
+    // The API returns scopes in the same order as the input paths
+    const scopesWithPaths = scopes.map((scope, index) => {
+      const inputPath = allPathsWithParents[index];
+      const normalizedPath = inputPath?.startsWith('/') ? inputPath.slice(1) : inputPath;
 
-    return scopes;
-  }
+      return {
+        ...scope,
+        path: normalizedPath,
+      };
+    });
 
-  /**
-   * Rebuilds full paths from parent-child relationships in the scope hierarchy.
-   * traverses the scope tree to reconstruct paths without relying on API response order.
-   */
-  private buildScopePaths(scopes: Scope[]): Map<string, string> {
-    const scopeMap = new Map<string, Scope>();
-    const pathMap = new Map<string, string>();
+    this.logger.log(`[SiteId: ${siteId}] Created ${scopes.length} scopes with paths`);
+    this.logger.debug(
+      `[SiteId: ${siteId}] First enriched scope: ${JSON.stringify({ id: scopesWithPaths[0]?.id, name: scopesWithPaths[0]?.name, path: scopesWithPaths[0]?.path })}`,
+    );
 
-    // Create lookup map: scopeId -> scope
-    for (const scope of scopes) {
-      scopeMap.set(scope.id, scope);
-    }
-
-    // Recursive function to build path by walking up parent chain
-    const getPath = (scopeId: string): string => {
-      // Return cached path if already calculated
-      if (pathMap.has(scopeId)) {
-        const cachedPath = pathMap.get(scopeId);
-        return cachedPath || '';
-      }
-
-      const scope = scopeMap.get(scopeId);
-      if (!scope) return '';
-
-      if (scope.parentId === null) {
-        // Root scope - path is just the name
-        pathMap.set(scopeId, scope.name);
-        return scope.name;
-      } else {
-        // Child scope - recursively get parent path and append
-        const parentPath = getPath(scope.parentId);
-        const fullPath = parentPath ? `${parentPath}/${scope.name}` : scope.name;
-        pathMap.set(scopeId, fullPath);
-        return fullPath;
-      }
-    };
-
-    // Build paths for all scopes
-    for (const scope of scopes) {
-      getPath(scope.id);
-    }
-
-    return pathMap;
+    return scopesWithPaths;
   }
 
   public buildItemIdToScopeIdMap(
@@ -167,35 +137,41 @@ export class ScopeManagementService {
       return itemIdToScopeIdMap;
     }
 
-    // Rebuild paths from parent-child relationships (order-independent)
-    const scopeIdToPathMap = this.buildScopePaths(scopes);
-
-    // Build path -> scopeId lookup map
+    // Build path -> scopeId map from scopes
     const scopePathToIdMap: Record<string, string> = {};
-    for (const [scopeId, path] of scopeIdToPathMap) {
-      scopePathToIdMap[path] = scopeId;
-    }
-
-    this.logger.debug(`${items[0]?.siteId} Built scopePathToIdMap with ${Object.keys(scopePathToIdMap).length} entries`,);
-
-    // Build itemId -> path map
-    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
-
-    this.logger.debug(
-      `${items[0]?.siteId} Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries.`,
-    );
-
-    for (const [itemId, scopePath] of itemIdToScopePathMap) {
-      const scopeId = scopePathToIdMap[scopePath];
-      if (scopeId) {
-        itemIdToScopeIdMap.set(itemId, scopeId);
+    for (const scope of scopes) {
+      if ('path' in scope && typeof scope.path === 'string') {
+        scopePathToIdMap[scope.path] = scope.id;
       } else {
-        this.logger.warn(`${items[0]?.siteId} Scope not found in cache for path: ${scopePath}`);
+        this.logger.warn(
+          `Scope missing path property: ${JSON.stringify({ id: scope.id, name: scope.name })}`,
+        );
       }
     }
 
     this.logger.debug(
-      `${items[0]?.siteId} Built itemIdToScopeIdMap with ${itemIdToScopeIdMap.size} entries for ${items.length} items`,
+      `Built scopePathToIdMap with ${Object.keys(scopePathToIdMap).length} entries. Sample keys: ${JSON.stringify(Object.keys(scopePathToIdMap).slice(0, 5))}`,
+    );
+
+    // Build item -> path map
+    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
+
+    this.logger.debug(
+      `Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries. Sample paths: ${JSON.stringify(Array.from(itemIdToScopePathMap.values()).slice(0, 5))}`,
+    );
+
+    for (const [itemId, scopePath] of itemIdToScopePathMap) {
+      const decodedPath = decodeURIComponent(scopePath);
+      const scopeId = scopePathToIdMap[decodedPath];
+      if (scopeId) {
+        itemIdToScopeIdMap.set(itemId, scopeId);
+      } else {
+        this.logger.warn(`Scope not found in cache for path: ${decodedPath}`);
+      }
+    }
+
+    this.logger.debug(
+      `Built itemIdToScopeIdMap with ${itemIdToScopeIdMap.size} entries for ${items.length} items`,
     );
 
     return itemIdToScopeIdMap;

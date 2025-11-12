@@ -215,7 +215,7 @@ describe('ScopeManagementService', () => {
       expect(result.get(item!.item.id)).toBe('scope_3');
     });
 
-    it('matches URL-decoded paths from SharePoint items', () => {
+    it('decodes URL-encoded paths before lookup', () => {
       const items = [createDriveContentItem('UniqueAG/Freigegebene%20Dokumente/General')];
       const item = items[0];
 
