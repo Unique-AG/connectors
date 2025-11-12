@@ -22,7 +22,7 @@ variable "secrets_placeholders" {
 }
 
 variable "tls_certificate" {
-  description = "Configuration for automatic TLS certificate generation. Pass null to disable."
+  description = "Configuration for automatic TLS certificate generation. Pass null to disable. Users opting for this option must ensure on their behalf that their state is properly protected (as it should be anyway)."
   type = object({
     secret_name      = string
     subject          = optional(string)
