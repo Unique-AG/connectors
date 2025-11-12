@@ -147,7 +147,12 @@ export class GraphApiService {
       }
       return Buffer.concat(chunks);
     } catch (error) {
-      this.logger.error(`Failed to download file content for item ${itemId}:`, error);
+      this.logger.error({
+        msg: 'Failed to download file content',
+        itemId,
+        driveId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -268,7 +273,13 @@ export class GraphApiService {
         title: response.fields.Title,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch site page content for item ${itemId}:`, error);
+      this.logger.error({
+        msg: 'Failed to fetch site page content',
+        itemId,
+        siteId,
+        listId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -370,7 +381,9 @@ export class GraphApiService {
       for (const driveItem of allItems) {
         // Check if we've reached the file limit for local testing
         if (maxFiles && sharepointContentItemsToSync.length >= maxFiles) {
-          this.logger.warn(`Reached file limit of ${maxFiles}, stopping scan in ${itemId}`);
+          this.logger.warn(
+            `Reached file limit of ${maxFiles}, stopping scan in drive ${driveId}, item ${itemId} for site ${siteId}`,
+          );
           break;
         }
 
@@ -408,7 +421,9 @@ export class GraphApiService {
       this.logger.error(
         `Failed to fetch items for drive ${driveId}, item ${itemId}: ${normalizeError(error).message}`,
       );
-      this.logger.warn(`Continuing scan with results collected so far from ${itemId}`);
+      this.logger.warn(
+        `Continuing scan with results collected so far from drive ${driveId}, item ${itemId} for site ${siteId}`,
+      );
       return sharepointContentItemsToSync;
     }
   }
