@@ -77,8 +77,8 @@ resource "azuread_service_principal" "sharepoint_connector" {
 
   client_id    = azuread_application.sharepoint_connector.client_id
   use_existing = true
-  tags         = coalesce(var.service_principal_configuration.tags, var.tags)
-  notes        = coalesce(var.service_principal_configuration.notes, var.notes)
+  tags         = var.service_principal_configuration.tags != null ? var.service_principal_configuration.tags : var.tags
+  notes        = var.service_principal_configuration.notes != null ? var.service_principal_configuration.notes : var.notes
 }
 
 # Wait for Azure AD propagation
