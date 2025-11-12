@@ -27,7 +27,7 @@ variable "tls_certificate" {
     expiration_date  = optional(string, "2099-12-31T23:59:59Z")
     key_vault_id     = optional(string)
     rotation_trigger = optional(string)
-    secret_name      = string
+    secret_name      = optional(string, "spc-certificate-private-key")
     subject          = optional(string, "sharepoint-connector")
   })
   default = null # For now we leave it to the user to either use the manual secret or the automatic one
