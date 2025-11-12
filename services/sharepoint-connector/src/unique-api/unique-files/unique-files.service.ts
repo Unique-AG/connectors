@@ -1,0 +1,90 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { IngestionClient } from '../clients/ingestion.client';
+import {
+  CONTENT_DELETE_MUTATION,
+  CONTENT_UPDATE_MUTATION,
+  ContentDeleteMutationInput,
+  ContentDeleteMutationResult,
+  ContentUpdateMutationInput,
+  ContentUpdateMutationResult,
+  PAGINATED_CONTENT_QUERY,
+  PaginatedContentQueryInput,
+  PaginatedContentQueryResult,
+} from './unique-files.consts';
+import { UniqueFile } from './unique-files.types';
+
+const BATCH_SIZE = 100;
+
+@Injectable()
+export class UniqueFilesService {
+  private readonly logger = new Logger(this.constructor.name);
+  public constructor(private readonly ingestionClient: IngestionClient) {}
+
+  public async moveFile(
+    contentId: string,
+    newOwnerId: string,
+  ): Promise<ContentUpdateMutationResult['contentUpdate']> {
+    this.logger.log(`Moving file ${contentId} to owner ${newOwnerId}`);
+
+    const result = await this.ingestionClient.get(
+      async (client) =>
+        await client.request<ContentUpdateMutationResult, ContentUpdateMutationInput>(
+          CONTENT_UPDATE_MUTATION,
+          {
+            contentId,
+            ownerId: newOwnerId,
+            input: {},
+          },
+        ),
+    );
+
+    return result.contentUpdate;
+  }
+
+  public async deleteFile(contentId: string): Promise<boolean> {
+    this.logger.log(`Deleting file ${contentId}`);
+
+    const result = await this.ingestionClient.get(
+      async (client) =>
+        await client.request<ContentDeleteMutationResult, ContentDeleteMutationInput>(
+          CONTENT_DELETE_MUTATION,
+          {
+            contentDeleteId: contentId,
+          },
+        ),
+    );
+
+    return result.contentDelete;
+  }
+
+  public async getFilesForSite(siteId: string): Promise<UniqueFile[]> {
+    this.logger.log(`Fetching files for site ${siteId}`);
+
+    let skip = 0;
+    const files: UniqueFile[] = [];
+
+    let batchCount = 0;
+    do {
+      const batchResult = await this.ingestionClient.get(
+        async (client) =>
+          await client.request<PaginatedContentQueryResult, PaginatedContentQueryInput>(
+            PAGINATED_CONTENT_QUERY,
+            {
+              skip,
+              take: BATCH_SIZE,
+              where: {
+                key: {
+                  startsWith: `${siteId}/`,
+                },
+              },
+            },
+          ),
+      );
+      files.push(...batchResult.paginatedContent.nodes);
+      batchCount = batchResult.paginatedContent.nodes.length;
+      skip += BATCH_SIZE;
+    } while (batchCount === BATCH_SIZE);
+
+    return files;
+  }
+}
