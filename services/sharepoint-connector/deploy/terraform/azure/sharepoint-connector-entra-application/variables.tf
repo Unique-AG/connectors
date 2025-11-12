@@ -4,16 +4,31 @@ variable "display_name" {
   default     = "Unique AI SharePoint Connector"
 }
 
+variable "tags" {
+  description = "Tags for the Azure AD application. These will be inherited by the service principal if not explicitly overridden."
+  type        = list(string)
+  default     = []
+}
+
+variable "notes" {
+  description = "Notes for the Azure AD application. These will be inherited by the service principal if not explicitly overridden."
+  type        = string
+  default     = null
+}
+
 variable "sign_in_audience" {
   description = "The Microsoft identity platform audiences that are supported by this application. Valid values are 'AzureADMyOrg', 'AzureADMultipleOrgs', 'AzureADandPersonalMicrosoftAccount', or 'PersonalMicrosoftAccount'. We default to AzureADMultipleOrgs as it's the most common use case. Stricter setups can revert back to 'AzureADMyOrg'."
   type        = string
   default     = "AzureADMultipleOrgs"
 }
 
-variable "service_principal_configuration_enabled" {
-  description = "Whether to configure a service principal for the Azure AD application. Might get disabled in certain cross-tenant scenarios where the counter-tenant creates the service principal."
-  default     = true
-  type        = bool
+variable "service_principal_configuration" {
+  description = "Configuration for the service principal. Set to null to skip service principal creation (useful in cross-tenant scenarios). When set, you can provide optional tags and notes that override the application-level values."
+  type = object({
+    tags  = optional(list(string))
+    notes = optional(string)
+  })
+  default = {}
 }
 
 variable "sync_mode_role_preset" {

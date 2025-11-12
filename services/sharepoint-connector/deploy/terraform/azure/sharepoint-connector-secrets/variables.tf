@@ -24,11 +24,11 @@ variable "secrets_placeholders" {
 variable "tls_certificate" {
   description = "Configuration for automatic TLS certificate generation. Pass null to disable. Users opting for this option must ensure on their behalf that their state is properly protected (as it should be anyway)."
   type = object({
-    secret_name      = string
-    subject          = optional(string)
-    key_vault_id     = optional(string)
     expiration_date  = optional(string, "2099-12-31T23:59:59Z")
+    key_vault_id     = optional(string)
     rotation_trigger = optional(string)
+    secret_name      = string
+    subject          = optional(string, "sharepoint-connector")
   })
   default = null # For now we leave it to the user to either use the manual secret or the automatic one
 }

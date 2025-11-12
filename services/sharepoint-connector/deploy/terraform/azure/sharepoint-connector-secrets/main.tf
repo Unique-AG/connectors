@@ -32,7 +32,7 @@ resource "tls_self_signed_cert" "certificate" {
   count           = var.tls_certificate != null ? 1 : 0
   private_key_pem = tls_private_key.private_key[0].private_key_pem
   subject {
-    common_name = coalesce(var.tls_certificate.subject, "sharepoint-connector.unique.dev")
+    common_name = var.tls_certificate.subject
   }
   validity_period_hours = 24 * 30 * 20 # ~ 20 months # TODO: technically the rotation can trigger at this time, but someone would need to manually run terraform at that time and also pass the certificate output to the application
   allowed_uses          = ["digital_signature"]
