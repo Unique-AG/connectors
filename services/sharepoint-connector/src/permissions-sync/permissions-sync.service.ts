@@ -7,6 +7,7 @@ import { UniqueUsersService } from '../unique-api/unique-users/unique-users.serv
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
+import { SyncSharepointFilesPermissionsToUniqueCommand } from './sync-sharepoint-files-permissions-to-unique.command';
 import { SyncSharepointGroupsToUniqueCommand } from './sync-sharepoint-groups-to-unique.command';
 import { UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
@@ -19,6 +20,7 @@ export class PermissionsSyncService {
     private readonly fetchGraphPermissionsMapQuery: FetchGraphPermissionsMapQuery,
     private readonly fetchGroupsWithMembershipsQuery: FetchGroupsWithMembershipsQuery,
     private readonly syncSharepointGroupsToUniqueCommand: SyncSharepointGroupsToUniqueCommand,
+    private readonly syncSharepointFilesPermissionsToUniqueCommand: SyncSharepointFilesPermissionsToUniqueCommand,
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly uniqueUsersService: UniqueUsersService,
   ) {}
@@ -72,6 +74,15 @@ export class PermissionsSyncService {
     this.logger.log(
       `${logPrefix} Synced ${Object.keys(updatedUniqueGroupsMap).length} resulting unique groups`,
     );
+
+    await this.syncSharepointFilesPermissionsToUniqueCommand.run({
+      siteId,
+      permissionsMap,
+      uniqueGroupsMap: updatedUniqueGroupsMap,
+      uniqueUsersMap,
+    });
+
+    this.logger.log(`${logPrefix} Synced file permissions to Unique`);
   }
 
   private async getUniqueUsersMap(): Promise<UniqueUsersMap> {

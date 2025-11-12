@@ -7,6 +7,7 @@ import {
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { buildIngestionItemKey } from '../utils/sharepoint.util';
 import { Membership } from './types';
 import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
 
@@ -32,22 +33,23 @@ export class FetchGraphPermissionsMapQuery {
     const permissionsMap: Record<string, Permission[]> = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
+      let permissions: SimplePermission[] = [];
       if (item.itemType === 'driveItem') {
-        const permissions = await this.graphApiService.getDriveItemPermissions(
+        permissions = await this.graphApiService.getDriveItemPermissions(
           item.driveId,
           item.item.id,
         );
-        permissionsMap[`${item.driveId}/${item.item.id}`] =
-          this.mapSharePointPermissionsToOurPermissions(permissions, siteName);
       } else if (item.itemType === 'listItem') {
-        const permissions = await this.graphApiService.getListItemPermissions(
+        permissions = await this.graphApiService.getListItemPermissions(
           siteId,
           item.driveId,
           item.item.id,
         );
-        permissionsMap[`${item.driveId}/${item.item.id}`] =
-          this.mapSharePointPermissionsToOurPermissions(permissions, siteName);
       }
+      permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
+        permissions,
+        siteName,
+      );
     }
     return permissionsMap;
   }
