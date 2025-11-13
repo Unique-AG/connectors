@@ -31,11 +31,11 @@ export class FileMoveProcessor {
     scopes?: Scope[],
   ): Promise<void> {
     const logPrefix = `[SiteId: ${siteId}]`;
+    const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId);
     let ingestedFiles: UniqueFile[] = [];
-    const movedFileFullKeys = this.convertToFullKeys(movedFileKeys, siteId);
 
     try {
-      ingestedFiles = await this.uniqueFilesService.getFilesByKeys(movedFileFullKeys);
+      ingestedFiles = await this.uniqueFilesService.getFilesByKeys(movedFileCompleteKeys);
     } catch (error) {
       this.logger.error(`${logPrefix} Failed to get ingested files by keys from unique:`, error);
       throw error;
@@ -60,9 +60,6 @@ export class FileMoveProcessor {
     this.logger.log(`${logPrefix} Completed move processing: ${totalMoved} content items moved`);
   }
 
-  /**
-   * Converts relative file keys to full keys with siteId prefix
-   */
   private convertToFullKeys(relativeKeys: string[], siteId: string): string[] {
     return relativeKeys.map((key) => `${siteId}/${key}`);
   }

@@ -75,7 +75,7 @@ export class ScopeManagementService {
   }
 
   public async batchCreateScopes(items: SharepointContentItem[]): Promise<Scope[]> {
-    const siteId = items[0]?.siteId || 'unknown siteId';
+    const logPrefix = `[SiteId: ${items[0]?.siteId || 'unknown siteId'}]`;
     const rootScopeName = this.configService.get('unique.rootScopeName', {
       infer: true,
     });
@@ -85,25 +85,19 @@ export class ScopeManagementService {
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
 
     if (uniqueFolderPaths.size === 0) {
-      this.logger.log(`[SiteId: ${siteId}] No folder paths to create scopes for`);
+      this.logger.log(`${logPrefix} No folder paths to create scopes for`);
       return [];
     }
 
     // Extract all parent paths from the folder paths
     const allPathsWithParents = this.extractAllParentPaths(Array.from(uniqueFolderPaths));
 
-    this.logger.debug(
-      `[SiteId: ${siteId}] Sending ${allPathsWithParents.length} paths to API: ${JSON.stringify(allPathsWithParents.slice(0, 5))}...`,
-    );
+    this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
     });
-    this.logger.log(`[SiteId: ${siteId}] Created ${scopes.length} scopes`);
-
-    this.logger.debug(
-      `[SiteId: ${siteId}] Received ${scopes.length} scopes from API. First scope: ${JSON.stringify({ id: scopes[0]?.id, name: scopes[0]?.name, parentId: scopes[0]?.parentId })}`,
-    );
+    this.logger.log(`${logPrefix} Created ${scopes.length} scopes`);
 
     // Add the full path to each scope object
     // The API returns scopes in the same order as the input paths
@@ -117,11 +111,7 @@ export class ScopeManagementService {
       };
     });
 
-    this.logger.log(`[SiteId: ${siteId}] Created ${scopes.length} scopes with paths`);
-    this.logger.debug(
-      `[SiteId: ${siteId}] First enriched scope: ${JSON.stringify({ id: scopesWithPaths[0]?.id, name: scopesWithPaths[0]?.name, path: scopesWithPaths[0]?.path })}`,
-    );
-
+    this.logger.log(`${logPrefix} Created ${scopes.length} scopes with paths`);
     return scopesWithPaths;
   }
 

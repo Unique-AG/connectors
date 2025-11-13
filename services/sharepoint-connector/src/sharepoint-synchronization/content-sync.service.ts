@@ -95,7 +95,6 @@ export class ContentSyncService {
     const logPrefix = `[SiteId: ${siteId}]`;
     let filesToDelete: UniqueFile[] = [];
     // Convert relative keys to full keys (with siteId prefix)
-    // TODO: This works for files but does it work file sitePages aspx files?
     const fullKeys = deletedFileKeys.map((key) => `${siteId}/${key}`);
 
     try {

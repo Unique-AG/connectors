@@ -160,10 +160,6 @@
                 "https://api.unique.app/scope-management/graphql"
               ]
             },
-            "scopeManagementGraphqlUrl": {
-              "type": ["string", "null"],
-              "description": "GraphQL URL for Scope Management service (required for recursive mode with scope creation)"
-            },
             "ingestionMode": {
               "type": "string",
               "enum": ["flat", "recursive"],
@@ -171,7 +167,7 @@
             },
             "rootScopeName": {
               "type": ["string", "null"],
-              "description": "Name of the root scope/folder in the knowledge base where SharePoint content should be synced (for recursive mode). It will be created by the connector. If this scope name already exists and the service-user does not have read+write access to it it will fail."
+              "description": "Name of the root scope/folder in the knowledge base where SharePoint content should be synced"
             },
             "scopeId": {
               "type": ["string", "null"],

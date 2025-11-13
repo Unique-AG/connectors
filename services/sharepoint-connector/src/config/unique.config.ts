@@ -59,7 +59,7 @@ const baseConfig = z
       .string()
       .optional()
       .describe(
-        'Scope ID for FLAT ingestion mode. Required when ingestionMode is FLAT. Leave undefined for RECURSIVE mode (path-based ingestion)..',
+        'Scope ID for FLAT ingestion mode. Required when ingestionMode is FLAT. Leave undefined for RECURSIVE mode (path-based ingestion).',
       ),
     rootScopeName: z
       .string()

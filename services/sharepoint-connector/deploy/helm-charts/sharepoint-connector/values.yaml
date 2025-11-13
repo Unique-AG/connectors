@@ -136,7 +136,7 @@ connectorConfig:
     # -- name of the root scope/folder in the knowledge base where SharePoint content should be synced (for recursive mode). It will be created by the connector. If this scope name already exists and the service-user does not have read+write access to it it will fail.
     # example: SharePoint Content
     rootScopeName: null
-    # -- scope id for the scope based ingestion (only for flat mode)
+    # -- scope id for the scope based ingestion
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion
     apiRateLimitPerMinute: 100
