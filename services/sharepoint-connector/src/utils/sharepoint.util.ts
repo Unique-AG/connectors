@@ -1,5 +1,8 @@
 import assert from 'node:assert';
-import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type {
+  AnySharepointItem,
+  SharepointContentItem,
+} from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 
 interface SharepointFileKeyParams {
   scopeId?: string | null;
@@ -144,7 +147,7 @@ export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): 
  * Ingestion requires a complete hierarchical key (e.g., "siteId/itemId") to ensure uniqueness of the stored key
  * across different scopes and drives. This differs from buildFileDiffKey which only uses the item ID.
  */
-export function buildIngestionItemKey(sharepointContentItem: SharepointContentItem): string {
+export function buildIngestionItemKey(sharepointContentItem: AnySharepointItem): string {
   if (sharepointContentItem.itemType === 'listItem') {
     return `${sharepointContentItem.siteId}/${sharepointContentItem.driveId}/${sharepointContentItem.item.id}`;
   }

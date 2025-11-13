@@ -19,3 +19,10 @@ export type SharepointContentItem = BaseItem &
         item: ListItem;
       }
   );
+
+export type SharepointDirectoryItem = BaseItem & {
+  itemType: 'directory';
+  item: DriveItem;
+};
+
+export type AnySharepointItem = SharepointContentItem | SharepointDirectoryItem;

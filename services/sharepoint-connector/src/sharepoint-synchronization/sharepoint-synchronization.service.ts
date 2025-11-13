@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
+import { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
@@ -36,7 +37,7 @@ export class SharepointSynchronizationService {
       const logPrefix = `[SiteId: ${siteId}]`;
 
       const siteStartTime = Date.now();
-      const items = await this.graphApiService.getAllSiteItems(siteId);
+      const { items, directories } = await this.graphApiService.getAllSiteItems(siteId);
       this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
 
       if (items.length === 0) {
@@ -57,7 +58,12 @@ export class SharepointSynchronizationService {
       const syncMode = this.configService.get('processing.syncMode', { infer: true });
       if (syncMode === 'content_and_permissions') {
         try {
-          await this.permissionsSyncService.syncPermissionsForSite(siteId, items);
+          await this.permissionsSyncService.syncPermissionsForSite({
+            siteId,
+            sharePoint: { items, directories },
+            // TODO: Replace with list of scopes fetched before / during content sync
+            unique: { folders: [] as (Scope & { path: string })[] },
+          });
         } catch (error) {
           this.logger.error({
             msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,

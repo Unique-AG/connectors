@@ -6,7 +6,7 @@ import {
   SimpleIdentitySet,
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
-import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { buildIngestionItemKey } from '../utils/sharepoint.util';
 import { Membership } from './types';
 import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
@@ -16,10 +16,7 @@ import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './
 // the local type name.
 type Permission = Membership;
 type PermissionsMap = Record<string, Permission[]>;
-type PermissionsFetcher = Record<
-  SharepointContentItem['itemType'],
-  () => Promise<SimplePermission[]>
->;
+type PermissionsFetcher = Record<AnySharepointItem['itemType'], () => Promise<SimplePermission[]>>;
 
 @Injectable()
 export class FetchGraphPermissionsMapQuery {
@@ -27,7 +24,7 @@ export class FetchGraphPermissionsMapQuery {
 
   public constructor(private readonly graphApiService: GraphApiService) {}
 
-  public async run(siteId: string, items: SharepointContentItem[]): Promise<PermissionsMap> {
+  public async run(siteId: string, items: AnySharepointItem[]): Promise<PermissionsMap> {
     const siteWebUrl = await this.graphApiService.getSiteWebUrl(siteId);
     const siteName = siteWebUrl.split('/').pop();
     assert.ok(siteName, `Site name not found for site ${siteId}`);
@@ -39,6 +36,7 @@ export class FetchGraphPermissionsMapQuery {
         driveItem: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
         listItem: () =>
           this.graphApiService.getListItemPermissions(siteId, item.driveId, item.item.id),
+        directory: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
       };
 
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(

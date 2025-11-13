@@ -19,7 +19,10 @@ import {
   SimplePermission,
   SitePageContent,
 } from './types/sharepoint.types';
-import { SharepointContentItem } from './types/sharepoint-content-item.interface';
+import {
+  SharepointContentItem,
+  SharepointDirectoryItem,
+} from './types/sharepoint-content-item.interface';
 
 @Injectable()
 export class GraphApiService {
@@ -46,7 +49,9 @@ export class GraphApiService {
     });
   }
 
-  public async getAllSiteItems(siteId: string): Promise<SharepointContentItem[]> {
+  public async getAllSiteItems(
+    siteId: string,
+  ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const logPrefix = `[SiteId: ${siteId}]`;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
       this.getAspxPagesForSite(siteId),
@@ -54,6 +59,7 @@ export class GraphApiService {
     ]);
 
     const sharepointContentItemsToSync: SharepointContentItem[] = [];
+    const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
 
     if (aspxPagesResult.status === 'fulfilled') {
       sharepointContentItemsToSync.push(...aspxPagesResult.value);
@@ -62,7 +68,8 @@ export class GraphApiService {
     }
 
     if (filesResult.status === 'fulfilled') {
-      sharepointContentItemsToSync.push(...filesResult.value);
+      sharepointContentItemsToSync.push(...filesResult.value.items);
+      sharepointDirectoryItemsToSync.push(...filesResult.value.directories);
     } else {
       this.logger.error(`${logPrefix} Failed to scan drive files:`, filesResult.reason);
     }
@@ -70,12 +77,15 @@ export class GraphApiService {
     this.logger.log(
       `${logPrefix} Completed scan. Found ${sharepointContentItemsToSync.length} total items marked for synchronization.`,
     );
-    return sharepointContentItemsToSync;
+    return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
   }
 
-  public async getAllFilesForSite(siteId: string): Promise<SharepointContentItem[]> {
+  public async getAllFilesForSite(
+    siteId: string,
+  ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
     const sharepointContentFilesToSync: SharepointContentItem[] = [];
+    const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
     let totalScanned = 0;
 
     if (maxFilesToScan) {
@@ -96,7 +106,7 @@ export class GraphApiService {
         break;
       }
 
-      const filesInDrive = await this.recursivelyFetchDriveItems(
+      const { items, directories } = await this.recursivelyFetchDriveItems(
         drive.id,
         'root',
         siteId,
@@ -105,8 +115,9 @@ export class GraphApiService {
         remainingLimit,
       );
 
-      sharepointContentFilesToSync.push(...filesInDrive);
-      totalScanned += filesInDrive.length;
+      sharepointContentFilesToSync.push(...items);
+      sharepointDirectoryItemsToSync.push(...directories);
+      totalScanned += items.length;
 
       // Stop scanning if we've reached the limit for testing
       if (maxFilesToScan && totalScanned >= maxFilesToScan) {
@@ -116,7 +127,7 @@ export class GraphApiService {
     }
 
     this.logger.log(`Found ${sharepointContentFilesToSync.length} drive files for site ${siteId}`);
-    return sharepointContentFilesToSync;
+    return { items: sharepointContentFilesToSync, directories: sharepointDirectoryItemsToSync };
   }
 
   public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
@@ -361,9 +372,9 @@ export class GraphApiService {
     siteWebUrl: string,
     driveName: string,
     maxFiles?: number,
-  ): Promise<SharepointContentItem[]> {
+  ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const sharepointContentItemsToSync: SharepointContentItem[] = [];
-
+    const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
     try {
       const allItems = await this.fetchAllDriveItemsInDrive(driveId, itemId);
 
@@ -378,7 +389,7 @@ export class GraphApiService {
           const remainingLimit = maxFiles
             ? maxFiles - sharepointContentItemsToSync.length
             : undefined;
-          const filesInNestedDrive = await this.recursivelyFetchDriveItems(
+          const { items, directories } = await this.recursivelyFetchDriveItems(
             driveId,
             driveItem.id,
             siteId,
@@ -387,7 +398,23 @@ export class GraphApiService {
             remainingLimit,
           );
 
-          sharepointContentItemsToSync.push(...filesInNestedDrive);
+          // We simply do not care about subtree of the site that contains no files to sync.
+          if (items.length === 0) {
+            continue;
+          }
+
+          sharepointContentItemsToSync.push(...items);
+          sharepointDirectoryItemsToSync.push({
+            itemType: 'directory',
+            item: driveItem,
+            siteId,
+            siteWebUrl,
+            driveId,
+            driveName,
+            folderPath: this.extractFolderPath(driveItem),
+            fileName: driveItem.name,
+          });
+          sharepointDirectoryItemsToSync.push(...directories);
         } else if (this.fileFilterService.isFileValidForIngestion(driveItem)) {
           const folderPath = this.extractFolderPath(driveItem);
           sharepointContentItemsToSync.push({
@@ -403,13 +430,13 @@ export class GraphApiService {
         }
       }
 
-      return sharepointContentItemsToSync;
+      return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
     } catch (error) {
       this.logger.error(
         `Failed to fetch items for drive ${driveId}, item ${itemId}: ${normalizeError(error).message}`,
       );
       this.logger.warn(`Continuing scan with results collected so far from ${itemId}`);
-      return sharepointContentItemsToSync;
+      return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
     }
   }
 
