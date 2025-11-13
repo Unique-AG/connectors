@@ -82,9 +82,9 @@ export class PermissionsSyncService {
     );
 
     const { updatedUniqueGroupsMap } = await this.syncSharepointGroupsToUniqueCommand.run({
-      sharePointGroupsMap: groupsWithMemberships,
-      uniqueGroupsMap,
-      uniqueUsersMap,
+      siteId,
+      sharePoint: { groupsMap: groupsWithMemberships },
+      unique: { groupsMap: uniqueGroupsMap, usersMap: uniqueUsersMap },
     });
 
     this.logger.log(
@@ -93,9 +93,8 @@ export class PermissionsSyncService {
 
     await this.syncSharepointFilesPermissionsToUniqueCommand.run({
       siteId,
-      permissionsMap,
-      uniqueGroupsMap: updatedUniqueGroupsMap,
-      uniqueUsersMap,
+      sharePoint: { permissionsMap },
+      unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
     });
 
     this.logger.log(`${logPrefix} Synced file permissions to Unique`);

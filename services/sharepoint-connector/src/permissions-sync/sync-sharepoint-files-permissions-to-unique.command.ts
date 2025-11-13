@@ -17,9 +17,13 @@ import { groupDistinctId } from './utils';
 
 interface Input {
   siteId: string;
-  permissionsMap: Record<string, Membership[]>;
-  uniqueGroupsMap: UniqueGroupsMap;
-  uniqueUsersMap: UniqueUsersMap;
+  sharePoint: {
+    permissionsMap: Record<string, Membership[]>;
+  };
+  unique: {
+    groupsMap: UniqueGroupsMap;
+    usersMap: UniqueUsersMap;
+  };
 }
 
 @Injectable()
@@ -29,11 +33,12 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
   public constructor(private readonly uniqueFilesService: UniqueFilesService) {}
 
   public async run(input: Input): Promise<void> {
-    const { siteId, permissionsMap, uniqueGroupsMap, uniqueUsersMap } = input;
+    const { siteId, sharePoint, unique } = input;
 
     const logPrefix = `[Site: ${siteId}]`;
     this.logger.log(
-      `${logPrefix} Starting permissions sync for ${Object.keys(permissionsMap).length} items`,
+      `${logPrefix} Starting permissions sync for ` +
+        `${Object.keys(sharePoint.permissionsMap).length} items`,
     );
 
     this.logger.log(`${logPrefix} Fetching unique files`);
@@ -46,7 +51,7 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
     for (const uniqueFile of uniqueFiles) {
       const loopLogPrefix = `${logPrefix}[File: ${uniqueFile.id}]`;
       this.logger.debug(`${loopLogPrefix} Starting permissions processing`);
-      const permissions = permissionsMap[uniqueFile.key];
+      const permissions = sharePoint.permissionsMap[uniqueFile.key];
 
       if (isNullish(permissions)) {
         this.logger.warn(
@@ -59,8 +64,8 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
         this.mapSharePointPermissionsToUniqueFileAccessInputs(
           uniqueFile.id,
           permissions,
-          uniqueGroupsMap,
-          uniqueUsersMap,
+          unique.groupsMap,
+          unique.usersMap,
         );
       const uniqueFileAccessInputsFromUnique =
         this.extractUniqueFileAccessInputsFromUniqueFile(uniqueFile);
