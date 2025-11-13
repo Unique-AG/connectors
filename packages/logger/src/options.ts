@@ -1,4 +1,5 @@
 import { IncomingMessage } from 'node:http';
+import path from 'node:path';
 import { RequestMethod } from '@nestjs/common';
 import type { Params } from 'nestjs-pino';
 
@@ -7,24 +8,14 @@ export const productionTarget = {
 };
 
 export const developmentTarget = {
-  target: 'pino-http-print',
-  options: {
-    destination: 1,
-    all: true,
-    translateTime: false,
-    colorize: true,
-    prettyOptions: {
-      ignore: 'pid,hostname,context,req',
-      translateTime: 'yyyy-mm-dd HH:MM:ss o',
-      messageFormat: '\x1b[93;1m[{context}]\x1b[0m \x1b[97m{msg}\x1b[0m',
-    },
-  },
+  // https://github.com/pinojs/pino-pretty?tab=readme-ov-file#handling-non-serializable-options
+  target: path.resolve(__dirname, './development'),
 };
 
 export const defaultLoggerOptions: Params = {
+  renameContext: process.env.NODE_ENV !== 'production' ? 'caller' : undefined,
   pinoHttp: {
     enabled: true,
-    // eslint-disable-next-line no-process-env
     level: 'info',
     redact: {
       paths: [
@@ -44,9 +35,7 @@ export const defaultLoggerOptions: Params = {
       }
       return {};
     },
-    transport:
-      // eslint-disable-next-line no-process-env
-      process.env.NODE_ENV !== 'production' ? developmentTarget : productionTarget,
+    transport: process.env.NODE_ENV !== 'production' ? developmentTarget : productionTarget,
   },
   exclude: [
     {
