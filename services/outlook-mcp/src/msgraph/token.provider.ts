@@ -1,3 +1,4 @@
+import { DefaultAzureCredential } from '@azure/identity';
 import { AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
 import {
   AuthenticationProvider,
@@ -18,6 +19,8 @@ export class TokenProvider implements AuthenticationProvider {
   private readonly scopes: string[];
   private readonly drizzle: DrizzleDatabase;
   private readonly encryptionService: AesGcmEncryptionService;
+  private readonly credential: DefaultAzureCredential;
+  private readonly tenantId?: string;
 
   public constructor(
     {
@@ -25,11 +28,13 @@ export class TokenProvider implements AuthenticationProvider {
       clientId,
       clientSecret,
       scopes,
+      tenantId,
     }: {
       userProfileId: string;
       clientId: string;
       clientSecret: string;
       scopes: string[];
+      tenantId?: string;
     },
     {
       drizzle,
@@ -43,8 +48,10 @@ export class TokenProvider implements AuthenticationProvider {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
     this.scopes = scopes;
+    this.tenantId = tenantId;
     this.drizzle = drizzle;
     this.encryptionService = encryptionService;
+    this.credential = new DefaultAzureCredential({ tenantId });
   }
 
   public async getAccessToken(
@@ -77,6 +84,15 @@ export class TokenProvider implements AuthenticationProvider {
     const decrypedRefreshToken = this.encryptionService.decryptFromString(userProfile.refreshToken);
 
     try {
+      // Get client assertion token using Azure Workload Identity
+      const clientAssertion = await this.credential.getToken(
+        'https://login.microsoftonline.com/.default',
+      );
+
+      if (!clientAssertion?.token) {
+        throw new Error('Failed to acquire client assertion token from workload identity');
+      }
+
       // Microsoft OAuth2 token refresh endpoint
       const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
         method: 'POST',
@@ -87,7 +103,8 @@ export class TokenProvider implements AuthenticationProvider {
           grant_type: 'refresh_token',
           refresh_token: decrypedRefreshToken.toString('utf-8'),
           client_id: this.clientId,
-          client_secret: this.clientSecret,
+          client_assertion: clientAssertion.token,
+          client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
           scope: this.scopes.join(' '),
         }),
       });
