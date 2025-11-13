@@ -96,14 +96,10 @@ export class UniqueFileIngestionService {
     partialKey: string,
   ): Promise<FileDiffResponse> {
     const uniqueConfig = this.configService.get('unique', { infer: true });
-    const sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const fileDiffUrl = new URL(uniqueConfig.fileDiffUrl);
     const fileDiffPath = fileDiffUrl.pathname + fileDiffUrl.search;
 
-    const basePath = uniqueConfig.rootScopeName || sharepointBaseUrl;
-
     const diffRequest: FileDiffRequest = {
-      basePath,
       partialKey,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,

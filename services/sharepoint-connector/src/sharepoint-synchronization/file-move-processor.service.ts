@@ -86,7 +86,6 @@ export class FileMoveProcessor {
       const sharepointItem = sharepointItems.find((item) => item.item.id === relativeKey);
 
       if (!sharepointItem) {
-        // TODO: check if a moved file has the same fileId in sharepoint in the new location
         this.logger.warn(
           `Could not find SharePoint item for moved file with key: ${ingestedFile.key} for site ${siteId}`,
         );

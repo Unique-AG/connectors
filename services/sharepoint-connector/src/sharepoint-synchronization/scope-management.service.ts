@@ -192,13 +192,11 @@ export class ScopeManagementService {
     assert(rootScopeName, 'rootScopeName must be configured for recursive mode');
 
     const scopePath = buildScopePathFromItem(item, rootScopeName);
-    // todo check if this is needed
-    const decodedPath = decodeURIComponent(scopePath);
 
     // Find scope with this path.
-    const scope = scopes.find((scope) => scope.path === decodedPath);
+    const scope = scopes.find((scope) => scope.path === scopePath);
     if (!scope?.id) {
-      this.logger.warn(`Scope not found for path: ${decodedPath}`);
+      this.logger.warn(`Scope not found for path: ${scopePath}`);
       return undefined;
     }
     return scope.id;
