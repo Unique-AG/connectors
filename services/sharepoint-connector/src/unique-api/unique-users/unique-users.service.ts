@@ -1,7 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { pick } from 'remeda';
 import { ScopeManagementClient } from '../clients/scope-management.client';
-import { LIST_USERS_QUERY, ListUsersQueryInput, ListUsersQueryResult } from './unique-users.consts';
+import {
+  GET_CURRENT_USER_QUERY,
+  GetCurrentUserQueryResult,
+  LIST_USERS_QUERY,
+  ListUsersQueryInput,
+  ListUsersQueryResult,
+} from './unique-users.consts';
 import { SimpleUniqueUser } from './unique-users.types';
 
 const BATCH_SIZE = 100;
@@ -32,5 +38,15 @@ export class UniqueUsersService {
     } while (batchCount === BATCH_SIZE);
 
     return users;
+  }
+
+  public async getCurrentUserId(): Promise<string> {
+    this.logger.log('Requesting current user ID from Unique API');
+
+    const result = await this.scopeManagementClient.get(
+      async (client) => await client.request<GetCurrentUserQueryResult>(GET_CURRENT_USER_QUERY, {}),
+    );
+
+    return result.me.user.id;
   }
 }

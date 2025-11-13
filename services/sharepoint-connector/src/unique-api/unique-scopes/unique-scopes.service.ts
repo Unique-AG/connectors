@@ -1,11 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ScopeManagementClient } from '../clients/scope-management.client';
 import {
+  CREATE_SCOPE_ACCESSES_MUTATION,
+  CreateScopeAccessesMutationInput,
+  CreateScopeAccessesMutationResult,
+  DELETE_SCOPE_ACCESSES_MUTATION,
+  DeleteScopeAccessesMutationInput,
+  DeleteScopeAccessesMutationResult,
   GenerateScopesBasedOnPathsMutationInput,
   GenerateScopesBasedOnPathsMutationResult,
   getGenerateScopesBasedOnPathsMutation,
 } from './unique-scopes.consts';
-import { Scope } from './unique-scopes.types';
+import { Scope, ScopeAccess } from './unique-scopes.types';
 
 @Injectable()
 export class UniqueScopesService {
@@ -29,5 +35,49 @@ export class UniqueScopesService {
     );
 
     return result.generateScopesBasedOnPaths;
+  }
+
+  public async createScopeAccesses(
+    scopeId: string,
+    scopeAccesses: ScopeAccess[],
+    applyToSubScopes: boolean = false,
+  ): Promise<void> {
+    this.logger.log(
+      `Creating ${scopeAccesses.length} scope accesses for scope ${scopeId} (applyToSubScopes: ${applyToSubScopes})`,
+    );
+
+    await this.scopeManagementClient.get(
+      async (client) =>
+        await client.request<CreateScopeAccessesMutationResult, CreateScopeAccessesMutationInput>(
+          CREATE_SCOPE_ACCESSES_MUTATION,
+          {
+            scopeId,
+            scopeAccesses,
+            applyToSubScopes,
+          },
+        ),
+    );
+  }
+
+  public async deleteScopeAccesses(
+    scopeId: string,
+    scopeAccesses: ScopeAccess[],
+    applyToSubScopes: boolean = false,
+  ): Promise<void> {
+    this.logger.log(
+      `Deleting ${scopeAccesses.length} scope accesses for scope ${scopeId} (applyToSubScopes: ${applyToSubScopes})`,
+    );
+
+    await this.scopeManagementClient.get(
+      async (client) =>
+        await client.request<DeleteScopeAccessesMutationResult, DeleteScopeAccessesMutationInput>(
+          DELETE_SCOPE_ACCESSES_MUTATION,
+          {
+            scopeId,
+            scopeAccesses,
+            applyToSubScopes,
+          },
+        ),
+    );
   }
 }

@@ -12,6 +12,7 @@ import {
 } from 'remeda';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile, UniqueFileAccessInput } from '../unique-api/unique-files/unique-files.types';
+import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -30,7 +31,10 @@ interface Input {
 export class SyncSharepointFilesPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly uniqueFilesService: UniqueFilesService) {}
+  public constructor(
+    private readonly uniqueFilesService: UniqueFilesService,
+    private readonly uniqueUsersService: UniqueUsersService,
+  ) {}
 
   public async run(input: Input): Promise<void> {
     const { siteId, sharePoint, unique } = input;
@@ -45,6 +49,9 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
     const uniqueFiles = await this.uniqueFilesService.getFilesForSite(siteId);
     this.logger.log(`${logPrefix} Fetched ${uniqueFiles.length} unique files`);
 
+    // We need current user id to be sure to not remove their access to file, because it won't be
+    // present in SharePoint, but should be present in Unique.
+    const currentUserId = await this.uniqueUsersService.getCurrentUserId();
     // Maps from scope id to permissions to add/remove, because API calls are limited to the scope
     const permissionsToAddByScopeId: Record<string, UniqueFileAccessInput[]> = {};
     const permissionsToRemoveByScopeId: Record<string, UniqueFileAccessInput[]> = {};
@@ -86,6 +93,8 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
         uniqueFileAccessInputsFromUnique,
         uniqueFileAccessInputsFromSharePoint,
         isDeepEqual,
+      ).filter(
+        ({ entityType, entityId }) => !(entityType === 'USER' && entityId === currentUserId),
       );
       this.logger.debug(`${loopLogPrefix} ${permissionsToRemove.length} permissions to remove`);
       if (permissionsToRemove.length > 0) {

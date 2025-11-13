@@ -1,3 +1,5 @@
+import { UniqueAccessType, UniqueEntityType } from '../types';
+
 export interface UniqueFile {
   id: string;
   fileAccess: FileAccessKey[];
@@ -14,7 +16,7 @@ export type FileAccessKey = `${FileGranteeType}:${string}${FileAccessModifier}`;
 
 export interface UniqueFileAccessInput {
   contentId: string;
-  accessType: 'READ' | 'WRITE' | 'MANAGE';
+  accessType: UniqueAccessType;
   entityId: string;
-  entityType: 'USER' | 'GROUP';
+  entityType: UniqueEntityType;
 }

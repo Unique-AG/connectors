@@ -1,3 +1,5 @@
+import { UniqueAccessType, UniqueEntityType } from '../types';
+
 export interface Scope {
   id: string;
   name: string;
@@ -6,7 +8,7 @@ export interface Scope {
 }
 
 export interface ScopeAccess {
+  type: UniqueAccessType;
   entityId: string;
-  type: string;
-  entityType: string;
+  entityType: UniqueEntityType;
 }

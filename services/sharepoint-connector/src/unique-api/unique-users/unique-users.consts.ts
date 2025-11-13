@@ -28,3 +28,21 @@ export const LIST_USERS_QUERY = gql`
     }
   }
 `;
+
+export interface GetCurrentUserQueryResult {
+  me: {
+    user: {
+      id: string;
+    };
+  };
+}
+
+export const GET_CURRENT_USER_QUERY = gql`
+  query User {
+    me {
+      user {
+        id
+      }
+    }
+  }
+`;

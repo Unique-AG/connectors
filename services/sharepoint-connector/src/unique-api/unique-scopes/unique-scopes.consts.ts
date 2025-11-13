@@ -1,5 +1,5 @@
 import { gql } from 'graphql-request';
-import type { Scope } from './unique-scopes.types';
+import type { Scope, ScopeAccessChangeDto } from './unique-scopes.types';
 
 export interface GenerateScopesBasedOnPathsMutationInput {
   paths: string[];
@@ -29,3 +29,35 @@ export function getGenerateScopesBasedOnPathsMutation(includePermissions: boolea
     }
   `;
 }
+
+export interface CreateScopeAccessesMutationInput {
+  scopeId: string;
+  scopeAccesses: ScopeAccessChangeDto[];
+  applyToSubScopes?: boolean;
+}
+
+export interface CreateScopeAccessesMutationResult {
+  createScopeAccesses: boolean;
+}
+
+export const CREATE_SCOPE_ACCESSES_MUTATION = gql`
+  mutation CreateScopeAccesses($scopeAccesses: [ScopeAccessChangeDto!]!, $scopeId: String!, $applyToSubScopes: Boolean) {
+    createScopeAccesses(scopeAccesses: $scopeAccesses, scopeId: $scopeId, applyToSubScopes: $applyToSubScopes)
+  }
+`;
+
+export interface DeleteScopeAccessesMutationInput {
+  scopeId: string;
+  scopeAccesses: ScopeAccessChangeDto[];
+  applyToSubScopes?: boolean;
+}
+
+export interface DeleteScopeAccessesMutationResult {
+  deleteScopeAccesses: boolean;
+}
+
+export const DELETE_SCOPE_ACCESSES_MUTATION = gql`
+  mutation DeleteScopeAccesses($scopeAccesses: [ScopeAccessChangeDto!]!, $scopeId: String!, $applyToSubScopes: Boolean) {
+    deleteScopeAccesses(scopeAccesses: $scopeAccesses, scopeId: $scopeId, applyToSubScopes: $applyToSubScopes)
+  }
+`;
