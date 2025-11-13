@@ -8,6 +8,8 @@
 # 9012 - litellm
 # 9013 - qdrant rest
 # 9014 - qdrant grpc
+# 50005 - dapr-placement
+# 50006 - dapr-scheduler
 name: connectors-monorepo
 services:
   traefik:
@@ -31,6 +33,7 @@ services:
     restart: always
     volumes:
       - postgres:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - 9001:5432
     environment:
@@ -79,8 +82,8 @@ services:
     image: journeyapps/powersync-service:1.15.7
     command: ["start", "-r", "unified"]
     volumes:
-      - ./services/agentic-outlook-mcp/powersync/config.yaml:/config/config.yaml
-      - ./services/agentic-outlook-mcp/powersync/sync_rules.yaml:/config/sync_rules.yaml
+      - ../../services/agentic-outlook-mcp/powersync/config.yaml:/config/config.yaml
+      - ../../services/agentic-outlook-mcp/powersync/sync_rules.yaml:/config/sync_rules.yaml
     environment:
       POWERSYNC_CONFIG_PATH: /config/config.yaml
     ports:
@@ -106,7 +109,7 @@ services:
     ports:
       - 9012:4444
     volumes:
-      - ./services/agentic-outlook-mcp/litellm/config.yaml:/etc/litellm/config.yaml
+      - ../../services/agentic-outlook-mcp/litellm/config.yaml:/etc/litellm/config.yaml
     command: "--config /etc/litellm/config.yaml --detailed_debug"
     labels:
       - traefik.enable=true
@@ -266,7 +269,7 @@ services:
       LANGFUSE_INIT_USER_PASSWORD: RootPassword1!
 
   qdrant:
-    image: ghcr.io/qdrant/qdrant/qdrant:v1.15.5
+    image: qdrant/qdrant:v1.15.5
     volumes:
       - qdrant:/qdrant/storage
     restart: always
@@ -279,12 +282,27 @@ services:
       - traefik.http.routers.qdrant.service=qdrant
       - traefik.http.services.qdrant.loadbalancer.server.port=6333
 
+  dapr-placement:
+    image: "daprio/placement"
+    command: ["./placement"]
+    ports:
+      - "50005:50005"
+
+  dapr-scheduler:
+    image: "daprio/scheduler"
+    command: ["./scheduler", "--override-broadcast-host-port", "localhost:50006", "--etcd-data-dir", "/data"]
+    ports:
+      - "50006:50006"
+    user: root
+    volumes:
+      - dapr-etcd-data:/data
+
 volumes:
   postgres:
   rabbitmq:
   redis:
-  rabbitmq:
   minio:
   qdrant:
   clickhouse_data:
   clickhouse_logs:
+  dapr-etcd-data:
