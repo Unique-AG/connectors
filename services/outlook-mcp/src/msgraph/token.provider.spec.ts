@@ -3,6 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
 import { TokenProvider } from './token.provider';
 
+// Mock Azure Identity
+const mockGetToken = vi.fn();
+vi.mock('@azure/identity', () => ({
+  DefaultAzureCredential: vi.fn().mockImplementation(() => ({
+    getToken: mockGetToken,
+  })),
+}));
+
 // Mock fetch globally
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -23,6 +31,13 @@ describe('TokenProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset();
+    mockGetToken.mockReset();
+    
+    // Default mock for Azure credential token
+    mockGetToken.mockResolvedValue({
+      token: 'mock-client-assertion-token',
+      expiresOnTimestamp: Date.now() + 3600000,
+    });
   });
 
   describe('getAccessToken', () => {
@@ -92,6 +107,7 @@ describe('TokenProvider', () => {
       const result = await unit.refreshAccessToken('user-profile-123');
 
       expect(result).toBe('new-access-token');
+      expect(mockGetToken).toHaveBeenCalledWith('https://login.microsoftonline.com/.default');
       expect(mockFetch).toHaveBeenCalledWith(
         'https://login.microsoftonline.com/common/oauth2/v2.0/token',
         {
@@ -103,7 +119,8 @@ describe('TokenProvider', () => {
             grant_type: 'refresh_token',
             refresh_token: 'encrypted-refresh-token',
             client_id: 'test-client-id',
-            client_secret: 'test-client-secret',
+            client_assertion: 'mock-client-assertion-token',
+            client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
             scope: 'https://graph.microsoft.com/.default',
           }),
         },
@@ -197,6 +214,22 @@ describe('TokenProvider', () => {
 
       await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
         'Token refresh failed: Network error',
+      );
+    });
+
+    it('throws error when Azure credential fails to get token', async () => {
+      const mockUserProfile = {
+        id: 'user-profile-123',
+        refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      };
+
+      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
+      mockGetToken.mockResolvedValue(null);
+
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
+        'Token refresh failed: Failed to acquire client assertion token from workload identity',
       );
     });
   });
