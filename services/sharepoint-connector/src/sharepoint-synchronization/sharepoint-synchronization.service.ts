@@ -40,21 +40,20 @@ export class SharepointSynchronizationService {
 
     for (const siteId of siteIdsToScan) {
       const logPrefix = `[SiteId: ${siteId}]`;
-
+      let scopes: Scope[] | undefined;
       const siteStartTime = Date.now();
+
       const items = await this.graphApiService.getAllSiteItems(siteId);
       this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
 
       if (items.length === 0) {
-        this.logger.warn(`${logPrefix} Found no items marked for synchronization.`);
+        this.logger.log(`${logPrefix} Found no items marked for synchronization.`);
         continue;
       }
 
-      // Create scopes for recursive mode
-      let scopes: Scope[] | undefined;
-
       if (ingestionMode === IngestionMode.Recursive) {
         try {
+          // Create scopes for ALL paths (including moved file destinations)
           scopes = await this.scopeManagementService.batchCreateScopes(items);
         } catch (error) {
           this.logger.error({

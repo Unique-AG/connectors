@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
@@ -11,7 +12,7 @@ export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
 
   public constructor(
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
     private readonly uniqueScopesService: UniqueScopesService,
   ) {}
 
@@ -175,5 +176,33 @@ export class ScopeManagementService {
     );
 
     return itemIdToScopeIdMap;
+  }
+
+  /**
+   * Determines the appropriate scope ID for a SharePoint item based on ingestion mode
+   */
+  public determineScopeForItem(item: SharepointContentItem, scopes?: Scope[]): string | undefined {
+    if (!scopes || scopes.length === 0) {
+      // Flat mode - return the configured scope ID
+      return this.configService.get('unique.scopeId', { infer: true });
+    }
+
+    const rootScopeName = this.configService.get('unique.rootScopeName', {
+      infer: true,
+    });
+
+    assert(rootScopeName, 'rootScopeName must be configured for recursive mode');
+
+    const scopePath = buildScopePathFromItem(item, rootScopeName);
+    // todo check if this is needed
+    const decodedPath = decodeURIComponent(scopePath);
+
+    // Find scope with this path.
+    const scope = scopes.find((scope) => scope.path === decodedPath);
+    if (!scope?.id) {
+      this.logger.warn(`Scope not found for path: ${decodedPath}`);
+      return undefined;
+    }
+    return scope.id;
   }
 }

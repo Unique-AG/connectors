@@ -1,16 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
-import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
-import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
+import {Injectable, Logger} from '@nestjs/common';
+import type {SharepointContentItem} from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import {ItemProcessingOrchestratorService} from '../processing-pipeline/item-processing-orchestrator.service';
+import {UniqueFileIngestionService} from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import type {
   FileDiffItem,
   FileDiffResponse,
 } from '../unique-api/unique-file-ingestion/unique-file-ingestion.types';
-import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
-import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
-import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
-import { elapsedSecondsLog } from '../utils/timing.util';
-import { ScopeManagementService } from './scope-management.service';
+import {UniqueFilesService} from '../unique-api/unique-files/unique-files.service';
+import type {Scope} from '../unique-api/unique-scopes/unique-scopes.types';
+import {buildFileDiffKey, getItemUrl} from '../utils/sharepoint.util';
+import {elapsedSecondsLog} from '../utils/timing.util';
+import {FileMoveProcessor} from './file-move-processor.service';
+import {ScopeManagementService} from './scope-management.service';
+import {UniqueFile} from "../unique-api/unique-files/unique-files.types";
 
 @Injectable()
 export class ContentSyncService {
@@ -20,21 +22,23 @@ export class ContentSyncService {
     private readonly orchestrator: ItemProcessingOrchestratorService,
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly uniqueFilesService: UniqueFilesService,
+    private readonly fileMoveProcessor: FileMoveProcessor,
     private readonly scopeManagementService: ScopeManagementService,
-  ) {}
+  ) {
+  }
 
   public async syncContentForSite(
     siteId: string,
     items: SharepointContentItem[],
     scopes?: Scope[],
   ): Promise<void> {
-    const logPrefix = `[SiteId: ${siteId}] `;
+    const logPrefix = `[SiteId: ${ siteId }] `;
     const processStartTime = Date.now();
 
     const diffResult = await this.calculateDiffForSite(items, siteId);
 
     this.logger.log(
-      `${logPrefix} File Diff Results: ${diffResult.newFiles.length} new, ${diffResult.updatedFiles.length} updated, ${diffResult.movedFiles.length} moved, ${diffResult.deletedFiles.length} deleted`,
+      `${ logPrefix } File Diff Results: ${ diffResult.newFiles.length } new, ${ diffResult.updatedFiles.length } updated, ${ diffResult.movedFiles.length } moved, ${ diffResult.deletedFiles.length } deleted`,
     );
 
     // 1. Delete removed files first
@@ -42,12 +46,15 @@ export class ContentSyncService {
       await this.deleteRemovedFiles(siteId, diffResult.deletedFiles);
     }
 
-    // 2. TODO: Handle moved files (update scopes)
+    // 2. Handle moved files (update scopes)
+    if (diffResult.movedFiles.length > 0) {
+      await this.fileMoveProcessor.processFileMoves(siteId, diffResult.movedFiles, items, scopes);
+    }
 
     // 3. Process new/updated files
     const fileKeysToSync = new Set([...diffResult.newFiles, ...diffResult.updatedFiles]);
     if (fileKeysToSync.size === 0) {
-      this.logger.log(`${logPrefix} No new/updated files to sync`);
+      this.logger.log(`${ logPrefix } No new/updated files to sync`);
       return;
     }
 
@@ -62,7 +69,7 @@ export class ContentSyncService {
     await this.orchestrator.processItems(siteId, itemsToSync, itemIdToScopeIdMap);
 
     this.logger.log(
-      `${logPrefix} Finished processing all content operations in ${elapsedSecondsLog(processStartTime)}`,
+      `${ logPrefix } Finished processing all content operations in ${ elapsedSecondsLog(processStartTime) }`,
     );
   }
 
@@ -86,43 +93,41 @@ export class ContentSyncService {
   }
 
   private async deleteRemovedFiles(siteId: string, deletedFileKeys: string[]): Promise<void> {
-    const logPrefix = `[SiteId: ${siteId}]`;
-
-    if (deletedFileKeys.length === 0) {
-      return;
-    }
+    const logPrefix = `[SiteId: ${ siteId }]`;
+    let filesToDelete: UniqueFile[] = [];
+    // Convert relative keys to full keys (with siteId prefix)
+    // TODO: This works for files but does it work file sitePages aspx files?
+    const fullKeys = deletedFileKeys.map((key) => `${ siteId }/${ key }`);
 
     try {
-      // Convert relative keys to full keys (with siteId prefix)
-      // TODO: This works for files but does it work file sitePages aspx files? 
-      const fullKeys = deletedFileKeys.map((key) => `${siteId}/${key}`);
-
       // Get content that matches the exact keys
-      const filesToDelete = await this.uniqueFilesService.getFilesByKeys(fullKeys);
-
-      this.logger.log(
-        `${logPrefix} Found ${filesToDelete.length} files to delete for ${deletedFileKeys.length} deleted file keys`,
-      );
-
-      // Delete each file
-      let totalDeleted = 0;
-      for (const file of filesToDelete) {
-        try {
-          await this.uniqueFilesService.deleteFile(file.id);
-          totalDeleted++;
-        } catch (error) {
-          this.logger.error(
-            `${logPrefix} Failed to delete content ${file.key} (ID: ${file.id}):`,
-            error,
-          );
-        }
-      }
-
-      this.logger.log(
-        `${logPrefix} Completed deletion processing: ${totalDeleted} content items deleted for ${deletedFileKeys.length} deleted files`,
-      );
+      filesToDelete = await this.uniqueFilesService.getFilesByKey(fullKeys);
     } catch (error) {
-      this.logger.error(`${logPrefix} Failed to fetch files for deletion:`, error);
+      this.logger.error(`${ logPrefix } File deleted: ${ error }`);
+      throw error;
     }
+
+    // Delete each file
+    let totalDeleted = 0;
+    for (const file of filesToDelete) {
+      try {
+        await this.uniqueFilesService.deleteFile(file.id);
+        totalDeleted++;
+      } catch (error) {
+        this.logger.error(
+          `${ logPrefix } Failed to delete content ${ file.key } (ID: ${ file.id }):`,
+          error,
+        );
+      }
+    }
+
+    this.logger.log(
+      `${ logPrefix } Completed deletion processing: ${ totalDeleted } content items deleted for ${ deletedFileKeys.length } deleted files`,
+    );
   }
+
+  catch(error) {
+    this.logger.error(`${ logPrefix } Failed to fetch files for deletion:`, error);
+  }
+}
 }

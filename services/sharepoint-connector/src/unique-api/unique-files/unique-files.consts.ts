@@ -3,8 +3,10 @@ import type { UniqueFile } from './unique-files.types';
 
 export interface ContentUpdateMutationInput {
   contentId: string;
-  ownerId?: string;
-  input: Record<string, never>;
+  ownerId: string;
+  input: {
+    url: string;
+  };
 }
 
 export interface ContentUpdateMutationResult {
