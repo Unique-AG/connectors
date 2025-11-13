@@ -125,9 +125,4 @@ export class ContentSyncService {
       `${ logPrefix } Completed deletion processing: ${ totalDeleted } content items deleted for ${ deletedFileKeys.length } deleted files`,
     );
   }
-
-  catch(error) {
-    this.logger.error(`${ logPrefix } Failed to fetch files for deletion:`, error);
-  }
-}
 }
