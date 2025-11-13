@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/Unique-AG/connectors/compare/factset-mcp@v0.2.3...factset-mcp@v0.2.4) (2025-11-13)
+
+
+### Features
+
+* **factset:** remove manifest controller, add robots controller to hide Factset MCP ([#107](https://github.com/Unique-AG/connectors/issues/107)) ([e71c1ed](https://github.com/Unique-AG/connectors/commit/e71c1edc1cf6b7b386f79329fc5888fdcafca0f3))
+
 ## [0.2.3](https://github.com/Unique-AG/connectors/compare/factset-mcp@v0.2.2...factset-mcp@v0.2.3) (2025-10-20)
 
 
