@@ -7,7 +7,7 @@
   "license": "Unique License v1",
   "scripts": {
     "build": "nest build",
-    "dev": "nodemon",
+    "dev": "dapr run --app-id agentic-outlook-mcp --app-port 3000 --resources-path ../../infra/local/dapr/components --config ../../infra/local/dapr/config.yaml -- nest start",
     "dev:webhook": "ngrok http 3000 --url=agentic-outlook-mcp.ngrok.io",
     "debug": "nest start --debug --watch",
     "codegen": "ts-node scripts/generate-openapi-spec.ts",
@@ -16,10 +16,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
     "generate-jwks": "node scripts/generate-jwks.js",
-    "lint": "biome check .",
-    "lint:fix": "biome check . --write",
-    "format": "biome format .",
-    "format:fix": "biome format . --write",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
     "check-types": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest watch",
@@ -110,7 +108,6 @@
     "drizzle-kit": "^0.31.4",
     "globals": "^16.3.0",
     "istanbul-badges-readme": "^1.9.0",
-    "nodemon": "^3.1.10",
     "pino-http-print": "^3.1.0",
     "source-map-support": "^0.5.21",
     "supertest": "^7.1.4",
@@ -118,15 +115,5 @@
     "typescript": "^5.9.2",
     "unplugin-swc": "^1.5.7",
     "vitest": "^3.2.4"
-  },
-  "nodemonConfig": {
-    "watch": [
-      "../../packages/**/dist/index.js"
-    ],
-    "ignore": [
-      "../../packages/**/node_modules/**",
-      "../../packages/**/.turbo/**"
-    ],
-    "exec": "nest start --watch"
   }
 }
