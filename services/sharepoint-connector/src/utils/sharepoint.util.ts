@@ -145,8 +145,6 @@ export function extractFolderPathFromUrl(fileUrl: string): string {
 
 export function buildScopePathFromItem(item: SharepointContentItem, rootScopeName: string): string {
   const fileUrl = extractFileUrl(item);
-  assert(fileUrl, 'Unable to determine file URL from item');
-
   const folderPath = extractFolderPathFromUrl(fileUrl);
   return `${rootScopeName}/${folderPath}`;
 }

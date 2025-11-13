@@ -23,14 +23,8 @@ export class ScopeManagementService {
     const itemIdToScopePathMap = new Map<string, string>();
 
     for (const item of items) {
-      try {
-        const scopePath = buildScopePathFromItem(item, rootScopeName);
-        itemIdToScopePathMap.set(item.item.id, scopePath);
-      } catch (error) {
-        this.logger.warn(
-          `Failed to build scope path for item: ${item.item.id} ${item.item.webUrl} ${error}`,
-        );
-      }
+      const scopePath = buildScopePathFromItem(item, rootScopeName);
+      itemIdToScopePathMap.set(item.item.id, scopePath);
     }
 
     return itemIdToScopePathMap;
@@ -150,12 +144,11 @@ export class ScopeManagementService {
     this.logger.debug(`Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries`);
 
     for (const [itemId, scopePath] of itemIdToScopePathMap) {
-      const decodedPath = decodeURIComponent(scopePath);
-      const scopeId = scopePathToIdMap[decodedPath];
+      const scopeId = scopePathToIdMap[scopePath];
       if (scopeId) {
         itemIdToScopeIdMap.set(itemId, scopeId);
       } else {
-        this.logger.warn(`Scope not found in cache for path: ${decodedPath}`);
+        this.logger.warn(`Scope not found in cache for path: ${scopePath}`);
       }
     }
 
