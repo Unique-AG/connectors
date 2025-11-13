@@ -93,15 +93,8 @@ export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): 
 
 /**
  * Builds a unique hierarchical key for ingestion.
- *
- * Ingestion requires a complete hierarchical key (e.g., "siteId/itemId") to ensure uniqueness of the stored key
- * across different scopes and drives. This differs from buildFileDiffKey which only uses the item ID.
  */
 export function buildIngestionItemKey(sharepointContentItem: SharepointContentItem): string {
-  if (sharepointContentItem.itemType === 'listItem') {
-    return `${sharepointContentItem.siteId}/${sharepointContentItem.driveId}/${sharepointContentItem.item.id}`;
-  }
-
   return `${sharepointContentItem.siteId}/${sharepointContentItem.item.id}`;
 }
 
