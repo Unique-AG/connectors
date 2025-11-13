@@ -1,10 +1,10 @@
 import {Injectable, Logger} from '@nestjs/common';
 import type {SharepointContentItem} from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import {UniqueFilesService} from '../unique-api/unique-files/unique-files.service';
+import {UniqueFile} from "../unique-api/unique-files/unique-files.types";
 import type {Scope} from '../unique-api/unique-scopes/unique-scopes.types';
 import {getItemUrl} from '../utils/sharepoint.util';
 import {ScopeManagementService} from './scope-management.service';
-import {UniqueFile} from "../unique-api/unique-files/unique-files.types";
 
 interface FileMoveData {
   contentId: string; // ingested file id
@@ -36,7 +36,7 @@ export class FileMoveProcessor {
     const movedFileFullKeys = this.convertToFullKeys(movedFileKeys, siteId);
 
     try {
-      ingestedFiles = await this.uniqueFilesService.getFilesByKey(movedFileFullKeys);
+      ingestedFiles = await this.uniqueFilesService.getFilesByKeys(movedFileFullKeys);
     } catch (error) {
       this.logger.error(`${ logPrefix } Failed to get ingested files by keys from unique:`, error)
       throw error;

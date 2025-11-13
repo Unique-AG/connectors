@@ -101,7 +101,7 @@ export class ContentSyncService {
 
     try {
       // Get content that matches the exact keys
-      filesToDelete = await this.uniqueFilesService.getFilesByKey(fullKeys);
+      filesToDelete = await this.uniqueFilesService.getFilesByKeys(fullKeys);
     } catch (error) {
       this.logger.error(`${ logPrefix } File deleted: ${ error }`);
       throw error;
