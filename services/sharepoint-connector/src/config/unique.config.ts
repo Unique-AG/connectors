@@ -53,19 +53,19 @@ const baseConfig = z
     ingestionMode: z
       .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
       .describe(
-        'Ingestion mode: FLAT ingests all files to a single root scope, RECURSIVE maintains the folder hierarchy and creates explicit scope hierarchy via Scope Management service.',
+        'Ingestion mode: FLAT ingests all files to a single root scope, RECURSIVE maintains the folder hierarchy (path-based ingestion).',
       ),
     scopeId: z
       .string()
       .optional()
       .describe(
-        'Scope ID for FLAT ingestion mode. Required when ingestionMode is FLAT. Leave undefined for RECURSIVE mode.',
+        'Scope ID for FLAT ingestion mode. Required when ingestionMode is FLAT. Leave undefined for RECURSIVE mode (path-based ingestion)..',
       ),
     rootScopeName: z
       .string()
       .optional()
       .describe(
-        'Name of the root scope/folder in the knowledge base where SharePoint content should be synced (for recursive mode).',
+        'Used only in case of Recursive ingestion mode. Indicates the name of the root scope/folder in the knowledge base where SharePoint content should be synced.',
       ),
     ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
     // TODO: Right now scopeManagementGraphqlUrl is required, but in the future it should be
@@ -80,7 +80,7 @@ const baseConfig = z
       .describe('Number of Unique API requests allowed per minute'),
   })
   .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {
-    message: 'scopeId is required for FLAT ingestion mode or ingestionMode must be RECURSIVE',
+    message: 'scopeId is required for FLAT ingestion mode',
     path: ['scopeId'],
   });
 
