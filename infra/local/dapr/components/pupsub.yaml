@@ -8,7 +8,7 @@ spec:
   version: v1
   metadata:
     - name: connectionString
-      value: 'amqp://rabbitmq:rabbitmq@localhost:5672'
+      value: 'amqp://rabbitmq:rabbitmq@localhost:9010'
     - name: publisherConfirm
       value: true
     - name: exchangeKind

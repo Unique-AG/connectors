@@ -17,6 +17,7 @@
     "dev": {
       "cache": false,
       "persistent": true,
+      "interruptible": true,
       "dependsOn": ["^build"]
     },
     "db:generate": {},
