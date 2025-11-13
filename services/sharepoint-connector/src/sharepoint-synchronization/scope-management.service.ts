@@ -142,7 +142,9 @@ export class ScopeManagementService {
     // Build item -> path map
     const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
 
-    this.logger.debug(`${logPrefix} Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries`);
+    this.logger.debug(
+      `${logPrefix} Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries`,
+    );
 
     for (const [itemId, scopePath] of itemIdToScopePathMap) {
       const scopeId = scopePathToIdMap[scopePath];
