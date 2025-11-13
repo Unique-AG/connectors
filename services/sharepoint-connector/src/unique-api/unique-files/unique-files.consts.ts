@@ -73,4 +73,3 @@ export const PAGINATED_CONTENT_QUERY = gql`
     }
   }
 `;
-

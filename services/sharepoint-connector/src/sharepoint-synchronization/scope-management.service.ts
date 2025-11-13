@@ -157,9 +157,7 @@ export class ScopeManagementService {
     // Build item -> path map
     const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
 
-    this.logger.debug(
-      `Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries. Sample paths: ${JSON.stringify(Array.from(itemIdToScopePathMap.values()).slice(0, 5))}`,
-    );
+    this.logger.debug(`Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries`);
 
     for (const [itemId, scopePath] of itemIdToScopePathMap) {
       const decodedPath = decodeURIComponent(scopePath);

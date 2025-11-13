@@ -9,6 +9,7 @@ export interface ContentRegistrationRequest {
   sourceName: string;
   url?: string;
   baseUrl?: string;
+  byteSize: number;
 }
 
 export interface IngestionFinalizationRequest {

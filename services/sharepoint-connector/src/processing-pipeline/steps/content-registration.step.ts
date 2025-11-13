@@ -42,6 +42,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       sourceName: INGESTION_SOURCE_NAME,
       url: context.knowledgeBaseUrl,
       baseUrl: this.sharepointBaseUrl,
+      byteSize: context.fileSize ?? 0,
     };
 
     this.logger.debug(

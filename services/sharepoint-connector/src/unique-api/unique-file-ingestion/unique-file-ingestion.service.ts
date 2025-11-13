@@ -38,6 +38,7 @@ export class UniqueFileIngestionService {
         mimeType: request.mimeType,
         ownerType: UniqueOwnerType.Scope,
         url: request.url,
+        byteSize: request.byteSize,
       },
       scopeId: request.scopeId,
       sourceOwnerType: request.sourceOwnerType,
