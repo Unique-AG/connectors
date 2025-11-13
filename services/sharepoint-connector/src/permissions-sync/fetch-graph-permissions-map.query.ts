@@ -15,6 +15,11 @@ import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './
 // as memberships of groups. These are the same structures, so for the ease of code reading we ranem
 // the local type name.
 type Permission = Membership;
+type PermissionsMap = Record<string, Permission[]>;
+type PermissionsFetcher = Record<
+  SharepointContentItem['itemType'],
+  () => Promise<SimplePermission[]>
+>;
 
 @Injectable()
 export class FetchGraphPermissionsMapQuery {
@@ -22,32 +27,22 @@ export class FetchGraphPermissionsMapQuery {
 
   public constructor(private readonly graphApiService: GraphApiService) {}
 
-  public async run(
-    siteId: string,
-    items: SharepointContentItem[],
-  ): Promise<Record<string, Permission[]>> {
+  public async run(siteId: string, items: SharepointContentItem[]): Promise<PermissionsMap> {
     const siteWebUrl = await this.graphApiService.getSiteWebUrl(siteId);
     const siteName = siteWebUrl.split('/').pop();
     assert.ok(siteName, `Site name not found for site ${siteId}`);
 
-    const permissionsMap: Record<string, Permission[]> = {};
+    const permissionsMap: PermissionsMap = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
-      let permissions: SimplePermission[] = [];
-      if (item.itemType === 'driveItem') {
-        permissions = await this.graphApiService.getDriveItemPermissions(
-          item.driveId,
-          item.item.id,
-        );
-      } else if (item.itemType === 'listItem') {
-        permissions = await this.graphApiService.getListItemPermissions(
-          siteId,
-          item.driveId,
-          item.item.id,
-        );
-      }
+      const permissionsFetcher: PermissionsFetcher = {
+        driveItem: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
+        listItem: () =>
+          this.graphApiService.getListItemPermissions(siteId, item.driveId, item.item.id),
+      };
+
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
-        permissions,
+        await permissionsFetcher[item.itemType](),
         siteName,
       );
     }
