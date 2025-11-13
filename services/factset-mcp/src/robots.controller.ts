@@ -8,4 +8,3 @@ export class RobotsController {
     return 'User-agent: *\nDisallow: /';
   }
 }
-
