@@ -115,7 +115,7 @@ export function extractFolderPathFromUrl(fileUrl: string): string {
       return siteName;
     }
 
-    // Remove leading slash and trailing filename
+    // Remove leading slash
     let path = afterSite.replace(/^\//, '');
     if (!path) {
       return siteName;

@@ -113,6 +113,7 @@ export class ScopeManagementService {
     items: SharepointContentItem[],
     scopes: Scope[],
   ): Map<string, string> {
+    const logPrefix = items[0]?.siteId || '';
     const itemIdToScopeIdMap = new Map<string, string>();
     const rootScopeName = this.configService.get('unique.rootScopeName', {
       infer: true,
@@ -135,25 +136,25 @@ export class ScopeManagementService {
     }
 
     this.logger.debug(
-      `${items[0]?.siteId} Built scopePathToIdMap with ${Object.keys(scopePathToIdMap).length} entries`,
+      `${logPrefix} Built scopePathToIdMap with ${Object.keys(scopePathToIdMap).length} entries`,
     );
 
     // Build item -> path map
     const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
 
-    this.logger.debug(`Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries`);
+    this.logger.debug(`${logPrefix} Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries`);
 
     for (const [itemId, scopePath] of itemIdToScopePathMap) {
       const scopeId = scopePathToIdMap[scopePath];
       if (scopeId) {
         itemIdToScopeIdMap.set(itemId, scopeId);
       } else {
-        this.logger.warn(`Scope not found in cache for path: ${scopePath}`);
+        this.logger.warn(`${logPrefix} Scope not found in cache for path: ${scopePath}`);
       }
     }
 
     this.logger.debug(
-      `Built itemIdToScopeIdMap with ${itemIdToScopeIdMap.size} entries for ${items.length} items`,
+      `${logPrefix} Built itemIdToScopeIdMap with ${itemIdToScopeIdMap.size} entries for ${items.length} items`,
     );
 
     return itemIdToScopeIdMap;
