@@ -3,12 +3,6 @@ import { DrizzleModule } from '../drizzle/drizzle.module';
 import { LLMModule } from '../llm/llm.module';
 import { MsGraphModule } from '../msgraph/msgraph.module';
 import { QdrantModule } from '../qdrant/qdrant.module';
-import { CleanupPrompts } from './prompts/cleanup.prompts';
-import { CompliancePrompts } from './prompts/compliance.prompts';
-import { ComposePrompts } from './prompts/compose.prompts';
-import { SearchPrompts } from './prompts/search.prompts';
-import { TriagePrompts } from './prompts/triage.prompts';
-import { WorkflowPrompts } from './prompts/workflow.prompts';
 import { SemanticSearchEmailsTool } from './tools/agentic/semantic-search-emails.tool';
 import { CreateDraftEmailTool } from './tools/create-draft-email.tool';
 import { DeleteMailMessageTool } from './tools/delete-mail-message.tool';
@@ -33,12 +27,6 @@ import { SendMailTool } from './tools/send-mail.tool';
     MoveMailMessageTool,
     SearchEmailTool,
     SemanticSearchEmailsTool,
-    TriagePrompts,
-    ComposePrompts,
-    SearchPrompts,
-    WorkflowPrompts,
-    CompliancePrompts,
-    CleanupPrompts,
   ],
   exports: [],
 })
