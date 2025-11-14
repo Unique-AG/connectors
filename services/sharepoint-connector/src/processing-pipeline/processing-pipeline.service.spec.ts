@@ -126,7 +126,7 @@ describe('ProcessingPipelineService', () => {
   });
 
   it('processes file through all pipeline steps successfully', async () => {
-    const result = await service.processItem(mockFile);
+    const result = await service.processItem(mockFile, 'test-scope-id');
 
     expect(result.success).toBe(true);
     expect(mockSteps.contentFetching.execute).toHaveBeenCalled();
@@ -137,7 +137,7 @@ describe('ProcessingPipelineService', () => {
   });
 
   it('creates proper processing context', async () => {
-    await service.processItem(mockFile);
+    await service.processItem(mockFile, 'test-scope-id');
 
     const executeCalls = vi.mocked(mockSteps.contentFetching.execute).mock.calls;
     const context = executeCalls[0]?.[0];
@@ -154,7 +154,7 @@ describe('ProcessingPipelineService', () => {
   });
 
   it('calls cleanup for each completed step', async () => {
-    await service.processItem(mockFile);
+    await service.processItem(mockFile, 'test-scope-id');
 
     expect(mockSteps.contentFetching.cleanup).toHaveBeenCalled();
   });
@@ -163,7 +163,7 @@ describe('ProcessingPipelineService', () => {
     const testError = new Error('Step failed');
     vi.mocked(mockSteps.contentRegistration.execute).mockRejectedValue(testError);
 
-    const result = await service.processItem(mockFile);
+    const result = await service.processItem(mockFile, 'test-scope-id');
 
     expect(result.success).toBe(false);
     expect(mockSteps.storageUpload.execute).not.toHaveBeenCalled();
@@ -172,7 +172,7 @@ describe('ProcessingPipelineService', () => {
   it('calls cleanup on failed step', async () => {
     vi.mocked(mockSteps.contentFetching.execute).mockRejectedValue(new Error('Step failed'));
 
-    await service.processItem(mockFile);
+    await service.processItem(mockFile, 'test-scope-id');
 
     expect(mockSteps.contentFetching.cleanup).toHaveBeenCalled();
   });
@@ -184,7 +184,7 @@ describe('ProcessingPipelineService', () => {
       () => new Promise((resolve) => setTimeout(resolve, 35000)),
     );
 
-    const processPromise = service.processItem(mockFile);
+    const processPromise = service.processItem(mockFile, 'test-scope-id');
 
     vi.advanceTimersByTime(31000);
 
@@ -199,25 +199,25 @@ describe('ProcessingPipelineService', () => {
     vi.mocked(mockSteps.contentFetching.execute).mockRejectedValue(new Error('Step failed'));
     mockSteps.contentFetching.cleanup.mockResolvedValue(undefined);
 
-    const result = await service.processItem(mockFile);
+    const result = await service.processItem(mockFile, 'test-scope-id');
 
     expect(result.success).toBe(false);
   });
 
   it('releases content buffer in final cleanup', async () => {
-    const result = await service.processItem(mockFile);
+    const result = await service.processItem(mockFile, 'test-scope-id');
 
     expect(result.success).toBe(true);
   });
 
   it('tracks total duration of pipeline execution', async () => {
-    const result = await service.processItem(mockFile);
+    const result = await service.processItem(mockFile, 'test-scope-id');
 
     expect(result.success).toBe(true);
   });
 
   it('handles steps without cleanup method', async () => {
-    const result = await service.processItem(mockFile);
+    const result = await service.processItem(mockFile, 'test-scope-id');
 
     expect(result.success).toBe(true);
   });

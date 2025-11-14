@@ -3,13 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
-import {
-  INGESTION_SOURCE_KIND,
-  INGESTION_SOURCE_NAME,
-  IngestionMode,
-} from '../../constants/ingestion.constants';
+import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import { getScopeIdForIngestion } from '../../unique-api/ingestion.util';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 import { normalizeError } from '../../utils/normalize-error';
@@ -22,43 +17,34 @@ import type { IPipelineStep } from './pipeline-step.interface';
 export class ContentRegistrationStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.ContentRegistration;
-  private readonly ingestionMode: IngestionMode;
-  private readonly scopeId: string | undefined;
-  private readonly rootScopeName: string | undefined;
   private readonly sharepointBaseUrl: string;
 
   public constructor(
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly configService: ConfigService<Config, true>,
   ) {
-    this.ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-    this.scopeId = this.configService.get('unique.scopeId', { infer: true });
-    this.rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
 
-    const scopeId = getScopeIdForIngestion(this.ingestionMode, this.scopeId);
-
     const itemKey = buildIngestionItemKey(context.pipelineItem);
-    const baseUrl = this.rootScopeName || this.sharepointBaseUrl;
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
       key: itemKey,
       title: context.pipelineItem.fileName,
       mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
       ownerType: UniqueOwnerType.Scope,
-      scopeId: scopeId,
+      scopeId: context.scopeId,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
-      ...(this.ingestionMode === IngestionMode.Recursive && {
-        url: context.knowledgeBaseUrl,
-        baseUrl,
-      }),
+      url: context.knowledgeBaseUrl,
+      baseUrl: this.sharepointBaseUrl,
+      byteSize: context.fileSize ?? 0,
     };
+
     this.logger.debug(
       `contentRegistrationRequest: ${JSON.stringify(
         {
@@ -90,7 +76,14 @@ export class ContentRegistrationStep implements IPipelineStep {
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] Content registration failed: ${message}`);
+      this.logger.error({
+        msg: 'Content registration failed',
+        correlationId: context.correlationId,
+        itemId: context.pipelineItem.item.id,
+        driveId: context.pipelineItem.driveId,
+        siteId: context.pipelineItem.siteId,
+        error: message,
+      });
       throw error;
     }
   }

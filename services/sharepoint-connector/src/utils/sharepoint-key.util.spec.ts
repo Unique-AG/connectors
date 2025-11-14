@@ -1,142 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { buildSharepointFileKey, buildSharepointPartialKey, getItemUrl } from './sharepoint.util';
-
-describe('buildSharepointFileKey', () => {
-  it('should build scope-based key when scopeId is provided', () => {
-    const result = buildSharepointFileKey({
-      scopeId: 'scope123',
-      siteId: 'site456',
-      driveName: 'Documents',
-      folderPath: '/folder/subfolder',
-      fileId: 'file789',
-      fileName: 'document.docx',
-    });
-
-    expect(result).toBe('sharepoint_scope_scope123_file789');
-  });
-
-  it('should build path-based key when scopeId is null', () => {
-    const result = buildSharepointFileKey({
-      scopeId: null,
-      siteId: 'site456',
-      driveName: 'Documents',
-      folderPath: '/folder/subfolder',
-      fileId: 'file789',
-      fileName: 'document.docx',
-    });
-
-    expect(result).toBe('site456/Documents/folder/subfolder/document.docx');
-  });
-
-  it('should build path-based key when scopeId is undefined', () => {
-    const result = buildSharepointFileKey({
-      siteId: 'site456',
-      driveName: 'Documents',
-      folderPath: '/folder/subfolder',
-      fileId: 'file789',
-      fileName: 'document.docx',
-    });
-
-    expect(result).toBe('site456/Documents/folder/subfolder/document.docx');
-  });
-
-  it('should handle empty folderPath', () => {
-    const result = buildSharepointFileKey({
-      siteId: 'site456',
-      driveName: 'Documents',
-      folderPath: '',
-      fileId: 'file789',
-      fileName: 'document.docx',
-    });
-
-    expect(result).toBe('site456/Documents/document.docx');
-  });
-
-  it('should handle root folderPath', () => {
-    const result = buildSharepointFileKey({
-      siteId: 'site456',
-      driveName: 'Documents',
-      folderPath: '/',
-      fileId: 'file789',
-      fileName: 'document.docx',
-    });
-
-    expect(result).toBe('site456/Documents/document.docx');
-  });
-
-  it('should trim slashes from inputs', () => {
-    const result = buildSharepointFileKey({
-      siteId: '/site456/',
-      driveName: '/Documents/',
-      folderPath: '/folder/subfolder/',
-      fileId: 'file789',
-      fileName: 'document.docx',
-    });
-
-    expect(result).toBe('site456/Documents/folder/subfolder/document.docx');
-  });
-
-  it('should handle extra spaces in inputs', () => {
-    const result = buildSharepointFileKey({
-      siteId: '  site456  ',
-      driveName: '  Documents  ',
-      folderPath: '  /folder/subfolder  ',
-      fileId: 'file789',
-      fileName: '  document.docx  ',
-    });
-
-    expect(result).toBe('site456/Documents/folder/subfolder/document.docx');
-  });
-
-  it('should filter out empty segments', () => {
-    const result = buildSharepointFileKey({
-      siteId: '',
-      driveName: 'Documents',
-      folderPath: '',
-      fileId: 'file789',
-      fileName: 'document.docx',
-    });
-
-    expect(result).toBe('Documents/document.docx');
-  });
-});
-
-describe('buildSharepointPartialKey', () => {
-  it('should build scope-based partial key when scopeId is provided', () => {
-    const result = buildSharepointPartialKey({
-      scopeId: 'scope123',
-      siteId: 'site456',
-    });
-
-    expect(result).toBe('sharepoint_scope_scope123_');
-  });
-
-  it('should build path-based partial key when scopeId is null', () => {
-    const result = buildSharepointPartialKey({
-      scopeId: null,
-      siteId: 'site456',
-    });
-
-    expect(result).toBe('site456');
-  });
-
-  it('should build path-based partial key when scopeId is undefined', () => {
-    const result = buildSharepointPartialKey({
-      siteId: 'site456',
-    });
-
-    expect(result).toBe('site456');
-  });
-
-  it('should trim slashes from siteId', () => {
-    const result = buildSharepointPartialKey({
-      siteId: '/site456/',
-    });
-
-    expect(result).toBe('site456');
-  });
-});
+import { getItemUrl } from './sharepoint.util';
 
 describe('getItemUrl', () => {
   it('returns full URL when no rootScopeName is provided for driveItem', () => {
@@ -164,7 +28,7 @@ describe('getItemUrl', () => {
     );
   });
 
-  it('simplifies path structure with custom scope for driveItem', () => {
+  it('appends web=1 parameter for driveItem', () => {
     const item = {
       itemType: 'driveItem' as const,
       siteId: 'site123',
@@ -182,12 +46,14 @@ describe('getItemUrl', () => {
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'my-custom-scope');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('my-custom-scope/project/Shared Documents/folder/report.pdf?web=1');
+    expect(result).toBe(
+      'https://uniqueapp.sharepoint.com/sites/project/Shared Documents/folder/report.pdf?web=1',
+    );
   });
 
-  it('simplifies path structure with custom scope for listItem', () => {
+  it('appends web=1 parameter for listItem', () => {
     const item = {
       itemType: 'listItem' as const,
       siteId: 'site456',
@@ -202,9 +68,11 @@ describe('getItemUrl', () => {
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'knowledge-base');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('knowledge-base/Engineering/SitePages/home.aspx?web=1');
+    expect(result).toBe(
+      'https://contoso.sharepoint.com/sites/Engineering/SitePages/home.aspx?web=1',
+    );
   });
 
   it('handles different SharePoint domains correctly', () => {
@@ -224,12 +92,14 @@ describe('getItemUrl', () => {
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'finance-scope');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('finance-scope/team/Documents/budget.xlsx?web=1');
+    expect(result).toBe(
+      'https://company-dev.sharepoint.com/sites/team/Documents/budget.xlsx?web=1',
+    );
   });
 
-  it('preserves query parameters when simplifying path', () => {
+  it('handles URLs with existing query parameters', () => {
     const item = {
       itemType: 'listItem' as const,
       siteId: 'site999',
@@ -244,9 +114,11 @@ describe('getItemUrl', () => {
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'content-root');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('content-root/marketing/news/article.aspx?id=123&web=1');
+    expect(result).toBe(
+      'https://company.sharepoint.com/sites/marketing/news/article.aspx?id=123&web=1',
+    );
   });
 
   it('handles special characters in folder paths', () => {
@@ -266,12 +138,14 @@ describe('getItemUrl', () => {
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'archive');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('archive/team/Shared Documents/2024 Q1/report.pdf?web=1');
+    expect(result).toBe(
+      'https://company.sharepoint.com/sites/team/Shared Documents/2024 Q1/report.pdf?web=1',
+    );
   });
 
-  it('removes sites prefix correctly', () => {
+  it('handles URLs with existing query string', () => {
     const item = {
       itemType: 'driveItem' as const,
       siteId: 'site222',
@@ -283,13 +157,15 @@ describe('getItemUrl', () => {
       item: {
         id: 'file1',
         listItem: {
-          webUrl: 'https://tenant.sharepoint.com/sites/site-name/library/path/file.txt',
+          webUrl: 'https://tenant.sharepoint.com/sites/site-name/library/path/file.txt?param=value',
         },
       },
     } as SharepointContentItem;
 
-    const result = getItemUrl(item, 'root');
+    const result = getItemUrl(item);
 
-    expect(result).toBe('root/site-name/library/path/file.txt?web=1');
+    expect(result).toBe(
+      'https://tenant.sharepoint.com/sites/site-name/library/path/file.txt?param=value&web=1',
+    );
   });
 });

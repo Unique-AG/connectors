@@ -9,6 +9,7 @@ export interface ContentRegistrationRequest {
   sourceName: string;
   url?: string;
   baseUrl?: string;
+  byteSize: number;
 }
 
 export interface IngestionFinalizationRequest {
@@ -47,16 +48,15 @@ export interface FileDiffItem {
 }
 
 export interface FileDiffRequest {
-  basePath: string;
   partialKey: string;
   sourceKind: string;
   sourceName: string;
   fileList: FileDiffItem[];
-  scope: string;
 }
 
 export interface FileDiffResponse {
-  newAndUpdatedFiles: string[];
-  deletedFiles: string[];
+  newFiles: string[];
+  updatedFiles: string[];
   movedFiles: string[];
+  deletedFiles: string[];
 }

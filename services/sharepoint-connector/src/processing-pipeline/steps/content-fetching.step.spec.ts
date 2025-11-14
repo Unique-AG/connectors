@@ -64,6 +64,7 @@ describe('ContentFetchingStep', () => {
           ContentType: 'Document',
           AuthorLookupId: '1',
           EditorLookupId: '1',
+          FileSizeDisplay: '1024',
           ItemChildCount: '0',
           FolderChildCount: '0',
         },
@@ -75,6 +76,7 @@ describe('ContentFetchingStep', () => {
       startTime: new Date(),
       knowledgeBaseUrl: 'https://sharepoint.example.com/test.pdf',
       mimeType: 'application/pdf',
+      scopeId: 'scope-1',
       pipelineItem: {
         itemType: 'driveItem',
         item: driveItem,
@@ -88,7 +90,7 @@ describe('ContentFetchingStep', () => {
     };
 
     const result = await step.execute(context);
-    expect(result.fileSize).toBe(3);
+    expect(result.fileSize).toBe(1024);
     expect(Buffer.isBuffer(result.contentBuffer)).toBe(true);
   });
 });

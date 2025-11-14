@@ -39,6 +39,7 @@ describe('AspxProcessingStep', () => {
     startTime: new Date(),
     knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/test/test.aspx',
     mimeType: 'application/octet-stream',
+    scopeId: 'scope-1',
     pipelineItem: {
       itemType: 'listItem' as const,
       item: mockListItem,

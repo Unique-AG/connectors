@@ -23,12 +23,19 @@ export class AspxProcessingStep implements IPipelineStep {
     try {
       const htmlContent = this.buildHtmlContent(context, context.pipelineItem.item);
       context.contentBuffer = Buffer.from(htmlContent, 'utf-8');
+      context.fileSize = context.contentBuffer.length;
       context.mimeType = 'text/html';
 
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] ASPX processing failed: ${message}`);
+      this.logger.error({
+        msg: 'ASPX processing failed',
+        correlationId: context.correlationId,
+        itemId: context.pipelineItem.item.id,
+        siteId: context.pipelineItem.siteId,
+        error: message,
+      });
       throw error;
     }
   }

@@ -1,5 +1,5 @@
 > [!WARNING]
-> This module is **EXPERIMENTAL**. Unique reserves the right to move, breakingly refactor, or deprecate the module at any stage without notice.
+> This module is **ALPHA**. Unique reserves the right to move, breakingly refactor, or deprecate the module at any stage without notice.
 
 This module might also eventually evolve into (Unique-AG/terraform-modules)[https://github.com/Unique-AG/terraform-modules].
 
@@ -9,7 +9,7 @@ Clients and users are not required to use this module per se. Any means to creat
 
 ## Requirements
 
-- Module just creates the principal, the workload must be deployed separately.
+- Module just creates the principal and associated resources, the workload must be deployed separately.
 
 ## Setup steps
 It is not yet 100% clear how Azure resolves the permissions and assignments.

@@ -41,6 +41,7 @@ describe('FileFilterService', () => {
           ContentType: 'Dokument',
           AuthorLookupId: '1704',
           EditorLookupId: '1704',
+          FileSizeDisplay: '12345',
           ItemChildCount: '0',
           FolderChildCount: '0',
         },

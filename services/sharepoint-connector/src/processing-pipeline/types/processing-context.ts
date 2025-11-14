@@ -5,11 +5,11 @@ export interface ProcessingContext {
   correlationId: string;
   pipelineItem: SharepointContentItem;
   knowledgeBaseUrl: string;
+  scopeId: string;
   uploadUrl?: string;
   uniqueContentId?: string;
   contentBuffer?: Buffer;
   fileSize?: number;
-
   startTime: Date;
   mimeType?: string;
   registrationResponse?: IngestionApiResponse;

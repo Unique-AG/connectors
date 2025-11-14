@@ -87,6 +87,7 @@ export class GraphApiService {
     const sharepointContentFilesToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
     let totalScanned = 0;
+    const LOG_INTERVAL = 20;
 
     if (maxFilesToScan) {
       this.logger.warn(`File scan limit set to ${maxFilesToScan} files for testing purpose.`);
@@ -118,6 +119,13 @@ export class GraphApiService {
       sharepointContentFilesToSync.push(...items);
       sharepointDirectoryItemsToSync.push(...directories);
       totalScanned += items.length;
+
+      // Log progress every 20 files
+      if (totalScanned % LOG_INTERVAL === 0) {
+        this.logger.log(
+          `Scanning in progress for site ${siteId}: ${totalScanned} files scanned so far`,
+        );
+      }
 
       // Stop scanning if we've reached the limit for testing
       if (maxFilesToScan && totalScanned >= maxFilesToScan) {
@@ -158,7 +166,13 @@ export class GraphApiService {
       }
       return Buffer.concat(chunks);
     } catch (error) {
-      this.logger.error(`Failed to download file content for item ${itemId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to download file content for item ${itemId}: ${normalizedError.message}`,
+        itemId,
+        driveId,
+        error,
+      });
       throw error;
     }
   }
@@ -204,7 +218,11 @@ export class GraphApiService {
 
       return allLists;
     } catch (error) {
-      this.logger.error(`Failed to fetch lists for site ${siteId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to fetch lists for site ${siteId}: ${normalizedError.message}`,
+        error,
+      });
       throw error;
     }
   }
@@ -250,7 +268,11 @@ export class GraphApiService {
       this.logger.log(`Found ${aspxItems.length} ASPX files in SitePages list`);
       return aspxItems;
     } catch (error) {
-      this.logger.error(`Failed to fetch ASPX files from SitePages list ${listId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to fetch ASPX files from SitePages list ${listId}: ${normalizedError.message}`,
+        error,
+      });
       throw error;
     }
   }
@@ -279,7 +301,11 @@ export class GraphApiService {
         title: response.fields.Title,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch site page content for item ${itemId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to fetch site page content for item ${itemId}: ${normalizedError.message}`,
+        error,
+      });
       throw error;
     }
   }
@@ -344,7 +370,11 @@ export class GraphApiService {
 
       return site.webUrl;
     } catch (error) {
-      this.logger.error(`Failed to fetch site info for ${siteId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to fetch site info for ${siteId}: ${normalizedError.message}`,
+        error,
+      });
       throw error;
     }
   }
@@ -360,7 +390,11 @@ export class GraphApiService {
 
       return allDrives;
     } catch (error) {
-      this.logger.error(`Failed to fetch drives for site ${siteId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to fetch drives for site ${siteId}: ${normalizedError.message}`,
+        error,
+      });
       throw error;
     }
   }
@@ -381,7 +415,9 @@ export class GraphApiService {
       for (const driveItem of allItems) {
         // Check if we've reached the file limit for local testing
         if (maxFiles && sharepointContentItemsToSync.length >= maxFiles) {
-          this.logger.warn(`Reached file limit of ${maxFiles}, stopping scan in ${itemId}`);
+          this.logger.warn(
+            `Reached file limit of ${maxFiles}, stopping scan in drive ${driveId}, item ${itemId} for site ${siteId}`,
+          );
           break;
         }
 
@@ -435,7 +471,10 @@ export class GraphApiService {
       this.logger.error(
         `Failed to fetch items for drive ${driveId}, item ${itemId}: ${normalizeError(error).message}`,
       );
-      this.logger.warn(`Continuing scan with results collected so far from ${itemId}`);
+
+      this.logger.warn(
+        `Continuing scan with results collected so far from drive ${driveId}, item ${itemId} for site ${siteId}`,
+      );
       return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
     }
   }

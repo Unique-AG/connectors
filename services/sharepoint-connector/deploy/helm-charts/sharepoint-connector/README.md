@@ -68,7 +68,7 @@ spec:
 | connector.envVars[0] | object | `{"name":"UNIQUE_ZITADEL_CLIENT_SECRET","valueFrom":{"secretKeyRef":{"key":"UNIQUE_ZITADEL_CLIENT_SECRET","name":"sharepoint-connector-secret"}}}` | loading of Zitadel Secret, Users can supersede this with their own secret that contains UNIQUE_ZITADEL_CLIENT_SECRET or use https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load completely arbitrary secret mappings. See also below in connectorConfig.unique.zitadel.clientSecret. |
 | connector.extraEnvCM[0] | string | `"sharepoint-connector-config"` |  |
 | connector.image.repository | string | `"ghcr.io/unique-ag/connectors/services/sharepoint-connector"` |  |
-| connector.image.tag | string | `"2.0.0-alpha.11"` |  |
+| connector.image.tag | string | `"2.0.0-alpha.12"` |  |
 | connector.networkPolicy.egress | string | `nil` |  |
 | connector.networkPolicy.enabled | bool | `true` |  |
 | connector.networkPolicy.policyTypes[0] | string | `"Ingress"` |  |
@@ -105,9 +105,9 @@ spec:
 | connectorConfig.unique.authMode | string | `"cluster_local"` | communication mode for the Unique Services possible values: cluster_local, external cluster_local: comunicates using in-cluster URLs and requires no authentication external: communicates using external URLs and requires authentication via Zitadel |
 | connectorConfig.unique.fileDiffUrl | string | `"unset_default_value"` | url for the file diff example: https://api.unique.app/ingestion/v1/content/file-diff |
 | connectorConfig.unique.ingestionGraphqlUrl | string | `"unset_default_value"` | url for the ingestion graphql TODO: should use only public urls! example: https://api.unique.app/ingestion/graphql |
-| connectorConfig.unique.rootScopeName | string | `nil` | name of the root scope/folder in the knowledge base where SharePoint content should be synced example: SharePoint Content |
+| connectorConfig.unique.rootScopeName | string | `nil` | name of the root scope/folder in the knowledge base where SharePoint content should be synced (for recursive mode). It will be created by the connector. If this scope name already exists and the service-user does not have read+write access to it it will fail. example: SharePoint Content |
 | connectorConfig.unique.scopeId | string | `nil` | scope id for the scope based ingestion example: scope_bu4gokr0atzj0kfiuaaaaaaa |
-| connectorConfig.unique.scopeManagementGraphqlUrl | string | `"unset_default_value"` | url for the scope management graphql |
+| connectorConfig.unique.scopeManagementGraphqlUrl | string | `"unset_default_value"` | url for the scope management graphql example: https://api.unique.app/scope-management/graphql |
 | connectorConfig.unique.serviceExtraHeaders | object | `{}` | Object containing extra HTTP headers for ingestion API requests (GraphQL and file diff) Used for service-to-service authentication when using internal cluster URLs |
 | connectorConfig.unique.zitadel.projectId | string | `"unset_default_value"` | project id for the zitadel project example: 225317577440629999 |
 | connectorConfig.unique.zitadel.serviceExtraHeaders | object | `{}` | Object containing extra HTTP headers for Zitadel OAuth requests |

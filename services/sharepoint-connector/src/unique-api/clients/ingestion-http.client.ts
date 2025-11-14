@@ -52,7 +52,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
       } catch (error) {
         this.logger.error({
           msg: `Failed ingestion HTTP request: ${normalizeError(error).message}`,
-          err: error,
+          error,
         });
         throw error;
       }

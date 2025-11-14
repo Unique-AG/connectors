@@ -39,17 +39,20 @@ export class ProcessingPipelineService {
       this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
   }
 
-  public async processItem(pipelineItem: SharepointContentItem): Promise<PipelineResult> {
+  public async processItem(
+    pipelineItem: SharepointContentItem,
+    scopeId: string,
+  ): Promise<PipelineResult> {
     const startTime = new Date();
     const correlationId = randomUUID();
-    const rootScopeName = this.configService.get('unique.rootScopeName', { infer: true });
 
     const context: ProcessingContext = {
       correlationId,
       pipelineItem,
       startTime,
-      knowledgeBaseUrl: getItemUrl(pipelineItem, rootScopeName),
+      knowledgeBaseUrl: getItemUrl(pipelineItem),
       mimeType: this.resolveMimeType(pipelineItem),
+      scopeId,
     };
 
     this.logger.log(

@@ -57,7 +57,7 @@ export class UniqueGraphqlClient {
       } catch (error) {
         this.logger.error({
           msg: `Failed ${this.clientTarget} request: ${normalizeError(error).message}`,
-          err: error,
+          error,
         });
         throw error;
       }
