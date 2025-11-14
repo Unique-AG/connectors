@@ -122,7 +122,7 @@ export function extractFolderPathFromUrl(fileUrl: string): string {
 
   // Remove filename (last segment after last slash)
   const lastSlashIndex = path.lastIndexOf('/');
-  if (lastSlashIndex > 0) {
+  if (lastSlashIndex !== -1) {
     const folderPath = path.substring(0, lastSlashIndex);
     assert(folderPath, 'Folder path is empty');
     path = folderPath;
