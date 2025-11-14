@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-alpha.13](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.12...sharepoint-connector@v2.0.0-alpha.13) (2025-11-14)
+
+
+### Features
+
+* **sharepoint-connector:** implement path based ingestion by manually creating the scopes and ingesting by scopeId ([#91](https://github.com/Unique-AG/connectors/issues/91)) ([3652046](https://github.com/Unique-AG/connectors/commit/365204691d61e94896a47908c79d91ccdfa3b937))
+
 ## [2.0.0-alpha.12](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.11...sharepoint-connector@v2.0.0-alpha.12) (2025-11-13)
 
 
