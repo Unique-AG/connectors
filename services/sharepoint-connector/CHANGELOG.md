@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0-alpha.12](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.11...sharepoint-connector@v2.0.0-alpha.12) (2025-11-13)
+
+
+### Features
+
+* **sharepoint-connector:** added drive id to logs ([#103](https://github.com/Unique-AG/connectors/issues/103)) ([241a923](https://github.com/Unique-AG/connectors/commit/241a92376cdd0aa7d2d99845f6e911b2725f32e6))
+* **sharepoint-connector:** allow auto-creating key and certificate ([#104](https://github.com/Unique-AG/connectors/issues/104)) ([0bb5b95](https://github.com/Unique-AG/connectors/commit/0bb5b95326cbd5b763bea2beb81664f8d7bf525a))
+* **sharepoint-connector:** implement groups syncing from SharePoint to Unique ([#93](https://github.com/Unique-AG/connectors/issues/93)) ([1d94465](https://github.com/Unique-AG/connectors/commit/1d94465dcede85dad3e3a6c962c2c3ef90c3c60a))
+* **sharepoint-connector:** support for Unique API auth modes ([#101](https://github.com/Unique-AG/connectors/issues/101)) ([743999e](https://github.com/Unique-AG/connectors/commit/743999edb48554a8378a43b822a1a6c2e2aa4e48))
+* **sharepoint-connector:** UniqueFilesService simple implementation ([#102](https://github.com/Unique-AG/connectors/issues/102)) ([974d778](https://github.com/Unique-AG/connectors/commit/974d7788ba3b5e23bb60dc678f291168ee043ef6))
+
 ## [2.0.0-alpha.11](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.10...sharepoint-connector@v2.0.0-alpha.11) (2025-11-09)
 
 
