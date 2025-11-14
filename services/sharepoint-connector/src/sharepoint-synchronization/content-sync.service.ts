@@ -124,7 +124,7 @@ export class ContentSyncService {
     }
 
     this.logger.log(
-      `${logPrefix} Completed deletion processing: ${totalDeleted} content items deleted for ${deletedFileKeys.length} deleted files`,
+      `${logPrefix} Completed file deletion in Unique: ${totalDeleted}/${deletedFileKeys.length} files deleted files`,
     );
   }
 }
