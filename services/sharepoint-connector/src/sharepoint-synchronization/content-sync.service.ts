@@ -13,6 +13,7 @@ import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
+import {normalizeError} from "../utils/normalize-error";
 
 @Injectable()
 export class ContentSyncService {
@@ -101,8 +102,9 @@ export class ContentSyncService {
       // Get content that matches the exact keys
       filesToDelete = await this.uniqueFilesService.getFilesByKeys(fullKeys);
     } catch (error) {
-      this.logger.error(`${logPrefix} File deleted: ${error}`);
-      throw error;
+      const normalizedError = normalizeError(error);
+      this.logger.error(`${logPrefix} Failed to get content for deleted files, cannot delete ${ deletedFileKeys.length } ingested files ${normalizedError.message}`);
+      return;
     }
 
     // Delete each file
