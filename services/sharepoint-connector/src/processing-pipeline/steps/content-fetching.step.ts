@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
-import type { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -42,8 +41,8 @@ export class ContentFetchingStep implements IPipelineStep {
 
       const content = canvasContent || wikiField || '';
       context.contentBuffer = Buffer.from(content, 'utf-8');
-      // Get file size using unified helper
-      context.fileSize = this.getFileSize(context.pipelineItem.item);
+      // Use content buffer length for list items
+      context.fileSize = context.contentBuffer.length;
 
       return context;
     } catch (error) {
@@ -66,23 +65,13 @@ export class ContentFetchingStep implements IPipelineStep {
       );
 
       context.contentBuffer = contentBuffer;
-      context.fileSize = this.getFileSize(item);
+      context.fileSize = item.size;
 
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
       this.logger.error(`[${context.correlationId}] Content fetching failed: ${message}`);
       throw error;
-    }
-  }
-
-  private getFileSize(item: SharepointContentItem['item']): number {
-    if ('size' in item) {
-      // DriveItem has direct size property
-      return item.size;
-    } else {
-      // ListItem has FileSizeDisplay in fields
-      return parseInt(item.fields.FileSizeDisplay, 10);
     }
   }
 

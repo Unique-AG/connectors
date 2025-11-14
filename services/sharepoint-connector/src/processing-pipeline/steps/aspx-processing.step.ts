@@ -23,8 +23,7 @@ export class AspxProcessingStep implements IPipelineStep {
     try {
       const htmlContent = this.buildHtmlContent(context, context.pipelineItem.item);
       context.contentBuffer = Buffer.from(htmlContent, 'utf-8');
-      const item = context.pipelineItem.item;
-      context.fileSize = parseInt(item.fields.FileSizeDisplay, 10);
+      context.fileSize = context.contentBuffer.length;
       context.mimeType = 'text/html';
 
       return context;
