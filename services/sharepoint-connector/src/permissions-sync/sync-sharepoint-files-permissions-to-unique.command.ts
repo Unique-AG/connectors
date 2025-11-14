@@ -137,13 +137,15 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
         granteeType && entityId && accessModifier,
         `Invalid file access key: ${fileAccessKey}`,
       );
+
+      const accessType =
+        ({ r: 'READ', w: 'WRITE', m: 'MANAGE' } as const)[accessModifier.toLowerCase()] ??
+        assert.fail(`Invalid access modifier: ${accessModifier} in key ${fileAccessKey}`);
       return {
         contentId: uniqueFile.id,
-        accessType:
-          ({ R: 'READ', W: 'WRITE', M: 'MANAGE' } as const)[accessModifier] ??
-          assert.fail(`Invalid access modifier: ${accessModifier}`),
+        accessType,
         entityId,
-        entityType: granteeType === 'u' ? 'USER' : 'GROUP',
+        entityType: granteeType.toLowerCase() === 'u' ? 'USER' : 'GROUP',
       };
     });
   }

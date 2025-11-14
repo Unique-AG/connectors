@@ -39,8 +39,9 @@ export class FetchGraphPermissionsMapQuery {
         directory: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
       };
 
+      const sharePointPermissions = await permissionsFetcher[item.itemType]();
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
-        await permissionsFetcher[item.itemType](),
+        sharePointPermissions,
         siteName,
       );
     }
