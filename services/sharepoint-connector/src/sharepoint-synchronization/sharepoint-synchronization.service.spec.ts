@@ -71,7 +71,7 @@ describe('SharepointSynchronizationService', () => {
 
   beforeEach(async () => {
     mockGraphApiService = {
-      getAllSiteItems: vi.fn().mockResolvedValue([mockFile]),
+      getAllSiteItems: vi.fn().mockResolvedValue({ items: [mockFile], directories: [] }),
     };
 
     mockContentSyncService = {
@@ -126,7 +126,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('skips site when no items found', async () => {
-    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([]);
+    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue({ items: [], directories: [] });
 
     await service.synchronize();
 
@@ -137,7 +137,10 @@ describe('SharepointSynchronizationService', () => {
     mockGraphApiService.getAllSiteItems = vi
       .fn()
       .mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve([mockFile]), 100)),
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ items: [mockFile], directories: [] }), 100),
+          ),
       );
 
     const firstScan = service.synchronize();
@@ -159,7 +162,7 @@ describe('SharepointSynchronizationService', () => {
     mockGraphApiService.getAllSiteItems = vi
       .fn()
       .mockRejectedValueOnce(new Error('API failure'))
-      .mockResolvedValue([mockFile]);
+      .mockResolvedValue({ items: [mockFile], directories: [] });
 
     try {
       await service.synchronize();
@@ -202,10 +205,11 @@ describe('SharepointSynchronizationService', () => {
 
     await unit.synchronize();
 
-    expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-      [mockFile],
-    );
+    expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
+      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      sharePoint: { items: [mockFile], directories: [] },
+      unique: { folders: [] },
+    });
   });
 
   it('skips permissions sync when disabled', async () => {
@@ -292,7 +296,9 @@ describe('SharepointSynchronizationService', () => {
       fileName: '2019-BMW-Maintenance.pdf',
     };
 
-    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([fileWithAllFields]);
+    mockGraphApiService.getAllSiteItems = vi
+      .fn()
+      .mockResolvedValue({ items: [fileWithAllFields], directories: [] });
 
     await service.synchronize();
 
@@ -354,7 +360,9 @@ describe('SharepointSynchronizationService', () => {
       fileName: '6034030.pdf',
     };
 
-    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([fileWithoutTimestamp]);
+    mockGraphApiService.getAllSiteItems = vi
+      .fn()
+      .mockResolvedValue({ items: [fileWithoutTimestamp], directories: [] });
 
     await service.synchronize();
 
@@ -518,7 +526,9 @@ describe('SharepointSynchronizationService', () => {
       fileName: '6034030.pdf',
     };
 
-    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue([file1, file2, file3]);
+    mockGraphApiService.getAllSiteItems = vi
+      .fn()
+      .mockResolvedValue({ items: [file1, file2, file3], directories: [] });
 
     await service.synchronize();
 

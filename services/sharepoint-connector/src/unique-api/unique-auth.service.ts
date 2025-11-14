@@ -26,13 +26,8 @@ export class UniqueAuthService {
       'UniqueAuthService called but serviceAuthMode is not "external"',
     );
 
-    const {
-      zitadelOauthTokenUrl,
-      zitadelClientId,
-      zitadelClientSecret,
-      zitadelProjectId,
-      zitadelServiceExtraHeaders,
-    } = uniqueConfig;
+    const { zitadelOauthTokenUrl, zitadelClientId, zitadelClientSecret, zitadelProjectId } =
+      uniqueConfig;
 
     const params = new URLSearchParams({
       scope:
@@ -48,7 +43,6 @@ export class UniqueAuthService {
       const { statusCode, body } = await request(zitadelOauthTokenUrl, {
         method: 'POST',
         headers: {
-          ...zitadelServiceExtraHeaders,
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${basicAuth}`,
         },

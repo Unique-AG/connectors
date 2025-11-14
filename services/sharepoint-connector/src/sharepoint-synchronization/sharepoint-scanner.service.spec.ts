@@ -86,7 +86,9 @@ describe('SharepointSynchronizationService', () => {
         }),
       }))
       .mock(GraphApiService)
-      .impl(() => ({ getAllSiteItems: vi.fn().mockResolvedValue([mockFile]) }))
+      .impl(() => ({
+        getAllSiteItems: vi.fn().mockResolvedValue({ items: [mockFile], directories: [] }),
+      }))
       .mock(ContentSyncService)
       .impl(() => mockContentSyncService)
       .mock(PermissionsSyncService)

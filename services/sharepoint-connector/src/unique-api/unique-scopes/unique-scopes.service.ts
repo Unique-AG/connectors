@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ScopeManagementClient } from '../clients/scope-management.client';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   CREATE_SCOPE_ACCESSES_MUTATION,
   CreateScopeAccessesMutationInput,
@@ -16,7 +16,9 @@ import { Scope, ScopeAccess } from './unique-scopes.types';
 @Injectable()
 export class UniqueScopesService {
   private readonly logger = new Logger(this.constructor.name);
-  public constructor(private readonly scopeManagementClient: ScopeManagementClient) {}
+  public constructor(
+    @Inject(SCOPE_MANAGEMENT_CLIENT) private readonly scopeManagementClient: UniqueGraphqlClient,
+  ) {}
 
   public async createScopesBasedOnPaths(
     paths: string[],

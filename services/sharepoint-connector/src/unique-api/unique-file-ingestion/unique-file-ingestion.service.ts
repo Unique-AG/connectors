@@ -1,11 +1,11 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import { IngestionClient } from '../clients/ingestion.client';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
+import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import { getScopeIdForIngestion } from '../ingestion.util';
 import {
   CONTENT_UPSERT_MUTATION,
@@ -26,7 +26,7 @@ export class UniqueFileIngestionService {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly ingestionClient: IngestionClient,
+    @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
     private readonly ingestionHttpClient: IngestionHttpClient,
     private readonly configService: ConfigService<Config, true>,
   ) {}

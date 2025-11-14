@@ -6,29 +6,34 @@ import { Config } from '../../config';
 import { normalizeError } from '../../utils/normalize-error';
 import { UniqueAuthService } from '../unique-auth.service';
 
+export const INGESTION_CLIENT = Symbol('INGESTION_CLIENT');
+export const SCOPE_MANAGEMENT_CLIENT = Symbol('SCOPE_MANAGEMENT_CLIENT');
+
+export type UniqueGraphqlClientTarget = 'ingestion' | 'scopeManagement';
+
 @Injectable()
-export class ScopeManagementClient {
+export class UniqueGraphqlClient {
   private readonly logger = new Logger(this.constructor.name);
   private readonly graphQlClient: GraphQLClient;
   private readonly limiter: Bottleneck;
 
   public constructor(
+    private readonly clientTarget: UniqueGraphqlClientTarget,
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
   ) {
     const uniqueConfig = this.configService.get('unique', { infer: true });
-    this.graphQlClient = new GraphQLClient(uniqueConfig.scopeManagementGraphqlUrl, {
+    const graphqlUrl = uniqueConfig[`${clientTarget}GraphqlUrl`];
+
+    this.graphQlClient = new GraphQLClient(graphqlUrl, {
       requestMiddleware: async (request) => {
-        const clientExtraHeaders =
-          uniqueConfig.serviceAuthMode === 'cluster_local'
-            ? uniqueConfig.serviceExtraHeaders
-            : { Authorization: `Bearer ${await this.uniqueAuthService.getToken()}` };
+        const additionalHeaders = await this.getAdditionalHeaders();
 
         return {
           ...request,
           headers: {
             ...request.headers,
-            ...clientExtraHeaders,
+            ...additionalHeaders,
             'Content-Type': 'application/json',
           },
         };
@@ -50,13 +55,27 @@ export class ScopeManagementClient {
       try {
         return await callback(this.graphQlClient);
       } catch (error) {
-        // TODO: Test that this log provides enough info about which operation failed
         this.logger.error({
-          msg: `Failed scope management request: ${normalizeError(error).message}`,
+          msg: `Failed ${this.clientTarget} request: ${normalizeError(error).message}`,
           err: error,
         });
         throw error;
       }
     });
+  }
+
+  private async getAdditionalHeaders(): Promise<Record<string, string>> {
+    const uniqueConfig = this.configService.get('unique', { infer: true });
+    return uniqueConfig.serviceAuthMode === 'cluster_local'
+      ? {
+          'x-service-id': 'sharepoint-connector',
+          // We need this role because we need permissions added to some property resolves and that
+          // was unfortunately omitted when making last PR to adjust permissions.
+          // It is a temporary solution until we're sure that Unique API version we're working
+          // with has proper permissions set.
+          'x-user-roles': 'chat.admin.all',
+          ...uniqueConfig.serviceExtraHeaders,
+        }
+      : { Authorization: `Bearer ${await this.uniqueAuthService.getToken()}` };
   }
 }

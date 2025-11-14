@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { IngestionClient } from '../clients/ingestion.client';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   ADD_ACCESSES_MUTATION,
   AddAccessesMutationInput,
@@ -24,7 +24,9 @@ const BATCH_SIZE = 100;
 @Injectable()
 export class UniqueFilesService {
   private readonly logger = new Logger(this.constructor.name);
-  public constructor(private readonly ingestionClient: IngestionClient) {}
+  public constructor(
+    @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
+  ) {}
 
   public async moveFile(
     contentId: string,

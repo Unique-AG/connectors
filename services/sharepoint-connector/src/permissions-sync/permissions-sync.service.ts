@@ -12,7 +12,6 @@ import { elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
 import { SyncSharepointFilesPermissionsToUniqueCommand } from './sync-sharepoint-files-permissions-to-unique.command';
-import { SyncSharepointFolderPermissionsToUniqueCommand } from './sync-sharepoint-folder-permissions-to-unique.command';
 import { SyncSharepointGroupsToUniqueCommand } from './sync-sharepoint-groups-to-unique.command';
 import { UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
@@ -37,7 +36,6 @@ export class PermissionsSyncService {
     private readonly fetchGroupsWithMembershipsQuery: FetchGroupsWithMembershipsQuery,
     private readonly syncSharepointGroupsToUniqueCommand: SyncSharepointGroupsToUniqueCommand,
     private readonly syncSharepointFilesPermissionsToUniqueCommand: SyncSharepointFilesPermissionsToUniqueCommand,
-    private readonly _syncSharepointFolderPermissionsToUniqueCommand: SyncSharepointFolderPermissionsToUniqueCommand,
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly uniqueUsersService: UniqueUsersService,
   ) {}

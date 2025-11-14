@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { pick, prop } from 'remeda';
-import { ScopeManagementClient } from '../clients/scope-management.client';
+import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   ADD_GROUP_MEMBERS_MUTATION,
   AddGroupMembersMutationInput,
@@ -30,7 +30,9 @@ const BATCH_SIZE = 100;
 @Injectable()
 export class UniqueGroupsService {
   private readonly logger = new Logger(this.constructor.name);
-  public constructor(private readonly scopeManagementClient: ScopeManagementClient) {}
+  public constructor(
+    @Inject(SCOPE_MANAGEMENT_CLIENT) private readonly scopeManagementClient: UniqueGraphqlClient,
+  ) {}
 
   public async listAllGroups(): Promise<UniqueGroup[]> {
     this.logger.log('Requesting all groups from Unique API');

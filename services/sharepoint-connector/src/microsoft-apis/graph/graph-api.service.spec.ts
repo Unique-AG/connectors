@@ -157,22 +157,30 @@ describe('GraphApiService', () => {
 
     it('finds syncable files across multiple drives', async () => {
       vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockSharepointContentItem]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
+        items: [mockSharepointContentItem],
+        directories: [],
+      });
 
-      const files = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1');
 
-      expect(files).toHaveLength(1);
+      expect(result.items).toHaveLength(1);
+      expect(result.directories).toHaveLength(0);
       expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
       expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
 
     it('skips drives without IDs', async () => {
       vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockSharepointContentItem]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
+        items: [mockSharepointContentItem],
+        directories: [],
+      });
 
-      const files = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1');
 
-      expect(files).toHaveLength(1);
+      expect(result.items).toHaveLength(1);
+      expect(result.directories).toHaveLength(0);
       expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
       expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
@@ -186,11 +194,15 @@ describe('GraphApiService', () => {
       };
 
       vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([mockEnrichedSitePage]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([file2]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
+        items: [file2],
+        directories: [],
+      });
 
-      const files = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1');
 
-      expect(files).toHaveLength(2);
+      expect(result.items).toHaveLength(2);
+      expect(result.directories).toHaveLength(0);
       expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
       expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
@@ -201,20 +213,28 @@ describe('GraphApiService', () => {
         .mockReturnValue(false) as unknown as FileFilterService['isFileValidForIngestion'];
 
       vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
+        items: [],
+        directories: [],
+      });
 
-      const files = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1');
 
-      expect(files).toHaveLength(0);
+      expect(result.items).toHaveLength(0);
+      expect(result.directories).toHaveLength(0);
     });
 
     it('recursively scans folders', async () => {
       vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockSharepointContentItem]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
+        items: [mockSharepointContentItem],
+        directories: [],
+      });
 
-      const files = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1');
 
-      expect(files).toHaveLength(1);
+      expect(result.items).toHaveLength(1);
+      expect(result.directories).toHaveLength(0);
       expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
       expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
     });
@@ -227,15 +247,19 @@ describe('GraphApiService', () => {
         ) as unknown as FileFilterService['isFileValidForIngestion'];
 
       vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue([mockSharepointContentItem]);
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
+        items: [mockSharepointContentItem],
+        directories: [],
+      });
 
-      const files = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1');
 
-      expect(files).toHaveLength(1);
-      expect(files[0]).toBeDefined();
-      if (files[0]) {
-        expect(files[0].itemType === 'driveItem').toBe(true);
-        expect((files[0].item as DriveItem).name).toBe('test.pdf');
+      expect(result.items).toHaveLength(1);
+      expect(result.directories).toHaveLength(0);
+      expect(result.items[0]).toBeDefined();
+      if (result.items[0]) {
+        expect(result.items[0].itemType === 'driveItem').toBe(true);
+        expect((result.items[0].item as DriveItem).name).toBe('test.pdf');
       }
     });
   });
