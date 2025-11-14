@@ -138,6 +138,7 @@ export interface DriveItemFields {
   ContentType: string;
   AuthorLookupId: string;
   EditorLookupId: string;
+  FileSizeDisplay: string;
   ItemChildCount: string;
   FolderChildCount: string;
   [key: string]: unknown;

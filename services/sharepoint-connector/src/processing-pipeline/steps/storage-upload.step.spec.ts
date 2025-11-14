@@ -43,6 +43,7 @@ describe('StorageUploadStep', () => {
           ContentType: 'Document',
           AuthorLookupId: '1',
           EditorLookupId: '1',
+          FileSizeDisplay: '12345',
           ItemChildCount: '0',
           FolderChildCount: '0',
         },
@@ -54,6 +55,7 @@ describe('StorageUploadStep', () => {
       startTime: new Date(),
       knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
       mimeType: 'application/pdf',
+      scopeId: 'scope-1',
       pipelineItem: {
         itemType: 'driveItem',
         item: driveItem,

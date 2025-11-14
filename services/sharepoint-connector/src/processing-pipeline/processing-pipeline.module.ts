@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MicrosoftApisModule } from '../microsoft-apis/microsoft-apis.module';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
-import { FileProcessingOrchestratorService } from './file-processing-orchestrator.service';
+import { ItemProcessingOrchestratorService } from './item-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -14,13 +14,13 @@ import { StorageUploadStep } from './steps/storage-upload.step';
   imports: [ConfigModule, MicrosoftApisModule, UniqueApiModule],
   providers: [
     ProcessingPipelineService,
-    FileProcessingOrchestratorService,
+    ItemProcessingOrchestratorService,
     ContentFetchingStep,
     AspxProcessingStep,
     ContentRegistrationStep,
     StorageUploadStep,
     IngestionFinalizationStep,
   ],
-  exports: [ProcessingPipelineService, FileProcessingOrchestratorService],
+  exports: [ProcessingPipelineService, ItemProcessingOrchestratorService],
 })
 export class ProcessingPipelineModule {}

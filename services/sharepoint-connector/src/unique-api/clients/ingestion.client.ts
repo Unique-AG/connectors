@@ -50,10 +50,9 @@ export class IngestionClient {
       try {
         return await callback(this.graphQlClient);
       } catch (error) {
-        // TODO: Test that this log provides enough info about which operation failed
         this.logger.error({
           msg: `Failed ingestion request: ${normalizeError(error).message}`,
-          err: error,
+          error,
         });
         throw error;
       }

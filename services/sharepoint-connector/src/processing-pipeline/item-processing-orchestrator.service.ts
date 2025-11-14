@@ -3,12 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { FileDiffResponse } from '../unique-api/unique-file-ingestion/unique-file-ingestion.types';
-import { buildFileDiffKey } from '../utils/sharepoint.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
 @Injectable()
-export class FileProcessingOrchestratorService {
+export class ItemProcessingOrchestratorService {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
@@ -16,30 +14,26 @@ export class FileProcessingOrchestratorService {
     private readonly processingPipelineService: ProcessingPipelineService,
   ) {}
 
-  public async processSiteItems(
+  public async processItems(
     siteId: string,
     items: SharepointContentItem[],
-    diffResult: FileDiffResponse,
+    getScopeIdForItem: (itemId: string) => string,
   ): Promise<void> {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
 
-    const newFileKeys = new Set(diffResult.newAndUpdatedFiles);
-    const filteredItems = items.filter((item) => {
-      const key = buildFileDiffKey(item);
-      return newFileKeys.has(key);
-    });
-    if (filteredItems.length === 0) {
-      this.logger.log(`No files to process for site ${siteId}`);
+    if (items.length === 0) {
+      this.logger.log(`No items to process for site ${siteId}`);
       return;
     }
 
-    this.logger.log(`Processing ${filteredItems.length} files for site ${siteId}`);
+    this.logger.log(`Processing ${items.length} items for site ${siteId}`);
 
     const results = await Promise.allSettled(
-      filteredItems.map((item) =>
+      items.map((item) =>
         limit(async () => {
-          await this.processingPipelineService.processItem(item);
+          const scopeId = getScopeIdForItem(item.item.id);
+          await this.processingPipelineService.processItem(item, scopeId);
         }),
       ),
     );

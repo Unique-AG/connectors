@@ -41,6 +41,7 @@ export class ContentFetchingStep implements IPipelineStep {
 
       const content = canvasContent || wikiField || '';
       context.contentBuffer = Buffer.from(content, 'utf-8');
+      // Use content buffer length for list items
       context.fileSize = context.contentBuffer.length;
 
       return context;
@@ -71,7 +72,7 @@ export class ContentFetchingStep implements IPipelineStep {
       );
 
       context.contentBuffer = contentBuffer;
-      context.fileSize = contentBuffer.length;
+      context.fileSize = item.size;
 
       return context;
     } catch (error) {

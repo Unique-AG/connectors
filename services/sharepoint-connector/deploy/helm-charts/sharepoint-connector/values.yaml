@@ -128,11 +128,12 @@ connectorConfig:
     # example: https://api.unique.app/ingestion/graphql
     ingestionGraphqlUrl: unset_default_value
     # -- url for the scope management graphql
+    # example: https://api.unique.app/scope-management/graphql
     scopeManagementGraphqlUrl: unset_default_value
     # flat: sync all files to a single root scope/folder
     # recursive: maintain the folder hierarchy
     ingestionMode: recursive
-    # -- name of the root scope/folder in the knowledge base where SharePoint content should be synced
+    # -- name of the root scope/folder in the knowledge base where SharePoint content should be synced (for recursive mode). It will be created by the connector. If this scope name already exists and the service-user does not have read+write access to it it will fail.
     # example: SharePoint Content
     rootScopeName: null
     # -- scope id for the scope based ingestion
