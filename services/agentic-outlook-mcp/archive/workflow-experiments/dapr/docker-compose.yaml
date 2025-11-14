@@ -8,7 +8,8 @@
 # 9012 - litellm
 # 9013 - qdrant rest
 # 9014 - qdrant grpc
-# 9015 - temporal
+# 50005 - dapr-placement
+# 50006 - dapr-scheduler
 name: connectors-monorepo
 services:
   traefik:
@@ -129,24 +130,6 @@ services:
       - traefik.http.routers.otlp.rule=Host(`otlp.localhost`)
       - traefik.http.routers.otlp.service=otlp
       - traefik.http.services.otlp.loadbalancer.server.port=4318
-
-  rabbitmq:
-    image: rabbitmq:4-management
-    restart: always
-    volumes:
-      - rabbitmq:/var/lib/rabbitmq
-    ports:
-      - '9005:5672'   # AMQP
-      - '9006:15672'  # Management UI
-    environment:
-      RABBITMQ_DEFAULT_USER: rabbitmq
-      RABBITMQ_DEFAULT_PASS: rabbitmq
-    healthcheck:
-      test: ['CMD-SHELL', 'rabbitmq-diagnostics check_running']
-      interval: '10s'
-      timeout: '30s'
-      retries: 5
-      start_period: '20s'
 
   minio:
     image: minio/minio
@@ -281,45 +264,25 @@ services:
       - traefik.http.routers.qdrant.service=qdrant
       - traefik.http.services.qdrant.loadbalancer.server.port=6333
 
-  temporal:
-    container_name: temporal
-    depends_on:
-      - postgres
-    environment:
-      - DB=postgres12
-      - DB_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PWD=postgres
-      - POSTGRES_SEEDS=postgres
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
-      - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_CLI_ADDRESS=temporal:7233
-    image: temporalio/auto-setup:1.29.1
+  dapr-placement:
+    image: "daprio/placement"
+    command: ["./placement"]
     ports:
-      - 7233:7233
-    volumes:
-      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
+      - "50005:50005"
 
-  temporal-ui:
-    container_name: temporal-ui
-    depends_on:
-      - temporal
-    environment:
-      - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_CORS_ORIGINS=http://temporal.localhost
-    image: temporalio/ui:2.34.0
+  dapr-scheduler:
+    image: "daprio/scheduler"
+    command: ["./scheduler", "--override-broadcast-host-port", "localhost:50006", "--etcd-data-dir", "/data"]
     ports:
-      - 9015:8080
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.temporal-ui.rule=Host(`temporal.localhost`)
-      - traefik.http.routers.temporal-ui.service=temporal-ui
-      - traefik.http.services.temporal-ui.loadbalancer.server.port=8080
+      - "50006:50006"
+    user: root
+    volumes:
+      - dapr-etcd-data:/data
 
 volumes:
   postgres:
-  rabbitmq:
   redis:
+  rabbitmq:
   minio:
   qdrant:
   clickhouse_data:
