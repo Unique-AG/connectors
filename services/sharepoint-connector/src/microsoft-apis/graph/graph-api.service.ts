@@ -158,7 +158,7 @@ export class GraphApiService {
       const normalizedError = normalizeError(error);
       this.logger.error({
         msg: `Failed to download file content for item ${itemId}: ${normalizedError.message}`,
-        err: error,
+        error,
       });
       throw error;
     }
@@ -208,7 +208,7 @@ export class GraphApiService {
       const normalizedError = normalizeError(error);
       this.logger.error({
         msg: `Failed to fetch lists for site ${siteId}: ${normalizedError.message}`,
-        err: error,
+        error,
       });
       throw error;
     }
@@ -258,7 +258,7 @@ export class GraphApiService {
       const normalizedError = normalizeError(error);
       this.logger.error({
         msg: `Failed to fetch ASPX files from SitePages list ${listId}: ${normalizedError.message}`,
-        err: error,
+        error,
       });
       throw error;
     }
@@ -291,7 +291,7 @@ export class GraphApiService {
       const normalizedError = normalizeError(error);
       this.logger.error({
         msg: `Failed to fetch site page content for item ${itemId}: ${normalizedError.message}`,
-        err: error,
+        error,
       });
       throw error;
     }
@@ -360,7 +360,7 @@ export class GraphApiService {
       const normalizedError = normalizeError(error);
       this.logger.error({
         msg: `Failed to fetch site info for ${siteId}: ${normalizedError.message}`,
-        err: error,
+        error,
       });
       throw error;
     }
@@ -380,7 +380,7 @@ export class GraphApiService {
       const normalizedError = normalizeError(error);
       this.logger.error({
         msg: `Failed to fetch drives for site ${siteId}: ${normalizedError.message}`,
-        err: error,
+        error,
       });
       throw error;
     }

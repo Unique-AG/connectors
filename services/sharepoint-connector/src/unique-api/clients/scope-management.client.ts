@@ -52,7 +52,7 @@ export class ScopeManagementClient {
       } catch (error) {
         this.logger.error({
           msg: `Failed scope management request: ${normalizeError(error).message}`,
-          err: error,
+          error,
         });
         throw error;
       }

@@ -121,7 +121,7 @@ export class ContentSyncService {
       const normalizedError = normalizeError(error);
       this.logger.error({
         msg: `${logPrefix} Failed to get content for deleted files, cannot delete ${deletedFileKeys.length} ingested files: ${normalizedError.message}`,
-        err: error,
+        error,
       });
       return;
     }
@@ -136,7 +136,7 @@ export class ContentSyncService {
         const normalizedError = normalizeError(error);
         this.logger.error({
           msg: `${logPrefix} Failed to delete content ${file.key} (ID: ${file.id}): ${normalizedError.message}`,
-          err: error,
+          error,
         });
       }
     }

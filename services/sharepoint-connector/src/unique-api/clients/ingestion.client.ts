@@ -52,7 +52,7 @@ export class IngestionClient {
       } catch (error) {
         this.logger.error({
           msg: `Failed ingestion request: ${normalizeError(error).message}`,
-          err: error,
+          error,
         });
         throw error;
       }

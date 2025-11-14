@@ -41,7 +41,7 @@ export class FileMoveProcessor {
       const normalizedError = normalizeError(error);
       this.logger.error({
         msg: `${logPrefix} Failed to get ingested files by keys from unique: ${normalizedError.message}`,
-        err: error,
+        error,
       });
       throw error;
     }
@@ -61,7 +61,7 @@ export class FileMoveProcessor {
         const normalizedError = normalizeError(error);
         this.logger.error({
           msg: `${logPrefix} Failed to move file ${data.contentId}: ${normalizedError.message}`,
-          err: error,
+          error,
         });
       }
     }
@@ -101,7 +101,12 @@ export class FileMoveProcessor {
 
       // Get the new scopeId for the new location
       const newOwnerId = this.scopeManagementService.determineScopeForItem(sharepointItem, scopes);
-      if (!newOwnerId) continue;
+      if (!newOwnerId) {
+        this.logger.warn(
+          `${logPrefix} Could not determine scope for moved file with key: ${ingestedFile.key}`,
+        );
+        continue;
+      }
 
       const newUrl = getItemUrl(sharepointItem);
 

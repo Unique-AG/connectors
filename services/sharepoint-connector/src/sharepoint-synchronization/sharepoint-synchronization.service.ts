@@ -58,7 +58,7 @@ export class SharepointSynchronizationService {
         } catch (error) {
           this.logger.error({
             msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}. Skipping site.`,
-            err: error,
+            error,
           });
           continue;
         }
@@ -69,7 +69,7 @@ export class SharepointSynchronizationService {
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
-          err: error,
+          error,
         });
         continue;
       }
@@ -81,7 +81,7 @@ export class SharepointSynchronizationService {
         } catch (error) {
           this.logger.error({
             msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,
-            err: error,
+            error,
           });
         }
       }
