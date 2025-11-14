@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MicrosoftApisModule } from '../microsoft-apis/microsoft-apis.module';
-import { ScopeManagementService } from '../sharepoint-synchronization/scope-management.service';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ItemProcessingOrchestratorService } from './item-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
@@ -16,7 +15,6 @@ import { StorageUploadStep } from './steps/storage-upload.step';
   providers: [
     ProcessingPipelineService,
     ItemProcessingOrchestratorService,
-    ScopeManagementService,
     ContentFetchingStep,
     AspxProcessingStep,
     ContentRegistrationStep,

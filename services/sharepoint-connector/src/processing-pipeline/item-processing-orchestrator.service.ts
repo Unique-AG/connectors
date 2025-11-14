@@ -9,7 +9,7 @@ import { ProcessingPipelineService } from './processing-pipeline.service';
 
 @Injectable()
 export class ItemProcessingOrchestratorService {
-  private readonly logger = new Logger(ItemProcessingOrchestratorService.name);
+  private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
