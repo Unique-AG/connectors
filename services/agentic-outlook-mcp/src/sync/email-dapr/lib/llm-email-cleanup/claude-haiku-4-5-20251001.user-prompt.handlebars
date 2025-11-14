@@ -1,0 +1,42 @@
+Task: Clean the following email according to the system instructions and return the specified JSON.
+
+Context / Preferences
+- Organization phrases to treat as banners (optional, case-insensitive): {{{ORG_BANNER_PHRASES}}}
+- Known banner/security vendor domains: {{{KNOWN_DOMAINS}}}
+- Languages commonly seen: {{{LANGUAGES}}}
+
+Email Metadata
+- Subject: {{{EMAIL.SUBJECT}}}
+- From: {{{EMAIL.FROM}}}
+- To: {{{EMAIL.TO}}}
+- Date: {{{EMAIL.DATE}}}
+
+Raw Parts
+- Plain Text (if any):
+```
+{{{EMAIL.PLAIN_TEXT}}}
+```
+
+- HTML (if any):
+```html
+{{{EMAIL.HTML}}}
+```
+
+Deliverables
+- Return exactly one JSON object as specified by the system instructions ("clean_markdown", "clean_text", "removed_blocks", "meta").
+- Keep "clean_markdown" concise and semantically structured.
+- Ensure every removed block has a "type", "reason", "confidence", and short "excerpt".
+- If nothing is removed, return an empty "removed_blocks" array and explain in "meta.notes".
+
+Guidance Few-shot Examples (recognize and remove as banners)
+{{#each FEW_SHOT_BLOCKS}}
+### Few-shot {{@index}}: {{{this.name}}}
+Input HTML:
+```html
+{{{this.html}}}
+```
+Expected removal metadata (illustrative):
+```json
+{{{this.expect}}}
+```
+{{/each}}

@@ -1,3 +1,4 @@
+import { DaprWorkflowClient } from '@dapr/dapr';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Message } from '@microsoft/microsoft-graph-types';
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -75,6 +76,7 @@ export class EmailSyncService {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly emailService: EmailService,
+    private readonly workflowClient: DaprWorkflowClient,
   ) {}
 
   @OnEvent(EmailEvents.EmailFullSyncRequested)
@@ -263,6 +265,7 @@ export class EmailSyncService {
       const response: DeltaResponse = await graphClient.api(url).get();
 
       for (const message of response.value) {
+        let emailId: TypeID<'email'> | undefined;
         const isDeleted = (message as unknown as DeletedItem)['@removed'] !== undefined;
 
         if (isDeleted) {
@@ -276,19 +279,27 @@ export class EmailSyncService {
             foldersMap,
           });
 
-          const _emailId = await this.emailService.upsertEmail(
+          emailId = await this.emailService.upsertEmail(
             userProfileId,
             folder.id,
             mappedEmail,
           );
         }
 
-        // await this.amqpOrchestrator.startPipeline(
-        //   userProfileId.toString(),
-        //   folder.id,
-        //   emailId.toString(),
-        //   message,
-        // );
+        if (!emailId) throw new Error('Email ID not found');
+
+        const workflowId = await this.workflowClient.scheduleNewWorkflow(
+          'ingestWorkflow',
+          {
+            userProfileId: userProfileId.toString(),
+            emailId: emailId.toString(),
+          }
+        )
+
+        this.logger.debug({
+          msg: 'Ingest workflow scheduled',
+          workflowId,
+        });
 
         totalEmailsProcessed++;
       }
