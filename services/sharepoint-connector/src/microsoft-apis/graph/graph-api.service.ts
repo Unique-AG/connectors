@@ -155,7 +155,11 @@ export class GraphApiService {
       }
       return Buffer.concat(chunks);
     } catch (error) {
-      this.logger.error(`Failed to download file content for item ${itemId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to download file content for item ${itemId}: ${normalizedError.message}`,
+        err: error,
+      });
       throw error;
     }
   }
@@ -201,7 +205,11 @@ export class GraphApiService {
 
       return allLists;
     } catch (error) {
-      this.logger.error(`Failed to fetch lists for site ${siteId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to fetch lists for site ${siteId}: ${normalizedError.message}`,
+        err: error,
+      });
       throw error;
     }
   }
@@ -247,7 +255,11 @@ export class GraphApiService {
       this.logger.log(`Found ${aspxItems.length} ASPX files in SitePages list`);
       return aspxItems;
     } catch (error) {
-      this.logger.error(`Failed to fetch ASPX files from SitePages list ${listId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to fetch ASPX files from SitePages list ${listId}: ${normalizedError.message}`,
+        err: error,
+      });
       throw error;
     }
   }
@@ -276,7 +288,11 @@ export class GraphApiService {
         title: response.fields.Title,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch site page content for item ${itemId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to fetch site page content for item ${itemId}: ${normalizedError.message}`,
+        err: error,
+      });
       throw error;
     }
   }
@@ -341,7 +357,11 @@ export class GraphApiService {
 
       return site.webUrl;
     } catch (error) {
-      this.logger.error(`Failed to fetch site info for ${siteId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to fetch site info for ${siteId}: ${normalizedError.message}`,
+        err: error,
+      });
       throw error;
     }
   }
@@ -357,7 +377,11 @@ export class GraphApiService {
 
       return allDrives;
     } catch (error) {
-      this.logger.error(`Failed to fetch drives for site ${siteId}:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `Failed to fetch drives for site ${siteId}: ${normalizedError.message}`,
+        err: error,
+      });
       throw error;
     }
   }

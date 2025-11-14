@@ -36,7 +36,7 @@ export class ScopeManagementService {
    * @returns A deduplicated array of all parent paths (e.g., "/a", "/a/b").
    */
   public extractAllParentPaths(paths: string[]): string[] {
-    const allGeneratedPaths = paths.flatMap((path) => this.generatePathsFromSingleString(path));
+    const allGeneratedPaths = paths.flatMap((path) => this.generateAllSubpathsFromPath(path));
 
     const result = Array.from(new Set(allGeneratedPaths));
 
@@ -47,7 +47,7 @@ export class ScopeManagementService {
     return result;
   }
 
-  private generatePathsFromSingleString(path: string): string[] {
+  private generateAllSubpathsFromPath(path: string): string[] {
     const trimmedPath = path.trim();
 
     if (!trimmedPath) {
@@ -113,7 +113,7 @@ export class ScopeManagementService {
     items: SharepointContentItem[],
     scopes: Scope[],
   ): Map<string, string> {
-    const logPrefix = items[0]?.siteId || '';
+    const logPrefix = `[Site: ${items[0]?.siteId || ''}]`;
     const itemIdToScopeIdMap = new Map<string, string>();
     const rootScopeName = this.configService.get('unique.rootScopeName', {
       infer: true,

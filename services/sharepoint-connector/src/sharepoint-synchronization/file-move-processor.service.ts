@@ -3,6 +3,7 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
+import { normalizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { ScopeManagementService } from './scope-management.service';
 
@@ -37,7 +38,11 @@ export class FileMoveProcessor {
     try {
       ingestedFiles = await this.uniqueFilesService.getFilesByKeys(movedFileCompleteKeys);
     } catch (error) {
-      this.logger.error(`${logPrefix} Failed to get ingested files by keys from unique:`, error);
+      const normalizedError = normalizeError(error);
+      this.logger.error({
+        msg: `${logPrefix} Failed to get ingested files by keys from unique: ${normalizedError.message}`,
+        err: error,
+      });
       throw error;
     }
 
@@ -53,7 +58,11 @@ export class FileMoveProcessor {
         await this.uniqueFilesService.moveFile(data.contentId, data.newOwnerId, data.newUrl);
         totalMoved++;
       } catch (error) {
-        this.logger.error(`${logPrefix} Failed to move file ${data.contentId}:`, error);
+        const normalizedError = normalizeError(error);
+        this.logger.error({
+          msg: `${logPrefix} Failed to move file ${data.contentId}: ${normalizedError.message}`,
+          err: error,
+        });
       }
     }
 
@@ -74,6 +83,7 @@ export class FileMoveProcessor {
     siteId: string,
     scopes?: Scope[],
   ): FileMoveData[] {
+    const logPrefix = `[SiteId: ${siteId}]`;
     const filesToMove: FileMoveData[] = [];
 
     for (const ingestedFile of ingestedFiles) {
@@ -84,7 +94,7 @@ export class FileMoveProcessor {
 
       if (!sharepointItem) {
         this.logger.warn(
-          `Could not find SharePoint item for moved file with key: ${ingestedFile.key} for site ${siteId}`,
+          `${logPrefix} Could not find SharePoint item for moved file with key: ${ingestedFile.key}`,
         );
         continue;
       }
