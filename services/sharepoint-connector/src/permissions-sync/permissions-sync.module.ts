@@ -5,6 +5,7 @@ import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
 import { PermissionsSyncService } from './permissions-sync.service';
 import { SyncSharepointFilesPermissionsToUniqueCommand } from './sync-sharepoint-files-permissions-to-unique.command';
+import { SyncSharepointFolderPermissionsToUniqueCommand } from './sync-sharepoint-folder-permissions-to-unique.command';
 import { SyncSharepointGroupsToUniqueCommand } from './sync-sharepoint-groups-to-unique.command';
 
 @Module({
@@ -15,6 +16,7 @@ import { SyncSharepointGroupsToUniqueCommand } from './sync-sharepoint-groups-to
     FetchGroupsWithMembershipsQuery,
     SyncSharepointGroupsToUniqueCommand,
     SyncSharepointFilesPermissionsToUniqueCommand,
+    SyncSharepointFolderPermissionsToUniqueCommand,
   ],
   exports: [PermissionsSyncService],
 })
