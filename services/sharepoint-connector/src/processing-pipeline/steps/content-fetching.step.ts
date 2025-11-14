@@ -47,7 +47,14 @@ export class ContentFetchingStep implements IPipelineStep {
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] Site page content fetching failed: ${message}`);
+      this.logger.error({
+        msg: 'Site page content fetching failed',
+        correlationId: context.correlationId,
+        itemId: context.pipelineItem.item.id,
+        driveId: context.pipelineItem.driveId,
+        siteId: context.pipelineItem.siteId,
+        error: message,
+      });
       throw error;
     }
   }
@@ -70,7 +77,14 @@ export class ContentFetchingStep implements IPipelineStep {
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] Content fetching failed: ${message}`);
+      this.logger.error({
+        msg: 'Content fetching failed',
+        correlationId: context.correlationId,
+        itemId: context.pipelineItem.item.id,
+        driveId: context.pipelineItem.driveId,
+        siteId: context.pipelineItem.siteId,
+        error: message,
+      });
       throw error;
     }
   }

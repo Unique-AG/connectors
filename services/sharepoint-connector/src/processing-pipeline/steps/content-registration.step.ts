@@ -76,7 +76,14 @@ export class ContentRegistrationStep implements IPipelineStep {
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] Content registration failed: ${message}`);
+      this.logger.error({
+        msg: 'Content registration failed',
+        correlationId: context.correlationId,
+        itemId: context.pipelineItem.item.id,
+        driveId: context.pipelineItem.driveId,
+        siteId: context.pipelineItem.siteId,
+        error: message,
+      });
       throw error;
     }
   }

@@ -56,7 +56,14 @@ export class IngestionFinalizationStep implements IPipelineStep {
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] Ingestion finalization failed: ${message}`);
+      this.logger.error({
+        msg: 'Ingestion finalization failed',
+        correlationId: context.correlationId,
+        itemId: context.pipelineItem.item.id,
+        driveId: context.pipelineItem.driveId,
+        siteId: context.pipelineItem.siteId,
+        error: message,
+      });
       throw error;
     }
   }

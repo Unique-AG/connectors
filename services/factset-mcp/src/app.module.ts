@@ -19,9 +19,9 @@ import { createZitadelOAuthProvider } from './auth/zitadel.provider';
 import { EstimatesModule } from './estimates/estimates.module';
 import { FundamentalsModule } from './fundamentals/fundamentals.module';
 import { GlobalPricesModule } from './global-prices/global-prices.module';
-import { ManifestController } from './manifest.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
+import { RobotsController } from './robots.controller';
 import { serverInstructions } from './server.instructions';
 import { StreetAccountNewsModule } from './street-account-news/street-account-news.module';
 
@@ -118,7 +118,7 @@ import { StreetAccountNewsModule } from './street-account-news/street-account-ne
     StreetAccountNewsModule,
     // PromptsModule,
   ],
-  controllers: [ManifestController],
+  controllers: [RobotsController],
   providers: [
     {
       provide: APP_GUARD,
