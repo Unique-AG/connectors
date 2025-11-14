@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { IngestionClient } from '../clients/ingestion.client';
 import {
+  ADD_ACCESSES_MUTATION,
+  AddAccessesMutationInput,
+  AddAccessesMutationResult,
   CONTENT_DELETE_MUTATION,
   CONTENT_UPDATE_MUTATION,
   ContentDeleteMutationInput,
@@ -10,8 +13,11 @@ import {
   PAGINATED_CONTENT_QUERY,
   PaginatedContentQueryInput,
   PaginatedContentQueryResult,
+  REMOVE_ACCESSES_MUTATION,
+  RemoveAccessesMutationInput,
+  RemoveAccessesMutationResult,
 } from './unique-files.consts';
-import { UniqueFile } from './unique-files.types';
+import { UniqueFile, UniqueFileAccessInput } from './unique-files.types';
 
 const BATCH_SIZE = 100;
 
@@ -86,5 +92,32 @@ export class UniqueFilesService {
     } while (batchCount === BATCH_SIZE);
 
     return files;
+  }
+
+  public async addAccesses(scopeId: string, fileAccesses: UniqueFileAccessInput[]): Promise<void> {
+    await this.ingestionClient.get(async (client) => {
+      await client.request<AddAccessesMutationResult, AddAccessesMutationInput>(
+        ADD_ACCESSES_MUTATION,
+        {
+          scopeId,
+          fileAccesses,
+        },
+      );
+    });
+  }
+
+  public async removeAccesses(
+    scopeId: string,
+    fileAccesses: UniqueFileAccessInput[],
+  ): Promise<void> {
+    await this.ingestionClient.get(async (client) => {
+      await client.request<RemoveAccessesMutationResult, RemoveAccessesMutationInput>(
+        REMOVE_ACCESSES_MUTATION,
+        {
+          scopeId,
+          fileAccesses,
+        },
+      );
+    });
   }
 }
