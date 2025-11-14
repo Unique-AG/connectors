@@ -9,11 +9,11 @@ import type {
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
+import { normalizeError } from '../utils/normalize-error';
 import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
-import {normalizeError} from "../utils/normalize-error";
 
 @Injectable()
 export class ContentSyncService {
@@ -103,7 +103,9 @@ export class ContentSyncService {
       filesToDelete = await this.uniqueFilesService.getFilesByKeys(fullKeys);
     } catch (error) {
       const normalizedError = normalizeError(error);
-      this.logger.error(`${logPrefix} Failed to get content for deleted files, cannot delete ${ deletedFileKeys.length } ingested files ${normalizedError.message}`);
+      this.logger.error(
+        `${logPrefix} Failed to get content for deleted files, cannot delete ${deletedFileKeys.length} ingested files ${normalizedError.message}`,
+      );
       return;
     }
 

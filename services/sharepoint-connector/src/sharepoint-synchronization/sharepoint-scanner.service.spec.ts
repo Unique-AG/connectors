@@ -49,6 +49,7 @@ describe('SharepointSynchronizationService', () => {
         ContentType: 'Document',
         AuthorLookupId: '1',
         EditorLookupId: '1',
+        FileSizeDisplay: '12345',
         ItemChildCount: '0',
         FolderChildCount: '0',
       },

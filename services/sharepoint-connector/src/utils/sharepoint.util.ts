@@ -134,7 +134,7 @@ export function extractFolderPathFromUrl(fileUrl: string): string {
   // Normalize slashes and combine
   const normalizedPath = normalizeSlashes(path);
   assert(normalizedPath, 'Normalized path is empty');
-  return `${ siteName }/${ normalizedPath }`;
+  return `${siteName}/${normalizedPath}`;
 }
 
 export function buildScopePathFromItem(item: SharepointContentItem, rootScopeName: string): string {
