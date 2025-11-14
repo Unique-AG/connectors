@@ -99,7 +99,11 @@ describe('SharepointSynchronizationService', () => {
   it('scans and triggers processing', async () => {
     await service.synchronize();
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledTimes(1);
-    expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith('site-1', [mockFile]);
+    expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
+      'site-1',
+      [mockFile],
+      undefined,
+    );
   });
 
   it('prevents overlapping scans', async () => {
