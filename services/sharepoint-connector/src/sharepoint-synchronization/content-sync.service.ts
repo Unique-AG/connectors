@@ -119,9 +119,10 @@ export class ContentSyncService {
       filesToDelete = await this.uniqueFilesService.getFilesByKeys(fullKeys);
     } catch (error) {
       const normalizedError = normalizeError(error);
-      this.logger.error(
-        `${logPrefix} Failed to get content for deleted files, cannot delete ${deletedFileKeys.length} ingested files ${normalizedError.message}`,
-      );
+      this.logger.error({
+        msg: `${logPrefix} Failed to get content for deleted files, cannot delete ${deletedFileKeys.length} ingested files: ${normalizedError.message}`,
+        err: error,
+      });
       return;
     }
 
@@ -132,10 +133,11 @@ export class ContentSyncService {
         await this.uniqueFilesService.deleteFile(file.id);
         totalDeleted++;
       } catch (error) {
-        this.logger.error(
-          `${logPrefix} Failed to delete content ${file.key} (ID: ${file.id}):`,
-          error,
-        );
+        const normalizedError = normalizeError(error);
+        this.logger.error({
+          msg: `${logPrefix} Failed to delete content ${file.key} (ID: ${file.id}): ${normalizedError.message}`,
+          err: error,
+        });
       }
     }
 
