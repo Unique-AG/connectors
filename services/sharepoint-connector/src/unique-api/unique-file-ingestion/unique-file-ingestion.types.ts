@@ -60,29 +60,3 @@ export interface FileDiffResponse {
   movedFiles: string[];
   deletedFiles: string[];
 }
-
-export interface ContentNode {
-  id: string;
-  key: string;
-}
-
-export interface PaginatedContentResult {
-  nodes: ContentNode[];
-  totalCount: number;
-}
-
-export interface PaginatedContentQueryResult {
-  paginatedContent: PaginatedContentResult;
-}
-
-export interface ContentDeleteByKeyInput {
-  key: string;
-  ownerType: string;
-  scopeId?: string;
-  url?: string;
-  baseUrl?: string;
-}
-
-export interface ContentDeleteByKeyResult {
-  contentDeleteByKey: boolean;
-}
