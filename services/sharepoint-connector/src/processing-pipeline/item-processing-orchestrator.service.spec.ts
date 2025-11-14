@@ -3,7 +3,6 @@ import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { ScopeManagementService } from '../sharepoint-synchronization/scope-management.service';
 import { ItemProcessingOrchestratorService } from './item-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
@@ -11,9 +10,6 @@ describe('ItemProcessingOrchestratorService', () => {
   let service: ItemProcessingOrchestratorService;
   let mockPipelineService: {
     processItem: ReturnType<typeof vi.fn>;
-  };
-  let mockScopeManagementService: {
-    buildItemIdToScopeIdMap: ReturnType<typeof vi.fn>;
   };
 
   const createMockFile = (id: string, siteId: string): SharepointContentItem => ({
@@ -69,10 +65,6 @@ describe('ItemProcessingOrchestratorService', () => {
       processItem: vi.fn().mockResolvedValue({ success: true }),
     };
 
-    mockScopeManagementService = {
-      buildItemIdToScopeIdMap: vi.fn().mockReturnValue(new Map()),
-    };
-
     const { unit } = await TestBed.solitary(ItemProcessingOrchestratorService)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -86,8 +78,6 @@ describe('ItemProcessingOrchestratorService', () => {
       }))
       .mock(ProcessingPipelineService)
       .impl(() => mockPipelineService)
-      .mock(ScopeManagementService)
-      .impl(() => mockScopeManagementService)
       .compile();
 
     service = unit;
@@ -99,7 +89,11 @@ describe('ItemProcessingOrchestratorService', () => {
       createMockFile('file-3', 'bd9c85ee-998f-4665-9c44-577cf5a08a66'),
     ];
 
-    await service.processItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files);
+    await service.processItems(
+      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      files,
+      () => 'test-scope-id',
+    );
 
     expect(mockPipelineService.processItem).toHaveBeenCalledTimes(2);
     expect(mockPipelineService.processItem).toHaveBeenCalledWith(files[0], 'test-scope-id');
@@ -109,14 +103,18 @@ describe('ItemProcessingOrchestratorService', () => {
   it('processes only files for specified site', async () => {
     const files = [createMockFile('file-1', 'bd9c85ee-998f-4665-9c44-577cf5a08a66')];
 
-    await service.processItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files);
+    await service.processItems(
+      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      files,
+      () => 'test-scope-id',
+    );
 
     expect(mockPipelineService.processItem).toHaveBeenCalledTimes(1);
     expect(mockPipelineService.processItem).toHaveBeenCalledWith(files[0], 'test-scope-id');
   });
 
   it('handles empty file list gracefully', async () => {
-    await service.processItems('site-1', []);
+    await service.processItems('site-1', [], () => 'test-scope-id');
 
     expect(mockPipelineService.processItem).not.toHaveBeenCalled();
   });
@@ -137,7 +135,11 @@ describe('ItemProcessingOrchestratorService', () => {
       return { success: true };
     });
 
-    await service.processItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files);
+    await service.processItems(
+      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      files,
+      () => 'test-scope-id',
+    );
 
     expect(mockPipelineService.processItem).toHaveBeenCalledTimes(10);
     expect(maxConcurrentCalls).toBeLessThanOrEqual(3);
@@ -155,13 +157,17 @@ describe('ItemProcessingOrchestratorService', () => {
       .mockRejectedValueOnce(new Error('Processing failed'))
       .mockResolvedValueOnce({ success: true });
 
-    await service.processItems('bd9c85ee-998f-4665-9c44-577cf5a08a66', files);
+    await service.processItems(
+      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      files,
+      () => 'test-scope-id',
+    );
 
     expect(mockPipelineService.processItem).toHaveBeenCalledTimes(3);
   });
 
   it('does nothing when no files are provided', async () => {
-    await service.processItems('site-1', []);
+    await service.processItems('site-1', [], () => 'test-scope-id');
 
     expect(mockPipelineService.processItem).not.toHaveBeenCalled();
   });

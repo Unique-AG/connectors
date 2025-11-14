@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
@@ -20,6 +22,7 @@ export class ContentSyncService {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
+    private readonly configService: ConfigService<Config, true>,
     private readonly orchestrator: ItemProcessingOrchestratorService,
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly uniqueFilesService: UniqueFilesService,
@@ -60,13 +63,26 @@ export class ContentSyncService {
 
     const itemsToSync = items.filter((item) => fileKeysToSync.has(item.item.id));
 
-    // Build itemIdToScopeIdMap from scopes if in recursive mode
-    let itemIdToScopeIdMap: Map<string, string> | undefined;
-    if (scopes && scopes.length > 0) {
-      itemIdToScopeIdMap = this.scopeManagementService.buildItemIdToScopeIdMap(itemsToSync, scopes);
-    }
+    const configuredScopeId = this.configService.get('unique.scopeId', { infer: true });
 
-    await this.orchestrator.processItems(siteId, itemsToSync, itemIdToScopeIdMap);
+    const getScopeIdForItem = (itemId: string): string => {
+      const scopeId = configuredScopeId ?? ''; // if scopes is empty and we got here it means we are in flat mode and scopeId is required
+
+      if (!scopes || scopes.length === 0) {
+        return scopeId;
+      }
+
+      const item = itemsToSync.find((item) => item.item.id === itemId);
+      if (!item) {
+        this.logger.warn(
+          `${logPrefix} Cannot determine scope for item because item with id: ${itemId} not found`,
+        );
+        return scopeId;
+      }
+      return this.scopeManagementService.determineScopeForItem(item, scopes) || scopeId;
+    };
+
+    await this.orchestrator.processItems(siteId, itemsToSync, getScopeIdForItem);
 
     this.logger.log(
       `${logPrefix} Finished processing all content operations in ${elapsedSecondsLog(processStartTime)}`,
