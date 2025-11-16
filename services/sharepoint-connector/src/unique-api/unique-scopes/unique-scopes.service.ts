@@ -54,7 +54,11 @@ export class UniqueScopesService {
           CREATE_SCOPE_ACCESSES_MUTATION,
           {
             scopeId,
-            scopeAccesses,
+            scopeAccesses: scopeAccesses.map((scopeAccess) => ({
+              accessType: scopeAccess.type,
+              entityId: scopeAccess.entityId,
+              entityType: scopeAccess.entityType,
+            })),
             applyToSubScopes,
           },
         ),
@@ -76,7 +80,11 @@ export class UniqueScopesService {
           DELETE_SCOPE_ACCESSES_MUTATION,
           {
             scopeId,
-            scopeAccesses,
+            scopeAccesses: scopeAccesses.map((scopeAccess) => ({
+              accessType: scopeAccess.type,
+              entityId: scopeAccess.entityId,
+              entityType: scopeAccess.entityType,
+            })),
             applyToSubScopes,
           },
         ),

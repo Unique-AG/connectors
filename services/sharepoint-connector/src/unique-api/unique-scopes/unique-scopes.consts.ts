@@ -1,4 +1,5 @@
 import { gql } from 'graphql-request';
+import { UniqueAccessType, UniqueEntityType } from '../types';
 import type { Scope, ScopeAccess } from './unique-scopes.types';
 
 export interface GenerateScopesBasedOnPathsMutationInput {
@@ -30,9 +31,15 @@ export function getGenerateScopesBasedOnPathsMutation(includePermissions: boolea
   `;
 }
 
+export interface ScopeAccessChangeDto {
+  accessType: UniqueAccessType;
+  entityId: string;
+  entityType: UniqueEntityType;
+}
+
 export interface CreateScopeAccessesMutationInput {
   scopeId: string;
-  scopeAccesses: ScopeAccess[];
+  scopeAccesses: ScopeAccessChangeDto[];
   applyToSubScopes?: boolean;
 }
 
@@ -41,14 +48,14 @@ export interface CreateScopeAccessesMutationResult {
 }
 
 export const CREATE_SCOPE_ACCESSES_MUTATION = gql`
-  mutation CreateScopeAccesses($scopeAccesses: [ScopeAccess!]!, $scopeId: String!, $applyToSubScopes: Boolean) {
+  mutation CreateScopeAccesses($scopeAccesses: [ScopeAccessChangeDto!]!, $scopeId: String!, $applyToSubScopes: Boolean) {
     createScopeAccesses(scopeAccesses: $scopeAccesses, scopeId: $scopeId, applyToSubScopes: $applyToSubScopes)
   }
 `;
 
 export interface DeleteScopeAccessesMutationInput {
   scopeId: string;
-  scopeAccesses: ScopeAccess[];
+  scopeAccesses: ScopeAccessChangeDto[];
   applyToSubScopes?: boolean;
 }
 
@@ -57,7 +64,7 @@ export interface DeleteScopeAccessesMutationResult {
 }
 
 export const DELETE_SCOPE_ACCESSES_MUTATION = gql`
-  mutation DeleteScopeAccesses($scopeAccesses: [ScopeAccess!]!, $scopeId: String!, $applyToSubScopes: Boolean) {
+  mutation DeleteScopeAccesses($scopeAccesses: [ScopeAccessChangeDto!]!, $scopeId: String!, $applyToSubScopes: Boolean) {
     deleteScopeAccesses(scopeAccesses: $scopeAccesses, scopeId: $scopeId, applyToSubScopes: $applyToSubScopes)
   }
 `;
