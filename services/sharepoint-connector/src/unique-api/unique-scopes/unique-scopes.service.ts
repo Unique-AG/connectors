@@ -10,8 +10,13 @@ import {
   GenerateScopesBasedOnPathsMutationInput,
   GenerateScopesBasedOnPathsMutationResult,
   getGenerateScopesBasedOnPathsMutation,
+  PAGINATED_SCOPE_QUERY,
+  PaginatedScopeQueryInput,
+  PaginatedScopeQueryResult,
 } from './unique-scopes.consts';
 import { Scope, ScopeAccess } from './unique-scopes.types';
+
+const BATCH_SIZE = 100;
 
 @Injectable()
 export class UniqueScopesService {
@@ -24,7 +29,7 @@ export class UniqueScopesService {
     paths: string[],
     opts: { includePermissions: boolean } = { includePermissions: false },
   ): Promise<Scope[]> {
-    this.logger.log(`Creating scopes based on ${paths.length} paths`);
+    this.logger.debug(`Creating scopes based on ${paths.length} paths`);
 
     const mutation = getGenerateScopesBasedOnPathsMutation(opts.includePermissions);
 
@@ -44,7 +49,7 @@ export class UniqueScopesService {
     scopeAccesses: ScopeAccess[],
     applyToSubScopes: boolean = false,
   ): Promise<void> {
-    this.logger.log(
+    this.logger.debug(
       `Creating ${scopeAccesses.length} scope accesses for scope ${scopeId} (applyToSubScopes: ${applyToSubScopes})`,
     );
 
@@ -70,7 +75,7 @@ export class UniqueScopesService {
     scopeAccesses: ScopeAccess[],
     applyToSubScopes: boolean = false,
   ): Promise<void> {
-    this.logger.log(
+    this.logger.debug(
       `Deleting ${scopeAccesses.length} scope accesses for scope ${scopeId} (applyToSubScopes: ${applyToSubScopes})`,
     );
 
@@ -89,5 +94,60 @@ export class UniqueScopesService {
           },
         ),
     );
+  }
+
+  // TODO: Remove this method once we refer to root scope by its ID in the config.
+  // Getting the root scope this way is temporary. This wil break if we will have deeper paths for
+  // the root ingestion scope. We plan to refer to root scope by its ID in the config. Once we do
+  // that, we can remove this method. If we decide to refer to root scope by path, we have to double
+  // check how this method should work.
+  public async getRootScopeByName(name: string): Promise<Scope | null> {
+    const result = await this.scopeManagementClient.get(
+      async (client) =>
+        await client.request<PaginatedScopeQueryResult, PaginatedScopeQueryInput>(
+          PAGINATED_SCOPE_QUERY,
+          {
+            skip: 0,
+            take: 1,
+            where: {
+              name: { equals: name },
+              parentId: null,
+            },
+          },
+        ),
+    );
+
+    return result.paginatedScope.nodes[0] ?? null;
+  }
+
+  public async listChildrenScopes(parentId: string): Promise<Scope[]> {
+    this.logger.debug(`Fetching children scopes for parent ${parentId} from Unique API`);
+
+    let skip = 0;
+    const scopes: Scope[] = [];
+
+    let batchCount = 0;
+    do {
+      const batchResult = await this.scopeManagementClient.get(
+        async (client) =>
+          await client.request<PaginatedScopeQueryResult, PaginatedScopeQueryInput>(
+            PAGINATED_SCOPE_QUERY,
+            {
+              skip,
+              take: BATCH_SIZE,
+              where: {
+                parentId: {
+                  equals: parentId,
+                },
+              },
+            },
+          ),
+      );
+      scopes.push(...batchResult.paginatedScope.nodes);
+      batchCount = batchResult.paginatedScope.nodes.length;
+      skip += BATCH_SIZE;
+    } while (batchCount === BATCH_SIZE);
+
+    return scopes;
   }
 }

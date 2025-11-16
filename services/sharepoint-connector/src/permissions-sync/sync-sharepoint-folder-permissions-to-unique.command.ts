@@ -47,16 +47,18 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   public async run(input: Input): Promise<void> {
     const { siteId, sharePoint, unique } = input;
     const logPrefix = `[Site: ${siteId}]`;
-    this.logger.log(
-      `${logPrefix} Starting folder permissions sync for ${unique.folders.length} Unique folders`,
-    );
 
     const serviceUserId = await this.uniqueUsersService.getCurrentUserId();
     const sharePointDirectoriesPathMap = this.getSharePointDirectoriesPathMap(
       sharePoint.directories,
     );
 
-    for (const uniqueFolder of unique.folders) {
+    const uniqueFoldersToProcess = this.getUniqueFoldersToProcess(unique.folders);
+    this.logger.log(
+      `${logPrefix} Starting folder permissions sync for ${uniqueFoldersToProcess.length} Unique folders`,
+    );
+
+    for (const uniqueFolder of uniqueFoldersToProcess) {
       assert.ok(
         uniqueFolder.scopeAccess,
         'Unique folder scope accesses are required. Check if the folders were queried correctly' +
@@ -125,6 +127,24 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     });
     assert.ok(rootScopeName, 'rootScopeName must be configured');
     return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootScopeName));
+  }
+
+  private getUniqueFoldersToProcess(scopes: ScopeWithPath[]): ScopeWithPath[] {
+    const rootScopeName = this.configService.get('unique.rootScopeName', {
+      infer: true,
+    });
+    assert.ok(rootScopeName, 'rootScopeName must be configured');
+    // We're removing the root scope part, in case it has any slashes, to make it predictable.
+    // Then we can check if the remaining part has at least 3 levels, because it indicates it is
+    // neither the site nor the drive level.
+    // Example: /RootScope/Site/Drive/Folder -> Site/Drive/Folder -> 3 levels -> true
+    // Example: /RootScope/Site/Drive -> Site/Drive -> 2 levels -> false
+    // We do it because we want to ignore the first three levels of folders - they don't have
+    // permissions fetched from SharePoint and their permissions are set in the
+    // SetRootGroupReadPermissionsCommand instead.
+    return scopes.filter(
+      (scope) => scope.path.replace(`/${rootScopeName}/`, '').split('/').length > 2,
+    );
   }
 
   private mapSharePointPermissionsToScopeAccesses(

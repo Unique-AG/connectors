@@ -4,32 +4,52 @@ export const SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX = 'SPC-';
 export const SHAREPOINT_CONNECTOR_GROUP_CREATED_BY = 'sharepoint-connector';
 
 export interface ListGroupsQueryInput {
-  externalIdPrefix: string;
+  where: {
+    externalId?: {
+      startsWith: string;
+    };
+    name?: {
+      equals: string;
+    };
+  };
   skip: number;
   take: number;
 }
 
-export interface ListGroupsQueryResult {
-  listGroups: {
-    id: string;
-    name: string;
-    externalId: string;
-    members: { entityId: string }[];
-  }[];
+interface ListGroupsQueryResultNode {
+  id: string;
+  name: string;
+  externalId: string;
 }
 
-export const LIST_GROUPS_QUERY = gql`
-  query ListGroups($externalIdPrefix: String!, $skip: Int!, $take: Int!) {
-    listGroups: allGroups(where: { externalId: { startsWith: $externalIdPrefix } }, skip: $skip, take: $take) {
-      id
-      name
-      externalId
-      members {
+interface ListGroupsQueryResultNodeWithMembers extends ListGroupsQueryResultNode {
+  members: { entityId: string }[];
+}
+
+export interface ListGroupsQueryResult<TWithMembers extends boolean> {
+  listGroups: TWithMembers extends true
+    ? ListGroupsQueryResultNodeWithMembers[]
+    : ListGroupsQueryResultNode[];
+}
+
+export function getListGroupsQuery(includeMembers: boolean): string {
+  const membersFields = includeMembers
+    ? `members {
         entityId
+      }`
+    : '';
+
+  return gql`
+    query ListGroups($where: GroupWhereInput!, $skip: Int!, $take: Int!) {
+      listGroups: allGroups(where: $where, skip: $skip, take: $take) {
+        id
+        name
+        externalId
+        ${membersFields}
       }
     }
-  }
-`;
+  `;
+}
 
 export interface CreateGroupMutationInput {
   name: string;

@@ -379,6 +379,11 @@ export class GraphApiService {
     }
   }
 
+  public async getSiteName(siteId: string): Promise<string> {
+    const siteWebUrl = await this.getSiteWebUrl(siteId);
+    return siteWebUrl.split('/').pop() ?? assert.fail(`Site name not found for site ${siteId}`);
+  }
+
   private async getDrivesForSite(siteId: string): Promise<Drive[]> {
     try {
       const allDrives = await this.paginateGraphApiRequest<Drive>(

@@ -9,6 +9,7 @@ import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
+import { SetRootGroupReadPermissionsCommand } from './set-root-group-read-permissions.command';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -21,6 +22,7 @@ export class SharepointSynchronizationService {
     private readonly contentSyncService: ContentSyncService,
     private readonly permissionsSyncService: PermissionsSyncService,
     private readonly scopeManagementService: ScopeManagementService,
+    private readonly setRootGroupReadPermissionsCommand: SetRootGroupReadPermissionsCommand,
   ) {}
 
   public async synchronize(): Promise<void> {
@@ -88,6 +90,18 @@ export class SharepointSynchronizationService {
             error,
           });
         }
+      }
+    }
+
+    const syncMode = this.configService.get('processing.syncMode', { infer: true });
+    if (syncMode === 'content_and_permissions') {
+      try {
+        await this.setRootGroupReadPermissionsCommand.run();
+      } catch (error) {
+        this.logger.error({
+          msg: `Failed to set root group read permissions: ${normalizeError(error).message}`,
+          error,
+        });
       }
     }
 

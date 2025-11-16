@@ -1,6 +1,6 @@
 import { gql } from 'graphql-request';
 import { UniqueAccessType, UniqueEntityType } from '../types';
-import type { Scope, ScopeAccess } from './unique-scopes.types';
+import type { Scope } from './unique-scopes.types';
 
 export interface GenerateScopesBasedOnPathsMutationInput {
   paths: string[];
@@ -66,5 +66,38 @@ export interface DeleteScopeAccessesMutationResult {
 export const DELETE_SCOPE_ACCESSES_MUTATION = gql`
   mutation DeleteScopeAccesses($scopeAccesses: [ScopeAccessChangeDto!]!, $scopeId: String!, $applyToSubScopes: Boolean) {
     deleteScopeAccesses(scopeAccesses: $scopeAccesses, scopeId: $scopeId, applyToSubScopes: $applyToSubScopes)
+  }
+`;
+
+export interface PaginatedScopeQueryInput {
+  skip: number;
+  take: number;
+  where: {
+    name?: {
+      equals: string;
+    };
+    parentId?: {
+      equals: string;
+    } | null;
+  };
+}
+
+export interface PaginatedScopeQueryResult {
+  paginatedScope: {
+    totalCount: number;
+    nodes: Scope[];
+  };
+}
+
+export const PAGINATED_SCOPE_QUERY = gql`
+  query PaginatedScope($skip: Int!, $take: Int!, $where: ScopeWhereInput!) {
+    paginatedScope(skip: $skip, take: $take, where: $where) {
+      totalCount
+      nodes {
+        id
+        name
+        parentId
+      }
+    }
   }
 `;

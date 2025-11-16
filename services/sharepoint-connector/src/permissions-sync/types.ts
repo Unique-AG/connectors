@@ -1,7 +1,7 @@
 // TODO: Consider using name Access instead of Membership or Permission. It encompasses both
 //       permissions on files/folders and memberships of groups.
 
-import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
+import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 
 export type UserMembership = {
   type: 'user';
@@ -38,5 +38,5 @@ export interface SharepointGroupWithMembers {
 }
 
 export type SharePointGroupsMap = Record<GroupDistinctId, SharepointGroupWithMembers>;
-export type UniqueGroupsMap = Record<GroupDistinctId, UniqueGroup>;
+export type UniqueGroupsMap = Record<GroupDistinctId, UniqueGroupWithMembers>;
 export type UniqueUsersMap = Record<string, string>; // email -> unique user id

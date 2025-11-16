@@ -99,10 +99,7 @@ export class PermissionsSyncService {
     const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
 
     if (ingestionMode === IngestionMode.Recursive) {
-      assert.ok(
-        unique.folders,
-        `[Site: ${siteId}] Folders are required for recursive ingestion mode`,
-      );
+      assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
       await this.syncSharepointFolderPermissionsToUniqueCommand.run({
         siteId,
         sharePoint: { directories: sharePoint.directories, permissionsMap },

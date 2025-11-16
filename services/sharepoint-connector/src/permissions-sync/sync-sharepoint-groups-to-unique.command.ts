@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
 import { SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX } from '../unique-api/unique-groups/unique-groups.consts';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
-import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
+import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 import {
   GroupDistinctId,
   SharePointGroupsMap,
@@ -41,7 +41,7 @@ export class SyncSharepointGroupsToUniqueCommand {
   public async run(input: Input): Promise<Output> {
     const { siteId, sharePoint, unique } = input;
     const logPrefix = `[SiteId: ${siteId}]`;
-    const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroup | null> = {};
+    const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 
     const sharePointGroups = Object.values(sharePoint.groupsMap);
     this.logger.log(`${logPrefix} Syncing ${sharePointGroups.length} sharepoint groups`);
@@ -131,7 +131,7 @@ export class SyncSharepointGroupsToUniqueCommand {
   private async createUniqueGroup(
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
-  ): Promise<UniqueGroup | null> {
+  ): Promise<UniqueGroupWithMembers | null> {
     const memberIds = getUniqueMemberIds(sharePointGroup, uniqueUsersMap);
 
     if (memberIds.length === 0) {
@@ -150,10 +150,10 @@ export class SyncSharepointGroupsToUniqueCommand {
   }
 
   private async syncExistingUniqueGroup(
-    uniqueGroup: UniqueGroup,
+    uniqueGroup: UniqueGroupWithMembers,
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
-  ): Promise<[groupUpdated: boolean, UniqueGroup | null]> {
+  ): Promise<[groupUpdated: boolean, UniqueGroupWithMembers | null]> {
     const memberIdsFromSharePoint = getUniqueMemberIds(sharePointGroup, uniqueUsersMap);
 
     if (memberIdsFromSharePoint.length === 0) {

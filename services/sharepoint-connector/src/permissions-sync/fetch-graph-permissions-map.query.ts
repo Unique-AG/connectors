@@ -1,4 +1,3 @@
-import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { isNonNullish } from 'remeda';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
@@ -25,9 +24,7 @@ export class FetchGraphPermissionsMapQuery {
   public constructor(private readonly graphApiService: GraphApiService) {}
 
   public async run(siteId: string, items: AnySharepointItem[]): Promise<PermissionsMap> {
-    const siteWebUrl = await this.graphApiService.getSiteWebUrl(siteId);
-    const siteName = siteWebUrl.split('/').pop();
-    assert.ok(siteName, `Site name not found for site ${siteId}`);
+    const siteName = await this.graphApiService.getSiteName(siteId);
 
     const permissionsMap: PermissionsMap = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
