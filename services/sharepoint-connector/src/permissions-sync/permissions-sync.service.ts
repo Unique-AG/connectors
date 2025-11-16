@@ -90,14 +90,11 @@ export class PermissionsSyncService {
       `${logPrefix} Synced ${Object.keys(updatedUniqueGroupsMap).length} resulting unique groups`,
     );
 
-    await this.syncSharepointFilesPermissionsToUniqueCommand.run({
-      siteId,
-      sharePoint: { permissionsMap },
-      unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
-    });
-
+    // Folder pemissions sync is first to mitigate the fact that scope permissions change affects
+    // the particular file permissions. With that order files can temporarily get more permissions
+    // before it's reducd to the correct ones.
+    // TODO: Fix that behavior - it is a big security problem.
     const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-
     if (ingestionMode === IngestionMode.Recursive) {
       assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
       await this.syncSharepointFolderPermissionsToUniqueCommand.run({
@@ -110,6 +107,12 @@ export class PermissionsSyncService {
         },
       });
     }
+
+    await this.syncSharepointFilesPermissionsToUniqueCommand.run({
+      siteId,
+      sharePoint: { permissionsMap },
+      unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
+    });
 
     this.logger.log(`${logPrefix} Synced file permissions to Unique`);
   }

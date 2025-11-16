@@ -78,6 +78,7 @@ export class SetRootGroupReadPermissionsCommand {
     // First level is the root scope itself, selected by user in config.
     // Second level are the sites selected by user in the config.
     // Third level are the drives in the site + SitePages list with aspx pages.
+    // Examples: /RootScope/Site/Drive1, /RootScope/Site/SitePages
     let totalScopesProcessed = 0;
     for (const siteScope of siteScopes) {
       this.logger.debug(
