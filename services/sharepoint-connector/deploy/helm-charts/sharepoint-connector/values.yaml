@@ -121,7 +121,7 @@ connectorConfig:
     # external: communicates using external URLs and requires authentication via Zitadel
     authMode: cluster_local
     # -- url for the file diff
-    # example: https://api.unique.app/ingestion/v1/content/file-diff
+    # example: https://api.unique.app/ingestion/v2/content/file-diff
     fileDiffUrl: unset_default_value
     # -- url for the ingestion graphql
     # TODO: should use only public urls!
