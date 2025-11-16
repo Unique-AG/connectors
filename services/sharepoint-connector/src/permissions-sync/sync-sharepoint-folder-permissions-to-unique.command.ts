@@ -14,6 +14,8 @@ import {
 } from 'remeda';
 import { Config } from '../config';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
+import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
@@ -41,6 +43,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
+    private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly configService: ConfigService<Config, true>,
   ) {}
 
@@ -49,11 +52,17 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const logPrefix = `[Site: ${siteId}]`;
 
     const serviceUserId = await this.uniqueUsersService.getCurrentUserId();
+    const rootGroup = await this.uniqueGroupsService.getRootGroup();
+    if (!rootGroup) {
+      this.logger.warn(`${logPrefix} Root group not found, skipping folder permissions sync`);
+      return;
+    }
+
     const sharePointDirectoriesPathMap = this.getSharePointDirectoriesPathMap(
       sharePoint.directories,
     );
 
-    const uniqueFoldersToProcess = this.getUniqueFoldersToProcess(unique.folders);
+    const uniqueFoldersToProcess = unique.folders;
     this.logger.log(
       `${logPrefix} Starting folder permissions sync for ${uniqueFoldersToProcess.length} Unique folders`,
     );
@@ -66,56 +75,35 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
       );
       const loopLogPrefix = `${logPrefix}[Folder: ${uniqueFolder.id}]`;
       this.logger.debug(`${loopLogPrefix} Starting folder permissions processing`);
-      const sharePointDirectory = sharePointDirectoriesPathMap[uniqueFolder.path];
 
-      if (isNullish(sharePointDirectory)) {
-        this.logger.warn(
-          `${loopLogPrefix} No SharePoint directory found for path ${uniqueFolder.path}`,
-        );
+      const sharePointScopeAccesses = this.getSharePointScopeAccesses({
+        logPrefix: loopLogPrefix,
+        sharePoint: {
+          directoriesPathMap: sharePointDirectoriesPathMap,
+          permissionsMap: sharePoint.permissionsMap,
+        },
+        unique: {
+          folder: uniqueFolder,
+          rootGroup,
+          groupsMap: unique.groupsMap,
+          usersMap: unique.usersMap,
+        },
+      });
+
+      if (isNullish(sharePointScopeAccesses)) {
         continue;
       }
 
-      const sharePointDirectoryKey = buildIngestionItemKey(sharePointDirectory);
-      const sharePointPermissions = sharePoint.permissionsMap[sharePointDirectoryKey];
-      if (isNullish(sharePointPermissions)) {
-        this.logger.warn(
-          `${loopLogPrefix} No SharePoint permissions found for key ${sharePointDirectoryKey}`,
-        );
-        continue;
-      }
-
-      const sharePointScopeAccesses = this.mapSharePointPermissionsToScopeAccesses(
-        sharePointPermissions,
-        unique.groupsMap,
-        unique.usersMap,
-      );
-
-      const scopeAccessesToAdd = differenceWith(
-        sharePointScopeAccesses,
-        uniqueFolder.scopeAccess,
-        isDeepEqual,
-      );
-      const scopeAccessesToRemove = differenceWith(
-        uniqueFolder.scopeAccess,
-        sharePointScopeAccesses,
-        isDeepEqual,
-      ).filter(
-        // We need to ensure we do not remove the service user's access to folder. It won't be
-        // present in SharePoint, but should be present in Unique, so we filter out any removals for
-        // the service user.
-        ({ entityType, entityId }) => !(entityType === 'USER' && entityId === serviceUserId),
-      );
-
-      this.logger.debug(
-        `${loopLogPrefix} Adding ${scopeAccessesToAdd.length} and removing ` +
-          `${scopeAccessesToRemove.length} scope accesses`,
-      );
-      if (scopeAccessesToAdd.length > 0) {
-        await this.uniqueScopesService.createScopeAccesses(uniqueFolder.id, scopeAccessesToAdd);
-      }
-      if (scopeAccessesToRemove.length > 0) {
-        await this.uniqueScopesService.deleteScopeAccesses(uniqueFolder.id, scopeAccessesToRemove);
-      }
+      await this.syncScopeAccesses({
+        logPrefix: loopLogPrefix,
+        sharePoint: {
+          scopeAccesses: sharePointScopeAccesses,
+        },
+        unique: {
+          folder: uniqueFolder,
+          serviceUserId,
+        },
+      });
     }
   }
 
@@ -129,22 +117,18 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootScopeName));
   }
 
-  private getUniqueFoldersToProcess(scopes: ScopeWithPath[]): ScopeWithPath[] {
+  private isTopFolder(path: string): boolean {
     const rootScopeName = this.configService.get('unique.rootScopeName', {
       infer: true,
     });
     assert.ok(rootScopeName, 'rootScopeName must be configured');
     // We're removing the root scope part, in case it has any slashes, to make it predictable.
-    // Then we can check if the remaining part has at least 3 levels, because it indicates it is
-    // neither the site nor the drive level.
-    // Example: /RootScope/Site/Drive/Folder -> Site/Drive/Folder -> 3 levels -> true
-    // Example: /RootScope/Site/Drive -> Site/Drive -> 2 levels -> false
-    // We do it because we want to ignore the first three levels of folders - they don't have
-    // permissions fetched from SharePoint and their permissions are set in the
-    // SetRootGroupReadPermissionsCommand instead.
-    return scopes.filter(
-      (scope) => scope.path.replace(`/${rootScopeName}/`, '').split('/').length > 2,
-    );
+    // Then we can check if the remaining part has at most 2 levels, because it indicates it is
+    // either the site or the drive level.
+    // Example: /RootScope/Site/Drive/Folder -> Site/Drive/Folder -> 3 levels -> false
+    // Example: /RootScope/Site/Drive -> Site/Drive -> 2 levels -> true
+    // Top folders don't have permissions fetched from SharePoint, so we use root group permission instead.
+    return path.replace(`/${rootScopeName}/`, '').split('/').length <= 2;
   }
 
   private mapSharePointPermissionsToScopeAccesses(
@@ -187,5 +171,103 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     );
 
     return [...userScopeAccesses, ...groupScopeAccesses];
+  }
+
+  private getSharePointScopeAccesses(input: {
+    logPrefix: string;
+    sharePoint: {
+      directoriesPathMap: Record<string, SharepointDirectoryItem>;
+      permissionsMap: Record<string, Membership[]>;
+    };
+    unique: {
+      folder: ScopeWithPath;
+      rootGroup: UniqueGroup;
+      groupsMap: UniqueGroupsMap;
+      usersMap: UniqueUsersMap;
+    };
+  }): ScopeAccess[] | null {
+    const { logPrefix, sharePoint, unique } = input;
+    const { folder, rootGroup } = unique;
+
+    if (this.isTopFolder(folder.path)) {
+      this.logger.debug(
+        `${logPrefix} Using root group permission for top folder at path ${folder.path}`,
+      );
+      return [
+        {
+          type: 'READ' as const,
+          entityId: rootGroup.id,
+          entityType: 'GROUP' as const,
+        },
+      ];
+    }
+
+    const sharePointDirectory = sharePoint.directoriesPathMap[folder.path];
+
+    if (isNullish(sharePointDirectory)) {
+      this.logger.warn(`${logPrefix} No SharePoint directory found for path ${folder.path}`);
+      return null;
+    }
+
+    const sharePointDirectoryKey = buildIngestionItemKey(sharePointDirectory);
+    const sharePointPermissions = sharePoint.permissionsMap[sharePointDirectoryKey];
+    if (isNullish(sharePointPermissions)) {
+      this.logger.warn(
+        `${logPrefix} No SharePoint permissions found for key ${sharePointDirectoryKey}`,
+      );
+      return null;
+    }
+
+    return this.mapSharePointPermissionsToScopeAccesses(
+      sharePointPermissions,
+      unique.groupsMap,
+      unique.usersMap,
+    );
+  }
+
+  private async syncScopeAccesses(input: {
+    logPrefix: string;
+    sharePoint: {
+      scopeAccesses: ScopeAccess[];
+    };
+    unique: {
+      folder: ScopeWithPath;
+      serviceUserId: string;
+    };
+  }): Promise<void> {
+    const { logPrefix, sharePoint, unique } = input;
+
+    assert.ok(
+      unique.folder.scopeAccess,
+      'Unique folder scope accesses are required. Check if the folders were queried correctly' +
+        ' from the Unique API.',
+    );
+
+    const scopeAccessesToAdd = differenceWith(
+      sharePoint.scopeAccesses,
+      unique.folder.scopeAccess,
+      isDeepEqual,
+    );
+    const scopeAccessesToRemove = differenceWith(
+      unique.folder.scopeAccess,
+      sharePoint.scopeAccesses,
+      isDeepEqual,
+    ).filter(
+      // We need to ensure we do not remove the service user's access to folder. It won't be
+      // present in SharePoint, but should be present in Unique, so we filter out any removals for
+      // the service user.
+      ({ entityType, entityId }) => !(entityType === 'USER' && entityId === unique.serviceUserId),
+    );
+
+    this.logger.debug(
+      `${logPrefix} Adding ${scopeAccessesToAdd.length} and removing ` +
+        `${scopeAccessesToRemove.length} scope accesses`,
+    );
+    if (scopeAccessesToAdd.length > 0) {
+      await this.uniqueScopesService.createScopeAccesses(unique.folder.id, scopeAccessesToAdd);
+    }
+    if (scopeAccessesToRemove.length > 0) {
+      await this.uniqueScopesService.deleteScopeAccesses(unique.folder.id, scopeAccessesToRemove);
+    }
   }
 }

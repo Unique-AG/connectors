@@ -7,7 +7,6 @@ import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
-import { SetRootGroupReadPermissionsCommand } from './set-root-group-read-permissions.command';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
 @Module({
@@ -23,7 +22,6 @@ import { SharepointSynchronizationService } from './sharepoint-synchronization.s
     ContentSyncService,
     FileMoveProcessor,
     ScopeManagementService,
-    SetRootGroupReadPermissionsCommand,
   ],
   exports: [SharepointSynchronizationService],
 })
