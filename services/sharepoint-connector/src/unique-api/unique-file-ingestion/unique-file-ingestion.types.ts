@@ -1,3 +1,5 @@
+import { FileAccessKey } from '../unique-files/unique-files.types';
+
 export interface ContentRegistrationRequest {
   key: string;
   title: string;
@@ -10,6 +12,7 @@ export interface ContentRegistrationRequest {
   url?: string;
   baseUrl?: string;
   byteSize: number;
+  fileAccess?: FileAccessKey[];
 }
 
 export interface IngestionFinalizationRequest {

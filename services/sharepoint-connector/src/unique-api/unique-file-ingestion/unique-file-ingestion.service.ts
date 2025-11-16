@@ -48,6 +48,10 @@ export class UniqueFileIngestionService {
       baseUrl: request.baseUrl,
     };
 
+    if (request.fileAccess) {
+      variables.input.fileAccess = request.fileAccess;
+    }
+
     const result = await this.ingestionClient.get(
       async (client) =>
         await client.request<ContentUpsertMutationResult, ContentUpsertMutationInput>(
