@@ -72,9 +72,7 @@ export class FetchGroupsWithMembershipsQuery {
       `${logPrefix} Fetching groups with memberships for ${uniqueGroupPermissions.length} unique ` +
         `group permissions`,
     );
-    const siteWebUrl = await this.graphApiService.getSiteWebUrl(siteId);
-    const siteName = siteWebUrl.split('/').pop();
-    assert.ok(siteName, `Site name not found for site ${siteId}`);
+    const siteName = await this.graphApiService.getSiteName(siteId);
 
     const siteGroupsPermissions = pipe(
       uniqueGroupPermissions,

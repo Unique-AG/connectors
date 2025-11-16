@@ -121,7 +121,7 @@ connectorConfig:
     # external: communicates using external URLs and requires authentication via Zitadel
     authMode: cluster_local
     # -- url for the file diff
-    # example: https://api.unique.app/ingestion/v1/content/file-diff
+    # example: https://api.unique.app/ingestion/v2/content/file-diff
     fileDiffUrl: unset_default_value
     # -- url for the ingestion graphql
     # TODO: should use only public urls!
@@ -143,10 +143,8 @@ connectorConfig:
     # -- Object containing extra HTTP headers for ingestion API requests (GraphQL and file diff)
     # Used for service-to-service authentication when using internal cluster URLs
     serviceExtraHeaders: {}
-      # x-service-id: sharepoint-connector
       # x-company-id: 1234567890
       # x-user-id: 1234567890
-      # x-user-roles: "chat.admin.all"
     zitadel:
       clientId: unset_default_value
       # clientSecret is presented from a secret, see connector.extraEnvSecrets

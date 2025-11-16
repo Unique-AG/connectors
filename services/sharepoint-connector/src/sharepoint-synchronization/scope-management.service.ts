@@ -1,11 +1,12 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { prop, pullObject } from 'remeda';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
-import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
-import { buildScopePathFromItem } from '../utils/sharepoint.util';
+import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { getUniqueParentPathFromItem } from '../utils/sharepoint.util';
 
 @Injectable()
 export class ScopeManagementService {
@@ -23,7 +24,7 @@ export class ScopeManagementService {
     const itemIdToScopePathMap = new Map<string, string>();
 
     for (const item of items) {
-      const scopePath = buildScopePathFromItem(item, rootScopeName);
+      const scopePath = getUniqueParentPathFromItem(item, rootScopeName);
       itemIdToScopePathMap.set(item.item.id, scopePath);
     }
 
@@ -68,12 +69,12 @@ export class ScopeManagementService {
     });
   }
 
-  public async batchCreateScopes(items: SharepointContentItem[]): Promise<Scope[]> {
+  public async batchCreateScopes(items: SharepointContentItem[]): Promise<ScopeWithPath[]> {
     const logPrefix = `[SiteId: ${items[0]?.siteId || 'unknown siteId'}]`;
     const rootScopeName = this.configService.get('unique.rootScopeName', {
       infer: true,
     });
-    assert(rootScopeName, 'rootScopeName must be configured');
+    assert.ok(rootScopeName, 'rootScopeName must be configured');
 
     const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
@@ -95,15 +96,10 @@ export class ScopeManagementService {
 
     // Add the full path to each scope object
     // The API returns scopes in the same order as the input paths
-    const scopesWithPaths = scopes.map((scope, index) => {
-      const inputPath = allPathsWithParents[index];
-      const normalizedPath = inputPath?.startsWith('/') ? inputPath.slice(1) : inputPath;
-
-      return {
-        ...scope,
-        path: normalizedPath,
-      };
-    });
+    const scopesWithPaths: ScopeWithPath[] = scopes.map((scope, index) => ({
+      ...scope,
+      path: allPathsWithParents[index] || assert.fail(`No matching path for scope ${scope.id}`),
+    }));
 
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes with paths`);
     return scopesWithPaths;
@@ -111,7 +107,7 @@ export class ScopeManagementService {
 
   public buildItemIdToScopeIdMap(
     items: SharepointContentItem[],
-    scopes: Scope[],
+    scopes: ScopeWithPath[],
   ): Map<string, string> {
     const logPrefix = `[Site: ${items[0]?.siteId || ''}]`;
     const itemIdToScopeIdMap = new Map<string, string>();
@@ -124,16 +120,7 @@ export class ScopeManagementService {
     }
 
     // Build path -> scopeId map from scopes
-    const scopePathToIdMap: Record<string, string> = {};
-    for (const scope of scopes) {
-      if ('path' in scope && typeof scope.path === 'string') {
-        scopePathToIdMap[scope.path] = scope.id;
-      } else {
-        this.logger.warn(
-          `Scope missing path property: ${JSON.stringify({ id: scope.id, name: scope.name })}`,
-        );
-      }
-    }
+    const scopePathToIdMap = pullObject(scopes, prop('path'), prop('id'));
 
     this.logger.debug(
       `${logPrefix} Built scopePathToIdMap with ${Object.keys(scopePathToIdMap).length} entries`,
@@ -165,7 +152,10 @@ export class ScopeManagementService {
   /**
    * Determines the appropriate scope ID for a SharePoint item based on ingestion mode
    */
-  public determineScopeForItem(item: SharepointContentItem, scopes?: Scope[]): string | undefined {
+  public determineScopeForItem(
+    item: SharepointContentItem,
+    scopes: ScopeWithPath[] | null,
+  ): string | undefined {
     if (!scopes || scopes.length === 0) {
       // Flat mode - return the configured scope ID
       return this.configService.get('unique.scopeId', { infer: true });
@@ -177,7 +167,7 @@ export class ScopeManagementService {
 
     assert(rootScopeName, 'rootScopeName must be configured for recursive mode');
 
-    const scopePath = buildScopePathFromItem(item, rootScopeName);
+    const scopePath = getUniqueParentPathFromItem(item, rootScopeName);
 
     // Find scope with this path.
     const scope = scopes.find((scope) => scope.path === scopePath);

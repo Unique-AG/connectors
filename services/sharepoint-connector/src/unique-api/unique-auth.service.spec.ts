@@ -70,48 +70,4 @@ describe('UniqueAuthService', () => {
       }),
     );
   });
-
-  it('includes extra headers in Zitadel request', async () => {
-    const { request } = await import('undici');
-    vi.mocked(request).mockResolvedValue({
-      statusCode: 200,
-      body: {
-        text: vi.fn().mockResolvedValue(''),
-        json: vi.fn().mockResolvedValue({
-          access_token: 'jwt-token-with-headers',
-          expires_in: 600,
-          token_type: 'Bearer',
-          id_token: 'id',
-        }),
-      },
-    } as never);
-
-    const configWithExtraHeaders = {
-      ...MOCK_UNIQUE_CONFIG,
-      zitadelServiceExtraHeaders: { 'x-zitadel-instance-host': 'id.example.com' },
-    };
-
-    const { unit } = await TestBed.solitary(UniqueAuthService)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: vi.fn((key: string) => {
-          if (key === 'unique') {
-            return configWithExtraHeaders;
-          }
-          return undefined;
-        }),
-      }))
-      .compile();
-
-    await unit.getToken();
-    expect(request).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          'x-zitadel-instance-host': 'id.example.com',
-        }),
-      }),
-    );
-  });
 });

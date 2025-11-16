@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
 import { SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX } from '../unique-api/unique-groups/unique-groups.consts';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
-import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
+import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 import {
   GroupDistinctId,
   SharePointGroupsMap,
@@ -15,9 +15,14 @@ import {
 const SHAREPOINT_GROUP_NAME_PREFIX = '[SPC]';
 
 interface Input {
-  sharePointGroupsMap: SharePointGroupsMap;
-  uniqueGroupsMap: UniqueGroupsMap;
-  uniqueUsersMap: UniqueUsersMap;
+  siteId: string;
+  sharePoint: {
+    groupsMap: SharePointGroupsMap;
+  };
+  unique: {
+    groupsMap: UniqueGroupsMap;
+    usersMap: UniqueUsersMap;
+  };
 }
 
 // Normally we wouldn't return anything from command, but we don't want to re-fetch data form
@@ -34,11 +39,12 @@ export class SyncSharepointGroupsToUniqueCommand {
   public constructor(private readonly uniqueGroupsService: UniqueGroupsService) {}
 
   public async run(input: Input): Promise<Output> {
-    const { sharePointGroupsMap, uniqueGroupsMap, uniqueUsersMap } = input;
-    const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroup | null> = {};
+    const { siteId, sharePoint, unique } = input;
+    const logPrefix = `[SiteId: ${siteId}]`;
+    const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 
-    const sharePointGroups = Object.values(sharePointGroupsMap);
-    this.logger.log(`Syncing ${sharePointGroups.length} sharepoint groups`);
+    const sharePointGroups = Object.values(sharePoint.groupsMap);
+    this.logger.log(`${logPrefix} Syncing ${sharePointGroups.length} sharepoint groups`);
     const groupsSyncStats: Record<
       'created' | 'updated' | 'deleted' | 'skipped' | 'unchanged',
       number
@@ -51,19 +57,21 @@ export class SyncSharepointGroupsToUniqueCommand {
     };
 
     for (const sharePointGroup of sharePointGroups) {
-      const logPrefix = `[Group: ${sharePointGroup.id}]`;
-      this.logger.debug(`${logPrefix} Syncing sharepoint group ${sharePointGroup.displayName}`);
+      const groupLogPrefix = `[Group: ${sharePointGroup.id}]`;
+      this.logger.debug(
+        `${groupLogPrefix} Syncing sharepoint group ${sharePointGroup.displayName}`,
+      );
 
-      const correspondingUniqueGroup = uniqueGroupsMap[sharePointGroup.id];
+      const correspondingUniqueGroup = unique.groupsMap[sharePointGroup.id];
       if (!correspondingUniqueGroup) {
-        const newUniqueGroup = await this.createUniqueGroup(sharePointGroup, uniqueUsersMap);
+        const newUniqueGroup = await this.createUniqueGroup(sharePointGroup, unique.usersMap);
         updatedUniqueGroupsMap[sharePointGroup.id] = newUniqueGroup;
         if (newUniqueGroup) {
           groupsSyncStats.created++;
-          this.logger.debug(`${logPrefix} Created new Unique Group`);
+          this.logger.debug(`${groupLogPrefix} Created new Unique Group`);
         } else {
           groupsSyncStats.skipped++;
-          this.logger.debug(`${logPrefix} Skipped Unique Group creation due to no members`);
+          this.logger.debug(`${groupLogPrefix} Skipped Unique Group creation due to no members`);
         }
         continue;
       }
@@ -71,38 +79,43 @@ export class SyncSharepointGroupsToUniqueCommand {
       const [didUpdate, updatedUniqueGroup] = await this.syncExistingUniqueGroup(
         correspondingUniqueGroup,
         sharePointGroup,
-        uniqueUsersMap,
+        unique.usersMap,
       );
       if (didUpdate) {
         updatedUniqueGroupsMap[sharePointGroup.id] = updatedUniqueGroup;
         if (updatedUniqueGroup) {
           groupsSyncStats.updated++;
-          this.logger.debug(`${logPrefix} Updated Unique Group`);
+          this.logger.debug(`${groupLogPrefix} Updated Unique Group`);
         } else {
           groupsSyncStats.deleted++;
-          this.logger.debug(`${logPrefix} Deleted Unique Group due to no members`);
+          this.logger.debug(`${groupLogPrefix} Deleted Unique Group due to no members`);
         }
         continue;
       }
 
       groupsSyncStats.unchanged++;
-      this.logger.debug(`${logPrefix} No changes to Unique Group`);
+      this.logger.debug(`${groupLogPrefix} No changes to Unique Group`);
       updatedUniqueGroupsMap[sharePointGroup.id] = correspondingUniqueGroup;
     }
 
-    const missingGroupDistinctIds = difference(keys(uniqueGroupsMap), keys(updatedUniqueGroupsMap));
+    const missingGroupDistinctIds = difference(
+      keys(unique.groupsMap),
+      keys(updatedUniqueGroupsMap),
+    );
 
-    this.logger.log(`Deleting ${missingGroupDistinctIds.length} missing unique groups`);
+    this.logger.log(
+      `${logPrefix} Deleting ${missingGroupDistinctIds.length} missing unique groups`,
+    );
     for (const groupDistinctId of missingGroupDistinctIds) {
       const missingGroup =
-        uniqueGroupsMap[groupDistinctId] ??
+        unique.groupsMap[groupDistinctId] ??
         assert.fail(`Missing group ${groupDistinctId} in unique groups map`);
       await this.uniqueGroupsService.deleteGroup(missingGroup.id);
       groupsSyncStats.deleted++;
     }
 
     this.logger.log(
-      `Synced ${sharePointGroups.length} sharepoint groups:\n` +
+      `${logPrefix} Synced ${sharePointGroups.length} sharepoint groups:\n` +
         `    Created:   ${groupsSyncStats.created} groups\n` +
         `    Updated:   ${groupsSyncStats.updated} groups\n` +
         `    Deleted:   ${groupsSyncStats.deleted} groups\n` +
@@ -118,7 +131,7 @@ export class SyncSharepointGroupsToUniqueCommand {
   private async createUniqueGroup(
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
-  ): Promise<UniqueGroup | null> {
+  ): Promise<UniqueGroupWithMembers | null> {
     const memberIds = getUniqueMemberIds(sharePointGroup, uniqueUsersMap);
 
     if (memberIds.length === 0) {
@@ -137,10 +150,10 @@ export class SyncSharepointGroupsToUniqueCommand {
   }
 
   private async syncExistingUniqueGroup(
-    uniqueGroup: UniqueGroup,
+    uniqueGroup: UniqueGroupWithMembers,
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
-  ): Promise<[groupUpdated: boolean, UniqueGroup | null]> {
+  ): Promise<[groupUpdated: boolean, UniqueGroupWithMembers | null]> {
     const memberIdsFromSharePoint = getUniqueMemberIds(sharePointGroup, uniqueUsersMap);
 
     if (memberIdsFromSharePoint.length === 0) {

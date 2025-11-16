@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
-import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
+import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { normalizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { ScopeManagementService } from './scope-management.service';
@@ -29,7 +29,7 @@ export class FileMoveProcessor {
     siteId: string,
     movedFileKeys: string[],
     sharepointItems: SharepointContentItem[],
-    scopes?: Scope[],
+    scopes: ScopeWithPath[] | null,
   ): Promise<void> {
     const logPrefix = `[SiteId: ${siteId}]`;
     const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId);
@@ -81,7 +81,7 @@ export class FileMoveProcessor {
     ingestedFiles: Array<{ id: string; key: string; ownerId: string }>,
     sharepointItems: SharepointContentItem[],
     siteId: string,
-    scopes?: Scope[],
+    scopes: ScopeWithPath[] | null,
   ): FileMoveData[] {
     const logPrefix = `[SiteId: ${siteId}]`;
     const filesToMove: FileMoveData[] = [];

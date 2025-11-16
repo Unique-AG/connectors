@@ -1,5 +1,5 @@
 import { gql } from 'graphql-request';
-import type { UniqueFile } from './unique-files.types';
+import type { UniqueFile, UniqueFileAccessInput } from './unique-files.types';
 
 export interface ContentUpdateMutationInput {
   contentId: string;
@@ -71,5 +71,35 @@ export const PAGINATED_CONTENT_QUERY = gql`
       }
       totalCount
     }
+  }
+`;
+
+export interface AddAccessesMutationInput {
+  scopeId: string;
+  fileAccesses: UniqueFileAccessInput[];
+}
+
+export interface AddAccessesMutationResult {
+  createFileAccessesForContents: boolean;
+}
+
+export const ADD_ACCESSES_MUTATION = gql`
+  mutation CreateFileAccessesForContents($scopeId: String!, $fileAccesses: [FileAccessContentChangeDto!]!) {
+    createFileAccessesForContents(scopeId: $scopeId, fileAccesses: $fileAccesses)
+  }
+`;
+
+export interface RemoveAccessesMutationInput {
+  scopeId: string;
+  fileAccesses: UniqueFileAccessInput[];
+}
+
+export interface RemoveAccessesMutationResult {
+  removeFileAccessesForContents: boolean;
+}
+
+export const REMOVE_ACCESSES_MUTATION = gql`
+  mutation RemoveFileAccessesForContents($scopeId: String!, $fileAccesses: [FileAccessContentChangeDto!]!) {
+    removeFileAccessesForContents(scopeId: $scopeId, fileAccesses: $fileAccesses)
   }
 `;

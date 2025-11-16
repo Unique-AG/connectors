@@ -1,19 +1,8 @@
 import assert from 'node:assert';
-import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-
-interface SharepointFileKeyParams {
-  scopeId?: string | null;
-  siteId: string;
-  driveName: string;
-  folderPath: string;
-  fileId: string;
-  fileName: string;
-}
-
-interface SharepointPartialKeyParams {
-  scopeId?: string | null;
-  siteId: string;
-}
+import type {
+  AnySharepointItem,
+  SharepointContentItem,
+} from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 
 export const normalizeSlashes = (value: string): string => {
   // 1. Remove leading/trailing whitespace
@@ -28,37 +17,6 @@ export const normalizeSlashes = (value: string): string => {
   return result;
 };
 
-export function buildSharepointFileKey({
-  scopeId,
-  siteId,
-  driveName,
-  folderPath,
-  fileId,
-  fileName,
-}: SharepointFileKeyParams): string {
-  if (scopeId) {
-    return `sharepoint_scope_${scopeId}_${fileId}`;
-  }
-
-  const normalizedSiteId = normalizeSlashes(siteId);
-  const normalizedDriveName = normalizeSlashes(driveName);
-  const normalizedFolderPath = normalizeSlashes(folderPath);
-
-  const segments = [normalizedSiteId, normalizedDriveName, normalizedFolderPath, fileName]
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0);
-
-  return segments.join('/');
-}
-
-export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartialKeyParams): string {
-  if (scopeId) {
-    return `sharepoint_scope_${scopeId}_`;
-  }
-
-  return normalizeSlashes(siteId);
-}
-
 /**
  * Gets the web URL for a SharePoint item with ?web=1 parameter.
  *
@@ -68,16 +26,7 @@ export function buildSharepointPartialKey({ scopeId, siteId }: SharepointPartial
  * We are adding ?web=1 to the url to get the web view of the item.
  */
 export function getItemUrl(sharepointContentItem: SharepointContentItem): string {
-  let url: string;
-
-  if (sharepointContentItem.itemType === 'driveItem') {
-    url = sharepointContentItem.item.listItem?.webUrl || sharepointContentItem.item.webUrl;
-  } else if (sharepointContentItem.itemType === 'listItem') {
-    url = sharepointContentItem.item.webUrl;
-  } else {
-    assert.fail('Invalid pipeline item type');
-  }
-
+  const url = extractFileUrl(sharepointContentItem);
   return url.includes('?') ? `${url}&web=1` : `${url}?web=1`;
 }
 
@@ -94,56 +43,66 @@ export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): 
 /**
  * Builds a unique hierarchical key for ingestion.
  */
-export function buildIngestionItemKey(sharepointContentItem: SharepointContentItem): string {
+export function buildIngestionItemKey(sharepointContentItem: AnySharepointItem): string {
   return `${sharepointContentItem.siteId}/${sharepointContentItem.item.id}`;
 }
 
-export function extractFolderPathFromUrl(fileUrl: string): string {
-  const urlObj = new URL(fileUrl);
+// Gets SharePoint URL and returns the relative unique path like without context of the root scope
+// Example 1:
+// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf
+// returns
+// /TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf
+// Example 2:
+// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files
+// returns
+// /TestTeamSite/Shared%20Documents/lorand%27s%20files
+function getRelativeUniquePathFromUrl(url: string): string {
+  const urlObj = new URL(url);
   const pathName = decodeURIComponent(urlObj.pathname);
 
-  // Extract site name: /sites/siteName or /sites/siteName/
-  const siteMatch = pathName.match(/\/sites\/([^/]+)/);
-  assert(siteMatch, 'Unable to extract site name from URL');
-  const siteName = siteMatch[1];
-  assert(siteName, 'Site name is empty');
+  // Path start with /sites/ and we don't want to include it in the path
+  return `/${normalizeSlashes(pathName.replace(/\/sites\//, '/'))}`;
+}
 
-  // Extract path after site name
-  const afterSite = pathName.substring(siteMatch[0].length);
-  if (!afterSite || afterSite === '/') {
-    return siteName;
-  }
-
-  // Remove leading slash
-  let path = afterSite.replace(/^\//, '');
-  if (!path) {
-    return siteName;
-  }
-
-  // Remove filename (last segment after last slash)
-  const lastSlashIndex = path.lastIndexOf('/');
+// Gets SharePoint URL and returns the relative unique parent path like without context of the root scope
+// Example 1:
+// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf
+// returns
+// /TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf
+// Example 2:
+// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files
+// returns
+// /TestTeamSite/Shared%20Documents
+function getRelativeUniqueParentPathFromUrl(url: string): string {
+  const uniqueItemPath = getRelativeUniquePathFromUrl(url);
+  const lastSlashIndex = uniqueItemPath.lastIndexOf('/');
   if (lastSlashIndex !== -1) {
-    const folderPath = path.substring(0, lastSlashIndex);
-    assert(folderPath, 'Folder path is empty');
-    path = folderPath;
-  } else {
-    // No folder, file is in root
-    return siteName;
+    return uniqueItemPath.substring(0, lastSlashIndex);
   }
-
-  // Normalize slashes and combine
-  const normalizedPath = normalizeSlashes(path);
-  assert(normalizedPath, 'Normalized path is empty');
-  return `${siteName}/${normalizedPath}`;
+  // This case shouldn't really happen because the path will always at least have {site}/{drive}
+  return '';
 }
 
-export function buildScopePathFromItem(item: SharepointContentItem, rootScopeName: string): string {
+export function getUniquePathFromItem(item: AnySharepointItem, rootScopeName: string): string {
+  assert.ok(rootScopeName, 'rootScopeName cannot be empty');
   const fileUrl = extractFileUrl(item);
-  const folderPath = extractFolderPathFromUrl(fileUrl);
-  return `${rootScopeName}/${folderPath}`;
+  const uniquePath = getRelativeUniquePathFromUrl(fileUrl);
+
+  return `/${rootScopeName}${uniquePath}`;
 }
 
-function extractFileUrl(item: SharepointContentItem): string {
+export function getUniqueParentPathFromItem(
+  item: AnySharepointItem,
+  rootScopeName: string,
+): string {
+  assert.ok(rootScopeName, 'rootScopeName cannot be empty');
+  const fileUrl = extractFileUrl(item);
+  const uniqueParentPath = getRelativeUniqueParentPathFromUrl(fileUrl);
+
+  return `/${rootScopeName}${uniqueParentPath}`;
+}
+
+function extractFileUrl(item: AnySharepointItem): string {
   if (item.itemType === 'driveItem') {
     return item.item.listItem?.webUrl || item.item.webUrl;
   }

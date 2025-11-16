@@ -14,12 +14,21 @@ const clusterLocalConfig = z.object({
     .describe('Authentication mode to use for accessing Unique API services'),
   serviceExtraHeaders: z
     .string()
-    .optional()
-    .prefault('')
-    .pipe(parseJsonEnvironmentVariable('httpExtraHeaders'))
+    .pipe(parseJsonEnvironmentVariable('UNIQUE_SERVICE_EXTRA_HEADERS'))
+    .refine(
+      (headers) => {
+        const providedHeaders = Object.keys(headers);
+        const requiredHeaders = ['x-company-id', 'x-user-id'];
+        return requiredHeaders.every((header) => providedHeaders.includes(header));
+      },
+      {
+        message: 'UNIQUE_SERVICE_EXTRA_HEADERS must contain x-company-id and x-user-id headers',
+        path: ['serviceExtraHeaders'],
+      },
+    )
     .describe(
       'JSON string of extra HTTP headers for ingestion API requests ' +
-        '(e.g., {"x-service-id": "<client-id>", "x-company-id": "<company-id>", "x-user-id": "<user-id>", "x-user-roles": "chat.admin.all"})',
+        '(e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
     ),
 });
 
@@ -36,14 +45,6 @@ const externalConfig = z.object({
     .string()
     .transform((val) => new Redacted(val))
     .describe('Zitadel client secret'),
-  zitadelServiceExtraHeaders: z
-    .string()
-    .optional()
-    .prefault('')
-    .pipe(parseJsonEnvironmentVariable('zitadelHttpExtraHeaders'))
-    .describe(
-      'JSON string of extra HTTP headers for Zitadel requests (e.g., {"x-zitadel-instance-host": "<zitadel-host>"})',
-    ),
 });
 
 // ==== Config common for both cluster_local and external authentication modes ====
@@ -94,7 +95,6 @@ export const uniqueConfig = registerConfig('unique', UniqueConfig, {
     'ZITADEL_PROJECT_ID',
     'ZITADEL_CLIENT_ID',
     'ZITADEL_CLIENT_SECRET',
-    'ZITADEL_SERVICE_EXTRA_HEADERS',
   ]),
 });
 

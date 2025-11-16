@@ -4,7 +4,7 @@ import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
-import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
+import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
@@ -40,10 +40,10 @@ export class SharepointSynchronizationService {
 
     for (const siteId of siteIdsToScan) {
       const logPrefix = `[SiteId: ${siteId}]`;
-      let scopes: Scope[] | undefined;
+      let scopes: ScopeWithPath[] | null = null;
       const siteStartTime = Date.now();
 
-      const items = await this.graphApiService.getAllSiteItems(siteId);
+      const { items, directories } = await this.graphApiService.getAllSiteItems(siteId);
       this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
 
       if (items.length === 0) {
@@ -77,7 +77,11 @@ export class SharepointSynchronizationService {
       const syncMode = this.configService.get('processing.syncMode', { infer: true });
       if (syncMode === 'content_and_permissions') {
         try {
-          await this.permissionsSyncService.syncPermissionsForSite(siteId, items);
+          await this.permissionsSyncService.syncPermissionsForSite({
+            siteId,
+            sharePoint: { items, directories },
+            unique: { folders: scopes },
+          });
         } catch (error) {
           this.logger.error({
             msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,

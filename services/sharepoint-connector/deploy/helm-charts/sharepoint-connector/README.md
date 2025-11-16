@@ -103,7 +103,7 @@ spec:
 | connectorConfig.sharepoint.siteIds | list | `["00000000-0000-0000-0000-000000000000","00000000-0000-0000-0000-000000000001"]` | Array of site IDs to scan |
 | connectorConfig.sharepoint.syncColumnName | string | `"unset_default_value"` | column name against which the files are synced example: FinanceGPTKnowledge |
 | connectorConfig.unique.authMode | string | `"cluster_local"` | communication mode for the Unique Services possible values: cluster_local, external cluster_local: comunicates using in-cluster URLs and requires no authentication external: communicates using external URLs and requires authentication via Zitadel |
-| connectorConfig.unique.fileDiffUrl | string | `"unset_default_value"` | url for the file diff example: https://api.unique.app/ingestion/v1/content/file-diff |
+| connectorConfig.unique.fileDiffUrl | string | `"unset_default_value"` | url for the file diff example: https://api.unique.app/ingestion/v2/content/file-diff |
 | connectorConfig.unique.ingestionGraphqlUrl | string | `"unset_default_value"` | url for the ingestion graphql TODO: should use only public urls! example: https://api.unique.app/ingestion/graphql |
 | connectorConfig.unique.rootScopeName | string | `nil` | name of the root scope/folder in the knowledge base where SharePoint content should be synced (for recursive mode). It will be created by the connector. If this scope name already exists and the service-user does not have read+write access to it it will fail. example: SharePoint Content |
 | connectorConfig.unique.scopeId | string | `nil` | scope id for the scope based ingestion example: scope_bu4gokr0atzj0kfiuaaaaaaa |

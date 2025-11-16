@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { pick, prop } from 'remeda';
-import { ScopeManagementClient } from '../clients/scope-management.client';
+import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   ADD_GROUP_MEMBERS_MUTATION,
   AddGroupMembersMutationInput,
@@ -11,7 +11,7 @@ import {
   DELETE_GROUP_MUTATION,
   DeleteGroupMutationInput,
   DeleteGroupMutationResult,
-  LIST_GROUPS_QUERY,
+  getListGroupsQuery,
   ListGroupsQueryInput,
   ListGroupsQueryResult,
   REMOVE_GROUP_MEMBER_MUTATION,
@@ -23,30 +23,39 @@ import {
   UpdateGroupMutationInput,
   UpdateGroupMutationResult,
 } from './unique-groups.consts';
-import { UniqueGroup } from './unique-groups.types';
+import { UniqueGroup, UniqueGroupWithMembers } from './unique-groups.types';
 
 const BATCH_SIZE = 100;
 
 @Injectable()
 export class UniqueGroupsService {
   private readonly logger = new Logger(this.constructor.name);
-  public constructor(private readonly scopeManagementClient: ScopeManagementClient) {}
+  public constructor(
+    @Inject(SCOPE_MANAGEMENT_CLIENT) private readonly scopeManagementClient: UniqueGraphqlClient,
+  ) {}
 
-  public async listAllGroups(): Promise<UniqueGroup[]> {
+  public async listAllGroups(): Promise<UniqueGroupWithMembers[]> {
     this.logger.log('Requesting all groups from Unique API');
 
     let skip = 0;
-    const groups: UniqueGroup[] = [];
+    const groups: UniqueGroupWithMembers[] = [];
 
     let batchCount = 0;
     do {
       const batchResult = await this.scopeManagementClient.get(
         async (client) =>
-          await client.request<ListGroupsQueryResult, ListGroupsQueryInput>(LIST_GROUPS_QUERY, {
-            externalIdPrefix: SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX,
-            skip,
-            take: BATCH_SIZE,
-          }),
+          await client.request<ListGroupsQueryResult<true>, ListGroupsQueryInput>(
+            getListGroupsQuery(true),
+            {
+              where: {
+                externalId: {
+                  startsWith: SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX,
+                },
+              },
+              skip,
+              take: BATCH_SIZE,
+            },
+          ),
       );
       groups.push(
         ...batchResult.listGroups.map((group) => ({
@@ -61,7 +70,31 @@ export class UniqueGroupsService {
     return groups;
   }
 
-  public async createGroup(group: Omit<UniqueGroup, 'id' | 'memberIds'>): Promise<UniqueGroup> {
+  public async getRootGroup(): Promise<UniqueGroup | null> {
+    this.logger.log('Requesting root group from Unique API');
+
+    const result = await this.scopeManagementClient.get(
+      async (client) =>
+        await client.request<ListGroupsQueryResult<false>, ListGroupsQueryInput>(
+          getListGroupsQuery(false),
+          {
+            skip: 0,
+            take: 1,
+            where: {
+              name: {
+                equals: 'Root Group',
+              },
+            },
+          },
+        ),
+    );
+
+    return result.listGroups[0] ?? null;
+  }
+
+  public async createGroup(
+    group: Omit<UniqueGroupWithMembers, 'id' | 'memberIds'>,
+  ): Promise<UniqueGroupWithMembers> {
     const result = await this.scopeManagementClient.get(
       async (client) =>
         await client.request<CreateGroupMutationResult, CreateGroupMutationInput>(
@@ -81,8 +114,8 @@ export class UniqueGroupsService {
   }
 
   public async updateGroup(
-    group: Omit<UniqueGroup, 'memberIds' | 'externalId'>,
-  ): Promise<Omit<UniqueGroup, 'memberIds'>> {
+    group: Omit<UniqueGroupWithMembers, 'memberIds' | 'externalId'>,
+  ): Promise<Omit<UniqueGroupWithMembers, 'memberIds'>> {
     const result = await this.scopeManagementClient.get(
       async (client) =>
         await client.request<UpdateGroupMutationResult, UpdateGroupMutationInput>(
