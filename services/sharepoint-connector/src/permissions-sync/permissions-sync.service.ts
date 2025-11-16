@@ -1,19 +1,24 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { filter, flat, indexBy, mapKeys, mapValues, pipe, prop, uniqueBy, values } from 'remeda';
+import { Config } from '../config';
+import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX } from '../unique-api/unique-groups/unique-groups.consts';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
-import { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
+import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { elapsedSecondsLog } from '../utils/timing.util';
-import { FetchGraphPermissionsMapQuery } from './fetch-graph-permissions-map.query';
+import { FetchGraphPermissionsMapQuery, PermissionsMap } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
 import { SyncSharepointFilesPermissionsToUniqueCommand } from './sync-sharepoint-files-permissions-to-unique.command';
+import { SyncSharepointFolderPermissionsToUniqueCommand } from './sync-sharepoint-folder-permissions-to-unique.command';
 import { SyncSharepointGroupsToUniqueCommand } from './sync-sharepoint-groups-to-unique.command';
-import { UniqueGroupsMap, UniqueUsersMap } from './types';
+import { SharePointGroupsMap, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
 interface Input {
@@ -23,7 +28,8 @@ interface Input {
     directories: SharepointDirectoryItem[];
   };
   unique: {
-    folders: (Scope & { path: string })[];
+    // We will not pass unique folders for flat ingestion mode
+    folders: ScopeWithPath[] | null;
   };
 }
 
@@ -36,42 +42,35 @@ export class PermissionsSyncService {
     private readonly fetchGroupsWithMembershipsQuery: FetchGroupsWithMembershipsQuery,
     private readonly syncSharepointGroupsToUniqueCommand: SyncSharepointGroupsToUniqueCommand,
     private readonly syncSharepointFilesPermissionsToUniqueCommand: SyncSharepointFilesPermissionsToUniqueCommand,
+    private readonly syncSharepointFolderPermissionsToUniqueCommand: SyncSharepointFolderPermissionsToUniqueCommand,
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly uniqueUsersService: UniqueUsersService,
+    private readonly configService: ConfigService<Config, true>,
   ) {}
 
   public async syncPermissionsForSite(input: Input): Promise<void> {
-    const { siteId, sharePoint, unique: _unique } = input;
+    const { siteId, sharePoint, unique } = input;
     const logPrefix = `[SiteId: ${siteId}]`;
     this.logger.log(
       `${logPrefix} Starting permissions fetching for ${sharePoint.items.length} items and ` +
         `${sharePoint.directories.length} directories`,
     );
     const permissionsFetchStartTime = Date.now();
-    const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(siteId, sharePoint.items);
+    const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(siteId, [
+      ...sharePoint.items,
+      ...sharePoint.directories,
+    ]);
     this.logger.log(
       `${logPrefix} Fetched permissions for ${sharePoint.items.length} items in ${elapsedSecondsLog(permissionsFetchStartTime)}`,
     );
 
-    const uniqueGroupPermissions = pipe(
-      permissionsMap,
-      values(),
-      flat(),
-      filter((permission) => permission.type !== 'user'),
-      uniqueBy(groupDistinctId),
-    );
-    this.logger.log(
-      `${logPrefix} Fetching groups with memberships from SharePoint & Graph APIs for ` +
-        `${uniqueGroupPermissions.length} unique group permissions`,
-    );
-    const groupsWithMemberships = await this.fetchGroupsWithMembershipsQuery.run(
+    const groupsWithMembershipsMap = await this.fetchGroupsWithMembershipsForSite(
       siteId,
-      uniqueGroupPermissions,
+      permissionsMap,
     );
-    this.logger.log(`${logPrefix} Groups with memberships fetched successfully`);
 
     this.logger.log(
-      `${logPrefix} Found ${Object.keys(groupsWithMemberships).length} groups with memberships`,
+      `${logPrefix} Fetched ${Object.keys(groupsWithMembershipsMap).length} groups with memberships`,
     );
 
     const uniqueUsersMap = await this.getUniqueUsersMap();
@@ -83,7 +82,7 @@ export class PermissionsSyncService {
 
     const { updatedUniqueGroupsMap } = await this.syncSharepointGroupsToUniqueCommand.run({
       siteId,
-      sharePoint: { groupsMap: groupsWithMemberships },
+      sharePoint: { groupsMap: groupsWithMembershipsMap },
       unique: { groupsMap: uniqueGroupsMap, usersMap: uniqueUsersMap },
     });
 
@@ -97,7 +96,44 @@ export class PermissionsSyncService {
       unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
     });
 
+    const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
+
+    if (ingestionMode === IngestionMode.Recursive) {
+      assert.ok(
+        unique.folders,
+        `[Site: ${siteId}] Folders are required for recursive ingestion mode`,
+      );
+      await this.syncSharepointFolderPermissionsToUniqueCommand.run({
+        siteId,
+        sharePoint: { directories: sharePoint.directories, permissionsMap },
+        unique: {
+          folders: unique.folders,
+          groupsMap: updatedUniqueGroupsMap,
+          usersMap: uniqueUsersMap,
+        },
+      });
+    }
+
     this.logger.log(`${logPrefix} Synced file permissions to Unique`);
+  }
+
+  private async fetchGroupsWithMembershipsForSite(
+    siteId: string,
+    permissionsMap: PermissionsMap,
+  ): Promise<SharePointGroupsMap> {
+    const logPrefix = `[Site: ${siteId}]`;
+    const uniqueGroupPermissions = pipe(
+      permissionsMap,
+      values(),
+      flat(),
+      filter((permission) => permission.type !== 'user'),
+      uniqueBy(groupDistinctId),
+    );
+    this.logger.log(
+      `${logPrefix} Fetching groups with memberships from SharePoint & Graph APIs for ` +
+        `${uniqueGroupPermissions.length} unique group permissions`,
+    );
+    return await this.fetchGroupsWithMembershipsQuery.run(siteId, uniqueGroupPermissions);
   }
 
   private async getUniqueUsersMap(): Promise<UniqueUsersMap> {

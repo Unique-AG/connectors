@@ -5,7 +5,10 @@ export interface Scope {
   name: string;
   parentId: string | null;
   scopeAccess?: ScopeAccess[];
-  path?: string;
+}
+
+export interface ScopeWithPath extends Scope {
+  path: string;
 }
 
 export interface ScopeAccess {

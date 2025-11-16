@@ -49,9 +49,7 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
     const uniqueFiles = await this.uniqueFilesService.getFilesForSite(siteId);
     this.logger.log(`${logPrefix} Fetched ${uniqueFiles.length} unique files`);
 
-    // We need current user id to be sure to not remove their access to file, because it won't be
-    // present in SharePoint, but should be present in Unique.
-    const currentUserId = await this.uniqueUsersService.getCurrentUserId();
+    const serviceUserId = await this.uniqueUsersService.getCurrentUserId();
     // Maps from scope id to permissions to add/remove, because API calls are limited to the scope
     const permissionsToAddByScopeId: Record<string, UniqueFileAccessInput[]> = {};
     const permissionsToRemoveByScopeId: Record<string, UniqueFileAccessInput[]> = {};
@@ -94,7 +92,10 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
         uniqueFileAccessInputsFromSharePoint,
         isDeepEqual,
       ).filter(
-        ({ entityType, entityId }) => !(entityType === 'USER' && entityId === currentUserId),
+        // We need to ensure we do not remove the service user's access to file. It won't be present
+        // in SharePoint, but should be present in Unique, so we filter out any removals for the
+        // service user.
+        ({ entityType, entityId }) => !(entityType === 'USER' && entityId === serviceUserId),
       );
       this.logger.debug(`${loopLogPrefix} ${permissionsToRemove.length} permissions to remove`);
       if (permissionsToRemove.length > 0) {

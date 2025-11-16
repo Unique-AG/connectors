@@ -3,7 +3,7 @@ import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
-import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
+import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { ScopeManagementService } from './scope-management.service';
 
 const createDriveContentItem = (path: string): SharepointContentItem => {
@@ -64,25 +64,25 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
 };
 
 describe('ScopeManagementService', () => {
-  const mockScopes: Scope[] = [
-    { id: 'scope_1', name: 'test1', parentId: null, path: 'test1' },
+  const mockScopes: ScopeWithPath[] = [
+    { id: 'scope_1', name: 'test1', parentId: null, path: '/test1' },
     {
       id: 'scope_2',
       name: 'test1',
       parentId: 'scope_1',
-      path: 'test1/test1',
+      path: '/test1/test1',
     },
     {
       id: 'scope_3',
       name: 'UniqueAG',
       parentId: 'scope_2',
-      path: 'test1/test1/UniqueAG',
+      path: '/test1/test1/UniqueAG',
     },
     {
       id: 'scope_4',
       name: 'SitePages',
       parentId: 'scope_3',
-      path: 'test1/test1/UniqueAG/SitePages',
+      path: '/test1/test1/UniqueAG/SitePages',
     },
   ];
 
@@ -186,17 +186,17 @@ describe('ScopeManagementService', () => {
 
       expect(result).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ id: 'scope_1', name: 'test1', path: 'test1' }),
-          expect.objectContaining({ id: 'scope_2', name: 'test1', path: 'test1/test1' }),
+          expect.objectContaining({ id: 'scope_1', name: 'test1', path: '/test1' }),
+          expect.objectContaining({ id: 'scope_2', name: 'test1', path: '/test1/test1' }),
           expect.objectContaining({
             id: 'scope_3',
             name: 'UniqueAG',
-            path: 'test1/test1/UniqueAG',
+            path: '/test1/test1/UniqueAG',
           }),
           expect.objectContaining({
             id: 'scope_4',
             name: 'SitePages',
-            path: 'test1/test1/UniqueAG/SitePages',
+            path: '/test1/test1/UniqueAG/SitePages',
           }),
         ]),
       );

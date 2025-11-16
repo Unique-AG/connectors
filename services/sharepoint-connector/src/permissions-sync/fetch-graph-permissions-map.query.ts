@@ -15,7 +15,7 @@ import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './
 // as memberships of groups. These are the same structures, so for the ease of code reading we ranem
 // the local type name.
 type Permission = Membership;
-type PermissionsMap = Record<string, Permission[]>;
+export type PermissionsMap = Record<string, Permission[]>;
 type PermissionsFetcher = Record<AnySharepointItem['itemType'], () => Promise<SimplePermission[]>>;
 
 @Injectable()

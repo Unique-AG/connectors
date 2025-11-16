@@ -4,7 +4,7 @@ import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
-import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
+import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
@@ -40,7 +40,7 @@ export class SharepointSynchronizationService {
 
     for (const siteId of siteIdsToScan) {
       const logPrefix = `[SiteId: ${siteId}]`;
-      let scopes: Scope[] | undefined;
+      let scopes: ScopeWithPath[] | null = null;
       const siteStartTime = Date.now();
 
       const { items, directories } = await this.graphApiService.getAllSiteItems(siteId);
@@ -80,8 +80,7 @@ export class SharepointSynchronizationService {
           await this.permissionsSyncService.syncPermissionsForSite({
             siteId,
             sharePoint: { items, directories },
-            // TODO: Replace with list of scopes fetched before / during content sync
-            unique: { folders: [] as (Scope & { path: string })[] },
+            unique: { folders: scopes },
           });
         } catch (error) {
           this.logger.error({

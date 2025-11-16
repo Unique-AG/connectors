@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   differenceWith,
   filter,
@@ -10,13 +11,13 @@ import {
   map,
   partition,
   pipe,
-  prop,
 } from 'remeda';
+import { Config } from '../config';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
-import { Scope, ScopeAccess } from '../unique-api/unique-scopes/unique-scopes.types';
+import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { buildIngestionItemKey } from '../utils/sharepoint.util';
+import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -27,7 +28,7 @@ interface Input {
     permissionsMap: Record<string, Membership[]>;
   };
   unique: {
-    folders: (Scope & { path: string })[];
+    folders: ScopeWithPath[];
     groupsMap: UniqueGroupsMap;
     usersMap: UniqueUsersMap;
   };
@@ -40,18 +41,17 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
+    private readonly configService: ConfigService<Config, true>,
   ) {}
 
   public async run(input: Input): Promise<void> {
     const { siteId, sharePoint, unique } = input;
     const logPrefix = `[Site: ${siteId}]`;
     this.logger.log(
-      `${logPrefix} Starting folder permissions sync for ${unique.folders.length} Uniquefolders`,
+      `${logPrefix} Starting folder permissions sync for ${unique.folders.length} Unique folders`,
     );
 
-    // We need current user id to be sure to not remove their access to folder, because it won't be
-    // present in SharePoint, but should be present in Unique.
-    const currentUserId = await this.uniqueUsersService.getCurrentUserId();
+    const serviceUserId = await this.uniqueUsersService.getCurrentUserId();
     const sharePointDirectoriesPathMap = this.getSharePointDirectoriesPathMap(
       sharePoint.directories,
     );
@@ -88,22 +88,20 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
         unique.usersMap,
       );
 
-      const uniqueScopeAccesses = uniqueFolder.scopeAccess.filter(
-        (scopeAccess) =>
-          scopeAccess.entityType === 'USER' && scopeAccess.entityId === 'service-user',
-      );
-
       const scopeAccessesToAdd = differenceWith(
         sharePointScopeAccesses,
-        uniqueScopeAccesses,
+        uniqueFolder.scopeAccess,
         isDeepEqual,
       );
       const scopeAccessesToRemove = differenceWith(
-        uniqueScopeAccesses,
+        uniqueFolder.scopeAccess,
         sharePointScopeAccesses,
         isDeepEqual,
       ).filter(
-        ({ entityType, entityId }) => !(entityType === 'USER' && entityId === currentUserId),
+        // We need to ensure we do not remove the service user's access to folder. It won't be
+        // present in SharePoint, but should be present in Unique, so we filter out any removals for
+        // the service user.
+        ({ entityType, entityId }) => !(entityType === 'USER' && entityId === serviceUserId),
       );
 
       this.logger.debug(
@@ -122,9 +120,11 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   private getSharePointDirectoriesPathMap(
     directories: SharepointDirectoryItem[],
   ): Record<string, SharepointDirectoryItem> {
-    // TODO: Once Lorand's PR is merged, we have to use whatever util he uses to get path out of
-    //       directory sharepoint item to match it against path from unique folders.
-    return indexBy(directories, prop('item', 'listItem', 'webUrl'));
+    const rootScopeName = this.configService.get('unique.rootScopeName', {
+      infer: true,
+    });
+    assert.ok(rootScopeName, 'rootScopeName must be configured');
+    return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootScopeName));
   }
 
   private mapSharePointPermissionsToScopeAccesses(

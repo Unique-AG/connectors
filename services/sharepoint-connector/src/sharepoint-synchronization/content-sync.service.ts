@@ -10,7 +10,7 @@ import type {
 } from '../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
-import type { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
+import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { normalizeError } from '../utils/normalize-error';
 import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
@@ -33,7 +33,7 @@ export class ContentSyncService {
   public async syncContentForSite(
     siteId: string,
     items: SharepointContentItem[],
-    scopes?: Scope[],
+    scopes: ScopeWithPath[] | null,
   ): Promise<void> {
     const logPrefix = `[SiteId: ${siteId}] `;
     const processStartTime = Date.now();

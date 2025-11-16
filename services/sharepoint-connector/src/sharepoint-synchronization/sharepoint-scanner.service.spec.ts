@@ -105,7 +105,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       'site-1',
       [mockFile],
-      undefined,
+      null,
     );
   });
 

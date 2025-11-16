@@ -113,7 +113,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [mockFile],
-      undefined,
+      null,
     );
   });
 
@@ -123,7 +123,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [mockFile],
-      undefined,
+      null,
     );
   });
 
@@ -210,7 +210,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
       siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       sharePoint: { items: [mockFile], directories: [] },
-      unique: { folders: [] },
+      unique: { folders: null },
     });
   });
 
@@ -307,7 +307,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [fileWithAllFields],
-      undefined,
+      null,
     );
   });
 
@@ -372,7 +372,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [fileWithoutTimestamp],
-      undefined,
+      null,
     );
   });
 
@@ -539,7 +539,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [file1, file2, file3],
-      undefined,
+      null,
     );
   });
 });
