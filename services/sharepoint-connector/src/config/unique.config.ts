@@ -17,7 +17,7 @@ const clusterLocalConfig = z.object({
     .pipe(parseJsonEnvironmentVariable('UNIQUE_SERVICE_EXTRA_HEADERS'))
     .refine(
       (headers) => {
-        const providedHeaders = Object.keys(headers).map((key) => key.toLowerCase());
+        const providedHeaders = Object.keys(headers);
         const requiredHeaders = ['x-company-id', 'x-user-id'];
         return requiredHeaders.every((header) => providedHeaders.includes(header));
       },
