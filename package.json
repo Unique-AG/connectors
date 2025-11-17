@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
-    "dev": "concurrently --kill-others -P \"turbo watch build --filter='./packages/*'\" \"turbo dev {@}\"",
+    "dev": "turbo dev",
+    "watch:dev": "turbo watch dev --experimental-write-cache",
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate",
     "db:check": "turbo db:check",
@@ -13,20 +14,17 @@
     "test:e2e": "turbo test:e2e",
     "test:e2e:watch": "turbo test:e2e:watch",
     "test:coverage": "turbo test:coverage",
-    "lint": "biome check .",
-    "lint:fix": "biome check . --write",
-    "format": "biome format .",
-    "format:fix": "biome format . --write",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
     "check-types": "turbo check-types",
     "syncpack": "syncpack",
     "clean:force": "rimraf -g \"**/node_modules\" \"**/.turbo\" \"**/dist\" \"**/.turbo\" \"**/coverage\" \"**/@generated\" \"**/*.tsbuildinfo\" && pnpm store prune && pnpm cache delete"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.2",
-    "concurrently": "^9.2.1",
     "rimraf": "^6.0.1",
     "syncpack": "14.0.0-alpha.19",
-    "turbo": "^2.5.6",
+    "turbo": "^2.6.0",
     "typescript": "^5.9.2",
     "unplugin-swc": "^1.5.7",
     "vitest": "^3.2.4"

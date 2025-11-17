@@ -80,13 +80,9 @@ jobs:
         working-directory: .
         run: pnpm syncpack format --check && pnpm syncpack lint
 
-      - name: Run lint
+      - name: Run style
         working-directory: ${{ env.SERVICE_PATH }}
-        run: pnpm lint
-        
-      - name: Check formatting
-        working-directory: ${{ env.SERVICE_PATH }}
-        run: pnpm format
+        run: pnpm style
         
       - name: Type check
         working-directory: ${{ env.SERVICE_PATH }}
