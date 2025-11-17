@@ -62,6 +62,10 @@
           "type": "generic",
           "path": "deploy/helm-charts/sharepoint-connector/values.yaml"
         }
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/sharepoint-connector/README.md"
+        }
       ]
     }
   }
