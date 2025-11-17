@@ -106,7 +106,8 @@ connectorConfig:
       clientId: null
       # -- path to the private key file of the Azure AD application certificate in PEM format
       # this closely relates to the volumeMounts and volume definitions in the connector section
-      # users wanting to use another path can override this value and unset the volumeMounts and volume definitions
+      # users wanting to use another path can override this value and unset the volumeMounts and
+      # volume definitions
       privateKeyPath: /app/key.pem
       privateKeyPassword: null
       thumbprintSha1: null
@@ -133,14 +134,16 @@ connectorConfig:
     # flat: sync all files to a single root scope/folder
     # recursive: maintain the folder hierarchy
     ingestionMode: recursive
-    # -- name of the root scope/folder in the knowledge base where SharePoint content should be synced (for recursive mode). It will be created by the connector. If this scope name already exists and the service-user does not have read+write access to it it will fail.
+    # -- name of the root scope/folder in the knowledge base where SharePoint content should be
+    # synced (for recursive mode). It will be created by the connector. If this scope name already
+    # exists and the service-user does not have read+write access to it it will fail.
     # example: SharePoint Content
     rootScopeName: null
-    # -- scope id for the scope based ingestion
+    # -- scope id of the target scope for flat ingestion mode
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion
     apiRateLimitPerMinute: 100
-    # -- Object containing extra HTTP headers for ingestion API requests (GraphQL and file diff)
+    # -- Object containing extra HTTP headers for Unique API requests (GraphQL and REST)
     # Used for service-to-service authentication when using internal cluster URLs
     serviceExtraHeaders: {}
       # x-company-id: 1234567890
@@ -152,13 +155,18 @@ connectorConfig:
       # -- project id for the zitadel project
       # example: 225317577440629999
       projectId: unset_default_value
-      # -- Object containing extra HTTP headers for Zitadel OAuth requests
-      serviceExtraHeaders: {}
-        # x-zitadel-instance-host: id.qa.unique.app
 
   processing:
+    # -- mode of synchronization from SharePoint to Unique.
+    # Possible values:
+    # - content_only: sync only the content,
+    # - content_and_permissions: sync both content and permissions,
+    syncMode: content_only
+    # -- timeout in seconds for a file processing step before it will stop and skip processing the file
     stepTimeoutSeconds: 300
+    # -- how many files you want to submit for ingestion into Unique at once
     concurrency: 1
+    # -- list of allowed MIME types for files to sync
     allowedMimeTypes:
       - application/pdf
       - text/plain

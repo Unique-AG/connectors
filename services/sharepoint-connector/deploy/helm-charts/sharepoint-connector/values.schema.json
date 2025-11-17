@@ -234,8 +234,17 @@
         "processing": {
           "type": "object",
           "description": "Files processing configuration",
-          "required": ["allowedMimeTypes", "concurrency"],
+          "required": ["allowedMimeTypes", "concurrency", "syncMode"],
           "properties": {
+            "syncMode": {
+              "type": "string",
+              "enum": ["content_only", "content_and_permissions"],
+              "description": "Mode of synchronization from SharePoint to Unique",
+              "examples": [
+                "content_only",
+                "content_and_permissions"
+              ]
+            },
             "allowedMimeTypes": {
               "type": "array",
               "items": {
