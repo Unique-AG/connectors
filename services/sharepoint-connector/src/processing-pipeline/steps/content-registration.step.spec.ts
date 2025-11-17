@@ -72,6 +72,7 @@ describe('ContentRegistrationStep', () => {
       knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
       mimeType: 'application/pdf',
       scopeId: 'scope-1',
+      fileStatus: 'new',
       pipelineItem: {
         itemType: 'listItem',
         item: listItem,
