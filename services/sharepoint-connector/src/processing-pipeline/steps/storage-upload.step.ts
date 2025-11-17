@@ -62,9 +62,8 @@ export class StorageUploadStep implements IPipelineStep {
         body: context.contentBuffer,
       });
 
-      const responseBody = await response.body.text().catch(() => 'Unable to read response body');
-
       if (response.statusCode < 200 || response.statusCode >= HTTP_STATUS_OK_MAX) {
+        const responseBody = await response.body.text().catch(() => 'Unable to read response body');
         throw new Error(
           `Upload failed with status ${response.statusCode}. Response: ${responseBody}`,
         );
