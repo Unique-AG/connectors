@@ -13,6 +13,7 @@ export interface ProcessingContext {
   startTime: Date;
   mimeType?: string;
   registrationResponse?: IngestionApiResponse;
+  fileStatus: 'new' | 'updated';
 }
 
 export interface PipelineResult {

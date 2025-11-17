@@ -16,27 +16,38 @@ export class ItemProcessingOrchestratorService {
 
   public async processItems(
     siteId: string,
-    items: SharepointContentItem[],
+    newItems: SharepointContentItem[],
+    updatedItems: SharepointContentItem[],
     getScopeIdForItem: (itemId: string) => string,
   ): Promise<void> {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
 
-    if (items.length === 0) {
+    if (newItems.length === 0 && updatedItems.length === 0) {
       this.logger.log(`No items to process for site ${siteId}`);
       return;
     }
 
-    this.logger.log(`Processing ${items.length} items for site ${siteId}`);
-
-    const results = await Promise.allSettled(
-      items.map((item) =>
-        limit(async () => {
-          const scopeId = getScopeIdForItem(item.item.id);
-          await this.processingPipelineService.processItem(item, scopeId);
-        }),
-      ),
+    this.logger.log(
+      `Processing ${newItems.length + updatedItems.length} items for site ${siteId} ` +
+        `(${newItems.length} new, ${updatedItems.length} updated)`,
     );
+
+    const newItemsPromises = newItems.map((item) =>
+      limit(async () => {
+        const scopeId = getScopeIdForItem(item.item.id);
+        await this.processingPipelineService.processItem(item, scopeId, 'new');
+      }),
+    );
+
+    const updatedItemsPromises = updatedItems.map((item) =>
+      limit(async () => {
+        const scopeId = getScopeIdForItem(item.item.id);
+        await this.processingPipelineService.processItem(item, scopeId, 'updated');
+      }),
+    );
+
+    const results = await Promise.allSettled([...updatedItemsPromises, ...newItemsPromises]);
 
     const rejected = results.filter((result) => result.status === 'rejected');
     if (rejected.length > 0) {
