@@ -119,13 +119,13 @@ importers:
       pino-http:
         specifier: ^10.5.0
         version: 10.5.0
-      pino-pretty:
-        specifier: ^13.1.1
-        version: 13.1.1
     devDependencies:
       '@types/node':
         specifier: ^22.13.14
         version: 22.16.5
+      pino-pretty:
+        specifier: ^13.1.1
+        version: 13.1.1
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
