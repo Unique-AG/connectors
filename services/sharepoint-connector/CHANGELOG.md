@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-alpha.14](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.13...sharepoint-connector@v2.0.0-alpha.14) (2025-11-17)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** keep permissions of re-ingested files ([#115](https://github.com/Unique-AG/connectors/issues/115)) ([d8cbb0c](https://github.com/Unique-AG/connectors/commit/d8cbb0ccf1508d78eb0a736a9c797cbc789fedf7))
+
 ## [2.0.0-alpha.13](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.12...sharepoint-connector@v2.0.0-alpha.13) (2025-11-17)
 
 
