@@ -42,6 +42,7 @@ export class ProcessingPipelineService {
   public async processItem(
     pipelineItem: SharepointContentItem,
     scopeId: string,
+    fileStatus: 'new' | 'updated',
   ): Promise<PipelineResult> {
     const startTime = new Date();
     const correlationId = randomUUID();
@@ -53,6 +54,7 @@ export class ProcessingPipelineService {
       knowledgeBaseUrl: getItemUrl(pipelineItem),
       mimeType: this.resolveMimeType(pipelineItem),
       scopeId,
+      fileStatus,
     };
 
     this.logger.log(

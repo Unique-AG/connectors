@@ -77,6 +77,7 @@ describe('ContentFetchingStep', () => {
       knowledgeBaseUrl: 'https://sharepoint.example.com/test.pdf',
       mimeType: 'application/pdf',
       scopeId: 'scope-1',
+      fileStatus: 'new',
       pipelineItem: {
         itemType: 'driveItem',
         item: driveItem,

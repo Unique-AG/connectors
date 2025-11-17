@@ -48,7 +48,9 @@ export class ContentRegistrationStep implements IPipelineStep {
     };
 
     const syncMode = this.configService.get('processing.syncMode', { infer: true });
-    if (syncMode === 'content_and_permissions') {
+    // We add permissions only for new files, because existing ones should already have correct
+    // permissions (including service user permissions) and we don't want to override them.
+    if (syncMode === 'content_and_permissions' && context.fileStatus === 'new') {
       const currentUserId = await this.uniqueUsersService.getCurrentUserId();
       contentRegistrationRequest.fileAccess = [
         `u:${currentUserId}R`,

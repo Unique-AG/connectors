@@ -55,13 +55,16 @@ export class ContentSyncService {
     }
 
     // 3. Process new/updated files
-    const fileKeysToSync = new Set([...diffResult.newFiles, ...diffResult.updatedFiles]);
-    if (fileKeysToSync.size === 0) {
+    const newFileKeys = new Set(diffResult.newFiles);
+    const updatedFileKeys = new Set(diffResult.updatedFiles);
+
+    if (newFileKeys.size === 0 && updatedFileKeys.size === 0) {
       this.logger.log(`${logPrefix} No new/updated files to sync`);
       return;
     }
 
-    const itemsToSync = items.filter((item) => fileKeysToSync.has(item.item.id));
+    const newItems = items.filter((item) => newFileKeys.has(item.item.id));
+    const updatedItems = items.filter((item) => updatedFileKeys.has(item.item.id));
 
     const configuredScopeId = this.configService.get('unique.scopeId', { infer: true });
 
@@ -72,7 +75,7 @@ export class ContentSyncService {
         return scopeId;
       }
 
-      const item = itemsToSync.find((item) => item.item.id === itemId);
+      const item = [...newItems, ...updatedItems].find((item) => item.item.id === itemId);
       if (!item) {
         this.logger.warn(
           `${logPrefix} Cannot determine scope for item because item with id: ${itemId} not found`,
@@ -82,7 +85,7 @@ export class ContentSyncService {
       return this.scopeManagementService.determineScopeForItem(item, scopes) || scopeId;
     };
 
-    await this.orchestrator.processItems(siteId, itemsToSync, getScopeIdForItem);
+    await this.orchestrator.processItems(siteId, newItems, updatedItems, getScopeIdForItem);
 
     this.logger.log(
       `${logPrefix} Finished processing all content operations in ${elapsedSecondsLog(processStartTime)}`,
