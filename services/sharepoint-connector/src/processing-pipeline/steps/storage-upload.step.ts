@@ -45,6 +45,15 @@ export class StorageUploadStep implements IPipelineStep {
     assert.ok(context.contentBuffer, 'Content buffer not found - content fetching may have failed');
     assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
 
+    this.logger.debug({
+      msg: 'performUpload details:',
+      fileId: context.pipelineItem.item.id,
+      driveId: context.pipelineItem.driveId,
+      siteId: context.pipelineItem.siteId,
+      uploadUrl: context.uploadUrl,
+      mimeType: context.mimeType,
+    });
+
     const mimeType = context.mimeType;
     try {
       const response = await request(context.uploadUrl, {
@@ -54,7 +63,10 @@ export class StorageUploadStep implements IPipelineStep {
       });
 
       if (response.statusCode < 200 || response.statusCode >= HTTP_STATUS_OK_MAX) {
-        throw new Error(`Upload failed with status ${response.statusCode}`);
+        const responseBody = await response.body.text().catch(() => 'Unable to read response body');
+        throw new Error(
+          `Upload failed with status ${response.statusCode}. Response: ${responseBody}`,
+        );
       }
 
       this.logger.debug(`[${context.correlationId}] Upload completed successfully`);
