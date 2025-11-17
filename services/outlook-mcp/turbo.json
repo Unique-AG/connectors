@@ -3,15 +3,11 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "dependsOn": ["db:generate", "codegen", "^build"],
+      "dependsOn": ["^build"],
       "outputs": ["dist/**/*"]
     },
-    "codegen": {
-      "dependsOn": ["^codegen"],
-      "outputs": ["@generated/**/*"]
-    },
     "db:generate": {
-      "dependsOn": ["^db:generate"],
+      "dependsOn": ["db:generate"],
       "outputs": ["drizzle/**/*"]
     },
     "test": {
