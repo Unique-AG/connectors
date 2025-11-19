@@ -182,6 +182,11 @@
               "minimum": 0,
               "description": "Maximum number of files to ingest per site in a single run. If the number of new + updated files for a site exceeds this limit, the sync for that site will fail."
             },
+            "storeInternally": {
+              "type": "string",
+              "enum": ["enabled", "disabled"],
+              "description": "Whether to store content internally in Unique or not."
+            },
             "authMode": {
               "type": "string",
               "enum": ["cluster_local", "external"],

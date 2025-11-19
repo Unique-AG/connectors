@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
+import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
@@ -31,6 +32,7 @@ export class UniqueFileIngestionService {
   ) {}
 
   public async registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse> {
+    const uniqueConfig = this.configService.get('unique', { infer: true });
     const variables: ContentUpsertMutationInput = {
       input: {
         key: request.key,
@@ -44,7 +46,7 @@ export class UniqueFileIngestionService {
       sourceOwnerType: request.sourceOwnerType,
       sourceKind: request.sourceKind,
       sourceName: request.sourceName,
-      storeInternally: false,
+      storeInternally: uniqueConfig.storeInternally === StoreInternallyMode.Enabled,
       baseUrl: request.baseUrl,
     };
 
@@ -65,6 +67,7 @@ export class UniqueFileIngestionService {
   }
 
   public async finalizeIngestion(request: IngestionFinalizationRequest): Promise<{ id: string }> {
+    const uniqueConfig = this.configService.get('unique', { infer: true });
     const variables: ContentUpsertMutationInput = {
       input: {
         key: request.key,
@@ -79,7 +82,7 @@ export class UniqueFileIngestionService {
       sourceName: request.sourceName,
       sourceKind: request.sourceKind,
       fileUrl: request.fileUrl,
-      storeInternally: false,
+      storeInternally: uniqueConfig.storeInternally === StoreInternallyMode.Enabled,
       baseUrl: request.baseUrl,
     };
 

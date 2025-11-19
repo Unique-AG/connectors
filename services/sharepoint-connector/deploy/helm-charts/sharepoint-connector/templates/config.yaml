@@ -50,6 +50,7 @@ data:
   {{- if hasKey .Values.connectorConfig.unique "maxIngestedFiles" }}
   UNIQUE_MAX_INGESTED_FILES: {{ .Values.connectorConfig.unique.maxIngestedFiles | quote }}
   {{- end }}
+  UNIQUE_STORE_INTERNALLY: {{ .Values.connectorConfig.unique.storeInternally | quote }}
   UNIQUE_SERVICE_AUTH_MODE: {{ .Values.connectorConfig.unique.authMode | quote }}
   {{- if eq .Values.connectorConfig.unique.authMode "cluster_local" }}
   UNIQUE_SERVICE_EXTRA_HEADERS: {{ .Values.connectorConfig.unique.serviceExtraHeaders | toJson | quote }}
