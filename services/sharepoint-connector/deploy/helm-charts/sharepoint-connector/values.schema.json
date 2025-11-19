@@ -177,6 +177,11 @@
               "type": "integer",
               "description": "Rate limiting for Unique API requests per minute"
             },
+            "storeInternally": {
+              "type": "string",
+              "enum": ["enabled", "disabled"],
+              "description": "Whether to store content internally in Unique or not."
+            },
             "authMode": {
               "type": "string",
               "enum": ["cluster_local", "external"],
