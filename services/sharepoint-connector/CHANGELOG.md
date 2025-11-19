@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-alpha.15](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.14...sharepoint-connector@v2.0.0-alpha.15) (2025-11-19)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** prefix create groups with site ID ([#120](https://github.com/Unique-AG/connectors/issues/120)) ([cd38551](https://github.com/Unique-AG/connectors/commit/cd385511d120f84fb48dff677d3e3d0a2254aed0))
+* **sharepoint-connector:** preformat terraform output ([#117](https://github.com/Unique-AG/connectors/issues/117)) ([91d7acb](https://github.com/Unique-AG/connectors/commit/91d7acbb2a56492dd30ce6ab453e5f58e917bc89))
+
 ## [2.0.0-alpha.14](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.13...sharepoint-connector@v2.0.0-alpha.14) (2025-11-17)
 
 
