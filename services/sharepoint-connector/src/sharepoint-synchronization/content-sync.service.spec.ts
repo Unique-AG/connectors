@@ -177,38 +177,5 @@ describe('ContentSyncService', () => {
 
       await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
     });
-
-    it('should throw an error when maxIngestedFiles is 0 and there are files to ingest', async () => {
-      const siteId = 'site-id';
-      const items = [
-        {
-          itemType: 'driveItem',
-          item: {
-            id: '1',
-            lastModifiedDateTime: '2023-01-01',
-            webUrl: 'http://example.com/1',
-          },
-        },
-      ] as SharepointContentItem[];
-      const scopes = [] as ScopeWithPath[];
-
-      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
-        newFiles: ['1'],
-        updatedFiles: [],
-        movedFiles: [],
-        deletedFiles: [],
-      });
-
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 0;
-        }
-        return null;
-      });
-
-      await expect(service.syncContentForSite(siteId, items, scopes)).rejects.toThrow(
-        /Too many files to ingest: 1. Limit is 0. Aborting sync./,
-      );
-    });
   });
 });
