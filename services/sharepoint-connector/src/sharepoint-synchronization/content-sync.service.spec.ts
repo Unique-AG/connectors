@@ -14,6 +14,7 @@ describe('ContentSyncService', () => {
   let service: ContentSyncService;
   let configService: ConfigService;
   let uniqueFileIngestionService: UniqueFileIngestionService;
+  let uniqueFilesService: UniqueFilesService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -62,6 +63,7 @@ describe('ContentSyncService', () => {
     service = module.get<ContentSyncService>(ContentSyncService);
     configService = module.get<ConfigService>(ConfigService);
     uniqueFileIngestionService = module.get<UniqueFileIngestionService>(UniqueFileIngestionService);
+    uniqueFilesService = module.get<UniqueFilesService>(UniqueFilesService);
   });
 
   it('should be defined', () => {
@@ -168,6 +170,205 @@ describe('ContentSyncService', () => {
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
         if (key === 'unique.maxIngestedFiles') {
           return undefined;
+        }
+        if (key === 'unique.scopeId') {
+          return 'scope-id';
+        }
+        return null;
+      });
+
+      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+    });
+
+    it('should not throw an error when no files need to be ingested', async () => {
+      const siteId = 'site-id';
+      const items = [] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: [],
+        updatedFiles: [],
+        movedFiles: [],
+        deletedFiles: ['deleted-file'],
+      });
+
+      vi.spyOn(uniqueFilesService, 'getFilesByKeys').mockResolvedValue([
+        {
+          id: 'deleted-file-id',
+          key: 'site-id/deleted-file',
+          fileAccess: [],
+          ownerType: 'user',
+          ownerId: 'user-id',
+        },
+      ]);
+
+      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
+        if (key === 'unique.maxIngestedFiles') {
+          return 1;
+        }
+        return null;
+      });
+
+      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+    });
+
+    it('should not throw an error when total files to ingest equals the limit', async () => {
+      const siteId = 'site-id';
+      const items = [
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '1',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/1',
+          },
+        },
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: ['1'],
+        updatedFiles: [],
+        movedFiles: [],
+        deletedFiles: [],
+      });
+
+      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
+        if (key === 'unique.maxIngestedFiles') {
+          return 1;
+        }
+        if (key === 'unique.scopeId') {
+          return 'scope-id';
+        }
+        return null;
+      });
+
+      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+    });
+
+    it('should throw an error with correct message format when limit is exceeded', async () => {
+      const siteId = 'test-site-123';
+      const items = [
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '1',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/1',
+          },
+        },
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '2',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/2',
+          },
+        },
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '3',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/3',
+          },
+        },
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: ['1', '2'],
+        updatedFiles: ['3'],
+        movedFiles: [],
+        deletedFiles: [],
+      });
+
+      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
+        if (key === 'unique.maxIngestedFiles') {
+          return 2;
+        }
+        return null;
+      });
+
+      await expect(service.syncContentForSite(siteId, items, scopes)).rejects.toThrow(
+        '[SiteId: test-site-123]  Too many files to ingest: 3. Limit is 2. Aborting sync.',
+      );
+    });
+
+    it('should handle limit validation with only new files', async () => {
+      const siteId = 'site-id';
+      const items = [
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '1',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/1',
+          },
+        },
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '2',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/2',
+          },
+        },
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: ['1', '2'],
+        updatedFiles: [],
+        movedFiles: [],
+        deletedFiles: [],
+      });
+
+      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
+        if (key === 'unique.maxIngestedFiles') {
+          return 2;
+        }
+        if (key === 'unique.scopeId') {
+          return 'scope-id';
+        }
+        return null;
+      });
+
+      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+    });
+
+    it('should handle limit validation with only updated files', async () => {
+      const siteId = 'site-id';
+      const items = [
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '1',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/1',
+          },
+        },
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '2',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/2',
+          },
+        },
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: [],
+        updatedFiles: ['1', '2'],
+        movedFiles: [],
+        deletedFiles: [],
+      });
+
+      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
+        if (key === 'unique.maxIngestedFiles') {
+          return 2;
         }
         if (key === 'unique.scopeId') {
           return 'scope-id';
