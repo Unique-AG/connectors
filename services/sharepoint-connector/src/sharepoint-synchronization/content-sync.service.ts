@@ -58,6 +58,15 @@ export class ContentSyncService {
     const newFileKeys = new Set(diffResult.newFiles);
     const updatedFileKeys = new Set(diffResult.updatedFiles);
 
+    const totalFilesToIngest = newFileKeys.size + updatedFileKeys.size;
+    const maxIngestedFiles = this.configService.get('unique.maxIngestedFiles', { infer: true });
+
+    if (maxIngestedFiles && totalFilesToIngest > maxIngestedFiles) {
+      throw new Error(
+        `${logPrefix} Too many files to ingest: ${totalFilesToIngest}. Limit is ${maxIngestedFiles}. Aborting sync.`,
+      );
+    }
+
     if (newFileKeys.size === 0 && updatedFileKeys.size === 0) {
       this.logger.log(`${logPrefix} No new/updated files to sync`);
       return;

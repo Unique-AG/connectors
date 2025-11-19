@@ -177,6 +177,11 @@
               "type": "integer",
               "description": "Rate limiting for Unique API requests per minute"
             },
+            "maxIngestedFiles": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Maximum number of files to ingest in a single run. If the number of new + updated files exceeds this limit, the sync will fail."
+            },
             "authMode": {
               "type": "string",
               "enum": ["cluster_local", "external"],

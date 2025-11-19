@@ -79,6 +79,14 @@ const baseConfig = z
       .positive()
       .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
       .describe('Number of Unique API requests allowed per minute'),
+    maxIngestedFiles: z.coerce
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe(
+        'Maximum number of files to ingest in a single run. If the number of new + updated files exceeds this limit, the sync will fail.',
+      ),
   })
   .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {
     message: 'scopeId is required for FLAT ingestion mode',
