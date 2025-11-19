@@ -149,9 +149,7 @@ export class PermissionsSyncService {
     return pipe(
       await this.uniqueGroupsService.listAllGroupsForSite(siteId),
       indexBy(prop('externalId')),
-      mapKeys((groupExternalId) =>
-        groupExternalId.replace(new RegExp(`^${groupExternalIdPrefix}`), ''),
-      ),
+      mapKeys((groupExternalId) => groupExternalId.replace(groupExternalIdPrefix, '')),
     );
   }
 }
