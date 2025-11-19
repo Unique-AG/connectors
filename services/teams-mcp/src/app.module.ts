@@ -6,11 +6,12 @@ import { ProbeModule } from '@unique-ag/probe';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { context, trace } from '@opentelemetry/api';
 import { Cache } from 'cache-manager';
 import { MetricService, OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
+import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
 import { AMQPModule } from './amqp/amqp.module';
@@ -33,6 +34,7 @@ import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.modul
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
+import { TranscriptModule } from './transcript/transcript.module';
 
 @Module({
   imports: [
@@ -95,8 +97,8 @@ import { serverInstructions } from './server.instructions';
         clientSecret: configService.get('microsoft.clientSecret', { infer: true }).value,
         hmacSecret: configService.get('auth.hmacSecret', { infer: true }).value,
 
-        serverUrl: configService.get('app.selfUrl', { infer: true }),
-        resource: `${configService.get('app.selfUrl', { infer: true })}/mcp`,
+        serverUrl: configService.get('app.selfUrl', { infer: true }).toString().slice(0, -1),
+        resource: new URL("/mcp", configService.get('app.selfUrl', { infer: true })).toString(),
 
         accessTokenExpiresIn: configService.get('auth.accessTokenExpiresInSeconds', {
           infer: true,
@@ -123,13 +125,13 @@ import { serverInstructions } from './server.instructions';
     }),
     MsGraphModule,
     AMQPModule,
+    TranscriptModule,
   ],
   controllers: [ManifestController],
   providers: [
-    {
-      provide: APP_GUARD,
-      useClass: McpAuthJwtGuard,
-    },
+    { provide: APP_GUARD, useClass: McpAuthJwtGuard },
+    { provide: APP_PIPE, useClass: ZodValidationPipe },
+    { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
   ],
 })
 export class AppModule {}
