@@ -1,6 +1,5 @@
 import { gql } from 'graphql-request';
 
-export const SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX = 'SPC-';
 export const SHAREPOINT_CONNECTOR_GROUP_CREATED_BY = 'sharepoint-connector';
 
 export interface ListGroupsQueryInput {

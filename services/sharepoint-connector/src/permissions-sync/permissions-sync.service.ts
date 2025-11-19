@@ -8,8 +8,8 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX } from '../unique-api/unique-groups/unique-groups.consts';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
+import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/unique-groups/unique-groups.utils';
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { elapsedSecondsLog } from '../utils/timing.util';
@@ -74,7 +74,7 @@ export class PermissionsSyncService {
     );
 
     const uniqueUsersMap = await this.getUniqueUsersMap();
-    const uniqueGroupsMap = await this.getUniqueGroupsMap();
+    const uniqueGroupsMap = await this.getUniqueGroupsMap(siteId);
 
     this.logger.log(
       `${logPrefix} Found ${Object.keys(uniqueGroupsMap).length} unique groups and ${Object.keys(uniqueUsersMap).length} unique users`,
@@ -144,15 +144,13 @@ export class PermissionsSyncService {
     );
   }
 
-  private async getUniqueGroupsMap(): Promise<UniqueGroupsMap> {
+  private async getUniqueGroupsMap(siteId: string): Promise<UniqueGroupsMap> {
+    const groupExternalIdPrefix = getSharepointConnectorGroupExternalIdPrefix(siteId);
     return pipe(
-      await this.uniqueGroupsService.listAllGroups(),
+      await this.uniqueGroupsService.listAllGroupsForSite(siteId),
       indexBy(prop('externalId')),
       mapKeys((groupExternalId) =>
-        groupExternalId.replace(
-          new RegExp(`^${SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX}`),
-          '',
-        ),
+        groupExternalId.replace(new RegExp(`^${groupExternalIdPrefix}`), ''),
       ),
     );
   }
