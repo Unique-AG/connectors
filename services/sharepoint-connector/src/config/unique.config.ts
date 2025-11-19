@@ -3,6 +3,7 @@ import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod'
 import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import { IngestionMode } from '../constants/ingestion.constants';
+import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { Redacted } from '../utils/redacted';
 
@@ -79,6 +80,10 @@ const baseConfig = z
       .positive()
       .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
       .describe('Number of Unique API requests allowed per minute'),
+    storeInternally: z
+      .enum([StoreInternallyMode.Enabled, StoreInternallyMode.Disabled])
+      .default(StoreInternallyMode.Disabled)
+      .describe('Whether to store content internally in Unique or not.'),
   })
   .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {
     message: 'scopeId is required for FLAT ingestion mode',

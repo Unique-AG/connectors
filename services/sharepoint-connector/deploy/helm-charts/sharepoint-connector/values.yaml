@@ -142,6 +142,8 @@ connectorConfig:
     # -- scope id of the target scope for flat ingestion mode
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion
+    # -- Whether to store content internally in Unique or not.
+    storeInternally: disabled
     apiRateLimitPerMinute: 100
     # -- Object containing extra HTTP headers for Unique API requests (GraphQL and REST)
     # Used for service-to-service authentication when using internal cluster URLs
