@@ -47,7 +47,7 @@ data:
   {{- if .Values.connectorConfig.unique.apiRateLimitPerMinute }}
   UNIQUE_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.unique.apiRateLimitPerMinute | quote }}
   {{- end }}
-  {{- if .Values.connectorConfig.unique.maxIngestedFiles }}
+  {{- if hasKey .Values.connectorConfig.unique "maxIngestedFiles" }}
   UNIQUE_MAX_INGESTED_FILES: {{ .Values.connectorConfig.unique.maxIngestedFiles | quote }}
   {{- end }}
   UNIQUE_SERVICE_AUTH_MODE: {{ .Values.connectorConfig.unique.authMode | quote }}
