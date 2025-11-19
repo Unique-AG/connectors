@@ -1,9 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
+import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
@@ -69,7 +71,7 @@ describe('ContentSyncService', () => {
   describe('syncContentForSite', () => {
     it('should throw an error if the number of files to ingest exceeds the limit', async () => {
       const siteId = 'site-id';
-      const items: any[] = [
+      const items = [
         {
           itemType: 'driveItem',
           item: {
@@ -86,8 +88,8 @@ describe('ContentSyncService', () => {
             webUrl: 'http://example.com/2',
           },
         },
-      ];
-      const scopes: any[] = [];
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1'],
@@ -110,7 +112,7 @@ describe('ContentSyncService', () => {
 
     it('should not throw an error if the number of files to ingest is within the limit', async () => {
       const siteId = 'site-id';
-      const items: any[] = [
+      const items = [
         {
           itemType: 'driveItem',
           item: {
@@ -119,8 +121,8 @@ describe('ContentSyncService', () => {
             webUrl: 'http://example.com/1',
           },
         },
-      ];
-      const scopes: any[] = [];
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1'],
@@ -144,7 +146,7 @@ describe('ContentSyncService', () => {
 
     it('should not throw an error if the limit is not set', async () => {
       const siteId = 'site-id';
-      const items: any[] = [
+      const items = [
         {
           itemType: 'driveItem',
           item: {
@@ -153,8 +155,8 @@ describe('ContentSyncService', () => {
             webUrl: 'http://example.com/1',
           },
         },
-      ];
-      const scopes: any[] = [];
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1'],
