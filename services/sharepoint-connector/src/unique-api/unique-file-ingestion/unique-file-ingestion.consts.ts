@@ -2,6 +2,14 @@ import { gql } from 'graphql-request';
 import type { FileAccessKey } from '../unique-files/unique-files.types';
 import type { IngestionApiResponse } from './unique-file-ingestion.types';
 
+export interface IngestionConfig {
+  uniqueIngestionMode?:
+    | 'SKIP_INGESTION'
+    | 'INGESTION'
+    | 'SKIP_EXCEL_INGESTION'
+    | 'EXTERNAL_INGESTION';
+}
+
 export interface ContentUpsertMutationInput {
   input: {
     key: string;
@@ -11,6 +19,7 @@ export interface ContentUpsertMutationInput {
     url?: string;
     byteSize?: number;
     fileAccess?: FileAccessKey[];
+    ingestionConfig?: IngestionConfig;
   };
   fileUrl?: string;
   chatId?: string;

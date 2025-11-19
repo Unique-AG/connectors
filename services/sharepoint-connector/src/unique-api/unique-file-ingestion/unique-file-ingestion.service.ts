@@ -41,6 +41,9 @@ export class UniqueFileIngestionService {
         ownerType: UniqueOwnerType.Scope,
         url: request.url,
         byteSize: request.byteSize,
+        ingestionConfig: {
+          uniqueIngestionMode: 'SKIP_INGESTION',
+        },
       },
       scopeId: request.scopeId,
       sourceOwnerType: request.sourceOwnerType,
@@ -76,6 +79,9 @@ export class UniqueFileIngestionService {
         ownerType: UniqueOwnerType.Scope,
         byteSize: request.byteSize,
         url: request.url,
+        ingestionConfig: {
+          uniqueIngestionMode: 'SKIP_INGESTION',
+        },
       },
       scopeId: request.scopeId,
       sourceOwnerType: request.sourceOwnerType,
