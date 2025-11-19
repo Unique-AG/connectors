@@ -45,7 +45,6 @@ export class ContentSyncService {
       `${logPrefix} File Diff Results: ${diffResult.newFiles.length} new, ${diffResult.updatedFiles.length} updated, ${diffResult.movedFiles.length} moved, ${diffResult.deletedFiles.length} deleted`,
     );
 
-    // Check maxIngestedFiles limit before any modifications
     const newFileKeys = new Set(diffResult.newFiles);
     const updatedFileKeys = new Set(diffResult.updatedFiles);
     const totalFilesToIngest = newFileKeys.size + updatedFileKeys.size;
