@@ -85,7 +85,7 @@ const baseConfig = z
       .nonnegative()
       .optional()
       .describe(
-        'Maximum number of files to ingest in a single run. If the number of new + updated files exceeds this limit, the sync will fail.',
+        'Maximum number of files to ingest per site in a single run. If the number of new + updated files for a site exceeds this limit, the sync for that site will fail.',
       ),
   })
   .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {
