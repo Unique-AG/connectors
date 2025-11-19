@@ -1,9 +1,9 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
-import { SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX } from '../unique-api/unique-groups/unique-groups.consts';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
+import { getSharepointConnectorGroupExternalId } from '../unique-api/unique-groups/unique-groups.utils';
 import {
   GroupDistinctId,
   SharePointGroupsMap,
@@ -64,7 +64,11 @@ export class SyncSharepointGroupsToUniqueCommand {
 
       const correspondingUniqueGroup = unique.groupsMap[sharePointGroup.id];
       if (!correspondingUniqueGroup) {
-        const newUniqueGroup = await this.createUniqueGroup(sharePointGroup, unique.usersMap);
+        const newUniqueGroup = await this.createUniqueGroup(
+          siteId,
+          sharePointGroup,
+          unique.usersMap,
+        );
         updatedUniqueGroupsMap[sharePointGroup.id] = newUniqueGroup;
         if (newUniqueGroup) {
           groupsSyncStats.created++;
@@ -129,6 +133,7 @@ export class SyncSharepointGroupsToUniqueCommand {
   }
 
   private async createUniqueGroup(
+    siteId: string,
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
   ): Promise<UniqueGroupWithMembers | null> {
@@ -140,7 +145,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
     const uniqueGroup = await this.uniqueGroupsService.createGroup({
       name: getUniqueGroupName(sharePointGroup.displayName),
-      externalId: `${SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX}${sharePointGroup.id}`,
+      externalId: getSharepointConnectorGroupExternalId(siteId, sharePointGroup.id),
     });
 
     await this.uniqueGroupsService.addGroupMembers(uniqueGroup.id, memberIds);

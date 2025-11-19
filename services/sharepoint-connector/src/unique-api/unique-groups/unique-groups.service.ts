@@ -18,12 +18,12 @@ import {
   RemoveGroupMemberMutationInput,
   RemoveGroupMemberMutationResult,
   SHAREPOINT_CONNECTOR_GROUP_CREATED_BY,
-  SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX,
   UPDATE_GROUP_MUTATION,
   UpdateGroupMutationInput,
   UpdateGroupMutationResult,
 } from './unique-groups.consts';
 import { UniqueGroup, UniqueGroupWithMembers } from './unique-groups.types';
+import { getSharepointConnectorGroupExternalIdPrefix } from './unique-groups.utils';
 
 const BATCH_SIZE = 100;
 
@@ -34,7 +34,7 @@ export class UniqueGroupsService {
     @Inject(SCOPE_MANAGEMENT_CLIENT) private readonly scopeManagementClient: UniqueGraphqlClient,
   ) {}
 
-  public async listAllGroups(): Promise<UniqueGroupWithMembers[]> {
+  public async listAllGroupsForSite(siteId: string): Promise<UniqueGroupWithMembers[]> {
     this.logger.log('Requesting all groups from Unique API');
 
     let skip = 0;
@@ -49,7 +49,7 @@ export class UniqueGroupsService {
             {
               where: {
                 externalId: {
-                  startsWith: SHAREPOINT_CONNECTOR_GROUP_EXTERNAL_ID_PREFIX,
+                  startsWith: getSharepointConnectorGroupExternalIdPrefix(siteId),
                 },
               },
               skip,

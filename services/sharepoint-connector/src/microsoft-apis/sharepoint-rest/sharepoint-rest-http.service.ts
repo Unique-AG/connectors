@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { chunk, identity } from 'remeda';
 import { Client, Dispatcher, interceptors } from 'undici';
@@ -10,6 +10,7 @@ import { createTokenRefreshInterceptor } from './token-refresh.interceptor';
 
 @Injectable()
 export class SharepointRestHttpService {
+  private readonly logger = new Logger(this.constructor.name);
   private readonly client: Dispatcher;
 
   public constructor(
@@ -88,10 +89,20 @@ export class SharepointRestHttpService {
         body: requestBody,
       });
 
-      assert.ok(
-        200 <= statusCode && statusCode < 300,
-        `Failed to request SharePoint batch endpoint ${path}: ${statusCode}`,
-      );
+      const isSuccess = 200 <= statusCode && statusCode < 300;
+      if (!isSuccess) {
+        const errorBody = await body.text();
+        this.logger.error({
+          msg: 'Failed to request SharePoint batch endpoint',
+          path,
+          requestBody,
+          statusCode,
+          errorBody,
+        });
+        assert.fail(
+          `Failed to request SharePoint batch endpoint: Code: ${statusCode}. Response: ${errorBody}`,
+        );
+      }
 
       // Example: multipart/mixed; boundary=batchresponse_a1182996-c482-49d1-ac38-16ae3788d990
       const responseBoundary = headers['content-type']?.toString().split(';')[1]?.split('=')[1];
