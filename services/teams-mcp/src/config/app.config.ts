@@ -1,5 +1,6 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
+import { stringToURL } from '~/utils/zod';
 
 const ConfigSchema = z
   .object({
@@ -18,7 +19,7 @@ const ConfigSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .prefault('info')
       .describe('The log level at which the services outputs (pino).'),
-    selfUrl: z.url().describe('The URL of the MCP Server. Used for oAuth callbacks.'),
+    selfUrl: stringToURL().describe('The URL of the MCP Server. Used for oAuth callbacks.'),
   })
   .transform((c) => ({
     ...c,

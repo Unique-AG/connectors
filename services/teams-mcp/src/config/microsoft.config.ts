@@ -14,6 +14,9 @@ const ConfigSchema = z.object({
   clientSecret: redacted(z.string().min(1)).describe(
     'The client secret of the Microsoft App Registration that the MCP Server will use.',
   ),
+  webhookSecret: redacted(z.string().length(128)).describe(
+    'The webhook secret for validating subscriptions hooks (spoof protection). Must be a 128 random characters.',
+  ),
 });
 
 export const microsoftConfig = registerConfig('microsoft', ConfigSchema);

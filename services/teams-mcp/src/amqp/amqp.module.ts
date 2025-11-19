@@ -1,7 +1,7 @@
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { Global, Module } from '@nestjs/common';
 import { type AMQPConfig, amqpConfig } from '../config';
-import { AMQP_EXCHANGE } from './amqp.constants';
+import { DEAD_EXCHANGE, DEAD_QUEUE, MAIN_EXCHANGE, PARKING_QUEUE } from './amqp.constants';
 import { AMQPService } from './amqp.service';
 
 @Global()
@@ -13,7 +13,8 @@ import { AMQPService } from './amqp.service';
         return {
           uri: config.url.value.toString(),
           connectionInitOptions: { wait: false },
-          exchanges: [AMQP_EXCHANGE],
+          exchanges: [MAIN_EXCHANGE, DEAD_EXCHANGE],
+          queues: [DEAD_QUEUE, PARKING_QUEUE],
           enableControllerDiscovery: true,
           // NOTE: (de)serialisation for empty messages doesn't work well with OTEL & json parsing
         };
