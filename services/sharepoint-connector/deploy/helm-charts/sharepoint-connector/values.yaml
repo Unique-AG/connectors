@@ -142,6 +142,9 @@ connectorConfig:
     # -- scope id of the target scope for flat ingestion mode
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
     scopeId: null # null if not using scope based ingestion
+    # -- Maximum number of files to ingest per site in a single run.
+    # If the number of new + updated files for a site exceeds this limit, the sync for that site will fail.
+    maxIngestedFiles: 1000
     # -- Whether to store content internally in Unique or not.
     storeInternally: disabled
     apiRateLimitPerMinute: 100

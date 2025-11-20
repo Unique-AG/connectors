@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
@@ -57,6 +58,15 @@ export class ContentSyncService {
     // 3. Process new/updated files
     const newFileKeys = new Set(diffResult.newFiles);
     const updatedFileKeys = new Set(diffResult.updatedFiles);
+
+    // Check limit only for new/updated files after deletions and moves are processed
+    const totalFilesToIngest = newFileKeys.size + updatedFileKeys.size;
+    const maxIngestedFiles = this.configService.get('unique.maxIngestedFiles', { infer: true });
+
+    assert.ok(
+      !maxIngestedFiles || totalFilesToIngest <= maxIngestedFiles,
+      `${logPrefix} Too many files to ingest: ${totalFilesToIngest}. Limit is ${maxIngestedFiles}. Aborting sync.`,
+    );
 
     if (newFileKeys.size === 0 && updatedFileKeys.size === 0) {
       this.logger.log(`${logPrefix} No new/updated files to sync`);

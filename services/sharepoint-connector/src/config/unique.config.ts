@@ -80,6 +80,14 @@ const baseConfig = z
       .positive()
       .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
       .describe('Number of Unique API requests allowed per minute'),
+    maxIngestedFiles: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Maximum number of files to ingest per site in a single run. If the number of new + updated files for a site exceeds this limit, the sync for that site will fail.',
+      ),
     storeInternally: z
       .enum([StoreInternallyMode.Enabled, StoreInternallyMode.Disabled])
       .default(StoreInternallyMode.Disabled)
