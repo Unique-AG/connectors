@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.0-alpha.16](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.15...sharepoint-connector@v2.0.0-alpha.16) (2025-11-20)
+
+
+### Features
+
+* **sharepoint-connector:** added skip ingestion config ([#124](https://github.com/Unique-AG/connectors/issues/124)) ([41f8138](https://github.com/Unique-AG/connectors/commit/41f8138b35f229fe29984d35b50abbec2f39337d))
+* **sharepoint-connector:** expose storeInternally as environment variable ([#121](https://github.com/Unique-AG/connectors/issues/121)) ([a30df30](https://github.com/Unique-AG/connectors/commit/a30df3068881311205932b92f5630018e4630fbe))
+* **sharepoint-connector:** Implemented max ingested files environment variable ([#122](https://github.com/Unique-AG/connectors/issues/122)) ([efef764](https://github.com/Unique-AG/connectors/commit/efef764b249ddb9820b338b5ff22e799c02309f7))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** add missing onResponseError ([#125](https://github.com/Unique-AG/connectors/issues/125)) ([59ea328](https://github.com/Unique-AG/connectors/commit/59ea328cb030ee05efb9f915f1dfc5be2583cd07))
+
 ## [2.0.0-alpha.15](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.14...sharepoint-connector@v2.0.0-alpha.15) (2025-11-19)
 
 
