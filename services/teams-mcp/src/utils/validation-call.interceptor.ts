@@ -19,6 +19,8 @@ export class ValidationCallInterceptor implements NestInterceptor {
   private readonly logger = new Logger(ValidationCallInterceptor.name);
 
   public intercept(context: ExecutionContext, next: CallHandler) {
+    if (context.getType() !== 'http') return next.handle();
+
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
 

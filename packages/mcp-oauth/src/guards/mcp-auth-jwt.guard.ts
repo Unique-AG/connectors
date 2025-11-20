@@ -25,6 +25,8 @@ export class McpAuthJwtGuard implements CanActivate {
   ) {}
 
   public async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (context.getType() !== 'http') return true;
+
     const request = context.switchToHttp().getRequest<McpAuthenticatedRequest>();
 
     // This is a global guard, as we cannot inject it into the McpModule
