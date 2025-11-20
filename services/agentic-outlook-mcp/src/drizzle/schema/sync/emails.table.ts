@@ -4,33 +4,16 @@ import {
   index,
   integer,
   jsonb,
-  pgEnum,
   pgTable,
   text,
   timestamp,
   varchar,
 } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
-import { z } from 'zod';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 import { folders } from './folders.table';
 import { points } from './points.table';
-
-export const ingestionStatusEnum = z.enum([
-  'pending',
-  'processed',
-  'densely-embedded',
-  'sparsely-embedded',
-  'completed',
-  'failed',
-]);
-export type IngestionStatus = z.infer<typeof ingestionStatusEnum>;
-
-export const ingestionStatus = pgEnum(
-  'ingestion_status',
-  ingestionStatusEnum.options as [string, ...string[]],
-);
 
 export const emails = pgTable(
   'emails',
@@ -106,7 +89,6 @@ export const emails = pgTable(
       .references(() => folders.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
 
     // Ingestion Status
-    ingestionStatus: ingestionStatus(),
     ingestionLastError: text(),
     ingestionLastAttemptAt: timestamp({ mode: 'string' }),
     ingestionCompletedAt: timestamp({ mode: 'string' }),
