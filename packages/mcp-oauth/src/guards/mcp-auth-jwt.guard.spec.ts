@@ -68,6 +68,7 @@ describe('McpAuthJwtGuard', () => {
       switchToHttp: vi.fn().mockReturnValue({
         getRequest: vi.fn().mockReturnValue(mockRequest),
       }),
+      getType: vi.fn().mockReturnValue('http'),
     } as unknown as ExecutionContext;
 
     const { unit, unitRef } = await TestBed.solitary(McpAuthJwtGuard)
@@ -80,6 +81,21 @@ describe('McpAuthJwtGuard', () => {
   });
 
   describe('canActivate', () => {
+    it('allows non-HTTP contexts to pass through without authentication', async () => {
+      mockRequest.url = '/health';
+
+      const mockExecutionContext = {
+        switchToHttp: vi.fn().mockReturnValue({
+          getRequest: vi.fn().mockReturnValue(mockRequest),
+        }),
+        getType: vi.fn().mockReturnValue('rmq'),
+      } as unknown as ExecutionContext;
+      const result = await guard.canActivate(mockExecutionContext);
+
+      expect(result).toBe(true);
+      expect(tokenService.validateAccessToken).not.toHaveBeenCalled();
+    });
+
     it('allows non-MCP requests to pass through without authentication', async () => {
       mockRequest.url = '/health';
 

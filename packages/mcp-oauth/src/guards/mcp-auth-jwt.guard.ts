@@ -25,6 +25,9 @@ export class McpAuthJwtGuard implements CanActivate {
   ) {}
 
   public async canActivate(context: ExecutionContext): Promise<boolean> {
+    // We run the guard only on HTTP contexts (e.g. not on RabbitMQ contexts)
+    if (context.getType() !== 'http') return true;
+
     const request = context.switchToHttp().getRequest<McpAuthenticatedRequest>();
 
     // This is a global guard, as we cannot inject it into the McpModule
