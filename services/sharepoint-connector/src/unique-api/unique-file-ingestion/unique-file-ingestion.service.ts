@@ -42,7 +42,7 @@ export class UniqueFileIngestionService {
         url: request.url,
         byteSize: request.byteSize,
         ingestionConfig: {
-          uniqueIngestionMode: 'SKIP_INGESTION',
+          uniqueIngestionMode: 'SKIP_INGESTION', // TODO remove it after our testing is done
         },
       },
       scopeId: request.scopeId,
@@ -80,7 +80,7 @@ export class UniqueFileIngestionService {
         byteSize: request.byteSize,
         url: request.url,
         ingestionConfig: {
-          uniqueIngestionMode: 'SKIP_INGESTION',
+          uniqueIngestionMode: 'SKIP_INGESTION',  // TODO remove it after our testing is done
         },
       },
       scopeId: request.scopeId,
