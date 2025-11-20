@@ -22,13 +22,6 @@
       "cache": false,
       "persistent": true,
       "interruptible": true
-    },
-    "dapr:dev": {
-      "inputs": ["$TURBO_DEFAULT$", "src/**/*"],
-      "dependsOn": ["build"],
-      "cache": false,
-      "persistent": true,
-      "interruptible": true
     }
   }
 }

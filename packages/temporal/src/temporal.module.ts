@@ -62,7 +62,7 @@ export class TemporalModule extends ConfigurableModuleClass {
   }
 
   public static registerClient(options?: TemporalModuleOptions): DynamicModule {
-    const createClientProvider = createClientProviders(options ? [options] : []);
+    const createClientProvider = createClientProviders(options ? [options] : [{}]);
     return {
       global: true,
       module: TemporalModule,
@@ -70,6 +70,7 @@ export class TemporalModule extends ConfigurableModuleClass {
       exports: createClientProvider,
     };
   }
+
   public static registerClientAsync(
     asyncSharedWorkflowClientOptions: SharedWorkflowClientOptions,
   ): DynamicModule {

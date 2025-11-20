@@ -306,4 +306,3 @@ volumes:
   qdrant:
   clickhouse_data:
   clickhouse_logs:
-  dapr-etcd-data:
