@@ -3,7 +3,6 @@ import { defaultLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
-import { DaprClient } from '@dapr/dapr';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -26,7 +25,6 @@ import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
 import { SyncModule } from './sync/sync.module';
-import { WorkflowModule } from './workflow/workflow.module';
 
 @Module({
   imports: [
@@ -76,7 +74,6 @@ import { WorkflowModule } from './workflow/workflow.module';
     }),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
-    WorkflowModule,
     McpOAuthModule.forRootAsync({
       imports: [ConfigModule, DrizzleModule],
       useFactory: async (
@@ -135,10 +132,6 @@ import { WorkflowModule } from './workflow/workflow.module';
     {
       provide: APP_GUARD,
       useClass: McpAuthJwtGuard,
-    },
-    {
-      provide: DaprClient,
-      useValue: new DaprClient(),
     },
   ],
 })
