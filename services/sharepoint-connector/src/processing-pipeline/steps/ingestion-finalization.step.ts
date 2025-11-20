@@ -47,6 +47,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
       fileUrl: context.registrationResponse.readUrl,
       url: context.knowledgeBaseUrl,
       baseUrl: this.sharepointBaseUrl,
+      metadata: context.metadata,
     };
 
     try {

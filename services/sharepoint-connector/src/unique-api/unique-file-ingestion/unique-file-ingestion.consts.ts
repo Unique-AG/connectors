@@ -19,6 +19,7 @@ export interface ContentUpsertMutationInput {
     url?: string;
     byteSize?: number;
     fileAccess?: FileAccessKey[];
+    metadata?: Record<string, unknown>;
     ingestionConfig?: IngestionConfig;
   };
   fileUrl?: string;

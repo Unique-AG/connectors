@@ -6,6 +6,7 @@ import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { normalizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
+import { buildSharepointMetadata } from './metadata.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
@@ -54,6 +55,7 @@ export class ProcessingPipelineService {
       knowledgeBaseUrl: getItemUrl(pipelineItem),
       mimeType: this.resolveMimeType(pipelineItem),
       scopeId,
+      metadata: buildSharepointMetadata(pipelineItem),
       fileStatus,
     };
 

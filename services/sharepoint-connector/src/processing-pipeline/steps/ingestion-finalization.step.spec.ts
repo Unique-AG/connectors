@@ -11,8 +11,11 @@ import { IngestionFinalizationStep } from './ingestion-finalization.step';
 
 describe('IngestionFinalizationStep', () => {
   let step: IngestionFinalizationStep;
+  let finalizeIngestionMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
+    finalizeIngestionMock = vi.fn().mockResolvedValue({ id: 'final-id' });
+
     const { unit } = await TestBed.solitary(IngestionFinalizationStep)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -24,7 +27,7 @@ describe('IngestionFinalizationStep', () => {
         }),
       }))
       .mock(UniqueFileIngestionService)
-      .impl(() => ({ finalizeIngestion: vi.fn().mockResolvedValue({ id: 'final-id' }) }))
+      .impl(() => ({ finalizeIngestion: finalizeIngestionMock }))
       .compile();
     step = unit;
   });
@@ -56,6 +59,17 @@ describe('IngestionFinalizationStep', () => {
       correlationId: 'c1',
       startTime: new Date(),
       knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+      metadata: {
+        link: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf?web=1',
+        path: '/test',
+        filename: 'file.pdf',
+        siteId: 'site-1',
+        siteWebUrl: 'https://contoso.sharepoint.com/sites/Engineering',
+        driveId: 'drive-1',
+        driveName: 'Documents',
+        itemId: 'f1',
+        itemType: 'listItem',
+      },
       mimeType: 'application/pdf',
       scopeId: 'scope-1',
       fileStatus: 'new',
@@ -86,5 +100,10 @@ describe('IngestionFinalizationStep', () => {
 
     const result = await step.execute(context);
     expect(result).toEqual(context);
+    expect(finalizeIngestionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: context.metadata,
+      }),
+    );
   });
 });

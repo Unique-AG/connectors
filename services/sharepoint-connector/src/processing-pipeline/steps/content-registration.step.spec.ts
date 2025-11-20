@@ -11,8 +11,23 @@ import { ContentRegistrationStep } from './content-registration.step';
 
 describe('ContentRegistrationStep', () => {
   let step: ContentRegistrationStep;
+  let registerContentMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
+    registerContentMock = vi.fn().mockResolvedValue({
+      id: 'cid',
+      writeUrl: 'https://upload',
+      key: 'k',
+      byteSize: 1,
+      mimeType: 'application/pdf',
+      ownerType: UniqueOwnerType.Scope,
+      ownerId: 'o',
+      readUrl: 'https://read',
+      createdAt: new Date().toISOString(),
+      internallyStoredAt: null,
+      source: INGESTION_SOURCE_KIND,
+    });
+
     const { unit } = await TestBed.solitary(ContentRegistrationStep)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -25,19 +40,7 @@ describe('ContentRegistrationStep', () => {
       }))
       .mock(UniqueFileIngestionService)
       .impl(() => ({
-        registerContent: vi.fn().mockResolvedValue({
-          id: 'cid',
-          writeUrl: 'https://upload',
-          key: 'k',
-          byteSize: 1,
-          mimeType: 'application/pdf',
-          ownerType: UniqueOwnerType.Scope,
-          ownerId: 'o',
-          readUrl: 'https://read',
-          createdAt: new Date().toISOString(),
-          internallyStoredAt: null,
-          source: INGESTION_SOURCE_KIND,
-        }),
+        registerContent: registerContentMock,
       }))
       .compile();
     step = unit;
@@ -70,6 +73,17 @@ describe('ContentRegistrationStep', () => {
       correlationId: 'c1',
       startTime: new Date(),
       knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+      metadata: {
+        link: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf?web=1',
+        path: '/test',
+        filename: 'file.pdf',
+        siteId: 'site',
+        siteWebUrl: 'https://contoso.sharepoint.com/sites/Engineering',
+        driveId: 'drive',
+        driveName: 'Documents',
+        itemId: 'f1',
+        itemType: 'listItem',
+      },
       mimeType: 'application/pdf',
       scopeId: 'scope-1',
       fileStatus: 'new',
@@ -88,5 +102,10 @@ describe('ContentRegistrationStep', () => {
     const result = await step.execute(context);
     expect(result.uploadUrl).toBe('https://upload');
     expect(result.uniqueContentId).toBe('cid');
+    expect(registerContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: context.metadata,
+      }),
+    );
   });
 });

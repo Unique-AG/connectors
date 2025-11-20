@@ -124,6 +124,20 @@ export interface DriveItem {
       id?: string;
       name?: string;
     };
+    createdBy?: {
+      user?: {
+        displayName?: string;
+        email?: string;
+        id?: string;
+      };
+    };
+    lastModifiedBy?: {
+      user?: {
+        displayName?: string;
+        email?: string;
+        id?: string;
+      };
+    };
     fields: DriveItemFields;
   };
 }

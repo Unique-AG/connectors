@@ -13,6 +13,7 @@ export interface ContentRegistrationRequest {
   baseUrl?: string;
   byteSize: number;
   fileAccess?: FileAccessKey[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface IngestionFinalizationRequest {
@@ -28,6 +29,7 @@ export interface IngestionFinalizationRequest {
   fileUrl: string;
   url?: string;
   baseUrl?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface IngestionApiResponse {

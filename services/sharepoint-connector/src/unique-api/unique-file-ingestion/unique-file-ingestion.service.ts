@@ -33,18 +33,21 @@ export class UniqueFileIngestionService {
 
   public async registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse> {
     const uniqueConfig = this.configService.get('unique', { infer: true });
-    const variables: ContentUpsertMutationInput = {
-      input: {
-        key: request.key,
-        title: request.title,
-        mimeType: request.mimeType,
-        ownerType: UniqueOwnerType.Scope,
-        url: request.url,
-        byteSize: request.byteSize,
-        ingestionConfig: {
-          uniqueIngestionMode: 'SKIP_INGESTION',
-        },
+    const registrationInput: ContentUpsertMutationInput['input'] = {
+      key: request.key,
+      title: request.title,
+      mimeType: request.mimeType,
+      ownerType: UniqueOwnerType.Scope,
+      url: request.url,
+      byteSize: request.byteSize,
+      ingestionConfig: {
+        uniqueIngestionMode: 'SKIP_INGESTION',
       },
+      ...(request.metadata ? { metadata: request.metadata } : {}),
+    };
+
+    const variables: ContentUpsertMutationInput = {
+      input: registrationInput,
       scopeId: request.scopeId,
       sourceOwnerType: request.sourceOwnerType,
       sourceKind: request.sourceKind,
@@ -71,18 +74,21 @@ export class UniqueFileIngestionService {
 
   public async finalizeIngestion(request: IngestionFinalizationRequest): Promise<{ id: string }> {
     const uniqueConfig = this.configService.get('unique', { infer: true });
-    const variables: ContentUpsertMutationInput = {
-      input: {
-        key: request.key,
-        title: request.title,
-        mimeType: request.mimeType,
-        ownerType: UniqueOwnerType.Scope,
-        byteSize: request.byteSize,
-        url: request.url,
-        ingestionConfig: {
-          uniqueIngestionMode: 'SKIP_INGESTION',
-        },
+    const finalizationInput: ContentUpsertMutationInput['input'] = {
+      key: request.key,
+      title: request.title,
+      mimeType: request.mimeType,
+      ownerType: UniqueOwnerType.Scope,
+      byteSize: request.byteSize,
+      url: request.url,
+      ingestionConfig: {
+        uniqueIngestionMode: 'SKIP_INGESTION',
       },
+      ...(request.metadata ? { metadata: request.metadata } : {}),
+    };
+
+    const variables: ContentUpsertMutationInput = {
+      input: finalizationInput,
       scopeId: request.scopeId,
       sourceOwnerType: request.sourceOwnerType,
       sourceName: request.sourceName,

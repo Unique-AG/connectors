@@ -45,6 +45,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       url: context.knowledgeBaseUrl,
       baseUrl: this.sharepointBaseUrl,
       byteSize: context.fileSize ?? 0,
+      metadata: context.metadata,
     };
 
     const syncMode = this.configService.get('processing.syncMode', { infer: true });

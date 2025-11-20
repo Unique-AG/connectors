@@ -1,10 +1,12 @@
 import type { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { IngestionApiResponse } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
+import type { SharepointMetadata } from '../metadata.util';
 
 export interface ProcessingContext {
   correlationId: string;
   pipelineItem: SharepointContentItem;
   knowledgeBaseUrl: string;
+  metadata: SharepointMetadata;
   scopeId: string;
   uploadUrl?: string;
   uniqueContentId?: string;
