@@ -15,6 +15,7 @@ describe('ContentSyncService', () => {
   let configService: ConfigService;
   let uniqueFileIngestionService: UniqueFileIngestionService;
   let uniqueFilesService: UniqueFilesService;
+  let itemProcessingOrchestratorService: ItemProcessingOrchestratorService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -64,6 +65,9 @@ describe('ContentSyncService', () => {
     configService = module.get<ConfigService>(ConfigService);
     uniqueFileIngestionService = module.get<UniqueFileIngestionService>(UniqueFileIngestionService);
     uniqueFilesService = module.get<UniqueFilesService>(UniqueFilesService);
+    itemProcessingOrchestratorService = module.get<ItemProcessingOrchestratorService>(
+      ItemProcessingOrchestratorService,
+    );
   });
 
   it('should be defined', () => {
@@ -71,7 +75,7 @@ describe('ContentSyncService', () => {
   });
 
   describe('syncContentForSite', () => {
-    it('should throw an error if the number of files to ingest exceeds the limit', async () => {
+    it('should skip new/updated file ingestion if the number of files to ingest exceeds the limit, but still process deletions and moves', async () => {
       const siteId = 'site-id';
       const items = [
         {
@@ -96,9 +100,19 @@ describe('ContentSyncService', () => {
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1'],
         updatedFiles: ['2'],
-        movedFiles: [],
-        deletedFiles: [],
+        movedFiles: ['moved-file'],
+        deletedFiles: ['deleted-file'],
       });
+
+      vi.spyOn(uniqueFilesService, 'getFilesByKeys').mockResolvedValue([
+        {
+          id: 'deleted-file-id',
+          key: 'site-id/deleted-file',
+          fileAccess: [],
+          ownerType: 'user',
+          ownerId: 'user-id',
+        },
+      ]);
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
         if (key === 'unique.maxIngestedFiles') {
@@ -107,9 +121,19 @@ describe('ContentSyncService', () => {
         return null;
       });
 
-      await expect(service.syncContentForSite(siteId, items, scopes)).rejects.toThrow(
-        /Too many files to ingest: 2. Limit is 1. Aborting sync./,
-      );
+      // Should not throw an error, but should log a warning and skip new/updated file processing
+      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+
+      // Verify deletions were processed
+      expect(uniqueFilesService.getFilesByKeys).toHaveBeenCalledWith(['site-id/deleted-file']);
+      expect(uniqueFilesService.deleteFile).toHaveBeenCalledWith('deleted-file-id');
+
+      // Verify moves were processed (would call processFileMoves if there were actual moves)
+      // Note: In this test we have movedFiles but no actual move processor verification since it's mocked
+
+      // Verify new/updated file processing was skipped
+      expect(uniqueFileIngestionService.performFileDiff).toHaveBeenCalledTimes(1);
+      expect(itemProcessingOrchestratorService.processItems).not.toHaveBeenCalled();
     });
 
     it('should not throw an error if the number of files to ingest is within the limit', async () => {
@@ -246,7 +270,7 @@ describe('ContentSyncService', () => {
       await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
     });
 
-    it('should throw an error with correct message format when limit is exceeded', async () => {
+    it('should skip new/updated file ingestion with correct warning message when limit is exceeded, but process deletions and moves', async () => {
       const siteId = 'test-site-123';
       const items = [
         {
@@ -279,9 +303,19 @@ describe('ContentSyncService', () => {
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1', '2'],
         updatedFiles: ['3'],
-        movedFiles: [],
-        deletedFiles: [],
+        movedFiles: ['moved-file'],
+        deletedFiles: ['deleted-file'],
       });
+
+      vi.spyOn(uniqueFilesService, 'getFilesByKeys').mockResolvedValue([
+        {
+          id: 'deleted-file-id',
+          key: 'site-id/deleted-file',
+          fileAccess: [],
+          ownerType: 'user',
+          ownerId: 'user-id',
+        },
+      ]);
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
         if (key === 'unique.maxIngestedFiles') {
@@ -290,9 +324,25 @@ describe('ContentSyncService', () => {
         return null;
       });
 
-      await expect(service.syncContentForSite(siteId, items, scopes)).rejects.toThrow(
-        '[SiteId: test-site-123]  Too many files to ingest: 3. Limit is 2. Aborting sync.',
+      // Mock the logger to capture warning messages
+      const loggerSpy = vi.spyOn(service['logger'], 'warn').mockImplementation(() => {});
+
+      // Should not throw an error, but should log a warning and skip new/updated file processing
+      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+
+      // Verify the warning was logged with correct message
+      expect(loggerSpy).toHaveBeenCalledWith(
+        '[SiteId: test-site-123]  Too many files to ingest: 3. Limit is 2. Skipping new/updated file ingestion but deletions and moves were processed.',
       );
+
+      // Verify deletions were processed
+      expect(uniqueFilesService.getFilesByKeys).toHaveBeenCalledWith([
+        'test-site-123/deleted-file',
+      ]);
+      expect(uniqueFilesService.deleteFile).toHaveBeenCalledWith('deleted-file-id');
+
+      // Verify new/updated file processing was skipped
+      expect(itemProcessingOrchestratorService.processItems).not.toHaveBeenCalled();
     });
 
     it('should handle limit validation with only new files', async () => {
