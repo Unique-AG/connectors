@@ -48,7 +48,6 @@ export class ProcessingPipelineService {
   ): Promise<PipelineResult> {
     const startTime = new Date();
     const correlationId = randomUUID();
-
     const currentUserId = await this.uniqueUsersService.getCurrentUserId();
 
     const context: ProcessingContext = {

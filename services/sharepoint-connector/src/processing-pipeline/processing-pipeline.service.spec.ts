@@ -3,6 +3,7 @@ import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -120,6 +121,14 @@ describe('ProcessingPipelineService', () => {
       .impl(() => mockSteps.storageUpload as unknown as StorageUploadStep)
       .mock(IngestionFinalizationStep)
       .impl(() => mockSteps.ingestionFinalization as unknown as IngestionFinalizationStep)
+      .mock(UniqueUsersService)
+      .impl(
+        (stub) =>
+          ({
+            ...stub(),
+            getCurrentUserId: vi.fn().mockResolvedValue('test-user-id'),
+          }) as unknown as UniqueUsersService,
+      )
       .compile();
 
     service = unit;
@@ -186,7 +195,7 @@ describe('ProcessingPipelineService', () => {
 
     const processPromise = service.processItem(mockFile, 'test-scope-id', 'updated');
 
-    vi.advanceTimersByTime(31000);
+    await vi.advanceTimersByTimeAsync(31000);
 
     const result = await processPromise;
 

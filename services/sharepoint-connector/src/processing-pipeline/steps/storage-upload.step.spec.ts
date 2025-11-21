@@ -57,6 +57,7 @@ describe('StorageUploadStep', () => {
       mimeType: 'application/pdf',
       scopeId: 'scope-1',
       fileStatus: 'new',
+      currentUserId: 'user-1',
       pipelineItem: {
         itemType: 'driveItem',
         item: driveItem,
