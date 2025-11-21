@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-alpha.17](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.16...sharepoint-connector@v2.0.0-alpha.17) (2025-11-21)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** add regression test for multiple siteids ([#128](https://github.com/Unique-AG/connectors/issues/128)) ([55ef4f1](https://github.com/Unique-AG/connectors/commit/55ef4f1ceeb5829fa529cea92c86ee05243ef892))
+* **sharepoint-connector:** Remove permissions related hacks ([#126](https://github.com/Unique-AG/connectors/issues/126)) ([0b28859](https://github.com/Unique-AG/connectors/commit/0b28859cd227840f0847682f72230f95ebb77556))
+
 ## [2.0.0-alpha.16](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.15...sharepoint-connector@v2.0.0-alpha.16) (2025-11-20)
 
 
