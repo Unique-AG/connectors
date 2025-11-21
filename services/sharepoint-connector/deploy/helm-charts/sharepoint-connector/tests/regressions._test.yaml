@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: Test Reported Regressions
+templates:
+  - config.yaml
+release:
+  name: sharepoint-connector
+tests:
+  - it: "[UN-15144] mulitple site ids appear to not render correctly"
+    # values:
+    #   - ../ci/keda-values.yaml
+    # capabilities:
+    #   apiVersions:
+    #     - keda.sh/v1alpha1
+    template: config.yaml
+    set:
+      connectorConfig:
+        sharepoint:
+          siteIds:
+            - 00000000-0000-0000-0000-000000000000
+            - 00000000-0000-0000-0000-000000000001
+            - 00000000-0000-0000-0000-000000000002
+            - 00000000-0000-0000-0000-000000000003
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: data.SHAREPOINT_SITE_IDS
+          value: "00000000-0000-0000-0000-000000000000,00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002,00000000-0000-0000-0000-000000000003"
