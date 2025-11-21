@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
+import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 import { getSharepointConnectorGroupExternalId } from '../unique-api/unique-groups/unique-groups.utils';
@@ -11,8 +12,6 @@ import {
   UniqueGroupsMap,
   UniqueUsersMap,
 } from './types';
-
-const SHAREPOINT_GROUP_NAME_PREFIX = '[SPC]';
 
 interface Input {
   siteId: string;
@@ -36,11 +35,15 @@ interface Output {
 export class SyncSharepointGroupsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly uniqueGroupsService: UniqueGroupsService) {}
+  public constructor(
+    private readonly uniqueGroupsService: UniqueGroupsService,
+    private readonly graphApiService: GraphApiService,
+  ) {}
 
   public async run(input: Input): Promise<Output> {
     const { siteId, sharePoint, unique } = input;
     const logPrefix = `[SiteId: ${siteId}]`;
+    const siteName = await this.graphApiService.getSiteName(siteId);
     const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 
     const sharePointGroups = Object.values(sharePoint.groupsMap);
@@ -66,6 +69,7 @@ export class SyncSharepointGroupsToUniqueCommand {
       if (!correspondingUniqueGroup) {
         const newUniqueGroup = await this.createUniqueGroup(
           siteId,
+          siteName,
           sharePointGroup,
           unique.usersMap,
         );
@@ -82,6 +86,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
       const [didUpdate, updatedUniqueGroup] = await this.syncExistingUniqueGroup(
         correspondingUniqueGroup,
+        siteName,
         sharePointGroup,
         unique.usersMap,
       );
@@ -134,6 +139,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
   private async createUniqueGroup(
     siteId: string,
+    siteName: string,
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
   ): Promise<UniqueGroupWithMembers | null> {
@@ -144,7 +150,7 @@ export class SyncSharepointGroupsToUniqueCommand {
     }
 
     const uniqueGroup = await this.uniqueGroupsService.createGroup({
-      name: getUniqueGroupName(sharePointGroup.displayName),
+      name: getUniqueGroupName(siteName, sharePointGroup.displayName),
       externalId: getSharepointConnectorGroupExternalId(siteId, sharePointGroup.id),
     });
 
@@ -156,6 +162,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
   private async syncExistingUniqueGroup(
     uniqueGroup: UniqueGroupWithMembers,
+    siteName: string,
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
   ): Promise<[groupUpdated: boolean, UniqueGroupWithMembers | null]> {
@@ -169,10 +176,10 @@ export class SyncSharepointGroupsToUniqueCommand {
     let groupUpdated = false;
 
     // Currently nothing other than name is used in the Unique Groups so we keep check simple
-    if (uniqueGroup.name !== getUniqueGroupName(sharePointGroup.displayName)) {
+    if (uniqueGroup.name !== getUniqueGroupName(siteName, sharePointGroup.displayName)) {
       const updatedUniqueGroup = await this.uniqueGroupsService.updateGroup({
         id: uniqueGroup.id,
-        name: getUniqueGroupName(sharePointGroup.displayName),
+        name: getUniqueGroupName(siteName, sharePointGroup.displayName),
       });
       uniqueGroup = { ...updatedUniqueGroup, memberIds: uniqueGroup.memberIds };
       groupUpdated = true;
@@ -201,8 +208,8 @@ export class SyncSharepointGroupsToUniqueCommand {
   }
 }
 
-function getUniqueGroupName(sharePointGroupName: string): string {
-  return `${SHAREPOINT_GROUP_NAME_PREFIX} ${sharePointGroupName}`;
+function getUniqueGroupName(siteName: string, sharePointGroupName: string): string {
+  return `[SPC-${siteName}] ${sharePointGroupName}`;
 }
 
 function getUniqueMemberIds(

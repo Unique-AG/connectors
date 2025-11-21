@@ -41,6 +41,7 @@ describe('AspxProcessingStep', () => {
     mimeType: 'application/octet-stream',
     scopeId: 'scope-1',
     fileStatus: 'new',
+    currentUserId: 'user-1',
     pipelineItem: {
       itemType: 'listItem' as const,
       item: mockListItem,

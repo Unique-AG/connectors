@@ -69,11 +69,6 @@ export class UniqueGraphqlClient {
     return uniqueConfig.serviceAuthMode === 'cluster_local'
       ? {
           'x-service-id': 'sharepoint-connector',
-          // We need this role because we need permissions added to some property resolves and that
-          // was unfortunately omitted when making last PR to adjust permissions.
-          // It is a temporary solution until we're sure that Unique API version we're working
-          // with has proper permissions set.
-          'x-user-roles': 'chat.admin.all',
           ...uniqueConfig.serviceExtraHeaders,
         }
       : { Authorization: `Bearer ${await this.uniqueAuthService.getToken()}` };

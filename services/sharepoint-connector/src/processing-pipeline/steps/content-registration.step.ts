@@ -7,7 +7,6 @@ import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/in
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { ContentRegistrationRequest } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
-import { UniqueUsersService } from '../../unique-api/unique-users/unique-users.service';
 import { normalizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
@@ -22,7 +21,6 @@ export class ContentRegistrationStep implements IPipelineStep {
 
   public constructor(
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
-    private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService<Config, true>,
   ) {
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
@@ -51,11 +49,10 @@ export class ContentRegistrationStep implements IPipelineStep {
     // We add permissions only for new files, because existing ones should already have correct
     // permissions (including service user permissions) and we don't want to override them.
     if (syncMode === 'content_and_permissions' && context.fileStatus === 'new') {
-      const currentUserId = await this.uniqueUsersService.getCurrentUserId();
       contentRegistrationRequest.fileAccess = [
-        `u:${currentUserId}R`,
-        `u:${currentUserId}W`,
-        `u:${currentUserId}M`,
+        `u:${context.currentUserId}R`,
+        `u:${context.currentUserId}W`,
+        `u:${context.currentUserId}M`,
       ];
     }
 

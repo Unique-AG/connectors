@@ -14,6 +14,7 @@ export interface ProcessingContext {
   mimeType?: string;
   registrationResponse?: IngestionApiResponse;
   fileStatus: 'new' | 'updated';
+  currentUserId: string;
 }
 
 export interface PipelineResult {

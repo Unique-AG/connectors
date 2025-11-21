@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { normalizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
@@ -27,6 +28,7 @@ export class ProcessingPipelineService {
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly storageUploadStep: StorageUploadStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
+    private readonly uniqueUsersService: UniqueUsersService,
   ) {
     this.pipelineSteps = [
       this.contentFetchingStep,
@@ -46,6 +48,7 @@ export class ProcessingPipelineService {
   ): Promise<PipelineResult> {
     const startTime = new Date();
     const correlationId = randomUUID();
+    const currentUserId = await this.uniqueUsersService.getCurrentUserId();
 
     const context: ProcessingContext = {
       correlationId,
@@ -55,6 +58,7 @@ export class ProcessingPipelineService {
       mimeType: this.resolveMimeType(pipelineItem),
       scopeId,
       fileStatus,
+      currentUserId,
     };
 
     this.logger.log(
