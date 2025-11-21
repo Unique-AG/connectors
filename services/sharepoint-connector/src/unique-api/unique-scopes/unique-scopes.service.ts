@@ -65,6 +65,7 @@ export class UniqueScopesService {
               entityType: scopeAccess.entityType,
             })),
             applyToSubScopes,
+            skipFileAccessPropagation: true,
           },
         ),
     );
@@ -91,6 +92,7 @@ export class UniqueScopesService {
               entityType: scopeAccess.entityType,
             })),
             applyToSubScopes,
+            skipFileAccessPropagation: true,
           },
         ),
     );
