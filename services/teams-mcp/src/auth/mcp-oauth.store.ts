@@ -10,10 +10,11 @@ import {
   RefreshTokenMetadata,
 } from '@unique-ag/mcp-oauth';
 import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cache } from 'cache-manager';
 import { eq, lt } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
-import { typeid } from 'typeid-js';
+import { TypeID, typeid } from 'typeid-js';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import {
   authorizationCodes,
@@ -31,6 +32,7 @@ import {
   toDrizzleSessionInsert,
 } from '../utils/case-converter';
 import { normalizeError } from '../utils/normalize-error';
+import { UserUpsertEvent } from './events';
 
 export class McpOAuthStore implements IOAuthStore {
   private readonly logger = new Logger(this.constructor.name);
@@ -43,6 +45,7 @@ export class McpOAuthStore implements IOAuthStore {
     private readonly drizzle: DrizzleDatabase,
     private readonly encryptionService: IEncryptionService,
     private readonly cacheManager: Cache,
+    private readonly emitter: EventEmitter2,
   ) {}
 
   public async storeClient(client: OAuthClient): Promise<OAuthClient> {
@@ -162,6 +165,15 @@ export class McpOAuthStore implements IOAuthStore {
       })
       .returning({ id: userProfiles.id });
     if (!saved) throw new Error('Failed to upsert user profile');
+
+    // FIXME: shortcut to get a stable "on connected user" event for subscriptions
+    const event = UserUpsertEvent.encode({
+      type: 'user.upsert',
+      id: TypeID.fromString(saved.id, 'user_profile'),
+    })
+    const published = this.emitter.emit(event.type, event);
+    if (published === false) throw new Error('Could not publish event');
+
     return saved.id;
   }
 
