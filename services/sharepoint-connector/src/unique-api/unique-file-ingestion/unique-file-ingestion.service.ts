@@ -119,8 +119,6 @@ export class UniqueFileIngestionService {
       fileList,
     };
 
-    this.logger.debug(`File diff request payload: ${JSON.stringify(diffRequest, null, 2)}`);
-
     const { statusCode, body } = await this.ingestionHttpClient.request({
       method: 'POST',
       path: fileDiffPath,
