@@ -6,7 +6,7 @@ import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { ModerationStatusValue } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import { CreatedBy } from '../../microsoft-apis/graph/types/sharepoint.types';
+import { SharePointUser } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import {
@@ -121,9 +121,7 @@ export class ContentRegistrationStep implements IPipelineStep {
     const isListItem = item.itemType === 'listItem';
     const baseFields = isListItem ? item.item.fields : item.item.listItem.fields;
     const webUrl = isListItem ? item.item.webUrl : item.item.listItem.webUrl;
-    const createdBy: CreatedBy | undefined = isListItem
-      ? item.item.createdBy
-      : item.item.listItem.createdBy;
+    const createdBy = isListItem ? item.item.createdBy : item.item.listItem.createdBy;
 
     const moderationStatus = isListItem
       ? (baseFields._ModerationStatus as ModerationStatusValue)
@@ -148,7 +146,7 @@ export class ContentRegistrationStep implements IPipelineStep {
     return metadata;
   }
 
-  private extractAuthor(createdBy: CreatedBy): AuthorMetadata {
+  private extractAuthor(createdBy: { user: SharePointUser }): AuthorMetadata {
     return {
       email: createdBy.user.email,
       displayName: createdBy.user.displayName,

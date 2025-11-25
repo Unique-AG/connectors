@@ -78,10 +78,9 @@ export type ContentMetadataValue =
   | number
   | boolean
   | null
-  | undefined
   | AuthorMetadata
   | ModerationStatusValue
-  | unknown[];
+  | ContentMetadataValue[];
 
 export interface ContentMetadata {
   [key: string]: ContentMetadataValue;
