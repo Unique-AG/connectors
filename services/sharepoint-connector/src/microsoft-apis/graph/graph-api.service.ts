@@ -505,6 +505,7 @@ export class GraphApiService {
       'size',
       'createdDateTime',
       'lastModifiedDateTime',
+      'createdBy',
       'folder',
       'file',
       'listItem',

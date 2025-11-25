@@ -106,11 +106,11 @@ describe('ContentRegistrationStep', () => {
           // Additional fields added to match V1 PowerAutomate connector
           Url: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
           Path: '/test',
-          driveId: 'drive',
-          link: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+          DriveId: 'drive',
+          Link: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
           ItemInternalId: 'f1',
           Filename: 'test.aspx',
-          moderationStatus: 0,
+          ModerationStatus: 0,
           Author: {
             email: 'user@example.com',
             displayName: 'Test User',

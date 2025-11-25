@@ -14,7 +14,6 @@ import {
   ContentMetadata,
   ContentRegistrationRequest,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
-import { UniqueUsersService } from '../../unique-api/unique-users/unique-users.service';
 import { normalizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
@@ -124,7 +123,6 @@ export class ContentRegistrationStep implements IPipelineStep {
     const moderationStatus = isListItem
       ? (baseFields._ModerationStatus as ModerationStatusValue)
       : undefined;
-    //
     const metadata: ContentMetadata = {
       ...baseFields,
       Url: webUrl,
@@ -133,7 +131,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       Link: webUrl,
       ItemInternalId: item.item.id,
       Filename: baseFields.FileLeafRef,
-      ...(moderationStatus && {
+      ...(moderationStatus !== undefined && {
         ModerationStatus: moderationStatus,
       }),
       ...(createdBy?.user && {
