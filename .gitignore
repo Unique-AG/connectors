@@ -46,6 +46,7 @@ factset-auth.json
 **/*.tfstate.backup
 
 **/helm-charts/**/charts
+__snapshot__
 
 # local scripts
 **/local-scripts/**

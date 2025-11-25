@@ -29,7 +29,6 @@ export class ContentRegistrationStep implements IPipelineStep {
 
   public constructor(
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
-    private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService<Config, true>,
   ) {
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
@@ -61,11 +60,10 @@ export class ContentRegistrationStep implements IPipelineStep {
     // We add permissions only for new files, because existing ones should already have correct
     // permissions (including service user permissions) and we don't want to override them.
     if (syncMode === 'content_and_permissions' && context.fileStatus === 'new') {
-      const currentUserId = await this.uniqueUsersService.getCurrentUserId();
       contentRegistrationRequest.fileAccess = [
-        `u:${currentUserId}R`,
-        `u:${currentUserId}W`,
-        `u:${currentUserId}M`,
+        `u:${context.currentUserId}R`,
+        `u:${context.currentUserId}W`,
+        `u:${context.currentUserId}M`,
       ];
     }
 

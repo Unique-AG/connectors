@@ -76,6 +76,7 @@ describe('ContentRegistrationStep', () => {
       mimeType: 'application/pdf',
       scopeId: 'scope-1',
       fileStatus: 'new',
+      currentUserId: 'user-1',
       pipelineItem: {
         itemType: 'listItem',
         item: listItem,

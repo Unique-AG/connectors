@@ -41,6 +41,7 @@ export interface CreateScopeAccessesMutationInput {
   scopeId: string;
   scopeAccesses: ScopeAccessChangeDto[];
   applyToSubScopes?: boolean;
+  skipFileAccessPropagation?: boolean;
 }
 
 export interface CreateScopeAccessesMutationResult {
@@ -48,8 +49,18 @@ export interface CreateScopeAccessesMutationResult {
 }
 
 export const CREATE_SCOPE_ACCESSES_MUTATION = gql`
-  mutation CreateScopeAccesses($scopeAccesses: [ScopeAccessChangeDto!]!, $scopeId: String!, $applyToSubScopes: Boolean) {
-    createScopeAccesses(scopeAccesses: $scopeAccesses, scopeId: $scopeId, applyToSubScopes: $applyToSubScopes)
+  mutation CreateScopeAccesses(
+    $scopeAccesses: [ScopeAccessChangeDto!]!
+    $scopeId: String!
+    $applyToSubScopes: Boolean
+    $skipFileAccessPropagation: Boolean
+  ) {
+    createScopeAccesses(
+      scopeAccesses: $scopeAccesses
+      scopeId: $scopeId
+      applyToSubScopes: $applyToSubScopes
+      skipFileAccessPropagation: $skipFileAccessPropagation
+    )
   }
 `;
 
@@ -57,6 +68,7 @@ export interface DeleteScopeAccessesMutationInput {
   scopeId: string;
   scopeAccesses: ScopeAccessChangeDto[];
   applyToSubScopes?: boolean;
+  skipFileAccessPropagation?: boolean;
 }
 
 export interface DeleteScopeAccessesMutationResult {
@@ -64,8 +76,18 @@ export interface DeleteScopeAccessesMutationResult {
 }
 
 export const DELETE_SCOPE_ACCESSES_MUTATION = gql`
-  mutation DeleteScopeAccesses($scopeAccesses: [ScopeAccessChangeDto!]!, $scopeId: String!, $applyToSubScopes: Boolean) {
-    deleteScopeAccesses(scopeAccesses: $scopeAccesses, scopeId: $scopeId, applyToSubScopes: $applyToSubScopes)
+  mutation DeleteScopeAccesses(
+    $scopeAccesses: [ScopeAccessChangeDto!]!
+    $scopeId: String!
+    $applyToSubScopes: Boolean
+    $skipFileAccessPropagation: Boolean
+  ) {
+    deleteScopeAccesses(
+      scopeAccesses: $scopeAccesses
+      scopeId: $scopeId
+      applyToSubScopes: $applyToSubScopes
+      skipFileAccessPropagation: $skipFileAccessPropagation
+    )
   }
 `;
 
