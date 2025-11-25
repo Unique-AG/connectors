@@ -72,15 +72,35 @@ export class SharepointRestHttpService {
     const token = await this.microsoftAuthenticationService.getAccessToken('sharepoint-rest');
     const responses: T[] = [];
     const chunkedApiPaths = chunk(apiPaths, 20);
-    for (const apiPathsChunk of chunkedApiPaths) {
+
+    // TODO: Is siteName sensitive info? If yes, we should remove that from the log here, logging
+    //       interceptor and paths of batch request.
+    this.logger.debug({
+      msg: 'Starting SharePoint batch request',
+      siteName,
+      totalPaths: apiPaths.length,
+      batchChunks: chunkedApiPaths.length,
+    });
+
+    for (const [chunkIndex, apiPathsChunk] of chunkedApiPaths.entries()) {
       const boundary = `batch_${randomUUID()}`;
-      const batchItems = apiPathsChunk
+      const fullApiPaths = apiPathsChunk
         .map((apiPath) => (apiPath.startsWith('/') ? apiPath.slice(1) : apiPath))
-        .map((apiPath) => `/sites/${siteName}/_api/web/${apiPath}`)
-        .map((apiPath) => this.buildBatchItem(apiPath, boundary));
+        .map((apiPath) => `/sites/${siteName}/_api/web/${apiPath}`);
+
+      const batchItems = fullApiPaths.map((apiPath) => this.buildBatchItem(apiPath, boundary));
+
+      this.logger.debug({
+        msg: 'Executing batch chunk',
+        chunkIndex: chunkIndex + 1,
+        totalChunks: chunkedApiPaths.length,
+        pathsInChunk: fullApiPaths.length,
+        paths: fullApiPaths,
+      });
 
       const requestBody = `${batchItems.join('\r\n\r\n')}\r\n--${boundary}--\r\n`;
       const path = `/sites/${siteName}/_api/$batch`;
+      const requestStartTime = Date.now();
       const { statusCode, body, headers } = await this.client.request({
         method: 'POST',
         path,
@@ -91,14 +111,18 @@ export class SharepointRestHttpService {
         body: requestBody,
       });
 
+      const duration = Date.now() - requestStartTime;
       const isSuccess = 200 <= statusCode && statusCode < 300;
+
       if (!isSuccess) {
         const errorBody = await body.text();
         this.logger.error({
           msg: 'Failed to request SharePoint batch endpoint',
           path,
-          requestBody,
+          chunkIndex: chunkIndex + 1,
+          paths: fullApiPaths,
           statusCode,
+          duration,
           errorBody,
         });
         assert.fail(
@@ -113,19 +137,41 @@ export class SharepointRestHttpService {
       const responsesChunk = responseBody
         .split(`--${responseBoundary}`)
         .slice(1, -1)
-        .map((singleResponse) => {
+        .map((singleResponse, index): T => {
           const lines = singleResponse.split('\r\n').filter(identity());
           const responseCodeLine = lines.find((line) => line.startsWith('HTTP/1.1'));
           const statusCode = Number(responseCodeLine?.split(' ')[1]);
           const responseLine = lines[lines.length - 1];
           // TODO: Add proper handling for retrying on 429 / 5XX errors
           // TODO: Add some errors handling in general - currently we just swallow errors
-          return statusCode === 200
-            ? JSON.parse(responseLine ?? '{}')
-            : assert.fail(`Non-200 response ${responseCodeLine} from Batch Request`);
+          if (statusCode === 200) {
+            return JSON.parse(responseLine ?? '{}');
+          }
+
+          this.logger.error({
+            msg: 'Non-200 response in batch item',
+            path: fullApiPaths[index],
+            statusCode,
+            responseCodeLine,
+          });
+          return assert.fail(`Non-200 response ${responseCodeLine} from Batch Request`);
         });
+
+      this.logger.debug({
+        msg: 'Batch chunk completed successfully',
+        chunkIndex: chunkIndex + 1,
+        pathsInChunk: fullApiPaths.length,
+        duration,
+      });
+
       responses.push(...responsesChunk);
     }
+
+    this.logger.debug({
+      msg: 'SharePoint batch request completed',
+      totalResponses: responses.length,
+      totalChunks: chunkedApiPaths.length,
+    });
 
     return responses;
   }
