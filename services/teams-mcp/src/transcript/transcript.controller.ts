@@ -13,9 +13,11 @@ import {
   Post,
   UseInterceptors,
 } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { TraceService } from 'nestjs-otel';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
+import { UserUpsertEvent } from '~/auth/events';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
 import {
   ChangeEventDto,
@@ -227,5 +229,13 @@ export class TranscriptController {
         this.logger.warn(`event ${event.type} is unsupported`);
         break;
     }
+  }
+
+  @OnEvent('user.upsert')
+  public async onEvent(payload: unknown) {
+    const event = UserUpsertEvent.parse(payload);
+    this.logger.debug({ event }, 'user upsert event!');
+
+    return this.svc.enqueueSubscriptionRequested(event.id);
   }
 }

@@ -7,6 +7,7 @@ import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { context, trace } from '@opentelemetry/api';
 import { Cache } from 'cache-manager';
 import { MetricService, OpenTelemetryModule } from 'nestjs-otel';
@@ -78,9 +79,10 @@ import { TranscriptModule } from './transcript/transcript.module';
         hostMetrics: true,
       },
     }),
+    EventEmitterModule.forRoot(),
     McpOAuthModule.forRootAsync({
       imports: [DrizzleModule],
-      inject: [ConfigService, AesGcmEncryptionService, DRIZZLE, CACHE_MANAGER, MetricService],
+      inject: [ConfigService, AesGcmEncryptionService, DRIZZLE, CACHE_MANAGER, MetricService, EventEmitter2],
       useFactory: async (
         configService: ConfigService<
           AppConfigNamespaced & MicrosoftConfigNamespaced & AuthConfigNamespaced,
@@ -90,6 +92,7 @@ import { TranscriptModule } from './transcript/transcript.module';
         drizzle: DrizzleDatabase,
         cacheManager: Cache,
         metricService: MetricService,
+        emitter: EventEmitter2
       ) => ({
         provider: MicrosoftOAuthProvider,
 
@@ -107,7 +110,7 @@ import { TranscriptModule } from './transcript/transcript.module';
           infer: true,
         }),
 
-        oauthStore: new McpOAuthStore(drizzle, aesService, cacheManager),
+        oauthStore: new McpOAuthStore(drizzle, aesService, cacheManager, emitter),
         encryptionService: aesService,
         metricService,
       }),
