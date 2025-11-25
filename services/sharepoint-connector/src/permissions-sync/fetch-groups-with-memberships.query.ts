@@ -197,19 +197,44 @@ export class FetchGroupsWithMembershipsQuery {
     const chunkedGroups = chunk(groups, 20);
     const groupMembershipsMappings: [GroupDistinctId, Membership[]][] = [];
     for (const groupChunk of chunkedGroups) {
-      // We use Promise.all instead of Promise.allSettled because GraphQL client has retrying
-      // already built in, so failure means that it's is the final result and we should abort.
-      const groupMemberships = await Promise.all(
+      // We use Promise.allSettled instead of Promise.all to gracefully handle deleted groups.
+      // When an Entra group is deleted, SharePoint may still reference it in permissions, but
+      // Graph API returns 404 when trying to fetch members. We treat such groups as having
+      // empty memberships while still throwing on other types of errors.
+      const groupMembershipsResults = await Promise.allSettled(
         groupChunk.map((group) =>
           group.type === 'groupOwners'
             ? this.graphApiService.getGroupOwners(group.id)
             : this.graphApiService.getGroupMembers(group.id),
         ),
       );
+
       const chunkIds = groupChunk.map(groupDistinctId);
-      const chunkItemPermissions = groupMemberships.map(
-        map(this.mapGroupMembershipToItemPermission.bind(this)),
-      );
+      const chunkItemPermissions = groupMembershipsResults.map((result, index) => {
+        if (result.status === 'fulfilled') {
+          return result.value.map((membership) =>
+            this.mapGroupMembershipToItemPermission(membership),
+          );
+        }
+
+        // References to deleted Entra groups still appear in SharePoint REST API permissions but
+        // return 404 from Graph API when we request memberships.
+        // We check for 404 status to identify these cases and treat them as empty memberships.
+        const error = result.reason as Error & { statusCode?: number };
+        const group = groupChunk[index];
+        assert.ok(group, `Missing group at index ${index} in chunk`);
+
+        if (error.statusCode === 404) {
+          this.logger.warn(
+            `Group ${group.id} not found (404) - likely deleted from Entra ID but still ` +
+              `referenced in SharePoint permissions. Treating as empty membership.`,
+          );
+          return [];
+        }
+
+        this.logger.error(`Failed to fetch memberships for group ${group.id}: ${error.message}`);
+        throw error;
+      });
       groupMembershipsMappings.push(...zip(chunkIds, chunkItemPermissions));
     }
     return groupMembershipsMappings;

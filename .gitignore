@@ -19,13 +19,17 @@ coverage
 # Vercel
 .vercel
 
+# Editors
+.vscode
+.idea
+.cursor
+
 # Build Outputs
 .next/
 out/
 build
 dist
 *.tsbuildinfo
-
 
 # Debug
 npm-debug.log*
