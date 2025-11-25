@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.0-alpha.17](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.16...sharepoint-connector@v2.0.0-alpha.17) (2025-11-25)
+
+
+### Features
+
+* **sharepoint-connector:** removed logs without a level from the ms graph client sdk ([#131](https://github.com/Unique-AG/connectors/issues/131)) ([8c3a792](https://github.com/Unique-AG/connectors/commit/8c3a7926d7b3783a6605fbdca2b342108d9c3230))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** add regression test for multiple siteids ([#128](https://github.com/Unique-AG/connectors/issues/128)) ([55ef4f1](https://github.com/Unique-AG/connectors/commit/55ef4f1ceeb5829fa529cea92c86ee05243ef892))
+* **sharepoint-connector:** post-testing fixes and improvements ([#129](https://github.com/Unique-AG/connectors/issues/129)) ([5969b9f](https://github.com/Unique-AG/connectors/commit/5969b9fabdb09770ca47591da23082392b8d33ab))
+* **sharepoint-connector:** Remove permissions related hacks ([#126](https://github.com/Unique-AG/connectors/issues/126)) ([0b28859](https://github.com/Unique-AG/connectors/commit/0b28859cd227840f0847682f72230f95ebb77556))
+
 ## [2.0.0-alpha.16](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.15...sharepoint-connector@v2.0.0-alpha.16) (2025-11-20)
 
 
