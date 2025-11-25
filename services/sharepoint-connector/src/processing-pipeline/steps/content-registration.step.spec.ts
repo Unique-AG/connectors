@@ -11,8 +11,25 @@ import { ContentRegistrationStep } from './content-registration.step';
 
 describe('ContentRegistrationStep', () => {
   let step: ContentRegistrationStep;
+  let uniqueFileIngestionServiceMock: { registerContent: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    uniqueFileIngestionServiceMock = {
+      registerContent: vi.fn().mockResolvedValue({
+        id: 'cid',
+        writeUrl: 'https://upload',
+        key: 'k',
+        byteSize: 1,
+        mimeType: 'application/pdf',
+        ownerType: UniqueOwnerType.Scope,
+        ownerId: 'o',
+        readUrl: 'https://read',
+        createdAt: new Date().toISOString(),
+        internallyStoredAt: null,
+        source: INGESTION_SOURCE_KIND,
+      }),
+    };
+
     const { unit } = await TestBed.solitary(ContentRegistrationStep)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -24,21 +41,7 @@ describe('ContentRegistrationStep', () => {
         }),
       }))
       .mock(UniqueFileIngestionService)
-      .impl(() => ({
-        registerContent: vi.fn().mockResolvedValue({
-          id: 'cid',
-          writeUrl: 'https://upload',
-          key: 'k',
-          byteSize: 1,
-          mimeType: 'application/pdf',
-          ownerType: UniqueOwnerType.Scope,
-          ownerId: 'o',
-          readUrl: 'https://read',
-          createdAt: new Date().toISOString(),
-          internallyStoredAt: null,
-          source: INGESTION_SOURCE_KIND,
-        }),
-      }))
+      .impl(() => uniqueFileIngestionServiceMock)
       .compile();
     step = unit;
   });
@@ -89,5 +92,32 @@ describe('ContentRegistrationStep', () => {
     const result = await step.execute(context);
     expect(result.uploadUrl).toBe('https://upload');
     expect(result.uniqueContentId).toBe('cid');
+
+    expect(uniqueFileIngestionServiceMock.registerContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: {
+          // Original fields from the SharePoint item
+          '@odata.etag': 'etag1',
+          FinanceGPTKnowledge: false,
+          _ModerationStatus: ModerationStatus.Approved,
+          Title: 'Test Title',
+          FileSizeDisplay: '1024',
+          FileLeafRef: 'test.aspx',
+          // Additional fields added to match V1 PowerAutomate connector
+          Url: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+          Path: '/test',
+          DriveId: 'drive',
+          Link: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+          ItemInternalId: 'f1',
+          Filename: 'test.aspx',
+          ModerationStatus: 0,
+          Author: {
+            email: 'user@example.com',
+            displayName: 'Test User',
+            id: 'user1',
+          },
+        },
+      }),
+    );
   });
 });

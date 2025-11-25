@@ -20,7 +20,15 @@ describe('ItemProcessingOrchestratorService', () => {
       name: `file-${id}.pdf`,
       webUrl: `https://sharepoint.example.com/sites/test/file-${id}.pdf`,
       size: 1024,
+      createdDateTime: '2024-01-01T00:00:00Z',
       lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      createdBy: {
+        user: {
+          email: 'test@example.com',
+          id: 'user-1',
+          displayName: 'Test User',
+        },
+      },
       parentReference: {
         driveType: 'documentLibrary',
         driveId: 'drive-1',
@@ -37,6 +45,13 @@ describe('ItemProcessingOrchestratorService', () => {
         createdDateTime: '2024-01-01T00:00:00Z',
         lastModifiedDateTime: '2024-01-01T00:00:00Z',
         webUrl: `https://sharepoint.example.com/sites/test/file-${id}.pdf`,
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         fields: {
           '@odata.etag': 'etag1',
           FinanceGPTKnowledge: false,

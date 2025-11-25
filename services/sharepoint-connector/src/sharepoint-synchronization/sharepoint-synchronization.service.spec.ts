@@ -27,7 +27,15 @@ describe('SharepointSynchronizationService', () => {
       webUrl:
         'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
       size: 2178118,
+      createdDateTime: '2025-10-02T00:00:00Z',
       lastModifiedDateTime: '2025-10-10T13:59:12Z',
+      createdBy: {
+        user: {
+          email: 'test@example.com',
+          id: 'user-1',
+          displayName: 'Test User',
+        },
+      },
       parentReference: {
         driveType: 'documentLibrary',
         siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
@@ -45,6 +53,13 @@ describe('SharepointSynchronizationService', () => {
         lastModifiedDateTime: '2025-10-10T13:59:12Z',
         webUrl:
           'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         fields: {
           '@odata.etag': 'etag1',
           FinanceGPTKnowledge: false,
@@ -256,7 +271,15 @@ describe('SharepointSynchronizationService', () => {
         webUrl:
           'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
         size: 1027813,
+        createdDateTime: '2025-10-02T00:00:00Z',
         lastModifiedDateTime: '2025-10-10T13:59:11Z',
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         parentReference: {
           driveType: 'documentLibrary',
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
@@ -274,6 +297,13 @@ describe('SharepointSynchronizationService', () => {
           lastModifiedDateTime: '2025-10-10T13:59:11Z',
           webUrl:
             'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+          createdBy: {
+            user: {
+              email: 'test@example.com',
+              id: 'user-1',
+              displayName: 'Test User',
+            },
+          },
           fields: {
             '@odata.etag': 'etag2',
             FinanceGPTKnowledge: false,
@@ -321,7 +351,15 @@ describe('SharepointSynchronizationService', () => {
         webUrl:
           'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
         size: 932986,
+        createdDateTime: '2025-10-02T00:00:00Z',
         lastModifiedDateTime: '2025-10-10T13:59:12Z',
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         parentReference: {
           driveType: 'documentLibrary',
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
@@ -339,6 +377,13 @@ describe('SharepointSynchronizationService', () => {
           lastModifiedDateTime: '2025-10-10T13:59:12Z',
           webUrl:
             'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+          createdBy: {
+            user: {
+              email: 'test@example.com',
+              id: 'user-1',
+              displayName: 'Test User',
+            },
+          },
           fields: {
             '@odata.etag': 'etag3',
             FinanceGPTKnowledge: false,
@@ -386,7 +431,15 @@ describe('SharepointSynchronizationService', () => {
         webUrl:
           'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
         size: 2178118,
+        createdDateTime: '2025-10-02T00:00:00Z',
         lastModifiedDateTime: '2025-10-10T13:59:12Z',
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         parentReference: {
           driveType: 'documentLibrary',
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
@@ -404,6 +457,13 @@ describe('SharepointSynchronizationService', () => {
           lastModifiedDateTime: '2025-10-10T13:59:12Z',
           webUrl:
             'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/1173246.pdf',
+          createdBy: {
+            user: {
+              email: 'test@example.com',
+              id: 'user-1',
+              displayName: 'Test User',
+            },
+          },
           fields: {
             '@odata.etag': 'etag1',
             FinanceGPTKnowledge: false,
@@ -437,7 +497,15 @@ describe('SharepointSynchronizationService', () => {
         webUrl:
           'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
         size: 1027813,
+        createdDateTime: '2025-10-02T00:00:00Z',
         lastModifiedDateTime: '2025-10-10T13:59:11Z',
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         parentReference: {
           driveType: 'documentLibrary',
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
@@ -455,6 +523,13 @@ describe('SharepointSynchronizationService', () => {
           lastModifiedDateTime: '2025-10-10T13:59:11Z',
           webUrl:
             'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/2019-BMW-Maintenance.pdf',
+          createdBy: {
+            user: {
+              email: 'test@example.com',
+              id: 'user-1',
+              displayName: 'Test User',
+            },
+          },
           fields: {
             '@odata.etag': 'etag2',
             FinanceGPTKnowledge: false,
@@ -488,7 +563,15 @@ describe('SharepointSynchronizationService', () => {
         webUrl:
           'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
         size: 932986,
+        createdDateTime: '2025-10-02T00:00:00Z',
         lastModifiedDateTime: '2025-10-10T13:59:10Z',
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         parentReference: {
           driveType: 'documentLibrary',
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
@@ -506,6 +589,13 @@ describe('SharepointSynchronizationService', () => {
           lastModifiedDateTime: '2025-10-10T13:59:10Z',
           webUrl:
             'https://uniqueapp.sharepoint.com/sites/UniqueAG/Freigegebene%20Dokumente/test-sharepoint-connector-v2/6034030.pdf',
+          createdBy: {
+            user: {
+              email: 'test@example.com',
+              id: 'user-1',
+              displayName: 'Test User',
+            },
+          },
           fields: {
             '@odata.etag': 'etag3',
             FinanceGPTKnowledge: false,

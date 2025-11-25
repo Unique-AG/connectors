@@ -3,19 +3,27 @@ import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { FileFilterService } from './file-filter.service';
-import type { DriveItem as CustomDriveItem } from './types/sharepoint.types';
+import type { DriveItem } from './types/sharepoint.types';
 
 describe('FileFilterService', () => {
   let service: FileFilterService;
 
-  const mockDriveItem = (overrides: Partial<CustomDriveItem> = {}): CustomDriveItem => {
-    const base: CustomDriveItem = {
+  const mockDriveItem = (overrides: Partial<DriveItem> = {}): DriveItem => {
+    const base: DriveItem = {
       '@odata.etag': 'etag1',
       id: 'test-id',
       name: 'test.pdf',
       size: 1024,
       webUrl: 'https://sharepoint.example.com/test.pdf',
+      createdDateTime: '2024-01-01T00:00:00Z',
       lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      createdBy: {
+        user: {
+          email: 'test@example.com',
+          id: 'user-1',
+          displayName: 'Test User',
+        },
+      },
       parentReference: {
         driveType: 'documentLibrary',
         driveId: 'drive-1',
@@ -32,6 +40,13 @@ describe('FileFilterService', () => {
         createdDateTime: '2024-01-01T00:00:00Z',
         lastModifiedDateTime: '2024-01-01T00:00:00Z',
         webUrl: 'https://sharepoint.example.com/test.pdf',
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         fields: {
           '@odata.etag': '"47cc40f8-ba1f-4100-9623-fcdf93073928,4"',
           FinanceGPTKnowledge: true,
@@ -48,7 +63,7 @@ describe('FileFilterService', () => {
       },
     };
 
-    const result: CustomDriveItem = { ...base, ...overrides };
+    const result: DriveItem = { ...base, ...overrides };
 
     if (overrides.file) {
       result.file = {

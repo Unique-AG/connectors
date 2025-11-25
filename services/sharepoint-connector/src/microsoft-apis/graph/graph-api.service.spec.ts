@@ -95,7 +95,15 @@ describe('GraphApiService', () => {
         name: 'test.pdf',
         size: 1024,
         webUrl: 'https://sharepoint.example.com/test.pdf',
+        createdDateTime: '2024-01-01T00:00:00Z',
         lastModifiedDateTime: '2024-01-01T00:00:00Z',
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         parentReference: {
           driveType: 'documentLibrary',
           driveId: 'drive-1',
@@ -112,6 +120,13 @@ describe('GraphApiService', () => {
           createdDateTime: '2024-01-01T00:00:00Z',
           lastModifiedDateTime: '2024-01-01T00:00:00Z',
           webUrl: 'https://sharepoint.example.com/test.pdf',
+          createdBy: {
+            user: {
+              email: 'test@example.com',
+              id: 'user-1',
+              displayName: 'Test User',
+            },
+          },
           fields: {
             '@odata.etag': 'etag1',
             FinanceGPTKnowledge: true,

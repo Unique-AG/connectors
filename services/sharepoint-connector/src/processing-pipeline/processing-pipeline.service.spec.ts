@@ -32,7 +32,15 @@ describe('ProcessingPipelineService', () => {
       size: 20791,
       webUrl:
         'https://uniqueapp.sharepoint.com/sites/UniqueAG/_layouts/15/Doc.aspx?sourcedoc=%7B82009A9A-6CB2-4FE2-88FA-37D935120DF6%7D&file=Document.docx&action=default&mobileredirect=true',
+      createdDateTime: '2025-10-02T14:36:24Z',
       lastModifiedDateTime: '2025-10-10T13:59:28Z',
+      createdBy: {
+        user: {
+          email: 'test@example.com',
+          id: 'user-1',
+          displayName: 'Test User',
+        },
+      },
       file: {
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         hashes: { quickXorHash: 'hash1' },
@@ -53,6 +61,13 @@ describe('ProcessingPipelineService', () => {
         lastModifiedDateTime: '2025-10-10T13:59:28Z',
         webUrl:
           'https://uniqueapp.sharepoint.com/sites/UniqueAG/_layouts/15/Doc.aspx?sourcedoc=%7B82009A9A-6CB2-4FE2-88FA-37D935120DF6%7D&file=Document.docx&action=default&mobileredirect=true',
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         fields: {
           '@odata.etag': '"82009a9a-6cb2-4fe2-88fa-37d935120df6,7"',
           FileLeafRef: 'Document.docx',

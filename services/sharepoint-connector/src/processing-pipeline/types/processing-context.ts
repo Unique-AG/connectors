@@ -1,5 +1,8 @@
 import type { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { IngestionApiResponse } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
+import {
+  ContentMetadata,
+  IngestionApiResponse,
+} from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 
 export interface ProcessingContext {
   correlationId: string;
@@ -15,6 +18,7 @@ export interface ProcessingContext {
   registrationResponse?: IngestionApiResponse;
   fileStatus: 'new' | 'updated';
   currentUserId: string;
+  metadata?: ContentMetadata;
 }
 
 export interface PipelineResult {

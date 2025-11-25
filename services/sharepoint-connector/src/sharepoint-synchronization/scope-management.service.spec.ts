@@ -17,7 +17,15 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
       name: 'Page 1.aspx',
       webUrl,
       size: 1024,
+      createdDateTime: '2025-01-01T00:00:00Z',
       lastModifiedDateTime: '2025-01-01T00:00:00Z',
+      createdBy: {
+        user: {
+          email: 'test@example.com',
+          id: 'user-1',
+          displayName: 'Test User',
+        },
+      },
       parentReference: {
         driveType: 'documentLibrary',
         driveId: 'drive-1',
@@ -39,6 +47,13 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
         createdDateTime: '2025-01-01T00:00:00Z',
         lastModifiedDateTime: '2025-01-01T00:00:00Z',
         webUrl,
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         fields: {
           '@odata.etag': 'etag-2',
           FinanceGPTKnowledge: true,
