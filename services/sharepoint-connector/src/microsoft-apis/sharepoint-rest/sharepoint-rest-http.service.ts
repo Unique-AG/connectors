@@ -9,6 +9,8 @@ import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication
 import { createLoggingInterceptor } from './logging.interceptor';
 import { createTokenRefreshInterceptor } from './token-refresh.interceptor';
 
+const BATCH_SIZE = 20;
+
 @Injectable()
 export class SharepointRestHttpService {
   private readonly logger = new Logger(this.constructor.name);
@@ -71,7 +73,7 @@ export class SharepointRestHttpService {
   public async requestBatch<T>(siteName: string, apiPaths: string[]): Promise<T[]> {
     const token = await this.microsoftAuthenticationService.getAccessToken('sharepoint-rest');
     const responses: T[] = [];
-    const chunkedApiPaths = chunk(apiPaths, 20);
+    const chunkedApiPaths = chunk(apiPaths, BATCH_SIZE);
 
     // TODO: Is siteName sensitive info? If yes, we should remove that from the log here, logging
     //       interceptor and paths of batch request.
