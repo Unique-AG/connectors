@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
@@ -23,8 +23,6 @@ import {
 
 @Injectable()
 export class UniqueFileIngestionService {
-  private readonly logger = new Logger(this.constructor.name);
-
   public constructor(
     @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
     private readonly ingestionHttpClient: IngestionHttpClient,
@@ -118,8 +116,6 @@ export class UniqueFileIngestionService {
       sourceName: INGESTION_SOURCE_NAME,
       fileList,
     };
-
-    this.logger.debug(`File diff request payload: ${JSON.stringify(diffRequest, null, 2)}`);
 
     const { statusCode, body } = await this.ingestionHttpClient.request({
       method: 'POST',
