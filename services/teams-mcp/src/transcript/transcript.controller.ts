@@ -232,7 +232,7 @@ export class TranscriptController {
   }
 
   @OnEvent('user.upsert')
-  public async onEvent(payload: unknown) {
+  public async userUpsert(payload: unknown) {
     const event = UserUpsertEvent.parse(payload);
     this.logger.debug({ event }, 'user upsert event!');
 
