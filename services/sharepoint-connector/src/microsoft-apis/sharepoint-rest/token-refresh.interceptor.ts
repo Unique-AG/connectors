@@ -1,7 +1,6 @@
 import type { IncomingHttpHeaders } from 'node:http';
 import { Logger } from '@nestjs/common';
 import { chunk, isArray, isNonNullish, isObjectType } from 'remeda';
-import { serializeError } from 'serialize-error-cjs';
 import type { Dispatcher } from 'undici';
 import { normalizeError } from '../../utils/normalize-error';
 

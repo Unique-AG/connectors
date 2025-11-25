@@ -20,8 +20,9 @@ export class SharepointRestHttpService {
   ) {
     const sharePointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const httpClient = new Client(sharePointBaseUrl, {
-      bodyTimeout: 30000,
-      headersTimeout: 30000,
+      bodyTimeout: 60_000,
+      headersTimeout: 30_000,
+      connectTimeout: 15_000,
     });
 
     // TODO: Add metrics middleware once we start implementing proper metrics
