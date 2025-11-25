@@ -34,11 +34,19 @@ export function createLoggingInterceptor(): Dispatcher.DispatcherComposeIntercep
           statusMessage?: string,
         ): void {
           statusCode = responseStatusCode;
+
+          if (statusCode >= 400) {
+            bodyChunks.length = 0;
+          }
+
           handler.onResponseStart?.(controller, responseStatusCode, headers, statusMessage);
         },
 
         onResponseData(controller: Dispatcher.DispatchController, chunk: Buffer): void {
-          bodyChunks.push(chunk);
+          if (statusCode && statusCode >= 400) {
+            bodyChunks.push(chunk);
+          }
+
           handler.onResponseData?.(controller, chunk);
         },
 
