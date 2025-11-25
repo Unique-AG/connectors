@@ -1,0 +1,119 @@
+import { ConfigService } from '@nestjs/config';
+import { TestBed } from '@suites/unit';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
+import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import { IngestionHttpClient } from '../clients/ingestion-http.client';
+import { INGESTION_CLIENT } from '../clients/unique-graphql.client';
+import { CONTENT_UPSERT_MUTATION } from './unique-file-ingestion.consts';
+import { UniqueFileIngestionService } from './unique-file-ingestion.service';
+import type {
+  ContentRegistrationRequest,
+  IngestionFinalizationRequest,
+} from './unique-file-ingestion.types';
+
+describe('UniqueFileIngestionService', () => {
+  let service: UniqueFileIngestionService;
+  let ingestionClientMock: { get: ReturnType<typeof vi.fn> };
+  let graphqlClientMock: { request: ReturnType<typeof vi.fn> };
+
+  beforeEach(async () => {
+    graphqlClientMock = {
+      request: vi.fn().mockResolvedValue({
+        contentUpsert: {
+          id: 'content-id',
+          writeUrl: 'https://write-url',
+        },
+      }),
+    };
+
+    ingestionClientMock = {
+      get: vi.fn().mockImplementation(async (cb) => await cb(graphqlClientMock)),
+    };
+
+    const { unit } = await TestBed.solitary(UniqueFileIngestionService)
+      .mock(INGESTION_CLIENT)
+      .impl(() => ingestionClientMock)
+      .mock(IngestionHttpClient)
+      // biome-ignore lint/suspicious/noExplicitAny: Not testing IngestionHttpClient, mock is unused
+      .impl(() => ({}) as any)
+      .mock(ConfigService)
+      .impl((stub) => ({
+        ...stub(),
+        get: vi.fn((key: string) => {
+          if (key === 'unique') {
+            return { storeInternally: StoreInternallyMode.Enabled };
+          }
+          return undefined;
+        }),
+      }))
+      .compile();
+
+    service = unit;
+  });
+
+  it('registerContent should pass metadata to mutation', async () => {
+    const request: ContentRegistrationRequest = {
+      key: 'item-key',
+      title: 'Item Title',
+      mimeType: 'application/pdf',
+      ownerType: UniqueOwnerType.Scope,
+      scopeId: 'scope-1',
+      sourceOwnerType: UniqueOwnerType.Company,
+      sourceKind: 'sharepoint',
+      sourceName: 'Sharepoint',
+      byteSize: 1024,
+      metadata: {
+        Author: 'John Doe',
+        Modified: '2024-01-01',
+      },
+    };
+
+    await service.registerContent(request);
+
+    expect(graphqlClientMock.request).toHaveBeenCalledWith(
+      CONTENT_UPSERT_MUTATION,
+      expect.objectContaining({
+        input: expect.objectContaining({
+          metadata: {
+            Author: 'John Doe',
+            Modified: '2024-01-01',
+          },
+        }),
+      }),
+    );
+  });
+
+  it('finalizeIngestion should pass metadata to mutation', async () => {
+    const request: IngestionFinalizationRequest = {
+      key: 'item-key',
+      title: 'Item Title',
+      mimeType: 'application/pdf',
+      ownerType: UniqueOwnerType.Scope,
+      byteSize: 1024,
+      scopeId: 'scope-1',
+      sourceOwnerType: UniqueOwnerType.Company,
+      sourceName: 'Sharepoint',
+      sourceKind: 'sharepoint',
+      fileUrl: 'https://file-url',
+      metadata: {
+        Author: 'Jane Doe',
+        Created: '2024-01-02',
+      },
+    };
+
+    await service.finalizeIngestion(request);
+
+    expect(graphqlClientMock.request).toHaveBeenCalledWith(
+      CONTENT_UPSERT_MUTATION,
+      expect.objectContaining({
+        input: expect.objectContaining({
+          metadata: {
+            Author: 'Jane Doe',
+            Created: '2024-01-02',
+          },
+        }),
+      }),
+    );
+  });
+});

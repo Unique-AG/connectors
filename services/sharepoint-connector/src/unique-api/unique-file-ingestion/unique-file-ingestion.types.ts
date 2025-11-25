@@ -1,3 +1,4 @@
+import { ModerationStatusValue } from '../../constants/moderation-status.constants';
 import { FileAccessKey } from '../unique-files/unique-files.types';
 
 export interface ContentRegistrationRequest {
@@ -13,6 +14,7 @@ export interface ContentRegistrationRequest {
   baseUrl?: string;
   byteSize: number;
   fileAccess?: FileAccessKey[];
+  metadata: ContentMetadata;
 }
 
 export interface IngestionFinalizationRequest {
@@ -28,6 +30,7 @@ export interface IngestionFinalizationRequest {
   fileUrl: string;
   url?: string;
   baseUrl?: string;
+  metadata?: ContentMetadata;
 }
 
 export interface IngestionApiResponse {
@@ -62,4 +65,24 @@ export interface FileDiffResponse {
   updatedFiles: string[];
   movedFiles: string[];
   deletedFiles: string[];
+}
+
+export interface AuthorMetadata {
+  email: string;
+  displayName: string;
+  id: string;
+}
+
+export type ContentMetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | AuthorMetadata
+  | ModerationStatusValue
+  | unknown[];
+
+export interface ContentMetadata {
+  [key: string]: ContentMetadataValue;
 }

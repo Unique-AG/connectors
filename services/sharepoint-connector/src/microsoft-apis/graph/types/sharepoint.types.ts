@@ -62,13 +62,7 @@ export interface ListItem {
   lastModifiedDateTime: string;
   createdDateTime: string;
   webUrl: string;
-  createdBy?: {
-    user: {
-      email: string;
-      id: string;
-      displayName: string;
-    };
-  };
+  createdBy: CreatedBy;
   fields: {
     '@odata.etag': string;
     FinanceGPTKnowledge: boolean;
@@ -76,10 +70,21 @@ export interface ListItem {
     CanvasContent1?: string; // This is the HTML content of the page for modern pages
     WikiField?: string; // This is the wiki content of the page for classic pages
     Title: string;
+    NewsTag?: string;
     FileSizeDisplay: string;
     FileLeafRef: string; // This is the file name of the page
     [key: string]: unknown;
   };
+}
+
+export interface SharePointUser {
+  email: string;
+  id: string;
+  displayName: string;
+}
+
+export interface CreatedBy {
+  user: SharePointUser;
 }
 
 // Typing built from the response of the MS Graph API
@@ -89,7 +94,9 @@ export interface DriveItem {
   name: string;
   webUrl: string;
   size: number;
+  createdDateTime: string;
   lastModifiedDateTime: string;
+  createdBy: CreatedBy;
   parentReference: {
     driveType: string;
     driveId: string;
@@ -116,6 +123,7 @@ export interface DriveItem {
     createdDateTime: string;
     lastModifiedDateTime: string;
     webUrl: string;
+    createdBy: CreatedBy;
     parentReference?: {
       id?: string;
       siteId?: string;

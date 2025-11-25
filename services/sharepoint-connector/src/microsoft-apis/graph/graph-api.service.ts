@@ -242,7 +242,7 @@ export class GraphApiService {
             .api(url)
             .select('id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy')
             .expand(
-              'fields($select=FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus,Title)',
+              'fields($select=FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus,Title,AuthorLookupId,EditorLookupId,NewsTag)',
             )
             .top(GRAPH_API_PAGE_SIZE)
             .get(),
@@ -503,6 +503,7 @@ export class GraphApiService {
       'name',
       'webUrl',
       'size',
+      'createdDateTime',
       'lastModifiedDateTime',
       'folder',
       'file',

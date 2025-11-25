@@ -17,7 +17,15 @@ describe('StorageUploadStep', () => {
       name: 'file.pdf',
       webUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
       size: 1024,
+      createdDateTime: '2024-01-01T00:00:00Z',
       lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      createdBy: {
+        user: {
+          email: 'test@example.com',
+          id: 'user-1',
+          displayName: 'Test User',
+        },
+      },
       parentReference: {
         driveType: 'documentLibrary',
         driveId: 'drive1',
@@ -34,6 +42,13 @@ describe('StorageUploadStep', () => {
         createdDateTime: '2024-01-01T00:00:00Z',
         lastModifiedDateTime: '2024-01-01T00:00:00Z',
         webUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+        createdBy: {
+          user: {
+            email: 'test@example.com',
+            id: 'user-1',
+            displayName: 'Test User',
+          },
+        },
         fields: {
           '@odata.etag': 'etag1',
           FinanceGPTKnowledge: false,

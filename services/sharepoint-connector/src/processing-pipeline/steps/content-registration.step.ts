@@ -4,9 +4,16 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
+import { ModerationStatusValue } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import { CreatedBy } from '../../microsoft-apis/graph/types/sharepoint.types';
+import { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
-import { ContentRegistrationRequest } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
+import {
+  AuthorMetadata,
+  ContentMetadata,
+  ContentRegistrationRequest,
+} from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 import { UniqueUsersService } from '../../unique-api/unique-users/unique-users.service';
 import { normalizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
@@ -45,7 +52,10 @@ export class ContentRegistrationStep implements IPipelineStep {
       url: context.knowledgeBaseUrl,
       baseUrl: this.sharepointBaseUrl,
       byteSize: context.fileSize ?? 0,
+      metadata: this.extractMetadata(context.pipelineItem),
     };
+
+    context.metadata = contentRegistrationRequest.metadata;
 
     const syncMode = this.configService.get('processing.syncMode', { infer: true });
     // We add permissions only for new files, because existing ones should already have correct
@@ -100,5 +110,49 @@ export class ContentRegistrationStep implements IPipelineStep {
       });
       throw error;
     }
+  }
+  // PowerAutomate connector sends the raw body from Get_file_properties as metadata.
+  // We replicate this by getting all fields from the SharePoint item
+  // and adding additional fields that are available from the MS Graph API response.
+  // AuthorLookupId and EditorLookupId are included in the fields, but we cannot
+  // resolve them to full user objects (email, displayName) via MS Graph API like the
+  // SharePoint REST API does.
+  private extractMetadata(item: SharepointContentItem): ContentMetadata {
+    const isListItem = item.itemType === 'listItem';
+    const baseFields = isListItem ? item.item.fields : item.item.listItem.fields;
+    const webUrl = isListItem ? item.item.webUrl : item.item.listItem.webUrl;
+    const createdBy: CreatedBy | undefined = isListItem
+      ? item.item.createdBy
+      : item.item.listItem.createdBy;
+
+    const moderationStatus = isListItem
+      ? (baseFields._ModerationStatus as ModerationStatusValue)
+      : undefined;
+    //
+    const metadata: ContentMetadata = {
+      ...baseFields,
+      Url: webUrl,
+      Path: item.folderPath,
+      DriveId: item.driveId,
+      Link: webUrl,
+      ItemInternalId: item.item.id,
+      Filename: baseFields.FileLeafRef,
+      ...(moderationStatus && {
+        ModerationStatus: moderationStatus,
+      }),
+      ...(createdBy?.user && {
+        Author: this.extractAuthor(createdBy),
+      }),
+    };
+
+    return metadata;
+  }
+
+  private extractAuthor(createdBy: CreatedBy): AuthorMetadata {
+    return {
+      email: createdBy.user.email,
+      displayName: createdBy.user.displayName,
+      id: createdBy.user.id,
+    };
   }
 }
