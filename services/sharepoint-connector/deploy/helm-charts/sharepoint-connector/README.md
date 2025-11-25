@@ -68,7 +68,7 @@ spec:
 | connector.envVars[0] | object | `{"name":"UNIQUE_ZITADEL_CLIENT_SECRET","valueFrom":{"secretKeyRef":{"key":"UNIQUE_ZITADEL_CLIENT_SECRET","name":"sharepoint-connector-secret"}}}` | loading of Zitadel Secret, Users can supersede this with their own secret that contains UNIQUE_ZITADEL_CLIENT_SECRET or use https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load completely arbitrary secret mappings. See also below in connectorConfig.unique.zitadel.clientSecret. |
 | connector.extraEnvCM[0] | string | `"sharepoint-connector-config"` |  |
 | connector.image.repository | string | `"ghcr.io/unique-ag/connectors/services/sharepoint-connector"` |  |
-| connector.image.tag | string | `"2.0.0-alpha.15"` |  |
+| connector.image.tag | string | `"2.0.0-alpha.16"` |  |
 | connector.networkPolicy.egress | string | `nil` |  |
 | connector.networkPolicy.enabled | bool | `true` |  |
 | connector.networkPolicy.policyTypes[0] | string | `"Ingress"` |  |
