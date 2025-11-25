@@ -6,6 +6,7 @@ import { chunk, identity } from 'remeda';
 import { Client, Dispatcher, interceptors } from 'undici';
 import { Config } from '../../config';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
+import { createLoggingInterceptor } from './logging.interceptor';
 import { createTokenRefreshInterceptor } from './token-refresh.interceptor';
 
 @Injectable()
@@ -23,8 +24,7 @@ export class SharepointRestHttpService {
       headersTimeout: 30000,
     });
 
-    // TODO: Add metrics middleware with some logging once we start implementing proper metrics
-    // TODO: Add middleware that logs the request headers and body on debug level
+    // TODO: Add metrics middleware once we start implementing proper metrics
     const interceptorsInCallingOrder = [
       interceptors.redirect({
         maxRedirections: 10,
@@ -35,6 +35,7 @@ export class SharepointRestHttpService {
       createTokenRefreshInterceptor(async () =>
         this.microsoftAuthenticationService.getAccessToken('sharepoint-rest'),
       ),
+      createLoggingInterceptor(),
     ];
     this.client = httpClient.compose(interceptorsInCallingOrder.reverse());
   }
