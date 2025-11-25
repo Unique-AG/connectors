@@ -52,13 +52,8 @@ export function createTokenRefreshInterceptor(
           handler.onResponseData?.(controller, chunk);
         },
 
-        onResponseError(controller: Dispatcher.DispatchController, errorRaw: Error): void {
-          const error = normalizeError(errorRaw);
-          logger.error({
-            msg: `Response error during token refresh: ${error.message}`,
-            error: serializeError(error),
-          });
-          handler.onResponseError?.(controller, errorRaw);
+        onResponseError(controller: Dispatcher.DispatchController, error: Error): void {
+          handler.onResponseError?.(controller, error);
         },
 
         onResponseEnd(
@@ -79,7 +74,7 @@ export function createTokenRefreshInterceptor(
             return;
           }
 
-          logger.log('Token expired,refreshing token...');
+          logger.log('Token expired, refreshing token...');
 
           tokenRefreshCallback()
             .then((newAccessToken) => {
