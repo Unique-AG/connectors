@@ -138,7 +138,7 @@ describe('getUniqueParentPathFromItem', () => {
       'https://company.sharepoint.com/sites/Site/Library/path/to/file/document.pdf',
     );
 
-    expect(() => getUniqueParentPathFromItem(item, '')).toThrow('rootScopeName cannot be empty');
+    expect(() => getUniqueParentPathFromItem(item, '')).toThrow('rootPath cannot be empty');
   });
 
   it('handles nested paths with multiple levels', () => {
@@ -149,6 +149,54 @@ describe('getUniqueParentPathFromItem', () => {
     const result = getUniqueParentPathFromItem(item, 'DeepScope');
 
     expect(result).toBe('/DeepScope/DeepSite/Documents/level1/level2/level3/level4');
+  });
+
+  it('handles rootPath with trailing slash', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniqueParentPathFromItem(item, 'ProjectScope/');
+
+    expect(result).toBe('/ProjectScope/Project/Documents');
+  });
+
+  it('handles rootPath with leading slash', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniqueParentPathFromItem(item, '/ProjectScope');
+
+    expect(result).toBe('/ProjectScope/Project/Documents');
+  });
+
+  it('handles rootPath with both leading and trailing slashes', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniqueParentPathFromItem(item, '/ProjectScope/');
+
+    expect(result).toBe('/ProjectScope/Project/Documents');
+  });
+
+  it('handles rootPath with multiple consecutive slashes', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniqueParentPathFromItem(item, 'Project//Scope');
+
+    expect(result).toBe('/Project/Scope/Project/Documents');
+  });
+
+  it('handles rootPath with multiple slashes at start and end', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniqueParentPathFromItem(item, '///ProjectScope///');
+
+    expect(result).toBe('/ProjectScope/Project/Documents');
+  });
+
+  it('handles rootPath with multiple slashes in the middle', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniqueParentPathFromItem(item, 'Project///Scope//Test');
+
+    expect(result).toBe('/Project/Scope/Test/Project/Documents');
   });
 });
 
@@ -223,7 +271,7 @@ describe('getUniquePathFromItem', () => {
       'https://company.sharepoint.com/sites/Site/Library/path/to/file/document.pdf',
     );
 
-    expect(() => getUniquePathFromItem(item, '')).toThrow('rootScopeName cannot be empty');
+    expect(() => getUniquePathFromItem(item, '')).toThrow('rootPath cannot be empty');
   });
 
   it('handles nested paths with multiple levels', () => {
@@ -234,5 +282,53 @@ describe('getUniquePathFromItem', () => {
     const result = getUniquePathFromItem(item, 'DeepScope');
 
     expect(result).toBe('/DeepScope/DeepSite/Documents/level1/level2/level3/level4/deep-file.pdf');
+  });
+
+  it('handles rootPath with trailing slash', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniquePathFromItem(item, 'ProjectScope/');
+
+    expect(result).toBe('/ProjectScope/Project/Documents/file.pdf');
+  });
+
+  it('handles rootPath with leading slash', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniquePathFromItem(item, '/ProjectScope');
+
+    expect(result).toBe('/ProjectScope/Project/Documents/file.pdf');
+  });
+
+  it('handles rootPath with both leading and trailing slashes', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniquePathFromItem(item, '/ProjectScope/');
+
+    expect(result).toBe('/ProjectScope/Project/Documents/file.pdf');
+  });
+
+  it('handles rootPath with multiple consecutive slashes', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniquePathFromItem(item, 'Project//Scope');
+
+    expect(result).toBe('/Project/Scope/Project/Documents/file.pdf');
+  });
+
+  it('handles rootPath with multiple slashes at start and end', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniquePathFromItem(item, '///ProjectScope///');
+
+    expect(result).toBe('/ProjectScope/Project/Documents/file.pdf');
+  });
+
+  it('handles rootPath with multiple slashes in the middle', () => {
+    const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
+
+    const result = getUniquePathFromItem(item, 'Project///Scope//Test');
+
+    expect(result).toBe('/Project/Scope/Test/Project/Documents/file.pdf');
   });
 });

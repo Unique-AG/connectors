@@ -5,6 +5,7 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { ScopeManagementService } from './scope-management.service';
+import type { SharepointSyncContext } from './types';
 
 const createDriveContentItem = (path: string): SharepointContentItem => {
   const webUrl = `https://example.sharepoint.com/sites/test1/${path}/Page%201.aspx`;
@@ -101,6 +102,13 @@ describe('ScopeManagementService', () => {
     },
   ];
 
+  const mockContext: SharepointSyncContext = {
+    serviceUserId: 'user-123',
+    rootScopeId: 'root-scope-123',
+    rootPath: '/test1',
+    siteId: 'site-123',
+  };
+
   let service: ScopeManagementService;
   let configGetMock: ReturnType<typeof vi.fn>;
   let createScopesMock: ReturnType<typeof vi.fn>;
@@ -114,11 +122,10 @@ describe('ScopeManagementService', () => {
     });
 
     createScopesMock = vi.fn().mockResolvedValue(
-      mockScopes.map(({ id, name, parentId, scopeAccess }) => ({
+      mockScopes.map(({ id, name, parentId }) => ({
         id,
         name,
         parentId,
-        scopeAccess,
       })),
     );
 
@@ -197,7 +204,7 @@ describe('ScopeManagementService', () => {
     it('creates scopes and returns list', async () => {
       const items = [createDriveContentItem('UniqueAG/SitePages')];
 
-      const result = await service.batchCreateScopes(items);
+      const result = await service.batchCreateScopes(items, mockContext);
 
       expect(result).toEqual(
         expect.arrayContaining([
@@ -232,14 +239,14 @@ describe('ScopeManagementService', () => {
     });
 
     it('returns empty list when no items provided', async () => {
-      const result = await service.batchCreateScopes([]);
+      const result = await service.batchCreateScopes([], mockContext);
 
       expect(result).toHaveLength(0);
       expect(createScopesMock).not.toHaveBeenCalled();
     });
 
     it('logs site identifier in success message', async () => {
-      await service.batchCreateScopes([createDriveContentItem('UniqueAG/SitePages')]);
+      await service.batchCreateScopes([createDriveContentItem('UniqueAG/SitePages')], mockContext);
 
       // The logger is globally mocked, so we can check the mock calls
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
@@ -254,7 +261,7 @@ describe('ScopeManagementService', () => {
       const items = [createDriveContentItem('UniqueAG/SitePages')];
       const item = items[0];
 
-      const result = service.buildItemIdToScopeIdMap(items, mockScopes);
+      const result = service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
 
       // biome-ignore lint/style/noNonNullAssertion: Test data is guaranteed to exist
       expect(result.get(item!.item.id)).toBe('scope_4');
@@ -264,7 +271,7 @@ describe('ScopeManagementService', () => {
       const items = [createDriveContentItem('UniqueAG/Freigegebene%20Dokumente/General')];
       const item = items[0];
 
-      const result = service.buildItemIdToScopeIdMap(items, mockScopes);
+      const result = service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
 
       // The scope for this path doesn't exist in mockScopes, so it should return undefined
       // biome-ignore lint/style/noNonNullAssertion: Test data is guaranteed to exist
@@ -274,7 +281,7 @@ describe('ScopeManagementService', () => {
     it('returns empty map when scopes is empty', () => {
       const items = [createDriveContentItem('UniqueAG/SitePages')];
 
-      const result = service.buildItemIdToScopeIdMap(items, []);
+      const result = service.buildItemIdToScopeIdMap(items, [], mockContext);
 
       expect(result.size).toBe(0);
     });
@@ -282,7 +289,7 @@ describe('ScopeManagementService', () => {
     it('logs warning when scope is not present in cache', () => {
       const items = [createDriveContentItem('UniqueAG/UnknownFolder')];
 
-      service.buildItemIdToScopeIdMap(items, mockScopes);
+      service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
 
       // The logger is globally mocked, so we can check the mock calls
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing

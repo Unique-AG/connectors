@@ -126,9 +126,11 @@ describe('SharepointSynchronizationService', () => {
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
     );
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [mockFile],
       null,
+      expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
     );
   });
 
@@ -136,9 +138,11 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [mockFile],
       null,
+      expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
     );
   });
 
@@ -223,7 +227,9 @@ describe('SharepointSynchronizationService', () => {
     await unit.synchronize();
 
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      context: expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
       sharePoint: { items: [mockFile], directories: [] },
       unique: { folders: null },
     });
@@ -335,9 +341,11 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [fileWithAllFields],
       null,
+      expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
     );
   });
 
@@ -415,9 +423,11 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [fileWithoutTimestamp],
       null,
+      expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
     );
   });
 
@@ -627,9 +637,11 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [file1, file2, file3],
       null,
+      expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
     );
   });
 });

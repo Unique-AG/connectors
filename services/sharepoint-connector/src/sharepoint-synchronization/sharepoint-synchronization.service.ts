@@ -9,6 +9,7 @@ import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
+import type { BaseSyncContext, SharepointSyncContext } from './types';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -35,6 +36,20 @@ export class SharepointSynchronizationService {
     const syncStartTime = Date.now();
     const siteIdsToScan = this.configService.get('sharepoint.siteIds', { infer: true });
     const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
+    const scopeId = this.configService.get('unique.scopeId', { infer: true });
+
+    // Initialize root scope and context (once)
+    let baseContext: BaseSyncContext;
+    try {
+      baseContext = await this.scopeManagementService.initializeRootScope(scopeId, ingestionMode);
+    } catch (error) {
+      this.logger.error({
+        msg: `Failed to initialize root scope: ${normalizeError(error).message}`,
+        error,
+      });
+      this.isScanning = false;
+      return;
+    }
 
     this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
 
@@ -42,6 +57,11 @@ export class SharepointSynchronizationService {
       const logPrefix = `[SiteId: ${siteId}]`;
       let scopes: ScopeWithPath[] | null = null;
       const siteStartTime = Date.now();
+
+      const context: SharepointSyncContext = {
+        ...baseContext,
+        siteId,
+      };
 
       const { items, directories } = await this.graphApiService.getAllSiteItems(siteId);
       this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
@@ -54,7 +74,7 @@ export class SharepointSynchronizationService {
       if (ingestionMode === IngestionMode.Recursive) {
         try {
           // Create scopes for ALL paths (including moved file destinations)
-          scopes = await this.scopeManagementService.batchCreateScopes(items);
+          scopes = await this.scopeManagementService.batchCreateScopes(items, context);
         } catch (error) {
           this.logger.error({
             msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}. Skipping site.`,
@@ -65,7 +85,7 @@ export class SharepointSynchronizationService {
       }
 
       try {
-        await this.contentSyncService.syncContentForSite(siteId, items, scopes);
+        await this.contentSyncService.syncContentForSite(items, scopes, context);
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
@@ -78,7 +98,7 @@ export class SharepointSynchronizationService {
       if (syncMode === 'content_and_permissions') {
         try {
           await this.permissionsSyncService.syncPermissionsForSite({
-            siteId,
+            context,
             sharePoint: { items, directories },
             unique: { folders: scopes },
           });
