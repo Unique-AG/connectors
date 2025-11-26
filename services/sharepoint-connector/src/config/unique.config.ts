@@ -61,11 +61,20 @@ const baseConfig = z.object({
     .describe(
       'Scope ID to be used as root for ingestion. For flat mode, all files are ingested in this scope. For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
     ),
-  ingestionGraphqlUrl: z.url().describe('Unique graphql ingestion service URL'),
-  // TODO: Right now scopeManagementGraphqlUrl is required, but in the future it should be
+  ingestionServiceBaseUrl: z
+    .url()
+    .describe('Base URL for Unique ingestion service')
+    .refine((url) => !url.endsWith('/'), {
+      message: 'ingestionServiceBaseUrl must not end with a trailing slash',
+    }),
+  // TODO: Right now scopeManagementServiceBaseUrl is required, but in the future it should be
   //       optional based on the sync mode, but it lives in processing config.
-  scopeManagementGraphqlUrl: z.url().describe('Unique graphql scope management service URL'),
-  fileDiffUrl: z.url().describe('Unique file diff service URL'),
+  scopeManagementServiceBaseUrl: z
+    .url()
+    .describe('Base URL for Unique scope management service')
+    .refine((url) => !url.endsWith('/'), {
+      message: 'scopeManagementServiceBaseUrl must not end with a trailing slash',
+    }),
   apiRateLimitPerMinute: z.coerce
     .number()
     .int()

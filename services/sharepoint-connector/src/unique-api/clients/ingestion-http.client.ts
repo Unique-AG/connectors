@@ -16,9 +16,10 @@ export class IngestionHttpClient implements OnModuleDestroy {
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
   ) {
-    const fileDiffUrl = this.configService.get('unique.fileDiffUrl', { infer: true });
-    const url = new URL(fileDiffUrl);
-    this.httpClient = new Client(`${url.protocol}//${url.host}`, {
+    const ingestionUrl = new URL(
+      this.configService.get('unique.ingestionServiceBaseUrl', { infer: true }),
+    );
+    this.httpClient = new Client(`${ingestionUrl.protocol}//${ingestionUrl.host}`, {
       bodyTimeout: 30000,
       headersTimeout: 30000,
     });

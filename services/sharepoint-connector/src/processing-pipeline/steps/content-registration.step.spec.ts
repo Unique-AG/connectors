@@ -10,14 +10,63 @@ import type { ProcessingContext } from '../types/processing-context';
 import { ContentRegistrationStep } from './content-registration.step';
 
 describe('ContentRegistrationStep', () => {
-  let step: ContentRegistrationStep;
   let uniqueFileIngestionServiceMock: { registerContent: ReturnType<typeof vi.fn> };
 
-  beforeEach(async () => {
+  const mockWriteUrl = 'https://upload.com?key=dummyKey';
+  const mockIngestionServiceBaseUrl = 'https://api.unique.app/ingestion';
+
+  const createMockListItem = (): ListItem => ({
+    id: 'f1',
+    webUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+    lastModifiedDateTime: '2024-01-01T00:00:00Z',
+    createdDateTime: '2024-01-01T00:00:00Z',
+    createdBy: {
+      user: {
+        email: 'user@example.com',
+        id: 'user1',
+        displayName: 'Test User',
+      },
+    },
+    fields: {
+      '@odata.etag': 'etag1',
+      FinanceGPTKnowledge: false,
+      _ModerationStatus: ModerationStatus.Approved,
+      Title: 'Test Title',
+      FileSizeDisplay: '1024',
+      FileLeafRef: 'test.aspx',
+    },
+  });
+
+  const createMockContext = (): ProcessingContext => ({
+    correlationId: 'c1',
+    startTime: new Date(),
+    knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+    mimeType: 'application/pdf',
+    scopeId: 'scope-1',
+    fileStatus: 'new',
+    syncContext: {
+      serviceUserId: 'user-1',
+      rootScopeId: 'root-scope-1',
+      rootPath: '/Root',
+      siteId: 'site',
+    },
+    pipelineItem: {
+      itemType: 'listItem',
+      item: createMockListItem(),
+      siteId: 'site',
+      siteWebUrl: 'https://contoso.sharepoint.com/sites/Engineering',
+      driveId: 'drive',
+      driveName: 'Documents',
+      folderPath: '/test',
+      fileName: 'file.pdf',
+    },
+  });
+
+  beforeEach(() => {
     uniqueFileIngestionServiceMock = {
       registerContent: vi.fn().mockResolvedValue({
         id: 'cid',
-        writeUrl: 'https://upload',
+        writeUrl: mockWriteUrl,
         key: 'k',
         byteSize: 1,
         mimeType: 'application/pdf',
@@ -29,7 +78,9 @@ describe('ContentRegistrationStep', () => {
         source: INGESTION_SOURCE_KIND,
       }),
     };
+  });
 
+  it('registers content and updates context in external mode', async () => {
     const { unit } = await TestBed.solitary(ContentRegistrationStep)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -37,65 +88,18 @@ describe('ContentRegistrationStep', () => {
         get: vi.fn((k: string) => {
           if (k === 'unique.scopeId') return 'scope-1';
           if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
+          if (k === 'unique.serviceAuthMode') return 'external';
           return undefined;
         }),
       }))
       .mock(UniqueFileIngestionService)
       .impl(() => uniqueFileIngestionServiceMock)
       .compile();
-    step = unit;
-  });
 
-  it('registers content and updates context', async () => {
-    const listItem: ListItem = {
-      id: 'f1',
-      webUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
-      lastModifiedDateTime: '2024-01-01T00:00:00Z',
-      createdDateTime: '2024-01-01T00:00:00Z',
-      createdBy: {
-        user: {
-          email: 'user@example.com',
-          id: 'user1',
-          displayName: 'Test User',
-        },
-      },
-      fields: {
-        '@odata.etag': 'etag1',
-        FinanceGPTKnowledge: false,
-        _ModerationStatus: ModerationStatus.Approved,
-        Title: 'Test Title',
-        FileSizeDisplay: '1024',
-        FileLeafRef: 'test.aspx',
-      },
-    };
+    const context = createMockContext();
+    const result = await unit.execute(context);
 
-    const context: ProcessingContext = {
-      correlationId: 'c1',
-      startTime: new Date(),
-      knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
-      mimeType: 'application/pdf',
-      scopeId: 'scope-1',
-      fileStatus: 'new',
-      syncContext: {
-        serviceUserId: 'user-1',
-        rootScopeId: 'root-scope-1',
-        rootPath: '/Root',
-        siteId: 'site',
-      },
-      pipelineItem: {
-        itemType: 'listItem',
-        item: listItem,
-        siteId: 'site',
-        siteWebUrl: 'https://contoso.sharepoint.com/sites/Engineering',
-        driveId: 'drive',
-        driveName: 'Documents',
-        folderPath: '/test',
-        fileName: 'file.pdf',
-      },
-    };
-
-    const result = await step.execute(context);
-    expect(result.uploadUrl).toBe('https://upload');
+    expect(result.uploadUrl).toBe(mockWriteUrl);
     expect(result.uniqueContentId).toBe('cid');
 
     expect(uniqueFileIngestionServiceMock.registerContent).toHaveBeenCalledWith(
@@ -109,6 +113,55 @@ describe('ContentRegistrationStep', () => {
           FileSizeDisplay: '1024',
           FileLeafRef: 'test.aspx',
           // Additional fields added to match V1 PowerAutomate connector
+          Url: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+          Path: '/test',
+          DriveId: 'drive',
+          Link: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
+          ItemInternalId: 'f1',
+          Filename: 'test.aspx',
+          ModerationStatus: 0,
+          Author: {
+            email: 'user@example.com',
+            displayName: 'Test User',
+            id: 'user1',
+          },
+        },
+      }),
+    );
+  });
+
+  it('rewrites uploadUrl to ingestion service endpoint in cluster_local mode', async () => {
+    const { unit } = await TestBed.solitary(ContentRegistrationStep)
+      .mock(ConfigService)
+      .impl((stub) => ({
+        ...stub(),
+        get: vi.fn((k: string) => {
+          if (k === 'unique.scopeId') return 'scope-1';
+          if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
+          if (k === 'unique.serviceAuthMode') return 'cluster_local';
+          if (k === 'unique.ingestionServiceBaseUrl') return mockIngestionServiceBaseUrl;
+          return undefined;
+        }),
+      }))
+      .mock(UniqueFileIngestionService)
+      .impl(() => uniqueFileIngestionServiceMock)
+      .compile();
+
+    const context = createMockContext();
+    const result = await unit.execute(context);
+
+    expect(result.uploadUrl).toBe(`${mockIngestionServiceBaseUrl}/scoped/upload?key=dummyKey`);
+    expect(result.uniqueContentId).toBe('cid');
+
+    expect(uniqueFileIngestionServiceMock.registerContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: {
+          '@odata.etag': 'etag1',
+          FinanceGPTKnowledge: false,
+          _ModerationStatus: ModerationStatus.Approved,
+          Title: 'Test Title',
+          FileSizeDisplay: '1024',
+          FileLeafRef: 'test.aspx',
           Url: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
           Path: '/test',
           DriveId: 'drive',

@@ -17,9 +17,8 @@ const MOCK_UNIQUE_CONFIG = Object.freeze({
   zitadelServiceExtraHeaders: {},
   ingestionMode: 'flat' as const,
   scopeId: 'scope-1',
-  ingestionGraphqlUrl: 'https://ingestion.example.com/graphql',
-  scopeManagementGraphqlUrl: 'https://scope.example.com/graphql',
-  fileDiffUrl: 'https://diff.example.com/api',
+  ingestionServiceBaseUrl: 'https://ingestion.example.com',
+  scopeManagementServiceBaseUrl: 'https://scope.example.com',
   apiRateLimitPerMinute: 60,
 });
 
