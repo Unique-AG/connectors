@@ -3,7 +3,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   differenceWith,
   filter,
-  identity,
   indexBy,
   isDeepEqual,
   isNonNullish,
@@ -19,7 +18,11 @@ import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
+import {
+  buildIngestionItemKey,
+  getUniquePathFromItem,
+  normalizeSlashes,
+} from '../utils/sharepoint.util';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -123,7 +126,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     // Example: /RootScope/Site/Drive/Folder -> Site/Drive/Folder -> 3 levels -> false
     // Example: /RootScope/Site/Drive -> Site/Drive -> 2 levels -> true
     // Top folders don't have permissions fetched from SharePoint, so we use root group permission instead.
-    return path.replace(rootPath, '').split('/').filter(identity()).length <= 2;
+    return path.replace(`/${normalizeSlashes(rootPath)}/`, '').split('/').length <= 2;
   }
 
   private mapSharePointPermissionsToScopeAccesses(
