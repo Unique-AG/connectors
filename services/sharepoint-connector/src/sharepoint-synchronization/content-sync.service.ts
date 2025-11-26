@@ -95,7 +95,7 @@ export class ContentSyncService {
       return this.scopeManagementService.determineScopeForItem(item, scopes, context) || scopeId;
     };
 
-    await this.orchestrator.processItems(siteId, newItems, updatedItems, getScopeIdForItem);
+    await this.orchestrator.processItems(context, newItems, updatedItems, getScopeIdForItem);
 
     this.logger.log(
       `${logPrefix} Finished processing all content operations in ${elapsedSecondsLog(processStartTime)}`,

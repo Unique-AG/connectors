@@ -1,4 +1,5 @@
 import type { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type { SharepointSyncContext } from '../../sharepoint-synchronization/types';
 import {
   ContentMetadata,
   IngestionApiResponse,
@@ -17,7 +18,7 @@ export interface ProcessingContext {
   mimeType?: string;
   registrationResponse?: IngestionApiResponse;
   fileStatus: 'new' | 'updated';
-  currentUserId: string;
+  syncContext: SharepointSyncContext;
   metadata?: ContentMetadata;
 }
 

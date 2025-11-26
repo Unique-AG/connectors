@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
@@ -110,17 +109,9 @@ describe('ScopeManagementService', () => {
   };
 
   let service: ScopeManagementService;
-  let configGetMock: ReturnType<typeof vi.fn>;
   let createScopesMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
-    configGetMock = vi.fn((key: string) => {
-      if (key === 'unique.rootScopeName') {
-        return 'test1';
-      }
-      return undefined;
-    });
-
     createScopesMock = vi.fn().mockResolvedValue(
       mockScopes.map(({ id, name, parentId }) => ({
         id,
@@ -130,11 +121,6 @@ describe('ScopeManagementService', () => {
     );
 
     const { unit } = await TestBed.solitary(ScopeManagementService)
-      .mock<ConfigService>(ConfigService)
-      .impl((stubFn) => ({
-        ...stubFn(),
-        get: configGetMock,
-      }))
       .mock<UniqueScopesService>(UniqueScopesService)
       .impl((stubFn) => ({
         ...stubFn(),

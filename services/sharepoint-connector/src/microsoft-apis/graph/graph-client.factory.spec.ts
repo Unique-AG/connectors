@@ -1,29 +1,20 @@
-import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { GraphClientFactory } from './graph-client.factory';
+import { GraphAuthenticationService } from './middlewares/graph-authentication.service';
 
 describe('GraphClientFactory', () => {
   let factory: GraphClientFactory;
-  let mockAuthProvider: MicrosoftAuthenticationService;
+  let mockGraphAuthService: GraphAuthenticationService;
 
   beforeEach(async () => {
-    mockAuthProvider = {
+    mockGraphAuthService = {
       getAccessToken: async () => 'mock-token',
     } as never;
 
     const { unit } = await TestBed.solitary(GraphClientFactory)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: (key: string) => {
-          if (key === 'logLevel') return 'info';
-          return undefined;
-        },
-      }))
-      .mock(MicrosoftAuthenticationService)
-      .impl(() => mockAuthProvider)
+      .mock(GraphAuthenticationService)
+      .impl(() => mockGraphAuthService)
       .compile();
 
     factory = unit;
@@ -44,16 +35,8 @@ describe('GraphClientFactory', () => {
 
   it('creates client with debug logging disabled by default', async () => {
     const { unit } = await TestBed.solitary(GraphClientFactory)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: (key: string) => {
-          if (key === 'logLevel') return 'info';
-          return undefined;
-        },
-      }))
-      .mock(MicrosoftAuthenticationService)
-      .impl(() => mockAuthProvider)
+      .mock(GraphAuthenticationService)
+      .impl(() => mockGraphAuthService)
       .compile();
 
     const client = unit.createClient();
@@ -63,16 +46,8 @@ describe('GraphClientFactory', () => {
 
   it('creates client with debug logging enabled for debug level', async () => {
     const { unit } = await TestBed.solitary(GraphClientFactory)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: (key: string) => {
-          if (key === 'logLevel') return 'debug';
-          return undefined;
-        },
-      }))
-      .mock(MicrosoftAuthenticationService)
-      .impl(() => mockAuthProvider)
+      .mock(GraphAuthenticationService)
+      .impl(() => mockGraphAuthService)
       .compile();
 
     const client = unit.createClient();

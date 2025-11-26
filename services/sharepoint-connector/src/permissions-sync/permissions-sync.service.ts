@@ -93,7 +93,7 @@ export class PermissionsSyncService {
     );
 
     await this.syncSharepointFilesPermissionsToUniqueCommand.run({
-      siteId,
+      context,
       sharePoint: { permissionsMap },
       unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
     });

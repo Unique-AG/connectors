@@ -17,7 +17,6 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import {
   buildIngestionItemKey,
   getUniquePathFromItem,
@@ -45,16 +44,14 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
-    private readonly uniqueUsersService: UniqueUsersService,
     private readonly uniqueGroupsService: UniqueGroupsService,
   ) {}
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
-    const { siteId, rootPath } = context;
+    const { siteId, rootPath, serviceUserId } = context;
     const logPrefix = `[Site: ${siteId}]`;
 
-    const serviceUserId = await this.uniqueUsersService.getCurrentUserId();
     const rootGroup = await this.uniqueGroupsService.getRootGroup();
     if (!rootGroup) {
       this.logger.warn(`${logPrefix} Root group not found, skipping folder permissions sync`);

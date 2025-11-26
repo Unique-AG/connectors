@@ -10,14 +10,14 @@ import {
   partition,
   pipe,
 } from 'remeda';
+import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile, UniqueFileAccessInput } from '../unique-api/unique-files/unique-files.types';
-import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
 interface Input {
-  siteId: string;
+  context: SharepointSyncContext;
   sharePoint: {
     permissionsMap: Record<string, Membership[]>;
   };
@@ -31,13 +31,11 @@ interface Input {
 export class SyncSharepointFilesPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(
-    private readonly uniqueFilesService: UniqueFilesService,
-    private readonly uniqueUsersService: UniqueUsersService,
-  ) {}
+  public constructor(private readonly uniqueFilesService: UniqueFilesService) {}
 
   public async run(input: Input): Promise<void> {
-    const { siteId, sharePoint, unique } = input;
+    const { context, sharePoint, unique } = input;
+    const { siteId, serviceUserId } = context;
 
     const logPrefix = `[Site: ${siteId}]`;
     this.logger.log(
@@ -48,8 +46,6 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
     this.logger.log(`${logPrefix} Fetching unique files`);
     const uniqueFiles = await this.uniqueFilesService.getFilesForSite(siteId);
     this.logger.log(`${logPrefix} Fetched ${uniqueFiles.length} unique files`);
-
-    const serviceUserId = await this.uniqueUsersService.getCurrentUserId();
     // Maps from scope id to permissions to add/remove, because API calls are limited to the scope
     const permissionsToAddByScopeId: Record<string, UniqueFileAccessInput[]> = {};
     const permissionsToRemoveByScopeId: Record<string, UniqueFileAccessInput[]> = {};
