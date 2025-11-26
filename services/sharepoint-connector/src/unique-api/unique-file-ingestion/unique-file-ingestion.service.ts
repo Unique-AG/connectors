@@ -108,9 +108,12 @@ export class UniqueFileIngestionService {
     fileList: FileDiffItem[],
     partialKey: string,
   ): Promise<FileDiffResponse> {
-    const uniqueConfig = this.configService.get('unique', { infer: true });
-    const fileDiffUrl = new URL(uniqueConfig.fileDiffUrl);
-    const fileDiffPath = fileDiffUrl.pathname + fileDiffUrl.search;
+    const ingestionUrl = new URL(
+      this.configService.get('unique.ingestionServiceBaseUrl', { infer: true }),
+    );
+    // The ingestionServiceBaseUrl can have already part of the path when running in external mode
+    const pathPrefix = ingestionUrl.pathname === '/' ? '' : ingestionUrl.pathname;
+    const fileDiffPath = `${pathPrefix}/v2/content/file-diff`;
 
     const diffRequest: FileDiffRequest = {
       partialKey,

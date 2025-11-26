@@ -129,35 +129,26 @@
           "type": "object",
           "description": "Unique platform configuration",
           "required": [
-            "fileDiffUrl",
-            "ingestionGraphqlUrl",
-            "scopeManagementGraphqlUrl",
+            "ingestionServiceBaseUrl",
+            "scopeManagementServiceBaseUrl",
             "ingestionMode",
             "authMode"
           ],
           "properties": {
-            "fileDiffUrl": {
+            "ingestionServiceBaseUrl": {
               "type": "string",
-              "description": "URL for file differences",
+              "description": "Base URL for the ingestion service",
               "examples": [
-                "http://node-ingestion.finance-gpt:8091/v2/content/file-diff",
-                "https://api.unique.app/ingestion/v2/content/file-diff"
+                "http://node-ingestion.finance-gpt:8091",
+                "https://api.unique.app/ingestion"
               ]
             },
-            "ingestionGraphqlUrl": {
+            "scopeManagementServiceBaseUrl": {
               "type": "string",
-              "description": "GraphQL URL for data ingestion",
+              "description": "Base URL for the scope management service",
               "examples": [
-                "http://node-ingestion.finance-gpt:8091/graphql",
-                "https://api.unique.app/ingestion/graphql"
-              ]
-            },
-            "scopeManagementGraphqlUrl": {
-              "type": "string",
-              "description": "GraphQL URL for scope management",
-              "examples": [
-                "http://node-scope-management.finance-gpt:8094/graphql",
-                "https://api.unique.app/scope-management/graphql"
+                "http://node-scope-management.finance-gpt:8094",
+                "https://api.unique.app/scope-management"
               ]
             },
             "ingestionMode": {

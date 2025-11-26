@@ -89,7 +89,7 @@ export class ContentRegistrationStep implements IPipelineStep {
         'Registration response missing required fields: id or writeUrl',
       );
 
-      context.uploadUrl = registrationResponse.writeUrl;
+      context.uploadUrl = this.correctWriteUrl(registrationResponse.writeUrl);
       context.uniqueContentId = registrationResponse.id;
       context.registrationResponse = registrationResponse;
       const _stepDuration = Date.now() - stepStartTime;
@@ -148,5 +148,27 @@ export class ContentRegistrationStep implements IPipelineStep {
       displayName: createdBy.user.displayName,
       id: createdBy.user.id,
     };
+  }
+
+  // HACK:
+  // When running in internal auth mode, rewrite the writeUrl to route through the ingestion
+  // service's scoped upload endpoint. This enables internal services to upload files without
+  // requiring external network access (hairpinning).
+  // Ideally we should fix this somehow in the service itself by using a separate property or make
+  // writeUrl configurable, but for now this hack lets us avoid hairpinning issues in the internal
+  // upload flows.
+  private correctWriteUrl(writeUrl: string): string {
+    const uniqueAuthMode = this.configService.get('unique.serviceAuthMode', { infer: true });
+    if (uniqueAuthMode === 'external') {
+      return writeUrl;
+    }
+    const url = new URL(writeUrl);
+    const key = url.searchParams.get('key');
+    assert.ok(key, 'writeUrl is missing key parameter');
+
+    const ingestionApiUrl = this.configService.get('unique.ingestionServiceBaseUrl', {
+      infer: true,
+    });
+    return `${ingestionApiUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
   }
 }
