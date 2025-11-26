@@ -47,12 +47,11 @@ export class ScopeManagementService {
       ]);
 
       const parent = await this.uniqueScopesService.getScopeById(currentScope.parentId);
-      if (!parent) {
-        this.logger.warn(
-          `Parent scope ${currentScope.parentId} not found for scope ${currentScope.id}`,
-        );
-        break;
-      }
+
+      assert.ok(
+        parent,
+        `Parent scope ${currentScope.parentId} not found for scope ${currentScope.id}`,
+      );
 
       pathSegments.unshift(parent.name);
       currentScope = parent;
