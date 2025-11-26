@@ -179,7 +179,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
   });
 
-  it('does not release scan lock on getAllSiteItems error', async () => {
+  it('releases scan lock on getAllSiteItems error', async () => {
     mockGraphApiService.getAllSiteItems = vi
       .fn()
       .mockRejectedValueOnce(new Error('API failure'))
@@ -188,12 +188,12 @@ describe('SharepointSynchronizationService', () => {
     try {
       await service.synchronize();
     } catch {
-      // Expected to throw
+      // Expected to throw because of the error in getAllSiteItems
     }
 
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
   });
 
   it('continues content sync on error and attempts permissions sync', async () => {
