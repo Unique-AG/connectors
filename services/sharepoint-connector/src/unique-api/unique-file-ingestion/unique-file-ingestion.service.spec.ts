@@ -9,6 +9,7 @@ import { CONTENT_UPSERT_MUTATION } from './unique-file-ingestion.consts';
 import { UniqueFileIngestionService } from './unique-file-ingestion.service';
 import type {
   ContentRegistrationRequest,
+  FileDiffItem,
   IngestionFinalizationRequest,
 } from './unique-file-ingestion.types';
 
@@ -115,5 +116,125 @@ describe('UniqueFileIngestionService', () => {
         }),
       }),
     );
+  });
+
+  describe('performFileDiff', () => {
+    it('preserves path prefix from ingestionServiceBaseUrl when making file-diff request', async () => {
+      let capturedPath: string | undefined;
+      const mockHttpClient = {
+        request: vi.fn().mockImplementation(async (options) => {
+          capturedPath = options.path;
+          return {
+            statusCode: 200,
+            body: {
+              json: vi.fn().mockResolvedValue({
+                newFiles: [],
+                updatedFiles: [],
+                movedFiles: [],
+                deletedFiles: [],
+              }),
+              text: vi.fn().mockResolvedValue(''),
+            },
+          };
+        }),
+      };
+
+      const { unit } = await TestBed.solitary(UniqueFileIngestionService)
+        .mock(INGESTION_CLIENT)
+        .impl(() => ingestionClientMock)
+        .mock(IngestionHttpClient)
+        .impl(() => mockHttpClient)
+        .mock(ConfigService)
+        .impl((stub) => ({
+          ...stub(),
+          get: vi.fn((key: string) => {
+            if (key === 'unique') {
+              return { storeInternally: StoreInternallyMode.Enabled };
+            }
+            if (key === 'unique.ingestionServiceBaseUrl') {
+              return 'https://api.unique.app/ingestion';
+            }
+            return undefined;
+          }),
+        }))
+        .compile();
+
+      const fileList: FileDiffItem[] = [
+        {
+          key: 'file-key-1',
+          url: 'https://example.com/file1',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+      ];
+
+      await unit.performFileDiff(fileList, 'partial-key');
+
+      expect(capturedPath).toBe('/ingestion/v2/content/file-diff');
+      expect(mockHttpClient.request).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'POST',
+          path: '/ingestion/v2/content/file-diff',
+        }),
+      );
+    });
+
+    it('uses correct path when ingestionServiceBaseUrl has no path prefix', async () => {
+      let capturedPath: string | undefined;
+      const mockHttpClient = {
+        request: vi.fn().mockImplementation(async (options) => {
+          capturedPath = options.path;
+          return {
+            statusCode: 200,
+            body: {
+              json: vi.fn().mockResolvedValue({
+                newFiles: [],
+                updatedFiles: [],
+                movedFiles: [],
+                deletedFiles: [],
+              }),
+              text: vi.fn().mockResolvedValue(''),
+            },
+          };
+        }),
+      };
+
+      const { unit } = await TestBed.solitary(UniqueFileIngestionService)
+        .mock(INGESTION_CLIENT)
+        .impl(() => ingestionClientMock)
+        .mock(IngestionHttpClient)
+        .impl(() => mockHttpClient)
+        .mock(ConfigService)
+        .impl((stub) => ({
+          ...stub(),
+          get: vi.fn((key: string) => {
+            if (key === 'unique') {
+              return { storeInternally: StoreInternallyMode.Enabled };
+            }
+            if (key === 'unique.ingestionServiceBaseUrl') {
+              return 'https://api.unique.app';
+            }
+            return undefined;
+          }),
+        }))
+        .compile();
+
+      const fileList: FileDiffItem[] = [
+        {
+          key: 'file-key-1',
+          url: 'https://example.com/file1',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+      ];
+
+      await unit.performFileDiff(fileList, 'partial-key');
+
+      expect(capturedPath).toBe('/v2/content/file-diff');
+      expect(mockHttpClient.request).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'POST',
+          path: '/v2/content/file-diff',
+        }),
+      );
+    });
   });
 });

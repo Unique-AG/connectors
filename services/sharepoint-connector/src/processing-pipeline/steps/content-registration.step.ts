@@ -169,6 +169,6 @@ export class ContentRegistrationStep implements IPipelineStep {
     const ingestionApiUrl = this.configService.get('unique.ingestionServiceBaseUrl', {
       infer: true,
     });
-    return `${ingestionApiUrl}/scoped/upload?key=${key}`;
+    return `${ingestionApiUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
   }
 }
