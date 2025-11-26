@@ -63,9 +63,13 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
       rootPath,
     );
 
-    const uniqueFoldersToProcess = unique.folders;
+    const uniqueFoldersToProcess = unique.folders.filter(
+      (folder) => !this.isParentOfRootFolder(folder.path, rootPath),
+    );
+
     this.logger.log(
-      `${logPrefix} Starting folder permissions sync for ${uniqueFoldersToProcess.length} Unique folders`,
+      `${logPrefix} Starting folder permissions sync for ${uniqueFoldersToProcess.length} Unique folders ` +
+        `(filtered ${unique.folders.length - uniqueFoldersToProcess.length} parent folders)`,
     );
 
     for (const uniqueFolder of uniqueFoldersToProcess) {
@@ -116,13 +120,32 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootPath));
   }
 
+  private isParentOfRootFolder(path: string, rootPath: string): boolean {
+    // A path is a parent of the root folder if the root path starts with the path
+    // but they are not equal. We need to ensure we're comparing full path segments.
+    // Example: if rootPath is /Top/Middle/IngestionRoot, then /Top and /Top/Middle are parents
+    // but /Top/Middle/IngestionRoot is not a parent (it's the root itself)
+    // and /Top/Middle/IngestionRoot/Folder is not a parent (it's a child)
+    if (path === rootPath) {
+      return false;
+    }
+    // Check if the normalized root path starts with this path followed by a slash
+    return rootPath.startsWith(`${path}/`);
+  }
+
   private isTopFolder(path: string, rootPath: string): boolean {
     // We're removing the root scope part, in case it has any slashes, to make it predictable.
     // Then we can check if the remaining part has at most 2 levels, because it indicates it is
     // either the site or the drive level.
     // Example: /RootScope/Site/Drive/Folder -> Site/Drive/Folder -> 3 levels -> false
     // Example: /RootScope/Site/Drive -> Site/Drive -> 2 levels -> true
-    // Top folders don't have permissions fetched from SharePoint, so we use root group permission instead.
+    // Top folders don't have permissions fetched from SharePoint, so we use root group permission
+    // instead.
+    // The actual root path will not have replacement working for them because of no trailing slash,
+    // so we handle it separately.
+    if (path === rootPath) {
+      return true;
+    }
     return path.replace(`/${normalizeSlashes(rootPath)}/`, '').split('/').length <= 2;
   }
 
