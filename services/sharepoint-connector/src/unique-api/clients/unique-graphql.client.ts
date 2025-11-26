@@ -23,7 +23,7 @@ export class UniqueGraphqlClient {
     private readonly configService: ConfigService<Config, true>,
   ) {
     const uniqueConfig = this.configService.get('unique', { infer: true });
-    const graphqlUrl = uniqueConfig[`${clientTarget}GraphqlUrl`];
+    const graphqlUrl = `${uniqueConfig[`${clientTarget}ServiceBaseUrl`]}/graphql`;
 
     this.graphQlClient = new GraphQLClient(graphqlUrl, {
       requestMiddleware: async (request) => {

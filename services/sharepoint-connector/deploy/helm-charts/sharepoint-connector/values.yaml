@@ -121,16 +121,14 @@ connectorConfig:
     # cluster_local: comunicates using in-cluster URLs and requires no authentication
     # external: communicates using external URLs and requires authentication via Zitadel
     authMode: cluster_local
-    # -- url for the file diff
-    # example: https://api.unique.app/ingestion/v2/content/file-diff
-    fileDiffUrl: unset_default_value
-    # -- url for the ingestion graphql
-    # TODO: should use only public urls!
-    # example: https://api.unique.app/ingestion/graphql
-    ingestionGraphqlUrl: unset_default_value
-    # -- url for the scope management graphql
-    # example: https://api.unique.app/scope-management/graphql
-    scopeManagementGraphqlUrl: unset_default_value
+    # -- base URL for the ingestion service
+    # example: https://api.unique.app/ingestion
+    # example: http://node-ingestion.finance-gpt:8091
+    ingestionServiceBaseUrl: unset_default_value
+    # -- base URL for the scope management service
+    # example: https://api.unique.app/scope-management
+    # example: http://node-scope-management.finance-gpt:8094
+    scopeManagementServiceBaseUrl: unset_default_value
     # flat: sync all files to a single root scope/folder
     # recursive: maintain the folder hierarchy
     ingestionMode: recursive

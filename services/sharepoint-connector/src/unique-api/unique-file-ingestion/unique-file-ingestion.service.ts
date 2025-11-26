@@ -108,9 +108,7 @@ export class UniqueFileIngestionService {
     fileList: FileDiffItem[],
     partialKey: string,
   ): Promise<FileDiffResponse> {
-    const uniqueConfig = this.configService.get('unique', { infer: true });
-    const fileDiffUrl = new URL(uniqueConfig.fileDiffUrl);
-    const fileDiffPath = fileDiffUrl.pathname + fileDiffUrl.search;
+    const fileDiffPath = '/v2/content/file-diff';
 
     const diffRequest: FileDiffRequest = {
       partialKey,

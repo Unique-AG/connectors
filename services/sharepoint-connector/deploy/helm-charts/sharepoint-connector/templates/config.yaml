@@ -41,9 +41,8 @@ data:
   {{- if .Values.connectorConfig.unique.rootScopeName }}
   UNIQUE_ROOT_SCOPE_NAME: {{ .Values.connectorConfig.unique.rootScopeName | quote }}
   {{- end }}
-  UNIQUE_FILE_DIFF_URL: {{ .Values.connectorConfig.unique.fileDiffUrl | quote }}
-  UNIQUE_INGESTION_GRAPHQL_URL: {{ .Values.connectorConfig.unique.ingestionGraphqlUrl | quote }}
-  UNIQUE_SCOPE_MANAGEMENT_GRAPHQL_URL: {{ .Values.connectorConfig.unique.scopeManagementGraphqlUrl | quote }}
+  UNIQUE_INGESTION_SERVICE_BASE_URL: {{ .Values.connectorConfig.unique.ingestionServiceBaseUrl | quote }}
+  UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL: {{ .Values.connectorConfig.unique.scopeManagementServiceBaseUrl | quote }}
   {{- if .Values.connectorConfig.unique.apiRateLimitPerMinute }}
   UNIQUE_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.unique.apiRateLimitPerMinute | quote }}
   {{- end }}
