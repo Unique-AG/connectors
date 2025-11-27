@@ -1,6 +1,8 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Counter } from '@opentelemetry/api';
+import { MetricService } from 'nestjs-otel';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
@@ -22,6 +24,7 @@ import type { SharepointSyncContext } from './types';
 @Injectable()
 export class ContentSyncService {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly spcFileDiffEventsTotal: Counter;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -30,7 +33,12 @@ export class ContentSyncService {
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly fileMoveProcessor: FileMoveProcessor,
     private readonly scopeManagementService: ScopeManagementService,
-  ) {}
+    metricService: MetricService,
+  ) {
+    this.spcFileDiffEventsTotal = metricService.getCounter('spc_file_diff_events_total', {
+      description: 'Monitor file change detection step',
+    });
+  }
 
   public async syncContentForSite(
     items: SharepointContentItem[],
@@ -42,6 +50,31 @@ export class ContentSyncService {
     const processStartTime = Date.now();
 
     const diffResult = await this.calculateDiffForSite(items, siteId);
+
+    if (diffResult.newFiles.length > 0) {
+      this.spcFileDiffEventsTotal.add(diffResult.newFiles.length, {
+        sp_site_id: siteId, // TODO: Smear based on logging policy
+        diff_result_type: 'new',
+      });
+    }
+    if (diffResult.updatedFiles.length > 0) {
+      this.spcFileDiffEventsTotal.add(diffResult.updatedFiles.length, {
+        sp_site_id: siteId, // TODO: Smear based on logging policy
+        diff_result_type: 'updated',
+      });
+    }
+    if (diffResult.movedFiles.length > 0) {
+      this.spcFileDiffEventsTotal.add(diffResult.movedFiles.length, {
+        sp_site_id: siteId, // TODO: Smear based on logging policy
+        diff_result_type: 'moved',
+      });
+    }
+    if (diffResult.deletedFiles.length > 0) {
+      this.spcFileDiffEventsTotal.add(diffResult.deletedFiles.length, {
+        sp_site_id: siteId, // TODO: Smear based on logging policy
+        diff_result_type: 'deleted',
+      });
+    }
 
     this.logger.log(
       `${logPrefix} File Diff Results: ${diffResult.newFiles.length} new, ${diffResult.updatedFiles.length} updated, ${diffResult.movedFiles.length} moved, ${diffResult.deletedFiles.length} deleted`,

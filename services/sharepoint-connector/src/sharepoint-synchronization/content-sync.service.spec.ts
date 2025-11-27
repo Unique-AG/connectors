@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import { MetricService } from 'nestjs-otel';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
@@ -56,6 +57,14 @@ describe('ContentSyncService', () => {
           provide: ScopeManagementService,
           useValue: {
             determineScopeForItem: vi.fn(),
+          },
+        },
+        {
+          provide: MetricService,
+          useValue: {
+            getCounter: vi.fn().mockReturnValue({
+              add: vi.fn(),
+            }),
           },
         },
       ],
