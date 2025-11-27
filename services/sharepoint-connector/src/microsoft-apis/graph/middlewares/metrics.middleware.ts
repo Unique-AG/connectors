@@ -91,8 +91,8 @@ export class MetricsMiddleware implements Middleware {
 
       // Apply logging policy to sensitive path segments
       if (this.shouldConcealLogs) {
-        endpoint = smearSiteIdFromPath(endpoint); // Process GUIDs first (specific match)
-        endpoint = redactSiteNameFromPath(endpoint); // Then names
+        endpoint = redactSiteNameFromPath(endpoint); // Process names first
+        endpoint = smearSiteIdFromPath(endpoint); // Then GUIDs (more specific match)
       }
 
       return endpoint || '/';

@@ -283,14 +283,25 @@ describe('MetricsMiddleware', () => {
   });
 
   describe('endpoint extraction with sensitive data concealment', () => {
-    let loggerSpy: ReturnType<typeof vi.spyOn>;
+    let loggerDebugSpy: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      loggerSpy = vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+      loggerDebugSpy = vi.fn();
+      // Mock the Logger constructor to return an object with debug method
+      vi.mocked(Logger).mockImplementation(
+        () =>
+          ({
+            debug: loggerDebugSpy,
+            log: vi.fn(),
+            error: vi.fn(),
+            warn: vi.fn(),
+            verbose: vi.fn(),
+          }) as unknown as Logger,
+      );
     });
 
     afterEach(() => {
-      loggerSpy.mockRestore();
+      vi.restoreAllMocks();
     });
 
     it('conceals site names in logged endpoints when enabled', async () => {
@@ -312,7 +323,7 @@ describe('MetricsMiddleware', () => {
 
       await concealingMiddleware.execute(mockContext);
 
-      expect(loggerSpy).toHaveBeenCalledWith(
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           endpoint: '/sites/Lo[Redacted]at/_layouts/15/download.aspx',
         }),
@@ -339,7 +350,7 @@ describe('MetricsMiddleware', () => {
 
       await concealingMiddleware.execute(mockContext);
 
-      expect(loggerSpy).toHaveBeenCalledWith(
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           endpoint: '/sites/********-****-****-****-********7729/lists',
         }),
@@ -365,7 +376,7 @@ describe('MetricsMiddleware', () => {
 
       await concealingMiddleware.execute(mockContext);
 
-      expect(loggerSpy).toHaveBeenCalledWith(
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           endpoint: '/sites/********-****-****-****-********7729',
         }),
@@ -391,7 +402,7 @@ describe('MetricsMiddleware', () => {
 
       await nonConcealingMiddleware.execute(mockContext);
 
-      expect(loggerSpy).toHaveBeenCalledWith(
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           endpoint: '/sites/LoadTestFlat/_layouts/15/download.aspx',
         }),
