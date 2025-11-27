@@ -315,7 +315,7 @@ describe('MetricsMiddleware', () => {
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           endpoint: '/sites/Lo[Redacted]at/_layouts/15/download.aspx',
-        })
+        }),
       );
     });
 
@@ -324,7 +324,8 @@ describe('MetricsMiddleware', () => {
       concealingMiddleware.setNext(mockNextMiddleware as never);
 
       const mockContext: Context = {
-        request: 'https://graph.microsoft.com/v1.0/sites/1d045c6a-f230-48fd-b826-7cf8601d7729/lists',
+        request:
+          'https://graph.microsoft.com/v1.0/sites/1d045c6a-f230-48fd-b826-7cf8601d7729/lists',
         options: { method: 'GET' },
         middlewareControl: {} as never,
       };
@@ -341,7 +342,7 @@ describe('MetricsMiddleware', () => {
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           endpoint: '/sites/********-****-****-****-********7729/lists',
-        })
+        }),
       );
     });
 
@@ -367,7 +368,7 @@ describe('MetricsMiddleware', () => {
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           endpoint: '/sites/********-****-****-****-********7729',
-        })
+        }),
       );
     });
 
@@ -393,7 +394,7 @@ describe('MetricsMiddleware', () => {
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           endpoint: '/sites/LoadTestFlat/_layouts/15/download.aspx',
-        })
+        }),
       );
     });
   });

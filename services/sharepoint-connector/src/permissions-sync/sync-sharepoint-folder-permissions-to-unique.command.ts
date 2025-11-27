@@ -244,7 +244,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     if (isNullish(sharePointPermissions)) {
       this.logger.warn(
         `${logPrefix} No SharePoint permissions found for key ${
-          this.shouldConcealLogs ? concealIngestionKey(sharePointDirectoryKey) : sharePointDirectoryKey
+          this.shouldConcealLogs
+            ? concealIngestionKey(sharePointDirectoryKey)
+            : sharePointDirectoryKey
         }`,
       );
       return null;
