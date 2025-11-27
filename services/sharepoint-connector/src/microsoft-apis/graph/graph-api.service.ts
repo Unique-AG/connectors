@@ -139,7 +139,8 @@ export class GraphApiService {
   }
 
   public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
-    this.logger.debug(`Downloading file content for item ${itemId} from drive ${driveId}`);
+    const logPrefix = `[DriveId: ${driveId}, ItemId: ${itemId}]`;
+    this.logger.debug(`${logPrefix} Downloading file content`);
     const maxFileSizeBytes = this.configService.get('processing.maxFileSizeBytes', { infer: true });
 
     try {
@@ -159,16 +160,25 @@ export class GraphApiService {
           const reader = stream.getReader();
           await reader.cancel();
           reader.releaseLock();
-          throw new Error(`File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
+          throw new Error(`${logPrefix} File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
         }
 
         chunks.push(bufferChunk);
       }
-      return Buffer.concat(chunks);
+
+      // TODO replace this log with a metric
+      this.logger.debug(`${logPrefix} Starting Buffer.concat for ${chunks.length} chunks`);
+      const concatStartTime = Date.now();
+
+      const finalBuffer = Buffer.concat(chunks);
+
+      this.logger.debug(`${logPrefix} Buffer.concat completed in ${Date.now() - concatStartTime}ms`);
+
+      return finalBuffer;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to download file content for item ${itemId}: ${normalizedError.message}`,
+        msg: `${logPrefix} Failed to download file content: ${normalizedError.message}`,
         itemId,
         driveId,
         error,
