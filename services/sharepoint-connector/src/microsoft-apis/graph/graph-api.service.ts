@@ -246,7 +246,7 @@ export class GraphApiService {
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch lists for site ${loggedSiteId}: ${normalizedError.message}`,
+        msg: `Failed to fetch lists for site ${loggedSiteId}. Check Sites.Selected permission. ${normalizedError.message}`,
         error,
       });
       throw error;
@@ -399,7 +399,7 @@ export class GraphApiService {
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch site info for ${loggedSiteId}: ${normalizedError.message}`,
+        msg: `Failed to fetch site info for ${loggedSiteId}. Check Sites.Selected permission.  ${normalizedError.message}`,
         error,
       });
       throw error;
