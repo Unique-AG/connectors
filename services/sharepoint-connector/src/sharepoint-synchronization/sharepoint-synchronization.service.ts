@@ -1,12 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Histogram } from '@opentelemetry/api';
+import { MetricService } from 'nestjs-otel';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { normalizeError } from '../utils/normalize-error';
-import { elapsedSecondsLog } from '../utils/timing.util';
+import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
@@ -16,17 +18,38 @@ export class SharepointSynchronizationService {
   private readonly logger = new Logger(this.constructor.name);
   private isScanning = false;
 
+  private readonly spcSiteSyncDurationSeconds: Histogram;
+  private readonly spcFullSyncDurationSeconds: Histogram;
+
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly graphApiService: GraphApiService,
     private readonly contentSyncService: ContentSyncService,
     private readonly permissionsSyncService: PermissionsSyncService,
     private readonly scopeManagementService: ScopeManagementService,
-  ) {}
+    private readonly metricService: MetricService,
+  ) {
+    this.spcSiteSyncDurationSeconds = this.metricService.getHistogram(
+      'spc_site_sync_duration_seconds',
+      {
+        description: 'Duration of a SharePoint site sync cycle',
+      },
+    );
+    this.spcFullSyncDurationSeconds = this.metricService.getHistogram(
+      'spc_full_sync_duration_seconds',
+      {
+        description: 'Duration of a full SharePoint synchronization cycle',
+      },
+    );
+  }
 
   public async synchronize(): Promise<void> {
+    const syncStartTime = Date.now();
     if (this.isScanning) {
       this.logger.warn('Skipping scan - previous scan is still in progress.');
+      this.spcFullSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+        result: 'skipped',
+      });
       return;
     }
 
@@ -35,7 +58,6 @@ export class SharepointSynchronizationService {
     // We wrap the whole action in a try-finally block to ensure that the isScanning flag is reset
     // in case of some unexpected one-off error occurring.
     try {
-      const syncStartTime = Date.now();
       const siteIdsToScan = this.configService.get('sharepoint.siteIds', { infer: true });
       const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
       const scopeId = this.configService.get('unique.scopeId', { infer: true });
@@ -49,12 +71,17 @@ export class SharepointSynchronizationService {
           msg: `Failed to initialize root scope: ${normalizeError(error).message}`,
           error,
         });
+        this.spcFullSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+          result: 'failure',
+          failureStep: 'root_scope_initialization',
+        });
         return;
       }
 
       this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
 
       for (const siteId of siteIdsToScan) {
+        const siteSyncStartTime = Date.now();
         const logPrefix = `[SiteId: ${siteId}]`;
         let scopes: ScopeWithPath[] | null = null;
         const siteStartTime = Date.now();
@@ -81,6 +108,11 @@ export class SharepointSynchronizationService {
               msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}. Skipping site.`,
               error,
             });
+            this.spcSiteSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+              sp_site_id: siteId, // TODO: Smear based on logging policy
+              result: 'failure',
+              failureStep: 'scopes_creation',
+            });
             continue;
           }
         }
@@ -91,6 +123,11 @@ export class SharepointSynchronizationService {
           this.logger.error({
             msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
             error,
+          });
+          this.spcSiteSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+            sp_site_id: siteId, // TODO: Smear based on logging policy
+            result: 'failure',
+            failureStep: 'content_sync',
           });
           continue;
         }
@@ -108,13 +145,36 @@ export class SharepointSynchronizationService {
               msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,
               error,
             });
+            this.spcSiteSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+              sp_site_id: siteId, // TODO: Smear based on logging policy
+              result: 'failure',
+              failureStep: 'permissions_sync',
+            });
+            continue;
           }
         }
+
+        this.spcSiteSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+          sp_site_id: siteId, // TODO: Smear based on logging policy
+          result: 'success',
+        });
       }
 
       this.logger.log(
         `SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`,
       );
+      this.spcFullSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+        result: 'success',
+      });
+    } catch (error) {
+      this.logger.error({
+        msg: `Failed full synchronization: ${normalizeError(error).message}`,
+        error,
+      });
+      this.spcFullSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+        result: 'failure',
+        failureStep: 'unknown',
+      });
     } finally {
       this.isScanning = false;
     }
