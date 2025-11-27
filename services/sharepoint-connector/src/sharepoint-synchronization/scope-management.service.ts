@@ -7,7 +7,7 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { concealLogs, smear } from '../utils/logging.util';
+import { concealLogs, redact, smear } from '../utils/logging.util';
 import { getUniqueParentPathFromItem } from '../utils/sharepoint.util';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
 
@@ -61,7 +61,7 @@ export class ScopeManagementService {
     }
 
     const rootPath = `/${pathSegments.join('/')}`;
-    this.logger.log(`Resolved root path: ${rootPath}`);
+    this.logger.log(`Resolved root path: ${concealLogs(this.configService) ? redact(rootPath) : rootPath}`);
 
     return { serviceUserId: userId, rootScopeId: rootScopeId, rootPath };
   }
@@ -108,7 +108,7 @@ export class ScopeManagementService {
     const segments = trimmedPath.split('/').filter((segment) => segment.length > 0);
 
     if (segments.length === 0) {
-      this.logger.warn(`Path has no valid segments: ${path}`);
+      this.logger.warn(`Path has no valid segments: ${concealLogs(this.configService) ? redact(path) : path}`);
       return [];
     }
 
@@ -184,7 +184,7 @@ export class ScopeManagementService {
       if (scopeId) {
         itemIdToScopeIdMap.set(itemId, scopeId);
       } else {
-        this.logger.warn(`${logPrefix} Scope not found in cache for path: ${scopePath}`);
+        this.logger.warn(`${logPrefix} Scope not found in cache for path: ${concealLogs(this.configService) ? redact(scopePath) : scopePath}`);
       }
     }
 
@@ -213,7 +213,7 @@ export class ScopeManagementService {
     // Find scope with this path.
     const scope = scopes.find((scope) => scope.path === scopePath);
     if (!scope?.id) {
-      this.logger.warn(`Scope not found for path: ${scopePath}`);
+      this.logger.warn(`Scope not found for path: ${concealLogs(this.configService) ? redact(scopePath) : scopePath}`);
       return undefined;
     }
     return scope.id;

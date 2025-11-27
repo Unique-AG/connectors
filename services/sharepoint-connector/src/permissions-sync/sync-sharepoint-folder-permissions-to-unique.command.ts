@@ -19,7 +19,7 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { concealLogs, smear } from '../utils/logging.util';
+import { concealLogs, redact, smear } from '../utils/logging.util';
 import {
   buildIngestionItemKey,
   getUniquePathFromItem,
@@ -228,7 +228,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const sharePointDirectory = sharePoint.directoriesPathMap[folder.path];
 
     if (isNullish(sharePointDirectory)) {
-      this.logger.warn(`${logPrefix} No SharePoint directory found for path ${folder.path}`);
+      this.logger.warn(`${logPrefix} No SharePoint directory found for path ${concealLogs(this.configService) ? redact(folder.path) : folder.path}`);
       return null;
     }
 
