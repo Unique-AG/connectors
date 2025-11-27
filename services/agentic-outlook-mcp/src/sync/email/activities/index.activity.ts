@@ -52,6 +52,9 @@ export class IndexActivity {
           distance: 'Cosine',
         },
       },
+      sparseVectors: {
+        sparse_content: {},
+      },
     });
 
     const points: components['schemas']['PointStruct'][] = [];
@@ -73,6 +76,10 @@ export class IndexActivity {
     };
 
     for (const point of email.points) {
+      if (point.vector.length === 0 && (!point.sparseVector || point.sparseVector.indices.length === 0)) {
+        this.logger.warn('Point has no vector or sparse vector, skipping index');
+        continue;
+      }
       const payload =
         point.pointType === 'chunk'
           ? {
@@ -86,16 +93,28 @@ export class IndexActivity {
               point_type: point.pointType,
             };
 
-      const pointStruct = {
+      const pointStruct: components['schemas']['PointStruct'] = {
         id: point.qdrantId.toString(),
         vector: {
           content: point.vector,
         },
         payload,
       };
+
+      if (point.sparseVector && point.sparseVector.indices.length > 0) {
+        pointStruct.vector = {
+          ...pointStruct.vector,
+          sparse_content: {
+            indices: point.sparseVector.indices,
+            values: point.sparseVector.values,
+          },
+        };
+      }
+
       points.push(pointStruct);
     }
 
     await this.qdrantService.upsert('emails', points);
   }
 }
+

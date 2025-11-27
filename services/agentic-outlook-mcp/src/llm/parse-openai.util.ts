@@ -99,10 +99,12 @@ export const parseCompletionOutput = (res: unknown): unknown => {
 export const getFirstTextFromResponse = (response: Response): string | undefined => {
   if (response.output_text) return response.output_text;
   if (response.output.length > 0) {
-    const firstOutput = response.output[0];
-    if (firstOutput && firstOutput.type === 'message' && 'content' in firstOutput) {
-      if (Array.isArray(firstOutput.content)) {
-        const textContent = firstOutput.content.find(
+    const messageOutput = response.output.find(
+      (item) => item.type === 'message' && item.role === 'assistant',
+    );
+    if (messageOutput && 'content' in messageOutput) {
+      if (Array.isArray(messageOutput.content)) {
+        const textContent = messageOutput.content.find(
           (c) => c.type === 'output_text' && 'text' in c,
         );
         if (textContent && 'text' in textContent && typeof textContent.text === 'string') {

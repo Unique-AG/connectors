@@ -12,13 +12,13 @@ export class IngestService {
 
   @OnEvent(EmailEvents.EmailSaved)
   public async onEmailSaved(event: EmailSavedEvent) {
-    const { userProfileId, emailId } = event;
+    // const { userProfileId, emailId } = event;
 
-    const handle = await this.temporalClient.start('ingest', {
-      args: [userProfileId.toString(), emailId.toString()],
-      taskQueue: 'default',
-      workflowId: `wf-id-${emailId.toString()}-${Math.floor(Math.random() * 1000)}`,
-    });
-    this.logger.log(`Started workflow ${handle.workflowId}`);
+    // const handle = await this.temporalClient.start('ingest', {
+    //   args: [userProfileId.toString(), emailId.toString()],
+    //   taskQueue: 'default',
+    //   workflowId: `wf-id-${emailId.toString()}-${Math.floor(Math.random() * 1000)}`,
+    // });
+    // this.logger.log(`Started workflow ${handle.workflowId}`);
   }
 }

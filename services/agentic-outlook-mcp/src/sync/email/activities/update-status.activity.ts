@@ -20,11 +20,14 @@ export class UpdateStatusActivity {
 
   @Activity()
   public async updateStatus(payload: UpdateStatusPayload): Promise<void> {
-    const updateData: Record<string, string> = {
+    const updateData: Record<string, string | null> = {
       ingestionLastAttemptAt: new Date().toISOString(),
     };
 
-    if (payload.completed) updateData.ingestionCompletedAt = new Date().toISOString();
+    if (payload.completed) {
+      updateData.ingestionCompletedAt = new Date().toISOString();
+      updateData.ingestionLastError = null;
+    }
     if (payload.error) updateData.ingestionLastError = JSON.stringify(payload.error);
 
     await this.db.update(emailsTable).set(updateData).where(eq(emailsTable.id, payload.emailId));

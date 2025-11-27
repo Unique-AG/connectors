@@ -54,10 +54,16 @@ Main message body, headings, lists, numbered lists, data tables, links (keep tex
 8) Be conservative: if uncertain, keep content, lower confidence, and explain in meta.notes.
 
 # Known banner/security vendor domains (case-insensitive)
-{{{KNOWN_DOMAINS}}}
+aka.ms,microsoft.com,proofpoint.com,barracuda.com,postini.com,menlosecurity.com,mimecast.com,cofense.com,ironscales.com,trendmicro.com
 
 # Organization-specific banner phrases (optional, case-insensitive)
-{{{ORG_BANNER_PHRASES}}}
+- EXTERNAL EMAIL
+- This message came from outside your organization
+- You don't often get email from ...
+- Learn why this is important
+
+# Languages commonly seen
+en, de, fr
 
 # Additional rules
 - Preserve link text + URL: [Text](https://...).

@@ -21,7 +21,7 @@ export class EmailDebugController {
     const workflowId = `debug-wf-${emailId}-${Date.now()}`;
 
     const handle = await this.temporalClient.start('ingest', {
-      args: [userProfileId, emailId],
+      args: [{ userProfileId, emailId }],
       taskQueue: 'default',
       workflowId,
     });
@@ -42,4 +42,3 @@ export class EmailDebugController {
     };
   }
 }
-

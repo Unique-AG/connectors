@@ -105,6 +105,8 @@ services:
       REDIS_URL: "redis://redis:6379/7"
       ANTHROPHIC_API_KEY: "${ANTHROPHIC_API_KEY}" # To inject this API key run `docker-compose --profile agentic-outlook-mcp up -d --env-file services/agentic-outlook-mcp/.env up -d`
       VOYAGE_API_KEY: "${VOYAGE_API_KEY}" # To inject this API key run `docker-compose --profile agentic-outlook-mcp up -d --env-file services/agentic-outlook-mcp/.env up -d`
+      TOGETHERAI_API_KEY: "${TOGETHERAI_API_KEY}" # To inject this API key run `docker-compose --profile agentic-outlook-mcp up -d --env-file services/agentic-outlook-mcp/.env up -d`
+      OPENAI_API_KEY: "${OPENAI_API_KEY}" # To inject this API key run `docker-compose --profile agentic-outlook-mcp up -d --env-file services/agentic-outlook-mcp/.env up -d`
     ports:
       - 9012:4444
     volumes:
@@ -282,7 +284,6 @@ services:
       - traefik.http.services.qdrant.loadbalancer.server.port=6333
 
   temporal:
-    container_name: temporal
     depends_on:
       - postgres
     environment:
@@ -301,7 +302,6 @@ services:
       - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
 
   temporal-ui:
-    container_name: temporal-ui
     depends_on:
       - temporal
     environment:
@@ -315,6 +315,21 @@ services:
       - traefik.http.routers.temporal-ui.rule=Host(`temporal.localhost`)
       - traefik.http.routers.temporal-ui.service=temporal-ui
       - traefik.http.services.temporal-ui.loadbalancer.server.port=8080
+
+  dapr-placement:
+    image: "daprio/placement"
+    command: ["./placement"]
+    ports:
+      - "50005:50005"
+
+  dapr-scheduler:
+    image: "daprio/scheduler"
+    command: ["./scheduler", "--override-broadcast-host-port", "localhost:50006", "--etcd-data-dir", "/data"]
+    ports:
+      - "50006:50006"
+    user: root
+    volumes:
+      - dapr-etcd-data:/data
 
 volumes:
   postgres:
