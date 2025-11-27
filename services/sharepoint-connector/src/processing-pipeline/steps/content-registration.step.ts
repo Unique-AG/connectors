@@ -14,7 +14,7 @@ import {
   ContentMetadata,
   ContentRegistrationRequest,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
-import { concealLogs, redact, smear } from '../../utils/logging.util';
+import { concealIngestionKey, concealLogs, redact, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
@@ -78,7 +78,9 @@ export class ContentRegistrationStep implements IPipelineStep {
           baseUrl: this.shouldConcealLogs
             ? redact(contentRegistrationRequest.baseUrl ?? '')
             : contentRegistrationRequest.baseUrl,
-          key: contentRegistrationRequest.key,
+          key: this.shouldConcealLogs
+            ? concealIngestionKey(contentRegistrationRequest.key)
+            : contentRegistrationRequest.key,
           correlationId: context.correlationId,
           sourceName: contentRegistrationRequest.sourceName,
         },

@@ -60,6 +60,22 @@ export function smearSiteIdFromPath(path: string): string {
 }
 
 /**
+ * Conceals SharePoint ingestion keys for secure logging.
+ * Ingestion keys have format: siteId/itemId
+ * @param key The ingestion key containing siteId and itemId
+ * @returns The key with siteId smeared
+ */
+export function concealIngestionKey(key: string): string {
+  const parts = key.split('/');
+  if (parts.length >= 2 && parts[0] && parts[0].length > 0) {
+    // First part is siteId, rest is item path
+    const [siteId, ...rest] = parts;
+    return `${smear(siteId)}/${rest.join('/')}`;
+  }
+  return smear(key); // Smear the whole key if format is unexpected
+}
+
+/**
  * Checks if logs should be concealed based on the LOGS_DIAGNOSTICS_DATA_POLICY configuration
  * @param configService The config service instance
  * @returns true if logs should be concealed, false if they should be disclosed

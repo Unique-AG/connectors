@@ -19,7 +19,7 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { concealLogs, redact, smear } from '../utils/logging.util';
+import { concealIngestionKey, concealLogs, redact, smear } from '../utils/logging.util';
 import {
   buildIngestionItemKey,
   getUniquePathFromItem,
@@ -217,7 +217,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
     if (this.isTopFolder(folder.path, rootPath)) {
       this.logger.debug(
-        `${logPrefix} Using root group permission for top folder at path ${folder.path}`,
+        `${logPrefix} Using root group permission for top folder at path ${
+          this.shouldConcealLogs ? redact(folder.path) : folder.path
+        }`,
       );
       return [
         {
@@ -241,7 +243,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const sharePointPermissions = sharePoint.permissionsMap[sharePointDirectoryKey];
     if (isNullish(sharePointPermissions)) {
       this.logger.warn(
-        `${logPrefix} No SharePoint permissions found for key ${sharePointDirectoryKey}`,
+        `${logPrefix} No SharePoint permissions found for key ${
+          this.shouldConcealLogs ? concealIngestionKey(sharePointDirectoryKey) : sharePointDirectoryKey
+        }`,
       );
       return null;
     }
