@@ -1,11 +1,14 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
+import { MetricService } from 'nestjs-otel';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { IngestionMode } from '../constants/ingestion.constants';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { ContentSyncService } from './content-sync.service';
+import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
 describe('SharepointSynchronizationService', () => {
@@ -16,6 +19,13 @@ describe('SharepointSynchronizationService', () => {
   };
   let mockPermissionsSyncService: {
     syncPermissionsForSite: ReturnType<typeof vi.fn>;
+  };
+  let mockScopeManagementService: {
+    initializeRootScope: ReturnType<typeof vi.fn>;
+    batchCreateScopes: ReturnType<typeof vi.fn>;
+  };
+  let mockMetricService: {
+    getHistogram: ReturnType<typeof vi.fn>;
   };
 
   const mockFile: SharepointContentItem = {
@@ -97,6 +107,22 @@ describe('SharepointSynchronizationService', () => {
       syncPermissionsForSite: vi.fn().mockResolvedValue(undefined),
     };
 
+    mockScopeManagementService = {
+      initializeRootScope: vi.fn().mockResolvedValue({
+        scopeId: 'test-scope-id',
+        ingestionMode: IngestionMode.Flat,
+      }),
+      batchCreateScopes: vi.fn().mockResolvedValue([]),
+    };
+
+    const mockHistogram = {
+      record: vi.fn(),
+    };
+
+    mockMetricService = {
+      getHistogram: vi.fn().mockReturnValue(mockHistogram),
+    };
+
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -104,6 +130,8 @@ describe('SharepointSynchronizationService', () => {
         get: vi.fn((key: string) => {
           if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
           if (key === 'processing.syncMode') return 'content_only';
+          if (key === 'unique.ingestionMode') return IngestionMode.Flat;
+          if (key === 'unique.scopeId') return 'test-scope-id';
           return undefined;
         }),
       }))
@@ -113,6 +141,10 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockContentSyncService)
       .mock(PermissionsSyncService)
       .impl(() => mockPermissionsSyncService)
+      .mock(ScopeManagementService)
+      .impl(() => mockScopeManagementService)
+      .mock(MetricService)
+      .impl(() => mockMetricService)
       .compile();
 
     service = unit;
@@ -130,6 +162,8 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        scopeId: 'test-scope-id',
+        ingestionMode: IngestionMode.Flat,
       }),
     );
   });
@@ -142,6 +176,8 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        scopeId: 'test-scope-id',
+        ingestionMode: IngestionMode.Flat,
       }),
     );
   });
@@ -213,6 +249,8 @@ describe('SharepointSynchronizationService', () => {
         get: vi.fn((key: string) => {
           if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
           if (key === 'processing.syncMode') return 'content_and_permissions';
+          if (key === 'unique.ingestionMode') return IngestionMode.Flat;
+          if (key === 'unique.scopeId') return 'test-scope-id';
           return undefined;
         }),
       }))
@@ -222,6 +260,10 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockContentSyncService)
       .mock(PermissionsSyncService)
       .impl(() => mockPermissionsSyncService)
+      .mock(ScopeManagementService)
+      .impl(() => mockScopeManagementService)
+      .mock(MetricService)
+      .impl(() => mockMetricService)
       .compile();
 
     await unit.synchronize();
@@ -229,6 +271,8 @@ describe('SharepointSynchronizationService', () => {
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
       context: expect.objectContaining({
         siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        scopeId: 'test-scope-id',
+        ingestionMode: IngestionMode.Flat,
       }),
       sharePoint: { items: [mockFile], directories: [] },
       unique: { folders: null },
@@ -249,6 +293,8 @@ describe('SharepointSynchronizationService', () => {
         get: vi.fn((key: string) => {
           if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
           if (key === 'processing.syncMode') return 'content_and_permissions';
+          if (key === 'unique.ingestionMode') return IngestionMode.Flat;
+          if (key === 'unique.scopeId') return 'test-scope-id';
           return undefined;
         }),
       }))
@@ -260,6 +306,10 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => ({
         syncPermissionsForSite: vi.fn().mockRejectedValue(new Error('Permissions sync failed')),
       }))
+      .mock(ScopeManagementService)
+      .impl(() => mockScopeManagementService)
+      .mock(MetricService)
+      .impl(() => mockMetricService)
       .compile();
 
     await unit.synchronize();

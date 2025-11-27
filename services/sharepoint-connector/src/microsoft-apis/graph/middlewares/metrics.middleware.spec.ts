@@ -1,6 +1,9 @@
 import type { Context } from '@microsoft/microsoft-graph-client';
 import { GraphClientError, GraphError } from '@microsoft/microsoft-graph-client';
+import type { ConfigService } from '@nestjs/config';
+import type { MetricService } from 'nestjs-otel';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Config } from '../../../config';
 import { MetricsMiddleware } from './metrics.middleware';
 
 describe('MetricsMiddleware', () => {
@@ -8,13 +11,43 @@ describe('MetricsMiddleware', () => {
   let mockNextMiddleware: {
     execute: ReturnType<typeof vi.fn>;
   };
+  let mockHistogram: {
+    record: ReturnType<typeof vi.fn>;
+  };
+  let mockCounter: {
+    add: ReturnType<typeof vi.fn>;
+  };
+  let mockMetricService: MetricService;
+  let mockConfigService: ConfigService<Config, true>;
 
   beforeEach(() => {
     mockNextMiddleware = {
       execute: vi.fn(),
     };
 
-    middleware = new MetricsMiddleware();
+    mockHistogram = {
+      record: vi.fn(),
+    };
+
+    mockCounter = {
+      add: vi.fn(),
+    };
+
+    mockMetricService = {
+      getHistogram: vi.fn().mockReturnValue(mockHistogram),
+      getCounter: vi.fn().mockReturnValue(mockCounter),
+    } as unknown as MetricService;
+
+    mockConfigService = {
+      get: vi.fn().mockImplementation((key: string) => {
+        if (key === 'sharepoint.authTenantId') {
+          return 'test-tenant-id';
+        }
+        return undefined;
+      }),
+    } as unknown as ConfigService<Config, true>;
+
+    middleware = new MetricsMiddleware(mockMetricService, mockConfigService);
     middleware.setNext(mockNextMiddleware as never);
   });
 
@@ -227,11 +260,11 @@ describe('MetricsMiddleware', () => {
     const testCases = [
       { status: 200, expectedClass: '2xx' },
       { status: 301, expectedClass: '3xx' },
-      { status: 404, expectedClass: '4xx' },
+      { status: 404, expectedClass: '404' },
       { status: 500, expectedClass: '5xx' },
     ];
 
-    for (const { status } of testCases) {
+    for (const { status, expectedClass } of testCases) {
       const mockContext: Context = {
         request: 'https://graph.microsoft.com/v1.0/me',
         options: {},
@@ -243,13 +276,20 @@ describe('MetricsMiddleware', () => {
       });
 
       await middleware.execute(mockContext);
-    }
 
-    expect(mockNextMiddleware.execute).toHaveBeenCalledTimes(testCases.length);
+      expect(mockHistogram.record).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.objectContaining({
+          http_status: expectedClass,
+        }),
+      );
+
+      mockHistogram.record.mockClear();
+    }
   });
 
   it('throws error if next middleware not set', async () => {
-    const middlewareWithoutNext = new MetricsMiddleware();
+    const middlewareWithoutNext = new MetricsMiddleware(mockMetricService, mockConfigService);
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
@@ -279,5 +319,394 @@ describe('MetricsMiddleware', () => {
     mockNextMiddleware.execute.mockRejectedValue(graphError);
 
     await expect(middleware.execute(mockContext)).rejects.toThrow(graphError);
+  });
+
+  it('records histogram metric on success with correct labels', async () => {
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123/drives',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+      ctx.response = new Response('{}', { status: 200 });
+    });
+
+    await middleware.execute(mockContext);
+
+    expect(mockHistogram.record).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({
+        ms_tenant_id: 'test-tenant-id',
+        api_method: 'GET:/sites/{siteId}/drives',
+        result: 'success',
+        http_status: '2xx',
+      }),
+    );
+  });
+
+  it('records histogram metric on error with correct labels', async () => {
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/drives/drive-123/items/item-456',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    const graphError = new GraphError(404, 'Not found');
+    Object.assign(graphError, { statusCode: 404 });
+    mockNextMiddleware.execute.mockRejectedValue(graphError);
+
+    await expect(middleware.execute(mockContext)).rejects.toThrow(graphError);
+
+    expect(mockHistogram.record).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({
+        ms_tenant_id: 'test-tenant-id',
+        api_method: 'GET:/drives/{driveId}/items/{itemId}',
+        result: 'error',
+        http_status: '404',
+      }),
+    );
+  });
+
+  it('uses specific status code for individual 4XX errors', async () => {
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    const graphError = new GraphError(403, 'Forbidden');
+    Object.assign(graphError, { statusCode: 403 });
+    mockNextMiddleware.execute.mockRejectedValue(graphError);
+
+    await expect(middleware.execute(mockContext)).rejects.toThrow(graphError);
+
+    expect(mockHistogram.record).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({
+        http_status: '403',
+      }),
+    );
+  });
+
+  it('uses status class for 5XX errors', async () => {
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    const graphError = new GraphError(503, 'Service Unavailable');
+    Object.assign(graphError, { statusCode: 503 });
+    mockNextMiddleware.execute.mockRejectedValue(graphError);
+
+    await expect(middleware.execute(mockContext)).rejects.toThrow(graphError);
+
+    expect(mockHistogram.record).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({
+        http_status: '5xx',
+      }),
+    );
+  });
+
+  it('extracts correct api_method for different endpoints', async () => {
+    const testCases = [
+      { url: '/sites/site-123/drives', method: 'GET', expected: 'GET:/sites/{siteId}/drives' },
+      {
+        url: '/drives/drive-123/items/item-456/children',
+        method: 'GET',
+        expected: 'GET:/drives/{driveId}/items/{itemId}/children',
+      },
+      {
+        url: '/drives/drive-123/items/item-456/content',
+        method: 'GET',
+        expected: 'GET:/drives/{driveId}/items/{itemId}/content',
+      },
+      {
+        url: '/drives/drive-123/items/item-456',
+        method: 'GET',
+        expected: 'GET:/drives/{driveId}/items/{itemId}',
+      },
+      { url: '/sites/site-123/lists', method: 'GET', expected: 'GET:/sites/{siteId}/lists' },
+      {
+        url: '/sites/site-123/lists/list-123/items',
+        method: 'GET',
+        expected: 'GET:/sites/{siteId}/lists/{listId}/items',
+      },
+    ];
+
+    for (const { url, method, expected } of testCases) {
+      const mockContext: Context = {
+        request: `https://graph.microsoft.com/v1.0${url}`,
+        options: { method },
+        middlewareControl: {} as never,
+      };
+
+      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+        ctx.response = new Response('{}', { status: 200 });
+      });
+
+      await middleware.execute(mockContext);
+
+      expect(mockHistogram.record).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.objectContaining({
+          api_method: expected,
+        }),
+      );
+
+      mockHistogram.record.mockClear();
+    }
+  });
+
+  it('increments throttle counter on 429 status', async () => {
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123/drives',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    const throttledResponse = new Response('Too Many Requests', {
+      status: 429,
+      headers: { 'Retry-After': '60' },
+    });
+
+    mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+      ctx.response = throttledResponse;
+    });
+
+    await middleware.execute(mockContext);
+
+    expect(mockCounter.add).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        ms_tenant_id: 'test-tenant-id',
+        api_method: 'GET:/sites/{siteId}/drives',
+        policy: 'retry_after',
+      }),
+    );
+  });
+
+  it('increments throttle counter with rate_limit policy', async () => {
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123/lists',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    const throttledResponse = new Response('Too Many Requests', {
+      status: 429,
+      headers: { 'RateLimit-Limit': '1000' },
+    });
+
+    mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+      ctx.response = throttledResponse;
+    });
+
+    await middleware.execute(mockContext);
+
+    expect(mockCounter.add).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        ms_tenant_id: 'test-tenant-id',
+        api_method: 'GET:/sites/{siteId}/lists',
+        policy: 'rate_limit',
+      }),
+    );
+  });
+
+  it('does not increment throttle counter on non-throttled requests', async () => {
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+      ctx.response = new Response('{}', { status: 200 });
+    });
+
+    await middleware.execute(mockContext);
+
+    expect(mockCounter.add).not.toHaveBeenCalled();
+  });
+
+  it('increments slow request counter for requests >1s', async () => {
+    vi.useFakeTimers();
+
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123/drives',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      ctx.response = new Response('{}', { status: 200 });
+    });
+
+    const executePromise = middleware.execute(mockContext);
+    await vi.advanceTimersByTimeAsync(1100);
+    await executePromise;
+
+    expect(mockCounter.add).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        ms_tenant_id: 'test-tenant-id',
+        api_method: 'GET:/sites/{siteId}/drives',
+        duration_bucket: '>1s',
+      }),
+    );
+
+    vi.useRealTimers();
+  });
+
+  it('increments slow request counter for requests >3s', async () => {
+    vi.useFakeTimers();
+
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123/lists',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+      await new Promise((resolve) => setTimeout(resolve, 3100));
+      ctx.response = new Response('{}', { status: 200 });
+    });
+
+    const executePromise = middleware.execute(mockContext);
+    await vi.advanceTimersByTimeAsync(3100);
+    await executePromise;
+
+    expect(mockCounter.add).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        ms_tenant_id: 'test-tenant-id',
+        api_method: 'GET:/sites/{siteId}/lists',
+        duration_bucket: '>3s',
+      }),
+    );
+
+    vi.useRealTimers();
+  });
+
+  it('increments slow request counter for requests >5s', async () => {
+    vi.useFakeTimers();
+
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/drives/drive-123/items/item-456',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+      await new Promise((resolve) => setTimeout(resolve, 5100));
+      ctx.response = new Response('{}', { status: 200 });
+    });
+
+    const executePromise = middleware.execute(mockContext);
+    await vi.advanceTimersByTimeAsync(5100);
+    await executePromise;
+
+    expect(mockCounter.add).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        ms_tenant_id: 'test-tenant-id',
+        api_method: 'GET:/drives/{driveId}/items/{itemId}',
+        duration_bucket: '>5s',
+      }),
+    );
+
+    vi.useRealTimers();
+  });
+
+  it('increments slow request counter for requests >10s', async () => {
+    vi.useFakeTimers();
+
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+      await new Promise((resolve) => setTimeout(resolve, 10100));
+      ctx.response = new Response('{}', { status: 200 });
+    });
+
+    const executePromise = middleware.execute(mockContext);
+    await vi.advanceTimersByTimeAsync(10100);
+    await executePromise;
+
+    expect(mockCounter.add).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        ms_tenant_id: 'test-tenant-id',
+        api_method: 'GET:/sites/{siteId}',
+        duration_bucket: '>10s',
+      }),
+    );
+
+    vi.useRealTimers();
+  });
+
+  it('does not increment slow request counter for fast requests', async () => {
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    const initialCallCount = mockCounter.add.mock.calls.length;
+
+    mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+      ctx.response = new Response('{}', { status: 200 });
+    });
+
+    await middleware.execute(mockContext);
+
+    const callsWithSlowRequestsLabel = mockCounter.add.mock.calls
+      .slice(initialCallCount)
+      .filter((call) => call[1]?.duration_bucket);
+
+    expect(callsWithSlowRequestsLabel).toHaveLength(0);
+  });
+
+  it('increments slow request counter on error with slow duration', async () => {
+    vi.useFakeTimers();
+
+    const mockContext: Context = {
+      request: 'https://graph.microsoft.com/v1.0/sites/site-123/drives',
+      options: { method: 'GET' },
+      middlewareControl: {} as never,
+    };
+
+    const graphError = new GraphError(500, 'Internal Server Error');
+    Object.assign(graphError, { statusCode: 500 });
+
+    mockNextMiddleware.execute.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      throw graphError;
+    });
+
+    const executePromise = middleware.execute(mockContext);
+    const expectPromise = expect(executePromise).rejects.toThrow(graphError);
+
+    await vi.advanceTimersByTimeAsync(2000);
+    await expectPromise;
+
+    expect(mockCounter.add).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        ms_tenant_id: 'test-tenant-id',
+        api_method: 'GET:/sites/{siteId}/drives',
+        duration_bucket: '>1s',
+      }),
+    );
+
+    vi.useRealTimers();
   });
 });
