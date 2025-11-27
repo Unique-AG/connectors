@@ -27,13 +27,13 @@ export class UniqueUsersService {
 
     let batchCount = 0;
     do {
-      const batchResult = await this.scopeManagementClient.get(
-        async (client) =>
-          await client.request<ListUsersQueryResult, ListUsersQueryInput>(LIST_USERS_QUERY, {
-            skip,
-            take: BATCH_SIZE,
-          }),
-      );
+      const batchResult = await this.scopeManagementClient.request<
+        ListUsersQueryResult,
+        ListUsersQueryInput
+      >(LIST_USERS_QUERY, {
+        skip,
+        take: BATCH_SIZE,
+      });
       users.push(...batchResult.listUsers.nodes.map(pick(['id', 'email'])));
       batchCount = batchResult.listUsers.nodes.length;
       skip += BATCH_SIZE;
@@ -45,9 +45,8 @@ export class UniqueUsersService {
   public async getCurrentUserId(): Promise<string> {
     this.logger.log('Requesting current user ID from Unique API');
 
-    const result = await this.scopeManagementClient.get(
-      async (client) => await client.request<GetCurrentUserQueryResult>(GET_CURRENT_USER_QUERY, {}),
-    );
+    const result =
+      await this.scopeManagementClient.request<GetCurrentUserQueryResult>(GET_CURRENT_USER_QUERY);
 
     return result.me.user.id;
   }

@@ -9,12 +9,18 @@ import type { ConfigService } from '@nestjs/config';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import type { MetricService } from 'nestjs-otel';
 import type { Config } from '../../../config';
+import {
+  createApiMethodExtractor,
+  getDurationBucket,
+  getHttpStatusCodeClass,
+} from '../../../utils/metrics.util';
 import { elapsedMilliseconds, elapsedSeconds } from '../../../utils/timing.util';
 import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.types';
 
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
   private nextMiddleware: Middleware | undefined;
+  private readonly extractApiMethod: ReturnType<typeof createApiMethodExtractor>;
 
   private readonly spcGraphApiRequestDurationSeconds: Histogram;
   private readonly spcGraphApiThrottleEventsTotal: Counter;
@@ -45,6 +51,19 @@ export class MetricsMiddleware implements Middleware {
     );
 
     this.msTenantId = configService.get('sharepoint.authTenantId', { infer: true });
+
+    this.extractApiMethod = createApiMethodExtractor([
+      'sites',
+      'drives',
+      'items',
+      'children',
+      'content',
+      'lists',
+      'permissions',
+      'groups',
+      'members',
+      'owners',
+    ]);
   }
 
   public async execute(context: Context): Promise<void> {
@@ -58,7 +77,7 @@ export class MetricsMiddleware implements Middleware {
     try {
       await this.nextMiddleware.execute(context);
 
-      const statusClass = this.getHttpStatusCodeClass(context.response?.status || 0);
+      const statusClass = getHttpStatusCodeClass(context.response?.status || 0);
 
       this.spcGraphApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
         ms_tenant_id: this.msTenantId,
@@ -94,7 +113,7 @@ export class MetricsMiddleware implements Middleware {
       }
 
       const duration = elapsedMilliseconds(startTime);
-      const durationBucket = this.getDurationBucket(duration);
+      const durationBucket = getDurationBucket(duration);
       if (durationBucket) {
         this.spcGraphApiSlowRequestsTotal.add(1, {
           ms_tenant_id: this.msTenantId,
@@ -112,7 +131,7 @@ export class MetricsMiddleware implements Middleware {
       }
     } catch (error) {
       const errorDetails = this.extractGraphErrorDetails(error);
-      const statusClass = this.getHttpStatusCodeClass(this.extractStatusCodeFromError(error));
+      const statusClass = getHttpStatusCodeClass(this.extractStatusCodeFromError(error));
       const duration = elapsedMilliseconds(startTime);
 
       this.spcGraphApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
@@ -122,7 +141,7 @@ export class MetricsMiddleware implements Middleware {
         http_status: statusClass,
       });
 
-      const durationBucket = this.getDurationBucket(duration);
+      const durationBucket = getDurationBucket(duration);
       if (durationBucket) {
         this.spcGraphApiSlowRequestsTotal.add(1, {
           ms_tenant_id: this.msTenantId,
@@ -253,63 +272,6 @@ export class MetricsMiddleware implements Middleware {
     }
   }
 
-  private extractApiMethod(endpointPath: string, httpMethod: string): string {
-    if (endpointPath === 'unknown') {
-      return `${httpMethod}:/unknown`;
-    }
-
-    const knownSegments = new Set([
-      'sites',
-      'drives',
-      'items',
-      'children',
-      'content',
-      'lists',
-      'permissions',
-      'groups',
-      'members',
-      'owners',
-    ]);
-
-    const segments = endpointPath.split('/').filter(Boolean);
-    const normalizedSegments: string[] = [];
-    let previousSegment = '';
-
-    for (const segment of segments) {
-      if (knownSegments.has(segment)) {
-        normalizedSegments.push(segment);
-        previousSegment = segment;
-      } else {
-        const paramName = previousSegment
-          ? `{${previousSegment.replace(/s$/, '')}Id}`
-          : '[unknown]';
-        normalizedSegments.push(paramName);
-        previousSegment = segment;
-      }
-    }
-
-    const normalizedPath = normalizedSegments.join('/');
-    return `${httpMethod}:/${normalizedPath}`;
-  }
-
-  private getHttpStatusCodeClass(statusCode: number): string {
-    if (statusCode >= 200 && statusCode < 300) {
-      return '2xx';
-    }
-    if (statusCode >= 300 && statusCode < 400) {
-      return '3xx';
-    }
-    if (statusCode >= 400 && statusCode < 500) {
-      // We keep 4XX status codes as they are because for them it's very important which status code
-      // exactly we encountered, to be able to tell what's happening.
-      return statusCode.toString();
-    }
-    if (statusCode >= 500) {
-      return '5xx';
-    }
-    return 'unknown';
-  }
-
   private extractStatusCodeFromError(error: unknown): number {
     if (error instanceof GraphError) {
       return error.statusCode || 0;
@@ -320,21 +282,5 @@ export class MetricsMiddleware implements Middleware {
     }
 
     return 0;
-  }
-
-  private getDurationBucket(durationMs: number): string | null {
-    if (durationMs > 10_000) {
-      return '>10s';
-    }
-    if (durationMs > 5_000) {
-      return '>5s';
-    }
-    if (durationMs > 3_000) {
-      return '>3s';
-    }
-    if (durationMs > 1_000) {
-      return '>1s';
-    }
-    return null;
   }
 }

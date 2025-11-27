@@ -35,17 +35,14 @@ export class UniqueFilesService {
   ): Promise<ContentUpdateMutationResult['contentUpdate']> {
     this.logger.debug(`Moving file ${contentId} to owner ${newOwnerId}`);
 
-    const result = await this.ingestionClient.get(
-      async (client) =>
-        await client.request<ContentUpdateMutationResult, ContentUpdateMutationInput>(
-          CONTENT_UPDATE_MUTATION,
-          {
-            contentId,
-            ownerId: newOwnerId,
-            input: { url: newUrl },
-          },
-        ),
-    );
+    const result = await this.ingestionClient.request<
+      ContentUpdateMutationResult,
+      ContentUpdateMutationInput
+    >(CONTENT_UPDATE_MUTATION, {
+      contentId,
+      ownerId: newOwnerId,
+      input: { url: newUrl },
+    });
 
     return result.contentUpdate;
   }
@@ -53,15 +50,12 @@ export class UniqueFilesService {
   public async deleteFile(contentId: string): Promise<boolean> {
     this.logger.debug(`Deleting file ${contentId}`);
 
-    const result = await this.ingestionClient.get(
-      async (client) =>
-        await client.request<ContentDeleteMutationResult, ContentDeleteMutationInput>(
-          CONTENT_DELETE_MUTATION,
-          {
-            contentDeleteId: contentId,
-          },
-        ),
-    );
+    const result = await this.ingestionClient.request<
+      ContentDeleteMutationResult,
+      ContentDeleteMutationInput
+    >(CONTENT_DELETE_MUTATION, {
+      contentDeleteId: contentId,
+    });
 
     return result.contentDelete;
   }
@@ -76,21 +70,18 @@ export class UniqueFilesService {
 
     let batchCount = 0;
     do {
-      const batchResult = await this.ingestionClient.get(
-        async (client) =>
-          await client.request<PaginatedContentQueryResult, PaginatedContentQueryInput>(
-            PAGINATED_CONTENT_QUERY,
-            {
-              skip,
-              take: BATCH_SIZE,
-              where: {
-                key: {
-                  in: keys,
-                },
-              },
-            },
-          ),
-      );
+      const batchResult = await this.ingestionClient.request<
+        PaginatedContentQueryResult,
+        PaginatedContentQueryInput
+      >(PAGINATED_CONTENT_QUERY, {
+        skip,
+        take: BATCH_SIZE,
+        where: {
+          key: {
+            in: keys,
+          },
+        },
+      });
       files.push(...batchResult.paginatedContent.nodes);
       batchCount = batchResult.paginatedContent.nodes.length;
       skip += BATCH_SIZE;
@@ -107,21 +98,18 @@ export class UniqueFilesService {
 
     let batchCount = 0;
     do {
-      const batchResult = await this.ingestionClient.get(
-        async (client) =>
-          await client.request<PaginatedContentQueryResult, PaginatedContentQueryInput>(
-            PAGINATED_CONTENT_QUERY,
-            {
-              skip,
-              take: BATCH_SIZE,
-              where: {
-                key: {
-                  startsWith: `${siteId}/`,
-                },
-              },
-            },
-          ),
-      );
+      const batchResult = await this.ingestionClient.request<
+        PaginatedContentQueryResult,
+        PaginatedContentQueryInput
+      >(PAGINATED_CONTENT_QUERY, {
+        skip,
+        take: BATCH_SIZE,
+        where: {
+          key: {
+            startsWith: `${siteId}/`,
+          },
+        },
+      });
       files.push(...batchResult.paginatedContent.nodes);
       batchCount = batchResult.paginatedContent.nodes.length;
       skip += BATCH_SIZE;
@@ -131,29 +119,25 @@ export class UniqueFilesService {
   }
 
   public async addAccesses(scopeId: string, fileAccesses: UniqueFileAccessInput[]): Promise<void> {
-    await this.ingestionClient.get(async (client) => {
-      await client.request<AddAccessesMutationResult, AddAccessesMutationInput>(
-        ADD_ACCESSES_MUTATION,
-        {
-          scopeId,
-          fileAccesses,
-        },
-      );
-    });
+    await this.ingestionClient.request<AddAccessesMutationResult, AddAccessesMutationInput>(
+      ADD_ACCESSES_MUTATION,
+      {
+        scopeId,
+        fileAccesses,
+      },
+    );
   }
 
   public async removeAccesses(
     scopeId: string,
     fileAccesses: UniqueFileAccessInput[],
   ): Promise<void> {
-    await this.ingestionClient.get(async (client) => {
-      await client.request<RemoveAccessesMutationResult, RemoveAccessesMutationInput>(
-        REMOVE_ACCESSES_MUTATION,
-        {
-          scopeId,
-          fileAccesses,
-        },
-      );
-    });
+    await this.ingestionClient.request<RemoveAccessesMutationResult, RemoveAccessesMutationInput>(
+      REMOVE_ACCESSES_MUTATION,
+      {
+        scopeId,
+        fileAccesses,
+      },
+    );
   }
 }

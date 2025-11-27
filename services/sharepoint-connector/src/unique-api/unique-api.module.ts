@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MetricService } from 'nestjs-otel';
 import { Config } from '../config';
 import { IngestionHttpClient } from './clients/ingestion-http.client';
 import {
@@ -25,20 +26,32 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
       useFactory: (
         uniqueAuthService: UniqueAuthService,
         configService: ConfigService<Config, true>,
+        metricService: MetricService,
       ) => {
-        return new UniqueGraphqlClient('scopeManagement', uniqueAuthService, configService);
+        return new UniqueGraphqlClient(
+          'scopeManagement',
+          uniqueAuthService,
+          configService,
+          metricService,
+        );
       },
-      inject: [UniqueAuthService, ConfigService],
+      inject: [UniqueAuthService, ConfigService, MetricService],
     },
     {
       provide: INGESTION_CLIENT,
       useFactory: (
         uniqueAuthService: UniqueAuthService,
         configService: ConfigService<Config, true>,
+        metricService: MetricService,
       ) => {
-        return new UniqueGraphqlClient('ingestion', uniqueAuthService, configService);
+        return new UniqueGraphqlClient(
+          'ingestion',
+          uniqueAuthService,
+          configService,
+          metricService,
+        );
       },
-      inject: [UniqueAuthService, ConfigService],
+      inject: [UniqueAuthService, ConfigService, MetricService],
     },
     IngestionHttpClient,
     UniqueFileIngestionService,

@@ -33,13 +33,10 @@ export class UniqueScopesService {
 
     const mutation = getGenerateScopesBasedOnPathsMutation(opts.includePermissions);
 
-    const result = await this.scopeManagementClient.get(
-      async (client) =>
-        await client.request<
-          GenerateScopesBasedOnPathsMutationResult,
-          GenerateScopesBasedOnPathsMutationInput
-        >(mutation, { paths }),
-    );
+    const result = await this.scopeManagementClient.request<
+      GenerateScopesBasedOnPathsMutationResult,
+      GenerateScopesBasedOnPathsMutationInput
+    >(mutation, { paths });
 
     return result.generateScopesBasedOnPaths;
   }
@@ -53,22 +50,19 @@ export class UniqueScopesService {
       `Creating ${scopeAccesses.length} scope accesses for scope ${scopeId} (applyToSubScopes: ${applyToSubScopes})`,
     );
 
-    await this.scopeManagementClient.get(
-      async (client) =>
-        await client.request<CreateScopeAccessesMutationResult, CreateScopeAccessesMutationInput>(
-          CREATE_SCOPE_ACCESSES_MUTATION,
-          {
-            scopeId,
-            scopeAccesses: scopeAccesses.map((scopeAccess) => ({
-              accessType: scopeAccess.type,
-              entityId: scopeAccess.entityId,
-              entityType: scopeAccess.entityType,
-            })),
-            applyToSubScopes,
-            skipFileAccessPropagation: true,
-          },
-        ),
-    );
+    await this.scopeManagementClient.request<
+      CreateScopeAccessesMutationResult,
+      CreateScopeAccessesMutationInput
+    >(CREATE_SCOPE_ACCESSES_MUTATION, {
+      scopeId,
+      scopeAccesses: scopeAccesses.map((scopeAccess) => ({
+        accessType: scopeAccess.type,
+        entityId: scopeAccess.entityId,
+        entityType: scopeAccess.entityType,
+      })),
+      applyToSubScopes,
+      skipFileAccessPropagation: true,
+    });
   }
 
   public async deleteScopeAccesses(
@@ -80,38 +74,32 @@ export class UniqueScopesService {
       `Deleting ${scopeAccesses.length} scope accesses for scope ${scopeId} (applyToSubScopes: ${applyToSubScopes})`,
     );
 
-    await this.scopeManagementClient.get(
-      async (client) =>
-        await client.request<DeleteScopeAccessesMutationResult, DeleteScopeAccessesMutationInput>(
-          DELETE_SCOPE_ACCESSES_MUTATION,
-          {
-            scopeId,
-            scopeAccesses: scopeAccesses.map((scopeAccess) => ({
-              accessType: scopeAccess.type,
-              entityId: scopeAccess.entityId,
-              entityType: scopeAccess.entityType,
-            })),
-            applyToSubScopes,
-            skipFileAccessPropagation: true,
-          },
-        ),
-    );
+    await this.scopeManagementClient.request<
+      DeleteScopeAccessesMutationResult,
+      DeleteScopeAccessesMutationInput
+    >(DELETE_SCOPE_ACCESSES_MUTATION, {
+      scopeId,
+      scopeAccesses: scopeAccesses.map((scopeAccess) => ({
+        accessType: scopeAccess.type,
+        entityId: scopeAccess.entityId,
+        entityType: scopeAccess.entityType,
+      })),
+      applyToSubScopes,
+      skipFileAccessPropagation: true,
+    });
   }
 
   public async getScopeById(id: string): Promise<Scope | null> {
-    const result = await this.scopeManagementClient.get(
-      async (client) =>
-        await client.request<PaginatedScopeQueryResult, PaginatedScopeQueryInput>(
-          PAGINATED_SCOPE_QUERY,
-          {
-            skip: 0,
-            take: 1,
-            where: {
-              id: { equals: id },
-            },
-          },
-        ),
-    );
+    const result = await this.scopeManagementClient.request<
+      PaginatedScopeQueryResult,
+      PaginatedScopeQueryInput
+    >(PAGINATED_SCOPE_QUERY, {
+      skip: 0,
+      take: 1,
+      where: {
+        id: { equals: id },
+      },
+    });
 
     return result.paginatedScope.nodes[0] ?? null;
   }
@@ -124,21 +112,18 @@ export class UniqueScopesService {
 
     let batchCount = 0;
     do {
-      const batchResult = await this.scopeManagementClient.get(
-        async (client) =>
-          await client.request<PaginatedScopeQueryResult, PaginatedScopeQueryInput>(
-            PAGINATED_SCOPE_QUERY,
-            {
-              skip,
-              take: BATCH_SIZE,
-              where: {
-                parentId: {
-                  equals: parentId,
-                },
-              },
-            },
-          ),
-      );
+      const batchResult = await this.scopeManagementClient.request<
+        PaginatedScopeQueryResult,
+        PaginatedScopeQueryInput
+      >(PAGINATED_SCOPE_QUERY, {
+        skip,
+        take: BATCH_SIZE,
+        where: {
+          parentId: {
+            equals: parentId,
+          },
+        },
+      });
       scopes.push(...batchResult.paginatedScope.nodes);
       batchCount = batchResult.paginatedScope.nodes.length;
       skip += BATCH_SIZE;

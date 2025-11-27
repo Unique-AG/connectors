@@ -1,9 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Counter, Histogram } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
+import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
+import { MetricService } from 'nestjs-otel';
+import { isObjectType } from 'remeda';
 import { Config } from '../../config';
+import { getDurationBucket, getHttpStatusCodeClass } from '../../utils/metrics.util';
 import { normalizeError } from '../../utils/normalize-error';
+import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
 import { UniqueAuthService } from '../unique-auth.service';
 
 export const INGESTION_CLIENT = Symbol('INGESTION_CLIENT');
@@ -17,10 +23,14 @@ export class UniqueGraphqlClient {
   private readonly graphQlClient: GraphQLClient;
   private readonly limiter: Bottleneck;
 
+  private readonly spcUniqueApiRequestDurationSeconds: Histogram;
+  private readonly spcUniqueApiSlowRequestsTotal: Counter;
+
   public constructor(
     private readonly clientTarget: UniqueGraphqlClientTarget,
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
+    metricService: MetricService,
   ) {
     const uniqueConfig = this.configService.get('unique', { infer: true });
     const graphqlUrl = `${uniqueConfig[`${clientTarget}ServiceBaseUrl`]}/graphql`;
@@ -48,15 +58,84 @@ export class UniqueGraphqlClient {
       reservoirRefreshAmount: apiRateLimitPerMinute,
       reservoirRefreshInterval: 60_000,
     });
+
+    this.spcUniqueApiRequestDurationSeconds = metricService.getHistogram(
+      'spc_unique_api_request_duration_seconds',
+      {
+        description: 'Measure latency of internal Unique API calls',
+      },
+    );
+
+    this.spcUniqueApiSlowRequestsTotal = metricService.getCounter(
+      'spc_unique_api_slow_requests_total',
+      {
+        description: 'Total number of slow Unique API requests',
+      },
+    );
   }
 
-  public async get<T>(callback: (client: GraphQLClient) => Promise<T>): Promise<T> {
+  public async request<T, V extends Variables = Variables>(
+    document: RequestDocument,
+    variables?: V,
+  ): Promise<T> {
     return await this.limiter.schedule(async () => {
+      const startTime = Date.now();
+      const operationName = this.extractOperationName(document);
+      const apiMethod = `graphql:${this.clientTarget}:${operationName}`;
+
       try {
-        return await callback(this.graphQlClient);
+        // However I tried to type variables, I alwayes got an error, no matter how I tried. AI
+        // agent wasted good 15 minutes on this and also didn't find a solution. For such internal
+        // call and with such weird typing I think it's okay to use hard type casting.
+        const options = { document, variables } as unknown as RequestOptions<V, T>;
+        const result = await this.graphQlClient.request<T, V>(options);
+
+        this.spcUniqueApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
+          api_method: apiMethod,
+          result: 'success',
+          http_status: '2xx',
+        });
+
+        const duration = elapsedMilliseconds(startTime);
+        const durationBucket = getDurationBucket(duration);
+        if (durationBucket) {
+          this.spcUniqueApiSlowRequestsTotal.add(1, {
+            api_method: apiMethod,
+            duration_bucket: durationBucket,
+          });
+
+          this.logger.warn({
+            msg: 'Slow Unique GraphQL request detected',
+            target: this.clientTarget,
+            operationName,
+            duration,
+            durationBucket,
+          });
+        }
+
+        return result;
       } catch (error) {
+        const statusCode = this.getErrorCodeFromGraphqlRequest(error);
+        const statusClass = getHttpStatusCodeClass(statusCode);
+
+        this.spcUniqueApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
+          api_method: apiMethod,
+          result: 'error',
+          http_status: statusClass,
+        });
+
+        const duration = elapsedMilliseconds(startTime);
+        const durationBucket = getDurationBucket(duration);
+        if (durationBucket) {
+          this.spcUniqueApiSlowRequestsTotal.add(1, {
+            api_method: apiMethod,
+            duration_bucket: durationBucket,
+          });
+        }
+
         this.logger.error({
-          msg: `Failed ${this.clientTarget} request: ${normalizeError(error).message}`,
+          msg: `Failed ${this.clientTarget} request (${operationName}): ${normalizeError(error).message}`,
+          operationName,
           error,
         });
         throw error;
@@ -72,5 +151,31 @@ export class UniqueGraphqlClient {
           ...uniqueConfig.serviceExtraHeaders,
         }
       : { Authorization: `Bearer ${await this.uniqueAuthService.getToken()}` };
+  }
+
+  private extractOperationName(document: RequestDocument): string {
+    const query = typeof document === 'string' ? document : (document.loc?.source.body ?? '');
+    const match = query.match(/(?:query|mutation|subscription)\s+(\w+)/);
+    return match?.[1] ?? 'unknown';
+  }
+
+  private getErrorCodeFromGraphqlRequest(error: unknown): number {
+    if (!isObjectType(error)) {
+      return 0;
+    }
+
+    const graphQlError = error as {
+      response?: {
+        errors?: Array<{
+          extensions?: {
+            response?: {
+              statusCode?: number;
+            };
+          };
+        }>;
+      };
+    };
+
+    return graphQlError?.response?.errors?.[0]?.extensions?.response?.statusCode ?? 0;
   }
 }
