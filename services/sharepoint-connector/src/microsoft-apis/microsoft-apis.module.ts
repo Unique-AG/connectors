@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { BottleneckFactory } from '../utils/bottleneck.factory';
 import { MicrosoftAuthenticationService } from './auth/microsoft-authentication.service';
 import { FileFilterService } from './graph/file-filter.service';
 import { GraphApiService } from './graph/graph-api.service';
@@ -18,6 +19,7 @@ import { SharepointRestHttpService } from './sharepoint-rest/sharepoint-rest-htt
     GraphApiService,
     SharepointRestHttpService,
     SharepointRestClientService,
+    BottleneckFactory,
   ],
   exports: [GraphApiService, SharepointRestClientService],
 })

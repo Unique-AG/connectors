@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Config } from '../../config';
 import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
+import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
 import { concealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
@@ -36,6 +37,7 @@ export class GraphApiService {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly configService: ConfigService<Config, true>,
     private readonly fileFilterService: FileFilterService,
+    private readonly bottleneckFactory: BottleneckFactory,
   ) {
     this.graphClient = this.graphClientFactory.createClient();
 
@@ -44,11 +46,14 @@ export class GraphApiService {
       { infer: true },
     );
 
-    this.limiter = new Bottleneck({
-      reservoir: msGraphRateLimitPerMinute,
-      reservoirRefreshAmount: msGraphRateLimitPerMinute,
-      reservoirRefreshInterval: 60000,
-    });
+    this.limiter = this.bottleneckFactory.createLimiter(
+      {
+        reservoir: msGraphRateLimitPerMinute,
+        reservoirRefreshAmount: msGraphRateLimitPerMinute,
+        reservoirRefreshInterval: 60000,
+      },
+      'Graph API',
+    );
 
     this.shouldConcealLogs = concealLogs(this.configService);
   }

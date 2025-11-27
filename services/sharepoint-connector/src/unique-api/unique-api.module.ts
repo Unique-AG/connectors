@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Config } from '../config';
+import { BottleneckFactory } from '../utils/bottleneck.factory';
 import { IngestionHttpClient } from './clients/ingestion-http.client';
 import {
   INGESTION_CLIENT,
@@ -25,25 +26,48 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
       useFactory: (
         uniqueAuthService: UniqueAuthService,
         configService: ConfigService<Config, true>,
+        bottleneckFactory: BottleneckFactory,
       ) => {
-        return new UniqueGraphqlClient('scopeManagement', uniqueAuthService, configService);
+        return new UniqueGraphqlClient(
+          'scopeManagement',
+          uniqueAuthService,
+          configService,
+          bottleneckFactory,
+        );
       },
-      inject: [UniqueAuthService, ConfigService],
+      inject: [UniqueAuthService, ConfigService, BottleneckFactory],
     },
     {
       provide: INGESTION_CLIENT,
       useFactory: (
         uniqueAuthService: UniqueAuthService,
         configService: ConfigService<Config, true>,
+        bottleneckFactory: BottleneckFactory,
       ) => {
-        return new UniqueGraphqlClient('ingestion', uniqueAuthService, configService);
+        return new UniqueGraphqlClient(
+          'ingestion',
+          uniqueAuthService,
+          configService,
+          bottleneckFactory,
+        );
       },
-      inject: [UniqueAuthService, ConfigService],
+      inject: [UniqueAuthService, ConfigService, BottleneckFactory],
     },
-    IngestionHttpClient,
+    {
+      provide: IngestionHttpClient,
+      useFactory: (
+        uniqueAuthService: UniqueAuthService,
+        configService: ConfigService<Config, true>,
+        bottleneckFactory: BottleneckFactory,
+      ) => {
+        return new IngestionHttpClient(uniqueAuthService, configService, bottleneckFactory);
+      },
+      inject: [UniqueAuthService, ConfigService, BottleneckFactory],
+    },
     UniqueFileIngestionService,
     UniqueFilesService,
     UniqueScopesService,
+    BottleneckFactory,
   ],
   exports: [
     UniqueAuthService,

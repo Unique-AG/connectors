@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Client, Dispatcher } from 'undici';
 import { Config } from '../../config';
+import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { normalizeError } from '../../utils/normalize-error';
 import { UniqueAuthService } from '../unique-auth.service';
 
@@ -15,6 +16,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly bottleneckFactory: BottleneckFactory,
   ) {
     const ingestionUrl = new URL(
       this.configService.get('unique.ingestionServiceBaseUrl', { infer: true }),
@@ -27,11 +29,14 @@ export class IngestionHttpClient implements OnModuleDestroy {
     const apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
       infer: true,
     });
-    this.limiter = new Bottleneck({
-      reservoir: apiRateLimitPerMinute,
-      reservoirRefreshAmount: apiRateLimitPerMinute,
-      reservoirRefreshInterval: 60_000,
-    });
+    this.limiter = this.bottleneckFactory.createLimiter(
+      {
+        reservoir: apiRateLimitPerMinute,
+        reservoirRefreshAmount: apiRateLimitPerMinute,
+        reservoirRefreshInterval: 60_000,
+      },
+      'Ingestion HTTP',
+    );
   }
 
   public async onModuleDestroy(): Promise<void> {
