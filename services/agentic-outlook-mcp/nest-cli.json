@@ -7,7 +7,7 @@
     "typeCheck": false,
     "assets": [
       {
-        "include": "**/*.handlebars",
+        "include": "**/*.txt",
         "watchAssets": true
       }
     ]

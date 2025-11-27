@@ -1,0 +1,1 @@
+ALTER TABLE "points" ADD COLUMN "sparse_vector" jsonb;
