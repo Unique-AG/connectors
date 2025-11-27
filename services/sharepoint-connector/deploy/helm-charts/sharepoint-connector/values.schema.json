@@ -5,6 +5,21 @@
     "connector": {
       "type": "object",
       "description": "Configuration for the backend-service dependency",
+      "properties": {
+        "env": {
+          "type": "object",
+          "description": "Environment variables for the connector",
+          "properties": {
+            "LOGS_DIAGNOSTICS_DATA_POLICY": {
+              "type": "string",
+              "enum": ["conceal", "disclose"],
+              "description": "Controls whether sensitive data like site names and IDs are logged in full or redacted",
+              "default": "conceal"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
       "additionalProperties": true
     },
     "grafana": {

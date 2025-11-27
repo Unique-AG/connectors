@@ -16,11 +16,13 @@ const BATCH_SIZE = 20;
 export class SharepointRestHttpService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly client: Dispatcher;
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly microsoftAuthenticationService: MicrosoftAuthenticationService,
     private readonly configService: ConfigService<Config, true>,
   ) {
+    this.shouldConcealLogs = concealLogs(this.configService);
     const sharePointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const httpClient = new Client(sharePointBaseUrl, {
       bodyTimeout: 60_000,
@@ -61,7 +63,7 @@ export class SharepointRestHttpService {
 
     assert.ok(
       200 <= statusCode && statusCode < 300,
-      `Failed to request SharePoint endpoint ${path}: ${statusCode}`,
+      `Failed to request SharePoint endpoint ${this.shouldConcealLogs ? path.replace(siteName, redact(siteName)) : path}: ${statusCode}`,
     );
 
     return body.json() as Promise<T>;
@@ -78,7 +80,7 @@ export class SharepointRestHttpService {
 
     this.logger.debug({
       msg: 'Starting SharePoint batch request',
-      siteName: concealLogs(this.configService) ? redact(siteName) : siteName,
+      siteName: this.shouldConcealLogs ? redact(siteName) : siteName,
       totalPaths: apiPaths.length,
       batchChunks: chunkedApiPaths.length,
     });
@@ -88,19 +90,23 @@ export class SharepointRestHttpService {
       const fullApiPaths = apiPathsChunk
         .map((apiPath) => (apiPath.startsWith('/') ? apiPath.slice(1) : apiPath))
         .map((apiPath) => `/sites/${siteName}/_api/web/${apiPath}`);
-
       const batchItems = fullApiPaths.map((apiPath) => this.buildBatchItem(apiPath, boundary));
+
+      const redactedApiPaths = this.shouldConcealLogs
+        ? fullApiPaths.map((path) => path.replace(siteName, redact(siteName)))
+        : fullApiPaths;
 
       this.logger.debug({
         msg: 'Executing batch chunk',
         chunkIndex: chunkIndex + 1,
         totalChunks: chunkedApiPaths.length,
         pathsInChunk: fullApiPaths.length,
-        paths: fullApiPaths,
+        paths: redactedApiPaths,
       });
 
       const requestBody = `${batchItems.join('\r\n\r\n')}\r\n--${boundary}--\r\n`;
       const path = `/sites/${siteName}/_api/$batch`;
+
       const requestStartTime = Date.now();
       const { statusCode, body, headers } = await this.client.request({
         method: 'POST',
@@ -116,12 +122,16 @@ export class SharepointRestHttpService {
       const isSuccess = 200 <= statusCode && statusCode < 300;
 
       if (!isSuccess) {
+        const redactedPath = this.shouldConcealLogs
+          ? path.replace(siteName, redact(siteName))
+          : path;
+
         const errorBody = await body.text();
         this.logger.error({
           msg: 'Failed to request SharePoint batch endpoint',
-          path,
+          path: redactedPath,
           chunkIndex: chunkIndex + 1,
-          paths: fullApiPaths, // contains sitename
+          paths: redactedApiPaths,
           statusCode,
           duration,
           errorBody,
@@ -151,7 +161,7 @@ export class SharepointRestHttpService {
 
           this.logger.error({
             msg: 'Non-200 response in batch item',
-            path: fullApiPaths[index],
+            path: redactedApiPaths[index],
             statusCode,
             responseCodeLine,
           });
