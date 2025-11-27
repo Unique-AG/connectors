@@ -120,7 +120,7 @@ export class PermissionsSyncService {
     siteId: string,
     permissionsMap: PermissionsMap,
   ): Promise<SharePointGroupsMap> {
-    const logPrefix = `[Site: ${siteId}]`;
+    const logPrefix = `[Site: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
     const uniqueGroupPermissions = pipe(
       permissionsMap,
       values(),

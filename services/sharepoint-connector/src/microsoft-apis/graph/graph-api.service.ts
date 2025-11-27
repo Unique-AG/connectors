@@ -228,20 +228,22 @@ export class GraphApiService {
   }
 
   public async getSiteLists(siteId: string): Promise<List[]> {
+    const loggedSiteId = concealLogs(this.configService) ? smear(siteId) : siteId;
+
     try {
       const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId}/lists`, (url) =>
         this.graphClient.api(url).select('system,name,id').top(GRAPH_API_PAGE_SIZE).get(),
       );
 
       this.logger.log(
-        `Found ${allLists.length} lists for site ${concealLogs(this.configService) ? smear(siteId) : siteId}`,
+        `Found ${allLists.length} lists for site ${loggedSiteId}`,
       );
 
       return allLists;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch lists for site ${concealLogs(this.configService) ? smear(siteId) : siteId}: ${normalizedError.message}`,
+        msg: `Failed to fetch lists for site ${loggedSiteId}: ${normalizedError.message}`,
         error,
       });
       throw error;

@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   differenceWith,
   filter,
@@ -11,12 +12,14 @@ import {
   partition,
   pipe,
 } from 'remeda';
+import { Config } from '../config';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { concealLogs, smear } from '../utils/logging.util';
 import {
   buildIngestionItemKey,
   getUniquePathFromItem,
@@ -45,12 +48,13 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueGroupsService: UniqueGroupsService,
+    private readonly configService: ConfigService<Config, true>,
   ) {}
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId, rootPath, serviceUserId } = context;
-    const logPrefix = `[Site: ${siteId}]`;
+    const logPrefix = `[Site: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
 
     const rootGroup = await this.uniqueGroupsService.getRootGroup();
     if (!rootGroup) {

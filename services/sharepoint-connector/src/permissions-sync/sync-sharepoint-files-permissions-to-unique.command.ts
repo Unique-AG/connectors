@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   differenceWith,
   filter,
@@ -10,9 +11,11 @@ import {
   partition,
   pipe,
 } from 'remeda';
+import { Config } from '../config';
 import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile, UniqueFileAccessInput } from '../unique-api/unique-files/unique-files.types';
+import { concealLogs, smear } from '../utils/logging.util';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -31,13 +34,16 @@ interface Input {
 export class SyncSharepointFilesPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly uniqueFilesService: UniqueFilesService) {}
+  public constructor(
+    private readonly uniqueFilesService: UniqueFilesService,
+    private readonly configService: ConfigService<Config, true>,
+  ) {}
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId, serviceUserId } = context;
 
-    const logPrefix = `[Site: ${siteId}]`;
+    const logPrefix = `[Site: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
     this.logger.log(
       `${logPrefix} Starting permissions sync for ` +
         `${Object.keys(sharePoint.permissionsMap).length} items`,
