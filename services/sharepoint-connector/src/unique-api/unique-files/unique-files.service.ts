@@ -104,7 +104,9 @@ export class UniqueFilesService {
   }
 
   public async getFilesForSite(siteId: string): Promise<UniqueFile[]> {
-    this.logger.log(`Fetching files for site ${concealLogs(this.configService) ? smear(siteId) : siteId}`);
+    this.logger.log(
+      `Fetching files for site ${concealLogs(this.configService) ? smear(siteId) : siteId}`,
+    );
 
     let skip = 0;
     const files: UniqueFile[] = [];

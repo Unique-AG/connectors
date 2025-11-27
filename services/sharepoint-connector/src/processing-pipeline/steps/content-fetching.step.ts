@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
+import { concealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -13,11 +14,14 @@ import type { IPipelineStep } from './pipeline-step.interface';
 export class ContentFetchingStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.ContentFetching;
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly apiService: GraphApiService,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+    this.shouldConcealLogs = concealLogs(this.configService);
+  }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     if (context.pipelineItem.itemType === 'listItem') {
@@ -52,7 +56,9 @@ export class ContentFetchingStep implements IPipelineStep {
         correlationId: context.correlationId,
         itemId: context.pipelineItem.item.id,
         driveId: context.pipelineItem.driveId,
-        siteId: context.pipelineItem.siteId,
+        siteId: this.shouldConcealLogs
+          ? smear(context.pipelineItem.siteId)
+          : context.pipelineItem.siteId,
         error: message,
       });
       throw error;
@@ -82,7 +88,9 @@ export class ContentFetchingStep implements IPipelineStep {
         correlationId: context.correlationId,
         itemId: context.pipelineItem.item.id,
         driveId: context.pipelineItem.driveId,
-        siteId: context.pipelineItem.siteId,
+        siteId: this.shouldConcealLogs
+          ? smear(context.pipelineItem.siteId)
+          : context.pipelineItem.siteId,
         error: message,
       });
       throw error;

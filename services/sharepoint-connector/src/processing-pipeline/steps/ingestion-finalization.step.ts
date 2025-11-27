@@ -5,6 +5,7 @@ import { Config } from '../../config';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
+import { concealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
@@ -61,7 +62,9 @@ export class IngestionFinalizationStep implements IPipelineStep {
         correlationId: context.correlationId,
         itemId: context.pipelineItem.item.id,
         driveId: context.pipelineItem.driveId,
-        siteId: context.pipelineItem.siteId,
+        siteId: concealLogs(this.configService)
+          ? smear(context.pipelineItem.siteId)
+          : context.pipelineItem.siteId,
         error: message,
       });
       throw error;

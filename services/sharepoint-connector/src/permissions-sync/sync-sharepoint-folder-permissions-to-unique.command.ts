@@ -44,17 +44,20 @@ interface Input {
 @Injectable()
 export class SyncSharepointFolderPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+    this.shouldConcealLogs = concealLogs(this.configService);
+  }
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId, rootPath, serviceUserId } = context;
-    const logPrefix = `[Site: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
 
     const rootGroup = await this.uniqueGroupsService.getRootGroup();
     if (!rootGroup) {
@@ -228,7 +231,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const sharePointDirectory = sharePoint.directoriesPathMap[folder.path];
 
     if (isNullish(sharePointDirectory)) {
-      this.logger.warn(`${logPrefix} No SharePoint directory found for path ${concealLogs(this.configService) ? redact(folder.path) : folder.path}`);
+      this.logger.warn(
+        `${logPrefix} No SharePoint directory found for path ${this.shouldConcealLogs ? redact(folder.path) : folder.path}`,
+      );
       return null;
     }
 

@@ -1,7 +1,10 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { request } from 'undici';
+import { Config } from '../../config';
 import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
+import { concealLogs, redact, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -11,8 +14,11 @@ import type { IPipelineStep } from './pipeline-step.interface';
 export class StorageUploadStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.StorageUpload;
+  private readonly shouldConcealLogs: boolean;
 
-  public constructor() {}
+  public constructor(private readonly configService: ConfigService<Config, true>) {
+    this.shouldConcealLogs = concealLogs(this.configService);
+  }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
@@ -47,10 +53,13 @@ export class StorageUploadStep implements IPipelineStep {
 
     this.logger.debug({
       msg: 'performUpload details:',
+      correlationId: context.correlationId,
       fileId: context.pipelineItem.item.id,
       driveId: context.pipelineItem.driveId,
-      siteId: context.pipelineItem.siteId,
-      uploadUrl: context.uploadUrl,
+      siteId: this.shouldConcealLogs
+        ? smear(context.pipelineItem.siteId)
+        : context.pipelineItem.siteId,
+      uploadUrl: this.shouldConcealLogs ? redact(context.uploadUrl) : context.uploadUrl,
       mimeType: context.mimeType,
     });
 

@@ -19,12 +19,15 @@ interface FileMoveData {
 @Injectable()
 export class FileMoveProcessor {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly scopeManagementService: ScopeManagementService,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    this.shouldConcealLogs = concealLogs(this.configService);
+  }
 
   /**
    * Processes files that have been moved to new locations in SharePoint
@@ -36,7 +39,7 @@ export class FileMoveProcessor {
     context: SharepointSyncContext,
   ): Promise<void> {
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId);
     let ingestedFiles: UniqueFile[] = [];
 
@@ -89,7 +92,7 @@ export class FileMoveProcessor {
     context: SharepointSyncContext,
   ): FileMoveData[] {
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const filesToMove: FileMoveData[] = [];
 
     for (const ingestedFile of ingestedFiles) {

@@ -30,6 +30,21 @@ export function redact(text: string, ends = 2): string {
 }
 
 /**
+ * Regex pattern to match and capture SharePoint site names in REST API paths.
+ * Matches: /sites/{siteName}/
+ */
+const SHAREPOINT_SITE_NAME_REGEX = /\/sites\/([^/]+)\//g;
+
+/**
+ * Redacts SharePoint site names from API paths for secure logging.
+ * @param path The API path containing site names to redact
+ * @returns The path with site names redacted using the redact function
+ */
+export function redactSiteNameFromPath(path: string): string {
+  return path.replace(SHAREPOINT_SITE_NAME_REGEX, (_, siteName) => `/sites/${redact(siteName)}/`);
+}
+
+/**
  * Checks if logs should be concealed based on the LOGS_DIAGNOSTICS_DATA_POLICY configuration
  * @param configService The config service instance
  * @returns true if logs should be concealed, false if they should be disclosed

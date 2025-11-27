@@ -38,6 +38,7 @@ interface Input {
 @Injectable()
 export class PermissionsSyncService {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly fetchGraphPermissionsMapQuery: FetchGraphPermissionsMapQuery,
@@ -48,12 +49,14 @@ export class PermissionsSyncService {
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+    this.shouldConcealLogs = concealLogs(this.configService);
+  }
 
   public async syncPermissionsForSite(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     this.logger.log(
       `${logPrefix} Starting permissions fetching for ${sharePoint.items.length} items and ` +
         `${sharePoint.directories.length} directories`,
@@ -120,7 +123,7 @@ export class PermissionsSyncService {
     siteId: string,
     permissionsMap: PermissionsMap,
   ): Promise<SharePointGroupsMap> {
-    const logPrefix = `[Site: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const uniqueGroupPermissions = pipe(
       permissionsMap,
       values(),

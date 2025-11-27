@@ -24,15 +24,17 @@ export class ItemProcessingOrchestratorService {
   ): Promise<void> {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
-    const siteId = concealLogs(this.configService) ? smear(syncContext.siteId) : syncContext.siteId;
+    const loggedSiteId = concealLogs(this.configService)
+      ? smear(syncContext.siteId)
+      : syncContext.siteId;
 
     if (newItems.length === 0 && updatedItems.length === 0) {
-      this.logger.log(`No items to process for site ${siteId}`);
+      this.logger.log(`No items to process for site ${loggedSiteId}`);
       return;
     }
 
     this.logger.log(
-      `Processing ${newItems.length + updatedItems.length} items for site ${siteId} ` +
+      `Processing ${newItems.length + updatedItems.length} items for site ${loggedSiteId} ` +
         `(${newItems.length} new, ${updatedItems.length} updated)`,
     );
 
@@ -55,7 +57,7 @@ export class ItemProcessingOrchestratorService {
     const rejected = results.filter((result) => result.status === 'rejected');
     if (rejected.length > 0) {
       this.logger.warn(
-        `Completed processing with ${rejected.length} failures for site ${syncContext.siteId}`,
+        `Completed processing with ${rejected.length} failures for site ${loggedSiteId}`,
       );
     }
   }

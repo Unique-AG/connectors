@@ -30,6 +30,7 @@ export class GraphApiService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly graphClient: Client;
   private readonly limiter: Bottleneck;
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
@@ -48,12 +49,14 @@ export class GraphApiService {
       reservoirRefreshAmount: msGraphRateLimitPerMinute,
       reservoirRefreshInterval: 60000,
     });
+
+    this.shouldConcealLogs = concealLogs(this.configService);
   }
 
   public async getAllSiteItems(
     siteId: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
-    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
       this.getAspxPagesForSite(siteId),
       this.getAllFilesForSite(siteId),
@@ -84,6 +87,7 @@ export class GraphApiService {
   public async getAllFilesForSite(
     siteId: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
+    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
     const sharepointContentFilesToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
@@ -124,7 +128,7 @@ export class GraphApiService {
       // Log progress every 20 files
       if (totalScanned % LOG_INTERVAL === 0) {
         this.logger.log(
-          `Scanning in progress for site ${siteId}: ${totalScanned} files scanned so far`,
+          `Scanning in progress for site ${loggedSiteId}: ${totalScanned} files scanned so far`,
         );
       }
 
@@ -136,7 +140,7 @@ export class GraphApiService {
     }
 
     this.logger.log(
-      `Found ${sharepointContentFilesToSync.length} drive files for site ${concealLogs(this.configService) ? smear(siteId) : siteId}`,
+      `Found ${sharepointContentFilesToSync.length} drive files for site ${loggedSiteId}`,
     );
     return { items: sharepointContentFilesToSync, directories: sharepointDirectoryItemsToSync };
   }
@@ -195,6 +199,7 @@ export class GraphApiService {
   }
 
   public async getAspxPagesForSite(siteId: string): Promise<SharepointContentItem[]> {
+    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const [siteWebUrl, lists] = await Promise.all([
       this.getSiteWebUrl(siteId),
       this.getSiteLists(siteId),
@@ -204,7 +209,7 @@ export class GraphApiService {
     const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
     if (!sitePagesList?.id) {
       this.logger.warn(
-        `Cannot scan Site Pages because SitePages list was not found for site ${siteId}`,
+        `Cannot scan Site Pages because SitePages list was not found for site ${loggedSiteId}`,
       );
       return [];
     }
@@ -216,28 +221,26 @@ export class GraphApiService {
         siteWebUrl,
       );
       this.logger.log(
-        `Found ${aspxSharepointContentItems.length} ASPX files from SitePages for site ${siteId}`,
+        `Found ${aspxSharepointContentItems.length} ASPX files from SitePages for site ${loggedSiteId}`,
       );
       return aspxSharepointContentItems;
     } catch (error) {
       this.logger.warn(
-        `Failed to scan ASPX files from SitePages for site ${concealLogs(this.configService) ? smear(siteId) : siteId}: ${error}`,
+        `Failed to scan ASPX files from SitePages for site ${loggedSiteId}: ${error}`,
       );
       return [];
     }
   }
 
   public async getSiteLists(siteId: string): Promise<List[]> {
-    const loggedSiteId = concealLogs(this.configService) ? smear(siteId) : siteId;
+    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
 
     try {
       const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId}/lists`, (url) =>
         this.graphClient.api(url).select('system,name,id').top(GRAPH_API_PAGE_SIZE).get(),
       );
 
-      this.logger.log(
-        `Found ${allLists.length} lists for site ${loggedSiteId}`,
-      );
+      this.logger.log(`Found ${allLists.length} lists for site ${loggedSiteId}`);
 
       return allLists;
     } catch (error) {
@@ -386,6 +389,7 @@ export class GraphApiService {
   }
 
   public async getSiteWebUrl(siteId: string): Promise<string> {
+    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     try {
       const site = await this.makeRateLimitedRequest(() =>
         this.graphClient.api(`/sites/${siteId}`).select('webUrl').get(),
@@ -395,7 +399,7 @@ export class GraphApiService {
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch site info for ${siteId}: ${normalizedError.message}`,
+        msg: `Failed to fetch site info for ${loggedSiteId}: ${normalizedError.message}`,
         error,
       });
       throw error;
@@ -408,21 +412,20 @@ export class GraphApiService {
   }
 
   private async getDrivesForSite(siteId: string): Promise<Drive[]> {
+    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     try {
       const allDrives = await this.paginateGraphApiRequest<Drive>(
         `/sites/${siteId}/drives`,
         (url) => this.graphClient.api(url).top(GRAPH_API_PAGE_SIZE).get(),
       );
 
-      this.logger.log(
-        `Found ${allDrives.length} drives for site ${concealLogs(this.configService) ? smear(siteId) : siteId}`,
-      );
+      this.logger.log(`Found ${allDrives.length} drives for site ${loggedSiteId}`);
 
       return allDrives;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch drives for site ${siteId}: ${normalizedError.message}`,
+        msg: `Failed to fetch drives for site ${loggedSiteId}: ${normalizedError.message}`,
         error,
       });
       throw error;
@@ -437,6 +440,7 @@ export class GraphApiService {
     driveName: string,
     maxFiles?: number,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
+    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const sharepointContentItemsToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
     try {
@@ -446,7 +450,7 @@ export class GraphApiService {
         // Check if we've reached the file limit for local testing
         if (maxFiles && sharepointContentItemsToSync.length >= maxFiles) {
           this.logger.warn(
-            `Reached file limit of ${maxFiles}, stopping scan in drive ${driveId}, item ${itemId} for site ${siteId}`,
+            `Reached file limit of ${maxFiles}, stopping scan in drive ${driveId}, item ${itemId} for site ${loggedSiteId}`,
           );
           break;
         }
@@ -503,7 +507,7 @@ export class GraphApiService {
       );
 
       this.logger.warn(
-        `Continuing scan with results collected so far from drive ${driveId}, item ${itemId} for site ${siteId}`,
+        `Continuing scan with results collected so far from drive ${driveId}, item ${itemId} for site ${loggedSiteId}`,
       );
       return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
     }

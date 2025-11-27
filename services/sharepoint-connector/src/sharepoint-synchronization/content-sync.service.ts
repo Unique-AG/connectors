@@ -23,6 +23,7 @@ import type { SharepointSyncContext } from './types';
 @Injectable()
 export class ContentSyncService {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -31,7 +32,9 @@ export class ContentSyncService {
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly fileMoveProcessor: FileMoveProcessor,
     private readonly scopeManagementService: ScopeManagementService,
-  ) {}
+  ) {
+    this.shouldConcealLogs = concealLogs(this.configService);
+  }
 
   public async syncContentForSite(
     items: SharepointContentItem[],
@@ -39,7 +42,7 @@ export class ContentSyncService {
     context: SharepointSyncContext,
   ): Promise<void> {
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}] `;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}] `;
     const processStartTime = Date.now();
 
     const diffResult = await this.calculateDiffForSite(items, siteId);
@@ -123,7 +126,7 @@ export class ContentSyncService {
   }
 
   private async deleteRemovedFiles(siteId: string, deletedFileKeys: string[]): Promise<void> {
-    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     let filesToDelete: UniqueFile[] = [];
     // Convert relative keys to full keys (with siteId prefix)
     const fullKeys = deletedFileKeys.map((key) => `${siteId}/${key}`);

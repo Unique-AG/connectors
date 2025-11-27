@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { getTitle } from '../../utils/list-item.util';
+import { concealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -33,7 +34,9 @@ export class AspxProcessingStep implements IPipelineStep {
         msg: 'ASPX processing failed',
         correlationId: context.correlationId,
         itemId: context.pipelineItem.item.id,
-        siteId: context.pipelineItem.siteId,
+        siteId: concealLogs(this.configService)
+          ? smear(context.pipelineItem.siteId)
+          : context.pipelineItem.siteId,
         error: message,
       });
       throw error;
