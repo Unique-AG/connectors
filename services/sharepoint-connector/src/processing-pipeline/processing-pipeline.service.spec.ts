@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
+import { MetricService } from 'nestjs-otel';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
@@ -136,6 +137,13 @@ describe('ProcessingPipelineService', () => {
       .impl(() => mockSteps.storageUpload as unknown as StorageUploadStep)
       .mock(IngestionFinalizationStep)
       .impl(() => mockSteps.ingestionFinalization as unknown as IngestionFinalizationStep)
+      .mock(MetricService)
+      .impl((stub) => ({
+        ...stub(),
+        getCounter: vi.fn().mockReturnValue({
+          add: vi.fn(),
+        }),
+      }))
       .compile();
 
     service = unit;

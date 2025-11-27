@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Counter } from '@opentelemetry/api';
+import { MetricService } from 'nestjs-otel';
+import { toSnakeCase } from 'remeda';
 import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
@@ -20,6 +23,7 @@ export class ProcessingPipelineService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly pipelineSteps: IPipelineStep[];
   private readonly stepTimeoutMs: number;
+  private readonly spcIngestionFileProcessedTotal: Counter;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -28,6 +32,7 @@ export class ProcessingPipelineService {
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly storageUploadStep: StorageUploadStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
+    metricService: MetricService,
   ) {
     this.pipelineSteps = [
       this.contentFetchingStep,
@@ -38,6 +43,13 @@ export class ProcessingPipelineService {
     ];
     this.stepTimeoutMs =
       this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
+
+    this.spcIngestionFileProcessedTotal = metricService.getCounter(
+      'spc_ingestion_file_processed_total',
+      {
+        description: 'Monitor the pipeline steps',
+      },
+    );
   }
 
   public async processItem(
@@ -68,13 +80,30 @@ export class ProcessingPipelineService {
       try {
         await Promise.race([step.execute(context), this.timeoutPromise(step)]);
 
+        this.spcIngestionFileProcessedTotal.add(1, {
+          sp_site_id: syncContext.siteId, // TODO: Smear based on logging policy
+          step_name: toSnakeCase(step.stepName),
+          file_state: fileStatus,
+          result: 'success',
+        });
+
         this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
         if (step.cleanup) await step.cleanup(context);
       } catch (error) {
         const totalDuration = Date.now() - startTime.getTime();
         const normalizedError = normalizeError(error);
+        const isTimeout = 'isTimeout' in normalizedError && Boolean(normalizedError.isTimeout);
+
+        this.spcIngestionFileProcessedTotal.add(1, {
+          sp_site_id: syncContext.siteId, // TODO: Smear based on logging policy
+          step_name: toSnakeCase(step.stepName),
+          file_state: fileStatus,
+          result: isTimeout ? 'timeout' : 'failure',
+        });
+
         this.logger.error(
-          `[${correlationId}] Pipeline failed at step: ${step.stepName} after ${totalDuration}ms: ${normalizedError.message}`,
+          `[${correlationId}] Pipeline ${isTimeout ? 'timed out' : 'failed'} at step: ` +
+            `${step.stepName} after ${totalDuration}ms: ${normalizedError.message}`,
         );
 
         if (step.cleanup) await step.cleanup(context);
@@ -99,8 +128,11 @@ export class ProcessingPipelineService {
     return mimeType ?? DEFAULT_MIME_TYPE;
   }
 
-  private timeoutPromise(step: IPipelineStep) {
-    const timeoutError = new Error(`Step ${step.stepName} timed out after ${this.stepTimeoutMs}ms`);
+  private timeoutPromise(step: IPipelineStep): Promise<never> {
+    const timeoutError = new Error(
+      `Step ${step.stepName} timed out after ${this.stepTimeoutMs}ms`,
+    ) as Error & { isTimeout: boolean };
+    timeoutError.isTimeout = true;
     return new Promise((_resolve, reject) => {
       setTimeout(() => reject(timeoutError), this.stepTimeoutMs);
     });
