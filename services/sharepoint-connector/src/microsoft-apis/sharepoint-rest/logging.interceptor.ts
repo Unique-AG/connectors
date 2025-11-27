@@ -4,7 +4,9 @@ import type { Dispatcher } from 'undici';
 import { redactSiteNameFromPath } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 
-export function createLoggingInterceptor(): Dispatcher.DispatcherComposeInterceptor {
+export function createLoggingInterceptor(
+  shouldConcealLogs: boolean,
+): Dispatcher.DispatcherComposeInterceptor {
   const logger = new Logger('SharepointRestHttpInterceptor');
 
   return (dispatch) => {
@@ -15,7 +17,7 @@ export function createLoggingInterceptor(): Dispatcher.DispatcherComposeIntercep
       logger.debug({
         msg: 'SharePoint REST request started',
         method,
-        path: redactSiteNameFromPath(path),
+        path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
       });
 
       let statusCode: number | undefined;
@@ -56,7 +58,7 @@ export function createLoggingInterceptor(): Dispatcher.DispatcherComposeIntercep
           logger.error({
             msg: 'SharePoint REST request failed with error',
             method,
-            path: redactSiteNameFromPath(path),
+            path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
             error: normalizeError(error).message,
             duration,
           });
@@ -82,7 +84,7 @@ export function createLoggingInterceptor(): Dispatcher.DispatcherComposeIntercep
             logger.debug({
               msg: 'SharePoint REST request completed',
               method,
-              path: redactSiteNameFromPath(path),
+              path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
               statusCode,
               duration,
             });
@@ -91,7 +93,7 @@ export function createLoggingInterceptor(): Dispatcher.DispatcherComposeIntercep
             logger.error({
               msg: 'SharePoint REST request failed with server error',
               method,
-              path: redactSiteNameFromPath(path),
+              path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
               statusCode,
               duration,
               errorBody,
@@ -101,7 +103,7 @@ export function createLoggingInterceptor(): Dispatcher.DispatcherComposeIntercep
             logger.warn({
               msg: 'SharePoint REST request failed with client error',
               method,
-              path: redactSiteNameFromPath(path),
+              path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
               statusCode,
               duration,
               errorBody,
@@ -110,7 +112,7 @@ export function createLoggingInterceptor(): Dispatcher.DispatcherComposeIntercep
             logger.warn({
               msg: 'SharePoint REST request completed with unexpected status code',
               method,
-              path: redactSiteNameFromPath(path),
+              path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
               statusCode,
               duration,
             });

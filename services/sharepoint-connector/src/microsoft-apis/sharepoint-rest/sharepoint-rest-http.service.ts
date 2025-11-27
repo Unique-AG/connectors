@@ -41,7 +41,7 @@ export class SharepointRestHttpService {
       createTokenRefreshInterceptor(async () =>
         this.microsoftAuthenticationService.getAccessToken('sharepoint-rest'),
       ),
-      createLoggingInterceptor(),
+      createLoggingInterceptor(this.shouldConcealLogs),
     ];
     this.client = httpClient.compose(interceptorsInCallingOrder.reverse());
   }
