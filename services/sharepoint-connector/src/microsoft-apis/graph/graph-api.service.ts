@@ -7,6 +7,7 @@ import Bottleneck from 'bottleneck';
 import { Config } from '../../config';
 import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { getTitle } from '../../utils/list-item.util';
+import { concealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
@@ -52,7 +53,7 @@ export class GraphApiService {
   public async getAllSiteItems(
     siteId: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
-    const logPrefix = `[SiteId: ${siteId}]`;
+    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
       this.getAspxPagesForSite(siteId),
       this.getAllFilesForSite(siteId),
@@ -134,7 +135,9 @@ export class GraphApiService {
       }
     }
 
-    this.logger.log(`Found ${sharepointContentFilesToSync.length} drive files for site ${siteId}`);
+    this.logger.log(
+      `Found ${sharepointContentFilesToSync.length} drive files for site ${concealLogs(this.configService) ? smear(siteId) : siteId}`,
+    );
     return { items: sharepointContentFilesToSync, directories: sharepointDirectoryItemsToSync };
   }
 
@@ -160,7 +163,9 @@ export class GraphApiService {
           const reader = stream.getReader();
           await reader.cancel();
           reader.releaseLock();
-          throw new Error(`${logPrefix} File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
+          throw new Error(
+            `${logPrefix} File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`,
+          );
         }
 
         chunks.push(bufferChunk);
@@ -172,7 +177,9 @@ export class GraphApiService {
 
       const finalBuffer = Buffer.concat(chunks);
 
-      this.logger.debug(`${logPrefix} Buffer.concat completed in ${Date.now() - concatStartTime}ms`);
+      this.logger.debug(
+        `${logPrefix} Buffer.concat completed in ${Date.now() - concatStartTime}ms`,
+      );
 
       return finalBuffer;
     } catch (error) {
@@ -213,7 +220,9 @@ export class GraphApiService {
       );
       return aspxSharepointContentItems;
     } catch (error) {
-      this.logger.warn(`Failed to scan ASPX files from SitePages for site ${siteId}: ${error}`);
+      this.logger.warn(
+        `Failed to scan ASPX files from SitePages for site ${concealLogs(this.configService) ? smear(siteId) : siteId}: ${error}`,
+      );
       return [];
     }
   }
@@ -224,13 +233,15 @@ export class GraphApiService {
         this.graphClient.api(url).select('system,name,id').top(GRAPH_API_PAGE_SIZE).get(),
       );
 
-      this.logger.log(`Found ${allLists.length} lists for site ${siteId}`);
+      this.logger.log(
+        `Found ${allLists.length} lists for site ${concealLogs(this.configService) ? smear(siteId) : siteId}`,
+      );
 
       return allLists;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch lists for site ${siteId}: ${normalizedError.message}`,
+        msg: `Failed to fetch lists for site ${concealLogs(this.configService) ? smear(siteId) : siteId}: ${normalizedError.message}`,
         error,
       });
       throw error;
@@ -401,7 +412,9 @@ export class GraphApiService {
         (url) => this.graphClient.api(url).top(GRAPH_API_PAGE_SIZE).get(),
       );
 
-      this.logger.log(`Found ${allDrives.length} drives for site ${siteId}`);
+      this.logger.log(
+        `Found ${allDrives.length} drives for site ${concealLogs(this.configService) ? smear(siteId) : siteId}`,
+      );
 
       return allDrives;
     } catch (error) {

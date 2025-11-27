@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { chunk, identity } from 'remeda';
 import { Client, Dispatcher, interceptors } from 'undici';
 import { Config } from '../../config';
+import { concealLogs, redact } from '../../utils/logging.util';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { createLoggingInterceptor } from './logging.interceptor';
 import { createTokenRefreshInterceptor } from './token-refresh.interceptor';
@@ -75,11 +76,9 @@ export class SharepointRestHttpService {
     const responses: T[] = [];
     const chunkedApiPaths = chunk(apiPaths, BATCH_SIZE);
 
-    // TODO: Is siteName sensitive info? If yes, we should remove that from the log here, logging
-    //       interceptor and paths of batch request.
     this.logger.debug({
       msg: 'Starting SharePoint batch request',
-      siteName,
+      siteName: concealLogs(this.configService) ? redact(siteName) : siteName,
       totalPaths: apiPaths.length,
       batchChunks: chunkedApiPaths.length,
     });
@@ -122,7 +121,7 @@ export class SharepointRestHttpService {
           msg: 'Failed to request SharePoint batch endpoint',
           path,
           chunkIndex: chunkIndex + 1,
-          paths: fullApiPaths,
+          paths: fullApiPaths, // contains sitename
           statusCode,
           duration,
           errorBody,

@@ -1,10 +1,12 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 import { getSharepointConnectorGroupExternalId } from '../unique-api/unique-groups/unique-groups.utils';
+import { concealLogs, smear } from '../utils/logging.util';
 import {
   GroupDistinctId,
   SharePointGroupsMap,
@@ -38,11 +40,12 @@ export class SyncSharepointGroupsToUniqueCommand {
   public constructor(
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly graphApiService: GraphApiService,
+    private readonly configService: ConfigService,
   ) {}
 
   public async run(input: Input): Promise<Output> {
     const { siteId, sharePoint, unique } = input;
-    const logPrefix = `[SiteId: ${siteId}]`;
+    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
     const siteName = await this.graphApiService.getSiteName(siteId);
     const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 

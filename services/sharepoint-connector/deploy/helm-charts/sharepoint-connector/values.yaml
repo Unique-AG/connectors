@@ -5,6 +5,7 @@ connector:
         reloader.stakater.com/auto: "true"
   env:
     LOG_LEVEL: info
+    LOGS_DIAGNOSTICS_DATA_POLICY: conceal
     MAX_FILE_SIZE_BYTES: "209715200"
     MAX_HEAP_MB: 1920
     NODE_ENV: production

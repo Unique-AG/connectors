@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   chunk,
   filter,
@@ -26,6 +27,7 @@ import {
   SharepointRestClientService,
   SiteGroupMembership,
 } from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
+import { concealLogs, smear } from '../utils/logging.util';
 import type {
   GroupDistinctId,
   GroupMembership,
@@ -48,6 +50,7 @@ export class FetchGroupsWithMembershipsQuery {
   public constructor(
     private readonly graphApiService: GraphApiService,
     private readonly sharepointRestClientService: SharepointRestClientService,
+    private readonly configService: ConfigService,
   ) {}
 
   // For given list of group permissions from files/lists, fetch all the present sharepoint group
@@ -65,7 +68,7 @@ export class FetchGroupsWithMembershipsQuery {
     siteId: string,
     groupPermissions: GroupMembership[],
   ): Promise<SharePointGroupsMap> {
-    const logPrefix = `[SiteId: ${siteId}]`;
+    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
     const uniqueGroupPermissions = uniqueBy(groupPermissions, groupDistinctId);
 
     this.logger.log(
