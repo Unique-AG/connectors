@@ -27,17 +27,16 @@ export class LLMError extends Error {
 
 @Injectable()
 export class LLMService {
-  public readonly client: OpenAI;
+  public readonly rawClient: OpenAI;
+  public readonly observedClient: OpenAI;
   public readonly voyageClient: VoyageAIClient;
 
   public constructor(configService: ConfigService<AppConfig, true>) {
-    const client = observeOpenAI(
-      new OpenAI({
-        apiKey: configService.get(AppSettings.LITELLM_API_KEY),
-        baseURL: configService.get(AppSettings.LITELLM_BASE_URL),
-      }),
-    );
-    this.client = client;
+    this.rawClient = new OpenAI({
+      apiKey: configService.get(AppSettings.LITELLM_API_KEY),
+      baseURL: configService.get(AppSettings.LITELLM_BASE_URL),
+    });
+    this.observedClient = observeOpenAI(this.rawClient);
     this.voyageClient = new VoyageAIClient({
       apiKey: configService.get(AppSettings.VOYAGE_API_KEY),
     });
@@ -101,7 +100,7 @@ export class LLMService {
       let output: unknown;
       // If the generation fails, set the cost to 0, as we don't have to pay for it.
       try {
-        const response = await this.client.chat.completions.create(inputArgs);
+        const response = await this.rawClient.chat.completions.create(inputArgs);
 
         output = parseCompletionOutput(response);
         const usageDetails = parseUsageDetailsFromResponse(response);

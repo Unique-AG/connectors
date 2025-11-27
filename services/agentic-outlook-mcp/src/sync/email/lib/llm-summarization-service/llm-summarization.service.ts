@@ -1,13 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { Injectable, Logger } from '@nestjs/common';
-import { compile } from 'handlebars';
+import { LangfuseClient } from '@langfuse/client';
+import { observeOpenAI } from '@langfuse/openai';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { serializeError } from 'serialize-error-cjs';
 import { getFirstTextFromResponse } from '../../../../llm';
+import { LangfusePromptService } from '../../../../llm/langfuse-prompt.service';
 import { LLMService } from '../../../../llm/llm.service';
 import { normalizeError } from '../../../../utils/normalize-error';
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = 'openai-gpt-oss-120b';
+const PROMPT_TEMPLATE_NAME = 'email-summarization';
 
 export interface SummarizationOutput {
   summarizedBody: string;
@@ -24,20 +27,33 @@ export class SummarizationError extends Error {
 }
 
 @Injectable()
-export class LLMSummarizationService {
+export class LLMSummarizationService implements OnModuleInit {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly llmService: LLMService) {}
+  public constructor(
+    private readonly llmService: LLMService,
+    private readonly langfuse: LangfuseClient,
+    private readonly promptService: LangfusePromptService,
+  ) {}
+
+  public async onModuleInit(): Promise<void> {
+    await this.ensurePromptTemplates();
+  }
 
   public async summarize(text: string): Promise<SummarizationOutput> {
     try {
-      const systemPrompt = this.buildSystemPrompt();
-      const userPrompt = this.buildUserPrompt(text);
+      const prompt = await this.langfuse.prompt.get(PROMPT_TEMPLATE_NAME, { type: 'chat' });
+      const [systemMessage, userMessage] = prompt.compile({
+        EMAIL_TEXT: text,
+      });
 
-      const response = await this.llmService.client.responses.create({
+      const response = await observeOpenAI(this.llmService.rawClient, {
+        generationName: 'summarize',
+        langfusePrompt: prompt,
+      }).responses.create({
         model: MODEL,
-        instructions: systemPrompt,
-        input: userPrompt,
+        instructions: systemMessage.content,
+        input: userMessage.content,
       });
 
       const output = getFirstTextFromResponse(response);
@@ -55,29 +71,24 @@ export class LLMSummarizationService {
     }
   }
 
-  private buildSystemPrompt(): string {
-    try {
-      const template = fs.readFileSync(
-        path.join(__dirname, `${MODEL}.system-prompt.handlebars`),
-        'utf8',
-      );
-      return compile(template)({});
-    } catch (error) {
-      throw new SummarizationError('Failed to load system prompt template', error);
-    }
-  }
+  private async ensurePromptTemplates(): Promise<void> {
+    const systemPromptTemplate = fs.readFileSync(path.join(__dirname, 'system-prompt.txt'), 'utf8');
+    const userPromptTemplate = fs.readFileSync(path.join(__dirname, 'user-prompt.txt'), 'utf8');
 
-  private buildUserPrompt(text: string): string {
-    try {
-      const template = fs.readFileSync(
-        path.join(__dirname, `${MODEL}.user-prompt.handlebars`),
-        'utf8',
-      );
-      return compile(template)({
-        EMAIL_TEXT: text,
-      });
-    } catch (error) {
-      throw new SummarizationError('Failed to load user prompt template', error);
-    }
+    await this.promptService.ensurePrompt({
+      name: PROMPT_TEMPLATE_NAME,
+      type: 'chat',
+      prompt: [
+        { role: 'system', content: systemPromptTemplate },
+        { role: 'user', content: userPromptTemplate },
+      ],
+      labels: ['production', MODEL],
+      config: {
+        model: MODEL,
+        temperature: 1.0,
+        top_p: 1.0,
+        max_tokens: 10_000,
+      },
+    });
   }
 }

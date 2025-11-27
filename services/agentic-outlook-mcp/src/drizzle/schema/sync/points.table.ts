@@ -11,6 +11,7 @@ export const points = pgTable('points', {
   qdrantId: uuid().notNull().defaultRandom().unique(),
   pointType: pointType().notNull(),
   vector: jsonb().$type<number[]>().notNull(),
+  sparseVector: jsonb('sparse_vector').$type<{ indices: number[]; values: number[] } | null>(),
   index: integer().notNull(),
   
   // References

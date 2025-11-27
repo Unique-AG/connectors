@@ -1,37 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { Injectable, Logger } from '@nestjs/common';
-import { compile } from 'handlebars';
+import { LangfuseClient } from '@langfuse/client';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { serializeError } from 'serialize-error-cjs';
 import * as z from 'zod';
 import { Email } from '../../../../drizzle';
+import { LangfusePromptService } from '../../../../llm/langfuse-prompt.service';
 import { LLMService } from '../../../../llm/llm.service';
 import { normalizeError } from '../../../../utils/normalize-error';
-import { FEW_SHOT_EXAMPLES } from './few-shot.examples';
 
-const DEFAULT_KNOWN_DOMAINS = [
-  'aka.ms',
-  'microsoft.com',
-  'proofpoint.com',
-  'barracuda.com',
-  'postini.com',
-  'menlosecurity.com',
-  'mimecast.com',
-  'cofense.com',
-  'ironscales.com',
-  'trendmicro.com',
-];
+const MODEL = 'openai-gpt-oss-120b';
 
-const ORG_BANNER_PHRASES = [
-  'EXTERNAL EMAIL',
-  'This message came from outside your organization',
-  "You don't often get email from ...",
-  'Learn why this is important',
-];
-
-const LANGUAGES = ['en', 'de', 'fr'];
-
-const MODEL = 'claude-haiku-4-5-20251001';
+const PROMPT_TEMPLATE_NAME = 'email-cleanup';
 
 export const emailCleanupOutputSchema = z.object({
   clean_markdown: z.string(),
@@ -41,7 +21,6 @@ export const emailCleanupOutputSchema = z.object({
       type: z.enum(['banner', 'signature', 'legal', 'thread', 'tracking', 'other']),
       reason: z.string(),
       confidence: z.number().min(0).max(1),
-      excerpt: z.string().max(300),
     }),
   ),
   meta: z.object({
@@ -52,8 +31,14 @@ export const emailCleanupOutputSchema = z.object({
     had_thread: z.boolean(),
     kept_links_count: z.number(),
     removed_links_count: z.number(),
-    notes: z.string().optional(),
   }),
+});
+
+export const promptConfig = z.object({
+  model: z.string(),
+  temperature: z.number(),
+  top_p: z.number(),
+  max_tokens: z.number(),
 });
 
 export type EmailCleanupOutput = z.infer<typeof emailCleanupOutputSchema>;
@@ -94,24 +79,43 @@ export class EmailCleanupAPIError extends EmailCleanupError {
 }
 
 @Injectable()
-export class LLMEmailCleanupService {
+export class LLMEmailCleanupService implements OnModuleInit {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly llmService: LLMService) {}
+  public constructor(
+    private readonly llmService: LLMService,
+    private readonly langfuse: LangfuseClient,
+    private readonly promptService: LangfusePromptService,
+  ) {}
+
+  public async onModuleInit(): Promise<void> {
+    await this.ensurePromptTemplates();
+  }
 
   public async cleanupEmail(email: Email): Promise<CleanedEmail> {
     try {
-      const systemPrompt = this.buildSystemPrompt();
-      const userPrompt = this.buildUserPrompt(email);
-
-      const response = await this.llmService.generateObject({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        schema: emailCleanupOutputSchema,
+      const prompt = await this.langfuse.prompt.get(PROMPT_TEMPLATE_NAME, { type: 'chat' });
+      const compiledPrompt = prompt.compile({
+        EMAIL_SUBJECT: email.subject ?? '',
+        EMAIL_FROM: email.from?.address ?? '',
+        EMAIL_TO: email.to.map((to) => to.address).join(', '),
+        EMAIL_DATE: email.receivedAt ?? '',
+        EMAIL_PLAIN_TEXT: email.bodyText ?? '',
+        EMAIL_HTML: email.uniqueBodyHtml ?? '',
       });
+      const config = promptConfig.parse(prompt.config);
+
+      const response = await this.llmService.generateObject(
+        {
+          ...config,
+          messages: compiledPrompt,
+          schema: emailCleanupOutputSchema,
+        },
+        {
+          generationName: 'email-cleanup',
+          langfusePrompt: prompt,
+        },
+      );
 
       this.logger.debug({
         msg: 'Email cleanup successful',
@@ -139,43 +143,24 @@ export class LLMEmailCleanupService {
     }
   }
 
-  private buildSystemPrompt(): string {
-    try {
-      const template = fs.readFileSync(
-        path.join(__dirname, `${MODEL}.system-prompt.handlebars`),
-        'utf8',
-      );
-      return compile(template)({
-        KNOWN_DOMAINS: DEFAULT_KNOWN_DOMAINS.join(', '),
-        ORG_BANNER_PHRASES: ORG_BANNER_PHRASES.join(', '),
-      });
-    } catch (error) {
-      throw new EmailCleanupError('Failed to load system prompt template', error);
-    }
-  }
+  private async ensurePromptTemplates(): Promise<void> {
+    const systemPromptTemplate = fs.readFileSync(path.join(__dirname, `system-prompt.txt`), 'utf8');
+    const userPromptTemplate = fs.readFileSync(path.join(__dirname, `user-prompt.txt`), 'utf8');
 
-  private buildUserPrompt(email: Email): string {
-    try {
-      const template = fs.readFileSync(
-        path.join(__dirname, `${MODEL}.user-prompt.handlebars`),
-        'utf8',
-      );
-      return compile(template)({
-        ORG_BANNER_PHRASES: ORG_BANNER_PHRASES.join(', '),
-        KNOWN_DOMAINS: DEFAULT_KNOWN_DOMAINS.join(', '),
-        LANGUAGES: LANGUAGES.join(', '),
-        FEW_SHOT_BLOCKS: FEW_SHOT_EXAMPLES,
-        EMAIL: {
-          SUBJECT: email.subject,
-          FROM: `${email.from?.name} <${email.from?.address}>`,
-          TO: email.to.map((to) => `${to.name} <${to.address}>`).join(', '),
-          DATE: email.receivedAt,
-          PLAIN_TEXT: email.bodyText,
-          HTML: email.uniqueBodyHtml,
-        },
-      });
-    } catch (error) {
-      throw new EmailCleanupError('Failed to load user prompt template', error);
-    }
+    await this.promptService.ensurePrompt({
+      name: PROMPT_TEMPLATE_NAME,
+      type: 'chat',
+      prompt: [
+        { role: 'system', content: systemPromptTemplate },
+        { role: 'user', content: userPromptTemplate },
+      ],
+      labels: ['production', MODEL],
+      config: {
+        model: MODEL,
+        temperature: 1.0,
+        top_p: 1.0,
+        max_tokens: 30_000,
+      },
+    });
   }
 }

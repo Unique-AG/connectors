@@ -20,9 +20,11 @@ export class QdrantService {
   public async ensureCollection({
     name,
     vectors,
+    sparseVectors,
   }: {
     name: string;
     vectors: Record<string, components['schemas']['VectorParams']>;
+    sparseVectors?: Record<string, components['schemas']['SparseVectorParams']>;
   }) {
     try {
       const collection = await this.client.getCollection(name);
@@ -61,6 +63,17 @@ export class QdrantService {
         }
       }
 
+       const existingSparseVectors = collection.config.params.sparse_vectors;
+
+       if (sparseVectors) {
+       for (const [sparseVectorName, _] of Object.entries(sparseVectors)) {
+        const existingSparseVector = existingSparseVectors?.[sparseVectorName as keyof typeof existingSparseVectors];
+
+        if (!existingSparseVector || typeof existingSparseVector !== 'object') {
+          throw new Error(`Collection ${name} is missing required sparse vector: ${sparseVectorName}`);
+        }
+      }}
+
       if (collection.status !== 'green' && collection.status !== 'yellow') {
         throw new Error(`Collection ${name} is not ready`);
       }
@@ -87,6 +100,7 @@ export class QdrantService {
     // significantly accelerating the process.
     await this.client.createCollection(name, {
       vectors,
+      sparse_vectors: sparseVectors,
       // see: https://qdrant.tech/documentation/guides/multiple-partitions/#calibrate-performance
       hnsw_config: {
         payload_m: 16,

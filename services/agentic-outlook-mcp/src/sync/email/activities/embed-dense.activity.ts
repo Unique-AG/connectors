@@ -1,79 +1,51 @@
 import { Activities, Activity } from '@unique-ag/temporal';
-import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { Injectable, Logger } from '@nestjs/common';
 import { encodingForModel } from 'js-tiktoken';
-import {
-  DRIZZLE,
-  DrizzleDatabase,
-  Email,
-  emails as emailsTable,
-  Point,
-  PointInput,
-  points as pointsTable,
-} from '../../../drizzle';
+import { PointInput } from '../../../drizzle';
 import { LLMService } from '../../../llm/llm.service';
 
-export interface IEmbedActivity {
-  embed(payload: EmbedPayload): Promise<void>;
+export interface IEmbedDenseActivity {
+  embedDense(payload: EmbedDensePayload): Promise<PointInput[]>;
 }
 
-interface EmbedPayload {
+interface EmbedDensePayload {
   userProfileId: string;
   emailId: string;
+  translatedSubject: string | null;
+  translatedBody: string;
+  summarizedBody: string;
+  chunks: string[];
 }
 
-const CHUNK_SIZE = 3_200;
 const MAX_TOKENS = 32_000;
 
 @Injectable()
 @Activities()
-export class EmbedActivity {
+export class EmbedDenseActivity implements IEmbedDenseActivity {
   private readonly logger = new Logger(this.constructor.name);
-  
-  public constructor(
-    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    private readonly llmService: LLMService,
-  ) {}
+
+  public constructor(private readonly llmService: LLMService) {}
 
   @Activity()
-  public async embed({ userProfileId, emailId }: EmbedPayload) {
-    const email = await this.db.query.emails.findFirst({
-      where: and(eq(emailsTable.id, emailId), eq(emailsTable.userProfileId, userProfileId)),
-      with: {
-        points: true,
-      },
-    });
-
-    if (!email) {
-      this.logger.warn('Email not found, skipping embed');
-      return;
-    }
-
-    if (email.points.length > 0) {
-      this.logger.warn('Email already has vectors, skipping embed');
-      return;
-    }
-
-    if (!email.processedBody) throw new Error('Email processed body is missing');
-    const chunks = await this.createChunks(email.processedBody);
-    const vectors = await this.createVectors(email, chunks);
+  public async embedDense({
+    userProfileId,
+    emailId,
+    translatedSubject,
+    translatedBody,
+    summarizedBody,
+    chunks,
+  }: EmbedDensePayload): Promise<PointInput[]> {
+    const pointInputs = await this.createVectors(
+      { id: emailId, userProfileId, translatedSubject, translatedBody, summarizedBody },
+      chunks,
+    );
 
     this.logger.debug({
       msg: 'Generated embeddings',
-      vectorsCreated: vectors.length,
-    });
-  }
-
-  private async createChunks(body: string): Promise<string[]> {
-    if (body.length < 5000) return [body];
-
-    const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: CHUNK_SIZE,
-      chunkOverlap: 0,
+      vectorsCreated: pointInputs.length,
     });
 
-    return splitter.splitText(body);
+    return pointInputs;
   }
 
   private countTokens(text: string): number {
@@ -83,9 +55,15 @@ export class EmbedActivity {
   }
 
   private async createVectors(
-    email: Email,
+    email: {
+      id: string;
+      userProfileId: string;
+      translatedSubject: string | null;
+      translatedBody: string;
+      summarizedBody: string;
+    },
     chunks: string[],
-  ): Promise<Point[]> {
+  ): Promise<PointInput[]> {
     const pointInputs: PointInput[] = [];
     const documents = [];
 
@@ -95,7 +73,7 @@ export class EmbedActivity {
     // 1. Either the summarized body or the full email body with the subject
     // 2. If we chunked the email, we will ingest one point per chunk.
     if (email.summarizedBody) {
-      documents.push([`Subject: ${email.subject}\n\nSummary: ${email.summarizedBody}`]);
+      documents.push([`Subject: ${email.translatedSubject}\n\nSummary: ${email.summarizedBody}`]);
       pointInputs.push({
         emailId: email.id,
         pointType: 'summary',
@@ -103,7 +81,7 @@ export class EmbedActivity {
         index: 0,
       });
     } else {
-      const content = `Subject: ${email.subject}\n\nBody: ${email.processedBody}`;
+      const content = `Subject: ${email.translatedSubject}\n\nBody: ${email.translatedBody}`;
       if (this.countTokens(content) >= MAX_TOKENS - 50)
         throw new Error('Processed body is too long. Should have summarized');
       documents.push([content]);
@@ -157,6 +135,6 @@ export class EmbedActivity {
       }
     }
 
-    return this.db.insert(pointsTable).values(pointInputs).returning();
+    return pointInputs;
   }
 }

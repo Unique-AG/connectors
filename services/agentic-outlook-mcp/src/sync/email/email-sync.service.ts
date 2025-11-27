@@ -37,7 +37,6 @@ export interface DeletedItem {
 @Injectable()
 export class EmailSyncService {
   private readonly logger = new Logger(EmailSyncService.name);
-  private readonly PAGE_SIZE = 100;
   private readonly SYNC_DEBOUNCE_MS = 1000;
   private readonly SELECT_FIELDS = [
     'id',
@@ -247,9 +246,17 @@ export class EmailSyncService {
   ): Promise<string> {
     let url: string;
 
+    this.logger.debug({
+      msg: 'Starting delta sync...',
+      folderId: folder.id,
+      folderName: folder.name,
+      userProfileId: userProfileId.toString(),
+      syncToken: folder.syncToken,
+    });
+
     url = folder.syncToken
       ? folder.syncToken
-      : `/me/mailFolders/${folder.folderId}/messages/delta?$top=${this.PAGE_SIZE}&$select=${this.SELECT_FIELDS.join(',')}&$expand=attachments`;
+      : `/me/mailFolders/${folder.folderId}/messages/delta?$select=${this.SELECT_FIELDS.join(',')}&$expand=attachments`;
 
     const isInitialSync = !folder.syncToken;
     let deltaLink: string | undefined;
@@ -301,11 +308,24 @@ export class EmailSyncService {
       // Check for next page or delta link
       if (response['@odata.nextLink']) {
         url = response['@odata.nextLink'];
+        this.logger.debug({
+          msg: 'There are more pages to sync',
+          nextPageUrl: url,
+          totalEmailsProcessed: `${totalEmailsProcessed}`,
+        });
       } else if (response['@odata.deltaLink']) {
         deltaLink = response['@odata.deltaLink'];
         hasMorePages = false;
+        this.logger.debug({
+          msg: 'No more pages to sync. Found delta link.',
+          totalEmailsProcessed: `${totalEmailsProcessed}`,
+        });
       } else {
         hasMorePages = false;
+        this.logger.debug({
+          msg: 'No more pages to sync. No delta link found. Stopping sync.',
+          totalEmailsProcessed: `${totalEmailsProcessed}`,
+        });
       }
 
       // Log progress for initial sync
