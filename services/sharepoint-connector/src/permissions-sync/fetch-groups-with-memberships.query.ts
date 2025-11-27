@@ -27,7 +27,7 @@ import {
   SharepointRestClientService,
   SiteGroupMembership,
 } from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
-import { concealLogs, smear } from '../utils/logging.util';
+import { concealLogs, redact, smear } from '../utils/logging.util';
 import type {
   GroupDistinctId,
   GroupMembership,
@@ -46,12 +46,15 @@ import {
 @Injectable()
 export class FetchGroupsWithMembershipsQuery {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly graphApiService: GraphApiService,
     private readonly sharepointRestClientService: SharepointRestClientService,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    this.shouldConcealLogs = concealLogs(this.configService);
+  }
 
   // For given list of group permissions from files/lists, fetch all the present sharepoint group
   // members from SharePoint and Graph APIs. Result is a map from GroupDistinctId to
@@ -229,13 +232,15 @@ export class FetchGroupsWithMembershipsQuery {
 
         if (error.statusCode === 404) {
           this.logger.warn(
-            `Group ${group.id} not found (404) - likely deleted from Entra ID but still ` +
+            `Group ${this.shouldConcealLogs ? redact(group.id) : group.id} not found (404) - likely deleted from Entra ID but still ` +
               `referenced in SharePoint permissions. Treating as empty membership.`,
           );
           return [];
         }
 
-        this.logger.error(`Failed to fetch memberships for group ${group.id}: ${error.message}`);
+        this.logger.error(
+          `Failed to fetch memberships for group ${this.shouldConcealLogs ? redact(group.id) : group.id}: ${error.message}`,
+        );
         throw error;
       });
       groupMembershipsMappings.push(...zip(chunkIds, chunkItemPermissions));
