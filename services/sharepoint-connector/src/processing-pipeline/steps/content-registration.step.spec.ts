@@ -44,7 +44,12 @@ describe('ContentRegistrationStep', () => {
     mimeType: 'application/pdf',
     scopeId: 'scope-1',
     fileStatus: 'new',
-    currentUserId: 'user-1',
+    syncContext: {
+      serviceUserId: 'user-1',
+      rootScopeId: 'root-scope-1',
+      rootPath: '/Root',
+      siteId: 'site',
+    },
     pipelineItem: {
       itemType: 'listItem',
       item: createMockListItem(),

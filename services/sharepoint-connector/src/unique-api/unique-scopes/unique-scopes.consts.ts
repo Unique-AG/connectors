@@ -95,6 +95,9 @@ export interface PaginatedScopeQueryInput {
   skip: number;
   take: number;
   where: {
+    id?: {
+      equals: string;
+    };
     name?: {
       equals: string;
     };

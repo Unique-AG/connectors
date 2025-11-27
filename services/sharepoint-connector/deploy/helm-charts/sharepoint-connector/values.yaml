@@ -118,7 +118,7 @@ connectorConfig:
   unique:
     # -- communication mode for the Unique Services
     # possible values: cluster_local, external
-    # cluster_local: comunicates using in-cluster URLs and requires no authentication
+    # cluster_local: communicates using in-cluster URLs and requires serviceExtraHeaders with x-company-id and x-user-id
     # external: communicates using external URLs and requires authentication via Zitadel
     authMode: cluster_local
     # -- base URL for the ingestion service
@@ -129,35 +129,37 @@ connectorConfig:
     # example: https://api.unique.app/scope-management
     # example: http://node-scope-management.finance-gpt:8094
     scopeManagementServiceBaseUrl: unset_default_value
-    # flat: sync all files to a single root scope/folder
-    # recursive: maintain the folder hierarchy
+    # -- ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy (path-based ingestion)
+    # possible values: flat, recursive
     ingestionMode: recursive
-    # -- name of the root scope/folder in the knowledge base where SharePoint content should be
-    # synced (for recursive mode). It will be created by the connector. If this scope name already
-    # exists and the service-user does not have read+write access to it it will fail.
-    # example: SharePoint Content
-    rootScopeName: null
-    # -- scope id of the target scope for flat ingestion mode
+    # -- Scope ID to be used as root for ingestion. Required for both flat and recursive modes.
     # example: scope_bu4gokr0atzj0kfiuaaaaaaa
-    scopeId: null # null if not using scope based ingestion
+    scopeId: unset_default_value
     # -- Maximum number of files to ingest per site in a single run.
     # If the number of new + updated files for a site exceeds this limit, the sync for that site will fail.
     maxIngestedFiles: 1000
     # -- Whether to store content internally in Unique or not.
+    # possible values: enabled, disabled
     storeInternally: disabled
+    # -- Number of Unique API requests allowed per minute
     apiRateLimitPerMinute: 100
     # -- Object containing extra HTTP headers for Unique API requests (GraphQL and REST)
-    # Used for service-to-service authentication when using internal cluster URLs
-    serviceExtraHeaders: {}
-      # x-company-id: 1234567890
-      # x-user-id: 1234567890
+    # Required when authMode is cluster_local. Must contain x-company-id and x-user-id headers.
+    # example: {"x-company-id": "1234567890", "x-user-id": "1234567890"}
+    serviceExtraHeaders:
+      x-company-id: unset_default_value
+      x-user-id: unset_default_value
+    # -- Zitadel authentication configuration (required when authMode is external)
     zitadel:
+      # -- Zitadel client ID
       clientId: unset_default_value
-      # clientSecret is presented from a secret, see connector.extraEnvSecrets
+      # -- Zitadel OAuth token URL
+      # example: https://idp.unique.app/oauth/v2/token
       oauthTokenUrl: unset_default_value
-      # -- project id for the zitadel project
+      # -- Zitadel project ID
       # example: 225317577440629999
       projectId: unset_default_value
+      # clientSecret is loaded from a secret, see connector.envVars
 
   processing:
     # -- mode of synchronization from SharePoint to Unique.

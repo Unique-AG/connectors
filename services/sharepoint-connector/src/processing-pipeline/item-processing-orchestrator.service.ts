@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
 @Injectable()
@@ -15,7 +16,7 @@ export class ItemProcessingOrchestratorService {
   ) {}
 
   public async processItems(
-    siteId: string,
+    syncContext: SharepointSyncContext,
     newItems: SharepointContentItem[],
     updatedItems: SharepointContentItem[],
     getScopeIdForItem: (itemId: string) => string,
@@ -24,26 +25,26 @@ export class ItemProcessingOrchestratorService {
     const limit = pLimit(concurrency);
 
     if (newItems.length === 0 && updatedItems.length === 0) {
-      this.logger.log(`No items to process for site ${siteId}`);
+      this.logger.log(`No items to process for site ${syncContext.siteId}`);
       return;
     }
 
     this.logger.log(
-      `Processing ${newItems.length + updatedItems.length} items for site ${siteId} ` +
+      `Processing ${newItems.length + updatedItems.length} items for site ${syncContext.siteId} ` +
         `(${newItems.length} new, ${updatedItems.length} updated)`,
     );
 
     const newItemsPromises = newItems.map((item) =>
       limit(async () => {
         const scopeId = getScopeIdForItem(item.item.id);
-        await this.processingPipelineService.processItem(item, scopeId, 'new');
+        await this.processingPipelineService.processItem(item, scopeId, 'new', syncContext);
       }),
     );
 
     const updatedItemsPromises = updatedItems.map((item) =>
       limit(async () => {
         const scopeId = getScopeIdForItem(item.item.id);
-        await this.processingPipelineService.processItem(item, scopeId, 'updated');
+        await this.processingPipelineService.processItem(item, scopeId, 'updated', syncContext);
       }),
     );
 
@@ -51,7 +52,9 @@ export class ItemProcessingOrchestratorService {
 
     const rejected = results.filter((result) => result.status === 'rejected');
     if (rejected.length > 0) {
-      this.logger.warn(`Completed processing with ${rejected.length} failures for site ${siteId}`);
+      this.logger.warn(
+        `Completed processing with ${rejected.length} failures for site ${syncContext.siteId}`,
+      );
     }
   }
 }

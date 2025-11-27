@@ -83,23 +83,20 @@ function getRelativeUniqueParentPathFromUrl(url: string): string {
   return '';
 }
 
-export function getUniquePathFromItem(item: AnySharepointItem, rootScopeName: string): string {
-  assert.ok(rootScopeName, 'rootScopeName cannot be empty');
+export function getUniquePathFromItem(item: AnySharepointItem, rootPath: string): string {
+  assert.ok(rootPath, 'rootPath cannot be empty');
   const fileUrl = extractFileUrl(item);
   const uniquePath = getRelativeUniquePathFromUrl(fileUrl);
 
-  return `/${rootScopeName}${uniquePath}`;
+  return `/${normalizeSlashes(rootPath)}${uniquePath}`;
 }
 
-export function getUniqueParentPathFromItem(
-  item: AnySharepointItem,
-  rootScopeName: string,
-): string {
-  assert.ok(rootScopeName, 'rootScopeName cannot be empty');
+export function getUniqueParentPathFromItem(item: AnySharepointItem, rootPath: string): string {
+  assert.ok(rootPath, 'rootPath cannot be empty');
   const fileUrl = extractFileUrl(item);
   const uniqueParentPath = getRelativeUniqueParentPathFromUrl(fileUrl);
 
-  return `/${rootScopeName}${uniqueParentPath}`;
+  return `/${normalizeSlashes(rootPath)}${uniqueParentPath}`;
 }
 
 function extractFileUrl(item: AnySharepointItem): string {

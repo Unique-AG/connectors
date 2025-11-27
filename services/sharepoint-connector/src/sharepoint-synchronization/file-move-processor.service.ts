@@ -6,6 +6,7 @@ import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.ty
 import { normalizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { ScopeManagementService } from './scope-management.service';
+import type { SharepointSyncContext } from './types';
 
 interface FileMoveData {
   contentId: string; // ingested file id
@@ -26,11 +27,12 @@ export class FileMoveProcessor {
    * Processes files that have been moved to new locations in SharePoint
    */
   public async processFileMoves(
-    siteId: string,
     movedFileKeys: string[],
     sharepointItems: SharepointContentItem[],
     scopes: ScopeWithPath[] | null,
+    context: SharepointSyncContext,
   ): Promise<void> {
+    const { siteId } = context;
     const logPrefix = `[SiteId: ${siteId}]`;
     const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId);
     let ingestedFiles: UniqueFile[] = [];
@@ -47,7 +49,7 @@ export class FileMoveProcessor {
     }
 
     // Prepare move data with new scopeIds and URLs
-    const moveData = this.prepareFileMoveData(ingestedFiles, sharepointItems, siteId, scopes);
+    const moveData = this.prepareFileMoveData(ingestedFiles, sharepointItems, scopes, context);
 
     this.logger.log(`${logPrefix} Prepared ${moveData.length} file move operations`);
 
@@ -80,9 +82,10 @@ export class FileMoveProcessor {
   private prepareFileMoveData(
     ingestedFiles: Array<{ id: string; key: string; ownerId: string }>,
     sharepointItems: SharepointContentItem[],
-    siteId: string,
     scopes: ScopeWithPath[] | null,
+    context: SharepointSyncContext,
   ): FileMoveData[] {
+    const { siteId } = context;
     const logPrefix = `[SiteId: ${siteId}]`;
     const filesToMove: FileMoveData[] = [];
 
@@ -100,7 +103,11 @@ export class FileMoveProcessor {
       }
 
       // Get the new scopeId for the new location
-      const newOwnerId = this.scopeManagementService.determineScopeForItem(sharepointItem, scopes);
+      const newOwnerId = this.scopeManagementService.determineScopeForItem(
+        sharepointItem,
+        scopes,
+        context,
+      );
       if (!newOwnerId) {
         this.logger.warn(
           `${logPrefix} Could not determine scope for moved file with key: ${ingestedFile.key}`,

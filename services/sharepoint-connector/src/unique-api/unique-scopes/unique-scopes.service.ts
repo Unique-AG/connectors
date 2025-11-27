@@ -98,12 +98,7 @@ export class UniqueScopesService {
     );
   }
 
-  // TODO: Remove this method once we refer to root scope by its ID in the config.
-  // Getting the root scope this way is temporary. This wil break if we will have deeper paths for
-  // the root ingestion scope. We plan to refer to root scope by its ID in the config. Once we do
-  // that, we can remove this method. If we decide to refer to root scope by path, we have to double
-  // check how this method should work.
-  public async getRootScopeByName(name: string): Promise<Scope | null> {
+  public async getScopeById(id: string): Promise<Scope | null> {
     const result = await this.scopeManagementClient.get(
       async (client) =>
         await client.request<PaginatedScopeQueryResult, PaginatedScopeQueryInput>(
@@ -112,8 +107,7 @@ export class UniqueScopesService {
             skip: 0,
             take: 1,
             where: {
-              name: { equals: name },
-              parentId: null,
+              id: { equals: id },
             },
           },
         ),

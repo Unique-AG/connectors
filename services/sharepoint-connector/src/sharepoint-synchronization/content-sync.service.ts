@@ -17,6 +17,7 @@ import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
+import type { SharepointSyncContext } from './types';
 
 @Injectable()
 export class ContentSyncService {
@@ -32,10 +33,11 @@ export class ContentSyncService {
   ) {}
 
   public async syncContentForSite(
-    siteId: string,
     items: SharepointContentItem[],
     scopes: ScopeWithPath[] | null,
+    context: SharepointSyncContext,
   ): Promise<void> {
+    const { siteId } = context;
     const logPrefix = `[SiteId: ${siteId}] `;
     const processStartTime = Date.now();
 
@@ -52,7 +54,7 @@ export class ContentSyncService {
 
     // 2. Handle moved files (update scopes)
     if (diffResult.movedFiles.length > 0) {
-      await this.fileMoveProcessor.processFileMoves(siteId, diffResult.movedFiles, items, scopes);
+      await this.fileMoveProcessor.processFileMoves(diffResult.movedFiles, items, scopes, context);
     }
 
     // 3. Process new/updated files
@@ -76,10 +78,8 @@ export class ContentSyncService {
     const newItems = items.filter((item) => newFileKeys.has(item.item.id));
     const updatedItems = items.filter((item) => updatedFileKeys.has(item.item.id));
 
-    const configuredScopeId = this.configService.get('unique.scopeId', { infer: true });
-
     const getScopeIdForItem = (itemId: string): string => {
-      const scopeId = configuredScopeId ?? ''; // if scopes is empty and we got here it means we are in flat mode and scopeId is required
+      const scopeId = context.rootScopeId;
 
       if (!scopes || scopes.length === 0) {
         return scopeId;
@@ -92,10 +92,10 @@ export class ContentSyncService {
         );
         return scopeId;
       }
-      return this.scopeManagementService.determineScopeForItem(item, scopes) || scopeId;
+      return this.scopeManagementService.determineScopeForItem(item, scopes, context) || scopeId;
     };
 
-    await this.orchestrator.processItems(siteId, newItems, updatedItems, getScopeIdForItem);
+    await this.orchestrator.processItems(context, newItems, updatedItems, getScopeIdForItem);
 
     this.logger.log(
       `${logPrefix} Finished processing all content operations in ${elapsedSecondsLog(processStartTime)}`,

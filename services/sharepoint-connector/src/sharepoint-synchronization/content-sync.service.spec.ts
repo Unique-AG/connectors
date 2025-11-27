@@ -9,6 +9,7 @@ import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.ty
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
+import type { SharepointSyncContext } from './types';
 
 describe('ContentSyncService', () => {
   let service: ContentSyncService;
@@ -92,6 +93,12 @@ describe('ContentSyncService', () => {
         },
       ] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1'],
@@ -107,7 +114,7 @@ describe('ContentSyncService', () => {
         return null;
       });
 
-      await expect(service.syncContentForSite(siteId, items, scopes)).rejects.toThrow(
+      await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
         /Too many files to ingest: 2. Limit is 1. Aborting sync./,
       );
     });
@@ -125,6 +132,12 @@ describe('ContentSyncService', () => {
         },
       ] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1'],
@@ -143,7 +156,7 @@ describe('ContentSyncService', () => {
         return null;
       });
 
-      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
     it('should not throw an error if the limit is not set', async () => {
@@ -159,6 +172,12 @@ describe('ContentSyncService', () => {
         },
       ] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1'],
@@ -177,13 +196,19 @@ describe('ContentSyncService', () => {
         return null;
       });
 
-      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
     it('should not throw an error when no files need to be ingested', async () => {
       const siteId = 'site-id';
       const items = [] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: [],
@@ -209,7 +234,7 @@ describe('ContentSyncService', () => {
         return null;
       });
 
-      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
     it('should not throw an error when total files to ingest equals the limit', async () => {
@@ -225,6 +250,12 @@ describe('ContentSyncService', () => {
         },
       ] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1'],
@@ -243,7 +274,7 @@ describe('ContentSyncService', () => {
         return null;
       });
 
-      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
     it('should throw an error with correct message format when limit is exceeded', async () => {
@@ -275,6 +306,12 @@ describe('ContentSyncService', () => {
         },
       ] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1', '2'],
@@ -290,7 +327,7 @@ describe('ContentSyncService', () => {
         return null;
       });
 
-      await expect(service.syncContentForSite(siteId, items, scopes)).rejects.toThrow(
+      await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
         '[SiteId: test-site-123]  Too many files to ingest: 3. Limit is 2. Aborting sync.',
       );
     });
@@ -316,6 +353,12 @@ describe('ContentSyncService', () => {
         },
       ] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: ['1', '2'],
@@ -334,7 +377,7 @@ describe('ContentSyncService', () => {
         return null;
       });
 
-      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
     it('should handle limit validation with only updated files', async () => {
@@ -358,6 +401,12 @@ describe('ContentSyncService', () => {
         },
       ] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
         newFiles: [],
@@ -376,7 +425,7 @@ describe('ContentSyncService', () => {
         return null;
       });
 
-      await expect(service.syncContentForSite(siteId, items, scopes)).resolves.not.toThrow();
+      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
   });
 });

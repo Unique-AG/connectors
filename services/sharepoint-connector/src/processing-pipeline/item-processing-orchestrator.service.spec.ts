@@ -3,6 +3,7 @@ import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { ItemProcessingOrchestratorService } from './item-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
@@ -98,27 +99,31 @@ describe('ItemProcessingOrchestratorService', () => {
     service = unit;
   });
 
+  const mockSyncContext: SharepointSyncContext = {
+    serviceUserId: 'test-user-id',
+    rootScopeId: 'root-scope-1',
+    rootPath: '/Root',
+    siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+  };
+
   it('processes all provided files', async () => {
     const newFiles = [createMockFile('file-1', 'bd9c85ee-998f-4665-9c44-577cf5a08a66')];
     const updatedFiles = [createMockFile('file-3', 'bd9c85ee-998f-4665-9c44-577cf5a08a66')];
 
-    await service.processItems(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-      newFiles,
-      updatedFiles,
-      () => 'test-scope-id',
-    );
+    await service.processItems(mockSyncContext, newFiles, updatedFiles, () => 'test-scope-id');
 
     expect(mockPipelineService.processItem).toHaveBeenCalledTimes(2);
     expect(mockPipelineService.processItem).toHaveBeenCalledWith(
       newFiles[0],
       'test-scope-id',
       'new',
+      mockSyncContext,
     );
     expect(mockPipelineService.processItem).toHaveBeenCalledWith(
       updatedFiles[0],
       'test-scope-id',
       'updated',
+      mockSyncContext,
     );
   });
 
@@ -126,23 +131,19 @@ describe('ItemProcessingOrchestratorService', () => {
     const newFiles = [createMockFile('file-1', 'bd9c85ee-998f-4665-9c44-577cf5a08a66')];
     const updatedFiles: SharepointContentItem[] = [];
 
-    await service.processItems(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-      newFiles,
-      updatedFiles,
-      () => 'test-scope-id',
-    );
+    await service.processItems(mockSyncContext, newFiles, updatedFiles, () => 'test-scope-id');
 
     expect(mockPipelineService.processItem).toHaveBeenCalledTimes(1);
     expect(mockPipelineService.processItem).toHaveBeenCalledWith(
       newFiles[0],
       'test-scope-id',
       'new',
+      mockSyncContext,
     );
   });
 
   it('handles empty file list gracefully', async () => {
-    await service.processItems('site-1', [], [], () => 'test-scope-id');
+    await service.processItems(mockSyncContext, [], [], () => 'test-scope-id');
 
     expect(mockPipelineService.processItem).not.toHaveBeenCalled();
   });
@@ -166,12 +167,7 @@ describe('ItemProcessingOrchestratorService', () => {
       return { success: true };
     });
 
-    await service.processItems(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-      newFiles,
-      updatedFiles,
-      () => 'test-scope-id',
-    );
+    await service.processItems(mockSyncContext, newFiles, updatedFiles, () => 'test-scope-id');
 
     expect(mockPipelineService.processItem).toHaveBeenCalledTimes(10);
     expect(maxConcurrentCalls).toBeLessThanOrEqual(3);
@@ -189,18 +185,13 @@ describe('ItemProcessingOrchestratorService', () => {
       .mockRejectedValueOnce(new Error('Processing failed'))
       .mockResolvedValueOnce({ success: true });
 
-    await service.processItems(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-      newFiles,
-      updatedFiles,
-      () => 'test-scope-id',
-    );
+    await service.processItems(mockSyncContext, newFiles, updatedFiles, () => 'test-scope-id');
 
     expect(mockPipelineService.processItem).toHaveBeenCalledTimes(3);
   });
 
   it('does nothing when no files are provided', async () => {
-    await service.processItems('site-1', [], [], () => 'test-scope-id');
+    await service.processItems(mockSyncContext, [], [], () => 'test-scope-id');
 
     expect(mockPipelineService.processItem).not.toHaveBeenCalled();
   });

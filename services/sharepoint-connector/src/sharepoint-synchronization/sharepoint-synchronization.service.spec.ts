@@ -126,9 +126,11 @@ describe('SharepointSynchronizationService', () => {
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
     );
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [mockFile],
       null,
+      expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
     );
   });
 
@@ -136,9 +138,11 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [mockFile],
       null,
+      expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
     );
   });
 
@@ -175,7 +179,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
   });
 
-  it('does not release scan lock on getAllSiteItems error', async () => {
+  it('releases scan lock on getAllSiteItems error', async () => {
     mockGraphApiService.getAllSiteItems = vi
       .fn()
       .mockRejectedValueOnce(new Error('API failure'))
@@ -184,12 +188,12 @@ describe('SharepointSynchronizationService', () => {
     try {
       await service.synchronize();
     } catch {
-      // Expected to throw
+      // Expected to throw because of the error in getAllSiteItems
     }
 
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
   });
 
   it('continues content sync on error and attempts permissions sync', async () => {
@@ -223,7 +227,9 @@ describe('SharepointSynchronizationService', () => {
     await unit.synchronize();
 
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      context: expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
       sharePoint: { items: [mockFile], directories: [] },
       unique: { folders: null },
     });
@@ -335,9 +341,11 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [fileWithAllFields],
       null,
+      expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
     );
   });
 
@@ -415,9 +423,11 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [fileWithoutTimestamp],
       null,
+      expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
     );
   });
 
@@ -627,9 +637,11 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       [file1, file2, file3],
       null,
+      expect.objectContaining({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
     );
   });
 });

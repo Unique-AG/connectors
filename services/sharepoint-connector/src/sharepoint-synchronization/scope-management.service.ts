@@ -1,30 +1,76 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { prop, pullObject } from 'remeda';
-import { Config } from '../config';
+import { IngestionMode } from '../constants/ingestion.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
-import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { getUniqueParentPathFromItem } from '../utils/sharepoint.util';
+import type { BaseSyncContext, SharepointSyncContext } from './types';
 
 @Injectable()
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
 
   public constructor(
-    private readonly configService: ConfigService<Config, true>,
     private readonly uniqueScopesService: UniqueScopesService,
+    private readonly uniqueUsersService: UniqueUsersService,
   ) {}
+
+  public async initializeRootScope(
+    rootScopeId: string,
+    ingestionMode: IngestionMode,
+  ): Promise<BaseSyncContext> {
+    const userId = await this.uniqueUsersService.getCurrentUserId();
+    assert.ok(userId, 'User ID must be available');
+
+    this.logger.log(`Initializing root scope ${rootScopeId} (Mode: ${ingestionMode})`);
+
+    await this.uniqueScopesService.createScopeAccesses(rootScopeId, [
+      { type: 'MANAGE', entityId: userId, entityType: 'USER' },
+      { type: 'READ', entityId: userId, entityType: 'USER' },
+      { type: 'WRITE', entityId: userId, entityType: 'USER' },
+    ]);
+
+    const rootScope = await this.uniqueScopesService.getScopeById(rootScopeId);
+    assert.ok(rootScope, `Root scope with ID ${rootScopeId} not found`);
+
+    const pathSegments = [rootScope.name];
+    let currentScope: Scope = rootScope;
+
+    while (currentScope.parentId) {
+      // Grant READ permission first before accessing the parent scope. Otherwise we will not get it
+      // via `getScopeById` call.
+      await this.uniqueScopesService.createScopeAccesses(currentScope.parentId, [
+        { type: 'READ', entityId: userId, entityType: 'USER' },
+      ]);
+
+      const parent = await this.uniqueScopesService.getScopeById(currentScope.parentId);
+
+      assert.ok(
+        parent,
+        `Parent scope ${currentScope.parentId} not found for scope ${currentScope.id}`,
+      );
+
+      pathSegments.unshift(parent.name);
+      currentScope = parent;
+    }
+
+    const rootPath = `/${pathSegments.join('/')}`;
+    this.logger.log(`Resolved root path: ${rootPath}`);
+
+    return { serviceUserId: userId, rootScopeId: rootScopeId, rootPath };
+  }
 
   private buildItemIdToScopePathMap(
     items: SharepointContentItem[],
-    rootScopeName: string,
+    rootPath: string,
   ): Map<string, string> {
     const itemIdToScopePathMap = new Map<string, string>();
 
     for (const item of items) {
-      const scopePath = getUniqueParentPathFromItem(item, rootScopeName);
+      const scopePath = getUniqueParentPathFromItem(item, rootPath);
       itemIdToScopePathMap.set(item.item.id, scopePath);
     }
 
@@ -69,14 +115,13 @@ export class ScopeManagementService {
     });
   }
 
-  public async batchCreateScopes(items: SharepointContentItem[]): Promise<ScopeWithPath[]> {
-    const logPrefix = `[SiteId: ${items[0]?.siteId || 'unknown siteId'}]`;
-    const rootScopeName = this.configService.get('unique.rootScopeName', {
-      infer: true,
-    });
-    assert.ok(rootScopeName, 'rootScopeName must be configured');
+  public async batchCreateScopes(
+    items: SharepointContentItem[],
+    context: SharepointSyncContext,
+  ): Promise<ScopeWithPath[]> {
+    const logPrefix = `[SiteId: ${context.siteId}]`;
 
-    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
+    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
 
     if (uniqueFolderPaths.size === 0) {
@@ -108,14 +153,12 @@ export class ScopeManagementService {
   public buildItemIdToScopeIdMap(
     items: SharepointContentItem[],
     scopes: ScopeWithPath[],
+    context: SharepointSyncContext,
   ): Map<string, string> {
-    const logPrefix = `[Site: ${items[0]?.siteId || ''}]`;
+    const logPrefix = `[Site: ${context.siteId}]`;
     const itemIdToScopeIdMap = new Map<string, string>();
-    const rootScopeName = this.configService.get('unique.rootScopeName', {
-      infer: true,
-    });
 
-    if (!rootScopeName || scopes.length === 0) {
+    if (scopes.length === 0) {
       return itemIdToScopeIdMap;
     }
 
@@ -127,7 +170,7 @@ export class ScopeManagementService {
     );
 
     // Build item -> path map
-    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, rootScopeName);
+    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
 
     this.logger.debug(
       `${logPrefix} Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries`,
@@ -155,19 +198,14 @@ export class ScopeManagementService {
   public determineScopeForItem(
     item: SharepointContentItem,
     scopes: ScopeWithPath[] | null,
+    context: SharepointSyncContext,
   ): string | undefined {
     if (!scopes || scopes.length === 0) {
       // Flat mode - return the configured scope ID
-      return this.configService.get('unique.scopeId', { infer: true });
+      return context.rootScopeId;
     }
 
-    const rootScopeName = this.configService.get('unique.rootScopeName', {
-      infer: true,
-    });
-
-    assert(rootScopeName, 'rootScopeName must be configured for recursive mode');
-
-    const scopePath = getUniqueParentPathFromItem(item, rootScopeName);
+    const scopePath = getUniqueParentPathFromItem(item, context.rootPath);
 
     // Find scope with this path.
     const scope = scopes.find((scope) => scope.path === scopePath);

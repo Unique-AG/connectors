@@ -50,62 +50,50 @@ const externalConfig = z.object({
 
 // ==== Config common for both cluster_local and external authentication modes ====
 
-const baseConfig = z
-  .object({
-    ingestionMode: z
-      .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
-      .describe(
-        'Ingestion mode: FLAT ingests all files to a single root scope, RECURSIVE maintains the folder hierarchy (path-based ingestion).',
-      ),
-    scopeId: z
-      .string()
-      .optional()
-      .describe(
-        'Scope ID for FLAT ingestion mode. Required when ingestionMode is FLAT. Leave undefined for RECURSIVE mode (path-based ingestion).',
-      ),
-    rootScopeName: z
-      .string()
-      .optional()
-      .describe(
-        'Used only in case of Recursive ingestion mode. Indicates the name of the root scope/folder in the knowledge base where SharePoint content should be synced.',
-      ),
-    ingestionServiceBaseUrl: z
-      .url()
-      .describe('Base URL for Unique ingestion service')
-      .refine((url) => !url.endsWith('/'), {
-        message: 'ingestionServiceBaseUrl must not end with a trailing slash',
-      }),
-    // TODO: Right now scopeManagementServiceBaseUrl is required, but in the future it should be
-    //       optional based on the sync mode, but it lives in processing config.
-    scopeManagementServiceBaseUrl: z
-      .url()
-      .describe('Base URL for Unique scope management service')
-      .refine((url) => !url.endsWith('/'), {
-        message: 'scopeManagementServiceBaseUrl must not end with a trailing slash',
-      }),
-    apiRateLimitPerMinute: z.coerce
-      .number()
-      .int()
-      .positive()
-      .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
-      .describe('Number of Unique API requests allowed per minute'),
-    maxIngestedFiles: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        'Maximum number of files to ingest per site in a single run. If the number of new + updated files for a site exceeds this limit, the sync for that site will fail.',
-      ),
-    storeInternally: z
-      .enum([StoreInternallyMode.Enabled, StoreInternallyMode.Disabled])
-      .default(StoreInternallyMode.Disabled)
-      .describe('Whether to store content internally in Unique or not.'),
-  })
-  .refine((config) => config.ingestionMode === IngestionMode.Recursive || config.scopeId, {
-    message: 'scopeId is required for FLAT ingestion mode',
-    path: ['scopeId'],
-  });
+const baseConfig = z.object({
+  ingestionMode: z
+    .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
+    .describe(
+      'Ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy.',
+    ),
+  scopeId: z
+    .string()
+    .describe(
+      'Scope ID to be used as root for ingestion. For flat mode, all files are ingested in this scope. For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
+    ),
+  ingestionServiceBaseUrl: z
+    .url()
+    .describe('Base URL for Unique ingestion service')
+    .refine((url) => !url.endsWith('/'), {
+      message: 'ingestionServiceBaseUrl must not end with a trailing slash',
+    }),
+  // TODO: Right now scopeManagementServiceBaseUrl is required, but in the future it should be
+  //       optional based on the sync mode, but it lives in processing config.
+  scopeManagementServiceBaseUrl: z
+    .url()
+    .describe('Base URL for Unique scope management service')
+    .refine((url) => !url.endsWith('/'), {
+      message: 'scopeManagementServiceBaseUrl must not end with a trailing slash',
+    }),
+  apiRateLimitPerMinute: z.coerce
+    .number()
+    .int()
+    .positive()
+    .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
+    .describe('Number of Unique API requests allowed per minute'),
+  maxIngestedFiles: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Maximum number of files to ingest per site in a single run. If the number of new + updated files for a site exceeds this limit, the sync for that site will fail.',
+    ),
+  storeInternally: z
+    .enum([StoreInternallyMode.Enabled, StoreInternallyMode.Disabled])
+    .default(StoreInternallyMode.Disabled)
+    .describe('Whether to store content internally in Unique or not.'),
+});
 
 const UniqueConfig = z
   .discriminatedUnion('serviceAuthMode', [clusterLocalConfig, externalConfig])

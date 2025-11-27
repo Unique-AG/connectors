@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   differenceWith,
   filter,
@@ -12,19 +11,22 @@ import {
   partition,
   pipe,
 } from 'remeda';
-import { Config } from '../config';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
+import {
+  buildIngestionItemKey,
+  getUniquePathFromItem,
+  normalizeSlashes,
+} from '../utils/sharepoint.util';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
 interface Input {
-  siteId: string;
+  context: SharepointSyncContext;
   sharePoint: {
     directories: SharepointDirectoryItem[];
     permissionsMap: Record<string, Membership[]>;
@@ -42,16 +44,14 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
-    private readonly uniqueUsersService: UniqueUsersService,
     private readonly uniqueGroupsService: UniqueGroupsService,
-    private readonly configService: ConfigService<Config, true>,
   ) {}
 
   public async run(input: Input): Promise<void> {
-    const { siteId, sharePoint, unique } = input;
+    const { context, sharePoint, unique } = input;
+    const { siteId, rootPath, serviceUserId } = context;
     const logPrefix = `[Site: ${siteId}]`;
 
-    const serviceUserId = await this.uniqueUsersService.getCurrentUserId();
     const rootGroup = await this.uniqueGroupsService.getRootGroup();
     if (!rootGroup) {
       this.logger.warn(`${logPrefix} Root group not found, skipping folder permissions sync`);
@@ -60,11 +60,16 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
     const sharePointDirectoriesPathMap = this.getSharePointDirectoriesPathMap(
       sharePoint.directories,
+      rootPath,
     );
 
-    const uniqueFoldersToProcess = unique.folders;
+    const uniqueFoldersToProcess = unique.folders.filter(
+      (folder) => !this.isParentOfRootFolder(folder.path, rootPath),
+    );
+
     this.logger.log(
-      `${logPrefix} Starting folder permissions sync for ${uniqueFoldersToProcess.length} Unique folders`,
+      `${logPrefix} Starting folder permissions sync for ${uniqueFoldersToProcess.length} Unique folders ` +
+        `(filtered ${unique.folders.length - uniqueFoldersToProcess.length} parent folders)`,
     );
 
     for (const uniqueFolder of uniqueFoldersToProcess) {
@@ -88,6 +93,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
           groupsMap: unique.groupsMap,
           usersMap: unique.usersMap,
         },
+        rootPath,
       });
 
       if (isNullish(sharePointScopeAccesses)) {
@@ -109,26 +115,38 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
   private getSharePointDirectoriesPathMap(
     directories: SharepointDirectoryItem[],
+    rootPath: string,
   ): Record<string, SharepointDirectoryItem> {
-    const rootScopeName = this.configService.get('unique.rootScopeName', {
-      infer: true,
-    });
-    assert.ok(rootScopeName, 'rootScopeName must be configured');
-    return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootScopeName));
+    return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootPath));
   }
 
-  private isTopFolder(path: string): boolean {
-    const rootScopeName = this.configService.get('unique.rootScopeName', {
-      infer: true,
-    });
-    assert.ok(rootScopeName, 'rootScopeName must be configured');
+  private isParentOfRootFolder(path: string, rootPath: string): boolean {
+    // A path is a parent of the root folder if the root path starts with the path
+    // but they are not equal. We need to ensure we're comparing full path segments.
+    // Example: if rootPath is /Top/Middle/IngestionRoot, then /Top and /Top/Middle are parents
+    // but /Top/Middle/IngestionRoot is not a parent (it's the root itself)
+    // and /Top/Middle/IngestionRoot/Folder is not a parent (it's a child)
+    if (path === rootPath) {
+      return false;
+    }
+    // Check if the normalized root path starts with this path followed by a slash
+    return rootPath.startsWith(`${path}/`);
+  }
+
+  private isTopFolder(path: string, rootPath: string): boolean {
     // We're removing the root scope part, in case it has any slashes, to make it predictable.
     // Then we can check if the remaining part has at most 2 levels, because it indicates it is
     // either the site or the drive level.
     // Example: /RootScope/Site/Drive/Folder -> Site/Drive/Folder -> 3 levels -> false
     // Example: /RootScope/Site/Drive -> Site/Drive -> 2 levels -> true
-    // Top folders don't have permissions fetched from SharePoint, so we use root group permission instead.
-    return path.replace(`/${rootScopeName}/`, '').split('/').length <= 2;
+    // Top folders don't have permissions fetched from SharePoint, so we use root group permission
+    // instead.
+    // The actual root path will not have replacement working for them because of no trailing slash,
+    // so we handle it separately.
+    if (path === rootPath) {
+      return true;
+    }
+    return path.replace(`/${normalizeSlashes(rootPath)}/`, '').split('/').length <= 2;
   }
 
   private mapSharePointPermissionsToScopeAccesses(
@@ -185,11 +203,12 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
       groupsMap: UniqueGroupsMap;
       usersMap: UniqueUsersMap;
     };
+    rootPath: string;
   }): ScopeAccess[] | null {
-    const { logPrefix, sharePoint, unique } = input;
+    const { logPrefix, sharePoint, unique, rootPath } = input;
     const { folder, rootGroup } = unique;
 
-    if (this.isTopFolder(folder.path)) {
+    if (this.isTopFolder(folder.path, rootPath)) {
       this.logger.debug(
         `${logPrefix} Using root group permission for top folder at path ${folder.path}`,
       );

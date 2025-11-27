@@ -60,9 +60,9 @@ export class ContentRegistrationStep implements IPipelineStep {
     // permissions (including service user permissions) and we don't want to override them.
     if (syncMode === 'content_and_permissions' && context.fileStatus === 'new') {
       contentRegistrationRequest.fileAccess = [
-        `u:${context.currentUserId}R`,
-        `u:${context.currentUserId}W`,
-        `u:${context.currentUserId}M`,
+        `u:${context.syncContext.serviceUserId}R`,
+        `u:${context.syncContext.serviceUserId}W`,
+        `u:${context.syncContext.serviceUserId}M`,
       ];
     }
 
