@@ -31,9 +31,9 @@ export function redact(text: string, ends = 2): string {
 
 /**
  * Regex pattern to match and capture SharePoint site names in REST API paths.
- * Matches: /sites/{siteName}/
+ * Matches: /sites/{siteName}/ but excludes GUID-like patterns (36 hex chars)
  */
-const SHAREPOINT_SITE_NAME_REGEX = /\/sites\/([^/]+)\//g;
+const SHAREPOINT_SITE_NAME_REGEX = /\/sites\/((?![a-f0-9-]{36}(?:\/|$))[^/]+)\//gi;
 
 /**
  * Redacts SharePoint site names from API paths for secure logging.
@@ -42,6 +42,21 @@ const SHAREPOINT_SITE_NAME_REGEX = /\/sites\/([^/]+)\//g;
  */
 export function redactSiteNameFromPath(path: string): string {
   return path.replace(SHAREPOINT_SITE_NAME_REGEX, (_, siteName) => `/sites/${redact(siteName)}/`);
+}
+
+/**
+ * Regex pattern to match and capture SharePoint site IDs (GUIDs) in Graph API paths.
+ * Matches: /sites/{siteId} where siteId is a GUID, followed by / or end of string
+ */
+const SHAREPOINT_SITE_ID_REGEX = /\/sites\/([a-f0-9-]{36})(?=\/|$)/gi;
+
+/**
+ * Smears SharePoint site IDs from Graph API paths for secure logging.
+ * @param path The API path containing site IDs to smear
+ * @returns The path with site IDs smeared using the smear function
+ */
+export function smearSiteIdFromPath(path: string): string {
+  return path.replace(SHAREPOINT_SITE_ID_REGEX, (_, siteId) => `/sites/${smear(siteId)}`);
 }
 
 /**

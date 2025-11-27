@@ -11,6 +11,9 @@ import {
   TelemetryHandler,
 } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { Config } from '../../config';
+import { concealLogs } from '../../utils/logging.util';
 import { GraphAuthenticationService } from './middlewares/graph-authentication.service';
 import { MetricsMiddleware } from './middlewares/metrics.middleware';
 import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
@@ -19,7 +22,10 @@ import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
 export class GraphClientFactory {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly graphAuthenticationService: GraphAuthenticationService) {}
+  public constructor(
+    private readonly graphAuthenticationService: GraphAuthenticationService,
+    private readonly configService: ConfigService<Config, true>,
+  ) {}
 
   public createClient(): Client {
     const authenticationHandler = new AuthenticationHandler(this.graphAuthenticationService);
@@ -27,7 +33,8 @@ export class GraphClientFactory {
     const retryHandler = new RetryHandler(new RetryHandlerOptions());
     const redirectHandler = new RedirectHandler(new RedirectHandlerOptions());
     const telemetryHandler = new TelemetryHandler();
-    const metricsMiddleware = new MetricsMiddleware();
+    const shouldConcealLogs = concealLogs(this.configService);
+    const metricsMiddleware = new MetricsMiddleware(shouldConcealLogs);
     const httpMessageHandler = new HTTPMessageHandler();
 
     // Order is critical - httpMessageHandler must be last
