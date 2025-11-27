@@ -25,6 +25,7 @@ import type { SharepointSyncContext } from './types';
 export class ContentSyncService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly spcFileDiffEventsTotal: Counter;
+  private readonly spcFileDeletedTotal: Counter;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -37,6 +38,9 @@ export class ContentSyncService {
   ) {
     this.spcFileDiffEventsTotal = metricService.getCounter('spc_file_diff_events_total', {
       description: 'Monitor file change detection step',
+    });
+    this.spcFileDeletedTotal = metricService.getCounter('spc_file_deleted_total', {
+      description: 'Monitor file deletion operations',
     });
   }
 
@@ -178,8 +182,19 @@ export class ContentSyncService {
       try {
         await this.uniqueFilesService.deleteFile(file.id);
         totalDeleted++;
+
+        this.spcFileDeletedTotal.add(1, {
+          sp_site_id: siteId, // TODO: Smear based on logging policy
+          result: 'success',
+        });
       } catch (error) {
         const normalizedError = normalizeError(error);
+
+        this.spcFileDeletedTotal.add(1, {
+          sp_site_id: siteId, // TODO: Smear based on logging policy
+          result: 'failure',
+        });
+
         this.logger.error({
           msg: `${logPrefix} Failed to delete content ${file.key} (ID: ${file.id}): ${normalizedError.message}`,
           error,

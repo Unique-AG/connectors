@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { Counter } from '@opentelemetry/api';
+import { MetricService } from 'nestjs-otel';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
@@ -17,11 +19,17 @@ interface FileMoveData {
 @Injectable()
 export class FileMoveProcessor {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly spcFileMovedTotal: Counter;
 
   public constructor(
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly scopeManagementService: ScopeManagementService,
-  ) {}
+    metricService: MetricService,
+  ) {
+    this.spcFileMovedTotal = metricService.getCounter('spc_file_moved_total', {
+      description: 'Monitor file move operations',
+    });
+  }
 
   /**
    * Processes files that have been moved to new locations in SharePoint
@@ -59,8 +67,19 @@ export class FileMoveProcessor {
       try {
         await this.uniqueFilesService.moveFile(data.contentId, data.newOwnerId, data.newUrl);
         totalMoved++;
+
+        this.spcFileMovedTotal.add(1, {
+          sp_site_id: siteId, // TODO: Smear based on logging policy
+          result: 'success',
+        });
       } catch (error) {
         const normalizedError = normalizeError(error);
+
+        this.spcFileMovedTotal.add(1, {
+          sp_site_id: siteId, // TODO: Smear based on logging policy
+          result: 'failure',
+        });
+
         this.logger.error({
           msg: `${logPrefix} Failed to move file ${data.contentId}: ${normalizedError.message}`,
           error,
