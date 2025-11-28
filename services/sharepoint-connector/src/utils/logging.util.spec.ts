@@ -80,10 +80,15 @@ describe('logging utilities', () => {
       expect(smear('abcd')).toBe('[Smeared]');
     });
 
+    it('returns [Smeared] for strings that would star fewer than 3 characters', () => {
+      expect(smear('hello')).toBe('[Smeared]');
+      expect(smear('world')).toBe('[Smeared]');
+    });
+
     it('smeares longer strings by replacing middle characters with asterisks', () => {
-      expect(smear('hello')).toBe('*ello');
       expect(smear('password')).toBe('****word');
       expect(smear('mySecret123')).toBe('*******t123');
+      expect(smear('verylongstring')).toBe('**********ring');
     });
 
     it('works with custom leaveOver parameter', () => {
@@ -187,12 +192,12 @@ describe('logging utilities', () => {
     it('smeares entire key if format is unexpected', () => {
       expect(concealIngestionKey('not-a-standard-format')).toBe('***-*-********-**rmat');
       expect(concealIngestionKey('')).toBe('[Smeared]');
-      expect(concealIngestionKey('short')).toBe('*hort');
+      expect(concealIngestionKey('short')).toBe('[Smeared]');
     });
 
     it('handles edge cases', () => {
       expect(concealIngestionKey('/item123')).toBe('/***m123'); // Empty siteId
-      expect(concealIngestionKey('siteId/')).toBe('**teId/'); // Empty item path
+      expect(concealIngestionKey('siteId/')).toBe('[Smeared]/'); // Empty item path
       expect(concealIngestionKey('/')).toBe('[Smeared]'); // Just separator
     });
 
