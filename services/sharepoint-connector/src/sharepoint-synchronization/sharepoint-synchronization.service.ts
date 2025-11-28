@@ -18,8 +18,7 @@ export class SharepointSynchronizationService {
   private readonly logger = new Logger(this.constructor.name);
   private isScanning = false;
 
-  private readonly spcSiteSyncDurationSeconds: Histogram;
-  private readonly spcFullSyncDurationSeconds: Histogram;
+  private readonly spcSyncDurationSeconds: Histogram;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -29,33 +28,21 @@ export class SharepointSynchronizationService {
     private readonly scopeManagementService: ScopeManagementService,
     private readonly metricService: MetricService,
   ) {
-    this.spcSiteSyncDurationSeconds = this.metricService.getHistogram(
-      'spc_site_sync_duration_seconds',
-      {
-        description: 'Duration of a SharePoint site sync cycle',
-        valueType: ValueType.DOUBLE,
-        advice: {
-          explicitBucketBoundaries: [10, 30, 60, 300, 600, 1800],
-        },
+    this.spcSyncDurationSeconds = this.metricService.getHistogram('spc_sync_duration_seconds', {
+      description: 'Duration of a SharePoint site sync cycle',
+      valueType: ValueType.DOUBLE,
+      advice: {
+        explicitBucketBoundaries: [10, 30, 60, 300, 600, 1800, 3600],
       },
-    );
-    this.spcFullSyncDurationSeconds = this.metricService.getHistogram(
-      'spc_full_sync_duration_seconds',
-      {
-        description: 'Duration of a full SharePoint synchronization cycle',
-        valueType: ValueType.DOUBLE,
-        advice: {
-          explicitBucketBoundaries: [30, 60, 300, 600, 1800, 3600],
-        },
-      },
-    );
+    });
   }
 
   public async synchronize(): Promise<void> {
     const syncStartTime = Date.now();
     if (this.isScanning) {
       this.logger.warn('Skipping scan - previous scan is still in progress.');
-      this.spcFullSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+      this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+        sp_site_id: 'full_sync',
         result: 'skipped',
       });
       return;
@@ -79,9 +66,10 @@ export class SharepointSynchronizationService {
           msg: `Failed to initialize root scope: ${normalizeError(error).message}`,
           error,
         });
-        this.spcFullSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+        this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+          sp_site_id: 'full_sync',
           result: 'failure',
-          failureStep: 'root_scope_initialization',
+          failure_step: 'root_scope_initialization',
         });
         return;
       }
@@ -116,10 +104,10 @@ export class SharepointSynchronizationService {
               msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}. Skipping site.`,
               error,
             });
-            this.spcSiteSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+            this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
               sp_site_id: siteId, // TODO: Smear based on logging policy
               result: 'failure',
-              failureStep: 'scopes_creation',
+              failure_step: 'scopes_creation',
             });
             continue;
           }
@@ -132,10 +120,10 @@ export class SharepointSynchronizationService {
             msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
             error,
           });
-          this.spcSiteSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+          this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
             sp_site_id: siteId, // TODO: Smear based on logging policy
             result: 'failure',
-            failureStep: 'content_sync',
+            failure_step: 'content_sync',
           });
           continue;
         }
@@ -153,16 +141,16 @@ export class SharepointSynchronizationService {
               msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,
               error,
             });
-            this.spcSiteSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+            this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
               sp_site_id: siteId, // TODO: Smear based on logging policy
               result: 'failure',
-              failureStep: 'permissions_sync',
+              failure_step: 'permissions_sync',
             });
             continue;
           }
         }
 
-        this.spcSiteSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+        this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
           sp_site_id: siteId, // TODO: Smear based on logging policy
           result: 'success',
         });
@@ -171,7 +159,8 @@ export class SharepointSynchronizationService {
       this.logger.log(
         `SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`,
       );
-      this.spcFullSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+      this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+        sp_site_id: 'full_sync',
         result: 'success',
       });
     } catch (error) {
@@ -179,9 +168,10 @@ export class SharepointSynchronizationService {
         msg: `Failed full synchronization: ${normalizeError(error).message}`,
         error,
       });
-      this.spcFullSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+      this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+        sp_site_id: 'full_sync',
         result: 'failure',
-        failureStep: 'unknown',
+        failure_step: 'unknown',
       });
     } finally {
       this.isScanning = false;

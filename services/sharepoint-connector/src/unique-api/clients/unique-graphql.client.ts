@@ -64,7 +64,7 @@ export class UniqueGraphqlClient {
     });
 
     this.spcUniqueApiRequestDurationSeconds = metricService.getHistogram(
-      'spc_unique_api_request_duration_seconds',
+      'spc_unique_graphql_api_request_duration_seconds',
       {
         description: 'Measure latency of internal Unique API calls',
         valueType: ValueType.DOUBLE,
@@ -75,7 +75,7 @@ export class UniqueGraphqlClient {
     );
 
     this.spcUniqueApiSlowRequestsTotal = metricService.getCounter(
-      'spc_unique_api_slow_requests_total',
+      'spc_unique_graphql_api_slow_requests_total',
       {
         description: 'Total number of slow Unique API requests',
         valueType: ValueType.INT,
@@ -102,7 +102,7 @@ export class UniqueGraphqlClient {
         this.spcUniqueApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
           api_method: apiMethod,
           result: 'success',
-          http_status: '2xx',
+          http_status_class: '2xx',
         });
 
         const duration = elapsedMilliseconds(startTime);
@@ -130,7 +130,7 @@ export class UniqueGraphqlClient {
         this.spcUniqueApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
           api_method: apiMethod,
           result: 'error',
-          http_status: statusClass,
+          http_status_class: statusClass,
         });
 
         const duration = elapsedMilliseconds(startTime);

@@ -90,7 +90,7 @@ export class MetricsMiddleware implements Middleware {
         ms_tenant_id: this.msTenantId,
         api_method: apiMethod,
         result: 'success',
-        http_status: statusClass,
+        http_status_class: statusClass,
       });
 
       this.logger.debug({
@@ -145,7 +145,7 @@ export class MetricsMiddleware implements Middleware {
         ms_tenant_id: this.msTenantId,
         api_method: apiMethod,
         result: 'error',
-        http_status: statusClass,
+        http_status_class: statusClass,
       });
 
       const durationBucket = getDurationBucket(duration);

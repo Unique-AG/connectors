@@ -280,7 +280,7 @@ describe('MetricsMiddleware', () => {
       expect(mockHistogram.record).toHaveBeenCalledWith(
         expect.any(Number),
         expect.objectContaining({
-          http_status: expectedClass,
+          http_status_class: expectedClass,
         }),
       );
 
@@ -340,7 +340,7 @@ describe('MetricsMiddleware', () => {
         ms_tenant_id: 'test-tenant-id',
         api_method: 'GET:/sites/{siteId}/drives',
         result: 'success',
-        http_status: '2xx',
+        http_status_class: '2xx',
       }),
     );
   });
@@ -364,7 +364,7 @@ describe('MetricsMiddleware', () => {
         ms_tenant_id: 'test-tenant-id',
         api_method: 'GET:/drives/{driveId}/items/{itemId}',
         result: 'error',
-        http_status: '404',
+        http_status_class: '404',
       }),
     );
   });
@@ -385,7 +385,7 @@ describe('MetricsMiddleware', () => {
     expect(mockHistogram.record).toHaveBeenCalledWith(
       expect.any(Number),
       expect.objectContaining({
-        http_status: '403',
+        http_status_class: '403',
       }),
     );
   });
@@ -406,7 +406,7 @@ describe('MetricsMiddleware', () => {
     expect(mockHistogram.record).toHaveBeenCalledWith(
       expect.any(Number),
       expect.objectContaining({
-        http_status: '5xx',
+        http_status_class: '5xx',
       }),
     );
   });

@@ -59,7 +59,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
     });
 
     this.spcUniqueApiRequestDurationSeconds = metricService.getHistogram(
-      'spc_unique_api_request_duration_seconds',
+      'spc_unique_rest_api_request_duration_seconds',
       {
         description: 'Measure latency of internal Unique API calls',
         valueType: ValueType.DOUBLE,
@@ -70,7 +70,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
     );
 
     this.spcUniqueApiSlowRequestsTotal = metricService.getCounter(
-      'spc_unique_api_slow_requests_total',
+      'spc_unique_rest_api_slow_requests_total',
       {
         description: 'Total number of slow Unique API requests',
         valueType: ValueType.INT,
@@ -124,7 +124,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
         this.spcUniqueApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
           api_method: apiMethod,
           result: 'success',
-          http_status: statusClass,
+          http_status_class: statusClass,
         });
 
         const duration = elapsedMilliseconds(startTime);
@@ -152,7 +152,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
         this.spcUniqueApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
           api_method: apiMethod,
           result: 'error',
-          http_status: statusClass,
+          http_status_class: statusClass,
         });
 
         const duration = elapsedMilliseconds(startTime);
