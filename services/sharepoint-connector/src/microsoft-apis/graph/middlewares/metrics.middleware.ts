@@ -33,7 +33,7 @@ export class MetricsMiddleware implements Middleware {
     this.spcGraphApiRequestDurationSeconds = metricService.getHistogram(
       'spc_ms_graph_api_request_duration_seconds',
       {
-        description: 'Performance of all Microsoft Graph API calls',
+        description: 'Request latency for Microsoft Graph API calls',
         valueType: ValueType.DOUBLE,
         advice: {
           explicitBucketBoundaries: REQUEST_DURATION_BUCKET_BOUNDARIES,
@@ -44,7 +44,7 @@ export class MetricsMiddleware implements Middleware {
     this.spcGraphApiThrottleEventsTotal = metricService.getCounter(
       'spc_ms_graph_api_throttle_events_total',
       {
-        description: 'Total number of Graph API throttling events',
+        description: 'Number of Microsoft Graph API throttling events',
         valueType: ValueType.INT,
       },
     );
@@ -52,7 +52,7 @@ export class MetricsMiddleware implements Middleware {
     this.spcGraphApiSlowRequestsTotal = metricService.getCounter(
       'spc_ms_graph_api_slow_requests_total',
       {
-        description: 'Total number of slow Graph API requests',
+        description: 'Number of slow Microsoft Graph API requests',
         valueType: ValueType.INT,
       },
     );

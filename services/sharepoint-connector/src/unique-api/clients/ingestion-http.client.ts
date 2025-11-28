@@ -61,7 +61,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
     this.spcUniqueApiRequestDurationSeconds = metricService.getHistogram(
       'spc_unique_rest_api_request_duration_seconds',
       {
-        description: 'Measure latency of internal Unique API calls',
+        description: 'Request latency for Unique REST API calls',
         valueType: ValueType.DOUBLE,
         advice: {
           explicitBucketBoundaries: REQUEST_DURATION_BUCKET_BOUNDARIES,
@@ -72,7 +72,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
     this.spcUniqueApiSlowRequestsTotal = metricService.getCounter(
       'spc_unique_rest_api_slow_requests_total',
       {
-        description: 'Total number of slow Unique API requests',
+        description: 'Number of slow Unique REST API calls',
         valueType: ValueType.INT,
       },
     );

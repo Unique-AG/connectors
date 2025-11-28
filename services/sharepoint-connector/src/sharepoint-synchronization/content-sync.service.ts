@@ -37,11 +37,11 @@ export class ContentSyncService {
     metricService: MetricService,
   ) {
     this.spcFileDiffEventsTotal = metricService.getCounter('spc_file_diff_events_total', {
-      description: 'Monitor file change detection step',
+      description: 'Number of file change detection events (new, updated, moved, deleted)',
       valueType: ValueType.INT,
     });
     this.spcFileDeletedTotal = metricService.getCounter('spc_file_deleted_total', {
-      description: 'Monitor file deletion operations',
+      description: 'Number of file deletion operations in Unique',
       valueType: ValueType.INT,
     });
   }

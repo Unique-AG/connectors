@@ -27,7 +27,7 @@ export class FileMoveProcessor {
     metricService: MetricService,
   ) {
     this.spcFileMovedTotal = metricService.getCounter('spc_file_moved_total', {
-      description: 'Monitor file move operations',
+      description: 'Number of file move operations in Unique',
       valueType: ValueType.INT,
     });
   }

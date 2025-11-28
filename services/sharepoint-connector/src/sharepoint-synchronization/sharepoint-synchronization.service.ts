@@ -29,7 +29,7 @@ export class SharepointSynchronizationService {
     private readonly metricService: MetricService,
   ) {
     this.spcSyncDurationSeconds = this.metricService.getHistogram('spc_sync_duration_seconds', {
-      description: 'Duration of a SharePoint site sync cycle',
+      description: 'Duration of SharePoint synchronization cycles (per site and full sync)',
       valueType: ValueType.DOUBLE,
       advice: {
         explicitBucketBoundaries: [10, 30, 60, 300, 600, 1800, 3600],

@@ -47,7 +47,7 @@ export class ProcessingPipelineService {
     this.spcIngestionFileProcessedTotal = metricService.getCounter(
       'spc_ingestion_file_processed_total',
       {
-        description: 'Monitor the pipeline steps',
+        description: 'Number of files processed by ingestion pipeline steps',
         valueType: ValueType.INT,
       },
     );

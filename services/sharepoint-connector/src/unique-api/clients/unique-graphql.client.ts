@@ -66,7 +66,7 @@ export class UniqueGraphqlClient {
     this.spcUniqueApiRequestDurationSeconds = metricService.getHistogram(
       'spc_unique_graphql_api_request_duration_seconds',
       {
-        description: 'Measure latency of internal Unique API calls',
+        description: 'Request latency for Unique GraphQL API calls',
         valueType: ValueType.DOUBLE,
         advice: {
           explicitBucketBoundaries: REQUEST_DURATION_BUCKET_BOUNDARIES,
@@ -77,7 +77,7 @@ export class UniqueGraphqlClient {
     this.spcUniqueApiSlowRequestsTotal = metricService.getCounter(
       'spc_unique_graphql_api_slow_requests_total',
       {
-        description: 'Total number of slow Unique API requests',
+        description: 'Number of slow Unique GraphQL API calls',
         valueType: ValueType.INT,
       },
     );
