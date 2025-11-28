@@ -1,13 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Counter, Histogram } from '@opentelemetry/api';
+import { type Counter, type Histogram, ValueType } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
 import { MetricService } from 'nestjs-otel';
 import { isObjectType } from 'remeda';
 import { Config } from '../../config';
-import { getDurationBucket, getHttpStatusCodeClass } from '../../utils/metrics.util';
+import {
+  getDurationBucket,
+  getHttpStatusCodeClass,
+  REQUEST_DURATION_BUCKET_BOUNDARIES,
+} from '../../utils/metrics.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
 import { UniqueAuthService } from '../unique-auth.service';
@@ -63,6 +67,10 @@ export class UniqueGraphqlClient {
       'spc_unique_api_request_duration_seconds',
       {
         description: 'Measure latency of internal Unique API calls',
+        valueType: ValueType.DOUBLE,
+        advice: {
+          explicitBucketBoundaries: REQUEST_DURATION_BUCKET_BOUNDARIES,
+        },
       },
     );
 
@@ -70,6 +78,7 @@ export class UniqueGraphqlClient {
       'spc_unique_api_slow_requests_total',
       {
         description: 'Total number of slow Unique API requests',
+        valueType: ValueType.INT,
       },
     );
   }

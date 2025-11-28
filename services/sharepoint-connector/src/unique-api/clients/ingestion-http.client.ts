@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Counter, Histogram } from '@opentelemetry/api';
+import { type Counter, type Histogram, ValueType } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
 import { MetricService } from 'nestjs-otel';
 import { Client, Dispatcher, errors, interceptors } from 'undici';
@@ -9,6 +9,7 @@ import {
   createApiMethodExtractor,
   getDurationBucket,
   getHttpStatusCodeClass,
+  REQUEST_DURATION_BUCKET_BOUNDARIES,
 } from '../../utils/metrics.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
@@ -61,6 +62,10 @@ export class IngestionHttpClient implements OnModuleDestroy {
       'spc_unique_api_request_duration_seconds',
       {
         description: 'Measure latency of internal Unique API calls',
+        valueType: ValueType.DOUBLE,
+        advice: {
+          explicitBucketBoundaries: REQUEST_DURATION_BUCKET_BOUNDARIES,
+        },
       },
     );
 
@@ -68,6 +73,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
       'spc_unique_api_slow_requests_total',
       {
         description: 'Total number of slow Unique API requests',
+        valueType: ValueType.INT,
       },
     );
 

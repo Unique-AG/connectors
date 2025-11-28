@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Counter } from '@opentelemetry/api';
+import { type Counter, ValueType } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
@@ -38,9 +38,11 @@ export class ContentSyncService {
   ) {
     this.spcFileDiffEventsTotal = metricService.getCounter('spc_file_diff_events_total', {
       description: 'Monitor file change detection step',
+      valueType: ValueType.INT,
     });
     this.spcFileDeletedTotal = metricService.getCounter('spc_file_deleted_total', {
       description: 'Monitor file deletion operations',
+      valueType: ValueType.INT,
     });
   }
 

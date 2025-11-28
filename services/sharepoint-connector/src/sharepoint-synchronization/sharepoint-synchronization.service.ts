@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Histogram } from '@opentelemetry/api';
+import { type Histogram, ValueType } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
@@ -33,12 +33,20 @@ export class SharepointSynchronizationService {
       'spc_site_sync_duration_seconds',
       {
         description: 'Duration of a SharePoint site sync cycle',
+        valueType: ValueType.DOUBLE,
+        advice: {
+          explicitBucketBoundaries: [10, 30, 60, 300, 600, 1800],
+        },
       },
     );
     this.spcFullSyncDurationSeconds = this.metricService.getHistogram(
       'spc_full_sync_duration_seconds',
       {
         description: 'Duration of a full SharePoint synchronization cycle',
+        valueType: ValueType.DOUBLE,
+        advice: {
+          explicitBucketBoundaries: [30, 60, 300, 600, 1800, 3600],
+        },
       },
     );
   }

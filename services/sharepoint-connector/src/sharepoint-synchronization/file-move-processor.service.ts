@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { Counter } from '@opentelemetry/api';
+import { type Counter, ValueType } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
@@ -28,6 +28,7 @@ export class FileMoveProcessor {
   ) {
     this.spcFileMovedTotal = metricService.getCounter('spc_file_moved_total', {
       description: 'Monitor file move operations',
+      valueType: ValueType.INT,
     });
   }
 

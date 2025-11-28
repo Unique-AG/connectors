@@ -6,13 +6,14 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import type { Counter, Histogram } from '@opentelemetry/api';
+import { type Counter, type Histogram, ValueType } from '@opentelemetry/api';
 import type { MetricService } from 'nestjs-otel';
 import type { Config } from '../../../config';
 import {
   createApiMethodExtractor,
   getDurationBucket,
   getHttpStatusCodeClass,
+  REQUEST_DURATION_BUCKET_BOUNDARIES,
 } from '../../../utils/metrics.util';
 import { elapsedMilliseconds, elapsedSeconds } from '../../../utils/timing.util';
 import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.types';
@@ -30,23 +31,29 @@ export class MetricsMiddleware implements Middleware {
 
   public constructor(metricService: MetricService, configService: ConfigService<Config, true>) {
     this.spcGraphApiRequestDurationSeconds = metricService.getHistogram(
-      'spc_graph_api_request_duration_seconds',
+      'spc_ms_graph_api_request_duration_seconds',
       {
         description: 'Performance of all Microsoft Graph API calls',
+        valueType: ValueType.DOUBLE,
+        advice: {
+          explicitBucketBoundaries: REQUEST_DURATION_BUCKET_BOUNDARIES,
+        },
       },
     );
 
     this.spcGraphApiThrottleEventsTotal = metricService.getCounter(
-      'spc_graph_api_throttle_events_total',
+      'spc_ms_graph_api_throttle_events_total',
       {
         description: 'Total number of Graph API throttling events',
+        valueType: ValueType.INT,
       },
     );
 
     this.spcGraphApiSlowRequestsTotal = metricService.getCounter(
-      'spc_graph_api_slow_requests_total',
+      'spc_ms_graph_api_slow_requests_total',
       {
         description: 'Total number of slow Graph API requests',
+        valueType: ValueType.INT,
       },
     );
 

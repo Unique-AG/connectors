@@ -1,3 +1,5 @@
+export const REQUEST_DURATION_BUCKET_BOUNDARIES: number[] = [0.1, 0.5, 1, 2, 5, 10, 20];
+
 export function getDurationBucket(durationMs: number): string | null {
   if (durationMs > 10_000) {
     return '>10s';

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Counter } from '@opentelemetry/api';
+import { type Counter, ValueType } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 import { toSnakeCase } from 'remeda';
 import { Config } from '../config';
@@ -48,6 +48,7 @@ export class ProcessingPipelineService {
       'spc_ingestion_file_processed_total',
       {
         description: 'Monitor the pipeline steps',
+        valueType: ValueType.INT,
       },
     );
   }
