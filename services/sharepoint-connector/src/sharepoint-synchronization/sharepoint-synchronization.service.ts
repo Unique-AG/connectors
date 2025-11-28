@@ -84,7 +84,7 @@ export class SharepointSynchronizationService {
       for (const siteId of siteIdsToScan) {
         const siteSyncStartTime = Date.now();
         const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-        const logPrefix = `[SiteId: ${logSiteId}]`;
+        const logPrefix = `[Site: ${logSiteId}]`;
         let scopes: ScopeWithPath[] | null = null;
         const siteStartTime = Date.now();
 

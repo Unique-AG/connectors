@@ -73,7 +73,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
           metricService,
         );
       },
-      inject: [UniqueAuthService, ConfigService, BottleneckFactory],
+      inject: [UniqueAuthService, ConfigService, BottleneckFactory, MetricService],
     },
     UniqueFileIngestionService,
     UniqueFilesService,

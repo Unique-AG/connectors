@@ -59,7 +59,8 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
     const { context, sharePoint, unique } = input;
     const { siteId, serviceUserId } = context;
 
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
     this.logger.log(
       `${logPrefix} Starting permissions sync for ` +
         `${Object.keys(sharePoint.permissionsMap).length} items`,
@@ -150,13 +151,13 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
 
     if (totalPermissionsAdded > 0) {
       this.spcPermissionsSyncFileOperationsTotal.add(totalPermissionsAdded, {
-        sp_site_id: siteId,
+        sp_site_id: logSiteId,
         operation: 'added',
       });
     }
     if (totalPermissionsRemoved > 0) {
       this.spcPermissionsSyncFileOperationsTotal.add(totalPermissionsRemoved, {
-        sp_site_id: siteId,
+        sp_site_id: logSiteId,
         operation: 'removed',
       });
     }

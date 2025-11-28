@@ -51,7 +51,7 @@ export class FileMoveProcessor {
   ): Promise<void> {
     const { siteId } = context;
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[SiteId: ${logSiteId}]`;
+    const logPrefix = `[Site: ${logSiteId}]`;
     const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId);
     let ingestedFiles: UniqueFile[] = [];
 
@@ -115,7 +115,7 @@ export class FileMoveProcessor {
     context: SharepointSyncContext,
   ): FileMoveData[] {
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const filesToMove: FileMoveData[] = [];
 
     for (const ingestedFile of ingestedFiles) {

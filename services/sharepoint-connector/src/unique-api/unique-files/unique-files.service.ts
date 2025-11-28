@@ -100,7 +100,7 @@ export class UniqueFilesService {
   }
 
   public async getFilesForSite(siteId: string): Promise<UniqueFile[]> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     this.logger.log(`${logPrefix} Fetching files`);
 
     let skip = 0;

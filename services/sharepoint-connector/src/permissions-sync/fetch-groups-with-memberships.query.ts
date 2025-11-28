@@ -72,7 +72,7 @@ export class FetchGroupsWithMembershipsQuery {
     siteId: string,
     groupPermissions: GroupMembership[],
   ): Promise<SharePointGroupsMap> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const uniqueGroupPermissions = uniqueBy(groupPermissions, groupDistinctId);
 
     this.logger.log(

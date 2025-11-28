@@ -43,7 +43,7 @@ export class UniqueGroupsService {
   }
 
   public async listAllGroupsForSite(siteId: string): Promise<UniqueGroupWithMembers[]> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     this.logger.log(`${logPrefix} Requesting all groups from Unique API`);
 
     let skip = 0;

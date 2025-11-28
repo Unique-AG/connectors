@@ -59,11 +59,14 @@ export class UniqueGraphqlClient {
     const apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
       infer: true,
     });
-    this.limiter = new Bottleneck({
-      reservoir: apiRateLimitPerMinute,
-      reservoirRefreshAmount: apiRateLimitPerMinute,
-      reservoirRefreshInterval: 60_000,
-    });
+    this.limiter = this.bottleneckFactory.createLimiter(
+      {
+        reservoir: apiRateLimitPerMinute,
+        reservoirRefreshAmount: apiRateLimitPerMinute,
+        reservoirRefreshInterval: 60_000,
+      },
+      `Unique ${this.clientTarget}`,
+    );
 
     this.spcUniqueApiRequestDurationSeconds = metricService.getHistogram(
       'spc_unique_graphql_api_request_duration_seconds',
@@ -82,15 +85,6 @@ export class UniqueGraphqlClient {
         description: 'Number of slow Unique GraphQL API calls',
         valueType: ValueType.INT,
       },
-    );
-
-    this.limiter = this.bottleneckFactory.createLimiter(
-      {
-        reservoir: apiRateLimitPerMinute,
-        reservoirRefreshAmount: apiRateLimitPerMinute,
-        reservoirRefreshInterval: 60_000,
-      },
-      `Unique ${this.clientTarget}`,
     );
   }
 

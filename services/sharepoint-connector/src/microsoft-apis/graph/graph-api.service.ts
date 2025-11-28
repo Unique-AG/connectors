@@ -61,7 +61,7 @@ export class GraphApiService {
   public async getAllSiteItems(
     siteId: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
       this.getAspxPagesForSite(siteId),
       this.getAllFilesForSite(siteId),
@@ -202,7 +202,7 @@ export class GraphApiService {
   }
 
   public async getAspxPagesForSite(siteId: string): Promise<SharepointContentItem[]> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const [siteWebUrl, lists] = await Promise.all([
       this.getSiteWebUrl(siteId),
       this.getSiteLists(siteId),
@@ -235,7 +235,7 @@ export class GraphApiService {
   }
 
   public async getSiteLists(siteId: string): Promise<List[]> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
 
     try {
       const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId}/lists`, (url) =>
@@ -260,7 +260,7 @@ export class GraphApiService {
     listId: string,
     siteWebUrl: string,
   ): Promise<SharepointContentItem[]> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const aspxItems: SharepointContentItem[] = [];
 
@@ -419,7 +419,7 @@ export class GraphApiService {
   }
 
   private async getDrivesForSite(siteId: string): Promise<Drive[]> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const allDrives = await this.paginateGraphApiRequest<Drive>(
         `/sites/${siteId}/drives`,

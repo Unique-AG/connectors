@@ -62,7 +62,10 @@ export class SyncSharepointGroupsToUniqueCommand {
 
   public async run(input: Input): Promise<Output> {
     const { siteId, sharePoint, unique } = input;
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
+
     const siteName = await this.graphApiService.getSiteName(siteId);
     const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 
@@ -154,7 +157,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
     const syncStatsEntries = Object.entries(groupsSyncStats).filter(([_, count]) => count > 0);
     for (const [operation, count] of syncStatsEntries) {
-      this.spcPermissionsSyncGroupOperationsTotal.add(count, { sp_site_id: siteId, operation });
+      this.spcPermissionsSyncGroupOperationsTotal.add(count, { sp_site_id: logSiteId, operation });
     }
 
     return {

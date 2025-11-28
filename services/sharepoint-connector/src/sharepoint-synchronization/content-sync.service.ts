@@ -58,7 +58,7 @@ export class ContentSyncService {
   ): Promise<void> {
     const { siteId } = context;
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[SiteId: ${logSiteId}] `;
+    const logPrefix = `[Site: ${logSiteId}] `;
     const processStartTime = Date.now();
 
     const diffResult = await this.calculateDiffForSite(items, siteId);
@@ -168,7 +168,7 @@ export class ContentSyncService {
 
   private async deleteRemovedFiles(siteId: string, deletedFileKeys: string[]): Promise<void> {
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[SiteId: ${logSiteId}]`;
+    const logPrefix = `[Site: ${logSiteId}]`;
     let filesToDelete: UniqueFile[] = [];
     // Convert relative keys to full keys (with siteId prefix)
     const fullKeys = deletedFileKeys.map((key) => `${siteId}/${key}`);

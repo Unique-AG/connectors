@@ -70,7 +70,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId, rootPath, serviceUserId } = context;
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
 
     const rootGroup = await this.uniqueGroupsService.getRootGroup();
     if (!rootGroup) {
@@ -140,13 +142,13 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
     if (totalScopeAccessesAdded > 0) {
       this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesAdded, {
-        sp_site_id: siteId,
+        sp_site_id: logSiteId,
         operation: 'added',
       });
     }
     if (totalScopeAccessesRemoved > 0) {
       this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesRemoved, {
-        sp_site_id: siteId,
+        sp_site_id: logSiteId,
         operation: 'removed',
       });
     }

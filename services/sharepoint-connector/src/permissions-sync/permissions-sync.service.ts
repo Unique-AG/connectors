@@ -73,7 +73,8 @@ export class PermissionsSyncService {
     const { context, sharePoint, unique } = input;
     const { siteId } = context;
 
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
     const startTime = Date.now();
     let currentStep = 'permissions_fetch';
 
@@ -145,12 +146,12 @@ export class PermissionsSyncService {
       this.logger.log(`${logPrefix} Synced file permissions to Unique`);
 
       this.spcPermissionsSyncDurationSeconds.record(elapsedSeconds(startTime), {
-        sp_site_id: siteId,
+        sp_site_id: logSiteId,
         result: 'success',
       });
     } catch (error) {
       this.spcPermissionsSyncDurationSeconds.record(elapsedSeconds(startTime), {
-        sp_site_id: siteId,
+        sp_site_id: logSiteId,
         result: 'failure',
         failure_step: currentStep,
       });

@@ -129,7 +129,7 @@ export class ScopeManagementService {
     items: SharepointContentItem[],
     context: SharepointSyncContext,
   ): Promise<ScopeWithPath[]> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
 
     const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());

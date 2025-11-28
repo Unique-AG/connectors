@@ -77,7 +77,7 @@ export class ProcessingPipelineService {
     };
 
     const logSiteId = this.shouldConcealLogs ? smear(syncContext.siteId) : syncContext.siteId;
-    const logPrefix = `[SiteId: ${logSiteId}][CorrelationId: ${correlationId}]`;
+    const logPrefix = `[Site: ${logSiteId}][CorrelationId: ${correlationId}]`;
     this.logger.log(`${logPrefix} Starting processing pipeline for item: ${pipelineItem.item.id}`);
 
     for (const step of this.pipelineSteps) {
