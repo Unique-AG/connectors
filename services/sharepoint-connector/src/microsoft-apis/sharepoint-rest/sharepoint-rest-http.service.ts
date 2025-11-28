@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { chunk, identity } from 'remeda';
 import { Client, Dispatcher, interceptors } from 'undici';
 import { Config } from '../../config';
+import { redact, shouldConcealLogs } from '../../utils/logging.util';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { createLoggingInterceptor } from './logging.interceptor';
 import { createTokenRefreshInterceptor } from './token-refresh.interceptor';
@@ -15,11 +16,13 @@ const BATCH_SIZE = 20;
 export class SharepointRestHttpService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly client: Dispatcher;
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly microsoftAuthenticationService: MicrosoftAuthenticationService,
     private readonly configService: ConfigService<Config, true>,
   ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
     const sharePointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
     const httpClient = new Client(sharePointBaseUrl, {
       bodyTimeout: 60_000,
@@ -38,7 +41,7 @@ export class SharepointRestHttpService {
       createTokenRefreshInterceptor(async () =>
         this.microsoftAuthenticationService.getAccessToken('sharepoint-rest'),
       ),
-      createLoggingInterceptor(),
+      createLoggingInterceptor(this.shouldConcealLogs),
     ];
     this.client = httpClient.compose(interceptorsInCallingOrder.reverse());
   }
@@ -60,7 +63,7 @@ export class SharepointRestHttpService {
 
     assert.ok(
       200 <= statusCode && statusCode < 300,
-      `Failed to request SharePoint endpoint ${path}: ${statusCode}`,
+      `Failed to request SharePoint endpoint ${this.shouldConcealLogs ? path.replace(siteName, redact(siteName)) : path}: ${statusCode}`,
     );
 
     return body.json() as Promise<T>;
@@ -75,11 +78,9 @@ export class SharepointRestHttpService {
     const responses: T[] = [];
     const chunkedApiPaths = chunk(apiPaths, BATCH_SIZE);
 
-    // TODO: Is siteName sensitive info? If yes, we should remove that from the log here, logging
-    //       interceptor and paths of batch request.
     this.logger.debug({
       msg: 'Starting SharePoint batch request',
-      siteName,
+      siteName: this.shouldConcealLogs ? redact(siteName) : siteName,
       totalPaths: apiPaths.length,
       batchChunks: chunkedApiPaths.length,
     });
@@ -89,19 +90,23 @@ export class SharepointRestHttpService {
       const fullApiPaths = apiPathsChunk
         .map((apiPath) => (apiPath.startsWith('/') ? apiPath.slice(1) : apiPath))
         .map((apiPath) => `/sites/${siteName}/_api/web/${apiPath}`);
-
       const batchItems = fullApiPaths.map((apiPath) => this.buildBatchItem(apiPath, boundary));
+
+      const redactedApiPaths = this.shouldConcealLogs
+        ? fullApiPaths.map((path) => path.replace(siteName, redact(siteName)))
+        : fullApiPaths;
 
       this.logger.debug({
         msg: 'Executing batch chunk',
         chunkIndex: chunkIndex + 1,
         totalChunks: chunkedApiPaths.length,
         pathsInChunk: fullApiPaths.length,
-        paths: fullApiPaths,
+        paths: redactedApiPaths,
       });
 
       const requestBody = `${batchItems.join('\r\n\r\n')}\r\n--${boundary}--\r\n`;
       const path = `/sites/${siteName}/_api/$batch`;
+
       const requestStartTime = Date.now();
       const { statusCode, body, headers } = await this.client.request({
         method: 'POST',
@@ -117,12 +122,16 @@ export class SharepointRestHttpService {
       const isSuccess = 200 <= statusCode && statusCode < 300;
 
       if (!isSuccess) {
+        const redactedPath = this.shouldConcealLogs
+          ? path.replace(siteName, redact(siteName))
+          : path;
+
         const errorBody = await body.text();
         this.logger.error({
           msg: 'Failed to request SharePoint batch endpoint',
-          path,
+          path: redactedPath,
           chunkIndex: chunkIndex + 1,
-          paths: fullApiPaths,
+          paths: redactedApiPaths,
           statusCode,
           duration,
           errorBody,
@@ -152,7 +161,7 @@ export class SharepointRestHttpService {
 
           this.logger.error({
             msg: 'Non-200 response in batch item',
-            path: fullApiPaths[index],
+            path: redactedApiPaths[index],
             statusCode,
             responseCodeLine,
           });

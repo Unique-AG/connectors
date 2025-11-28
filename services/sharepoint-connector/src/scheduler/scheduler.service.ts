@@ -51,7 +51,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
 
       await this.sharepointScanner.synchronize();
 
-      this.logger.log('SharePoint scan completed');
+      this.logger.log('SharePoint scan ended');
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error(

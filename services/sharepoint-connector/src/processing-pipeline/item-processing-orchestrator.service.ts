@@ -4,16 +4,20 @@ import pLimit from 'p-limit';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
 @Injectable()
 export class ItemProcessingOrchestratorService {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly processingPipelineService: ProcessingPipelineService,
-  ) {}
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async processItems(
     syncContext: SharepointSyncContext,
@@ -23,14 +27,15 @@ export class ItemProcessingOrchestratorService {
   ): Promise<void> {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(syncContext.siteId) : syncContext.siteId}]`;
 
     if (newItems.length === 0 && updatedItems.length === 0) {
-      this.logger.log(`No items to process for site ${syncContext.siteId}`);
+      this.logger.log(`${logPrefix} No items to process`);
       return;
     }
 
     this.logger.log(
-      `Processing ${newItems.length + updatedItems.length} items for site ${syncContext.siteId} ` +
+      `${logPrefix} Processing ${newItems.length + updatedItems.length} items ` +
         `(${newItems.length} new, ${updatedItems.length} updated)`,
     );
 
@@ -52,9 +57,7 @@ export class ItemProcessingOrchestratorService {
 
     const rejected = results.filter((result) => result.status === 'rejected');
     if (rejected.length > 0) {
-      this.logger.warn(
-        `Completed processing with ${rejected.length} failures for site ${syncContext.siteId}`,
-      );
+      this.logger.warn(`${logPrefix} Completed processing with ${rejected.length} failures`);
     }
   }
 }

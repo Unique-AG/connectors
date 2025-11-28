@@ -1,22 +1,29 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { prop, pullObject } from 'remeda';
+import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
+import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import { getUniqueParentPathFromItem } from '../utils/sharepoint.util';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
 
 @Injectable()
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
-  ) {}
+    private readonly configService: ConfigService<Config, true>,
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async initializeRootScope(
     rootScopeId: string,
@@ -24,8 +31,9 @@ export class ScopeManagementService {
   ): Promise<BaseSyncContext> {
     const userId = await this.uniqueUsersService.getCurrentUserId();
     assert.ok(userId, 'User ID must be available');
+    const logPrefix = `[RootScopeId: ${rootScopeId}]`;
 
-    this.logger.log(`Initializing root scope ${rootScopeId} (Mode: ${ingestionMode})`);
+    this.logger.log(`${logPrefix} Initializing root scope (Mode: ${ingestionMode})`);
 
     await this.uniqueScopesService.createScopeAccesses(rootScopeId, [
       { type: 'MANAGE', entityId: userId, entityType: 'USER' },
@@ -58,7 +66,7 @@ export class ScopeManagementService {
     }
 
     const rootPath = `/${pathSegments.join('/')}`;
-    this.logger.log(`Resolved root path: ${rootPath}`);
+    this.logger.log(`Resolved root path: ${this.shouldConcealLogs ? redact(rootPath) : rootPath}`);
 
     return { serviceUserId: userId, rootScopeId: rootScopeId, rootPath };
   }
@@ -105,7 +113,9 @@ export class ScopeManagementService {
     const segments = trimmedPath.split('/').filter((segment) => segment.length > 0);
 
     if (segments.length === 0) {
-      this.logger.warn(`Path has no valid segments: ${path}`);
+      this.logger.warn(
+        `Path has no valid segments: ${this.shouldConcealLogs ? redact(path) : path}`,
+      );
       return [];
     }
 
@@ -119,7 +129,7 @@ export class ScopeManagementService {
     items: SharepointContentItem[],
     context: SharepointSyncContext,
   ): Promise<ScopeWithPath[]> {
-    const logPrefix = `[SiteId: ${context.siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
 
     const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
@@ -155,7 +165,7 @@ export class ScopeManagementService {
     scopes: ScopeWithPath[],
     context: SharepointSyncContext,
   ): Map<string, string> {
-    const logPrefix = `[Site: ${context.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
     const itemIdToScopeIdMap = new Map<string, string>();
 
     if (scopes.length === 0) {
@@ -181,7 +191,9 @@ export class ScopeManagementService {
       if (scopeId) {
         itemIdToScopeIdMap.set(itemId, scopeId);
       } else {
-        this.logger.warn(`${logPrefix} Scope not found in cache for path: ${scopePath}`);
+        this.logger.warn(
+          `${logPrefix} Scope not found in cache for path: ${this.shouldConcealLogs ? redact(scopePath) : scopePath}`,
+        );
       }
     }
 
@@ -210,7 +222,9 @@ export class ScopeManagementService {
     // Find scope with this path.
     const scope = scopes.find((scope) => scope.path === scopePath);
     if (!scope?.id) {
-      this.logger.warn(`Scope not found for path: ${scopePath}`);
+      this.logger.warn(
+        `Scope not found for path: ${this.shouldConcealLogs ? redact(scopePath) : scopePath}`,
+      );
       return undefined;
     }
     return scope.id;

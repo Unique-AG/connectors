@@ -1,10 +1,13 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
+import { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 import { getSharepointConnectorGroupExternalId } from '../unique-api/unique-groups/unique-groups.utils';
+import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import {
   GroupDistinctId,
   SharePointGroupsMap,
@@ -34,15 +37,19 @@ interface Output {
 @Injectable()
 export class SyncSharepointGroupsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly graphApiService: GraphApiService,
-  ) {}
+    private readonly configService: ConfigService<Config, true>,
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async run(input: Input): Promise<Output> {
     const { siteId, sharePoint, unique } = input;
-    const logPrefix = `[SiteId: ${siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const siteName = await this.graphApiService.getSiteName(siteId);
     const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 
@@ -60,9 +67,9 @@ export class SyncSharepointGroupsToUniqueCommand {
     };
 
     for (const sharePointGroup of sharePointGroups) {
-      const groupLogPrefix = `[Group: ${sharePointGroup.id}]`;
+      const groupLogPrefix = `[Group: ${this.shouldConcealLogs ? redact(sharePointGroup.id) : sharePointGroup.id}]`;
       this.logger.debug(
-        `${groupLogPrefix} Syncing sharepoint group ${sharePointGroup.displayName}`,
+        `${groupLogPrefix} Syncing sharepoint group ${this.shouldConcealLogs ? redact(sharePointGroup.displayName) : sharePointGroup.displayName}`,
       );
 
       const correspondingUniqueGroup = unique.groupsMap[sharePointGroup.id];

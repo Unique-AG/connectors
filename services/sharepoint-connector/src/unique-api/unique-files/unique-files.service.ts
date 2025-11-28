@@ -1,4 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Config } from '../../config';
+import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   ADD_ACCESSES_MUTATION,
@@ -24,16 +27,21 @@ const BATCH_SIZE = 100;
 @Injectable()
 export class UniqueFilesService {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
   public constructor(
     @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
-  ) {}
+    private readonly configService: ConfigService<Config, true>,
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async moveFile(
     contentId: string,
     newOwnerId: string,
     newUrl: string,
   ): Promise<ContentUpdateMutationResult['contentUpdate']> {
-    this.logger.debug(`Moving file ${contentId} to owner ${newOwnerId}`);
+    const logPrefix = `[ContentId: ${contentId}]`;
+    this.logger.debug(`${logPrefix} Moving file to owner ${newOwnerId}`);
 
     const result = await this.ingestionClient.get(
       async (client) =>
@@ -51,7 +59,8 @@ export class UniqueFilesService {
   }
 
   public async deleteFile(contentId: string): Promise<boolean> {
-    this.logger.debug(`Deleting file ${contentId}`);
+    const logPrefix = `[ContentId: ${contentId}]`;
+    this.logger.debug(`${logPrefix} Deleting file`);
 
     const result = await this.ingestionClient.get(
       async (client) =>
@@ -100,7 +109,8 @@ export class UniqueFilesService {
   }
 
   public async getFilesForSite(siteId: string): Promise<UniqueFile[]> {
-    this.logger.log(`Fetching files for site ${siteId}`);
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    this.logger.log(`${logPrefix} Fetching files`);
 
     let skip = 0;
     const files: UniqueFile[] = [];

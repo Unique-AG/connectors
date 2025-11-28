@@ -13,6 +13,7 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/unique-groups/unique-groups.utils';
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery, PermissionsMap } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
@@ -37,6 +38,7 @@ interface Input {
 @Injectable()
 export class PermissionsSyncService {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly fetchGraphPermissionsMapQuery: FetchGraphPermissionsMapQuery,
@@ -47,12 +49,14 @@ export class PermissionsSyncService {
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async syncPermissionsForSite(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     this.logger.log(
       `${logPrefix} Starting permissions fetching for ${sharePoint.items.length} items and ` +
         `${sharePoint.directories.length} directories`,
@@ -119,7 +123,7 @@ export class PermissionsSyncService {
     siteId: string,
     permissionsMap: PermissionsMap,
   ): Promise<SharePointGroupsMap> {
-    const logPrefix = `[Site: ${siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const uniqueGroupPermissions = pipe(
       permissionsMap,
       values(),

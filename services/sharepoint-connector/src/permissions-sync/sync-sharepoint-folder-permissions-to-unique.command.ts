@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   differenceWith,
   filter,
@@ -11,12 +12,14 @@ import {
   partition,
   pipe,
 } from 'remeda';
+import { Config } from '../config';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import {
   buildIngestionItemKey,
   getUniquePathFromItem,
@@ -41,16 +44,20 @@ interface Input {
 @Injectable()
 export class SyncSharepointFolderPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueGroupsService: UniqueGroupsService,
-  ) {}
+    private readonly configService: ConfigService<Config, true>,
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId, rootPath, serviceUserId } = context;
-    const logPrefix = `[Site: ${siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
 
     const rootGroup = await this.uniqueGroupsService.getRootGroup();
     if (!rootGroup) {
@@ -210,7 +217,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
     if (this.isTopFolder(folder.path, rootPath)) {
       this.logger.debug(
-        `${logPrefix} Using root group permission for top folder at path ${folder.path}`,
+        `${logPrefix} Using root group permission for top folder at path ${
+          this.shouldConcealLogs ? redact(folder.path) : folder.path
+        }`,
       );
       return [
         {
@@ -224,7 +233,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const sharePointDirectory = sharePoint.directoriesPathMap[folder.path];
 
     if (isNullish(sharePointDirectory)) {
-      this.logger.warn(`${logPrefix} No SharePoint directory found for path ${folder.path}`);
+      this.logger.warn(
+        `${logPrefix} No SharePoint directory found for path ${this.shouldConcealLogs ? redact(folder.path) : folder.path}`,
+      );
       return null;
     }
 
@@ -232,7 +243,11 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const sharePointPermissions = sharePoint.permissionsMap[sharePointDirectoryKey];
     if (isNullish(sharePointPermissions)) {
       this.logger.warn(
-        `${logPrefix} No SharePoint permissions found for key ${sharePointDirectoryKey}`,
+        `${logPrefix} No SharePoint permissions found for key ${
+          this.shouldConcealLogs
+            ? concealIngestionKey(sharePointDirectoryKey)
+            : sharePointDirectoryKey
+        }`,
       );
       return null;
     }

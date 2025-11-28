@@ -5,16 +5,22 @@ import {
   Middleware,
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
+import { redactSiteNameFromPath, smearSiteIdFromPath } from '../../../utils/logging.util';
 import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.types';
 
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
   private nextMiddleware: Middleware | undefined;
+
+  public constructor(shouldConcealLogs: boolean) {
+    this.shouldConcealLogs = shouldConcealLogs;
+  }
 
   public async execute(context: Context): Promise<void> {
     if (!this.nextMiddleware) throw new Error('Next middleware not set');
 
-    const endpoint = this.extractEndpoint(context.request);
+    const loggedEndpoint = this.extractEndpoint(context.request);
     const method = this.extractMethod(context.options);
     const startTime = Date.now();
 
@@ -27,7 +33,7 @@ export class MetricsMiddleware implements Middleware {
 
       this.logger.debug({
         msg: 'Graph API request completed',
-        endpoint,
+        endpoint: loggedEndpoint,
         method,
         statusCode,
         statusClass,
@@ -39,7 +45,7 @@ export class MetricsMiddleware implements Middleware {
 
         this.logger.warn({
           msg: 'Graph API request throttled',
-          endpoint,
+          endpoint: loggedEndpoint,
           method,
           statusCode,
           policy,
@@ -50,7 +56,7 @@ export class MetricsMiddleware implements Middleware {
       if (duration > 5000) {
         this.logger.warn({
           msg: 'Slow Graph API request detected',
-          endpoint,
+          endpoint: loggedEndpoint,
           method,
           duration,
           statusCode,
@@ -63,7 +69,7 @@ export class MetricsMiddleware implements Middleware {
 
       this.logger.error({
         msg: 'Graph API request failed',
-        endpoint,
+        endpoint: loggedEndpoint,
         method,
         duration,
         error: errorDetails,
@@ -81,7 +87,14 @@ export class MetricsMiddleware implements Middleware {
     try {
       const url = typeof request === 'string' ? request : request.url;
       const urlObj = new URL(url);
-      const endpoint = urlObj.pathname.replace(/^\/v\d+(\.\d+)?/, '');
+      let endpoint = urlObj.pathname.replace(/^\/v\d+(\.\d+)?/, '');
+
+      // Apply logging policy to sensitive path segments
+      if (this.shouldConcealLogs) {
+        endpoint = redactSiteNameFromPath(endpoint); // Process names first
+        endpoint = smearSiteIdFromPath(endpoint); // Then GUIDs (more specific match)
+      }
+
       return endpoint || '/';
     } catch {
       return 'unknown';

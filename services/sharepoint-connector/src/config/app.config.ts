@@ -18,6 +18,12 @@ const AppConfigSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .prefault('info')
       .describe('The log level at which the services outputs (pino)'),
+    logsDiagnosticsDataPolicy: z
+      .enum(['conceal', 'disclose'])
+      .prefault('conceal')
+      .describe(
+        'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
+      ),
   })
   .transform((c) => ({
     ...c,
@@ -25,7 +31,7 @@ const AppConfigSchema = z
   }));
 
 export const appConfig = registerConfig('app', AppConfigSchema, {
-  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV']),
+  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'LOGS_DIAGNOSTICS_DATA_POLICY']),
 });
 
 export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;

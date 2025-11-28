@@ -1,3 +1,5 @@
+import { ConfigService } from '@nestjs/config';
+import { TestBed } from '@suites/unit';
 import { describe, expect, it, vi } from 'vitest';
 import type { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import type { ProcessingContext } from '../types/processing-context';
@@ -9,7 +11,16 @@ vi.mock('undici', () => ({
 
 describe('StorageUploadStep', () => {
   it('uploads buffer to storage', async () => {
-    const step = new StorageUploadStep();
+    const { unit: step } = await TestBed.solitary(StorageUploadStep)
+      .mock(ConfigService)
+      .impl((stub) => ({
+        ...stub(),
+        get: vi.fn((k: string) => {
+          if (k === 'app.logsDiagnosticsDataPolicy') return 'conceal';
+          return 'default-value';
+        }),
+      }))
+      .compile();
 
     const driveItem: DriveItem = {
       '@odata.etag': 'etag1',
