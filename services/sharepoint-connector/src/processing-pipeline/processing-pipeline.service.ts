@@ -79,7 +79,7 @@ export class ProcessingPipelineService {
 
     for (const step of this.pipelineSteps) {
       try {
-        await Promise.race([step.execute(context), this.timeoutPromise(step)]);
+        await this.executeWithTimeout(step, context);
 
         this.spcIngestionFileProcessedTotal.add(1, {
           sp_site_id: syncContext.siteId, // TODO: Smear based on logging policy
@@ -129,13 +129,28 @@ export class ProcessingPipelineService {
     return mimeType ?? DEFAULT_MIME_TYPE;
   }
 
-  private timeoutPromise(step: IPipelineStep): Promise<never> {
-    const timeoutError = new Error(
-      `Step ${step.stepName} timed out after ${this.stepTimeoutMs}ms`,
-    ) as Error & { isTimeout: boolean };
-    timeoutError.isTimeout = true;
-    return new Promise((_resolve, reject) => {
-      setTimeout(() => reject(timeoutError), this.stepTimeoutMs);
+  // Executes a pipeline step with a timeout. We use a custom Promise implementation instead of
+  // Promise.race() to ensure the timeout is properly cleared when the step completes. With
+  // Promise.race(), the timeout callback would remain scheduled even after successful completion,
+  // potentially accumulating orphaned timeouts in high-throughput scenarios.
+  private executeWithTimeout(
+    step: IPipelineStep,
+    context: ProcessingContext,
+  ): Promise<ProcessingContext> {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        const timeoutError = new Error(
+          `Step ${step.stepName} timed out after ${this.stepTimeoutMs}ms`,
+        ) as Error & { isTimeout: boolean };
+        timeoutError.isTimeout = true;
+        reject(timeoutError);
+      }, this.stepTimeoutMs);
+
+      step
+        .execute(context)
+        .then(resolve)
+        .catch(reject)
+        .finally(() => clearTimeout(timeoutId));
     });
   }
 

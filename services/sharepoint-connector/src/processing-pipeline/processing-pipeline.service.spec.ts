@@ -94,27 +94,29 @@ describe('ProcessingPipelineService', () => {
   };
 
   beforeEach(async () => {
+    const mockExecute = () => vi.fn().mockImplementation((ctx) => Promise.resolve(ctx));
+
     mockSteps = {
       contentFetching: {
         stepName: PipelineStep.ContentFetching,
-        execute: vi.fn(),
+        execute: mockExecute(),
         cleanup: vi.fn(),
       },
       aspxProcessing: {
         stepName: PipelineStep.AspxProcessing,
-        execute: vi.fn(),
+        execute: mockExecute(),
       },
       contentRegistration: {
         stepName: PipelineStep.ContentRegistration,
-        execute: vi.fn(),
+        execute: mockExecute(),
       },
       storageUpload: {
         stepName: PipelineStep.StorageUpload,
-        execute: vi.fn(),
+        execute: mockExecute(),
       },
       ingestionFinalization: {
         stepName: PipelineStep.IngestionFinalization,
-        execute: vi.fn(),
+        execute: mockExecute(),
       },
     };
 

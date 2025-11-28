@@ -93,7 +93,7 @@ export class SharepointSynchronizationService {
 
         if (items.length === 0) {
           this.logger.log(`${logPrefix} Found no items marked for synchronization.`);
-          this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+          this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
             sp_site_id: siteId,
             result: 'skipped',
             skip_reason: 'no_items_to_sync',

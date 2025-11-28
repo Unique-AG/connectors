@@ -93,7 +93,7 @@ export class UniqueGraphqlClient {
       const apiMethod = `graphql:${this.clientTarget}:${operationName}`;
 
       try {
-        // However I tried to type variables, I alwayes got an error, no matter how I tried. AI
+        // However I tried to type variables, I always got an error, no matter how I tried. AI
         // agent wasted good 15 minutes on this and also didn't find a solution. For such internal
         // call and with such weird typing I think it's okay to use hard type casting.
         const options = { document, variables } as unknown as RequestOptions<V, T>;

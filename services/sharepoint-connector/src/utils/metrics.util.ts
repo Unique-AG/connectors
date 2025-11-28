@@ -1,4 +1,4 @@
-export const REQUEST_DURATION_BUCKET_BOUNDARIES: number[] = [0.1, 0.5, 1, 2, 5, 10, 20];
+export const REQUEST_DURATION_BUCKET_BOUNDARIES = [0.1, 0.5, 1, 2, 5, 10, 20];
 
 export function getDurationBucket(durationMs: number): string | null {
   if (durationMs > 10_000) {
@@ -23,6 +23,8 @@ export function getHttpStatusCodeClass(statusCode: number): string {
   if (statusCode >= 300 && statusCode < 400) {
     return '3xx';
   }
+  // We treat 4xx status code differently and report them as-is, because these errors are very
+  // specific and it's important to know the exact code to understand what is actually happening.
   if (statusCode >= 400 && statusCode < 500) {
     return statusCode.toString();
   }
