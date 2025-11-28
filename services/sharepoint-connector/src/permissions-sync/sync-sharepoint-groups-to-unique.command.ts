@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
+import { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
@@ -41,7 +42,7 @@ export class SyncSharepointGroupsToUniqueCommand {
   public constructor(
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly graphApiService: GraphApiService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
@@ -24,7 +25,7 @@ export class FileMoveProcessor {
   public constructor(
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly scopeManagementService: ScopeManagementService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }

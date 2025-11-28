@@ -1,4 +1,6 @@
+import { ConfigService } from '@nestjs/config';
 import { describe, expect, it } from 'vitest';
+import type { Config } from '../config';
 import {
   concealIngestionKey,
   redact,
@@ -205,14 +207,14 @@ describe('logging utilities', () => {
     it('returns true when policy is "conceal"', () => {
       const mockConfigService = {
         get: (_key: string, _options: { infer: true }) => 'conceal' as const,
-      };
+      } as ConfigService<Config, true>;
       expect(shouldConcealLogs(mockConfigService)).toBe(true);
     });
 
     it('returns false when policy is "disclose"', () => {
       const mockConfigService = {
         get: (_key: string, _options: { infer: true }) => 'disclose' as const,
-      };
+      } as ConfigService<Config, true>;
       expect(shouldConcealLogs(mockConfigService)).toBe(false);
     });
 
@@ -226,7 +228,7 @@ describe('logging utilities', () => {
           capturedOptions = options;
           return 'conceal' as const;
         },
-      };
+      } as ConfigService<Config, true>;
 
       shouldConcealLogs(mockConfigService);
       expect(capturedKey).toBe('app.logsDiagnosticsDataPolicy');

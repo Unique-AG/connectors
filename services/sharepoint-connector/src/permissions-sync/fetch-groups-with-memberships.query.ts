@@ -20,6 +20,7 @@ import {
   values,
   zip,
 } from 'remeda';
+import { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { GroupMember } from '../microsoft-apis/graph/types/sharepoint.types';
 import {
@@ -51,7 +52,7 @@ export class FetchGroupsWithMembershipsQuery {
   public constructor(
     private readonly graphApiService: GraphApiService,
     private readonly sharepointRestClientService: SharepointRestClientService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }

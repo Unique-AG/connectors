@@ -1,3 +1,6 @@
+import { ConfigService } from '@nestjs/config';
+import type { Config } from '../config';
+
 export function smear(text: string | null | undefined, leaveOver = 4) {
   if (text === undefined || text === null) {
     return '__erroneous__';
@@ -40,8 +43,6 @@ export function concealIngestionKey(key: string): string {
   return smear(key); // Smear the whole key if format is unexpected
 }
 
-export function shouldConcealLogs(configService: {
-  get: (key: string, options: { infer: true }) => 'conceal' | 'disclose';
-}): boolean {
+export function shouldConcealLogs(configService: ConfigService<Config, true>): boolean {
   return configService.get('app.logsDiagnosticsDataPolicy', { infer: true }) === 'conceal';
 }

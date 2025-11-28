@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { prop, pullObject } from 'remeda';
+import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
@@ -19,7 +20,7 @@ export class ScopeManagementService {
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Config, true>,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
