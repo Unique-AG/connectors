@@ -184,6 +184,7 @@ export class SharepointSynchronizationService {
         result: 'failure',
         failure_step: 'unknown',
       });
+      throw error;
     } finally {
       this.isScanning = false;
     }
