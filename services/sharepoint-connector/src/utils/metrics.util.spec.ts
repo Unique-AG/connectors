@@ -9,24 +9,25 @@ describe('getDurationBucket', () => {
   it('returns null for durations under or equal to 1 second', () => {
     expect(getDurationBucket(0)).toBeNull();
     expect(getDurationBucket(500)).toBeNull();
-    expect(getDurationBucket(1000)).toBeNull();
+    expect(getDurationBucket(1_000)).toBeNull();
   });
 
-  it('returns >1s for durations between 1 and 3 seconds', () => {
-    expect(getDurationBucket(1001)).toBe('>1s');
-    expect(getDurationBucket(1500)).toBe('>1s');
-    expect(getDurationBucket(3000)).toBe('>1s');
+  it('returns >1s for durations between 1 and 2 seconds', () => {
+    expect(getDurationBucket(1_001)).toBe('>1s');
+    expect(getDurationBucket(1_500)).toBe('>1s');
+    expect(getDurationBucket(2_000)).toBe('>1s');
   });
 
-  it('returns >3s for durations between 3 and 5 seconds', () => {
-    expect(getDurationBucket(3001)).toBe('>3s');
-    expect(getDurationBucket(4000)).toBe('>3s');
-    expect(getDurationBucket(5000)).toBe('>3s');
+  it('returns >3s for durations between 2 and 5 seconds', () => {
+    expect(getDurationBucket(2_001)).toBe('>2s');
+    expect(getDurationBucket(3_000)).toBe('>2s');
+    expect(getDurationBucket(4_000)).toBe('>2s');
+    expect(getDurationBucket(5_000)).toBe('>2s');
   });
 
   it('returns >5s for durations between 5 and 10 seconds', () => {
-    expect(getDurationBucket(5001)).toBe('>5s');
-    expect(getDurationBucket(7500)).toBe('>5s');
+    expect(getDurationBucket(5_001)).toBe('>5s');
+    expect(getDurationBucket(7_500)).toBe('>5s');
     expect(getDurationBucket(10_000)).toBe('>5s');
   });
 

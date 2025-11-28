@@ -567,7 +567,7 @@ describe('MetricsMiddleware', () => {
     vi.useRealTimers();
   });
 
-  it('increments slow request counter for requests >3s', async () => {
+  it('increments slow request counter for requests >2s', async () => {
     vi.useFakeTimers();
 
     const mockContext: Context = {
@@ -590,7 +590,7 @@ describe('MetricsMiddleware', () => {
       expect.objectContaining({
         ms_tenant_id: 'test-tenant-id',
         api_method: 'GET:/sites/{siteId}/lists',
-        duration_bucket: '>3s',
+        duration_bucket: '>2s',
       }),
     );
 
