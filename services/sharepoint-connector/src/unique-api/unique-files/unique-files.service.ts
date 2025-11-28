@@ -40,7 +40,8 @@ export class UniqueFilesService {
     newOwnerId: string,
     newUrl: string,
   ): Promise<ContentUpdateMutationResult['contentUpdate']> {
-    this.logger.debug(`Moving file ${contentId} to owner ${newOwnerId}`);
+    const logPrefix = `[ContentId: ${contentId}]`;
+    this.logger.debug(`${logPrefix} Moving file to owner ${newOwnerId}`);
 
     const result = await this.ingestionClient.get(
       async (client) =>
@@ -58,7 +59,8 @@ export class UniqueFilesService {
   }
 
   public async deleteFile(contentId: string): Promise<boolean> {
-    this.logger.debug(`Deleting file ${contentId}`);
+    const logPrefix = `[ContentId: ${contentId}]`;
+    this.logger.debug(`${logPrefix} Deleting file`);
 
     const result = await this.ingestionClient.get(
       async (client) =>

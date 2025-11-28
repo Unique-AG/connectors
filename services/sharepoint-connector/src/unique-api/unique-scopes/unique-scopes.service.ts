@@ -117,7 +117,8 @@ export class UniqueScopesService {
   }
 
   public async listChildrenScopes(parentId: string): Promise<Scope[]> {
-    this.logger.debug(`Fetching children scopes for parent ${parentId} from Unique API`);
+    const logPrefix = `[ParentId: ${parentId}]`;
+    this.logger.debug(`${logPrefix} Fetching children scopes from Unique API`);
 
     let skip = 0;
     const scopes: Scope[] = [];

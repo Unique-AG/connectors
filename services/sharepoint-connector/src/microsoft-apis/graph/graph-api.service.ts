@@ -311,7 +311,8 @@ export class GraphApiService {
     listId: string,
     itemId: string,
   ): Promise<SitePageContent> {
-    this.logger.debug(`Fetching site page content for item ${itemId} from list ${listId}`);
+    const logPrefix = `[ItemId: ${itemId}]`;
+    this.logger.debug(`${logPrefix} Fetching site page content from list ${listId}`);
 
     try {
       const response = await this.makeRateLimitedRequest<ListItemDetailsResponse>(() =>

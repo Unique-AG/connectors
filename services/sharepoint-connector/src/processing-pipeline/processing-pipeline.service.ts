@@ -60,21 +60,20 @@ export class ProcessingPipelineService {
       syncContext,
     };
 
-    this.logger.log(
-      `[${correlationId}] Starting processing pipeline for item: ${pipelineItem.item.id}`,
-    );
+    const logPrefix = `[CorrelationId: ${correlationId}]`;
+    this.logger.log(`${logPrefix} Starting processing pipeline for item: ${pipelineItem.item.id}`);
 
     for (const step of this.pipelineSteps) {
       try {
         await Promise.race([step.execute(context), this.timeoutPromise(step)]);
 
-        this.logger.debug(`[${correlationId}] Completed step: ${step.stepName}`);
+        this.logger.debug(`${logPrefix} Completed step: ${step.stepName}`);
         if (step.cleanup) await step.cleanup(context);
       } catch (error) {
         const totalDuration = Date.now() - startTime.getTime();
         const normalizedError = normalizeError(error);
         this.logger.error(
-          `[${correlationId}] Pipeline failed at step: ${step.stepName} after ${totalDuration}ms: ${normalizedError.message}`,
+          `${logPrefix} Pipeline failed at step: ${step.stepName} after ${totalDuration}ms: ${normalizedError.message}`,
         );
 
         if (step.cleanup) await step.cleanup(context);
@@ -87,7 +86,7 @@ export class ProcessingPipelineService {
     this.finalCleanup(context);
     const totalDuration = Date.now() - startTime.getTime();
     this.logger.log(
-      `[${correlationId}] Pipeline completed successfully in ${totalDuration}ms for file id:${pipelineItem.item.id}`,
+      `${logPrefix} Pipeline completed successfully in ${totalDuration}ms for file id:${pipelineItem.item.id}`,
     );
 
     return { success: true };

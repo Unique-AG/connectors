@@ -22,9 +22,10 @@ export class StorageUploadStep implements IPipelineStep {
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
+    const logPrefix = `[CorrelationId: ${context.correlationId}]`;
 
     this.logger.debug(
-      `[${context.correlationId}] Starting storage upload for file: ${context.pipelineItem.item.id}`,
+      `${logPrefix} Starting storage upload for file: ${context.pipelineItem.item.id}`,
     );
 
     try {
@@ -34,20 +35,22 @@ export class StorageUploadStep implements IPipelineStep {
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] Storage upload failed: ${message}`);
+      this.logger.error(`${logPrefix} Storage upload failed: ${message}`);
       throw error;
     }
   }
 
   public async cleanup(context: ProcessingContext): Promise<void> {
+    const logPrefix = `[CorrelationId: ${context.correlationId}]`;
     if (context.contentBuffer) {
       context.contentBuffer = undefined;
       delete context.contentBuffer;
-      this.logger.debug(`[${context.correlationId}] Released content buffer memory`);
+      this.logger.debug(`${logPrefix} Released content buffer memory`);
     }
   }
 
   private async performUpload(context: ProcessingContext): Promise<void> {
+    const logPrefix = `[CorrelationId: ${context.correlationId}]`;
     assert.ok(context.contentBuffer, 'Content buffer not found - content fetching may have failed');
     assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
 
@@ -78,10 +81,10 @@ export class StorageUploadStep implements IPipelineStep {
         );
       }
 
-      this.logger.debug(`[${context.correlationId}] Upload completed successfully`);
+      this.logger.debug(`${logPrefix} Upload completed successfully`);
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] Upload failed: ${message}`);
+      this.logger.error(`${logPrefix} Upload failed: ${message}`);
       throw error;
     }
   }

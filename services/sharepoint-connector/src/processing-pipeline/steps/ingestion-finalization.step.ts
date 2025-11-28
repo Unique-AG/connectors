@@ -32,7 +32,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
     assert.ok(
       context.registrationResponse,
-      `[${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
+      `[CorrelationId: ${context.correlationId}] Ingestion finalization failed. Registration response not found in context - content registration may have failed`,
     );
 
     const fileKey = buildIngestionItemKey(context.pipelineItem);

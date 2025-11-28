@@ -31,8 +31,9 @@ export class ScopeManagementService {
   ): Promise<BaseSyncContext> {
     const userId = await this.uniqueUsersService.getCurrentUserId();
     assert.ok(userId, 'User ID must be available');
+    const logPrefix = `[RootScopeId: ${rootScopeId}]`;
 
-    this.logger.log(`Initializing root scope ${rootScopeId} (Mode: ${ingestionMode})`);
+    this.logger.log(`${logPrefix} Initializing root scope (Mode: ${ingestionMode})`);
 
     await this.uniqueScopesService.createScopeAccesses(rootScopeId, [
       { type: 'MANAGE', entityId: userId, entityType: 'USER' },

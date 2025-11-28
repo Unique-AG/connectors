@@ -35,7 +35,8 @@ export class UniqueGroupsService {
   ) {}
 
   public async listAllGroupsForSite(siteId: string): Promise<UniqueGroupWithMembers[]> {
-    this.logger.log('Requesting all groups from Unique API');
+    const logPrefix = `[SiteId: ${siteId}]`;
+    this.logger.log(`${logPrefix} Requesting all groups from Unique API`);
 
     let skip = 0;
     const groups: UniqueGroupWithMembers[] = [];
