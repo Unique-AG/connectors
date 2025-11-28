@@ -1,5 +1,7 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { type Counter, ValueType } from '@opentelemetry/api';
+import { MetricService } from 'nestjs-otel';
 import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
@@ -35,10 +37,21 @@ interface Output {
 export class SyncSharepointGroupsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
 
+  private readonly spcPermissionsSyncGroupOperationsTotal: Counter;
+
   public constructor(
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly graphApiService: GraphApiService,
-  ) {}
+    metricService: MetricService,
+  ) {
+    this.spcPermissionsSyncGroupOperationsTotal = metricService.getCounter(
+      'spc_permissions_sync_group_operations_total',
+      {
+        description: 'Number of operations performed on SharePoint groups during permissions sync',
+        valueType: ValueType.INT,
+      },
+    );
+  }
 
   public async run(input: Input): Promise<Output> {
     const { siteId, sharePoint, unique } = input;
@@ -131,6 +144,11 @@ export class SyncSharepointGroupsToUniqueCommand {
         `    Skipped:   ${groupsSyncStats.skipped} groups\n` +
         `    Unchanged: ${groupsSyncStats.unchanged} groups`,
     );
+
+    const syncStatsEntries = Object.entries(groupsSyncStats).filter(([_, count]) => count > 0);
+    for (const [operation, count] of syncStatsEntries) {
+      this.spcPermissionsSyncGroupOperationsTotal.add(count, { sp_site_id: siteId, operation });
+    }
 
     return {
       updatedUniqueGroupsMap: pickBy(updatedUniqueGroupsMap, (group) => isNonNullish(group)),

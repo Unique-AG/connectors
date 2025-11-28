@@ -1,5 +1,7 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { type Counter, ValueType } from '@opentelemetry/api';
+import { MetricService } from 'nestjs-otel';
 import {
   differenceWith,
   filter,
@@ -42,10 +44,21 @@ interface Input {
 export class SyncSharepointFolderPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
 
+  private readonly spcFolderPermissionsSyncTotal: Counter;
+
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueGroupsService: UniqueGroupsService,
-  ) {}
+    metricService: MetricService,
+  ) {
+    this.spcFolderPermissionsSyncTotal = metricService.getCounter(
+      'spc_permissions_sync_folder_operations_total',
+      {
+        description: 'Number of folder (scope) permission changes synced',
+        valueType: ValueType.INT,
+      },
+    );
+  }
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
@@ -71,6 +84,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
       `${logPrefix} Starting folder permissions sync for ${uniqueFoldersToProcess.length} Unique folders ` +
         `(filtered ${unique.folders.length - uniqueFoldersToProcess.length} parent folders)`,
     );
+
+    let totalScopeAccessesAdded = 0;
+    let totalScopeAccessesRemoved = 0;
 
     for (const uniqueFolder of uniqueFoldersToProcess) {
       assert.ok(
@@ -100,7 +116,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
         continue;
       }
 
-      await this.syncScopeAccesses({
+      const { added, removed } = await this.syncScopeAccesses({
         logPrefix: loopLogPrefix,
         sharePoint: {
           scopeAccesses: sharePointScopeAccesses,
@@ -109,6 +125,22 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
           folder: uniqueFolder,
           serviceUserId,
         },
+      });
+
+      totalScopeAccessesAdded += added;
+      totalScopeAccessesRemoved += removed;
+    }
+
+    if (totalScopeAccessesAdded > 0) {
+      this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesAdded, {
+        sp_site_id: siteId,
+        operation: 'added',
+      });
+    }
+    if (totalScopeAccessesRemoved > 0) {
+      this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesRemoved, {
+        sp_site_id: siteId,
+        operation: 'removed',
       });
     }
   }
@@ -253,7 +285,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
       folder: ScopeWithPath;
       serviceUserId: string;
     };
-  }): Promise<void> {
+  }): Promise<{ added: number; removed: number }> {
     const { logPrefix, sharePoint, unique } = input;
 
     assert.ok(
@@ -288,5 +320,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     if (scopeAccessesToRemove.length > 0) {
       await this.uniqueScopesService.deleteScopeAccesses(unique.folder.id, scopeAccessesToRemove);
     }
+
+    return { added: scopeAccessesToAdd.length, removed: scopeAccessesToRemove.length };
   }
 }

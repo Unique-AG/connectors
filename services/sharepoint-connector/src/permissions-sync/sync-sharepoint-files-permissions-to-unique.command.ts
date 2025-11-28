@@ -1,5 +1,7 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { type Counter, ValueType } from '@opentelemetry/api';
+import { MetricService } from 'nestjs-otel';
 import {
   differenceWith,
   filter,
@@ -31,7 +33,20 @@ interface Input {
 export class SyncSharepointFilesPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly uniqueFilesService: UniqueFilesService) {}
+  private readonly spcPermissionsSyncFileOperationsTotal: Counter;
+
+  public constructor(
+    private readonly uniqueFilesService: UniqueFilesService,
+    metricService: MetricService,
+  ) {
+    this.spcPermissionsSyncFileOperationsTotal = metricService.getCounter(
+      'spc_permissions_sync_file_operations_total',
+      {
+        description: 'Number of permissions changing operations performed on Unique files',
+        valueType: ValueType.INT,
+      },
+    );
+  }
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
@@ -105,21 +120,38 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
     this.logger.log(
       `${logPrefix} Adding permissions to unique files in ${Object.keys(permissionsToAddByScopeId).length} scopes`,
     );
+    let totalPermissionsAdded = 0;
     for (const [scopeId, permissionsToAdd] of Object.entries(permissionsToAddByScopeId)) {
       this.logger.debug(
         `${logPrefix}[Scope: ${scopeId}] Adding ${permissionsToAdd.length} permissions`,
       );
       await this.uniqueFilesService.addAccesses(scopeId, permissionsToAdd);
+      totalPermissionsAdded += permissionsToAdd.length;
     }
 
     this.logger.log(
       `${logPrefix} Removing permissions from unique files in ${Object.keys(permissionsToRemoveByScopeId).length} scopes`,
     );
+    let totalPermissionsRemoved = 0;
     for (const [scopeId, permissionsToRemove] of Object.entries(permissionsToRemoveByScopeId)) {
       this.logger.debug(
         `${logPrefix}[Scope: ${scopeId}] Removing ${permissionsToRemove.length} permissions`,
       );
       await this.uniqueFilesService.removeAccesses(scopeId, permissionsToRemove);
+      totalPermissionsRemoved += permissionsToRemove.length;
+    }
+
+    if (totalPermissionsAdded > 0) {
+      this.spcPermissionsSyncFileOperationsTotal.add(totalPermissionsAdded, {
+        sp_site_id: siteId,
+        operation: 'added',
+      });
+    }
+    if (totalPermissionsRemoved > 0) {
+      this.spcPermissionsSyncFileOperationsTotal.add(totalPermissionsRemoved, {
+        sp_site_id: siteId,
+        operation: 'removed',
+      });
     }
   }
 
