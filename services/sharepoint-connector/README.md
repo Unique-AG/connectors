@@ -28,12 +28,6 @@ The SharePoint connector requires the following Microsoft Graph API permissions 
 - Used to scan document libraries, list files, and download file contents
 
 ### Environment Configuration
-
-#### Required Environment Variables
-- `LOGS_DIAGNOSTICS_DATA_POLICY`: Controls whether sensitive data like site names and IDs are logged in full or redacted
-  - `conceal` (default): Hide sensitive data (recommended for production)
-  - `disclose`: Show all data including sensitive information (for debugging)
-
 Check `env.example` file for a full .env example/ 
 
 ### Monitoring
