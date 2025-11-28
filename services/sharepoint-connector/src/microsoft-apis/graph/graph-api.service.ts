@@ -202,7 +202,7 @@ export class GraphApiService {
   }
 
   public async getAspxPagesForSite(siteId: string): Promise<SharepointContentItem[]> {
-    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const [siteWebUrl, lists] = await Promise.all([
       this.getSiteWebUrl(siteId),
       this.getSiteLists(siteId),
@@ -211,9 +211,7 @@ export class GraphApiService {
     // Scan ASPX files from SitePages list
     const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
     if (!sitePagesList?.id) {
-      this.logger.warn(
-        `Cannot scan Site Pages because SitePages list was not found for site ${loggedSiteId}`,
-      );
+      this.logger.warn(`${logPrefix} Cannot scan Site Pages because SitePages list was not found`);
       return [];
     }
 
@@ -224,12 +222,13 @@ export class GraphApiService {
         siteWebUrl,
       );
       this.logger.log(
-        `Found ${aspxSharepointContentItems.length} ASPX files from SitePages for site ${loggedSiteId}`,
+        `${logPrefix} Found ${aspxSharepointContentItems.length} ASPX files from SitePages`,
       );
       return aspxSharepointContentItems;
     } catch (error) {
+      const normalizedError = normalizeError(error);
       this.logger.warn(
-        `Failed to scan ASPX files from SitePages for site ${loggedSiteId}: ${error}`,
+        `${logPrefix} Failed to scan ASPX files from SitePages: ${normalizedError.message}`,
       );
       return [];
     }
@@ -261,6 +260,7 @@ export class GraphApiService {
     listId: string,
     siteWebUrl: string,
   ): Promise<SharepointContentItem[]> {
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const aspxItems: SharepointContentItem[] = [];
 
@@ -294,12 +294,12 @@ export class GraphApiService {
         aspxItems.push(aspxSharepointContentItem);
       }
 
-      this.logger.log(`Found ${aspxItems.length} ASPX files in SitePages list`);
+      this.logger.log(`${logPrefix} Found ${aspxItems.length} ASPX files in SitePages list`);
       return aspxItems;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch ASPX files from SitePages list ${listId}: ${normalizedError.message}`,
+        msg: `${logPrefix} Failed to fetch ASPX files from SitePages list: ${normalizedError.message}`,
         error,
       });
       throw error;
