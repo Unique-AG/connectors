@@ -7,8 +7,8 @@ export function getDurationBucket(durationMs: number): string | null {
   if (durationMs > 5_000) {
     return '>5s';
   }
-  if (durationMs > 3_000) {
-    return '>3s';
+  if (durationMs > 2_000) {
+    return '>2s';
   }
   if (durationMs > 1_000) {
     return '>1s';
