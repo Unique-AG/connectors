@@ -4,7 +4,7 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { concealLogs, smear } from '../utils/logging.util';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { normalizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { ScopeManagementService } from './scope-management.service';
@@ -26,7 +26,7 @@ export class FileMoveProcessor {
     private readonly scopeManagementService: ScopeManagementService,
     private readonly configService: ConfigService,
   ) {
-    this.shouldConcealLogs = concealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   /**

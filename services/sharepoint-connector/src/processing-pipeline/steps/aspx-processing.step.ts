@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { getTitle } from '../../utils/list-item.util';
-import { concealLogs, smear } from '../../utils/logging.util';
+import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -13,8 +13,11 @@ import type { IPipelineStep } from './pipeline-step.interface';
 export class AspxProcessingStep implements IPipelineStep {
   private readonly logger = new Logger(AspxProcessingStep.name);
   public readonly stepName = PipelineStep.AspxProcessing;
+  private readonly shouldConcealLogs: boolean;
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {}
+  public constructor(private readonly configService: ConfigService<Config, true>) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     if (context.pipelineItem.itemType !== 'listItem') {
@@ -34,7 +37,7 @@ export class AspxProcessingStep implements IPipelineStep {
         msg: 'ASPX processing failed',
         correlationId: context.correlationId,
         itemId: context.pipelineItem.item.id,
-        siteId: concealLogs(this.configService)
+        siteId: this.shouldConcealLogs
           ? smear(context.pipelineItem.siteId)
           : context.pipelineItem.siteId,
         error: message,

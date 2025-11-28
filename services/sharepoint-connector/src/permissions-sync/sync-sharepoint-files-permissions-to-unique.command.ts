@@ -15,7 +15,7 @@ import { Config } from '../config';
 import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile, UniqueFileAccessInput } from '../unique-api/unique-files/unique-files.types';
-import { concealLogs, smear } from '../utils/logging.util';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -33,17 +33,20 @@ interface Input {
 @Injectable()
 export class SyncSharepointFilesPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId, serviceUserId } = context;
 
-    const logPrefix = `[Site: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     this.logger.log(
       `${logPrefix} Starting permissions sync for ` +
         `${Object.keys(sharePoint.permissionsMap).length} items`,

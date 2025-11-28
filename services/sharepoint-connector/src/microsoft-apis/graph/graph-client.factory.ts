@@ -13,7 +13,7 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Config } from '../../config';
-import { concealLogs } from '../../utils/logging.util';
+import { shouldConcealLogs } from '../../utils/logging.util';
 import { GraphAuthenticationService } from './middlewares/graph-authentication.service';
 import { MetricsMiddleware } from './middlewares/metrics.middleware';
 import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
@@ -21,11 +21,14 @@ import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
 @Injectable()
 export class GraphClientFactory {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly graphAuthenticationService: GraphAuthenticationService,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public createClient(): Client {
     const authenticationHandler = new AuthenticationHandler(this.graphAuthenticationService);
@@ -33,8 +36,7 @@ export class GraphClientFactory {
     const retryHandler = new RetryHandler(new RetryHandlerOptions());
     const redirectHandler = new RedirectHandler(new RedirectHandlerOptions());
     const telemetryHandler = new TelemetryHandler();
-    const shouldConcealLogs = concealLogs(this.configService);
-    const metricsMiddleware = new MetricsMiddleware(shouldConcealLogs);
+    const metricsMiddleware = new MetricsMiddleware(this.shouldConcealLogs);
     const httpMessageHandler = new HTTPMessageHandler();
 
     // Order is critical - httpMessageHandler must be last

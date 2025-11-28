@@ -4,17 +4,20 @@ import pLimit from 'p-limit';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
-import { concealLogs, smear } from '../utils/logging.util';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
 @Injectable()
 export class ItemProcessingOrchestratorService {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly processingPipelineService: ProcessingPipelineService,
-  ) {}
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async processItems(
     syncContext: SharepointSyncContext,
@@ -24,9 +27,7 @@ export class ItemProcessingOrchestratorService {
   ): Promise<void> {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
-    const loggedSiteId = concealLogs(this.configService)
-      ? smear(syncContext.siteId)
-      : syncContext.siteId;
+    const loggedSiteId = this.shouldConcealLogs ? smear(syncContext.siteId) : syncContext.siteId;
 
     if (newItems.length === 0 && updatedItems.length === 0) {
       this.logger.log(`No items to process for site ${loggedSiteId}`);

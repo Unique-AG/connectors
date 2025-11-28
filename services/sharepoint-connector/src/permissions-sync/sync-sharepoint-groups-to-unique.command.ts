@@ -6,7 +6,7 @@ import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 import { getSharepointConnectorGroupExternalId } from '../unique-api/unique-groups/unique-groups.utils';
-import { concealLogs, redact, smear } from '../utils/logging.util';
+import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import {
   GroupDistinctId,
   SharePointGroupsMap,
@@ -43,12 +43,12 @@ export class SyncSharepointGroupsToUniqueCommand {
     private readonly graphApiService: GraphApiService,
     private readonly configService: ConfigService,
   ) {
-    this.shouldConcealLogs = concealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async run(input: Input): Promise<Output> {
     const { siteId, sharePoint, unique } = input;
-    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const siteName = await this.graphApiService.getSiteName(siteId);
     const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 

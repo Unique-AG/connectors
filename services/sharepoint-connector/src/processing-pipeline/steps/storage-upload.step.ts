@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { request } from 'undici';
 import { Config } from '../../config';
 import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
-import { concealLogs, redact, smear } from '../../utils/logging.util';
+import { redact, shouldConcealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -17,7 +17,7 @@ export class StorageUploadStep implements IPipelineStep {
   private readonly shouldConcealLogs: boolean;
 
   public constructor(private readonly configService: ConfigService<Config, true>) {
-    this.shouldConcealLogs = concealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {

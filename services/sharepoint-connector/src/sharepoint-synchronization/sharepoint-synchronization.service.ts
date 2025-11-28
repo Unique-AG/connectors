@@ -5,7 +5,7 @@ import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { concealLogs, smear } from '../utils/logging.util';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
@@ -16,6 +16,7 @@ import type { BaseSyncContext, SharepointSyncContext } from './types';
 export class SharepointSynchronizationService {
   private readonly logger = new Logger(this.constructor.name);
   private isScanning = false;
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -23,7 +24,9 @@ export class SharepointSynchronizationService {
     private readonly contentSyncService: ContentSyncService,
     private readonly permissionsSyncService: PermissionsSyncService,
     private readonly scopeManagementService: ScopeManagementService,
-  ) {}
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async synchronize(): Promise<void> {
     if (this.isScanning) {
@@ -56,7 +59,7 @@ export class SharepointSynchronizationService {
       this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
 
       for (const siteId of siteIdsToScan) {
-        const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+        const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
         let scopes: ScopeWithPath[] | null = null;
         const siteStartTime = Date.now();
 

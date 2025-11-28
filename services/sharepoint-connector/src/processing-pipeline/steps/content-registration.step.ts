@@ -14,7 +14,7 @@ import {
   ContentMetadata,
   ContentRegistrationRequest,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
-import { concealIngestionKey, concealLogs, redact, smear } from '../../utils/logging.util';
+import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
@@ -33,7 +33,7 @@ export class ContentRegistrationStep implements IPipelineStep {
     private readonly configService: ConfigService<Config, true>,
   ) {
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
-    this.shouldConcealLogs = concealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {

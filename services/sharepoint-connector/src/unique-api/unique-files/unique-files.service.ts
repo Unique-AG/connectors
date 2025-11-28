@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
-import { concealLogs, smear } from '../../utils/logging.util';
+import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   ADD_ACCESSES_MUTATION,
@@ -27,10 +27,13 @@ const BATCH_SIZE = 100;
 @Injectable()
 export class UniqueFilesService {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
   public constructor(
     @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
     private readonly configService: ConfigService<Config, true>,
-  ) {}
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async moveFile(
     contentId: string,
@@ -104,9 +107,7 @@ export class UniqueFilesService {
   }
 
   public async getFilesForSite(siteId: string): Promise<UniqueFile[]> {
-    this.logger.log(
-      `Fetching files for site ${concealLogs(this.configService) ? smear(siteId) : siteId}`,
-    );
+    this.logger.log(`Fetching files for site ${this.shouldConcealLogs ? smear(siteId) : siteId}`);
 
     let skip = 0;
     const files: UniqueFile[] = [];

@@ -8,7 +8,7 @@ import { Config } from '../../config';
 import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
-import { concealLogs, smear } from '../../utils/logging.util';
+import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
@@ -55,7 +55,7 @@ export class GraphApiService {
       'Graph API',
     );
 
-    this.shouldConcealLogs = concealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async getAllSiteItems(
@@ -172,9 +172,7 @@ export class GraphApiService {
           const reader = stream.getReader();
           await reader.cancel();
           reader.releaseLock();
-          throw new Error(
-            `${logPrefix} File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`,
-          );
+          assert.fail(`${logPrefix} File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
         }
 
         chunks.push(bufferChunk);
@@ -238,20 +236,20 @@ export class GraphApiService {
   }
 
   public async getSiteLists(siteId: string): Promise<List[]> {
-    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
 
     try {
       const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId}/lists`, (url) =>
         this.graphClient.api(url).select('system,name,id').top(GRAPH_API_PAGE_SIZE).get(),
       );
 
-      this.logger.log(`Found ${allLists.length} lists for site ${loggedSiteId}`);
+      this.logger.log(`${logPrefix} Found ${allLists.length} lists`);
 
       return allLists;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch lists for site ${loggedSiteId}. Check Sites.Selected permission. ${normalizedError.message}`,
+        msg: `${logPrefix} Failed to fetch lists. Check Sites.Selected permission. ${normalizedError.message}`,
         error,
       });
       throw error;
@@ -420,20 +418,20 @@ export class GraphApiService {
   }
 
   private async getDrivesForSite(siteId: string): Promise<Drive[]> {
-    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const allDrives = await this.paginateGraphApiRequest<Drive>(
         `/sites/${siteId}/drives`,
         (url) => this.graphClient.api(url).top(GRAPH_API_PAGE_SIZE).get(),
       );
 
-      this.logger.log(`Found ${allDrives.length} drives for site ${loggedSiteId}`);
+      this.logger.log(`${logPrefix} Found ${allDrives.length} drives`);
 
       return allDrives;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch drives for site ${loggedSiteId}: ${normalizedError.message}`,
+        msg: `${logPrefix} Failed to fetch drives: ${normalizedError.message}`,
         error,
       });
       throw error;

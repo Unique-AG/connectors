@@ -13,7 +13,7 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/unique-groups/unique-groups.utils';
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { concealLogs, smear } from '../utils/logging.util';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery, PermissionsMap } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
@@ -50,7 +50,7 @@ export class PermissionsSyncService {
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService<Config, true>,
   ) {
-    this.shouldConcealLogs = concealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async syncPermissionsForSite(input: Input): Promise<void> {

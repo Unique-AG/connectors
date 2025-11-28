@@ -12,7 +12,7 @@ import type {
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { concealLogs, smear } from '../utils/logging.util';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { normalizeError } from '../utils/normalize-error';
 import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
@@ -33,7 +33,7 @@ export class ContentSyncService {
     private readonly fileMoveProcessor: FileMoveProcessor,
     private readonly scopeManagementService: ScopeManagementService,
   ) {
-    this.shouldConcealLogs = concealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async syncContentForSite(

@@ -19,7 +19,7 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { concealIngestionKey, concealLogs, redact, smear } from '../utils/logging.util';
+import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import {
   buildIngestionItemKey,
   getUniquePathFromItem,
@@ -51,7 +51,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly configService: ConfigService<Config, true>,
   ) {
-    this.shouldConcealLogs = concealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async run(input: Input): Promise<void> {

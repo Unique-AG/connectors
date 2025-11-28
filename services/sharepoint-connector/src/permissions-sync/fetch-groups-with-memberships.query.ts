@@ -27,7 +27,7 @@ import {
   SharepointRestClientService,
   SiteGroupMembership,
 } from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
-import { concealLogs, redact, smear } from '../utils/logging.util';
+import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import type {
   GroupDistinctId,
   GroupMembership,
@@ -53,7 +53,7 @@ export class FetchGroupsWithMembershipsQuery {
     private readonly sharepointRestClientService: SharepointRestClientService,
     private readonly configService: ConfigService,
   ) {
-    this.shouldConcealLogs = concealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   // For given list of group permissions from files/lists, fetch all the present sharepoint group
@@ -71,7 +71,7 @@ export class FetchGroupsWithMembershipsQuery {
     siteId: string,
     groupPermissions: GroupMembership[],
   ): Promise<SharePointGroupsMap> {
-    const logPrefix = `[SiteId: ${concealLogs(this.configService) ? smear(siteId) : siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const uniqueGroupPermissions = uniqueBy(groupPermissions, groupDistinctId);
 
     this.logger.log(

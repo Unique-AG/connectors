@@ -7,7 +7,7 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { concealLogs, redact, smear } from '../utils/logging.util';
+import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import { getUniqueParentPathFromItem } from '../utils/sharepoint.util';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
 
@@ -21,7 +21,7 @@ export class ScopeManagementService {
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService,
   ) {
-    this.shouldConcealLogs = concealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async initializeRootScope(
