@@ -7,6 +7,7 @@ import { IngestionMode } from '../constants/ingestion.constants';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { normalizeError } from '../utils/normalize-error';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
@@ -17,6 +18,7 @@ import type { BaseSyncContext, SharepointSyncContext } from './types';
 export class SharepointSynchronizationService {
   private readonly logger = new Logger(this.constructor.name);
   private isScanning = false;
+  private readonly shouldConcealLogs: boolean;
 
   private readonly spcSyncDurationSeconds: Histogram;
 
@@ -28,6 +30,8 @@ export class SharepointSynchronizationService {
     private readonly scopeManagementService: ScopeManagementService,
     private readonly metricService: MetricService,
   ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+
     this.spcSyncDurationSeconds = this.metricService.getHistogram('spc_sync_duration_seconds', {
       description: 'Duration of SharePoint synchronization cycles (per site and full sync)',
       valueType: ValueType.DOUBLE,
@@ -79,7 +83,7 @@ export class SharepointSynchronizationService {
 
       for (const siteId of siteIdsToScan) {
         const siteSyncStartTime = Date.now();
-        const logPrefix = `[SiteId: ${siteId}]`;
+        const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
         let scopes: ScopeWithPath[] | null = null;
         const siteStartTime = Date.now();
 

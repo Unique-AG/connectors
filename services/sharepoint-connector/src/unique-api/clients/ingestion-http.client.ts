@@ -5,6 +5,7 @@ import Bottleneck from 'bottleneck';
 import { MetricService } from 'nestjs-otel';
 import { Client, Dispatcher, errors, interceptors } from 'undici';
 import { Config } from '../../config';
+import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import {
   createApiMethodExtractor,
   getDurationBucket,
@@ -28,6 +29,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly bottleneckFactory: BottleneckFactory,
     metricService: MetricService,
   ) {
     const ingestionUrl = new URL(
@@ -51,11 +53,6 @@ export class IngestionHttpClient implements OnModuleDestroy {
 
     const apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
       infer: true,
-    });
-    this.limiter = new Bottleneck({
-      reservoir: apiRateLimitPerMinute,
-      reservoirRefreshAmount: apiRateLimitPerMinute,
-      reservoirRefreshInterval: 60_000,
     });
 
     this.spcUniqueApiRequestDurationSeconds = metricService.getHistogram(
@@ -84,6 +81,15 @@ export class IngestionHttpClient implements OnModuleDestroy {
       'scoped',
       'upload',
     ]);
+
+    this.limiter = this.bottleneckFactory.createLimiter(
+      {
+        reservoir: apiRateLimitPerMinute,
+        reservoirRefreshAmount: apiRateLimitPerMinute,
+        reservoirRefreshInterval: 60_000,
+      },
+      'Ingestion HTTP',
+    );
   }
 
   public async onModuleDestroy(): Promise<void> {

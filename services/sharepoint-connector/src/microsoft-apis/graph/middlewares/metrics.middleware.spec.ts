@@ -1,8 +1,8 @@
-import type { Context } from '@microsoft/microsoft-graph-client';
-import { GraphClientError, GraphError } from '@microsoft/microsoft-graph-client';
+import { type Context, GraphClientError, GraphError } from '@microsoft/microsoft-graph-client';
+import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { MetricService } from 'nestjs-otel';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '../../../config';
 import { MetricsMiddleware } from './metrics.middleware';
 
@@ -47,7 +47,7 @@ describe('MetricsMiddleware', () => {
       }),
     } as unknown as ConfigService<Config, true>;
 
-    middleware = new MetricsMiddleware(mockMetricService, mockConfigService);
+    middleware = new MetricsMiddleware(mockMetricService, mockConfigService, false);
     middleware.setNext(mockNextMiddleware as never);
   });
 
@@ -289,7 +289,11 @@ describe('MetricsMiddleware', () => {
   });
 
   it('throws error if next middleware not set', async () => {
-    const middlewareWithoutNext = new MetricsMiddleware(mockMetricService, mockConfigService);
+    const middlewareWithoutNext = new MetricsMiddleware(
+      mockMetricService,
+      mockConfigService,
+      false,
+    );
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
@@ -708,5 +712,149 @@ describe('MetricsMiddleware', () => {
     );
 
     vi.useRealTimers();
+  });
+
+  describe('endpoint extraction with sensitive data concealment', () => {
+    let loggerDebugSpy: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      loggerDebugSpy = vi.fn();
+      // Mock the Logger constructor to return an object with debug method
+      vi.mocked(Logger).mockImplementation(
+        () =>
+          ({
+            debug: loggerDebugSpy,
+            log: vi.fn(),
+            error: vi.fn(),
+            warn: vi.fn(),
+            verbose: vi.fn(),
+          }) as unknown as Logger,
+      );
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('conceals site names in logged endpoints when enabled', async () => {
+      const concealingMiddleware = new MetricsMiddleware(
+        mockMetricService,
+        mockConfigService,
+        true,
+      );
+      concealingMiddleware.setNext(mockNextMiddleware as never);
+
+      const mockContext: Context = {
+        request: 'https://graph.microsoft.com/v1.0/sites/LoadTestFlat/_layouts/15/download.aspx',
+        options: { method: 'GET' },
+        middlewareControl: {} as never,
+      };
+
+      const mockResponse = new Response('{"value": []}', { status: 200 });
+      mockContext.response = mockResponse;
+
+      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+        ctx.response = mockResponse;
+      });
+
+      await concealingMiddleware.execute(mockContext);
+
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: '/sites/Lo[Redacted]at/_layouts/15/download.aspx',
+        }),
+      );
+    });
+
+    it('conceals site IDs in logged endpoints when enabled', async () => {
+      const concealingMiddleware = new MetricsMiddleware(
+        mockMetricService,
+        mockConfigService,
+        true,
+      );
+      concealingMiddleware.setNext(mockNextMiddleware as never);
+
+      const mockContext: Context = {
+        request:
+          'https://graph.microsoft.com/v1.0/sites/1d045c6a-f230-48fd-b826-7cf8601d7729/lists',
+        options: { method: 'GET' },
+        middlewareControl: {} as never,
+      };
+
+      const mockResponse = new Response('{"value": []}', { status: 200 });
+      mockContext.response = mockResponse;
+
+      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+        ctx.response = mockResponse;
+      });
+
+      await concealingMiddleware.execute(mockContext);
+
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: '/sites/********-****-****-****-********7729/lists',
+        }),
+      );
+    });
+
+    it('conceals site IDs in logged endpoints without trailing path when enabled', async () => {
+      const concealingMiddleware = new MetricsMiddleware(
+        mockMetricService,
+        mockConfigService,
+        true,
+      );
+      concealingMiddleware.setNext(mockNextMiddleware as never);
+
+      const mockContext: Context = {
+        request: 'https://graph.microsoft.com/v1.0/sites/1d045c6a-f230-48fd-b826-7cf8601d7729',
+        options: { method: 'GET' },
+        middlewareControl: {} as never,
+      };
+
+      const mockResponse = new Response('{"value": []}', { status: 200 });
+      mockContext.response = mockResponse;
+
+      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+        ctx.response = mockResponse;
+      });
+
+      await concealingMiddleware.execute(mockContext);
+
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: '/sites/********-****-****-****-********7729',
+        }),
+      );
+    });
+
+    it('does not conceal endpoints in logs when disabled', async () => {
+      const nonConcealingMiddleware = new MetricsMiddleware(
+        mockMetricService,
+        mockConfigService,
+        false,
+      );
+      nonConcealingMiddleware.setNext(mockNextMiddleware as never);
+
+      const mockContext: Context = {
+        request: 'https://graph.microsoft.com/v1.0/sites/LoadTestFlat/_layouts/15/download.aspx',
+        options: { method: 'GET' },
+        middlewareControl: {} as never,
+      };
+
+      const mockResponse = new Response('{"value": []}', { status: 200 });
+      mockContext.response = mockResponse;
+
+      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+        ctx.response = mockResponse;
+      });
+
+      await nonConcealingMiddleware.execute(mockContext);
+
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: '/sites/LoadTestFlat/_layouts/15/download.aspx',
+        }),
+      );
+    });
   });
 });

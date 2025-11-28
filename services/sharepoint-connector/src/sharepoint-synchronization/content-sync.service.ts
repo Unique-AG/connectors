@@ -14,6 +14,7 @@ import type {
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { normalizeError } from '../utils/normalize-error';
 import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
@@ -24,8 +25,11 @@ import type { SharepointSyncContext } from './types';
 @Injectable()
 export class ContentSyncService {
   private readonly logger = new Logger(this.constructor.name);
+
   private readonly spcFileDiffEventsTotal: Counter;
   private readonly spcFileDeletedTotal: Counter;
+
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -44,6 +48,7 @@ export class ContentSyncService {
       description: 'Number of file deletion operations in Unique',
       valueType: ValueType.INT,
     });
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async syncContentForSite(
@@ -52,7 +57,7 @@ export class ContentSyncService {
     context: SharepointSyncContext,
   ): Promise<void> {
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${siteId}] `;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}] `;
     const processStartTime = Date.now();
 
     const diffResult = await this.calculateDiffForSite(items, siteId);
@@ -161,7 +166,7 @@ export class ContentSyncService {
   }
 
   private async deleteRemovedFiles(siteId: string, deletedFileKeys: string[]): Promise<void> {
-    const logPrefix = `[SiteId: ${siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     let filesToDelete: UniqueFile[] = [];
     // Convert relative keys to full keys (with siteId prefix)
     const fullKeys = deletedFileKeys.map((key) => `${siteId}/${key}`);

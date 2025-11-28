@@ -59,6 +59,7 @@ spec:
 |-----|------|---------|-------------|
 | connector.deployment.metadata.annotations."reloader.stakater.com/auto" | string | `"true"` |  |
 | connector.env.LOG_LEVEL | string | `"info"` |  |
+| connector.env.LOGS_DIAGNOSTICS_DATA_POLICY | string | `"conceal"` |  |
 | connector.env.MAX_FILE_SIZE_BYTES | string | `"209715200"` |  |
 | connector.env.MAX_HEAP_MB | int | `1920` |  |
 | connector.env.NODE_ENV | string | `"production"` |  |

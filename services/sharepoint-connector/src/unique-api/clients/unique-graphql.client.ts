@@ -7,6 +7,7 @@ import { GraphQLClient } from 'graphql-request';
 import { MetricService } from 'nestjs-otel';
 import { isObjectType } from 'remeda';
 import { Config } from '../../config';
+import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import {
   getDurationBucket,
   getHttpStatusCodeClass,
@@ -34,6 +35,7 @@ export class UniqueGraphqlClient {
     private readonly clientTarget: UniqueGraphqlClientTarget,
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly bottleneckFactory: BottleneckFactory,
     metricService: MetricService,
   ) {
     const uniqueConfig = this.configService.get('unique', { infer: true });
@@ -80,6 +82,15 @@ export class UniqueGraphqlClient {
         description: 'Number of slow Unique GraphQL API calls',
         valueType: ValueType.INT,
       },
+    );
+
+    this.limiter = this.bottleneckFactory.createLimiter(
+      {
+        reservoir: apiRateLimitPerMinute,
+        reservoirRefreshAmount: apiRateLimitPerMinute,
+        reservoirRefreshInterval: 60_000,
+      },
+      `Unique ${this.clientTarget}`,
     );
   }
 

@@ -1,7 +1,10 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { request } from 'undici';
+import { Config } from '../../config';
 import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
+import { redact, shouldConcealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -11,14 +14,18 @@ import type { IPipelineStep } from './pipeline-step.interface';
 export class StorageUploadStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.StorageUpload;
+  private readonly shouldConcealLogs: boolean;
 
-  public constructor() {}
+  public constructor(private readonly configService: ConfigService<Config, true>) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
+    const logPrefix = `[CorrelationId: ${context.correlationId}]`;
 
     this.logger.debug(
-      `[${context.correlationId}] Starting storage upload for file: ${context.pipelineItem.item.id}`,
+      `${logPrefix} Starting storage upload for file: ${context.pipelineItem.item.id}`,
     );
 
     try {
@@ -28,29 +35,34 @@ export class StorageUploadStep implements IPipelineStep {
       return context;
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] Storage upload failed: ${message}`);
+      this.logger.error(`${logPrefix} Storage upload failed: ${message}`);
       throw error;
     }
   }
 
   public async cleanup(context: ProcessingContext): Promise<void> {
+    const logPrefix = `[CorrelationId: ${context.correlationId}]`;
     if (context.contentBuffer) {
       context.contentBuffer = undefined;
       delete context.contentBuffer;
-      this.logger.debug(`[${context.correlationId}] Released content buffer memory`);
+      this.logger.debug(`${logPrefix} Released content buffer memory`);
     }
   }
 
   private async performUpload(context: ProcessingContext): Promise<void> {
+    const logPrefix = `[CorrelationId: ${context.correlationId}]`;
     assert.ok(context.contentBuffer, 'Content buffer not found - content fetching may have failed');
     assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
 
     this.logger.debug({
       msg: 'performUpload details:',
+      correlationId: context.correlationId,
       fileId: context.pipelineItem.item.id,
       driveId: context.pipelineItem.driveId,
-      siteId: context.pipelineItem.siteId,
-      uploadUrl: context.uploadUrl,
+      siteId: this.shouldConcealLogs
+        ? smear(context.pipelineItem.siteId)
+        : context.pipelineItem.siteId,
+      uploadUrl: this.shouldConcealLogs ? redact(context.uploadUrl) : context.uploadUrl,
       mimeType: context.mimeType,
     });
 
@@ -69,10 +81,10 @@ export class StorageUploadStep implements IPipelineStep {
         );
       }
 
-      this.logger.debug(`[${context.correlationId}] Upload completed successfully`);
+      this.logger.debug(`${logPrefix} Upload completed successfully`);
     } catch (error) {
       const message = normalizeError(error).message;
-      this.logger.error(`[${context.correlationId}] Upload failed: ${message}`);
+      this.logger.error(`${logPrefix} Upload failed: ${message}`);
       throw error;
     }
   }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MetricService } from 'nestjs-otel';
 import { Config } from '../config';
+import { BottleneckFactory } from '../utils/bottleneck.factory';
 import { IngestionHttpClient } from './clients/ingestion-http.client';
 import {
   INGESTION_CLIENT,
@@ -26,37 +27,58 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
       useFactory: (
         uniqueAuthService: UniqueAuthService,
         configService: ConfigService<Config, true>,
+        bottleneckFactory: BottleneckFactory,
         metricService: MetricService,
       ) => {
         return new UniqueGraphqlClient(
           'scopeManagement',
           uniqueAuthService,
           configService,
+          bottleneckFactory,
           metricService,
         );
       },
-      inject: [UniqueAuthService, ConfigService, MetricService],
+      inject: [UniqueAuthService, ConfigService, BottleneckFactory, MetricService],
     },
     {
       provide: INGESTION_CLIENT,
       useFactory: (
         uniqueAuthService: UniqueAuthService,
         configService: ConfigService<Config, true>,
+        bottleneckFactory: BottleneckFactory,
         metricService: MetricService,
       ) => {
         return new UniqueGraphqlClient(
           'ingestion',
           uniqueAuthService,
           configService,
+          bottleneckFactory,
           metricService,
         );
       },
-      inject: [UniqueAuthService, ConfigService, MetricService],
+      inject: [UniqueAuthService, ConfigService, BottleneckFactory, MetricService],
     },
-    IngestionHttpClient,
+    {
+      provide: IngestionHttpClient,
+      useFactory: (
+        uniqueAuthService: UniqueAuthService,
+        configService: ConfigService<Config, true>,
+        bottleneckFactory: BottleneckFactory,
+        metricService: MetricService,
+      ) => {
+        return new IngestionHttpClient(
+          uniqueAuthService,
+          configService,
+          bottleneckFactory,
+          metricService,
+        );
+      },
+      inject: [UniqueAuthService, ConfigService, BottleneckFactory],
+    },
     UniqueFileIngestionService,
     UniqueFilesService,
     UniqueScopesService,
+    BottleneckFactory,
   ],
   exports: [
     UniqueAuthService,

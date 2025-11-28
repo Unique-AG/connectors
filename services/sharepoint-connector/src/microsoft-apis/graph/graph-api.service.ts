@@ -6,7 +6,9 @@ import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Config } from '../../config';
 import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
+import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
+import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
@@ -29,11 +31,13 @@ export class GraphApiService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly graphClient: Client;
   private readonly limiter: Bottleneck;
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly configService: ConfigService<Config, true>,
     private readonly fileFilterService: FileFilterService,
+    private readonly bottleneckFactory: BottleneckFactory,
   ) {
     this.graphClient = this.graphClientFactory.createClient();
 
@@ -42,17 +46,22 @@ export class GraphApiService {
       { infer: true },
     );
 
-    this.limiter = new Bottleneck({
-      reservoir: msGraphRateLimitPerMinute,
-      reservoirRefreshAmount: msGraphRateLimitPerMinute,
-      reservoirRefreshInterval: 60000,
-    });
+    this.limiter = this.bottleneckFactory.createLimiter(
+      {
+        reservoir: msGraphRateLimitPerMinute,
+        reservoirRefreshAmount: msGraphRateLimitPerMinute,
+        reservoirRefreshInterval: 60000,
+      },
+      'Graph API',
+    );
+
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async getAllSiteItems(
     siteId: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
-    const logPrefix = `[SiteId: ${siteId}]`;
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
       this.getAspxPagesForSite(siteId),
       this.getAllFilesForSite(siteId),
@@ -83,6 +92,7 @@ export class GraphApiService {
   public async getAllFilesForSite(
     siteId: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
+    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
     const sharepointContentFilesToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
@@ -123,7 +133,7 @@ export class GraphApiService {
       // Log progress every 20 files
       if (totalScanned % LOG_INTERVAL === 0) {
         this.logger.log(
-          `Scanning in progress for site ${siteId}: ${totalScanned} files scanned so far`,
+          `Scanning in progress for site ${loggedSiteId}: ${totalScanned} files scanned so far`,
         );
       }
 
@@ -134,12 +144,15 @@ export class GraphApiService {
       }
     }
 
-    this.logger.log(`Found ${sharepointContentFilesToSync.length} drive files for site ${siteId}`);
+    this.logger.log(
+      `Found ${sharepointContentFilesToSync.length} drive files for site ${loggedSiteId}`,
+    );
     return { items: sharepointContentFilesToSync, directories: sharepointDirectoryItemsToSync };
   }
 
   public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
-    this.logger.debug(`Downloading file content for item ${itemId} from drive ${driveId}`);
+    const logPrefix = `[DriveId: ${driveId}, ItemId: ${itemId}]`;
+    this.logger.debug(`${logPrefix} Downloading file content`);
     const maxFileSizeBytes = this.configService.get('processing.maxFileSizeBytes', { infer: true });
 
     try {
@@ -159,16 +172,27 @@ export class GraphApiService {
           const reader = stream.getReader();
           await reader.cancel();
           reader.releaseLock();
-          throw new Error(`File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
+          assert.fail(`${logPrefix} File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
         }
 
         chunks.push(bufferChunk);
       }
-      return Buffer.concat(chunks);
+
+      // TODO (UN-14011) replace with a metric
+      this.logger.debug(`${logPrefix} Starting Buffer.concat for ${chunks.length} chunks`);
+      const concatStartTime = Date.now();
+
+      const finalBuffer = Buffer.concat(chunks);
+
+      this.logger.debug(
+        `${logPrefix} Buffer.concat completed in ${Date.now() - concatStartTime}ms`,
+      );
+
+      return finalBuffer;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to download file content for item ${itemId}: ${normalizedError.message}`,
+        msg: `${logPrefix} Failed to download file content: ${normalizedError.message}`,
         itemId,
         driveId,
         error,
@@ -178,6 +202,7 @@ export class GraphApiService {
   }
 
   public async getAspxPagesForSite(siteId: string): Promise<SharepointContentItem[]> {
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const [siteWebUrl, lists] = await Promise.all([
       this.getSiteWebUrl(siteId),
       this.getSiteLists(siteId),
@@ -186,9 +211,7 @@ export class GraphApiService {
     // Scan ASPX files from SitePages list
     const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
     if (!sitePagesList?.id) {
-      this.logger.warn(
-        `Cannot scan Site Pages because SitePages list was not found for site ${siteId}`,
-      );
+      this.logger.warn(`${logPrefix} Cannot scan Site Pages because SitePages list was not found`);
       return [];
     }
 
@@ -199,28 +222,33 @@ export class GraphApiService {
         siteWebUrl,
       );
       this.logger.log(
-        `Found ${aspxSharepointContentItems.length} ASPX files from SitePages for site ${siteId}`,
+        `${logPrefix} Found ${aspxSharepointContentItems.length} ASPX files from SitePages`,
       );
       return aspxSharepointContentItems;
     } catch (error) {
-      this.logger.warn(`Failed to scan ASPX files from SitePages for site ${siteId}: ${error}`);
+      const normalizedError = normalizeError(error);
+      this.logger.warn(
+        `${logPrefix} Failed to scan ASPX files from SitePages: ${normalizedError.message}`,
+      );
       return [];
     }
   }
 
   public async getSiteLists(siteId: string): Promise<List[]> {
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+
     try {
       const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId}/lists`, (url) =>
         this.graphClient.api(url).select('system,name,id').top(GRAPH_API_PAGE_SIZE).get(),
       );
 
-      this.logger.log(`Found ${allLists.length} lists for site ${siteId}`);
+      this.logger.log(`${logPrefix} Found ${allLists.length} lists`);
 
       return allLists;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch lists for site ${siteId}: ${normalizedError.message}`,
+        msg: `${logPrefix} Failed to fetch lists. Check Sites.Selected permission. ${normalizedError.message}`,
         error,
       });
       throw error;
@@ -232,6 +260,7 @@ export class GraphApiService {
     listId: string,
     siteWebUrl: string,
   ): Promise<SharepointContentItem[]> {
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const aspxItems: SharepointContentItem[] = [];
 
@@ -265,12 +294,12 @@ export class GraphApiService {
         aspxItems.push(aspxSharepointContentItem);
       }
 
-      this.logger.log(`Found ${aspxItems.length} ASPX files in SitePages list`);
+      this.logger.log(`${logPrefix} Found ${aspxItems.length} ASPX files in SitePages list`);
       return aspxItems;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch ASPX files from SitePages list ${listId}: ${normalizedError.message}`,
+        msg: `${logPrefix} Failed to fetch ASPX files from SitePages list: ${normalizedError.message}`,
         error,
       });
       throw error;
@@ -282,7 +311,8 @@ export class GraphApiService {
     listId: string,
     itemId: string,
   ): Promise<SitePageContent> {
-    this.logger.debug(`Fetching site page content for item ${itemId} from list ${listId}`);
+    const logPrefix = `[ItemId: ${itemId}]`;
+    this.logger.debug(`${logPrefix} Fetching site page content from list ${listId}`);
 
     try {
       const response = await this.makeRateLimitedRequest<ListItemDetailsResponse>(() =>
@@ -363,6 +393,7 @@ export class GraphApiService {
   }
 
   public async getSiteWebUrl(siteId: string): Promise<string> {
+    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     try {
       const site = await this.makeRateLimitedRequest(() =>
         this.graphClient.api(`/sites/${siteId}`).select('webUrl').get(),
@@ -372,7 +403,7 @@ export class GraphApiService {
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch site info for ${siteId}: ${normalizedError.message}`,
+        msg: `Failed to fetch site info for ${loggedSiteId}. Check Sites.Selected permission.  ${normalizedError.message}`,
         error,
       });
       throw error;
@@ -381,23 +412,27 @@ export class GraphApiService {
 
   public async getSiteName(siteId: string): Promise<string> {
     const siteWebUrl = await this.getSiteWebUrl(siteId);
-    return siteWebUrl.split('/').pop() ?? assert.fail(`Site name not found for site ${siteId}`);
+    return (
+      siteWebUrl.split('/').pop() ??
+      assert.fail(`Site name not found for site ${this.shouldConcealLogs ? smear(siteId) : siteId}`)
+    );
   }
 
   private async getDrivesForSite(siteId: string): Promise<Drive[]> {
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const allDrives = await this.paginateGraphApiRequest<Drive>(
         `/sites/${siteId}/drives`,
         (url) => this.graphClient.api(url).top(GRAPH_API_PAGE_SIZE).get(),
       );
 
-      this.logger.log(`Found ${allDrives.length} drives for site ${siteId}`);
+      this.logger.log(`${logPrefix} Found ${allDrives.length} drives`);
 
       return allDrives;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch drives for site ${siteId}: ${normalizedError.message}`,
+        msg: `${logPrefix} Failed to fetch drives: ${normalizedError.message}`,
         error,
       });
       throw error;
@@ -412,6 +447,7 @@ export class GraphApiService {
     driveName: string,
     maxFiles?: number,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
+    const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const sharepointContentItemsToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
     try {
@@ -421,7 +457,7 @@ export class GraphApiService {
         // Check if we've reached the file limit for local testing
         if (maxFiles && sharepointContentItemsToSync.length >= maxFiles) {
           this.logger.warn(
-            `Reached file limit of ${maxFiles}, stopping scan in drive ${driveId}, item ${itemId} for site ${siteId}`,
+            `Reached file limit of ${maxFiles}, stopping scan in drive ${driveId}, item ${itemId} for site ${loggedSiteId}`,
           );
           break;
         }
@@ -478,7 +514,7 @@ export class GraphApiService {
       );
 
       this.logger.warn(
-        `Continuing scan with results collected so far from drive ${driveId}, item ${itemId} for site ${siteId}`,
+        `Continuing scan with results collected so far from drive ${driveId}, item ${itemId} for site ${loggedSiteId}`,
       );
       return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
     }

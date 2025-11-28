@@ -14,6 +14,7 @@ import {
   ContentMetadata,
   ContentRegistrationRequest,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
+import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
@@ -25,12 +26,14 @@ export class ContentRegistrationStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.ContentRegistration;
   private readonly sharepointBaseUrl: string;
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly configService: ConfigService<Config, true>,
   ) {
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
@@ -69,9 +72,16 @@ export class ContentRegistrationStep implements IPipelineStep {
     this.logger.debug(
       `contentRegistrationRequest: ${JSON.stringify(
         {
-          url: contentRegistrationRequest.url,
-          baseUrl: contentRegistrationRequest.baseUrl,
-          key: contentRegistrationRequest.key,
+          url: this.shouldConcealLogs
+            ? redact(contentRegistrationRequest.url ?? '')
+            : contentRegistrationRequest.url,
+          baseUrl: this.shouldConcealLogs
+            ? redact(contentRegistrationRequest.baseUrl ?? '')
+            : contentRegistrationRequest.baseUrl,
+          key: this.shouldConcealLogs
+            ? concealIngestionKey(contentRegistrationRequest.key)
+            : contentRegistrationRequest.key,
+          correlationId: context.correlationId,
           sourceName: contentRegistrationRequest.sourceName,
         },
         null,
@@ -102,7 +112,9 @@ export class ContentRegistrationStep implements IPipelineStep {
         correlationId: context.correlationId,
         itemId: context.pipelineItem.item.id,
         driveId: context.pipelineItem.driveId,
-        siteId: context.pipelineItem.siteId,
+        siteId: this.shouldConcealLogs
+          ? smear(context.pipelineItem.siteId)
+          : context.pipelineItem.siteId,
         error: message,
       });
       throw error;

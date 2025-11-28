@@ -9,6 +9,7 @@ import type { ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram, ValueType } from '@opentelemetry/api';
 import type { MetricService } from 'nestjs-otel';
 import type { Config } from '../../../config';
+import { redactSiteNameFromPath, smearSiteIdFromPath } from '../../../utils/logging.util';
 import {
   createApiMethodExtractor,
   getDurationBucket,
@@ -20,6 +21,7 @@ import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.type
 
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
   private nextMiddleware: Middleware | undefined;
   private readonly extractApiMethod: ReturnType<typeof createApiMethodExtractor>;
 
@@ -29,7 +31,13 @@ export class MetricsMiddleware implements Middleware {
 
   private readonly msTenantId: string;
 
-  public constructor(metricService: MetricService, configService: ConfigService<Config, true>) {
+  public constructor(
+    metricService: MetricService,
+    configService: ConfigService<Config, true>,
+    shouldConcealLogs: boolean,
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs;
+
     this.spcGraphApiRequestDurationSeconds = metricService.getHistogram(
       'spc_ms_graph_api_request_duration_seconds',
       {
@@ -77,8 +85,11 @@ export class MetricsMiddleware implements Middleware {
     if (!this.nextMiddleware) throw new Error('Next middleware not set');
 
     const endpoint = this.extractEndpoint(context.request);
+    const loggedEndpoint = this.extractEndpoint(context.request);
+
     const httpMethod = this.extractMethod(context.options);
     const apiMethod = this.extractApiMethod(endpoint, httpMethod);
+
     const startTime = Date.now();
 
     try {
@@ -95,7 +106,7 @@ export class MetricsMiddleware implements Middleware {
 
       this.logger.debug({
         msg: 'Graph API request completed',
-        endpoint,
+        endpoint: loggedEndpoint,
         method: httpMethod,
         statusCode: statusClass,
         duration: elapsedMilliseconds(startTime),
@@ -112,8 +123,9 @@ export class MetricsMiddleware implements Middleware {
 
         this.logger.warn({
           msg: 'Graph API request throttled',
-          endpoint,
+          endpoint: loggedEndpoint,
           method: httpMethod,
+          statusCode: statusClass,
           policy,
           duration: elapsedMilliseconds(startTime),
         });
@@ -130,7 +142,7 @@ export class MetricsMiddleware implements Middleware {
 
         this.logger.warn({
           msg: 'Slow Graph API request detected',
-          endpoint,
+          endpoint: loggedEndpoint,
           method: httpMethod,
           duration,
           durationBucket,
@@ -159,7 +171,7 @@ export class MetricsMiddleware implements Middleware {
 
       this.logger.error({
         msg: 'Graph API request failed',
-        endpoint,
+        endpoint: loggedEndpoint,
         method: httpMethod,
         statusCode: statusClass,
         duration,
@@ -272,7 +284,14 @@ export class MetricsMiddleware implements Middleware {
     try {
       const url = typeof request === 'string' ? request : request.url;
       const urlObj = new URL(url);
-      const endpoint = urlObj.pathname.replace(/^\/(v\d+(\.\d+)?|beta)/, '');
+      let endpoint = urlObj.pathname.replace(/^\/(v\d+(\.\d+)?|beta)/, '');
+
+      // Apply logging policy to sensitive path segments
+      if (this.shouldConcealLogs) {
+        endpoint = redactSiteNameFromPath(endpoint); // Process names first
+        endpoint = smearSiteIdFromPath(endpoint); // Then GUIDs (more specific match)
+      }
+
       return endpoint || '/';
     } catch {
       return 'unknown';

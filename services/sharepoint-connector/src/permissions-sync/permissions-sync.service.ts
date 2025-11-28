@@ -15,6 +15,7 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/unique-groups/unique-groups.utils';
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery, PermissionsMap } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
@@ -39,6 +40,7 @@ interface Input {
 @Injectable()
 export class PermissionsSyncService {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
   private readonly spcPermissionsSyncDurationSeconds: Histogram;
 
@@ -53,6 +55,8 @@ export class PermissionsSyncService {
     private readonly configService: ConfigService<Config, true>,
     metricService: MetricService,
   ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+
     this.spcPermissionsSyncDurationSeconds = metricService.getHistogram(
       'spc_permissions_sync_duration_seconds',
       {
@@ -68,7 +72,8 @@ export class PermissionsSyncService {
   public async syncPermissionsForSite(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${siteId}]`;
+
+    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const startTime = Date.now();
     let currentStep = 'permissions_fetch';
 
@@ -157,7 +162,7 @@ export class PermissionsSyncService {
     siteId: string,
     permissionsMap: PermissionsMap,
   ): Promise<SharePointGroupsMap> {
-    const logPrefix = `[Site: ${siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const uniqueGroupPermissions = pipe(
       permissionsMap,
       values(),
