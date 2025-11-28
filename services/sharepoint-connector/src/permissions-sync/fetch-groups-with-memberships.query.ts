@@ -113,7 +113,7 @@ export class FetchGroupsWithMembershipsQuery {
       this.logger.debug(
         `${logPrefix} Fetching MS groups memberships for ${msGroupsToProcess.length} groups`,
       );
-      const responseMappings = await this.fetchGroupMemberships(msGroupsToProcess);
+      const responseMappings = await this.fetchGroupMemberships(msGroupsToProcess, logPrefix);
       responseMappings.forEach(([groupId, itemPermissions]) => {
         groupMembershipsCache[groupId] = itemPermissions;
       });
@@ -196,6 +196,7 @@ export class FetchGroupsWithMembershipsQuery {
 
   private async fetchGroupMemberships(
     groups: { id: string; type: 'groupMembers' | 'groupOwners' }[],
+    logPrefix: string,
   ): Promise<[GroupDistinctId, Membership[]][]> {
     // TODO: Once we have batch requests for Graph API implemented, change this method to take
     //       advantage of that instead of chunking manually.
@@ -239,7 +240,7 @@ export class FetchGroupsWithMembershipsQuery {
         }
 
         this.logger.error(
-          `Failed to fetch memberships for group ${this.shouldConcealLogs ? redact(group.id) : group.id}: ${error.message}`,
+          `${logPrefix} Failed to fetch memberships for group ${this.shouldConcealLogs ? redact(group.id) : group.id}: ${error.message}`,
         );
         throw error;
       });
