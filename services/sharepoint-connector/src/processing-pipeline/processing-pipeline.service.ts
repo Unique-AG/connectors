@@ -8,6 +8,7 @@ import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { normalizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
@@ -24,6 +25,7 @@ export class ProcessingPipelineService {
   private readonly pipelineSteps: IPipelineStep[];
   private readonly stepTimeoutMs: number;
   private readonly spcIngestionFileProcessedTotal: Counter;
+  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -34,6 +36,7 @@ export class ProcessingPipelineService {
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
     metricService: MetricService,
   ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
     this.pipelineSteps = [
       this.contentFetchingStep,
       this.aspxProcessingStep,
@@ -73,7 +76,8 @@ export class ProcessingPipelineService {
       syncContext,
     };
 
-    const logPrefix = `[CorrelationId: ${correlationId}]`;
+    const logSiteId = this.shouldConcealLogs ? smear(syncContext.siteId) : syncContext.siteId;
+    const logPrefix = `[SiteId: ${logSiteId}][CorrelationId: ${correlationId}]`;
     this.logger.log(`${logPrefix} Starting processing pipeline for item: ${pipelineItem.item.id}`);
 
     for (const step of this.pipelineSteps) {
@@ -81,7 +85,7 @@ export class ProcessingPipelineService {
         await this.executeWithTimeout(step, context);
 
         this.spcIngestionFileProcessedTotal.add(1, {
-          sp_site_id: syncContext.siteId, // TODO: Smear based on logging policy
+          sp_site_id: logSiteId,
           step_name: toSnakeCase(step.stepName),
           file_state: fileStatus,
           result: 'success',
@@ -95,7 +99,7 @@ export class ProcessingPipelineService {
         const isTimeout = 'isTimeout' in normalizedError && Boolean(normalizedError.isTimeout);
 
         this.spcIngestionFileProcessedTotal.add(1, {
-          sp_site_id: syncContext.siteId, // TODO: Smear based on logging policy
+          sp_site_id: logSiteId,
           step_name: toSnakeCase(step.stepName),
           file_state: fileStatus,
           result: isTimeout ? 'timeout' : 'failure',

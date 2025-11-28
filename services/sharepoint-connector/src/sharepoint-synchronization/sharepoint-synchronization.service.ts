@@ -83,7 +83,8 @@ export class SharepointSynchronizationService {
 
       for (const siteId of siteIdsToScan) {
         const siteSyncStartTime = Date.now();
-        const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+        const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+        const logPrefix = `[SiteId: ${logSiteId}]`;
         let scopes: ScopeWithPath[] | null = null;
         const siteStartTime = Date.now();
 
@@ -98,7 +99,7 @@ export class SharepointSynchronizationService {
         if (items.length === 0) {
           this.logger.log(`${logPrefix} Found no items marked for synchronization.`);
           this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
-            sp_site_id: siteId,
+            sp_site_id: logSiteId,
             result: 'skipped',
             skip_reason: 'no_items_to_sync',
           });
@@ -115,7 +116,7 @@ export class SharepointSynchronizationService {
               error,
             });
             this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
-              sp_site_id: siteId, // TODO: Smear based on logging policy
+              sp_site_id: logSiteId,
               result: 'failure',
               failure_step: 'scopes_creation',
             });
@@ -131,7 +132,7 @@ export class SharepointSynchronizationService {
             error,
           });
           this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
-            sp_site_id: siteId, // TODO: Smear based on logging policy
+            sp_site_id: logSiteId,
             result: 'failure',
             failure_step: 'content_sync',
           });
@@ -152,7 +153,7 @@ export class SharepointSynchronizationService {
               error,
             });
             this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
-              sp_site_id: siteId, // TODO: Smear based on logging policy
+              sp_site_id: logSiteId,
               result: 'failure',
               failure_step: 'permissions_sync',
             });
@@ -161,7 +162,7 @@ export class SharepointSynchronizationService {
         }
 
         this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
-          sp_site_id: siteId, // TODO: Smear based on logging policy
+          sp_site_id: logSiteId,
           result: 'success',
         });
       }

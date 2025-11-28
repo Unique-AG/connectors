@@ -57,32 +57,33 @@ export class ContentSyncService {
     context: SharepointSyncContext,
   ): Promise<void> {
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}] `;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[SiteId: ${logSiteId}] `;
     const processStartTime = Date.now();
 
     const diffResult = await this.calculateDiffForSite(items, siteId);
 
     if (diffResult.newFiles.length > 0) {
       this.spcFileDiffEventsTotal.add(diffResult.newFiles.length, {
-        sp_site_id: siteId, // TODO: Smear based on logging policy
+        sp_site_id: logSiteId,
         diff_result_type: 'new',
       });
     }
     if (diffResult.updatedFiles.length > 0) {
       this.spcFileDiffEventsTotal.add(diffResult.updatedFiles.length, {
-        sp_site_id: siteId, // TODO: Smear based on logging policy
+        sp_site_id: logSiteId,
         diff_result_type: 'updated',
       });
     }
     if (diffResult.movedFiles.length > 0) {
       this.spcFileDiffEventsTotal.add(diffResult.movedFiles.length, {
-        sp_site_id: siteId, // TODO: Smear based on logging policy
+        sp_site_id: logSiteId,
         diff_result_type: 'moved',
       });
     }
     if (diffResult.deletedFiles.length > 0) {
       this.spcFileDiffEventsTotal.add(diffResult.deletedFiles.length, {
-        sp_site_id: siteId, // TODO: Smear based on logging policy
+        sp_site_id: logSiteId,
         diff_result_type: 'deleted',
       });
     }
@@ -166,7 +167,8 @@ export class ContentSyncService {
   }
 
   private async deleteRemovedFiles(siteId: string, deletedFileKeys: string[]): Promise<void> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[SiteId: ${logSiteId}]`;
     let filesToDelete: UniqueFile[] = [];
     // Convert relative keys to full keys (with siteId prefix)
     const fullKeys = deletedFileKeys.map((key) => `${siteId}/${key}`);
@@ -191,14 +193,14 @@ export class ContentSyncService {
         totalDeleted++;
 
         this.spcFileDeletedTotal.add(1, {
-          sp_site_id: siteId, // TODO: Smear based on logging policy
+          sp_site_id: logSiteId,
           result: 'success',
         });
       } catch (error) {
         const normalizedError = normalizeError(error);
 
         this.spcFileDeletedTotal.add(1, {
-          sp_site_id: siteId, // TODO: Smear based on logging policy
+          sp_site_id: logSiteId,
           result: 'failure',
         });
 

@@ -50,7 +50,8 @@ export class FileMoveProcessor {
     context: SharepointSyncContext,
   ): Promise<void> {
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[SiteId: ${logSiteId}]`;
     const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId);
     let ingestedFiles: UniqueFile[] = [];
 
@@ -78,14 +79,14 @@ export class FileMoveProcessor {
         totalMoved++;
 
         this.spcFileMovedTotal.add(1, {
-          sp_site_id: siteId, // TODO: Smear based on logging policy
+          sp_site_id: logSiteId,
           result: 'success',
         });
       } catch (error) {
         const normalizedError = normalizeError(error);
 
         this.spcFileMovedTotal.add(1, {
-          sp_site_id: siteId, // TODO: Smear based on logging policy
+          sp_site_id: logSiteId,
           result: 'failure',
         });
 
