@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.0-beta.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.17...sharepoint-connector@v2.0.0-beta.1) (2025-11-28)
+
+
+### Features
+
+* **sharepoint-connector:** Added metadata when we ingest a file ([#130](https://github.com/Unique-AG/connectors/issues/130)) ([7b63078](https://github.com/Unique-AG/connectors/commit/7b630785708ff14d4f4b0b29df06f83422ac03dd))
+* **sharepoint-connector:** Smear and Redact logs ([#136](https://github.com/Unique-AG/connectors/issues/136)) ([de63672](https://github.com/Unique-AG/connectors/commit/de63672ac108b44e28b02573e957555438fa5e32))
+* **sharepoint-connector:** unify root folder config for both ingestion modes ([#133](https://github.com/Unique-AG/connectors/issues/133)) ([1ac8cd8](https://github.com/Unique-AG/connectors/commit/1ac8cd884341a5e0869fd933dbc5a8f60205f8d3))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** do not hairpin for upload when calling in cluster ([#134](https://github.com/Unique-AG/connectors/issues/134)) ([d261e02](https://github.com/Unique-AG/connectors/commit/d261e02ef213717b20ab6d1ab0a9ef266e35c67a))
+
 ## [2.0.0-alpha.17](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.16...sharepoint-connector@v2.0.0-alpha.17) (2025-11-25)
 
 
