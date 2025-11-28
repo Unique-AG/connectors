@@ -337,7 +337,7 @@ describe('ContentSyncService', () => {
       });
 
       await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
-        '[SiteId: test-site-123]  Too many files to ingest: 3. Limit is 2. Aborting sync.',
+        '[Site: test-site-123]  Too many files to ingest: 3. Limit is 2. Aborting sync.',
       );
     });
 
