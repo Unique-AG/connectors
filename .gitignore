@@ -22,7 +22,6 @@ coverage
 # Editors
 .vscode
 .idea
-.cursor
 
 # Build Outputs
 .next/
