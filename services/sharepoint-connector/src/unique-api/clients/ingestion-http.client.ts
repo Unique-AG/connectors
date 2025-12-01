@@ -39,15 +39,27 @@ export class IngestionHttpClient implements OnModuleDestroy {
       interceptors.redirect({
         maxRedirections: 10,
       }),
+      // This retry interceptor is specifically tailored to the V2 file-diff calling, as this is
+      // currently the only endpoint that we are calling from this client. Even though we're calling
+      // POST enpoint there, it's not doing anything on the BE side that would be problematic to
+      // retry.
+      // If we were to call additional endpoints, we should re-visit this interceptor to be sure it
+      // behaves in a way we expect.
       interceptors.retry({
+        // We do lower base retry count and higher min timeout to avoid hitting Unique API when it
+        // may be already under heavy load. These settings should be enough to get the response in
+        // case of some transient errors.
         maxRetries: 3,
+        minTimeout: 3_000,
+        methods: ['POST'],
         throwOnError: false,
       }),
     ];
 
     const httpClient = new Client(`${ingestionUrl.protocol}//${ingestionUrl.host}`, {
-      bodyTimeout: 30000,
-      headersTimeout: 30000,
+      bodyTimeout: 30_000,
+      headersTimeout: 30_000,
+      connectTimeout: 15_000,
     });
     this.httpClient = httpClient.compose(interceptorsInCallingOrder.reverse());
 
