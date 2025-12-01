@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-beta.2](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.1...sharepoint-connector@v2.0.0-beta.2) (2025-12-01)
+
+
+### Features
+
+* **sharepoint-connector:** add basic metrics ([#137](https://github.com/Unique-AG/connectors/issues/137)) ([51f5102](https://github.com/Unique-AG/connectors/commit/51f5102eb6d24141e92ff9062c8dc9c15c9c1193))
+
 ## [2.0.0-beta.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-alpha.17...sharepoint-connector@v2.0.0-beta.1) (2025-11-28)
 
 
