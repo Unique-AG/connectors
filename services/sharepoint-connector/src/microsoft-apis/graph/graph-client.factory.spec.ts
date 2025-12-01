@@ -1,15 +1,18 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { MetricService } from 'nestjs-otel';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '../../config';
+import {
+  SPC_MS_GRAPH_API_REQUEST_DURATION_SECONDS,
+  SPC_MS_GRAPH_API_SLOW_REQUESTS_TOTAL,
+  SPC_MS_GRAPH_API_THROTTLE_EVENTS_TOTAL,
+} from '../../metrics';
 import { GraphClientFactory } from './graph-client.factory';
 import { GraphAuthenticationService } from './middlewares/graph-authentication.service';
 
 describe('GraphClientFactory', () => {
   let factory: GraphClientFactory;
   let mockGraphAuthService: GraphAuthenticationService;
-  let mockMetricService: MetricService;
   let mockConfigService: ConfigService<Config, true>;
 
   beforeEach(async () => {
@@ -21,9 +24,9 @@ describe('GraphClientFactory', () => {
       record: vi.fn(),
     };
 
-    mockMetricService = {
-      getHistogram: vi.fn().mockReturnValue(mockHistogram),
-    } as unknown as MetricService;
+    const mockCounter = {
+      add: vi.fn(),
+    };
 
     mockConfigService = {
       get: vi.fn().mockImplementation((key: string) => {
@@ -46,8 +49,12 @@ describe('GraphClientFactory', () => {
     const { unit } = await TestBed.solitary(GraphClientFactory)
       .mock(GraphAuthenticationService)
       .impl(() => mockGraphAuthService)
-      .mock(MetricService)
-      .impl(() => mockMetricService)
+      .mock(SPC_MS_GRAPH_API_REQUEST_DURATION_SECONDS)
+      .impl(() => mockHistogram)
+      .mock(SPC_MS_GRAPH_API_THROTTLE_EVENTS_TOTAL)
+      .impl(() => mockCounter)
+      .mock(SPC_MS_GRAPH_API_SLOW_REQUESTS_TOTAL)
+      .impl(() => mockCounter)
       .mock(ConfigService)
       .impl(() => mockConfigService)
       .compile();
@@ -69,11 +76,22 @@ describe('GraphClientFactory', () => {
   });
 
   it('creates client with debug logging disabled by default', async () => {
+    const mockHistogram = {
+      record: vi.fn(),
+    };
+    const mockCounter = {
+      add: vi.fn(),
+    };
+
     const { unit } = await TestBed.solitary(GraphClientFactory)
       .mock(GraphAuthenticationService)
       .impl(() => mockGraphAuthService)
-      .mock(MetricService)
-      .impl(() => mockMetricService)
+      .mock(SPC_MS_GRAPH_API_REQUEST_DURATION_SECONDS)
+      .impl(() => mockHistogram)
+      .mock(SPC_MS_GRAPH_API_THROTTLE_EVENTS_TOTAL)
+      .impl(() => mockCounter)
+      .mock(SPC_MS_GRAPH_API_SLOW_REQUESTS_TOTAL)
+      .impl(() => mockCounter)
       .mock(ConfigService)
       .impl(() => mockConfigService)
       .compile();
@@ -84,11 +102,22 @@ describe('GraphClientFactory', () => {
   });
 
   it('creates client with debug logging enabled for debug level', async () => {
+    const mockHistogram = {
+      record: vi.fn(),
+    };
+    const mockCounter = {
+      add: vi.fn(),
+    };
+
     const { unit } = await TestBed.solitary(GraphClientFactory)
       .mock(GraphAuthenticationService)
       .impl(() => mockGraphAuthService)
-      .mock(MetricService)
-      .impl(() => mockMetricService)
+      .mock(SPC_MS_GRAPH_API_REQUEST_DURATION_SECONDS)
+      .impl(() => mockHistogram)
+      .mock(SPC_MS_GRAPH_API_THROTTLE_EVENTS_TOTAL)
+      .impl(() => mockCounter)
+      .mock(SPC_MS_GRAPH_API_SLOW_REQUESTS_TOTAL)
+      .impl(() => mockCounter)
       .mock(ConfigService)
       .impl(() => mockConfigService)
       .compile();

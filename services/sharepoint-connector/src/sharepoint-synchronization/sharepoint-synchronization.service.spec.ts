@@ -1,9 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
-import { MetricService } from 'nestjs-otel';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { ModerationStatus } from '../constants/moderation-status.constants';
+import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
@@ -23,9 +23,6 @@ describe('SharepointSynchronizationService', () => {
   let mockScopeManagementService: {
     initializeRootScope: ReturnType<typeof vi.fn>;
     batchCreateScopes: ReturnType<typeof vi.fn>;
-  };
-  let mockMetricService: {
-    getHistogram: ReturnType<typeof vi.fn>;
   };
 
   const mockFile: SharepointContentItem = {
@@ -119,10 +116,6 @@ describe('SharepointSynchronizationService', () => {
       record: vi.fn(),
     };
 
-    mockMetricService = {
-      getHistogram: vi.fn().mockReturnValue(mockHistogram),
-    };
-
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -143,8 +136,8 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockPermissionsSyncService)
       .mock(ScopeManagementService)
       .impl(() => mockScopeManagementService)
-      .mock(MetricService)
-      .impl(() => mockMetricService)
+      .mock(SPC_SYNC_DURATION_SECONDS)
+      .impl(() => mockHistogram)
       .compile();
 
     service = unit;
@@ -242,6 +235,10 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('syncs permissions when enabled', async () => {
+    const mockHistogram = {
+      record: vi.fn(),
+    };
+
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -262,8 +259,8 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockPermissionsSyncService)
       .mock(ScopeManagementService)
       .impl(() => mockScopeManagementService)
-      .mock(MetricService)
-      .impl(() => mockMetricService)
+      .mock(SPC_SYNC_DURATION_SECONDS)
+      .impl(() => mockHistogram)
       .compile();
 
     await unit.synchronize();
@@ -286,6 +283,10 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('handles permissions sync errors gracefully', async () => {
+    const mockHistogram = {
+      record: vi.fn(),
+    };
+
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -308,8 +309,8 @@ describe('SharepointSynchronizationService', () => {
       }))
       .mock(ScopeManagementService)
       .impl(() => mockScopeManagementService)
-      .mock(MetricService)
-      .impl(() => mockMetricService)
+      .mock(SPC_SYNC_DURATION_SECONDS)
+      .impl(() => mockHistogram)
       .compile();
 
     await unit.synchronize();
@@ -317,7 +318,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalled();
   });
 
-  it.skip('transforms files to diff items correctly', async () => {
+  it('transforms files to diff items correctly', async () => {
     const fileWithAllFields: SharepointContentItem = {
       itemType: 'driveItem',
       item: {
@@ -399,7 +400,7 @@ describe('SharepointSynchronizationService', () => {
     );
   });
 
-  it.skip('handles missing lastModifiedDateTime gracefully', async () => {
+  it('handles missing lastModifiedDateTime gracefully', async () => {
     const fileWithoutTimestamp: SharepointContentItem = {
       itemType: 'driveItem',
       item: {

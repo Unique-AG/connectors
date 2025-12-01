@@ -1,7 +1,6 @@
 import { type Context, GraphClientError, GraphError } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import type { MetricService } from 'nestjs-otel';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '../../../config';
 import { MetricsMiddleware } from './metrics.middleware';
@@ -17,7 +16,6 @@ describe('MetricsMiddleware', () => {
   let mockCounter: {
     add: ReturnType<typeof vi.fn>;
   };
-  let mockMetricService: MetricService;
   let mockConfigService: ConfigService<Config, true>;
 
   beforeEach(() => {
@@ -33,13 +31,8 @@ describe('MetricsMiddleware', () => {
       add: vi.fn(),
     };
 
-    mockMetricService = {
-      getHistogram: vi.fn().mockReturnValue(mockHistogram),
-      getCounter: vi.fn().mockReturnValue(mockCounter),
-    } as unknown as MetricService;
-
     mockConfigService = {
-      get: vi.fn().mockImplementation((key: string) => {
+      get: vi.fn().mockImplementation((key: string, _options?: { infer?: boolean }) => {
         if (key === 'sharepoint.authTenantId') {
           return 'test-tenant-id';
         }
@@ -47,15 +40,14 @@ describe('MetricsMiddleware', () => {
       }),
     } as unknown as ConfigService<Config, true>;
 
-    middleware = new MetricsMiddleware(mockMetricService, mockConfigService, false);
-    middleware.setNext(mockNextMiddleware as never);
+    middleware = new MetricsMiddleware(mockHistogram, mockCounter, mockCounter, mockConfigService);
+    middleware.setNext(mockNextMiddleware);
   });
 
   it('logs successful request metrics', async () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/abc/drives',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     const mockResponse = new Response('{"value": []}', { status: 200 });
@@ -74,7 +66,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123/drives',
       options: {},
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -90,7 +81,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: { method: 'POST' },
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -106,7 +96,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
-      middlewareControl: {} as never,
     };
 
     const throttledResponse = new Response('Too Many Requests', { status: 429 });
@@ -124,7 +113,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
-      middlewareControl: {} as never,
     };
 
     const throttledResponse = new Response('Service Unavailable', {
@@ -145,7 +133,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
-      middlewareControl: {} as never,
     };
 
     const response = new Response('', {
@@ -166,7 +153,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
-      middlewareControl: {} as never,
     };
 
     const error = new Error('Network failure');
@@ -179,7 +165,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
-      middlewareControl: {} as never,
     };
 
     const graphError = new GraphError(404, 'Not found');
@@ -198,7 +183,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
-      middlewareControl: {} as never,
     };
 
     const clientError = new GraphClientError('Custom error');
@@ -212,7 +196,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: mockRequest,
       options: {},
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -228,7 +211,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'invalid-url',
       options: {},
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -244,7 +226,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -268,7 +249,6 @@ describe('MetricsMiddleware', () => {
       const mockContext: Context = {
         request: 'https://graph.microsoft.com/v1.0/me',
         options: {},
-        middlewareControl: {} as never,
       };
 
       mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -290,14 +270,14 @@ describe('MetricsMiddleware', () => {
 
   it('throws error if next middleware not set', async () => {
     const middlewareWithoutNext = new MetricsMiddleware(
-      mockMetricService,
+      mockHistogram,
+      mockCounter,
+      mockCounter,
       mockConfigService,
-      false,
     );
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
-      middlewareControl: {} as never,
     };
 
     await expect(middlewareWithoutNext.execute(mockContext)).rejects.toThrow(
@@ -309,7 +289,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
       options: {},
-      middlewareControl: {} as never,
     };
 
     const headers = new Headers({ 'x-request-id': '123' });
@@ -329,7 +308,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123/drives',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -353,7 +331,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/drives/drive-123/items/item-456',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     const graphError = new GraphError(404, 'Not found');
@@ -377,7 +354,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     const graphError = new GraphError(403, 'Forbidden');
@@ -398,7 +374,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     const graphError = new GraphError(503, 'Service Unavailable');
@@ -445,7 +420,6 @@ describe('MetricsMiddleware', () => {
       const mockContext: Context = {
         request: `https://graph.microsoft.com/v1.0${url}`,
         options: { method },
-        middlewareControl: {} as never,
       };
 
       mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -469,7 +443,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123/drives',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     const throttledResponse = new Response('Too Many Requests', {
@@ -497,7 +470,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123/lists',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     const throttledResponse = new Response('Too Many Requests', {
@@ -525,7 +497,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -543,7 +514,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123/drives',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -573,7 +543,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123/lists',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -603,7 +572,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/drives/drive-123/items/item-456',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -633,7 +601,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
@@ -661,7 +628,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     const initialCallCount = mockCounter.add.mock.calls.length;
@@ -685,7 +651,6 @@ describe('MetricsMiddleware', () => {
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/sites/site-123/drives',
       options: { method: 'GET' },
-      middlewareControl: {} as never,
     };
 
     const graphError = new GraphError(500, 'Internal Server Error');
@@ -717,6 +682,20 @@ describe('MetricsMiddleware', () => {
   describe('endpoint extraction with sensitive data concealment', () => {
     let loggerDebugSpy: ReturnType<typeof vi.fn>;
 
+    const createConcealingConfigService = (): ConfigService<Config, true> => {
+      return {
+        get: vi.fn().mockImplementation((key: string, _options?: { infer?: boolean }) => {
+          if (key === 'sharepoint.authTenantId') {
+            return 'test-tenant-id';
+          }
+          if (key === 'app.logsDiagnosticsDataPolicy') {
+            return 'conceal';
+          }
+          return undefined;
+        }),
+      } as unknown as ConfigService<Config, true>;
+    };
+
     beforeEach(() => {
       loggerDebugSpy = vi.fn();
       // Mock the Logger constructor to return an object with debug method
@@ -737,17 +716,18 @@ describe('MetricsMiddleware', () => {
     });
 
     it('conceals site names in logged endpoints when enabled', async () => {
+      const concealingConfigService = createConcealingConfigService();
       const concealingMiddleware = new MetricsMiddleware(
-        mockMetricService,
-        mockConfigService,
-        true,
+        mockHistogram,
+        mockCounter,
+        mockCounter,
+        concealingConfigService,
       );
-      concealingMiddleware.setNext(mockNextMiddleware as never);
+      concealingMiddleware.setNext(mockNextMiddleware);
 
       const mockContext: Context = {
         request: 'https://graph.microsoft.com/v1.0/sites/LoadTestFlat/_layouts/15/download.aspx',
         options: { method: 'GET' },
-        middlewareControl: {} as never,
       };
 
       const mockResponse = new Response('{"value": []}', { status: 200 });
@@ -767,18 +747,19 @@ describe('MetricsMiddleware', () => {
     });
 
     it('conceals site IDs in logged endpoints when enabled', async () => {
+      const concealingConfigService = createConcealingConfigService();
       const concealingMiddleware = new MetricsMiddleware(
-        mockMetricService,
-        mockConfigService,
-        true,
+        mockHistogram,
+        mockCounter,
+        mockCounter,
+        concealingConfigService,
       );
-      concealingMiddleware.setNext(mockNextMiddleware as never);
+      concealingMiddleware.setNext(mockNextMiddleware);
 
       const mockContext: Context = {
         request:
           'https://graph.microsoft.com/v1.0/sites/1d045c6a-f230-48fd-b826-7cf8601d7729/lists',
         options: { method: 'GET' },
-        middlewareControl: {} as never,
       };
 
       const mockResponse = new Response('{"value": []}', { status: 200 });
@@ -798,17 +779,18 @@ describe('MetricsMiddleware', () => {
     });
 
     it('conceals site IDs in logged endpoints without trailing path when enabled', async () => {
+      const concealingConfigService = createConcealingConfigService();
       const concealingMiddleware = new MetricsMiddleware(
-        mockMetricService,
-        mockConfigService,
-        true,
+        mockHistogram,
+        mockCounter,
+        mockCounter,
+        concealingConfigService,
       );
-      concealingMiddleware.setNext(mockNextMiddleware as never);
+      concealingMiddleware.setNext(mockNextMiddleware);
 
       const mockContext: Context = {
         request: 'https://graph.microsoft.com/v1.0/sites/1d045c6a-f230-48fd-b826-7cf8601d7729',
         options: { method: 'GET' },
-        middlewareControl: {} as never,
       };
 
       const mockResponse = new Response('{"value": []}', { status: 200 });
@@ -829,16 +811,16 @@ describe('MetricsMiddleware', () => {
 
     it('does not conceal endpoints in logs when disabled', async () => {
       const nonConcealingMiddleware = new MetricsMiddleware(
-        mockMetricService,
+        mockHistogram,
+        mockCounter,
+        mockCounter,
         mockConfigService,
-        false,
       );
-      nonConcealingMiddleware.setNext(mockNextMiddleware as never);
+      nonConcealingMiddleware.setNext(mockNextMiddleware);
 
       const mockContext: Context = {
         request: 'https://graph.microsoft.com/v1.0/sites/LoadTestFlat/_layouts/15/download.aspx',
         options: { method: 'GET' },
-        middlewareControl: {} as never,
       };
 
       const mockResponse = new Response('{"value": []}', { status: 200 });

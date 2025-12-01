@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { MetricService } from 'nestjs-otel';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
@@ -60,11 +60,15 @@ describe('ContentSyncService', () => {
           },
         },
         {
-          provide: MetricService,
+          provide: SPC_FILE_DIFF_EVENTS_TOTAL,
           useValue: {
-            getCounter: vi.fn().mockReturnValue({
-              add: vi.fn(),
-            }),
+            add: vi.fn(),
+          },
+        },
+        {
+          provide: SPC_FILE_DELETED_TOTAL,
+          useValue: {
+            add: vi.fn(),
           },
         },
       ],
@@ -76,12 +80,12 @@ describe('ContentSyncService', () => {
     uniqueFilesService = module.get<UniqueFilesService>(UniqueFilesService);
   });
 
-  it('should be defined', () => {
+  it('is defined', () => {
     expect(service).toBeDefined();
   });
 
   describe('syncContentForSite', () => {
-    it('should throw an error if the number of files to ingest exceeds the limit', async () => {
+    it('throws an error if the number of files to ingest exceeds the limit', async () => {
       const siteId = 'site-id';
       const items = [
         {
@@ -128,7 +132,7 @@ describe('ContentSyncService', () => {
       );
     });
 
-    it('should not throw an error if the number of files to ingest is within the limit', async () => {
+    it('does not throw an error if the number of files to ingest is within the limit', async () => {
       const siteId = 'site-id';
       const items = [
         {
@@ -168,7 +172,7 @@ describe('ContentSyncService', () => {
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
-    it('should not throw an error if the limit is not set', async () => {
+    it('does not throw an error if the limit is not set', async () => {
       const siteId = 'site-id';
       const items = [
         {
@@ -208,7 +212,7 @@ describe('ContentSyncService', () => {
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
-    it('should not throw an error when no files need to be ingested', async () => {
+    it('does not throw an error when no files need to be ingested', async () => {
       const siteId = 'site-id';
       const items = [] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
@@ -246,7 +250,7 @@ describe('ContentSyncService', () => {
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
-    it('should not throw an error when total files to ingest equals the limit', async () => {
+    it('does not throw an error when total files to ingest equals the limit', async () => {
       const siteId = 'site-id';
       const items = [
         {
@@ -286,7 +290,7 @@ describe('ContentSyncService', () => {
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
-    it('should throw an error with correct message format when limit is exceeded', async () => {
+    it('throws an error with correct message format when limit is exceeded', async () => {
       const siteId = 'test-site-123';
       const items = [
         {
@@ -341,7 +345,7 @@ describe('ContentSyncService', () => {
       );
     });
 
-    it('should handle limit validation with only new files', async () => {
+    it('handles limit validation with only new files', async () => {
       const siteId = 'site-id';
       const items = [
         {
@@ -389,7 +393,7 @@ describe('ContentSyncService', () => {
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
-    it('should handle limit validation with only updated files', async () => {
+    it('handles limit validation with only updated files', async () => {
       const siteId = 'site-id';
       const items = [
         {
