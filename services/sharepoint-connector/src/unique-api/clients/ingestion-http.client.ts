@@ -73,6 +73,10 @@ export class IngestionHttpClient implements OnModuleDestroy {
       'file-diff',
       'scoped',
       'upload',
+      // The two segments below are not path of the ingestion service but may occur due to cluster
+      // routing based on paths.
+      'ingestion',
+      'ingestion-gen2',
     ]);
 
     this.limiter = this.bottleneckFactory.createLimiter(
