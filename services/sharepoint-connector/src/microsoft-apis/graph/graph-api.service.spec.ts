@@ -3,50 +3,40 @@ import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileFilterService } from './file-filter.service';
 import { GraphApiService } from './graph-api.service';
-import { GraphClientFactory } from './graph-client.factory';
+import { GraphHttpService } from './graph-http.service';
 import type { DriveItem } from './types/sharepoint.types';
 import type { SharepointContentItem } from './types/sharepoint-content-item.interface';
 
 describe('GraphApiService', () => {
   let service: GraphApiService;
-  let mockGraphClient: {
-    api: ReturnType<typeof vi.fn>;
+  let mockGraphHttpService: {
+    get: ReturnType<typeof vi.fn>;
+    getStream: ReturnType<typeof vi.fn>;
   };
   let mockFileFilterService: Partial<FileFilterService>;
 
   const mockDrive = { id: 'drive-1', name: 'Documents' };
 
   beforeEach(async () => {
-    mockGraphClient = {
-      api: vi.fn(),
-    };
-
-    const mockChain = {
+    mockGraphHttpService = {
       get: vi.fn(),
-      select: vi.fn(),
-      expand: vi.fn(),
       getStream: vi.fn(),
     };
 
-    mockChain.select.mockReturnValue(mockChain);
-    mockChain.expand.mockReturnValue(mockChain);
-    mockGraphClient.api.mockReturnValue(mockChain);
-
     // Mock get() calls based on the API endpoint
-    mockChain.get.mockImplementation((path?: string) => {
-      if (path?.includes('/lists')) {
-        // Return empty lists for getListsForSite
+    mockGraphHttpService.get.mockImplementation((path: string) => {
+      if (path.includes('/lists')) {
         return Promise.resolve({ value: [] });
       }
-      if (path?.includes('/drives/')) {
-        // Return mock drive for getDrivesForSite
+      if (path.includes('/drives/') && path.includes('/children')) {
+        return Promise.resolve({ value: [] });
+      }
+      if (path.includes('/drives/') && !path.includes('/items/')) {
         return Promise.resolve({ value: [mockDrive] });
       }
-      if (path?.includes('/sites/') && path?.includes('/webUrl')) {
-        // Return site web URL
+      if (path.includes('/sites/') && !path.includes('/lists') && !path.includes('/drives')) {
         return Promise.resolve({ webUrl: 'https://contoso.sharepoint.com/sites/test' });
       }
-      // Default: return empty result to terminate pagination
       return Promise.resolve({ value: [] });
     });
 
@@ -57,10 +47,8 @@ describe('GraphApiService', () => {
     };
 
     const { unit } = await TestBed.solitary(GraphApiService)
-      .mock(GraphClientFactory)
-      .impl(() => ({
-        createClient: () => mockGraphClient,
-      }))
+      .mock(GraphHttpService)
+      .impl(() => mockGraphHttpService)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
@@ -76,7 +64,6 @@ describe('GraphApiService', () => {
 
     service = unit;
 
-    // Mock the rate limiter to avoid async issues
     // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
     (service as any).makeRateLimitedRequest = vi.fn().mockImplementation(
       // biome-ignore lint/suspicious/noExplicitAny: Generic promise type for mocking
@@ -282,43 +269,32 @@ describe('GraphApiService', () => {
 
   describe('downloadFileContent', () => {
     it('downloads file content successfully', async () => {
-      const mockChain = mockGraphClient.api();
       const content = Buffer.from('test content');
-
-      async function* mockStream() {
-        yield content;
-      }
-
-      mockChain.getStream.mockResolvedValue(mockStream());
+      mockGraphHttpService.getStream.mockResolvedValue(content);
 
       const result = await service.downloadFileContent('drive-1', 'file-1');
 
       expect(result).toEqual(content);
-      expect(mockGraphClient.api).toHaveBeenCalledWith('/drives/drive-1/items/file-1/content');
+      expect(mockGraphHttpService.getStream).toHaveBeenCalledWith(
+        '/drives/drive-1/items/file-1/content',
+      );
     });
 
-    it('handles multiple chunks correctly', async () => {
-      const mockChain = mockGraphClient.api();
+    it('returns buffer with correct content', async () => {
       const chunk1 = Buffer.from('first');
       const chunk2 = Buffer.from('second');
-
-      async function* mockStream() {
-        yield chunk1;
-        yield chunk2;
-      }
-
-      mockChain.getStream.mockResolvedValue(mockStream());
+      const combinedContent = Buffer.concat([chunk1, chunk2]);
+      mockGraphHttpService.getStream.mockResolvedValue(combinedContent);
 
       const result = await service.downloadFileContent('drive-1', 'file-1');
 
-      expect(result).toEqual(Buffer.concat([chunk1, chunk2]));
+      expect(result).toEqual(combinedContent);
     });
   });
 
   describe('getSitePageContent', () => {
     it('retrieves page content with canvas and wiki content', async () => {
-      const mockChain = mockGraphClient.api();
-      mockChain.get.mockResolvedValue({
+      mockGraphHttpService.get.mockResolvedValue({
         fields: {
           CanvasContent1: '<div>Modern content</div>',
           WikiField: '<div>Legacy content</div>',
@@ -333,15 +309,17 @@ describe('GraphApiService', () => {
         wikiField: '<div>Legacy content</div>',
         title: 'Test Page',
       });
-      expect(mockGraphClient.api).toHaveBeenCalledWith('/sites/site-1/lists/list-1/items/item-1');
-      expect(mockChain.expand).toHaveBeenCalledWith(
-        'fields($select=CanvasContent1,WikiField,Title)',
+      expect(mockGraphHttpService.get).toHaveBeenCalledWith(
+        '/sites/site-1/lists/list-1/items/item-1',
+        expect.objectContaining({
+          select: 'id',
+          expand: 'fields($select=CanvasContent1,WikiField,Title)',
+        }),
       );
     });
 
     it('handles missing CanvasContent1 field', async () => {
-      const mockChain = mockGraphClient.api();
-      mockChain.get.mockResolvedValue({
+      mockGraphHttpService.get.mockResolvedValue({
         fields: {
           WikiField: '<div>Legacy content</div>',
           Title: 'Test Page',
@@ -358,8 +336,7 @@ describe('GraphApiService', () => {
     });
 
     it('handles missing WikiField field', async () => {
-      const mockChain = mockGraphClient.api();
-      mockChain.get.mockResolvedValue({
+      mockGraphHttpService.get.mockResolvedValue({
         fields: {
           CanvasContent1: '<div>Modern content</div>',
           Title: 'Test Page',
@@ -376,8 +353,7 @@ describe('GraphApiService', () => {
     });
 
     it('handles missing Title field', async () => {
-      const mockChain = mockGraphClient.api();
-      mockChain.get.mockResolvedValue({
+      mockGraphHttpService.get.mockResolvedValue({
         fields: {
           CanvasContent1: '<div>Modern content</div>',
           WikiField: '<div>Legacy content</div>',
@@ -394,8 +370,7 @@ describe('GraphApiService', () => {
     });
 
     it('throws error when response lacks fields', async () => {
-      const mockChain = mockGraphClient.api();
-      mockChain.get.mockResolvedValue({});
+      mockGraphHttpService.get.mockResolvedValue({});
 
       await expect(service.getAspxPageContent('site-1', 'list-1', 'item-1')).rejects.toThrow(
         'MS Graph response missing fields for page content',
