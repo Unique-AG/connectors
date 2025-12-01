@@ -13,7 +13,11 @@ import {
   getHttpStatusCodeClass,
   getSlowRequestDurationBucket,
 } from '../../../metrics';
-import { redactSiteNameFromPath, smearSiteIdFromPath } from '../../../utils/logging.util';
+import {
+  redactSiteNameFromPath,
+  shouldConcealLogs,
+  smearSiteIdFromPath,
+} from '../../../utils/logging.util';
 import { elapsedMilliseconds, elapsedSeconds } from '../../../utils/timing.util';
 import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.types';
 
@@ -23,23 +27,15 @@ export class MetricsMiddleware implements Middleware {
   private nextMiddleware: Middleware | undefined;
   private readonly extractApiMethod: ReturnType<typeof createApiMethodExtractor>;
 
-  private readonly spcGraphApiRequestDurationSeconds: Histogram;
-  private readonly spcGraphApiThrottleEventsTotal: Counter;
-  private readonly spcGraphApiSlowRequestsTotal: Counter;
-
   private readonly msTenantId: string;
 
   public constructor(
-    spcGraphApiRequestDurationSeconds: Histogram,
-    spcGraphApiThrottleEventsTotal: Counter,
-    spcGraphApiSlowRequestsTotal: Counter,
+    private readonly spcGraphApiRequestDurationSeconds: Histogram,
+    private readonly spcGraphApiThrottleEventsTotal: Counter,
+    private readonly spcGraphApiSlowRequestsTotal: Counter,
     configService: ConfigService<Config, true>,
-    shouldConcealLogs: boolean,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs;
-    this.spcGraphApiRequestDurationSeconds = spcGraphApiRequestDurationSeconds;
-    this.spcGraphApiThrottleEventsTotal = spcGraphApiThrottleEventsTotal;
-    this.spcGraphApiSlowRequestsTotal = spcGraphApiSlowRequestsTotal;
+    this.shouldConcealLogs = shouldConcealLogs(configService);
     this.msTenantId = configService.get('sharepoint.authTenantId', { infer: true });
 
     this.extractApiMethod = createApiMethodExtractor([

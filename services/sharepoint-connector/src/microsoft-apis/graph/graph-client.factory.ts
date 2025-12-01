@@ -19,7 +19,6 @@ import {
   SPC_MS_GRAPH_API_SLOW_REQUESTS_TOTAL,
   SPC_MS_GRAPH_API_THROTTLE_EVENTS_TOTAL,
 } from '../../metrics';
-import { shouldConcealLogs } from '../../utils/logging.util';
 import { GraphAuthenticationService } from './middlewares/graph-authentication.service';
 import { MetricsMiddleware } from './middlewares/metrics.middleware';
 import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
@@ -27,7 +26,6 @@ import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
 @Injectable()
 export class GraphClientFactory {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly graphAuthenticationService: GraphAuthenticationService,
@@ -38,9 +36,7 @@ export class GraphClientFactory {
     private readonly spcGraphApiThrottleEventsTotal: Counter,
     @Inject(SPC_MS_GRAPH_API_SLOW_REQUESTS_TOTAL)
     private readonly spcGraphApiSlowRequestsTotal: Counter,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public createClient(): Client {
     const authenticationHandler = new AuthenticationHandler(this.graphAuthenticationService);
@@ -53,7 +49,6 @@ export class GraphClientFactory {
       this.spcGraphApiThrottleEventsTotal,
       this.spcGraphApiSlowRequestsTotal,
       this.configService,
-      this.shouldConcealLogs,
     );
     const httpMessageHandler = new HTTPMessageHandler();
 
