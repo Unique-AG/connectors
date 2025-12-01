@@ -6,7 +6,7 @@ import type { RequestDocument, RequestOptions, Variables } from 'graphql-request
 import { GraphQLClient } from 'graphql-request';
 import { isObjectType } from 'remeda';
 import { Config } from '../../config';
-import { getDurationBucket, getHttpStatusCodeClass } from '../../metrics';
+import { getHttpStatusCodeClass, getSlowRequestDurationBucket } from '../../metrics';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { normalizeError } from '../../utils/normalize-error';
 import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
@@ -84,11 +84,11 @@ export class UniqueGraphqlClient {
         });
 
         const duration = elapsedMilliseconds(startTime);
-        const durationBucket = getDurationBucket(duration);
-        if (durationBucket) {
+        const slowRequestDurationBucket = getSlowRequestDurationBucket(duration);
+        if (slowRequestDurationBucket) {
           this.spcUniqueApiSlowRequestsTotal.add(1, {
             api_method: apiMethod,
-            duration_bucket: durationBucket,
+            duration_bucket: slowRequestDurationBucket,
           });
 
           this.logger.warn({
@@ -96,7 +96,7 @@ export class UniqueGraphqlClient {
             target: this.clientTarget,
             operationName,
             duration,
-            durationBucket,
+            durationBucket: slowRequestDurationBucket,
           });
         }
 
@@ -112,11 +112,11 @@ export class UniqueGraphqlClient {
         });
 
         const duration = elapsedMilliseconds(startTime);
-        const durationBucket = getDurationBucket(duration);
-        if (durationBucket) {
+        const slowRequestDurationBucket = getSlowRequestDurationBucket(duration);
+        if (slowRequestDurationBucket) {
           this.spcUniqueApiSlowRequestsTotal.add(1, {
             api_method: apiMethod,
-            duration_bucket: durationBucket,
+            duration_bucket: slowRequestDurationBucket,
           });
         }
 

@@ -10,8 +10,8 @@ import { type Counter, type Histogram } from '@opentelemetry/api';
 import type { Config } from '../../../config';
 import {
   createApiMethodExtractor,
-  getDurationBucket,
   getHttpStatusCodeClass,
+  getSlowRequestDurationBucket,
 } from '../../../metrics';
 import { redactSiteNameFromPath, smearSiteIdFromPath } from '../../../utils/logging.util';
 import { elapsedMilliseconds, elapsedSeconds } from '../../../utils/timing.util';
@@ -107,12 +107,12 @@ export class MetricsMiddleware implements Middleware {
       }
 
       const duration = elapsedMilliseconds(startTime);
-      const durationBucket = getDurationBucket(duration);
-      if (durationBucket) {
+      const slowRequestDurationBucket = getSlowRequestDurationBucket(duration);
+      if (slowRequestDurationBucket) {
         this.spcGraphApiSlowRequestsTotal.add(1, {
           ms_tenant_id: this.msTenantId,
           api_method: apiMethod,
-          duration_bucket: durationBucket,
+          duration_bucket: slowRequestDurationBucket,
         });
 
         this.logger.warn({
@@ -120,7 +120,7 @@ export class MetricsMiddleware implements Middleware {
           endpoint: loggedEndpoint,
           method: httpMethod,
           duration,
-          durationBucket,
+          durationBucket: slowRequestDurationBucket,
         });
       }
     } catch (error) {
@@ -135,12 +135,12 @@ export class MetricsMiddleware implements Middleware {
         http_status_class: statusClass,
       });
 
-      const durationBucket = getDurationBucket(duration);
-      if (durationBucket) {
+      const slowRequestDurationBucket = getSlowRequestDurationBucket(duration);
+      if (slowRequestDurationBucket) {
         this.spcGraphApiSlowRequestsTotal.add(1, {
           ms_tenant_id: this.msTenantId,
           api_method: apiMethod,
-          duration_bucket: durationBucket,
+          duration_bucket: slowRequestDurationBucket,
         });
       }
 

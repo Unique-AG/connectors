@@ -1,40 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import {
   createApiMethodExtractor,
-  getDurationBucket,
   getHttpStatusCodeClass,
+  getSlowRequestDurationBucket,
 } from './utils';
 
 describe('getDurationBucket', () => {
   it('returns null for durations under or equal to 1 second', () => {
-    expect(getDurationBucket(0)).toBeNull();
-    expect(getDurationBucket(500)).toBeNull();
-    expect(getDurationBucket(1_000)).toBeNull();
+    expect(getSlowRequestDurationBucket(0)).toBeNull();
+    expect(getSlowRequestDurationBucket(500)).toBeNull();
+    expect(getSlowRequestDurationBucket(1_000)).toBeNull();
   });
 
   it('returns >1s for durations between 1 and 2 seconds', () => {
-    expect(getDurationBucket(1_001)).toBe('>1s');
-    expect(getDurationBucket(1_500)).toBe('>1s');
-    expect(getDurationBucket(2_000)).toBe('>1s');
+    expect(getSlowRequestDurationBucket(1_001)).toBe('>1s');
+    expect(getSlowRequestDurationBucket(1_500)).toBe('>1s');
+    expect(getSlowRequestDurationBucket(2_000)).toBe('>1s');
   });
 
   it('returns >3s for durations between 2 and 5 seconds', () => {
-    expect(getDurationBucket(2_001)).toBe('>2s');
-    expect(getDurationBucket(3_000)).toBe('>2s');
-    expect(getDurationBucket(4_000)).toBe('>2s');
-    expect(getDurationBucket(5_000)).toBe('>2s');
+    expect(getSlowRequestDurationBucket(2_001)).toBe('>2s');
+    expect(getSlowRequestDurationBucket(3_000)).toBe('>2s');
+    expect(getSlowRequestDurationBucket(4_000)).toBe('>2s');
+    expect(getSlowRequestDurationBucket(5_000)).toBe('>2s');
   });
 
   it('returns >5s for durations between 5 and 10 seconds', () => {
-    expect(getDurationBucket(5_001)).toBe('>5s');
-    expect(getDurationBucket(7_500)).toBe('>5s');
-    expect(getDurationBucket(10_000)).toBe('>5s');
+    expect(getSlowRequestDurationBucket(5_001)).toBe('>5s');
+    expect(getSlowRequestDurationBucket(7_500)).toBe('>5s');
+    expect(getSlowRequestDurationBucket(10_000)).toBe('>5s');
   });
 
   it('returns >10s for durations over 10 seconds', () => {
-    expect(getDurationBucket(10_001)).toBe('>10s');
-    expect(getDurationBucket(15_000)).toBe('>10s');
-    expect(getDurationBucket(100_000)).toBe('>10s');
+    expect(getSlowRequestDurationBucket(10_001)).toBe('>10s');
+    expect(getSlowRequestDurationBucket(15_000)).toBe('>10s');
+    expect(getSlowRequestDurationBucket(100_000)).toBe('>10s');
   });
 });
 

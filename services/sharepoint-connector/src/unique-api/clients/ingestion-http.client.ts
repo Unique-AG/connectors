@@ -6,8 +6,8 @@ import { Client, Dispatcher, errors, interceptors } from 'undici';
 import { Config } from '../../config';
 import {
   createApiMethodExtractor,
-  getDurationBucket,
   getHttpStatusCodeClass,
+  getSlowRequestDurationBucket,
   SPC_UNIQUE_REST_API_REQUEST_DURATION_SECONDS,
   SPC_UNIQUE_REST_API_SLOW_REQUESTS_TOTAL,
 } from '../../metrics';
@@ -127,11 +127,11 @@ export class IngestionHttpClient implements OnModuleDestroy {
         });
 
         const duration = elapsedMilliseconds(startTime);
-        const durationBucket = getDurationBucket(duration);
-        if (durationBucket) {
+        const slowRequestDurationBucket = getSlowRequestDurationBucket(duration);
+        if (slowRequestDurationBucket) {
           this.spcUniqueApiSlowRequestsTotal.add(1, {
             api_method: apiMethod,
-            duration_bucket: durationBucket,
+            duration_bucket: slowRequestDurationBucket,
           });
 
           this.logger.warn({
@@ -139,7 +139,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
             method: options.method || 'GET',
             path: options.path,
             duration,
-            durationBucket,
+            durationBucket: slowRequestDurationBucket,
           });
         }
 
@@ -155,11 +155,11 @@ export class IngestionHttpClient implements OnModuleDestroy {
         });
 
         const duration = elapsedMilliseconds(startTime);
-        const durationBucket = getDurationBucket(duration);
-        if (durationBucket) {
+        const slowRequestDurationBucket = getSlowRequestDurationBucket(duration);
+        if (slowRequestDurationBucket) {
           this.spcUniqueApiSlowRequestsTotal.add(1, {
             api_method: apiMethod,
-            duration_bucket: durationBucket,
+            duration_bucket: slowRequestDurationBucket,
           });
         }
 
