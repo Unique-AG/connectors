@@ -4,7 +4,7 @@ import {
   registerConfig,
 } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-import { redacted } from '~/utils/zod';
+import { redacted, stringToURL } from '~/utils/zod';
 
 const ConfigSchema = z.object({
   clientId: z
@@ -14,6 +14,12 @@ const ConfigSchema = z.object({
   clientSecret: redacted(z.string().min(1)).describe(
     'The client secret of the Microsoft App Registration that the MCP Server will use.',
   ),
+  webhookSecret: redacted(z.string().length(128)).describe(
+    'The webhook secret for validating subscriptions hooks (spoof protection). Must be a 128 random characters.',
+  ),
+  publicWebhookUrl: stringToURL().describe(
+    'The public webhook URL reachable from external network used by Microsoft Graph subscription for pushes.'
+  )
 });
 
 export const microsoftConfig = registerConfig('microsoft', ConfigSchema);
