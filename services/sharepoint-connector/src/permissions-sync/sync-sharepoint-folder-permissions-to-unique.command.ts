@@ -1,6 +1,7 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { type Counter } from '@opentelemetry/api';
 import {
   differenceWith,
   filter,
@@ -13,6 +14,7 @@ import {
   pipe,
 } from 'remeda';
 import { Config } from '../config';
+import { SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
@@ -50,6 +52,8 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly configService: ConfigService<Config, true>,
+    @Inject(SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL)
+    private readonly spcFolderPermissionsSyncTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -57,7 +61,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId, rootPath, serviceUserId } = context;
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
 
     const rootGroup = await this.uniqueGroupsService.getRootGroup();
     if (!rootGroup) {
@@ -78,6 +84,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
       `${logPrefix} Starting folder permissions sync for ${uniqueFoldersToProcess.length} Unique folders ` +
         `(filtered ${unique.folders.length - uniqueFoldersToProcess.length} parent folders)`,
     );
+
+    let totalScopeAccessesAdded = 0;
+    let totalScopeAccessesRemoved = 0;
 
     for (const uniqueFolder of uniqueFoldersToProcess) {
       assert.ok(
@@ -107,7 +116,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
         continue;
       }
 
-      await this.syncScopeAccesses({
+      const { added, removed } = await this.syncScopeAccesses({
         logPrefix: loopLogPrefix,
         sharePoint: {
           scopeAccesses: sharePointScopeAccesses,
@@ -116,6 +125,22 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
           folder: uniqueFolder,
           serviceUserId,
         },
+      });
+
+      totalScopeAccessesAdded += added;
+      totalScopeAccessesRemoved += removed;
+    }
+
+    if (totalScopeAccessesAdded > 0) {
+      this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesAdded, {
+        sp_site_id: logSiteId,
+        operation: 'added',
+      });
+    }
+    if (totalScopeAccessesRemoved > 0) {
+      this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesRemoved, {
+        sp_site_id: logSiteId,
+        operation: 'removed',
       });
     }
   }
@@ -268,7 +293,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
       folder: ScopeWithPath;
       serviceUserId: string;
     };
-  }): Promise<void> {
+  }): Promise<{ added: number; removed: number }> {
     const { logPrefix, sharePoint, unique } = input;
 
     assert.ok(
@@ -303,5 +328,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     if (scopeAccessesToRemove.length > 0) {
       await this.uniqueScopesService.deleteScopeAccesses(unique.folder.id, scopeAccessesToRemove);
     }
+
+    return { added: scopeAccessesToAdd.length, removed: scopeAccessesToRemove.length };
   }
 }

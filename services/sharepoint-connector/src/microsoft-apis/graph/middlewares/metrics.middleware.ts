@@ -5,72 +5,144 @@ import {
   Middleware,
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
-import { redactSiteNameFromPath, smearSiteIdFromPath } from '../../../utils/logging.util';
+import type { ConfigService } from '@nestjs/config';
+import { type Counter, type Histogram } from '@opentelemetry/api';
+import type { Config } from '../../../config';
+import {
+  createApiMethodExtractor,
+  getHttpStatusCodeClass,
+  getSlowRequestDurationBucket,
+} from '../../../metrics';
+import {
+  redactSiteNameFromPath,
+  shouldConcealLogs,
+  smearSiteIdFromPath,
+} from '../../../utils/logging.util';
+import { elapsedMilliseconds, elapsedSeconds } from '../../../utils/timing.util';
 import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.types';
 
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
   private readonly shouldConcealLogs: boolean;
   private nextMiddleware: Middleware | undefined;
+  private readonly extractApiMethod: ReturnType<typeof createApiMethodExtractor>;
 
-  public constructor(shouldConcealLogs: boolean) {
-    this.shouldConcealLogs = shouldConcealLogs;
+  private readonly msTenantId: string;
+
+  public constructor(
+    private readonly spcGraphApiRequestDurationSeconds: Histogram,
+    private readonly spcGraphApiThrottleEventsTotal: Counter,
+    private readonly spcGraphApiSlowRequestsTotal: Counter,
+    configService: ConfigService<Config, true>,
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(configService);
+    this.msTenantId = configService.get('sharepoint.authTenantId', { infer: true });
+
+    this.extractApiMethod = createApiMethodExtractor([
+      'sites',
+      'drives',
+      'items',
+      'children',
+      'content',
+      'lists',
+      'permissions',
+      'groups',
+      'members',
+      'owners',
+    ]);
   }
 
   public async execute(context: Context): Promise<void> {
     if (!this.nextMiddleware) throw new Error('Next middleware not set');
 
     const loggedEndpoint = this.extractEndpoint(context.request);
-    const method = this.extractMethod(context.options);
+    const httpMethod = this.extractMethod(context.options);
+    const apiMethod = this.extractApiMethod(loggedEndpoint, httpMethod);
+
     const startTime = Date.now();
 
     try {
       await this.nextMiddleware.execute(context);
 
-      const duration = Date.now() - startTime;
-      const statusCode = context.response?.status || 0;
-      const statusClass = this.getStatusClass(statusCode);
+      const statusClass = getHttpStatusCodeClass(context.response?.status || 0);
+
+      this.spcGraphApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
+        ms_tenant_id: this.msTenantId,
+        api_method: apiMethod,
+        result: 'success',
+        http_status_class: statusClass,
+      });
 
       this.logger.debug({
         msg: 'Graph API request completed',
         endpoint: loggedEndpoint,
-        method,
-        statusCode,
-        statusClass,
-        duration,
+        method: httpMethod,
+        statusCode: statusClass,
+        duration: elapsedMilliseconds(startTime),
       });
 
       if (this.isThrottled(context.response)) {
         const policy = this.getThrottlePolicy(context.response);
 
+        this.spcGraphApiThrottleEventsTotal.add(1, {
+          ms_tenant_id: this.msTenantId,
+          api_method: apiMethod,
+          policy,
+        });
+
         this.logger.warn({
           msg: 'Graph API request throttled',
           endpoint: loggedEndpoint,
-          method,
-          statusCode,
+          method: httpMethod,
+          statusCode: statusClass,
           policy,
-          duration,
+          duration: elapsedMilliseconds(startTime),
         });
       }
 
-      if (duration > 5000) {
+      const duration = elapsedMilliseconds(startTime);
+      const slowRequestDurationBucket = getSlowRequestDurationBucket(duration);
+      if (slowRequestDurationBucket) {
+        this.spcGraphApiSlowRequestsTotal.add(1, {
+          ms_tenant_id: this.msTenantId,
+          api_method: apiMethod,
+          duration_bucket: slowRequestDurationBucket,
+        });
+
         this.logger.warn({
           msg: 'Slow Graph API request detected',
           endpoint: loggedEndpoint,
-          method,
+          method: httpMethod,
           duration,
-          statusCode,
+          durationBucket: slowRequestDurationBucket,
         });
       }
     } catch (error) {
-      const duration = Date.now() - startTime;
-
       const errorDetails = this.extractGraphErrorDetails(error);
+      const statusClass = getHttpStatusCodeClass(this.extractStatusCodeFromError(error));
+      const duration = elapsedMilliseconds(startTime);
+
+      this.spcGraphApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
+        ms_tenant_id: this.msTenantId,
+        api_method: apiMethod,
+        result: 'error',
+        http_status_class: statusClass,
+      });
+
+      const slowRequestDurationBucket = getSlowRequestDurationBucket(duration);
+      if (slowRequestDurationBucket) {
+        this.spcGraphApiSlowRequestsTotal.add(1, {
+          ms_tenant_id: this.msTenantId,
+          api_method: apiMethod,
+          duration_bucket: slowRequestDurationBucket,
+        });
+      }
 
       this.logger.error({
         msg: 'Graph API request failed',
         endpoint: loggedEndpoint,
-        method,
+        method: httpMethod,
+        statusCode: statusClass,
         duration,
         error: errorDetails,
       });
@@ -83,34 +155,8 @@ export class MetricsMiddleware implements Middleware {
     this.nextMiddleware = next;
   }
 
-  private extractEndpoint(request: RequestInfo): string {
-    try {
-      const url = typeof request === 'string' ? request : request.url;
-      const urlObj = new URL(url);
-      let endpoint = urlObj.pathname.replace(/^\/v\d+(\.\d+)?/, '');
-
-      // Apply logging policy to sensitive path segments
-      if (this.shouldConcealLogs) {
-        endpoint = redactSiteNameFromPath(endpoint); // Process names first
-        endpoint = smearSiteIdFromPath(endpoint); // Then GUIDs (more specific match)
-      }
-
-      return endpoint || '/';
-    } catch {
-      return 'unknown';
-    }
-  }
-
   private extractMethod(options: RequestInit | undefined): string {
     return options?.method?.toUpperCase() || 'GET';
-  }
-
-  private getStatusClass(statusCode: number): string {
-    if (statusCode >= 200 && statusCode < 300) return '2xx';
-    if (statusCode >= 300 && statusCode < 400) return '3xx';
-    if (statusCode >= 400 && statusCode < 500) return '4xx';
-    if (statusCode >= 500) return '5xx';
-    return 'unknown';
   }
 
   private isThrottled(response: Response | undefined): boolean {
@@ -131,13 +177,13 @@ export class MetricsMiddleware implements Middleware {
     // Check for standard Retry-After header
     const retryAfter = response.headers.get('Retry-After');
     if (retryAfter) {
-      return 'retry-after';
+      return 'retry_after';
     }
 
     // Check for Rate-Limit headers
     const rateLimit = response.headers.get('RateLimit-Limit');
     if (rateLimit) {
-      return 'rate-limit';
+      return 'rate_limit';
     }
 
     return 'unknown';
@@ -201,5 +247,35 @@ export class MetricsMiddleware implements Middleware {
       return Object.fromEntries(headers.entries());
     }
     return headers;
+  }
+
+  private extractEndpoint(request: RequestInfo): string {
+    try {
+      const url = typeof request === 'string' ? request : request.url;
+      const urlObj = new URL(url);
+      let endpoint = urlObj.pathname.replace(/^\/(v\d+(\.\d+)?|beta)/, '');
+
+      // Apply logging policy to sensitive path segments
+      if (this.shouldConcealLogs) {
+        endpoint = redactSiteNameFromPath(endpoint); // Process names first
+        endpoint = smearSiteIdFromPath(endpoint); // Then GUIDs (more specific match)
+      }
+
+      return endpoint || '/';
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  private extractStatusCodeFromError(error: unknown): number {
+    if (error instanceof GraphError) {
+      return error.statusCode || 0;
+    }
+
+    if (isGraphApiError(error)) {
+      return error.statusCode || error.response?.status || 0;
+    }
+
+    return 0;
   }
 }

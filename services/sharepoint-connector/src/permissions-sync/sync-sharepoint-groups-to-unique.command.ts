@@ -1,8 +1,9 @@
-import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
+import { type Counter } from '@opentelemetry/api';
+import { difference, filter, isNonNullish, map, pickBy, pipe } from 'remeda';
 import { Config } from '../config';
+import { SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
@@ -43,13 +44,18 @@ export class SyncSharepointGroupsToUniqueCommand {
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly graphApiService: GraphApiService,
     private readonly configService: ConfigService<Config, true>,
+    @Inject(SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL)
+    private readonly spcPermissionsSyncGroupOperationsTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async run(input: Input): Promise<Output> {
     const { siteId, sharePoint, unique } = input;
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
+
     const siteName = await this.graphApiService.getSiteName(siteId);
     const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 
@@ -114,21 +120,24 @@ export class SyncSharepointGroupsToUniqueCommand {
       updatedUniqueGroupsMap[sharePointGroup.id] = correspondingUniqueGroup;
     }
 
-    const missingGroupDistinctIds = difference(
-      keys(unique.groupsMap),
-      keys(updatedUniqueGroupsMap),
-    );
-
-    this.logger.log(
-      `${logPrefix} Deleting ${missingGroupDistinctIds.length} missing unique groups`,
-    );
-    for (const groupDistinctId of missingGroupDistinctIds) {
-      const missingGroup =
-        unique.groupsMap[groupDistinctId] ??
-        assert.fail(`Missing group ${groupDistinctId} in unique groups map`);
-      await this.uniqueGroupsService.deleteGroup(missingGroup.id);
-      groupsSyncStats.deleted++;
-    }
+    // TODO: Uncomment this once https://unique-ch.atlassian.net/browse/UN-15272 is resolved.
+    //       We've encountered a problem where scope accesses are not cleared correctly resulting in
+    //       orphaned scope accesses that we could no longer delete due to access checks.
+    // const missingGroupDistinctIds = difference(
+    //   keys(unique.groupsMap),
+    //   keys(updatedUniqueGroupsMap),
+    // );
+    //
+    // this.logger.log(
+    //   `${logPrefix} Deleting ${missingGroupDistinctIds.length} missing unique groups`,
+    // );
+    // for (const groupDistinctId of missingGroupDistinctIds) {
+    //   const missingGroup =
+    //     unique.groupsMap[groupDistinctId] ??
+    //     assert.fail(`Missing group ${groupDistinctId} in unique groups map`);
+    //   await this.uniqueGroupsService.deleteGroup(missingGroup.id);
+    //   groupsSyncStats.deleted++;
+    // }
 
     this.logger.log(
       `${logPrefix} Synced ${sharePointGroups.length} sharepoint groups:\n` +
@@ -138,6 +147,11 @@ export class SyncSharepointGroupsToUniqueCommand {
         `    Skipped:   ${groupsSyncStats.skipped} groups\n` +
         `    Unchanged: ${groupsSyncStats.unchanged} groups`,
     );
+
+    const syncStatsEntries = Object.entries(groupsSyncStats).filter(([_, count]) => count > 0);
+    for (const [operation, count] of syncStatsEntries) {
+      this.spcPermissionsSyncGroupOperationsTotal.add(count, { sp_site_id: logSiteId, operation });
+    }
 
     return {
       updatedUniqueGroupsMap: pickBy(updatedUniqueGroupsMap, (group) => isNonNullish(group)),

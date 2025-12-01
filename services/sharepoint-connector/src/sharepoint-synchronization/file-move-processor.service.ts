@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { type Counter } from '@opentelemetry/api';
 import { Config } from '../config';
+import { SPC_FILE_MOVED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
@@ -26,6 +28,7 @@ export class FileMoveProcessor {
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly scopeManagementService: ScopeManagementService,
     private readonly configService: ConfigService<Config, true>,
+    @Inject(SPC_FILE_MOVED_TOTAL) private readonly spcFileMovedTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -40,7 +43,8 @@ export class FileMoveProcessor {
     context: SharepointSyncContext,
   ): Promise<void> {
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
     const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId);
     let ingestedFiles: UniqueFile[] = [];
 
@@ -66,8 +70,19 @@ export class FileMoveProcessor {
       try {
         await this.uniqueFilesService.moveFile(data.contentId, data.newOwnerId, data.newUrl);
         totalMoved++;
+
+        this.spcFileMovedTotal.add(1, {
+          sp_site_id: logSiteId,
+          result: 'success',
+        });
       } catch (error) {
         const normalizedError = normalizeError(error);
+
+        this.spcFileMovedTotal.add(1, {
+          sp_site_id: logSiteId,
+          result: 'failure',
+        });
+
         this.logger.error({
           msg: `${logPrefix} Failed to move file ${data.contentId}: ${normalizedError.message}`,
           error,
@@ -93,7 +108,7 @@ export class FileMoveProcessor {
     context: SharepointSyncContext,
   ): FileMoveData[] {
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const filesToMove: FileMoveData[] = [];
 
     for (const ingestedFile of ingestedFiles) {

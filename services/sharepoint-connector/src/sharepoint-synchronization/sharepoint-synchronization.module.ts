@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { MetricsModule } from '../metrics/metrics.module';
 import { MicrosoftApisModule } from '../microsoft-apis/microsoft-apis.module';
 import { PermissionsSyncModule } from '../permissions-sync/permissions-sync.module';
 import { ProcessingPipelineModule } from '../processing-pipeline/processing-pipeline.module';
@@ -12,6 +13,7 @@ import { SharepointSynchronizationService } from './sharepoint-synchronization.s
 @Module({
   imports: [
     ConfigModule,
+    MetricsModule,
     MicrosoftApisModule,
     UniqueApiModule,
     ProcessingPipelineModule,

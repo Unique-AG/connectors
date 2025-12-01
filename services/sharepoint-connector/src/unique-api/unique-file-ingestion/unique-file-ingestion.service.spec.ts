@@ -15,21 +15,16 @@ import type {
 
 describe('UniqueFileIngestionService', () => {
   let service: UniqueFileIngestionService;
-  let ingestionClientMock: { get: ReturnType<typeof vi.fn> };
-  let graphqlClientMock: { request: ReturnType<typeof vi.fn> };
+  let ingestionClientMock: { request: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    graphqlClientMock = {
+    ingestionClientMock = {
       request: vi.fn().mockResolvedValue({
         contentUpsert: {
           id: 'content-id',
           writeUrl: 'https://write-url',
         },
       }),
-    };
-
-    ingestionClientMock = {
-      get: vi.fn().mockImplementation(async (cb) => await cb(graphqlClientMock)),
     };
 
     const { unit } = await TestBed.solitary(UniqueFileIngestionService)
@@ -72,7 +67,7 @@ describe('UniqueFileIngestionService', () => {
 
     await service.registerContent(request);
 
-    expect(graphqlClientMock.request).toHaveBeenCalledWith(
+    expect(ingestionClientMock.request).toHaveBeenCalledWith(
       CONTENT_UPSERT_MUTATION,
       expect.objectContaining({
         input: expect.objectContaining({
@@ -105,7 +100,7 @@ describe('UniqueFileIngestionService', () => {
 
     await service.finalizeIngestion(request);
 
-    expect(graphqlClientMock.request).toHaveBeenCalledWith(
+    expect(ingestionClientMock.request).toHaveBeenCalledWith(
       CONTENT_UPSERT_MUTATION,
       expect.objectContaining({
         input: expect.objectContaining({

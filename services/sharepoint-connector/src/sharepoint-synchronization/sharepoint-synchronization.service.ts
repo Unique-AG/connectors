@@ -1,13 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { type Histogram } from '@opentelemetry/api';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
+import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { normalizeError } from '../utils/normalize-error';
-import { elapsedSecondsLog } from '../utils/timing.util';
+import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
@@ -24,13 +26,21 @@ export class SharepointSynchronizationService {
     private readonly contentSyncService: ContentSyncService,
     private readonly permissionsSyncService: PermissionsSyncService,
     private readonly scopeManagementService: ScopeManagementService,
+    @Inject(SPC_SYNC_DURATION_SECONDS)
+    private readonly spcSyncDurationSeconds: Histogram,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async synchronize(): Promise<void> {
+    const syncStartTime = Date.now();
     if (this.isScanning) {
       this.logger.warn('Skipping scan - previous scan is still in progress.');
+      this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+        sync_type: 'full',
+        result: 'skipped',
+        skip_reason: 'scan_in_progress',
+      });
       return;
     }
 
@@ -39,7 +49,6 @@ export class SharepointSynchronizationService {
     // We wrap the whole action in a try-finally block to ensure that the isScanning flag is reset
     // in case of some unexpected one-off error occurring.
     try {
-      const syncStartTime = Date.now();
       const siteIdsToScan = this.configService.get('sharepoint.siteIds', { infer: true });
       const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
       const scopeId = this.configService.get('unique.scopeId', { infer: true });
@@ -53,13 +62,20 @@ export class SharepointSynchronizationService {
           msg: `Failed to initialize root scope: ${normalizeError(error).message}`,
           error,
         });
+        this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+          sync_type: 'full',
+          result: 'failure',
+          failure_step: 'root_scope_initialization',
+        });
         return;
       }
 
       this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
 
       for (const siteId of siteIdsToScan) {
-        const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+        const siteSyncStartTime = Date.now();
+        const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+        const logPrefix = `[Site: ${logSiteId}]`;
         let scopes: ScopeWithPath[] | null = null;
         const siteStartTime = Date.now();
 
@@ -73,6 +89,12 @@ export class SharepointSynchronizationService {
 
         if (items.length === 0) {
           this.logger.log(`${logPrefix} Found no items marked for synchronization.`);
+          this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+            sync_type: 'site',
+            sp_site_id: logSiteId,
+            result: 'skipped',
+            skip_reason: 'no_items_to_sync',
+          });
           continue;
         }
 
@@ -85,6 +107,12 @@ export class SharepointSynchronizationService {
               msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}. Skipping site.`,
               error,
             });
+            this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+              sync_type: 'site',
+              sp_site_id: logSiteId,
+              result: 'failure',
+              failure_step: 'scopes_creation',
+            });
             continue;
           }
         }
@@ -95,6 +123,12 @@ export class SharepointSynchronizationService {
           this.logger.error({
             msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
             error,
+          });
+          this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+            sync_type: 'site',
+            sp_site_id: logSiteId,
+            result: 'failure',
+            failure_step: 'content_sync',
           });
           continue;
         }
@@ -112,13 +146,41 @@ export class SharepointSynchronizationService {
               msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,
               error,
             });
+            this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+              sync_type: 'site',
+              sp_site_id: logSiteId,
+              result: 'failure',
+              failure_step: 'permissions_sync',
+            });
+            continue;
           }
         }
+
+        this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+          sync_type: 'site',
+          sp_site_id: logSiteId,
+          result: 'success',
+        });
       }
 
       this.logger.log(
         `SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`,
       );
+      this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+        sync_type: 'full',
+        result: 'success',
+      });
+    } catch (error) {
+      this.logger.error({
+        msg: `Failed full synchronization: ${normalizeError(error).message}`,
+        error,
+      });
+      this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+        sync_type: 'full',
+        result: 'failure',
+        failure_step: 'unknown',
+      });
+      throw error;
     } finally {
       this.isScanning = false;
     }

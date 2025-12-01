@@ -36,7 +36,24 @@ export class SharepointRestHttpService {
         maxRedirections: 10,
       }),
       interceptors.retry({
-        maxRetries: 3,
+        // We do lower base retry count and higher min timeout because the ETIMEDOUT error seems to
+        // be transient, as we encounter it for only some sites during a single sync.
+        maxRetries: 4,
+        minTimeout: 3_000,
+        errorCodes: [
+          // Error that we encounter occasionally on QA when calling SharePoint REST API
+          'ETIMEDOUT',
+          // Default codes takes from the undici library
+          'ECONNRESET',
+          'ECONNREFUSED',
+          'ENOTFOUND',
+          'ENETDOWN',
+          'ENETUNREACH',
+          'EHOSTDOWN',
+          'EHOSTUNREACH',
+          'EPIPE',
+          'UND_ERR_SOCKET',
+        ],
       }),
       createTokenRefreshInterceptor(async () =>
         this.microsoftAuthenticationService.getAccessToken('sharepoint-rest'),

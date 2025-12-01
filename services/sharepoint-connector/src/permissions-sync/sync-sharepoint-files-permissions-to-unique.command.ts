@@ -1,6 +1,7 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { type Counter } from '@opentelemetry/api';
 import {
   differenceWith,
   filter,
@@ -12,6 +13,7 @@ import {
   pipe,
 } from 'remeda';
 import { Config } from '../config';
+import { SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile, UniqueFileAccessInput } from '../unique-api/unique-files/unique-files.types';
@@ -38,6 +40,8 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
   public constructor(
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly configService: ConfigService<Config, true>,
+    @Inject(SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL)
+    private readonly spcPermissionsSyncFileOperationsTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -46,7 +50,8 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
     const { context, sharePoint, unique } = input;
     const { siteId, serviceUserId } = context;
 
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
     this.logger.log(
       `${logPrefix} Starting permissions sync for ` +
         `${Object.keys(sharePoint.permissionsMap).length} items`,
@@ -114,21 +119,38 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
     this.logger.log(
       `${logPrefix} Adding permissions to unique files in ${Object.keys(permissionsToAddByScopeId).length} scopes`,
     );
+    let totalPermissionsAdded = 0;
     for (const [scopeId, permissionsToAdd] of Object.entries(permissionsToAddByScopeId)) {
       this.logger.debug(
         `${logPrefix}[Scope: ${scopeId}] Adding ${permissionsToAdd.length} permissions`,
       );
       await this.uniqueFilesService.addAccesses(scopeId, permissionsToAdd);
+      totalPermissionsAdded += permissionsToAdd.length;
     }
 
     this.logger.log(
       `${logPrefix} Removing permissions from unique files in ${Object.keys(permissionsToRemoveByScopeId).length} scopes`,
     );
+    let totalPermissionsRemoved = 0;
     for (const [scopeId, permissionsToRemove] of Object.entries(permissionsToRemoveByScopeId)) {
       this.logger.debug(
         `${logPrefix}[Scope: ${scopeId}] Removing ${permissionsToRemove.length} permissions`,
       );
       await this.uniqueFilesService.removeAccesses(scopeId, permissionsToRemove);
+      totalPermissionsRemoved += permissionsToRemove.length;
+    }
+
+    if (totalPermissionsAdded > 0) {
+      this.spcPermissionsSyncFileOperationsTotal.add(totalPermissionsAdded, {
+        sp_site_id: logSiteId,
+        operation: 'added',
+      });
+    }
+    if (totalPermissionsRemoved > 0) {
+      this.spcPermissionsSyncFileOperationsTotal.add(totalPermissionsRemoved, {
+        sp_site_id: logSiteId,
+        operation: 'removed',
+      });
     }
   }
 

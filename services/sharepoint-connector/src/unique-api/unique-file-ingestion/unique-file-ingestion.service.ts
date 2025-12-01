@@ -53,13 +53,10 @@ export class UniqueFileIngestionService {
       variables.input.fileAccess = request.fileAccess;
     }
 
-    const result = await this.ingestionClient.get(
-      async (client) =>
-        await client.request<ContentUpsertMutationResult, ContentUpsertMutationInput>(
-          CONTENT_UPSERT_MUTATION,
-          variables,
-        ),
-    );
+    const result = await this.ingestionClient.request<
+      ContentUpsertMutationResult,
+      ContentUpsertMutationInput
+    >(CONTENT_UPSERT_MUTATION, variables);
 
     assert.ok(result?.contentUpsert, 'Invalid response from Unique API content registration');
     return result.contentUpsert;
@@ -86,13 +83,10 @@ export class UniqueFileIngestionService {
       baseUrl: request.baseUrl,
     };
 
-    const result = await this.ingestionClient.get(
-      async (client) =>
-        await client.request<ContentUpsertMutationResult, ContentUpsertMutationInput>(
-          CONTENT_UPSERT_MUTATION,
-          variables,
-        ),
-    );
+    const result = await this.ingestionClient.request<
+      ContentUpsertMutationResult,
+      ContentUpsertMutationInput
+    >(CONTENT_UPSERT_MUTATION, variables);
 
     assert.ok(result?.contentUpsert?.id, 'Invalid response from Unique API ingestion finalization');
     return { id: result.contentUpsert.id };

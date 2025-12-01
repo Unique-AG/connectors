@@ -1,7 +1,9 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { type Counter } from '@opentelemetry/api';
 import { Config } from '../config';
+import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
@@ -32,6 +34,8 @@ export class ContentSyncService {
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly fileMoveProcessor: FileMoveProcessor,
     private readonly scopeManagementService: ScopeManagementService,
+    @Inject(SPC_FILE_DIFF_EVENTS_TOTAL) private readonly spcFileDiffEventsTotal: Counter,
+    @Inject(SPC_FILE_DELETED_TOTAL) private readonly spcFileDeletedTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -42,10 +46,36 @@ export class ContentSyncService {
     context: SharepointSyncContext,
   ): Promise<void> {
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}] `;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}] `;
     const processStartTime = Date.now();
 
     const diffResult = await this.calculateDiffForSite(items, siteId);
+
+    if (diffResult.newFiles.length > 0) {
+      this.spcFileDiffEventsTotal.add(diffResult.newFiles.length, {
+        sp_site_id: logSiteId,
+        diff_result_type: 'new',
+      });
+    }
+    if (diffResult.updatedFiles.length > 0) {
+      this.spcFileDiffEventsTotal.add(diffResult.updatedFiles.length, {
+        sp_site_id: logSiteId,
+        diff_result_type: 'updated',
+      });
+    }
+    if (diffResult.movedFiles.length > 0) {
+      this.spcFileDiffEventsTotal.add(diffResult.movedFiles.length, {
+        sp_site_id: logSiteId,
+        diff_result_type: 'moved',
+      });
+    }
+    if (diffResult.deletedFiles.length > 0) {
+      this.spcFileDiffEventsTotal.add(diffResult.deletedFiles.length, {
+        sp_site_id: logSiteId,
+        diff_result_type: 'deleted',
+      });
+    }
 
     this.logger.log(
       `${logPrefix} File Diff Results: ${diffResult.newFiles.length} new, ${diffResult.updatedFiles.length} updated, ${diffResult.movedFiles.length} moved, ${diffResult.deletedFiles.length} deleted`,
@@ -126,7 +156,8 @@ export class ContentSyncService {
   }
 
   private async deleteRemovedFiles(siteId: string, deletedFileKeys: string[]): Promise<void> {
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
     let filesToDelete: UniqueFile[] = [];
     // Convert relative keys to full keys (with siteId prefix)
     const fullKeys = deletedFileKeys.map((key) => `${siteId}/${key}`);
@@ -149,8 +180,19 @@ export class ContentSyncService {
       try {
         await this.uniqueFilesService.deleteFile(file.id);
         totalDeleted++;
+
+        this.spcFileDeletedTotal.add(1, {
+          sp_site_id: logSiteId,
+          result: 'success',
+        });
       } catch (error) {
         const normalizedError = normalizeError(error);
+
+        this.spcFileDeletedTotal.add(1, {
+          sp_site_id: logSiteId,
+          result: 'failure',
+        });
+
         this.logger.error({
           msg: `${logPrefix} Failed to delete content ${file.key} (ID: ${file.id}): ${normalizedError.message}`,
           error,

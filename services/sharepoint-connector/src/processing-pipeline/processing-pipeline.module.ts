@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { MetricsModule } from '../metrics/metrics.module';
 import { MicrosoftApisModule } from '../microsoft-apis/microsoft-apis.module';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ItemProcessingOrchestratorService } from './item-processing-orchestrator.service';
@@ -11,7 +12,7 @@ import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
 import { StorageUploadStep } from './steps/storage-upload.step';
 
 @Module({
-  imports: [ConfigModule, MicrosoftApisModule, UniqueApiModule],
+  imports: [ConfigModule, MetricsModule, MicrosoftApisModule, UniqueApiModule],
   providers: [
     ProcessingPipelineService,
     ItemProcessingOrchestratorService,

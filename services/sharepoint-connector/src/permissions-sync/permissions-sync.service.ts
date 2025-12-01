@@ -1,9 +1,11 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { type Histogram } from '@opentelemetry/api';
 import { filter, flat, indexBy, mapKeys, mapValues, pipe, prop, uniqueBy, values } from 'remeda';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
+import { SPC_PERMISSIONS_SYNC_DURATION_SECONDS } from '../metrics';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
@@ -14,7 +16,7 @@ import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/uniqu
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
-import { elapsedSecondsLog } from '../utils/timing.util';
+import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery, PermissionsMap } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
 import { SyncSharepointFilesPermissionsToUniqueCommand } from './sync-sharepoint-files-permissions-to-unique.command';
@@ -49,6 +51,8 @@ export class PermissionsSyncService {
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService<Config, true>,
+    @Inject(SPC_PERMISSIONS_SYNC_DURATION_SECONDS)
+    private readonly spcPermissionsSyncDurationSeconds: Histogram,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -56,67 +60,91 @@ export class PermissionsSyncService {
   public async syncPermissionsForSite(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId } = context;
-    const logPrefix = `[SiteId: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
-    this.logger.log(
-      `${logPrefix} Starting permissions fetching for ${sharePoint.items.length} items and ` +
-        `${sharePoint.directories.length} directories`,
-    );
-    const permissionsFetchStartTime = Date.now();
-    const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(siteId, [
-      ...sharePoint.items,
-      ...sharePoint.directories,
-    ]);
-    this.logger.log(
-      `${logPrefix} Fetched permissions for ${sharePoint.items.length} items in ${elapsedSecondsLog(permissionsFetchStartTime)}`,
-    );
 
-    const groupsWithMembershipsMap = await this.fetchGroupsWithMembershipsForSite(
-      siteId,
-      permissionsMap,
-    );
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
+    const startTime = Date.now();
+    let currentStep = 'permissions_fetch';
 
-    this.logger.log(
-      `${logPrefix} Fetched ${Object.keys(groupsWithMembershipsMap).length} groups with memberships`,
-    );
+    try {
+      this.logger.log(
+        `${logPrefix} Starting permissions fetching for ${sharePoint.items.length} items and ` +
+          `${sharePoint.directories.length} directories`,
+      );
+      const permissionsFetchStartTime = Date.now();
+      const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(siteId, [
+        ...sharePoint.items,
+        ...sharePoint.directories,
+      ]);
+      this.logger.log(
+        `${logPrefix} Fetched permissions for ${sharePoint.items.length} items in ${elapsedSecondsLog(permissionsFetchStartTime)}`,
+      );
 
-    const uniqueUsersMap = await this.getUniqueUsersMap();
-    const uniqueGroupsMap = await this.getUniqueGroupsMap(siteId);
+      currentStep = 'groups_memberships_fetch';
+      const groupsWithMembershipsMap = await this.fetchGroupsWithMembershipsForSite(
+        siteId,
+        permissionsMap,
+      );
 
-    this.logger.log(
-      `${logPrefix} Found ${Object.keys(uniqueGroupsMap).length} unique groups and ${Object.keys(uniqueUsersMap).length} unique users`,
-    );
+      this.logger.log(
+        `${logPrefix} Fetched ${Object.keys(groupsWithMembershipsMap).length} groups with memberships`,
+      );
 
-    const { updatedUniqueGroupsMap } = await this.syncSharepointGroupsToUniqueCommand.run({
-      siteId,
-      sharePoint: { groupsMap: groupsWithMembershipsMap },
-      unique: { groupsMap: uniqueGroupsMap, usersMap: uniqueUsersMap },
-    });
+      currentStep = 'unique_data_fetch';
+      const uniqueUsersMap = await this.getUniqueUsersMap();
+      const uniqueGroupsMap = await this.getUniqueGroupsMap(siteId);
 
-    this.logger.log(
-      `${logPrefix} Synced ${Object.keys(updatedUniqueGroupsMap).length} resulting unique groups`,
-    );
+      this.logger.log(
+        `${logPrefix} Found ${Object.keys(uniqueGroupsMap).length} unique groups and ${Object.keys(uniqueUsersMap).length} unique users`,
+      );
 
-    await this.syncSharepointFilesPermissionsToUniqueCommand.run({
-      context,
-      sharePoint: { permissionsMap },
-      unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
-    });
-
-    const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-    if (ingestionMode === IngestionMode.Recursive) {
-      assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
-      await this.syncSharepointFolderPermissionsToUniqueCommand.run({
-        context,
-        sharePoint: { directories: sharePoint.directories, permissionsMap },
-        unique: {
-          folders: unique.folders,
-          groupsMap: updatedUniqueGroupsMap,
-          usersMap: uniqueUsersMap,
-        },
+      currentStep = 'groups_sync';
+      const { updatedUniqueGroupsMap } = await this.syncSharepointGroupsToUniqueCommand.run({
+        siteId,
+        sharePoint: { groupsMap: groupsWithMembershipsMap },
+        unique: { groupsMap: uniqueGroupsMap, usersMap: uniqueUsersMap },
       });
-    }
 
-    this.logger.log(`${logPrefix} Synced file permissions to Unique`);
+      this.logger.log(
+        `${logPrefix} Synced ${Object.keys(updatedUniqueGroupsMap).length} resulting unique groups`,
+      );
+
+      currentStep = 'file_permissions_sync';
+      await this.syncSharepointFilesPermissionsToUniqueCommand.run({
+        context,
+        sharePoint: { permissionsMap },
+        unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
+      });
+
+      const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
+      if (ingestionMode === IngestionMode.Recursive) {
+        currentStep = 'folder_permissions_sync';
+        assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
+        await this.syncSharepointFolderPermissionsToUniqueCommand.run({
+          context,
+          sharePoint: { directories: sharePoint.directories, permissionsMap },
+          unique: {
+            folders: unique.folders,
+            groupsMap: updatedUniqueGroupsMap,
+            usersMap: uniqueUsersMap,
+          },
+        });
+      }
+
+      this.logger.log(`${logPrefix} Synced file permissions to Unique`);
+
+      this.spcPermissionsSyncDurationSeconds.record(elapsedSeconds(startTime), {
+        sp_site_id: logSiteId,
+        result: 'success',
+      });
+    } catch (error) {
+      this.spcPermissionsSyncDurationSeconds.record(elapsedSeconds(startTime), {
+        sp_site_id: logSiteId,
+        result: 'failure',
+        failure_step: currentStep,
+      });
+      throw error;
+    }
   }
 
   private async fetchGroupsWithMembershipsForSite(
