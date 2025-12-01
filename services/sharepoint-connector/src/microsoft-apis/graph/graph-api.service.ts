@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Client } from '@microsoft/microsoft-graph-client';
 import type { Drive, List } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -11,7 +10,7 @@ import { getTitle } from '../../utils/list-item.util';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
-import { GraphClientFactory } from './graph-client.factory';
+import { GraphHttpService, type GraphRequestOptions } from './graph-http.service';
 import {
   DriveItem,
   GraphApiResponse,
@@ -29,18 +28,15 @@ import {
 @Injectable()
 export class GraphApiService {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly graphClient: Client;
   private readonly limiter: Bottleneck;
   private readonly shouldConcealLogs: boolean;
 
   public constructor(
-    private readonly graphClientFactory: GraphClientFactory,
+    private readonly graphHttpService: GraphHttpService,
     private readonly configService: ConfigService<Config, true>,
     private readonly fileFilterService: FileFilterService,
     private readonly bottleneckFactory: BottleneckFactory,
   ) {
-    this.graphClient = this.graphClientFactory.createClient();
-
     const msGraphRateLimitPerMinute = this.configService.get(
       'sharepoint.graphApiRateLimitPerMinute',
       { infer: true },
@@ -156,39 +152,16 @@ export class GraphApiService {
     const maxFileSizeBytes = this.configService.get('processing.maxFileSizeBytes', { infer: true });
 
     try {
-      const stream: ReadableStream = await this.makeRateLimitedRequest(() =>
-        this.graphClient.api(`/drives/${driveId}/items/${itemId}/content`).getStream(),
+      const buffer = await this.makeRateLimitedRequest(() =>
+        this.graphHttpService.getStream(`/drives/${driveId}/items/${itemId}/content`),
       );
 
-      const chunks: Buffer[] = [];
-      let totalSize = 0;
-
-      for await (const chunk of stream) {
-        const bufferChunk = Buffer.from(chunk);
-        totalSize += bufferChunk.length;
-
-        // This is how we need to cancel the download stream
-        if (totalSize > maxFileSizeBytes) {
-          const reader = stream.getReader();
-          await reader.cancel();
-          reader.releaseLock();
-          assert.fail(`${logPrefix} File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
-        }
-
-        chunks.push(bufferChunk);
+      if (buffer.length > maxFileSizeBytes) {
+        assert.fail(`${logPrefix} File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
       }
 
-      // TODO (UN-14011) replace with a metric
-      this.logger.debug(`${logPrefix} Starting Buffer.concat for ${chunks.length} chunks`);
-      const concatStartTime = Date.now();
-
-      const finalBuffer = Buffer.concat(chunks);
-
-      this.logger.debug(
-        `${logPrefix} Buffer.concat completed in ${Date.now() - concatStartTime}ms`,
-      );
-
-      return finalBuffer;
+      this.logger.debug(`${logPrefix} Downloaded ${buffer.length} bytes`);
+      return buffer;
     } catch (error) {
       const normalizedError = normalizeError(error);
       this.logger.error({
@@ -238,9 +211,10 @@ export class GraphApiService {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
 
     try {
-      const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId}/lists`, (url) =>
-        this.graphClient.api(url).select('system,name,id').top(GRAPH_API_PAGE_SIZE).get(),
-      );
+      const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId}/lists`, {
+        select: ['system', 'name', 'id'],
+        top: GRAPH_API_PAGE_SIZE,
+      });
 
       this.logger.log(`${logPrefix} Found ${allLists.length} lists`);
 
@@ -266,15 +240,19 @@ export class GraphApiService {
 
       const items = await this.paginateGraphApiRequest<ListItem>(
         `/sites/${siteId}/lists/${listId}/items`,
-        (url) =>
-          this.graphClient
-            .api(url)
-            .select('id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy')
-            .expand(
-              'fields($select=FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus,Title,AuthorLookupId,EditorLookupId)',
-            )
-            .top(GRAPH_API_PAGE_SIZE)
-            .get(),
+        {
+          select: [
+            'id',
+            'createdDateTime',
+            'lastModifiedDateTime',
+            'webUrl',
+            'createdBy',
+            'lastModifiedBy',
+          ],
+          expand:
+            'fields($select=FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus,Title,AuthorLookupId,EditorLookupId)',
+          top: GRAPH_API_PAGE_SIZE,
+        },
       );
 
       for (const item of items) {
@@ -316,11 +294,10 @@ export class GraphApiService {
 
     try {
       const response = await this.makeRateLimitedRequest<ListItemDetailsResponse>(() =>
-        this.graphClient
-          .api(`/sites/${siteId}/lists/${listId}/items/${itemId}`)
-          .select('id')
-          .expand('fields($select=CanvasContent1,WikiField,Title)')
-          .get(),
+        this.graphHttpService.get(`/sites/${siteId}/lists/${listId}/items/${itemId}`, {
+          select: 'id',
+          expand: 'fields($select=CanvasContent1,WikiField,Title)',
+        }),
       );
 
       assert(response?.fields, 'MS Graph response missing fields for page content');
@@ -346,12 +323,10 @@ export class GraphApiService {
   ): Promise<SimplePermission[]> {
     return await this.paginateGraphApiRequest<SimplePermission>(
       `/drives/${driveId}/items/${itemId}/permissions`,
-      (url) =>
-        this.graphClient
-          .api(url)
-          .select('id,grantedToV2,grantedToIdentitiesV2')
-          .top(GRAPH_API_PAGE_SIZE)
-          .get(),
+      {
+        select: ['id', 'grantedToV2', 'grantedToIdentitiesV2'],
+        top: GRAPH_API_PAGE_SIZE,
+      },
     );
   }
 
@@ -362,41 +337,33 @@ export class GraphApiService {
   ): Promise<SimplePermission[]> {
     return await this.paginateGraphApiRequest<SimplePermission>(
       `/sites/${siteId}/lists/${listId}/items/${itemId}/permissions`,
-      (url) =>
-        this.graphClient
-          .api(url)
-          .select('id,grantedToV2,grantedToIdentitiesV2')
-          .version('beta')
-          .top(GRAPH_API_PAGE_SIZE)
-          .get(),
+      {
+        apiVersion: 'beta',
+        select: ['id', 'grantedToV2', 'grantedToIdentitiesV2'],
+        top: GRAPH_API_PAGE_SIZE,
+      },
     );
   }
 
   public async getGroupMembers(groupId: string): Promise<GroupMember[]> {
-    return await this.paginateGraphApiRequest<GroupMember>(`/groups/${groupId}/members`, (url) =>
-      this.graphClient
-        .api(url)
-        .select(['id', 'displayName', 'mail', 'userPrincipalName'])
-        .top(GRAPH_API_PAGE_SIZE)
-        .get(),
-    );
+    return await this.paginateGraphApiRequest<GroupMember>(`/groups/${groupId}/members`, {
+      select: ['id', 'displayName', 'mail', 'userPrincipalName'],
+      top: GRAPH_API_PAGE_SIZE,
+    });
   }
 
   public async getGroupOwners(groupId: string): Promise<GroupMember[]> {
-    return await this.paginateGraphApiRequest<GroupMember>(`/groups/${groupId}/owners`, (url) =>
-      this.graphClient
-        .api(url)
-        .select(['id', 'displayName', 'mail', 'userPrincipalName'])
-        .top(GRAPH_API_PAGE_SIZE)
-        .get(),
-    );
+    return await this.paginateGraphApiRequest<GroupMember>(`/groups/${groupId}/owners`, {
+      select: ['id', 'displayName', 'mail', 'userPrincipalName'],
+      top: GRAPH_API_PAGE_SIZE,
+    });
   }
 
   public async getSiteWebUrl(siteId: string): Promise<string> {
     const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     try {
-      const site = await this.makeRateLimitedRequest(() =>
-        this.graphClient.api(`/sites/${siteId}`).select('webUrl').get(),
+      const site = await this.makeRateLimitedRequest<{ webUrl: string }>(() =>
+        this.graphHttpService.get(`/sites/${siteId}`, { select: 'webUrl' }),
       );
 
       return site.webUrl;
@@ -421,10 +388,9 @@ export class GraphApiService {
   private async getDrivesForSite(siteId: string): Promise<Drive[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
-      const allDrives = await this.paginateGraphApiRequest<Drive>(
-        `/sites/${siteId}/drives`,
-        (url) => this.graphClient.api(url).top(GRAPH_API_PAGE_SIZE).get(),
-      );
+      const allDrives = await this.paginateGraphApiRequest<Drive>(`/sites/${siteId}/drives`, {
+        top: GRAPH_API_PAGE_SIZE,
+      });
 
       this.logger.log(`${logPrefix} Found ${allDrives.length} drives`);
 
@@ -548,16 +514,11 @@ export class GraphApiService {
       'parentReference',
     ];
 
-    return this.paginateGraphApiRequest<DriveItem>(
-      `/drives/${driveId}/items/${itemId}/children`,
-      (url) =>
-        this.graphClient
-          .api(url)
-          .select(selectFields)
-          .expand('listItem($expand=fields)')
-          .top(GRAPH_API_PAGE_SIZE)
-          .get(),
-    );
+    return this.paginateGraphApiRequest<DriveItem>(`/drives/${driveId}/items/${itemId}/children`, {
+      select: selectFields,
+      expand: 'listItem($expand=fields)',
+      top: GRAPH_API_PAGE_SIZE,
+    });
   }
 
   private async makeRateLimitedRequest<T>(requestFn: () => Promise<T>): Promise<T> {
@@ -565,23 +526,35 @@ export class GraphApiService {
   }
 
   private async paginateGraphApiRequest<T>(
-    initialUrl: string,
-    requestBuilder: (url: string) => Promise<GraphApiResponse<T>>,
+    endpoint: string,
+    options: GraphRequestOptions,
   ): Promise<T[]> {
     const allItems: T[] = [];
-    let nextPageUrl = initialUrl;
+    let currentUrl: string = endpoint;
+    let isFirstRequest = true;
 
     while (true) {
-      const response = await this.makeRateLimitedRequest(() => requestBuilder(nextPageUrl));
-      const items = response?.value || [];
+      const urlToFetch = currentUrl;
+      const response = await this.makeRateLimitedRequest<GraphApiResponse<T>>(() => {
+        if (isFirstRequest) {
+          return this.graphHttpService.get(urlToFetch, options);
+        }
+        // For subsequent requests, the url already has all the query params
+        return this.graphHttpService.get(urlToFetch, { apiVersion: options.apiVersion });
+      });
 
+      isFirstRequest = false;
+      const items = response?.value || [];
       allItems.push(...items);
 
-      if (!response['@odata.nextLink']) {
+      if (response['@odata.nextLink']) {
+        const url = new URL(response['@odata.nextLink']);
+        const pathWithSearch = url.pathname + url.search;
+        // Strip API version prefix (e.g., /v1.0/ or /beta/) to avoid double prefixing
+        currentUrl = pathWithSearch.replace(/^\/(v\d+\.\d+|beta)\//, '');
+      } else {
         break;
       }
-
-      nextPageUrl = response['@odata.nextLink'];
     }
 
     return allItems;
