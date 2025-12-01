@@ -2,8 +2,8 @@ apiVersion: v2
 name: sharepoint-connector
 description: Take content from SharePoint and send it to Unique AI for RAG ingestion.
 type: application
-version: 2.0.0-beta.2
-appVersion: 2.0.0-beta.2
+version: 2.0.0-beta.3
+appVersion: 2.0.0-beta.3
 dependencies:
   - alias: connector
     name: backend-service
