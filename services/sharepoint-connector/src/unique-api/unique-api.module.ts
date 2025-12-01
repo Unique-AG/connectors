@@ -1,7 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MetricService } from 'nestjs-otel';
+import { type Counter, type Histogram } from '@opentelemetry/api';
 import { Config } from '../config';
+import {
+  SPC_UNIQUE_GRAPHQL_API_REQUEST_DURATION_SECONDS,
+  SPC_UNIQUE_GRAPHQL_API_SLOW_REQUESTS_TOTAL,
+} from '../metrics';
+import { MetricsModule } from '../metrics/metrics.module';
 import { BottleneckFactory } from '../utils/bottleneck.factory';
 import { IngestionHttpClient } from './clients/ingestion-http.client';
 import {
@@ -17,28 +22,41 @@ import { UniqueScopesService } from './unique-scopes/unique-scopes.service';
 import { UniqueUsersService } from './unique-users/unique-users.service';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, MetricsModule],
   providers: [
     UniqueAuthService,
     UniqueGroupsService,
     UniqueUsersService,
+    UniqueFileIngestionService,
+    UniqueFilesService,
+    UniqueScopesService,
+    BottleneckFactory,
+    IngestionHttpClient,
     {
       provide: SCOPE_MANAGEMENT_CLIENT,
       useFactory: (
         uniqueAuthService: UniqueAuthService,
         configService: ConfigService<Config, true>,
         bottleneckFactory: BottleneckFactory,
-        metricService: MetricService,
+        spcUniqueGraphqlApiRequestDurationSeconds: Histogram,
+        spcUniqueGraphqlApiSlowRequestsTotal: Counter,
       ) => {
         return new UniqueGraphqlClient(
           'scopeManagement',
           uniqueAuthService,
           configService,
           bottleneckFactory,
-          metricService,
+          spcUniqueGraphqlApiRequestDurationSeconds,
+          spcUniqueGraphqlApiSlowRequestsTotal,
         );
       },
-      inject: [UniqueAuthService, ConfigService, BottleneckFactory, MetricService],
+      inject: [
+        UniqueAuthService,
+        ConfigService,
+        BottleneckFactory,
+        SPC_UNIQUE_GRAPHQL_API_REQUEST_DURATION_SECONDS,
+        SPC_UNIQUE_GRAPHQL_API_SLOW_REQUESTS_TOTAL,
+      ],
     },
     {
       provide: INGESTION_CLIENT,
@@ -46,39 +64,26 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
         uniqueAuthService: UniqueAuthService,
         configService: ConfigService<Config, true>,
         bottleneckFactory: BottleneckFactory,
-        metricService: MetricService,
+        spcUniqueGraphqlApiRequestDurationSeconds: Histogram,
+        spcUniqueGraphqlApiSlowRequestsTotal: Counter,
       ) => {
         return new UniqueGraphqlClient(
           'ingestion',
           uniqueAuthService,
           configService,
           bottleneckFactory,
-          metricService,
+          spcUniqueGraphqlApiRequestDurationSeconds,
+          spcUniqueGraphqlApiSlowRequestsTotal,
         );
       },
-      inject: [UniqueAuthService, ConfigService, BottleneckFactory, MetricService],
+      inject: [
+        UniqueAuthService,
+        ConfigService,
+        BottleneckFactory,
+        SPC_UNIQUE_GRAPHQL_API_REQUEST_DURATION_SECONDS,
+        SPC_UNIQUE_GRAPHQL_API_SLOW_REQUESTS_TOTAL,
+      ],
     },
-    {
-      provide: IngestionHttpClient,
-      useFactory: (
-        uniqueAuthService: UniqueAuthService,
-        configService: ConfigService<Config, true>,
-        bottleneckFactory: BottleneckFactory,
-        metricService: MetricService,
-      ) => {
-        return new IngestionHttpClient(
-          uniqueAuthService,
-          configService,
-          bottleneckFactory,
-          metricService,
-        );
-      },
-      inject: [UniqueAuthService, ConfigService, BottleneckFactory, MetricService],
-    },
-    UniqueFileIngestionService,
-    UniqueFilesService,
-    UniqueScopesService,
-    BottleneckFactory,
   ],
   exports: [
     UniqueAuthService,

@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Counter, ValueType } from '@opentelemetry/api';
-import { MetricService } from 'nestjs-otel';
+import { type Counter } from '@opentelemetry/api';
 import { Config } from '../config';
+import { SPC_FILE_MOVED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
@@ -24,20 +24,13 @@ export class FileMoveProcessor {
   private readonly logger = new Logger(this.constructor.name);
   private readonly shouldConcealLogs: boolean;
 
-  private readonly spcFileMovedTotal: Counter;
-
   public constructor(
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly scopeManagementService: ScopeManagementService,
     private readonly configService: ConfigService<Config, true>,
-    metricService: MetricService,
+    @Inject(SPC_FILE_MOVED_TOTAL) private readonly spcFileMovedTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
-
-    this.spcFileMovedTotal = metricService.getCounter('spc_file_moved_total', {
-      description: 'Number of file move operations in Unique',
-      valueType: ValueType.INT,
-    });
   }
 
   /**

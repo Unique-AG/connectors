@@ -3,7 +3,7 @@ import {
   createApiMethodExtractor,
   getDurationBucket,
   getHttpStatusCodeClass,
-} from './metrics.util';
+} from './utils';
 
 describe('getDurationBucket', () => {
   it('returns null for durations under or equal to 1 second', () => {

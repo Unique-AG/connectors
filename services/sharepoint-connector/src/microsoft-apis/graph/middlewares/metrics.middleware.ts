@@ -6,16 +6,14 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import { type Counter, type Histogram, ValueType } from '@opentelemetry/api';
-import type { MetricService } from 'nestjs-otel';
+import { type Counter, type Histogram } from '@opentelemetry/api';
 import type { Config } from '../../../config';
-import { redactSiteNameFromPath, smearSiteIdFromPath } from '../../../utils/logging.util';
 import {
   createApiMethodExtractor,
   getDurationBucket,
   getHttpStatusCodeClass,
-  REQUEST_DURATION_BUCKET_BOUNDARIES,
-} from '../../../utils/metrics.util';
+} from '../../../metrics';
+import { redactSiteNameFromPath, smearSiteIdFromPath } from '../../../utils/logging.util';
 import { elapsedMilliseconds, elapsedSeconds } from '../../../utils/timing.util';
 import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.types';
 
@@ -32,39 +30,16 @@ export class MetricsMiddleware implements Middleware {
   private readonly msTenantId: string;
 
   public constructor(
-    metricService: MetricService,
+    spcGraphApiRequestDurationSeconds: Histogram,
+    spcGraphApiThrottleEventsTotal: Counter,
+    spcGraphApiSlowRequestsTotal: Counter,
     configService: ConfigService<Config, true>,
     shouldConcealLogs: boolean,
   ) {
     this.shouldConcealLogs = shouldConcealLogs;
-
-    this.spcGraphApiRequestDurationSeconds = metricService.getHistogram(
-      'spc_ms_graph_api_request_duration_seconds',
-      {
-        description: 'Request latency for Microsoft Graph API calls',
-        valueType: ValueType.DOUBLE,
-        advice: {
-          explicitBucketBoundaries: REQUEST_DURATION_BUCKET_BOUNDARIES,
-        },
-      },
-    );
-
-    this.spcGraphApiThrottleEventsTotal = metricService.getCounter(
-      'spc_ms_graph_api_throttle_events_total',
-      {
-        description: 'Number of Microsoft Graph API throttling events',
-        valueType: ValueType.INT,
-      },
-    );
-
-    this.spcGraphApiSlowRequestsTotal = metricService.getCounter(
-      'spc_ms_graph_api_slow_requests_total',
-      {
-        description: 'Number of slow Microsoft Graph API requests',
-        valueType: ValueType.INT,
-      },
-    );
-
+    this.spcGraphApiRequestDurationSeconds = spcGraphApiRequestDurationSeconds;
+    this.spcGraphApiThrottleEventsTotal = spcGraphApiThrottleEventsTotal;
+    this.spcGraphApiSlowRequestsTotal = spcGraphApiSlowRequestsTotal;
     this.msTenantId = configService.get('sharepoint.authTenantId', { infer: true });
 
     this.extractApiMethod = createApiMethodExtractor([

@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Histogram, ValueType } from '@opentelemetry/api';
-import { MetricService } from 'nestjs-otel';
+import { type Histogram } from '@opentelemetry/api';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
+import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
@@ -20,25 +20,16 @@ export class SharepointSynchronizationService {
   private isScanning = false;
   private readonly shouldConcealLogs: boolean;
 
-  private readonly spcSyncDurationSeconds: Histogram;
-
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly graphApiService: GraphApiService,
     private readonly contentSyncService: ContentSyncService,
     private readonly permissionsSyncService: PermissionsSyncService,
     private readonly scopeManagementService: ScopeManagementService,
-    private readonly metricService: MetricService,
+    @Inject(SPC_SYNC_DURATION_SECONDS)
+    private readonly spcSyncDurationSeconds: Histogram,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
-
-    this.spcSyncDurationSeconds = this.metricService.getHistogram('spc_sync_duration_seconds', {
-      description: 'Duration of SharePoint synchronization cycles (per site and full sync)',
-      valueType: ValueType.DOUBLE,
-      advice: {
-        explicitBucketBoundaries: [10, 30, 60, 300, 600, 1800, 3600],
-      },
-    });
   }
 
   public async synchronize(): Promise<void> {

@@ -1,10 +1,10 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Counter, ValueType } from '@opentelemetry/api';
-import { MetricService } from 'nestjs-otel';
+import { type Counter } from '@opentelemetry/api';
 import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
 import { Config } from '../config';
+import { SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
@@ -41,23 +41,14 @@ export class SyncSharepointGroupsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
   private readonly shouldConcealLogs: boolean;
 
-  private readonly spcPermissionsSyncGroupOperationsTotal: Counter;
-
   public constructor(
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly graphApiService: GraphApiService,
     private readonly configService: ConfigService<Config, true>,
-    metricService: MetricService,
+    @Inject(SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL)
+    private readonly spcPermissionsSyncGroupOperationsTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
-
-    this.spcPermissionsSyncGroupOperationsTotal = metricService.getCounter(
-      'spc_permissions_sync_group_operations_total',
-      {
-        description: 'Number of operations performed on SharePoint groups during permissions sync',
-        valueType: ValueType.INT,
-      },
-    );
   }
 
   public async run(input: Input): Promise<Output> {

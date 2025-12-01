@@ -1,17 +1,17 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Counter, type Histogram, ValueType } from '@opentelemetry/api';
+import { type Counter, type Histogram } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
-import { MetricService } from 'nestjs-otel';
 import { Client, Dispatcher, errors, interceptors } from 'undici';
 import { Config } from '../../config';
-import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import {
   createApiMethodExtractor,
   getDurationBucket,
   getHttpStatusCodeClass,
-  REQUEST_DURATION_BUCKET_BOUNDARIES,
-} from '../../utils/metrics.util';
+  SPC_UNIQUE_REST_API_REQUEST_DURATION_SECONDS,
+  SPC_UNIQUE_REST_API_SLOW_REQUESTS_TOTAL,
+} from '../../metrics';
+import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { normalizeError } from '../../utils/normalize-error';
 import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
 import { UniqueAuthService } from '../unique-auth.service';
@@ -23,14 +23,14 @@ export class IngestionHttpClient implements OnModuleDestroy {
   private readonly httpClient: Dispatcher;
   private readonly extractApiMethod: ReturnType<typeof createApiMethodExtractor>;
 
-  private readonly spcUniqueApiRequestDurationSeconds: Histogram;
-  private readonly spcUniqueApiSlowRequestsTotal: Counter;
-
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
     private readonly bottleneckFactory: BottleneckFactory,
-    metricService: MetricService,
+    @Inject(SPC_UNIQUE_REST_API_REQUEST_DURATION_SECONDS)
+    private readonly spcUniqueApiRequestDurationSeconds: Histogram,
+    @Inject(SPC_UNIQUE_REST_API_SLOW_REQUESTS_TOTAL)
+    private readonly spcUniqueApiSlowRequestsTotal: Counter,
   ) {
     const ingestionUrl = new URL(
       this.configService.get('unique.ingestionServiceBaseUrl', { infer: true }),
@@ -66,25 +66,6 @@ export class IngestionHttpClient implements OnModuleDestroy {
     const apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
       infer: true,
     });
-
-    this.spcUniqueApiRequestDurationSeconds = metricService.getHistogram(
-      'spc_unique_rest_api_request_duration_seconds',
-      {
-        description: 'Request latency for Unique REST API calls',
-        valueType: ValueType.DOUBLE,
-        advice: {
-          explicitBucketBoundaries: REQUEST_DURATION_BUCKET_BOUNDARIES,
-        },
-      },
-    );
-
-    this.spcUniqueApiSlowRequestsTotal = metricService.getCounter(
-      'spc_unique_rest_api_slow_requests_total',
-      {
-        description: 'Number of slow Unique REST API calls',
-        valueType: ValueType.INT,
-      },
-    );
 
     this.extractApiMethod = createApiMethodExtractor([
       'v2',

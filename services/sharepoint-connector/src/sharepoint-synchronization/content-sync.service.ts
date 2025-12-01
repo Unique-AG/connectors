@@ -1,9 +1,9 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Counter, ValueType } from '@opentelemetry/api';
-import { MetricService } from 'nestjs-otel';
+import { type Counter } from '@opentelemetry/api';
 import { Config } from '../config';
+import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
@@ -25,10 +25,6 @@ import type { SharepointSyncContext } from './types';
 @Injectable()
 export class ContentSyncService {
   private readonly logger = new Logger(this.constructor.name);
-
-  private readonly spcFileDiffEventsTotal: Counter;
-  private readonly spcFileDeletedTotal: Counter;
-
   private readonly shouldConcealLogs: boolean;
 
   public constructor(
@@ -38,16 +34,9 @@ export class ContentSyncService {
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly fileMoveProcessor: FileMoveProcessor,
     private readonly scopeManagementService: ScopeManagementService,
-    metricService: MetricService,
+    @Inject(SPC_FILE_DIFF_EVENTS_TOTAL) private readonly spcFileDiffEventsTotal: Counter,
+    @Inject(SPC_FILE_DELETED_TOTAL) private readonly spcFileDeletedTotal: Counter,
   ) {
-    this.spcFileDiffEventsTotal = metricService.getCounter('spc_file_diff_events_total', {
-      description: 'Number of file change detection events (new, updated, moved, deleted)',
-      valueType: ValueType.INT,
-    });
-    this.spcFileDeletedTotal = metricService.getCounter('spc_file_deleted_total', {
-      description: 'Number of file deletion operations in Unique',
-      valueType: ValueType.INT,
-    });
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 

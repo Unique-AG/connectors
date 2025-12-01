@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { MetricsModule } from '../metrics/metrics.module';
 import { MicrosoftApisModule } from '../microsoft-apis/microsoft-apis.module';
 import { FetchGraphPermissionsMapQuery } from '../permissions-sync/fetch-graph-permissions-map.query';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
@@ -9,7 +10,7 @@ import { SyncSharepointFolderPermissionsToUniqueCommand } from './sync-sharepoin
 import { SyncSharepointGroupsToUniqueCommand } from './sync-sharepoint-groups-to-unique.command';
 
 @Module({
-  imports: [MicrosoftApisModule, UniqueApiModule],
+  imports: [MetricsModule, MicrosoftApisModule, UniqueApiModule],
   providers: [
     PermissionsSyncService,
     FetchGraphPermissionsMapQuery,

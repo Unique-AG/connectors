@@ -1,8 +1,7 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Counter, ValueType } from '@opentelemetry/api';
-import { MetricService } from 'nestjs-otel';
+import { type Counter } from '@opentelemetry/api';
 import {
   differenceWith,
   filter,
@@ -14,6 +13,7 @@ import {
   pipe,
 } from 'remeda';
 import { Config } from '../config';
+import { SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile, UniqueFileAccessInput } from '../unique-api/unique-files/unique-files.types';
@@ -37,22 +37,13 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
   private readonly shouldConcealLogs: boolean;
 
-  private readonly spcPermissionsSyncFileOperationsTotal: Counter;
-
   public constructor(
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly configService: ConfigService<Config, true>,
-    metricService: MetricService,
+    @Inject(SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL)
+    private readonly spcPermissionsSyncFileOperationsTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
-
-    this.spcPermissionsSyncFileOperationsTotal = metricService.getCounter(
-      'spc_permissions_sync_file_operations_total',
-      {
-        description: 'Number of permissions changing operations performed on Unique files',
-        valueType: ValueType.INT,
-      },
-    );
   }
 
   public async run(input: Input): Promise<void> {

@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Counter, ValueType } from '@opentelemetry/api';
-import { MetricService } from 'nestjs-otel';
+import { type Counter } from '@opentelemetry/api';
 import { toSnakeCase } from 'remeda';
 import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
+import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
@@ -24,7 +24,6 @@ export class ProcessingPipelineService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly pipelineSteps: IPipelineStep[];
   private readonly stepTimeoutMs: number;
-  private readonly spcIngestionFileProcessedTotal: Counter;
   private readonly shouldConcealLogs: boolean;
 
   public constructor(
@@ -34,7 +33,8 @@ export class ProcessingPipelineService {
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly storageUploadStep: StorageUploadStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
-    metricService: MetricService,
+    @Inject(SPC_INGESTION_FILE_PROCESSED_TOTAL)
+    private readonly spcIngestionFileProcessedTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
     this.pipelineSteps = [
@@ -46,14 +46,6 @@ export class ProcessingPipelineService {
     ];
     this.stepTimeoutMs =
       this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
-
-    this.spcIngestionFileProcessedTotal = metricService.getCounter(
-      'spc_ingestion_file_processed_total',
-      {
-        description: 'Number of files processed by ingestion pipeline steps',
-        valueType: ValueType.INT,
-      },
-    );
   }
 
   public async processItem(

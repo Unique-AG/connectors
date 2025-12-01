@@ -1,8 +1,7 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Counter, ValueType } from '@opentelemetry/api';
-import { MetricService } from 'nestjs-otel';
+import { type Counter } from '@opentelemetry/api';
 import {
   differenceWith,
   filter,
@@ -15,6 +14,7 @@ import {
   pipe,
 } from 'remeda';
 import { Config } from '../config';
+import { SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
@@ -48,23 +48,14 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
   private readonly shouldConcealLogs: boolean;
 
-  private readonly spcFolderPermissionsSyncTotal: Counter;
-
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly configService: ConfigService<Config, true>,
-    metricService: MetricService,
+    @Inject(SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL)
+    private readonly spcFolderPermissionsSyncTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
-
-    this.spcFolderPermissionsSyncTotal = metricService.getCounter(
-      'spc_permissions_sync_folder_operations_total',
-      {
-        description: 'Number of folder (scope) permission changes synced',
-        valueType: ValueType.INT,
-      },
-    );
   }
 
   public async run(input: Input): Promise<void> {

@@ -10,10 +10,15 @@ import {
   RetryHandlerOptions,
   TelemetryHandler,
 } from '@microsoft/microsoft-graph-client';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MetricService } from 'nestjs-otel';
+import { type Counter, type Histogram } from '@opentelemetry/api';
 import type { Config } from '../../config';
+import {
+  SPC_MS_GRAPH_API_REQUEST_DURATION_SECONDS,
+  SPC_MS_GRAPH_API_SLOW_REQUESTS_TOTAL,
+  SPC_MS_GRAPH_API_THROTTLE_EVENTS_TOTAL,
+} from '../../metrics';
 import { shouldConcealLogs } from '../../utils/logging.util';
 import { GraphAuthenticationService } from './middlewares/graph-authentication.service';
 import { MetricsMiddleware } from './middlewares/metrics.middleware';
@@ -26,8 +31,13 @@ export class GraphClientFactory {
 
   public constructor(
     private readonly graphAuthenticationService: GraphAuthenticationService,
-    private readonly metricService: MetricService,
     private readonly configService: ConfigService<Config, true>,
+    @Inject(SPC_MS_GRAPH_API_REQUEST_DURATION_SECONDS)
+    private readonly spcGraphApiRequestDurationSeconds: Histogram,
+    @Inject(SPC_MS_GRAPH_API_THROTTLE_EVENTS_TOTAL)
+    private readonly spcGraphApiThrottleEventsTotal: Counter,
+    @Inject(SPC_MS_GRAPH_API_SLOW_REQUESTS_TOTAL)
+    private readonly spcGraphApiSlowRequestsTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -39,7 +49,9 @@ export class GraphClientFactory {
     const redirectHandler = new RedirectHandler(new RedirectHandlerOptions());
     const telemetryHandler = new TelemetryHandler();
     const metricsMiddleware = new MetricsMiddleware(
-      this.metricService,
+      this.spcGraphApiRequestDurationSeconds,
+      this.spcGraphApiThrottleEventsTotal,
+      this.spcGraphApiSlowRequestsTotal,
       this.configService,
       this.shouldConcealLogs,
     );

@@ -1,11 +1,11 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Histogram, ValueType } from '@opentelemetry/api';
-import { MetricService } from 'nestjs-otel';
+import { type Histogram } from '@opentelemetry/api';
 import { filter, flat, indexBy, mapKeys, mapValues, pipe, prop, uniqueBy, values } from 'remeda';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
+import { SPC_PERMISSIONS_SYNC_DURATION_SECONDS } from '../metrics';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
@@ -42,8 +42,6 @@ export class PermissionsSyncService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly shouldConcealLogs: boolean;
 
-  private readonly spcPermissionsSyncDurationSeconds: Histogram;
-
   public constructor(
     private readonly fetchGraphPermissionsMapQuery: FetchGraphPermissionsMapQuery,
     private readonly fetchGroupsWithMembershipsQuery: FetchGroupsWithMembershipsQuery,
@@ -53,20 +51,10 @@ export class PermissionsSyncService {
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService<Config, true>,
-    metricService: MetricService,
+    @Inject(SPC_PERMISSIONS_SYNC_DURATION_SECONDS)
+    private readonly spcPermissionsSyncDurationSeconds: Histogram,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
-
-    this.spcPermissionsSyncDurationSeconds = metricService.getHistogram(
-      'spc_permissions_sync_duration_seconds',
-      {
-        description: 'Duration of the permissions synchronization phase for a site',
-        valueType: ValueType.DOUBLE,
-        advice: {
-          explicitBucketBoundaries: [5, 10, 30, 60, 120, 300, 600, 1800],
-        },
-      },
-    );
   }
 
   public async syncPermissionsForSite(input: Input): Promise<void> {

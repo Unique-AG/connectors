@@ -1,18 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type Counter, type Histogram, ValueType } from '@opentelemetry/api';
+import { type Counter, type Histogram } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
-import { MetricService } from 'nestjs-otel';
 import { isObjectType } from 'remeda';
 import { Config } from '../../config';
+import { getDurationBucket, getHttpStatusCodeClass } from '../../metrics';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
-import {
-  getDurationBucket,
-  getHttpStatusCodeClass,
-  REQUEST_DURATION_BUCKET_BOUNDARIES,
-} from '../../utils/metrics.util';
 import { normalizeError } from '../../utils/normalize-error';
 import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
 import { UniqueAuthService } from '../unique-auth.service';
@@ -22,21 +17,18 @@ export const SCOPE_MANAGEMENT_CLIENT = Symbol('SCOPE_MANAGEMENT_CLIENT');
 
 export type UniqueGraphqlClientTarget = 'ingestion' | 'scopeManagement';
 
-@Injectable()
 export class UniqueGraphqlClient {
   private readonly logger = new Logger(this.constructor.name);
   private readonly graphQlClient: GraphQLClient;
   private readonly limiter: Bottleneck;
-
-  private readonly spcUniqueApiRequestDurationSeconds: Histogram;
-  private readonly spcUniqueApiSlowRequestsTotal: Counter;
 
   public constructor(
     private readonly clientTarget: UniqueGraphqlClientTarget,
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
     private readonly bottleneckFactory: BottleneckFactory,
-    metricService: MetricService,
+    private readonly spcUniqueApiRequestDurationSeconds: Histogram,
+    private readonly spcUniqueApiSlowRequestsTotal: Counter,
   ) {
     const uniqueConfig = this.configService.get('unique', { infer: true });
     const graphqlUrl = `${uniqueConfig[`${clientTarget}ServiceBaseUrl`]}/graphql`;
@@ -66,25 +58,6 @@ export class UniqueGraphqlClient {
         reservoirRefreshInterval: 60_000,
       },
       `Unique ${this.clientTarget}`,
-    );
-
-    this.spcUniqueApiRequestDurationSeconds = metricService.getHistogram(
-      'spc_unique_graphql_api_request_duration_seconds',
-      {
-        description: 'Request latency for Unique GraphQL API calls',
-        valueType: ValueType.DOUBLE,
-        advice: {
-          explicitBucketBoundaries: REQUEST_DURATION_BUCKET_BOUNDARIES,
-        },
-      },
-    );
-
-    this.spcUniqueApiSlowRequestsTotal = metricService.getCounter(
-      'spc_unique_graphql_api_slow_requests_total',
-      {
-        description: 'Number of slow Unique GraphQL API calls',
-        valueType: ValueType.INT,
-      },
     );
   }
 
