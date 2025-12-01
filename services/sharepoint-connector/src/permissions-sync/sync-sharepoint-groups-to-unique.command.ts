@@ -1,8 +1,7 @@
-import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
-import { difference, filter, isNonNullish, keys, map, pickBy, pipe } from 'remeda';
+import { difference, filter, isNonNullish, map, pickBy, pipe } from 'remeda';
 import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
@@ -121,21 +120,24 @@ export class SyncSharepointGroupsToUniqueCommand {
       updatedUniqueGroupsMap[sharePointGroup.id] = correspondingUniqueGroup;
     }
 
-    const missingGroupDistinctIds = difference(
-      keys(unique.groupsMap),
-      keys(updatedUniqueGroupsMap),
-    );
-
-    this.logger.log(
-      `${logPrefix} Deleting ${missingGroupDistinctIds.length} missing unique groups`,
-    );
-    for (const groupDistinctId of missingGroupDistinctIds) {
-      const missingGroup =
-        unique.groupsMap[groupDistinctId] ??
-        assert.fail(`Missing group ${groupDistinctId} in unique groups map`);
-      await this.uniqueGroupsService.deleteGroup(missingGroup.id);
-      groupsSyncStats.deleted++;
-    }
+    // TODO: Uncomment this once https://unique-ch.atlassian.net/browse/UN-15272 is resolved.
+    //       We've encountered a problem where scope accesses are not cleared correctly resulting in
+    //       orphaned scope accesses that we could no longer delete due to access checks.
+    // const missingGroupDistinctIds = difference(
+    //   keys(unique.groupsMap),
+    //   keys(updatedUniqueGroupsMap),
+    // );
+    //
+    // this.logger.log(
+    //   `${logPrefix} Deleting ${missingGroupDistinctIds.length} missing unique groups`,
+    // );
+    // for (const groupDistinctId of missingGroupDistinctIds) {
+    //   const missingGroup =
+    //     unique.groupsMap[groupDistinctId] ??
+    //     assert.fail(`Missing group ${groupDistinctId} in unique groups map`);
+    //   await this.uniqueGroupsService.deleteGroup(missingGroup.id);
+    //   groupsSyncStats.deleted++;
+    // }
 
     this.logger.log(
       `${logPrefix} Synced ${sharePointGroups.length} sharepoint groups:\n` +
