@@ -69,7 +69,6 @@ describe('ItemProcessingOrchestratorService', () => {
       },
     },
     siteId,
-    siteWebUrl: 'https://sharepoint.example.com/sites/test',
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: '/test/folder',

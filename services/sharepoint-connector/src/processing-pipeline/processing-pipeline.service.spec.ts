@@ -86,7 +86,6 @@ describe('ProcessingPipelineService', () => {
       },
     },
     siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-    siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/UniqueAG',
     driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     driveName: 'Documents',
     folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -174,9 +173,6 @@ describe('ProcessingPipelineService', () => {
 
     expect(context?.pipelineItem.item.id).toBe('01JWNC3IM2TIAIFMTM4JHYR6RX3E2REDPW');
     expect(context?.pipelineItem.fileName).toBe('Document.docx');
-    expect(context?.pipelineItem.siteWebUrl).toBe(
-      'https://uniqueapp.sharepoint.com/sites/UniqueAG',
-    );
     expect(context?.pipelineItem.driveId).toBe(
       'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     );

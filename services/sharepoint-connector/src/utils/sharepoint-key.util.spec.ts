@@ -7,7 +7,6 @@ describe('getItemUrl', () => {
     const item = {
       itemType: 'driveItem' as const,
       siteId: 'site123',
-      siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/project',
       driveId: 'drive123',
       driveName: 'Shared Documents',
       folderPath: '/folder',
@@ -32,7 +31,6 @@ describe('getItemUrl', () => {
     const item = {
       itemType: 'driveItem' as const,
       siteId: 'site123',
-      siteWebUrl: 'https://uniqueapp.sharepoint.com/sites/project',
       driveId: 'drive123',
       driveName: 'Shared Documents',
       folderPath: '/folder',
@@ -57,7 +55,6 @@ describe('getItemUrl', () => {
     const item = {
       itemType: 'listItem' as const,
       siteId: 'site456',
-      siteWebUrl: 'https://contoso.sharepoint.com/sites/Engineering',
       driveId: 'drive456',
       driveName: 'SitePages',
       folderPath: '/',
@@ -79,7 +76,6 @@ describe('getItemUrl', () => {
     const item = {
       itemType: 'driveItem' as const,
       siteId: 'site789',
-      siteWebUrl: 'https://company-dev.sharepoint.com/sites/team',
       driveId: 'drive789',
       driveName: 'Documents',
       folderPath: '/',
@@ -103,7 +99,6 @@ describe('getItemUrl', () => {
     const item = {
       itemType: 'listItem' as const,
       siteId: 'site999',
-      siteWebUrl: 'https://company.sharepoint.com/sites/marketing',
       driveId: 'drive999',
       driveName: 'news',
       folderPath: '/',
@@ -125,7 +120,6 @@ describe('getItemUrl', () => {
     const item = {
       itemType: 'driveItem' as const,
       siteId: 'site111',
-      siteWebUrl: 'https://company.sharepoint.com/sites/team',
       driveId: 'drive111',
       driveName: 'Shared Documents',
       folderPath: '/2024 Q1',
@@ -149,7 +143,6 @@ describe('getItemUrl', () => {
     const item = {
       itemType: 'driveItem' as const,
       siteId: 'site222',
-      siteWebUrl: 'https://tenant.sharepoint.com/sites/site-name',
       driveId: 'drive222',
       driveName: 'library',
       folderPath: '/path',

@@ -2,7 +2,6 @@ import { DriveItem, ListItem } from './sharepoint.types';
 
 interface BaseItem {
   siteId: string;
-  siteWebUrl: string;
   driveId: string;
   driveName: string;
   folderPath: string;

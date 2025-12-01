@@ -70,7 +70,6 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
       },
     },
     siteId: 'site-123',
-    siteWebUrl: 'https://example.sharepoint.com/sites/test1',
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: `/${path}`,
