@@ -253,7 +253,7 @@ export class TranscriptService {
     notificationUrl: URL;
     lifecycleNotificationUrl: URL;
   } {
-    const publicWebhookUrl = this.config.get('app.selfUrl', { infer: true });
+    const publicWebhookUrl = this.config.get('microsoft.publicWebhookUrl', { infer: true });
 
     const notificationUrl = new URL(
       path.join(publicWebhookUrl.pathname, 'transcript/notification'),
