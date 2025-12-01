@@ -59,11 +59,9 @@ export class MetricsMiddleware implements Middleware {
   public async execute(context: Context): Promise<void> {
     if (!this.nextMiddleware) throw new Error('Next middleware not set');
 
-    const endpoint = this.extractEndpoint(context.request);
     const loggedEndpoint = this.extractEndpoint(context.request);
-
     const httpMethod = this.extractMethod(context.options);
-    const apiMethod = this.extractApiMethod(endpoint, httpMethod);
+    const apiMethod = this.extractApiMethod(loggedEndpoint, httpMethod);
 
     const startTime = Date.now();
 
