@@ -37,7 +37,7 @@ export class SharepointSynchronizationService {
     if (this.isScanning) {
       this.logger.warn('Skipping scan - previous scan is still in progress.');
       this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
-        sp_site_id: 'full_sync',
+        sync_type: 'full',
         result: 'skipped',
         skip_reason: 'scan_in_progress',
       });
@@ -63,7 +63,7 @@ export class SharepointSynchronizationService {
           error,
         });
         this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
-          sp_site_id: 'full_sync',
+          sync_type: 'full',
           result: 'failure',
           failure_step: 'root_scope_initialization',
         });
@@ -90,6 +90,7 @@ export class SharepointSynchronizationService {
         if (items.length === 0) {
           this.logger.log(`${logPrefix} Found no items marked for synchronization.`);
           this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+            sync_type: 'site',
             sp_site_id: logSiteId,
             result: 'skipped',
             skip_reason: 'no_items_to_sync',
@@ -107,6 +108,7 @@ export class SharepointSynchronizationService {
               error,
             });
             this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+              sync_type: 'site',
               sp_site_id: logSiteId,
               result: 'failure',
               failure_step: 'scopes_creation',
@@ -123,6 +125,7 @@ export class SharepointSynchronizationService {
             error,
           });
           this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+            sync_type: 'site',
             sp_site_id: logSiteId,
             result: 'failure',
             failure_step: 'content_sync',
@@ -144,6 +147,7 @@ export class SharepointSynchronizationService {
               error,
             });
             this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+              sync_type: 'site',
               sp_site_id: logSiteId,
               result: 'failure',
               failure_step: 'permissions_sync',
@@ -153,6 +157,7 @@ export class SharepointSynchronizationService {
         }
 
         this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+          sync_type: 'site',
           sp_site_id: logSiteId,
           result: 'success',
         });
@@ -162,7 +167,7 @@ export class SharepointSynchronizationService {
         `SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`,
       );
       this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
-        sp_site_id: 'full_sync',
+        sync_type: 'full',
         result: 'success',
       });
     } catch (error) {
@@ -171,7 +176,7 @@ export class SharepointSynchronizationService {
         error,
       });
       this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
-        sp_site_id: 'full_sync',
+        sync_type: 'full',
         result: 'failure',
         failure_step: 'unknown',
       });
