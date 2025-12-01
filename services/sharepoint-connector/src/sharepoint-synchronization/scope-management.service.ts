@@ -4,12 +4,16 @@ import { ConfigService } from '@nestjs/config';
 import { prop, pullObject } from 'remeda';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
-import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type {
+  SharepointContentItem,
+  SharepointDirectoryItem,
+} from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
-import { getUniqueParentPathFromItem } from '../utils/sharepoint.util';
+import { normalizeError } from '../utils/normalize-error';
+import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
 
 @Injectable()
@@ -127,6 +131,7 @@ export class ScopeManagementService {
 
   public async batchCreateScopes(
     items: SharepointContentItem[],
+    directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<ScopeWithPath[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
@@ -142,12 +147,26 @@ export class ScopeManagementService {
     // Extract all parent paths from the folder paths
     const allPathsWithParents = this.extractAllParentPaths(Array.from(uniqueFolderPaths));
 
+    // Build path -> externalId map from directories
+    const pathToExternalIdMap = this.buildPathToExternalIdMap(
+      directories,
+      context.siteId,
+      context.rootPath,
+    );
+
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
     });
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes`);
+
+    // Update newly created scopes with externalId
+    await this.updateNewlyCreatedScopesWithExternalId(
+      scopes,
+      allPathsWithParents,
+      pathToExternalIdMap,
+    );
 
     // Add the full path to each scope object
     // The API returns scopes in the same order as the input paths
@@ -158,6 +177,60 @@ export class ScopeManagementService {
 
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes with paths`);
     return scopesWithPaths;
+  }
+
+  private async updateNewlyCreatedScopesWithExternalId(
+    scopes: Scope[],
+    paths: string[],
+    pathToExternalIdMap: Map<string, string>,
+  ): Promise<void> {
+    for (const [index, scope] of scopes.entries()) {
+      if (scope.externalId !== null) {
+        continue;
+      }
+
+      const path = paths[index];
+      if (!path) {
+        this.logger.warn(`Path at index ${index} is undefined. Skipping externalId update.`);
+        continue;
+      }
+
+      const externalId = pathToExternalIdMap.get(path);
+      if (!externalId) {
+        this.logger.debug(`No externalId mapping found for path: ${path}`);
+        continue;
+      }
+
+      try {
+        const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
+          scope.id,
+          externalId,
+        );
+        scope.externalId = updatedScope.externalId;
+        this.logger.debug(`Updated scope ${scope.id} with externalId: ${externalId}`);
+      } catch (error) {
+        this.logger.warn({
+          msg: `Failed to update externalId for scope ${scope.id}: ${normalizeError(error).message}`,
+          error,
+        });
+      }
+    }
+  }
+
+  private buildPathToExternalIdMap(
+    directories: SharepointDirectoryItem[],
+    siteId: string,
+    rootPath: string,
+  ): Map<string, string> {
+    const pathToExternalIdMap = new Map<string, string>();
+
+    for (const directory of directories) {
+      const path = getUniquePathFromItem(directory, rootPath);
+      const externalId = `${siteId}/${directory.item.id}`;
+      pathToExternalIdMap.set(path, externalId);
+    }
+
+    return pathToExternalIdMap;
   }
 
   public buildItemIdToScopeIdMap(

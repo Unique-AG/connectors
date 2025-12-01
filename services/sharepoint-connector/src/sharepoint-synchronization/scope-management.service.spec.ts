@@ -79,23 +79,26 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
 
 describe('ScopeManagementService', () => {
   const mockScopes: ScopeWithPath[] = [
-    { id: 'scope_1', name: 'test1', parentId: null, path: '/test1' },
+    { id: 'scope_1', name: 'test1', parentId: null, externalId: null, path: '/test1' },
     {
       id: 'scope_2',
       name: 'test1',
       parentId: 'scope_1',
+      externalId: null,
       path: '/test1/test1',
     },
     {
       id: 'scope_3',
       name: 'UniqueAG',
       parentId: 'scope_2',
+      externalId: null,
       path: '/test1/test1/UniqueAG',
     },
     {
       id: 'scope_4',
       name: 'SitePages',
       parentId: 'scope_3',
+      externalId: null,
       path: '/test1/test1/UniqueAG/SitePages',
     },
   ];
@@ -112,10 +115,11 @@ describe('ScopeManagementService', () => {
 
   beforeEach(async () => {
     createScopesMock = vi.fn().mockResolvedValue(
-      mockScopes.map(({ id, name, parentId }) => ({
+      mockScopes.map(({ id, name, parentId, externalId }) => ({
         id,
         name,
         parentId,
+        externalId,
       })),
     );
 
@@ -189,7 +193,7 @@ describe('ScopeManagementService', () => {
     it('creates scopes and returns list', async () => {
       const items = [createDriveContentItem('UniqueAG/SitePages')];
 
-      const result = await service.batchCreateScopes(items, mockContext);
+      const result = await service.batchCreateScopes(items, [], mockContext);
 
       expect(result).toEqual(
         expect.arrayContaining([
@@ -224,14 +228,18 @@ describe('ScopeManagementService', () => {
     });
 
     it('returns empty list when no items provided', async () => {
-      const result = await service.batchCreateScopes([], mockContext);
+      const result = await service.batchCreateScopes([], [], mockContext);
 
       expect(result).toHaveLength(0);
       expect(createScopesMock).not.toHaveBeenCalled();
     });
 
     it('logs site identifier in success message', async () => {
-      await service.batchCreateScopes([createDriveContentItem('UniqueAG/SitePages')], mockContext);
+      await service.batchCreateScopes(
+        [createDriveContentItem('UniqueAG/SitePages')],
+        [],
+        mockContext,
+      );
 
       // The logger is globally mocked, so we can check the mock calls
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing

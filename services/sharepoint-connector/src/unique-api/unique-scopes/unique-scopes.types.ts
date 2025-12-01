@@ -4,6 +4,7 @@ export interface Scope {
   id: string;
   name: string;
   parentId: string | null;
+  externalId: string | null;
   scopeAccess?: ScopeAccess[];
 }
 
