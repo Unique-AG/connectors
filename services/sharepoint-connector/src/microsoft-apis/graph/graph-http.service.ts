@@ -192,7 +192,9 @@ export class GraphHttpService {
 
       if (response['@odata.nextLink']) {
         const url = new URL(response['@odata.nextLink']);
-        nextPath = url.pathname + url.search;
+        const pathWithSearch = url.pathname + url.search;
+        // Strip API version prefix (e.g., /v1.0/ or /beta/) to avoid double prefixing
+        nextPath = pathWithSearch.replace(/^\/(v\d+\.\d+|beta)\//, '');
       } else {
         nextPath = undefined;
       }
