@@ -28,6 +28,8 @@ export class Connector implements PowerSyncBackendConnector {
     const { access_token } = this.user;
     if (!access_token) throw new Error('User not authenticated.');
 
+    console.log('fetchCredentials', this.config.powersyncUrl, access_token);
+
     return {
       endpoint: this.config.powersyncUrl,
       token: access_token,

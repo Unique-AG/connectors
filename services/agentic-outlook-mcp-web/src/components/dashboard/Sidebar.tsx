@@ -17,7 +17,7 @@ import {
 
 const navigationItems = [
   {
-    title: 'Folder Management',
+    title: 'Email Management',
     url: '/',
     icon: FolderTree,
     description: 'Manage Outlook folder sync',
