@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 class EmbedSparseParams(BaseModel):
     userProfileId: str
     emailId: str
-    translatedSubject: str | None
+    translatedSubject: str | None = None
     translatedBody: str
-    summarizedBody: str
+    summarizedBody: str | None = None
     chunks: list[str]
 
 class SparseVector(BaseModel):
@@ -46,7 +46,7 @@ async def embed_sparse(params: EmbedSparseParams) -> list[PointInput]:
     email_id: str = params.emailId
     translatedSubject: str | None = params.translatedSubject
     translatedBody: str = params.translatedBody
-    summarizedBody: str = params.summarizedBody
+    summarizedBody: str | None = params.summarizedBody
     chunks: list[str] = params.chunks
 
     logger.info(

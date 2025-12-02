@@ -14,7 +14,7 @@ interface SummarizeBodyPayload {
 }
 
 interface SummarizeBodyResult {
-  summarizedBody: string;
+  summarizedBody: string | null;
 }
 
 const SUMMARIZATION_THRESHOLD_CHARS = 1_600;
@@ -54,7 +54,7 @@ export class SummarizeBodyActivity implements ISummarizeBodyActivity {
         emailId,
         bodyLength: translatedBody.length,
       });
-      return { summarizedBody: translatedBody };
+      return { summarizedBody: null };
     }
 
     const summarization = await this.llmSummarizationService.summarize(translatedBody);

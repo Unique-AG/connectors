@@ -1,11 +1,17 @@
 import { format } from 'date-fns';
 import { Paperclip, RefreshCw } from 'lucide-react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Email } from '@/lib/powersync/schema';
 import { getProcessingStatus, parseFromField } from '@/types/email';
+import { SafeHtmlRenderer } from './SafeHtmlRenderer';
 
 interface EmailDetailProps {
   emails: Email[];
@@ -66,112 +72,115 @@ export const EmailDetail = ({ emails, onReprocess }: EmailDetailProps) => {
                   </div>
                 </div>
 
-                {email.bodyHtml && (
-                  <Card className="mb-4">
-                    <CardHeader>
-                      <CardTitle className="text-base">Original Content</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="prose prose-sm max-w-none dark:prose-invert">
-                        <div dangerouslySetInnerHTML={{ __html: email.bodyHtml }} />
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                <Accordion type="multiple" defaultValue={['original']} className="space-y-0">
+                  {email.bodyHtml && (
+                    <AccordionItem value="original" className="border-b">
+                      <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
+                        Original Content
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-4">
+                        <SafeHtmlRenderer html={email.bodyHtml} />
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
 
-                {status === 'completed' && (
-                  <>
-                    {email.processedBody && (
-                      <Card className="mb-4">
-                        <CardHeader>
-                          <CardTitle className="text-base">Processed Content</CardTitle>
-                          <CardDescription>
-                            {email.processedBody.length} characters
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-md overflow-x-auto">
-                            {email.processedBody}
-                          </pre>
-                        </CardContent>
-                      </Card>
-                    )}
+                  {status === 'completed' && (
+                    <>
+                      {email.processedBody && (
+                        <AccordionItem value="processed" className="border-b">
+                          <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
+                            Processed Content
+                            <span className="ml-2 text-xs text-muted-foreground font-normal">
+                              {email.processedBody.length} characters
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent className="pb-4">
+                            <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-md overflow-x-auto">
+                              {email.processedBody}
+                            </pre>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
 
-                    {email.translatedBody && (
-                      <Card className="mb-4">
-                        <CardHeader>
-                          <CardTitle className="text-base">English Translation</CardTitle>
-                          <CardDescription>
-                            {email.translatedBody.length} characters
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
-                            {email.translatedSubject && (
-                              <div>
-                                <div className="text-sm font-medium text-muted-foreground mb-1">
-                                  Subject:
+                      {email.translatedBody && (
+                        <AccordionItem value="translated" className="border-b">
+                          <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
+                            English Translation
+                            <span className="ml-2 text-xs text-muted-foreground font-normal">
+                              {email.translatedBody.length} characters
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent className="pb-4">
+                            <div className="space-y-3">
+                              {email.translatedSubject && (
+                                <div>
+                                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                                    Subject:
+                                  </div>
+                                  <div className="text-sm">{email.translatedSubject}</div>
                                 </div>
-                                <div>{email.translatedSubject}</div>
-                              </div>
-                            )}
-                            <div>
-                              <div className="text-sm font-medium text-muted-foreground mb-1">
-                                Body:
-                              </div>
-                              <div className="prose prose-sm max-w-none dark:prose-invert">
-                                {email.translatedBody}
+                              )}
+                              <div>
+                                <div className="text-xs font-medium text-muted-foreground mb-1">
+                                  Body:
+                                </div>
+                                <div className="text-sm leading-relaxed">
+                                  {email.translatedBody}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
 
-                    {email.summarizedBody && (
-                      <Card className="mb-4">
-                        <CardHeader>
-                          <CardTitle className="text-base">Summary</CardTitle>
-                          <CardDescription>
-                            {email.summarizedBody.length} characters
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm">{email.summarizedBody}</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </>
-                )}
+                      {email.summarizedBody && (
+                        <AccordionItem value="summary" className="border-b">
+                          <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
+                            Summary
+                            <span className="ml-2 text-xs text-muted-foreground font-normal">
+                              {email.summarizedBody.length} characters
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent className="pb-4">
+                            <p className="text-sm leading-relaxed">{email.summarizedBody}</p>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+                    </>
+                  )}
 
-                {status === 'error' && email.ingestionLastError && (
-                  <Card className="mb-4 border-destructive">
-                    <CardHeader>
-                      <CardTitle className="text-base text-destructive">Processing Error</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">{email.ingestionLastError}</p>
-                    </CardContent>
-                  </Card>
-                )}
+                  {status === 'error' && email.ingestionLastError && (
+                    <AccordionItem value="error" className="border-b border-destructive/50">
+                      <AccordionTrigger className="py-3 text-sm font-medium text-destructive hover:no-underline">
+                        Processing Error
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-4">
+                        <p className="text-sm text-muted-foreground">{email.ingestionLastError}</p>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
+                </Accordion>
               </div>
             );
           })}
 
           {emails.length > 1 && latestEmail.threadSummary && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle className="text-base">Thread Summary</CardTitle>
-                <CardDescription>{latestEmail.threadSummary.length} characters</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm">{latestEmail.threadSummary}</p>
-              </CardContent>
-            </Card>
+            <Accordion type="multiple" className="mt-6">
+              <AccordionItem value="thread-summary" className="border-b">
+                <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
+                  Thread Summary
+                  <span className="ml-2 text-xs text-muted-foreground font-normal">
+                    {latestEmail.threadSummary.length} characters
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="pb-4">
+                  <p className="text-sm leading-relaxed">{latestEmail.threadSummary}</p>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           )}
         </div>
       </div>
     </div>
   );
 };
-

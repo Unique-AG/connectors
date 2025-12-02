@@ -21,7 +21,7 @@
       "dependsOn": ["build"],
       "cache": false,
       "persistent": true,
-      "interruptible": false
+      "interruptible": true
     }
   }
 }
