@@ -1,4 +1,5 @@
 #!/bin/bash
+# This is just a local helper to quick-render the chart locally to see its output.
 helm template \
     sharepoint-connector \
     sharepoint-connector \
