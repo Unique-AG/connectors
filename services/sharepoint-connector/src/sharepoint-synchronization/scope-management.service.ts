@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { prop, pullObject } from 'remeda';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
+import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
@@ -24,6 +25,7 @@ export class ScopeManagementService {
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
+    private readonly graphApiService: GraphApiService,
     private readonly configService: ConfigService<Config, true>,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
@@ -166,6 +168,7 @@ export class ScopeManagementService {
       scopes,
       allPathsWithParents,
       pathToExternalIdMap,
+      context,
     );
 
     // Add the full path to each scope object
@@ -183,7 +186,23 @@ export class ScopeManagementService {
     scopes: Scope[],
     paths: string[],
     pathToExternalIdMap: Map<string, string>,
+    context: SharepointSyncContext,
   ): Promise<void> {
+    // Get site name for special case handling
+    let siteName: string | undefined;
+    try {
+      siteName = await this.graphApiService.getSiteName(context.siteId);
+    } catch (error) {
+      this.logger.warn({
+        msg: `Failed to get site name for site ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}: ${normalizeError(error).message}`,
+        error,
+      });
+    }
+
+    // Extract root scope name from root path
+    const rootPathSegments = context.rootPath.split('/').filter((segment) => segment.length > 0);
+    const rootScopeName = rootPathSegments[0];
+
     for (const [index, scope] of scopes.entries()) {
       if (scope.externalId !== null) {
         continue;
@@ -195,7 +214,21 @@ export class ScopeManagementService {
         continue;
       }
 
-      const externalId = pathToExternalIdMap.get(path);
+      let externalId: string | undefined;
+
+      // Special case: root scope - set external ID to root scope name
+      if (scope.name === rootScopeName) {
+        externalId = rootScopeName;
+      }
+      // Special case: site scope - set external ID to site ID when scope name matches site name
+      else if (siteName && scope.name === siteName) {
+        externalId = context.siteId;
+      }
+      // Default case: use mapping from directories
+      else {
+        externalId = pathToExternalIdMap.get(path);
+      }
+
       if (!externalId) {
         this.logger.debug(`No externalId mapping found for path: ${path}`);
         continue;
