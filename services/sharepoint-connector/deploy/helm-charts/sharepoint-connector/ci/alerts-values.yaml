@@ -3,3 +3,6 @@
 # can be added later and for regressions
 alerts:
   enabled: true
+  defaultAlerts:
+  additionalLabels:
+    team: flying-aces
