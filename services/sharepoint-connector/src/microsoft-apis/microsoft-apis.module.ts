@@ -5,7 +5,8 @@ import { BottleneckFactory } from '../utils/bottleneck.factory';
 import { MicrosoftAuthenticationService } from './auth/microsoft-authentication.service';
 import { FileFilterService } from './graph/file-filter.service';
 import { GraphApiService } from './graph/graph-api.service';
-import { GraphHttpService } from './graph/graph-http.service';
+import { GraphClientFactory } from './graph/graph-client.factory';
+import { GraphAuthenticationService } from './graph/middlewares/graph-authentication.service';
 import { SharepointRestClientService } from './sharepoint-rest/sharepoint-rest-client.service';
 import { SharepointRestHttpService } from './sharepoint-rest/sharepoint-rest-http.service';
 
@@ -13,8 +14,9 @@ import { SharepointRestHttpService } from './sharepoint-rest/sharepoint-rest-htt
   imports: [ConfigModule, MetricsModule],
   providers: [
     MicrosoftAuthenticationService,
-    GraphHttpService,
+    GraphClientFactory,
     FileFilterService,
+    GraphAuthenticationService,
     GraphApiService,
     SharepointRestHttpService,
     SharepointRestClientService,
