@@ -1,5 +1,8 @@
 import { TemporalModule } from '@unique-ag/temporal';
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { OpenTelemetryWorkflowClientInterceptor } from '@temporalio/interceptors-opentelemetry';
+import { AppConfig, AppSettings } from '../../app-settings';
 import { DrizzleModule } from '../../drizzle/drizzle.module';
 import { LLMModule } from '../../llm/llm.module';
 import { MsGraphModule } from '../../msgraph/msgraph.module';
@@ -23,20 +26,37 @@ import { LLMEmailCleanupService } from './lib/llm-email-cleanup/llm-email-cleanu
 import { LLMSummarizationService } from './lib/llm-summarization-service/llm-summarization.service';
 import { LLMTranslationService } from './lib/llm-translation-service/llm-translation.service';
 
+
 @Module({
   imports: [
     DrizzleModule,
     MsGraphModule,
     LLMModule,
     QdrantModule,
-    TemporalModule.registerWorker({
-      workerOptions: {
-        taskQueue: 'default',
-        workflowsPath: require.resolve('./temporal/ingest.workflow'),
-      },
+    TemporalModule.registerWorkerAsync({
+      useFactory: (configService: ConfigService<AppConfig, true>) => ({
+        runtimeOptions: {
+          telemetryOptions: {
+            metrics: {
+              otel: {
+                url: configService.get(AppSettings.OTEL_EXPORTER_OTLP_ENDPOINT),
+                metricsExportInterval: '1s',
+              }
+            }
+          }
+        },
+        workerOptions: {
+          taskQueue: 'default',
+          workflowsPath: require.resolve('./temporal/ingest.workflow'),
+        },
+      }),
+      inject: [ConfigService],
     }),
-
-    TemporalModule.registerClient(),
+    TemporalModule.registerClient({
+      workflowOptions: {
+        interceptors: [new OpenTelemetryWorkflowClientInterceptor()]
+      }
+    }),
   ],
   controllers: [EmailDebugController],
   providers: [
