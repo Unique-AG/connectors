@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-beta.3](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.2...sharepoint-connector@v2.0.0-beta.3) (2025-12-01)
+
+
+### Features
+
+* **sharepoint-connector:** experimental re-write of MS Graph API client ([#140](https://github.com/Unique-AG/connectors/issues/140)) ([09df586](https://github.com/Unique-AG/connectors/commit/09df58662aba21ea790aa0a90c87ef3713690c99))
+
 ## [2.0.0-beta.2](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.1...sharepoint-connector@v2.0.0-beta.2) (2025-12-01)
 
 
