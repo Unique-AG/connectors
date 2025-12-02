@@ -44,4 +44,19 @@ export class SyncController {
       TypeID.fromString(user.userProfileId, 'user_profile'),
     );
   }
+
+  @Patch('folder/:folderId/email/:emailId')
+  @ApiOperation({ summary: 'Reprocess a specific email' })
+  @ApiResponse({ status: 200, description: 'Email reprocessing started' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  public async reprocessEmail(
+    @User() user: TokenValidationResult,
+    @Param('folderId') _folderId: string,
+    @Param('emailId') emailId: string,
+  ): Promise<void> {
+    return this.syncService.reprocessEmail(
+      TypeID.fromString(user.userProfileId, 'user_profile'),
+      TypeID.fromString(emailId, 'email'),
+    );
+  }
 }

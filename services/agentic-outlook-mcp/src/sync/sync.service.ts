@@ -1,7 +1,9 @@
+import { InjectTemporalClient } from '@unique-ag/temporal';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { eq } from 'drizzle-orm';
-import { TypeID } from 'typeid-js';
+import { WorkflowClient } from '@temporalio/client';
+import { and, eq } from 'drizzle-orm';
+import { TypeID, typeid } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, emails, folders, subscriptions, userProfiles } from '../drizzle';
 import { EmailEvents, EmailFullSyncRequestedEvent } from './email/email.events';
 import { FolderEvents, FolderSyncEvent } from './folder/folder.events';
@@ -13,6 +15,7 @@ export class SyncService {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly eventEmitter: EventEmitter2,
+    @InjectTemporalClient() private readonly temporalClient: WorkflowClient,
   ) {}
 
   public async syncFolders(userProfileId: TypeID<'user_profile'>) {
@@ -41,5 +44,33 @@ export class SyncService {
         .set({ syncActivatedAt: null, syncDeactivatedAt: null, syncLastSyncedAt: null })
         .where(eq(userProfiles.id, userProfileId.toString())),
     ]);
+  }
+
+  public async reprocessEmail(userProfileId: TypeID<'user_profile'>, emailId: TypeID<'email'>) {
+    this.logger.log({ msg: 'Reprocessing email', userProfileId, emailId });
+
+    const email = await this.db.query.emails.findFirst({
+      where: and(
+        eq(emails.id, emailId.toString()),
+        eq(emails.userProfileId, userProfileId.toString()),
+      ),
+    });
+
+    if (!email) throw new Error(`Email not found: ${emailId}`);
+
+    const workflowId = `wf-reprocess-${emailId.toString()}-${typeid()}`;
+
+    const handle = await this.temporalClient.start('ingest', {
+      args: [{ userProfileId: userProfileId.toString(), emailId: emailId.toString() }],
+      taskQueue: 'default',
+      workflowId,
+    });
+
+    this.logger.log({
+      msg: 'Started reprocess workflow',
+      workflowId: handle.workflowId,
+      userProfileId,
+      emailId,
+    });
   }
 }

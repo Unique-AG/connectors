@@ -13,7 +13,7 @@ import {
 import { useCallApi } from '@/hooks/use-call-api';
 import { useToast } from '@/hooks/use-toast';
 import { EmailThread } from '@/types/email';
-import { deleteAllUserData, syncFolderEmails, syncFolders } from '../@generated/sync/sync';
+import { deleteAllUserData, reprocessEmail, syncFolderEmails, syncFolders } from '../@generated/sync/sync';
 import { db } from '../lib/powersync/database';
 import {
   Email,
@@ -196,11 +196,35 @@ export default function FolderManagement() {
     });
   };
 
-  const handleReprocess = (emailId: string) => {
-    toast({
-      title: 'Processing email',
-      description: `The email ${emailId} is being reprocessed...`,
-    });
+  const handleReprocess = async (emailId: string) => {
+    if (!selectedFolderId) {
+      toast({
+        title: 'Error',
+        description: 'No folder selected',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await callApi(reprocessEmail, [selectedFolderId, emailId]);
+
+      if (response.status === 200) {
+        toast({
+          title: 'Email Reprocessing Started',
+          description: `The email is being reprocessed...`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to reprocess email',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleErrorClick = (error: string) => {

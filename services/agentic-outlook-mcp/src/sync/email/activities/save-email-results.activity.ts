@@ -16,7 +16,7 @@ interface SaveEmailResultsPayload {
     language?: string;
     translatedBody?: string;
     translatedSubject?: string | null;
-    summarizedBody?: string;
+    summarizedBody?: string | null;
     threadSummary?: string;
   };
 }

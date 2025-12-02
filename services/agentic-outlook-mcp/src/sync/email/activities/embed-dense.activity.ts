@@ -13,7 +13,7 @@ interface EmbedDensePayload {
   emailId: string;
   translatedSubject: string | null;
   translatedBody: string;
-  summarizedBody: string;
+  summarizedBody: string | null;
   chunks: string[];
 }
 
@@ -60,7 +60,7 @@ export class EmbedDenseActivity implements IEmbedDenseActivity {
       userProfileId: string;
       translatedSubject: string | null;
       translatedBody: string;
-      summarizedBody: string;
+      summarizedBody: string | null;
     },
     chunks: string[],
   ): Promise<PointInput[]> {

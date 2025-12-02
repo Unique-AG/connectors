@@ -4,6 +4,11 @@
   "tasks": {
     "codegen": {
       "inputs": ["$TURBO_DEFAULT$", "../agentic-outlook-mcp/openapi.json"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "interruptible": false
     }
   }
 }

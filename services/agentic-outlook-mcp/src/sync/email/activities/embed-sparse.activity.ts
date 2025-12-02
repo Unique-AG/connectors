@@ -9,7 +9,7 @@ export interface EmbedSparsePayload {
   emailId: string;
   translatedSubject: string | null;
   translatedBody: string;
-  summarizedBody: string;
+  summarizedBody: string | null;
   chunks: string[];
 }
 
