@@ -48,6 +48,19 @@ export class ScopeManagementService {
     const rootScope = await this.uniqueScopesService.getScopeById(rootScopeId);
     assert.ok(rootScope, `Root scope with ID ${rootScopeId} not found`);
 
+    // Set externalId on root scope to the scope name if not already set
+    if (rootScope.externalId === null) {
+      try {
+        await this.uniqueScopesService.updateScopeExternalId(rootScopeId, rootScope.name);
+        this.logger.debug(`${logPrefix} Set root scope externalId to: ${rootScope.name}`);
+      } catch (error) {
+        this.logger.warn({
+          msg: `${logPrefix} Failed to set root scope externalId: ${normalizeError(error).message}`,
+          error,
+        });
+      }
+    }
+
     const pathSegments = [rootScope.name];
     let currentScope: Scope = rootScope;
 
@@ -147,8 +160,9 @@ export class ScopeManagementService {
     // Extract all parent paths from the folder paths
     const allPathsWithParents = this.extractAllParentPaths(Array.from(uniqueFolderPaths));
 
-    // Build path -> externalId map from directories
+    // Build path -> externalId map from items, directories, and context
     const pathToExternalIdMap = this.buildPathToExternalIdMap(
+      items,
       directories,
       context.siteId,
       context.rootPath,
@@ -195,11 +209,8 @@ export class ScopeManagementService {
         continue;
       }
 
-      const externalId = pathToExternalIdMap.get(path);
-      if (!externalId) {
-        this.logger.debug(`No externalId mapping found for path: ${path}`);
-        continue;
-      }
+      // Use SharePoint directory externalId if available, otherwise fall back to scope name
+      const externalId = pathToExternalIdMap.get(path) ?? scope.name;
 
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
@@ -218,12 +229,44 @@ export class ScopeManagementService {
   }
 
   private buildPathToExternalIdMap(
+    items: SharepointContentItem[],
     directories: SharepointDirectoryItem[],
     siteId: string,
     rootPath: string,
   ): Map<string, string> {
     const pathToExternalIdMap = new Map<string, string>();
 
+    // Add site and drive mappings from items
+    // Each item has siteId, driveId, driveName and webUrl which we can use to derive paths
+    for (const item of items) {
+      // Extract the site path from the item's webUrl
+      // The webUrl format is: https://tenant.sharepoint.com/sites/SiteName/Library/path/file
+      // We need to build: /{rootPath}/{SiteName} -> siteId
+      // And: /{rootPath}/{SiteName}/{driveName} -> siteId/driveId
+      const itemPath = getUniquePathFromItem(item, rootPath);
+      const pathSegments = itemPath.split('/').filter((s) => s.length > 0);
+
+      // Build site path (rootPath segments + site name)
+      // rootPath is like "/Company/test", site name is the next segment
+      const rootSegments = rootPath.split('/').filter((s) => s.length > 0);
+      if (pathSegments.length > rootSegments.length) {
+        const siteName = pathSegments[rootSegments.length];
+        const sitePath = `/${[...rootSegments, siteName].join('/')}`;
+        if (!pathToExternalIdMap.has(sitePath)) {
+          pathToExternalIdMap.set(sitePath, siteId);
+        }
+
+        // Build drive path (site path + drive name)
+        if (pathSegments.length > rootSegments.length + 1) {
+          const drivePath = `/${[...rootSegments, siteName, item.driveName].join('/')}`;
+          if (!pathToExternalIdMap.has(drivePath)) {
+            pathToExternalIdMap.set(drivePath, `${siteId}/${item.driveId}`);
+          }
+        }
+      }
+    }
+
+    // Add folder mappings from directories
     for (const directory of directories) {
       const path = getUniquePathFromItem(directory, rootPath);
       const externalId = `${siteId}/${directory.item.id}`;

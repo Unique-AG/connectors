@@ -112,6 +112,7 @@ describe('ScopeManagementService', () => {
 
   let service: ScopeManagementService;
   let createScopesMock: ReturnType<typeof vi.fn>;
+  let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     createScopesMock = vi.fn().mockResolvedValue(
@@ -123,11 +124,18 @@ describe('ScopeManagementService', () => {
       })),
     );
 
+    updateScopeExternalIdMock = vi
+      .fn()
+      .mockImplementation((scopeId: string, externalId: string) =>
+        Promise.resolve({ id: scopeId, externalId }),
+      );
+
     const { unit } = await TestBed.solitary(ScopeManagementService)
       .mock<UniqueScopesService>(UniqueScopesService)
       .impl((stubFn) => ({
         ...stubFn(),
         createScopesBasedOnPaths: createScopesMock,
+        updateScopeExternalId: updateScopeExternalIdMock,
       }))
       .compile();
 
@@ -246,6 +254,34 @@ describe('ScopeManagementService', () => {
       expect(service['logger'].log).toHaveBeenCalledWith(
         expect.stringContaining('[Site: site-123]'),
       );
+    });
+
+    it('sets externalId to scope name for scopes without SharePoint directory mapping', async () => {
+      const items = [createDriveContentItem('UniqueAG/SitePages')];
+
+      await service.batchCreateScopes(items, [], mockContext);
+
+      // All 4 scopes should have externalId updated since none have SharePoint directory mapping
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(4);
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope_1', 'test1');
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope_2', 'test1');
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope_3', 'UniqueAG');
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope_4', 'SitePages');
+    });
+
+    it('skips externalId update for scopes that already have externalId', async () => {
+      createScopesMock.mockResolvedValueOnce([
+        { id: 'scope_1', name: 'test1', parentId: null, externalId: 'existing-external-id' },
+        { id: 'scope_2', name: 'test1', parentId: 'scope_1', externalId: null },
+      ]);
+
+      const items = [createDriveContentItem('UniqueAG/SitePages')];
+
+      await service.batchCreateScopes(items, [], mockContext);
+
+      // Only scope_2 should be updated since scope_1 already has externalId
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope_2', 'test1');
     });
   });
 
