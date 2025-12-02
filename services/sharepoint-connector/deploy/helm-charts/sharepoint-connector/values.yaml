@@ -77,9 +77,10 @@ connector:
       mountPath: /app/key.pem
       subPath: key.pem
       readOnly: true
+
 grafana:
   dashboard:
-    enabled: false # TODO: Not yet implemented, template will fail on purpose if enabled
+    enabled: false
     folder: connectors
 
 # -- config for the deployed connector, will be mapped to the connectors environment variables
