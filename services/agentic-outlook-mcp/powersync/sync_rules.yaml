@@ -43,6 +43,28 @@ bucket_definitions:
         FROM folders
         WHERE folders.user_profile_id = bucket.user_profile_id
       
-      - SELECT id, user_profile_id, folder_id
+      - SELECT 
+          id,
+          message_id,
+          conversation_id,
+          "from",
+          subject,
+          preview,
+          body_html,
+          processed_body,
+          translated_body,
+          translated_subject,
+          summarized_body,
+          thread_summary,
+          is_read,
+          has_attachments,
+          received_at,
+          ingestion_last_error,
+          ingestion_last_attempt_at,
+          ingestion_completed_at,
+          user_profile_id,
+          folder_id,
+          created_at,
+          updated_at
         FROM emails
         WHERE emails.user_profile_id = bucket.user_profile_id

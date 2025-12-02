@@ -1,20 +1,17 @@
-import dayjs from 'dayjs';
-import LocalizedFormat from 'dayjs/plugin/localizedFormat';
 import { Folder, FolderOpen, RefreshCw } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { FolderWithEmails } from '../../lib/powersync/schema';
 import { FolderItem } from './FolderItem';
-
-dayjs.extend(LocalizedFormat);
 
 export type FolderWithChildren = FolderWithEmails & { children: FolderWithChildren[] };
 
 interface FolderTreeProps {
   syncEnabled: boolean;
   folders: FolderWithEmails[];
+  selectedFolderId?: string;
+  onFolderSelect: (folderId: string) => void;
   onResync: () => void;
   isRefreshing?: boolean;
 }
@@ -79,42 +76,49 @@ const buildFolderTree = (folders: FolderWithEmails[]): FolderWithChildren[] => {
 export const FolderTree = ({
   syncEnabled,
   folders,
+  selectedFolderId,
+  onFolderSelect,
   onResync,
   isRefreshing = false,
 }: FolderTreeProps) => {
   const folderTree = useMemo(() => buildFolderTree(folders), [folders]);
 
   return (
-    <div className="relative">
-      <Card className="shadow-medium">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <FolderOpen className="h-5 w-5 text-primary" />
-              Outlook Folders
-            </CardTitle>
-            <Button
-              onClick={onResync}
-              variant="outline"
-              disabled={isRefreshing}
-              className="hover:bg-primary hover:text-primary-foreground"
-            >
-              <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
-              Resync Folders
-            </Button>
+    <div className="h-full bg-card overflow-y-auto relative">
+      <div className="p-4 border-b sticky top-0 bg-card z-10">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <FolderOpen className="h-5 w-5 text-primary" />
+            Folders
+          </h2>
+          <Button
+            onClick={onResync}
+            variant="ghost"
+            size="sm"
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+          </Button>
+        </div>
+      </div>
+      <div className="p-2 space-y-1">
+        {folders.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Folder className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-sm">No folders found</p>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {folders.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Folder className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No folders found. Click resync to sync with Outlook.</p>
-            </div>
-          ) : (
-            folderTree.map((folder) => <FolderItem key={folder.id} folder={folder} level={0} />)
-          )}
-        </CardContent>
-      </Card>
+        ) : (
+          folderTree.map((folder) => (
+            <FolderItem
+              key={folder.id}
+              folder={folder}
+              level={0}
+              selectedFolderId={selectedFolderId}
+              onFolderSelect={onFolderSelect}
+            />
+          ))
+        )}
+      </div>
 
       {!syncEnabled && (
         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center rounded-lg">

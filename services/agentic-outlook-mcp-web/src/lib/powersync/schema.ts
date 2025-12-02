@@ -46,8 +46,26 @@ export const folders = sqliteTable('folders', {
 
 export const emails = sqliteTable('emails', {
   id: text('id').primaryKey(),
+  messageId: text('message_id'),
+  conversationId: text('conversation_id'),
+  from: text('from'),
+  subject: text('subject'),
+  preview: text('preview'),
+  bodyHtml: text('body_html'),
+  processedBody: text('processed_body'),
+  translatedBody: text('translated_body'),
+  translatedSubject: text('translated_subject'),
+  summarizedBody: text('summarized_body'),
+  threadSummary: text('thread_summary'),
+  isRead: integer('is_read', { mode: 'boolean' }),
+  hasAttachments: integer('has_attachments', { mode: 'boolean' }),
+  receivedAt: text('received_at'),
+  ingestionLastError: text('ingestion_last_error'),
+  ingestionLastAttemptAt: text('ingestion_last_attempt_at'),
+  ingestionCompletedAt: text('ingestion_completed_at'),
   userProfileId: text('user_profile_id'),
   folderId: text('folder_id'),
+  ...timestamps,
 });
 
 export const foldersRelations = relations(folders, ({ one, many }) => ({
