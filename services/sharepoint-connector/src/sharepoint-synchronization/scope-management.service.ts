@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { isNonNullish, prop, pullObject } from 'remeda';
+import { serializeError } from 'serialize-error-cjs';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
@@ -176,8 +177,8 @@ export class ScopeManagementService {
   }
 
   /* Sets the external id on newly created scopes.
-  * This is necessary after creating a new scope to make the scope non editable for other users, essentially marking
-  * the scope as externally created.
+   * This is necessary after creating a new scope to make the scope non editable for other users, essentially marking
+   * the scope as externally created.
    */
   private async updateNewlyCreatedScopesWithExternalId(
     scopes: Scope[],
@@ -199,8 +200,8 @@ export class ScopeManagementService {
 
       const path = paths[index] ?? '';
       /* We have a couple of known directories in sharepoint for which it's more complex to get the id: root scope,
-      * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
-      */
+       * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
+       */
       const externalId = pathToExternalIdMap.get(path) ?? scope.name;
       const prefixedExternalId = `${EXTERNAL_ID_PREFIX}${externalId}`;
       try {
@@ -213,7 +214,7 @@ export class ScopeManagementService {
       } catch (error) {
         this.logger.warn({
           msg: `Failed to update externalId for scope ${scope.id}: ${normalizeError(error).message}`,
-          error,
+          error: serializeError(normalizeError(error)),
         });
       }
     }
