@@ -32,6 +32,7 @@ import {
 } from '../../../drizzle';
 import { LLMService } from '../../../llm/llm.service';
 import { QdrantService } from '../../../qdrant/qdrant.service';
+import { SparseEmbeddingGrpcClient } from '../../../sparse-embedding/sparse-embedding-grpc.client';
 import { addSpanEvent } from '../../../utils/add-span-event';
 import { normalizeError } from '../../../utils/normalize-error';
 import { OTEL_ATTRIBUTES } from '../../../utils/otel-attributes';
@@ -86,6 +87,7 @@ export class SemanticSearchEmailsTool {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly qdrantService: QdrantService,
     private readonly llmService: LLMService,
+    private readonly sparseEmbeddingClient: SparseEmbeddingGrpcClient,
     metricService: MetricService,
     private readonly traceService: TraceService,
   ) {
@@ -145,20 +147,25 @@ export class SemanticSearchEmailsTool {
     this.incrementSearchCounter();
 
     try {
-      const queryEmbedding = await this.generateQueryEmbedding(query);
+      const [queryEmbedding, querySparseVector] = await Promise.all([
+        this.generateQueryEmbedding(query),
+        this.generateQuerySparseVector(query),
+      ]);
 
       if (span) {
         addSpanEvent(span, 'embedding.generated', {
           query,
           userProfileId,
           embeddingSize: queryEmbedding.length,
+          sparseVectorSize: querySparseVector.indices.length,
         });
       }
 
-      const queryRequest = await this.buildQueryRequest(
+      const queryRequest = await this.buildHybridQueryRequest(
         queryEmbedding,
+        querySparseVector,
         userProfileId,
-        limit * 3, // Get more results initially for reranking
+        limit * 3,
         scoreThreshold,
         dateFrom,
         dateTo,
@@ -282,8 +289,24 @@ export class SemanticSearchEmailsTool {
     }
   }
 
-  private async buildQueryRequest(
-    queryVector: number[],
+  private async generateQuerySparseVector(
+    query: string,
+  ): Promise<{ indices: number[]; values: number[] }> {
+    try {
+      return await this.sparseEmbeddingClient.embedQuery(query);
+    } catch (error) {
+      this.logger.error({
+        msg: 'Failed to generate query sparse vector',
+        query,
+        error: serializeError(normalizeError(error)),
+      });
+      throw error;
+    }
+  }
+
+  private async buildHybridQueryRequest(
+    denseVector: number[],
+    sparseVector: { indices: number[]; values: number[] },
     userProfileId: string,
     limit: number,
     scoreThreshold?: number,
@@ -297,7 +320,6 @@ export class SemanticSearchEmailsTool {
       },
     ];
 
-    // Add date filters if provided
     if (dateFrom) {
       mustConditions.push({
         key: 'created_at',
@@ -317,11 +339,28 @@ export class SemanticSearchEmailsTool {
     }
 
     const queryRequest: components['schemas']['QueryRequest'] = {
-      query: queryVector,
-      using: 'content',
-      filter: {
-        must: mustConditions,
-      },
+      prefetch: [
+        {
+          query: denseVector,
+          using: 'content',
+          limit: limit,
+          filter: {
+            must: mustConditions,
+          },
+        },
+        {
+          query: {
+            indices: sparseVector.indices,
+            values: sparseVector.values,
+          },
+          using: 'sparse_content',
+          limit: limit,
+          filter: {
+            must: mustConditions,
+          },
+        },
+      ],
+      query: { fusion: 'rrf' },
       limit,
       with_payload: true,
     };

@@ -83,7 +83,19 @@ const appSettingsSchema = z.object({
   LITELLM_API_KEY: z.string().describe('The API key for Litellm.'),
   LITELLM_BASE_URL: z.url().describe('The base URL for Litellm.'),
   VOYAGE_API_KEY: z.string().describe('The API key for Voyage.'),
-  OTEL_EXPORTER_OTLP_ENDPOINT: z.url().describe('The endpoint for the OpenTelemetry OTLP exporter.'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z
+    .url()
+    .describe('The endpoint for the OpenTelemetry OTLP exporter.'),
+  SPARSE_EMBEDDING_GRPC_HOST: z
+    .string()
+    .prefault('localhost')
+    .describe('The host for the Sparse Embedding gRPC server.'),
+  SPARSE_EMBEDDING_GRPC_PORT: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.int().min(0).max(65535))
+    .prefault('50051')
+    .describe('The port for the Sparse Embedding gRPC server.'),
 });
 
 export const AppSettings = appSettingsSchema.keyof().enum;

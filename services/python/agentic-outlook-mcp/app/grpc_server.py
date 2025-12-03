@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class SparseEmbeddingServicer(sparse_embedding_pb2_grpc.SparseEmbeddingServiceServicer):
-    def EmbedQuery(  # pyright: ignore[reportImplicitOverride]
+    def embedQuery(  # pyright: ignore[reportImplicitOverride]
         self,
         request: sparse_embedding_pb2.EmbedQueryRequest,
         context: grpc.ServicerContext,
@@ -34,7 +34,7 @@ class SparseEmbeddingServicer(sparse_embedding_pb2_grpc.SparseEmbeddingServiceSe
 
             logger.info(f"Generated sparse embedding with {len(sparse_vector.indices)} dimensions")
 
-            return sparse_embedding_pb2.EmbedQueryResponse(sparse_vector=sparse_vector)
+            return sparse_embedding_pb2.EmbedQueryResponse(sparseVector=sparse_vector)
 
         except Exception as e:
             logger.error(f"Error generating sparse embedding: {e}")
