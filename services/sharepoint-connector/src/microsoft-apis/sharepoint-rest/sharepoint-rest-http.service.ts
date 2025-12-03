@@ -40,6 +40,10 @@ export class SharepointRestHttpService {
         // be transient, as we encounter it for only some sites during a single sync.
         maxRetries: 4,
         minTimeout: 3_000,
+        // We retry on POST because batch endpoint is using POST method. We are not supposed to do
+        // any modifications on SharePoint so all called endpoints should be safe to retry,
+        // requestSingle is not even allowing non-GET requests at this time.
+        methods: ['GET', 'POST'],
         errorCodes: [
           // Error that we encounter occasionally on QA when calling SharePoint REST API
           'ETIMEDOUT',
