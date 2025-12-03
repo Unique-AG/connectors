@@ -16,7 +16,7 @@ metadata:
     {{- end }}
 spec:
   groups:
-    - name: {{ $fullName }}-sharepoint-connector
+    - name: {{ $fullName }}-unique-api
       rules:
         {{- if not (dig "SharepointConnectorUniqueAPIErrors" false (.Values.alerts.defaultAlerts.uniqueApi.disabled | default dict)) }}
         - alert: SharepointConnectorUniqueAPIErrors

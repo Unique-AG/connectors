@@ -16,7 +16,7 @@ metadata:
     {{- end }}
 spec:
   groups:
-    - name: {{ $fullName }}-sharepoint-connector
+    - name: {{ $fullName }}-graphql
       rules:
         {{- if not (dig "SharepointConnectorGraphQLErrors" false (.Values.alerts.defaultAlerts.graphql.disabled | default dict)) }}
         - alert: SharepointConnectorGraphQLErrors
