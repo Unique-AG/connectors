@@ -58,5 +58,9 @@ class Settings(BaseSettings):
         default="python-queue", description="The temporal task queue to use"
     )
 
+    grpc_port: int = Field(
+        default=50051, description="The gRPC server port"
+    )
+
 
 settings: Settings = Settings()
