@@ -199,7 +199,7 @@ export class ScopeManagementService {
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           scope.id,
-          prefixedExternalId
+          prefixedExternalId,
         );
         scope.externalId = updatedScope.externalId;
         this.logger.debug(`Updated scope ${scope.id} with externalId: ${prefixedExternalId}`);
