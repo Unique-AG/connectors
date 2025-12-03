@@ -93,6 +93,14 @@ const baseConfig = z.object({
     .enum([StoreInternallyMode.Enabled, StoreInternallyMode.Disabled])
     .default(StoreInternallyMode.Disabled)
     .describe('Whether to store content internally in Unique or not.'),
+  ingestionConfig: z
+    .string()
+    .pipe(parseJsonEnvironmentVariable('UNIQUE_INGESTION_CONFIG'))
+    .optional()
+    .describe(
+      'JSON string of config to pass when submitting file for ingestion (e.g., ' +
+        '{"uniqueIngestionMode": "SKIP_INGESTION", "customProperty": "value"})',
+    ),
 });
 
 const UniqueConfig = z

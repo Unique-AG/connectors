@@ -57,9 +57,19 @@ spec:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| alerts | object | `{"defaultAlerts":{"additionalLabels":{},"graphql":{"customRules":{},"disabled":{},"enabled":true},"uniqueApi":{"customRules":{},"disabled":{},"enabled":true}},"enabled":false}` | Prometheus alerting rules configuration |
+| alerts.defaultAlerts | object | `{"additionalLabels":{},"graphql":{"customRules":{},"disabled":{},"enabled":true},"uniqueApi":{"customRules":{},"disabled":{},"enabled":true}}` | Default alert definitions |
+| alerts.defaultAlerts.additionalLabels | object | `{}` | Additional labels to add to all default alerts |
+| alerts.defaultAlerts.graphql | object | `{"customRules":{},"disabled":{},"enabled":true}` | Enable GraphQL API error rate alerts |
+| alerts.defaultAlerts.graphql.customRules | object | `{}` | Override alert rules with custom values (for duration, severity, threshold, etc.) |
+| alerts.defaultAlerts.graphql.disabled | object | `{}` | Disable specific alerts by setting them to true |
+| alerts.defaultAlerts.uniqueApi | object | `{"customRules":{},"disabled":{},"enabled":true}` | Enable Unique REST API error rate alerts |
+| alerts.defaultAlerts.uniqueApi.customRules | object | `{}` | Override alert rules with custom values (for duration, severity, threshold, etc.) |
+| alerts.defaultAlerts.uniqueApi.disabled | object | `{}` | Disable specific alerts by setting them to true |
+| alerts.enabled | bool | `false` | Enable PrometheusRule resource creation |
 | connector.deployment.metadata.annotations."reloader.stakater.com/auto" | string | `"true"` |  |
-| connector.env.LOG_LEVEL | string | `"info"` |  |
 | connector.env.LOGS_DIAGNOSTICS_DATA_POLICY | string | `"conceal"` |  |
+| connector.env.LOG_LEVEL | string | `"info"` |  |
 | connector.env.MAX_FILE_SIZE_BYTES | string | `"209715200"` |  |
 | connector.env.MAX_HEAP_MB | int | `1920` |  |
 | connector.env.NODE_ENV | string | `"production"` |  |
@@ -69,7 +79,7 @@ spec:
 | connector.envVars[0] | object | `{"name":"UNIQUE_ZITADEL_CLIENT_SECRET","valueFrom":{"secretKeyRef":{"key":"UNIQUE_ZITADEL_CLIENT_SECRET","name":"sharepoint-connector-secret"}}}` | loading of Zitadel Secret, Users can supersede this with their own secret that contains UNIQUE_ZITADEL_CLIENT_SECRET or use https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load completely arbitrary secret mappings. See also below in connectorConfig.unique.zitadel.clientSecret. |
 | connector.extraEnvCM[0] | string | `"sharepoint-connector-config"` |  |
 | connector.image.repository | string | `"ghcr.io/unique-ag/connectors/services/sharepoint-connector"` |  |
-| connector.image.tag | string | `"2.0.0-alpha.16"` |  |
+| connector.image.tag | string | `"2.0.0-beta.3"` |  |
 | connector.networkPolicy.egress | string | `nil` |  |
 | connector.networkPolicy.enabled | bool | `true` |  |
 | connector.networkPolicy.policyTypes[0] | string | `"Ingress"` |  |
@@ -95,7 +105,7 @@ spec:
 | connector.volumes[1].secret.items[0].key | string | `"key.pem"` |  |
 | connector.volumes[1].secret.items[0].path | string | `"key.pem"` |  |
 | connector.volumes[1].secret.secretName | string | `"sharepoint-connector-secret"` |  |
-| connectorConfig | object | `{"enabled":true,"processing":{"allowedMimeTypes":["application/pdf","text/plain","text/html","application/x-asp","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.openxmlformats-officedocument.presentationml.presentation"],"concurrency":1,"maxFileSizeBytes":null,"scanIntervalCron":"*/15 * * * *","stepTimeoutSeconds":300,"syncMode":"content_only"},"sharepoint":{"auth":{"clientId":null,"mode":"certificate","privateKeyPassword":null,"privateKeyPath":"/app/key.pem","tenantId":"unset_default_value","thumbprintSha1":null,"thumbprintSha256":null},"baseUrl":"unset_default_value","graph":{"apiRateLimitPerMinute":780000},"siteIds":["00000000-0000-0000-0000-000000000000","00000000-0000-0000-0000-000000000001"],"syncColumnName":"unset_default_value"},"unique":{"apiRateLimitPerMinute":100,"authMode":"cluster_local","ingestionServiceBaseUrl":"unset_default_value","ingestionMode":"recursive","maxIngestedFiles":1000,"rootScopeName":null,"scopeId":null,"scopeManagementServiceBaseUrl":"unset_default_value","serviceExtraHeaders":{},"storeInternally":"disabled","zitadel":{"clientId":"unset_default_value","oauthTokenUrl":"unset_default_value","projectId":"unset_default_value"}}}` | config for the deployed connector, will be mapped to the connectors environment variables users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to [] |
+| connectorConfig | object | `{"enabled":true,"processing":{"allowedMimeTypes":["application/pdf","text/plain","text/html","application/x-asp","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.openxmlformats-officedocument.presentationml.presentation"],"concurrency":1,"maxFileSizeBytes":null,"scanIntervalCron":"*/15 * * * *","stepTimeoutSeconds":300,"syncMode":"content_only"},"sharepoint":{"auth":{"clientId":null,"mode":"certificate","privateKeyPassword":null,"privateKeyPath":"/app/key.pem","tenantId":"unset_default_value","thumbprintSha1":null,"thumbprintSha256":null},"baseUrl":"unset_default_value","graph":{"apiRateLimitPerMinute":780000},"siteIds":["00000000-0000-0000-0000-000000000000","00000000-0000-0000-0000-000000000001"],"syncColumnName":"unset_default_value"},"unique":{"apiRateLimitPerMinute":100,"authMode":"cluster_local","ingestionMode":"recursive","ingestionServiceBaseUrl":"unset_default_value","maxIngestedFiles":1000,"scopeId":"unset_default_value","scopeManagementServiceBaseUrl":"unset_default_value","serviceExtraHeaders":{"x-company-id":"unset_default_value","x-user-id":"unset_default_value"},"storeInternally":"disabled","zitadel":{"clientId":"unset_default_value","oauthTokenUrl":"unset_default_value","projectId":"unset_default_value"}}}` | config for the deployed connector, will be mapped to the connectors environment variables users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to [] |
 | connectorConfig.enabled | bool | `true` | if disabled, connector.extraEnvCM must be set to [] |
 | connectorConfig.processing.allowedMimeTypes | list | `["application/pdf","text/plain","text/html","application/x-asp","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.openxmlformats-officedocument.presentationml.presentation"]` | list of allowed MIME types for files to sync |
 | connectorConfig.processing.concurrency | int | `1` | how many files you want to submit for ingestion into Unique at once |
@@ -107,17 +117,22 @@ spec:
 | connectorConfig.sharepoint.baseUrl | string | `"unset_default_value"` | base url of the sharepoint instance example: https://acme.sharepoint.com |
 | connectorConfig.sharepoint.siteIds | list | `["00000000-0000-0000-0000-000000000000","00000000-0000-0000-0000-000000000001"]` | Array of site IDs to scan |
 | connectorConfig.sharepoint.syncColumnName | string | `"unset_default_value"` | column name against which the files are synced example: FinanceGPTKnowledge |
-| connectorConfig.unique.authMode | string | `"cluster_local"` | communication mode for the Unique Services possible values: cluster_local, external cluster_local: comunicates using in-cluster URLs and requires no authentication external: communicates using external URLs and requires authentication via Zitadel |
+| connectorConfig.unique.apiRateLimitPerMinute | int | `100` | Number of Unique API requests allowed per minute |
+| connectorConfig.unique.authMode | string | `"cluster_local"` | communication mode for the Unique Services possible values: cluster_local, external cluster_local: communicates using in-cluster URLs and requires serviceExtraHeaders with x-company-id and x-user-id external: communicates using external URLs and requires authentication via Zitadel |
+| connectorConfig.unique.ingestionMode | string | `"recursive"` | ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy (path-based ingestion) possible values: flat, recursive |
 | connectorConfig.unique.ingestionServiceBaseUrl | string | `"unset_default_value"` | base URL for the ingestion service example: https://api.unique.app/ingestion example: http://node-ingestion.finance-gpt:8091 |
 | connectorConfig.unique.maxIngestedFiles | int | `1000` | Maximum number of files to ingest per site in a single run. If the number of new + updated files for a site exceeds this limit, the sync for that site will fail. |
-| connectorConfig.unique.rootScopeName | string | `nil` | name of the root scope/folder in the knowledge base where SharePoint content should be synced (for recursive mode). It will be created by the connector. If this scope name already exists and the service-user does not have read+write access to it it will fail. example: SharePoint Content |
-| connectorConfig.unique.scopeId | string | `nil` | scope id of the target scope for flat ingestion mode example: scope_bu4gokr0atzj0kfiuaaaaaaa |
+| connectorConfig.unique.scopeId | string | `"unset_default_value"` | Scope ID to be used as root for ingestion. Required for both flat and recursive modes. example: scope_bu4gokr0atzj0kfiuaaaaaaa |
 | connectorConfig.unique.scopeManagementServiceBaseUrl | string | `"unset_default_value"` | base URL for the scope management service example: https://api.unique.app/scope-management example: http://node-scope-management.finance-gpt:8094 |
-| connectorConfig.unique.serviceExtraHeaders | object | `{}` | Object containing extra HTTP headers for Unique API requests (GraphQL and REST) Used for service-to-service authentication when using internal cluster URLs |
-| connectorConfig.unique.storeInternally | string | `"disabled"` | Whether to store content internally in Unique or not. |
-| connectorConfig.unique.zitadel.projectId | string | `"unset_default_value"` | project id for the zitadel project example: 225317577440629999 |
-| grafana.dashboard.enabled | bool | `false` |  |
-| grafana.dashboard.folder | string | `"connectors"` |  |
+| connectorConfig.unique.serviceExtraHeaders | object | `{"x-company-id":"unset_default_value","x-user-id":"unset_default_value"}` | Object containing extra HTTP headers for Unique API requests (GraphQL and REST) Required when authMode is cluster_local. Must contain x-company-id and x-user-id headers. example: {"x-company-id": "1234567890", "x-user-id": "1234567890"} |
+| connectorConfig.unique.storeInternally | string | `"disabled"` | Whether to store content internally in Unique or not. possible values: enabled, disabled |
+| connectorConfig.unique.zitadel | object | `{"clientId":"unset_default_value","oauthTokenUrl":"unset_default_value","projectId":"unset_default_value"}` | Zitadel authentication configuration (required when authMode is external) |
+| connectorConfig.unique.zitadel.clientId | string | `"unset_default_value"` | Zitadel client ID |
+| connectorConfig.unique.zitadel.oauthTokenUrl | string | `"unset_default_value"` | Zitadel OAuth token URL example: https://idp.unique.app/oauth/v2/token |
+| connectorConfig.unique.zitadel.projectId | string | `"unset_default_value"` | Zitadel project ID example: 225317577440629999 |
+| grafana | object | `{"dashboard":{"enabled":false,"folder":"connectors"}}` | Grafana dashboard configuration |
+| grafana.dashboard.enabled | bool | `false` | Enable Grafana dashboard ConfigMap creation |
+| grafana.dashboard.folder | string | `"connectors"` | Grafana folder where the dashboard will be placed |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

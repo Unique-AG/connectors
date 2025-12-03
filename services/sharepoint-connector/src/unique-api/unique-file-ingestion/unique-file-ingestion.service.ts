@@ -53,6 +53,10 @@ export class UniqueFileIngestionService {
       variables.input.fileAccess = request.fileAccess;
     }
 
+    if (uniqueConfig.ingestionConfig) {
+      variables.input.ingestionConfig = uniqueConfig.ingestionConfig;
+    }
+
     const result = await this.ingestionClient.request<
       ContentUpsertMutationResult,
       ContentUpsertMutationInput
@@ -82,6 +86,10 @@ export class UniqueFileIngestionService {
       storeInternally: uniqueConfig.storeInternally === StoreInternallyMode.Enabled,
       baseUrl: request.baseUrl,
     };
+
+    if (uniqueConfig.ingestionConfig) {
+      variables.input.ingestionConfig = uniqueConfig.ingestionConfig;
+    }
 
     const result = await this.ingestionClient.request<
       ContentUpsertMutationResult,
