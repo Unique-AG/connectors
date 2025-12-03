@@ -192,7 +192,7 @@ export class ScopeManagementService {
       }
 
       const path = paths[index] ?? '';
-      const externalId = pathToExternalIdMap.get(path) ?? scope.name;
+      const externalId = pathToExternalIdMap.get(path) ?? `spc:${scope.name}`;
 
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
