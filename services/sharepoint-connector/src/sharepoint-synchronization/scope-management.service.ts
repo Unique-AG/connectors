@@ -179,6 +179,8 @@ export class ScopeManagementService {
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<void> {
+    const EXTERNAL_ID_PREFIX = 'spc:' as const;
+
     // Build path -> externalId map from directories
     const pathToExternalIdMap = this.buildPathToExternalIdMap(
       directories,
@@ -192,15 +194,15 @@ export class ScopeManagementService {
       }
 
       const path = paths[index] ?? '';
-      const externalId = pathToExternalIdMap.get(path) ?? `spc:${scope.name}`;
-
+      const externalId = pathToExternalIdMap.get(path) ?? scope.name;
+      const prefixedExternalId = `${EXTERNAL_ID_PREFIX}${externalId}`;
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           scope.id,
-          externalId,
+          prefixedExternalId
         );
         scope.externalId = updatedScope.externalId;
-        this.logger.debug(`Updated scope ${scope.id} with externalId: ${externalId}`);
+        this.logger.debug(`Updated scope ${scope.id} with externalId: ${prefixedExternalId}`);
       } catch (error) {
         this.logger.warn({
           msg: `Failed to update externalId for scope ${scope.id}: ${normalizeError(error).message}`,
