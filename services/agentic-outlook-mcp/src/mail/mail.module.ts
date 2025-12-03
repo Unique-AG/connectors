@@ -3,6 +3,7 @@ import { DrizzleModule } from '../drizzle/drizzle.module';
 import { LLMModule } from '../llm/llm.module';
 import { MsGraphModule } from '../msgraph/msgraph.module';
 import { QdrantModule } from '../qdrant/qdrant.module';
+import { SparseEmbeddingModule } from '../sparse-embedding/sparse-embedding.module';
 import { SemanticSearchEmailsTool } from './tools/agentic/semantic-search-emails.tool';
 import { CreateDraftEmailTool } from './tools/create-draft-email.tool';
 import { DeleteMailMessageTool } from './tools/delete-mail-message.tool';
@@ -15,7 +16,7 @@ import { SearchEmailTool } from './tools/search-email.tool';
 import { SendMailTool } from './tools/send-mail.tool';
 
 @Module({
-  imports: [MsGraphModule, DrizzleModule, QdrantModule, LLMModule],
+  imports: [MsGraphModule, DrizzleModule, QdrantModule, LLMModule, SparseEmbeddingModule],
   providers: [
     ListMailsTool,
     SendMailTool,

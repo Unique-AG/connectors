@@ -10,7 +10,8 @@
     "dev": "nest start",
     "dev:webhook": "ngrok http 3000 --url=agentic-outlook-mcp.ngrok.io",
     "debug": "nest start --debug --watch",
-    "codegen": "ts-node scripts/generate-openapi-spec.ts",
+    "codegen": "ts-node scripts/generate-openapi-spec.ts && npm run codegen:grpc",
+    "codegen:grpc": "mkdir -p src/@generated/grpc && rm -rf src/@generated/grpc/* && proto-loader-gen-types --longs=String --enums=String --defaults --oneofs --grpcLib=@grpc/grpc-js --outDir=src/@generated/grpc proto/*.proto",
     "db:init": "psql ${DATABASE_URL:-postgresql://postgres:postgres@localhost:9001/postgres} -f scripts/init-db.sql",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -26,9 +27,10 @@
     "test:coverage": "vitest run --config vitest.coverage.config.ts && istanbul-badges-readme --style='square-flat'"
   },
   "dependencies": {
-    "@dapr/dapr": "^3.6.1",
     "@golevelup/nestjs-discovery": "^5.0.0",
     "@golevelup/nestjs-rabbitmq": "^6.0.2",
+    "@grpc/grpc-js": "^1.14.2",
+    "@grpc/proto-loader": "^0.8.0",
     "@langchain/textsplitters": "^1.0.0",
     "@langfuse/client": "^4.4.2",
     "@langfuse/openai": "^4.2.0",
