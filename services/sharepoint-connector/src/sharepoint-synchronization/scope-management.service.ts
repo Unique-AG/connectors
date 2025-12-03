@@ -189,12 +189,7 @@ export class ScopeManagementService {
         continue;
       }
 
-      const path = paths[index];
-      if (!path) {
-        this.logger.warn(`Path at index ${index} is undefined. Skipping externalId update.`);
-        continue;
-      }
-
+      const path = paths[index] ?? '';
       const externalId = pathToExternalIdMap.get(path) ?? scope.name;
 
       try {
