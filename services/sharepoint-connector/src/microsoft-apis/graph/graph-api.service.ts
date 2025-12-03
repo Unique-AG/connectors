@@ -32,7 +32,6 @@ export class GraphApiService {
   private readonly graphClient: Client;
   private readonly limiter: Bottleneck;
   private readonly shouldConcealLogs: boolean;
-  private readonly siteNameCache = new Map<string, string>();
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
@@ -399,12 +398,6 @@ export class GraphApiService {
   }
 
   public async getSiteName(siteId: string): Promise<string> {
-    // Check cache first
-    const cachedSiteName = this.siteNameCache.get(siteId);
-    if (cachedSiteName) {
-      return cachedSiteName;
-    }
-
     const siteWebUrl = await this.getSiteWebUrl(siteId);
     const siteName =
       siteWebUrl.split('/').pop() ??
@@ -412,8 +405,6 @@ export class GraphApiService {
         `Site name not found for site ${this.shouldConcealLogs ? smear(siteId) : siteId}`,
       );
 
-    // Cache the result
-    this.siteNameCache.set(siteId, siteName);
     return siteName;
   }
 
