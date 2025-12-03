@@ -2,10 +2,12 @@ import json
 import logging
 from typing import Literal
 
-from fastembed import SparseEmbedding, SparseTextEmbedding
+from fastembed import SparseEmbedding
 from pydantic import BaseModel
 from temporalio import activity
 from tokenizers import Tokenizer
+
+from app.model_manager import model_manager
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +81,7 @@ async def embed_sparse(params: EmbedSparseParams) -> list[PointInput]:
         logger.warning("Email has no documents to embed, skipping")
         return []
 
-    model: SparseTextEmbedding = SparseTextEmbedding(model_name="prithivida/Splade_PP_en_v1")
+    model = model_manager.get_model()
     embeddings: list[SparseEmbedding] = list(model.embed(documents))
 
     tokenizer: Tokenizer = Tokenizer.from_pretrained("Qdrant/Splade_PP_en_v1")  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
