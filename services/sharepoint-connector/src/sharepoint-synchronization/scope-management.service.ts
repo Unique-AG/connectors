@@ -147,13 +147,6 @@ export class ScopeManagementService {
     // Extract all parent paths from the folder paths
     const allPathsWithParents = this.extractAllParentPaths(Array.from(uniqueFolderPaths));
 
-    // Build path -> externalId map from directories
-    const pathToExternalIdMap = this.buildPathToExternalIdMap(
-      directories,
-      context.siteId,
-      context.rootPath,
-    );
-
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
@@ -165,7 +158,8 @@ export class ScopeManagementService {
     await this.updateNewlyCreatedScopesWithExternalId(
       scopes,
       allPathsWithParents,
-      pathToExternalIdMap,
+      directories,
+      context,
     );
 
     // Add the full path to each scope object
@@ -182,8 +176,16 @@ export class ScopeManagementService {
   private async updateNewlyCreatedScopesWithExternalId(
     scopes: Scope[],
     paths: string[],
-    pathToExternalIdMap: Map<string, string>,
+    directories: SharepointDirectoryItem[],
+    context: SharepointSyncContext,
   ): Promise<void> {
+    // Build path -> externalId map from directories
+    const pathToExternalIdMap = this.buildPathToExternalIdMap(
+      directories,
+      context.siteId,
+      context.rootPath,
+    );
+
     for (const [index, scope] of scopes.entries()) {
       if (scope.externalId !== null) {
         continue;
