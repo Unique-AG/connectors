@@ -399,13 +399,10 @@ export class GraphApiService {
 
   public async getSiteName(siteId: string): Promise<string> {
     const siteWebUrl = await this.getSiteWebUrl(siteId);
-    const siteName =
+    return (
       siteWebUrl.split('/').pop() ??
-      assert.fail(
-        `Site name not found for site ${this.shouldConcealLogs ? smear(siteId) : siteId}`,
-      );
-
-    return siteName;
+      assert.fail(`Site name not found for site ${this.shouldConcealLogs ? smear(siteId) : siteId}`)
+    );
   }
 
   private async getDrivesForSite(siteId: string): Promise<Drive[]> {
