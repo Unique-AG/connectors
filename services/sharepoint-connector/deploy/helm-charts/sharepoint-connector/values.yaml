@@ -77,10 +77,49 @@ connector:
       mountPath: /app/key.pem
       subPath: key.pem
       readOnly: true
+
+# -- Grafana dashboard configuration
 grafana:
   dashboard:
-    enabled: false # TODO: Not yet implemented, template will fail on purpose if enabled
+    # -- Enable Grafana dashboard ConfigMap creation
+    enabled: false
+    # -- Grafana folder where the dashboard will be placed
     folder: connectors
+
+# -- Prometheus alerting rules configuration
+alerts:
+  # -- Enable PrometheusRule resource creation
+  enabled: false
+  # -- Default alert definitions
+  defaultAlerts:
+    # -- Enable GraphQL API error rate alerts
+    graphql:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # SharepointConnectorGraphQLErrors: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # SharepointConnectorGraphQLErrors:
+        #   for: "10m"
+        #   severity: "critical"
+        #   threshold: 0.05
+    # -- Enable Unique REST API error rate alerts
+    uniqueApi:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # SharepointConnectorUniqueAPIErrors: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # SharepointConnectorUniqueAPIErrors:
+        #   for: "10m"
+        #   severity: "critical"
+        #   threshold: 0.05
+    # -- Additional labels to add to all default alerts
+    additionalLabels: {}
+      # environment: production
+      # team: backend
 
 # -- config for the deployed connector, will be mapped to the connectors environment variables
 # users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []

@@ -1,0 +1,46 @@
+{{- if and .Values.alerts.defaultAlerts .Values.alerts.defaultAlerts.uniqueApi .Values.alerts.defaultAlerts.uniqueApi.enabled .Values.alerts.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1") }}
+
+{{- $fullName := include "chart.fullname" . -}}
+{{- $labels := include "chart.labels" . -}}
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $fullName }}-unique-api-alerts
+  labels:
+    {{- $labels | nindent 4 }}
+    role: alert-rules
+    alertGroup: sharepoint-connector
+    {{- with .Values.alerts.defaultAlerts.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: {{ $fullName }}-unique-api
+      rules:
+        {{- if not (dig "SharepointConnectorUniqueAPIErrors" false (.Values.alerts.defaultAlerts.uniqueApi.disabled | default dict)) }}
+        - alert: SharepointConnectorUniqueAPIErrors
+          annotations:
+            summary: "SharePoint Connector Unique REST API errors detected"
+            description: "The SharePoint Connector is experiencing Unique REST API errors (4xx/5xx responses). Current error rate: {{ "{{ $value | humanizePercentage }}" }}."
+            runbook: |
+              1. Inspect application logs for specific error messages
+              2. Check for recent deployments or configuration changes (both the connector and the Unique Services)
+              3. Verify network connectivity between connector and Unique Services
+              4. Verify service user settings and permissions within Unique
+          expr: |
+            (
+              sum(rate(spc_unique_rest_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+              /
+              sum(rate(spc_unique_rest_api_request_duration_seconds_count[5m]))
+            ) > {{ dig "SharepointConnectorUniqueAPIErrors" "threshold" 0.01 (.Values.alerts.defaultAlerts.uniqueApi.customRules | default dict) }}
+          for: {{ dig "SharepointConnectorUniqueAPIErrors" "for" "5m" (.Values.alerts.defaultAlerts.uniqueApi.customRules | default dict) }}
+          labels:
+            severity: {{ dig "SharepointConnectorUniqueAPIErrors" "severity" "warning" (.Values.alerts.defaultAlerts.uniqueApi.customRules | default dict) }}
+            alertGroup: sharepoint-connector
+            {{- with .Values.alerts.defaultAlerts.additionalLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        {{- end }}
+{{- end }}
+

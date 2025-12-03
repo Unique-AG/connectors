@@ -1,0 +1,47 @@
+{{- if and .Values.alerts.defaultAlerts .Values.alerts.defaultAlerts.graphql .Values.alerts.defaultAlerts.graphql.enabled .Values.alerts.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1") }}
+
+{{- $fullName := include "chart.fullname" . -}}
+{{- $labels := include "chart.labels" . -}}
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $fullName }}-graphql-alerts
+  labels:
+    {{- $labels | nindent 4 }}
+    role: alert-rules
+    alertGroup: sharepoint-connector
+    {{- with .Values.alerts.defaultAlerts.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: {{ $fullName }}-graphql
+      rules:
+        {{- if not (dig "SharepointConnectorGraphQLErrors" false (.Values.alerts.defaultAlerts.graphql.disabled | default dict)) }}
+        - alert: SharepointConnectorGraphQLErrors
+          annotations:
+            summary: "SharePoint Connector GraphQL API errors detected"
+            description: "The SharePoint Connector is experiencing GraphQL API errors (4xx/5xx responses). Current error rate: {{ "{{ $value | humanizePercentage }}" }}."
+            runbook: |
+              1. Inspect application logs for specific error messages
+              2. Check for recent deployments or configuration changes
+              3. Verify network connectivity between connector and GraphQL API
+              4. Verify authentication credentials and token validity
+              5. Check for rate limiting or throttling issues
+          expr: |
+            (
+              sum(rate(spc_unique_graphql_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+              /
+              sum(rate(spc_unique_graphql_api_request_duration_seconds_count[5m]))
+            ) > {{ dig "SharepointConnectorGraphQLErrors" "threshold" 0.01 (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
+          for: {{ dig "SharepointConnectorGraphQLErrors" "for" "5m" (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
+          labels:
+            severity: {{ dig "SharepointConnectorGraphQLErrors" "severity" "warning" (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
+            alertGroup: sharepoint-connector
+            {{- with .Values.alerts.defaultAlerts.additionalLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        {{- end }}
+{{- end }}
+

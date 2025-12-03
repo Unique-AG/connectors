@@ -43,6 +43,135 @@
       },
       "additionalProperties": false
     },
+    "alerts": {
+      "type": "object",
+      "description": "Prometheus alerting rules configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable Prometheus alerting rules",
+          "default": false
+        },
+        "defaultAlerts": {
+          "type": "object",
+          "description": "Default alert configurations",
+          "properties": {
+            "graphql": {
+              "type": "object",
+              "description": "Configuration for GraphQL API error alerts",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable GraphQL API error rate alerts",
+                  "default": true
+                },
+                "disabled": {
+                  "type": "object",
+                  "description": "Disable specific alerts by setting them to true",
+                  "properties": {
+                    "SharepointConnectorGraphQLErrors": {
+                      "type": "boolean",
+                      "description": "Disable the SharepointConnectorGraphQLErrors alert"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "customRules": {
+                  "type": "object",
+                  "description": "Override alert rules with custom values",
+                  "properties": {
+                    "SharepointConnectorGraphQLErrors": {
+                      "type": "object",
+                      "description": "Custom configuration for SharepointConnectorGraphQLErrors alert",
+                      "properties": {
+                        "threshold": {
+                          "type": "number",
+                          "description": "Error rate threshold (0.01 = 1% error rate)",
+                          "default": 0.01
+                        },
+                        "for": {
+                          "type": "string",
+                          "description": "Duration the condition must be true before firing",
+                          "default": "5m"
+                        },
+                        "severity": {
+                          "type": "string",
+                          "enum": ["critical", "warning", "info"],
+                          "description": "Alert severity",
+                          "default": "warning"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "uniqueApi": {
+              "type": "object",
+              "description": "Configuration for Unique REST API error alerts",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable Unique REST API error rate alerts",
+                  "default": true
+                },
+                "disabled": {
+                  "type": "object",
+                  "description": "Disable specific alerts by setting them to true",
+                  "properties": {
+                    "SharepointConnectorUniqueAPIErrors": {
+                      "type": "boolean",
+                      "description": "Disable the SharepointConnectorUniqueAPIErrors alert"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "customRules": {
+                  "type": "object",
+                  "description": "Override alert rules with custom values",
+                  "properties": {
+                    "SharepointConnectorUniqueAPIErrors": {
+                      "type": "object",
+                      "description": "Custom configuration for SharepointConnectorUniqueAPIErrors alert",
+                      "properties": {
+                        "threshold": {
+                          "type": "number",
+                          "description": "Error rate threshold (0.01 = 1% error rate)",
+                          "default": 0.01
+                        },
+                        "for": {
+                          "type": "string",
+                          "description": "Duration the condition must be true before firing",
+                          "default": "5m"
+                        },
+                        "severity": {
+                          "type": "string",
+                          "enum": ["critical", "warning", "info"],
+                          "description": "Alert severity",
+                          "default": "warning"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "additionalLabels": {
+              "type": "object",
+              "description": "Additional labels to add to all alerts and the PrometheusRule"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "connectorConfig": {
       "type": "object",
       "description": "SharePoint connector configuration",

@@ -1,0 +1,8 @@
+# we keep the test simple for now, inflated tests like
+# https://github.com/Unique-AG/helm-charts/blob/09e17ce7203067b45f6de1b3e1f73d4e5af2a746/charts/backend-service/ci/alerts-argocd-values.yaml
+# can be added later and for regressions
+alerts:
+  enabled: true
+  defaultAlerts:
+    additionalLabels:
+      team: flying-aces

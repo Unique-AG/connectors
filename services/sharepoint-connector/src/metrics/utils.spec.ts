@@ -100,7 +100,7 @@ describe('createApiMethodExtractor', () => {
   it('handles unknown segments', () => {
     const extractor = createApiMethodExtractor(['known']);
 
-    expect(extractor('/unknown/segment', 'GET')).toBe('GET:/[unknown]/{unknownId}');
+    expect(extractor('/unknown/segment', 'GET')).toBe('GET:/[unknown]/[unknown]');
   });
 
   it('handles paths starting with unknown segments', () => {
@@ -135,5 +135,27 @@ describe('createApiMethodExtractor', () => {
 
     expect(extractor('/test/123', 'get')).toBe('get:/test/{testId}');
     expect(extractor('/test/123', 'POST')).toBe('POST:/test/{testId}');
+  });
+
+  it('handles paths with query strings', () => {
+    const extractor = createApiMethodExtractor(['sites', 'drives', 'items']);
+
+    expect(extractor('/sites/abc123/drives?filter=xyz', 'GET')).toBe('GET:/sites/{siteId}/drives');
+    expect(extractor('/sites/abc/drives/def/items/ghi?select=id,name&expand=children', 'GET')).toBe(
+      'GET:/sites/{siteId}/drives/{driveId}/items/{itemId}',
+    );
+    expect(extractor('/drives/xyz?$search=test', 'POST')).toBe('POST:/drives/{driveId}');
+  });
+
+  it('handles two unknown sections one after the other', () => {
+    const extractor = createApiMethodExtractor(['sites']);
+
+    expect(extractor('/unknown1/unknown2', 'GET')).toBe('GET:/[unknown]/[unknown]');
+    expect(extractor('/sites/abc/unknown1/unknown2', 'GET')).toBe(
+      'GET:/sites/{siteId}/[unknown]/[unknown]',
+    );
+    expect(extractor('/unknown1/unknown2/unknown3', 'POST')).toBe(
+      'POST:/[unknown]/[unknown]/[unknown]',
+    );
   });
 });

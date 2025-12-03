@@ -38,9 +38,10 @@ export function createApiMethodExtractor(knownSegments: string[]) {
   const knownSegmentsSet = new Set(knownSegments);
 
   return (path: string, httpMethod: string): string => {
-    const segments = path.split('/').filter(Boolean);
+    const [pathWithoutQueryString, _queryString] = path.split('?');
+    const segments = pathWithoutQueryString?.split('/').filter(Boolean) ?? [];
     const normalizedSegments: string[] = [];
-    let previousSegment = '';
+    let previousSegment: string | null = null;
 
     for (const segment of segments) {
       if (knownSegmentsSet.has(segment)) {
@@ -51,7 +52,7 @@ export function createApiMethodExtractor(knownSegments: string[]) {
           ? `{${previousSegment.replace(/s$/, '')}Id}`
           : '[unknown]';
         normalizedSegments.push(paramName);
-        previousSegment = segment;
+        previousSegment = null;
       }
     }
 
