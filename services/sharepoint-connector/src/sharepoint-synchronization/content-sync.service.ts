@@ -15,7 +15,7 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
-import { normalizeError } from '../utils/normalize-error';
+import { sanitizeError } from '../utils/normalize-error';
 import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
@@ -166,10 +166,10 @@ export class ContentSyncService {
       // Get content that matches the exact keys
       filesToDelete = await this.uniqueFilesService.getFilesByKeys(fullKeys);
     } catch (error) {
-      const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `${logPrefix} Failed to get content for deleted files, cannot delete ${deletedFileKeys.length} ingested files: ${normalizedError.message}`,
-        error,
+        msg: `${logPrefix} Failed to get content for deleted files, cannot delete ${deletedFileKeys.length} ingested files`,
+        deletedFileKeysCount: deletedFileKeys.length,
+        error: sanitizeError(error),
       });
       return;
     }
@@ -186,16 +186,16 @@ export class ContentSyncService {
           result: 'success',
         });
       } catch (error) {
-        const normalizedError = normalizeError(error);
-
         this.spcFileDeletedTotal.add(1, {
           sp_site_id: logSiteId,
           result: 'failure',
         });
 
         this.logger.error({
-          msg: `${logPrefix} Failed to delete content ${file.key} (ID: ${file.id}): ${normalizedError.message}`,
-          error,
+          msg: `${logPrefix} Failed to delete content`,
+          fileKey: file.key,
+          fileId: file.id,
+          error: sanitizeError(error),
         });
       }
     }

@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { HttpClientService } from '../shared/services/http-client.service';
-import { normalizeError } from '../utils/normalize-error';
+import { sanitizeError } from '../utils/normalize-error';
 
 @Injectable()
 export class UniqueAuthService {
@@ -67,8 +67,10 @@ export class UniqueAuthService {
       this.tokenExpirationTime = Date.now() + tokenData.expires_in * 1000;
       return tokenData.access_token;
     } catch (error) {
-      const normalized = normalizeError(error);
-      this.logger.error('Failed to acquire Unique API token from Zitadel:', normalized.message);
+      this.logger.error({
+        msg: 'Failed to acquire Unique API token from Zitadel',
+        error: sanitizeError(error),
+      });
       throw error;
     }
   }

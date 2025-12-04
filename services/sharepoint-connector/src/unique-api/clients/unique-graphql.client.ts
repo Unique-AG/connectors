@@ -8,7 +8,7 @@ import { isObjectType } from 'remeda';
 import { Config } from '../../config';
 import { getHttpStatusCodeClass, getSlowRequestDurationBucket } from '../../metrics';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
-import { normalizeError } from '../../utils/normalize-error';
+import { sanitizeError } from '../../utils/normalize-error';
 import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
 import { UniqueAuthService } from '../unique-auth.service';
 
@@ -121,9 +121,9 @@ export class UniqueGraphqlClient {
         }
 
         this.logger.error({
-          msg: `Failed ${this.clientTarget} request (${operationName}): ${normalizeError(error).message}`,
+          msg: `Failed ${this.clientTarget} request (${operationName})`,
           operationName,
-          error,
+          error: sanitizeError(error),
         });
         throw error;
       }

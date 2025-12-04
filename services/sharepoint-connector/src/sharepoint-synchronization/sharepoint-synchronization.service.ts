@@ -8,7 +8,7 @@ import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
-import { normalizeError } from '../utils/normalize-error';
+import { sanitizeError } from '../utils/normalize-error';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
@@ -59,8 +59,8 @@ export class SharepointSynchronizationService {
         baseContext = await this.scopeManagementService.initializeRootScope(scopeId, ingestionMode);
       } catch (error) {
         this.logger.error({
-          msg: `Failed to initialize root scope: ${normalizeError(error).message}`,
-          error,
+          msg: 'Failed to initialize root scope',
+          error: sanitizeError(error),
         });
         this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
           sync_type: 'full',
@@ -108,8 +108,8 @@ export class SharepointSynchronizationService {
             );
           } catch (error) {
             this.logger.error({
-              msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}. Skipping site.`,
-              error,
+              msg: `${logPrefix} Failed to create scopes. Skipping site.`,
+              error: sanitizeError(error),
             });
             this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
               sync_type: 'site',
@@ -125,8 +125,8 @@ export class SharepointSynchronizationService {
           await this.contentSyncService.syncContentForSite(items, scopes, context);
         } catch (error) {
           this.logger.error({
-            msg: `${logPrefix} Failed to synchronize content: ${normalizeError(error).message}`,
-            error,
+            msg: `${logPrefix} Failed to synchronize content`,
+            error: sanitizeError(error),
           });
           this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
             sync_type: 'site',
@@ -147,8 +147,8 @@ export class SharepointSynchronizationService {
             });
           } catch (error) {
             this.logger.error({
-              msg: `${logPrefix} Failed to synchronize permissions: ${normalizeError(error).message}`,
-              error,
+              msg: `${logPrefix} Failed to synchronize permissions`,
+              error: sanitizeError(error),
             });
             this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
               sync_type: 'site',
@@ -176,8 +176,8 @@ export class SharepointSynchronizationService {
       });
     } catch (error) {
       this.logger.error({
-        msg: `Failed full synchronization: ${normalizeError(error).message}`,
-        error,
+        msg: 'Failed full synchronization',
+        error: sanitizeError(error),
       });
       this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
         sync_type: 'full',

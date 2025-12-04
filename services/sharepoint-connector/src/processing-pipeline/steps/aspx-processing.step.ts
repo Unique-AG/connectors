@@ -4,7 +4,7 @@ import { Config } from '../../config';
 import { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { getTitle } from '../../utils/list-item.util';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
-import { normalizeError } from '../../utils/normalize-error';
+import { sanitizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -32,7 +32,6 @@ export class AspxProcessingStep implements IPipelineStep {
 
       return context;
     } catch (error) {
-      const message = normalizeError(error).message;
       this.logger.error({
         msg: 'ASPX processing failed',
         correlationId: context.correlationId,
@@ -40,7 +39,7 @@ export class AspxProcessingStep implements IPipelineStep {
         siteId: this.shouldConcealLogs
           ? smear(context.pipelineItem.siteId)
           : context.pipelineItem.siteId,
-        error: message,
+        error: sanitizeError(error),
       });
       throw error;
     }

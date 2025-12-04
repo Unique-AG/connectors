@@ -2,7 +2,6 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { isNonNullish, prop, pullObject } from 'remeda';
-import { serializeError } from 'serialize-error-cjs';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
@@ -13,7 +12,7 @@ import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.s
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
-import { normalizeError } from '../utils/normalize-error';
+import { sanitizeError } from '../utils/normalize-error';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
 
@@ -213,8 +212,8 @@ export class ScopeManagementService {
         this.logger.debug(`Updated scope ${scope.id} with externalId: ${prefixedExternalId}`);
       } catch (error) {
         this.logger.warn({
-          msg: `Failed to update externalId for scope ${scope.id}: ${normalizeError(error).message}`,
-          error: serializeError(normalizeError(error)),
+          msg: `Failed to update externalId for scope ${scope.id}`,
+          error: sanitizeError(error),
         });
       }
     }

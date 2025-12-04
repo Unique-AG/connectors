@@ -9,7 +9,7 @@ import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
-import { normalizeError } from '../utils/normalize-error';
+import { normalizeError, sanitizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentFetchingStep } from './steps/content-fetching.step';
@@ -97,10 +97,14 @@ export class ProcessingPipelineService {
           result: isTimeout ? 'timeout' : 'failure',
         });
 
-        this.logger.error(
-          `${logPrefix} Pipeline ${isTimeout ? 'timed out' : 'failed'} at step: ` +
-            `${step.stepName} after ${totalDuration}ms: ${normalizedError.message}`,
-        );
+        this.logger.error({
+          msg: `${logPrefix} Pipeline ${isTimeout ? 'timed out' : 'failed'} at step: ${step.stepName} after ${totalDuration}ms`,
+          correlationId: context.correlationId,
+          stepName: step.stepName,
+          duration: totalDuration,
+          isTimeout,
+          error: sanitizeError(error),
+        });
 
         if (step.cleanup) await step.cleanup(context);
         this.finalCleanup(context);

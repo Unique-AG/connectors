@@ -5,7 +5,7 @@ import { Config } from '../../config';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
-import { normalizeError } from '../../utils/normalize-error';
+import { sanitizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -50,7 +50,6 @@ export class ContentFetchingStep implements IPipelineStep {
 
       return context;
     } catch (error) {
-      const message = normalizeError(error).message;
       this.logger.error({
         msg: 'Site page content fetching failed',
         correlationId: context.correlationId,
@@ -59,7 +58,7 @@ export class ContentFetchingStep implements IPipelineStep {
         siteId: this.shouldConcealLogs
           ? smear(context.pipelineItem.siteId)
           : context.pipelineItem.siteId,
-        error: message,
+        error: sanitizeError(error),
       });
       throw error;
     }
@@ -82,7 +81,6 @@ export class ContentFetchingStep implements IPipelineStep {
 
       return context;
     } catch (error) {
-      const message = normalizeError(error).message;
       this.logger.error({
         msg: 'Content fetching failed',
         correlationId: context.correlationId,
@@ -91,7 +89,7 @@ export class ContentFetchingStep implements IPipelineStep {
         siteId: this.shouldConcealLogs
           ? smear(context.pipelineItem.siteId)
           : context.pipelineItem.siteId,
-        error: message,
+        error: sanitizeError(error),
       });
       throw error;
     }

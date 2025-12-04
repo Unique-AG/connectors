@@ -8,7 +8,7 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
-import { normalizeError } from '../utils/normalize-error';
+import { sanitizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './types';
@@ -51,10 +51,9 @@ export class FileMoveProcessor {
     try {
       ingestedFiles = await this.uniqueFilesService.getFilesByKeys(movedFileCompleteKeys);
     } catch (error) {
-      const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `${logPrefix} Failed to get ingested files by keys from unique: ${normalizedError.message}`,
-        error,
+        msg: `${logPrefix} Failed to get ingested files by keys from unique`,
+        error: sanitizeError(error),
       });
       throw error;
     }
@@ -76,16 +75,15 @@ export class FileMoveProcessor {
           result: 'success',
         });
       } catch (error) {
-        const normalizedError = normalizeError(error);
-
         this.spcFileMovedTotal.add(1, {
           sp_site_id: logSiteId,
           result: 'failure',
         });
 
         this.logger.error({
-          msg: `${logPrefix} Failed to move file ${data.contentId}: ${normalizedError.message}`,
-          error,
+          msg: `${logPrefix} Failed to move file ${data.contentId}`,
+          contentId: data.contentId,
+          error: sanitizeError(error),
         });
       }
     }

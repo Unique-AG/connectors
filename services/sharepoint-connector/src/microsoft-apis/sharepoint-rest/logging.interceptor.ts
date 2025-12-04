@@ -2,7 +2,7 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { Logger } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
 import { redactSiteNameFromPath } from '../../utils/logging.util';
-import { normalizeError } from '../../utils/normalize-error';
+import { sanitizeError } from '../../utils/normalize-error';
 
 export function createLoggingInterceptor(
   shouldConcealLogs: boolean,
@@ -59,7 +59,7 @@ export function createLoggingInterceptor(
             msg: 'SharePoint REST request failed with error',
             method,
             path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
-            error: normalizeError(error).message,
+            error: sanitizeError(error),
             duration,
           });
           handler.onResponseError?.(controller, error);

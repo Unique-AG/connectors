@@ -1,6 +1,6 @@
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
-import { normalizeError } from '../../../utils/normalize-error';
+import { sanitizeError } from '../../../utils/normalize-error';
 import { GraphAuthenticationService } from './graph-authentication.service';
 
 export class TokenRefreshMiddleware implements Middleware {
@@ -36,7 +36,7 @@ export class TokenRefreshMiddleware implements Middleware {
     } catch (error) {
       this.logger.error({
         msg: 'Failed to refresh SharePoint token or retry request',
-        error: normalizeError(error).message,
+        error: sanitizeError(error),
       });
     }
   }

@@ -9,7 +9,7 @@ import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
-import { normalizeError } from '../../utils/normalize-error';
+import { sanitizeError } from '../../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 import {
@@ -73,14 +73,22 @@ export class GraphApiService {
     if (aspxPagesResult.status === 'fulfilled') {
       sharepointContentItemsToSync.push(...aspxPagesResult.value);
     } else {
-      this.logger.error(`${logPrefix} Failed to scan pages:`, aspxPagesResult.reason);
+      this.logger.error({
+        msg: `${logPrefix} Failed to scan pages`,
+        siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
+        error: sanitizeError(aspxPagesResult.reason),
+      });
     }
 
     if (filesResult.status === 'fulfilled') {
       sharepointContentItemsToSync.push(...filesResult.value.items);
       sharepointDirectoryItemsToSync.push(...filesResult.value.directories);
     } else {
-      this.logger.error(`${logPrefix} Failed to scan drive files:`, filesResult.reason);
+      this.logger.error({
+        msg: `${logPrefix} Failed to scan drive files`,
+        siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
+        error: sanitizeError(filesResult.reason),
+      });
     }
 
     this.logger.log(
@@ -186,12 +194,11 @@ export class GraphApiService {
 
       return finalBuffer;
     } catch (error) {
-      const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `${logPrefix} Failed to download file content: ${normalizedError.message}`,
+        msg: `${logPrefix} Failed to download file content`,
         itemId,
         driveId,
-        error,
+        error: sanitizeError(error),
       });
       throw error;
     }
@@ -218,10 +225,11 @@ export class GraphApiService {
       );
       return aspxSharepointContentItems;
     } catch (error) {
-      const normalizedError = normalizeError(error);
-      this.logger.warn(
-        `${logPrefix} Failed to scan ASPX files from SitePages: ${normalizedError.message}`,
-      );
+      this.logger.warn({
+        msg: `${logPrefix} Failed to scan ASPX files from SitePages`,
+        siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
+        error: sanitizeError(error),
+      });
       return [];
     }
   }
@@ -238,10 +246,10 @@ export class GraphApiService {
 
       return allLists;
     } catch (error) {
-      const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `${logPrefix} Failed to fetch lists. Check Sites.Selected permission. ${normalizedError.message}`,
-        error,
+        msg: `${logPrefix} Failed to fetch lists. Check Sites.Selected permission.`,
+        siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
+        error: sanitizeError(error),
       });
       throw error;
     }
@@ -284,10 +292,11 @@ export class GraphApiService {
       this.logger.log(`${logPrefix} Found ${aspxItems.length} ASPX files in SitePages list`);
       return aspxItems;
     } catch (error) {
-      const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `${logPrefix} Failed to fetch ASPX files from SitePages list: ${normalizedError.message}`,
-        error,
+        msg: `${logPrefix} Failed to fetch ASPX files from SitePages list`,
+        siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
+        listId,
+        error: sanitizeError(error),
       });
       throw error;
     }
@@ -318,10 +327,12 @@ export class GraphApiService {
         title: response.fields.Title,
       };
     } catch (error) {
-      const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch site page content for item ${itemId}: ${normalizedError.message}`,
-        error,
+        msg: 'Failed to fetch site page content for item',
+        itemId,
+        siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
+        driveId: listId,
+        error: sanitizeError(error),
       });
       throw error;
     }
@@ -388,10 +399,10 @@ export class GraphApiService {
 
       return site.webUrl;
     } catch (error) {
-      const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `Failed to fetch site info for ${loggedSiteId}. Check Sites.Selected permission.  ${normalizedError.message}`,
-        error,
+        msg: 'Failed to fetch site info. Check Sites.Selected permission.',
+        siteId: loggedSiteId,
+        error: sanitizeError(error),
       });
       throw error;
     }
@@ -417,10 +428,10 @@ export class GraphApiService {
 
       return allDrives;
     } catch (error) {
-      const normalizedError = normalizeError(error);
       this.logger.error({
-        msg: `${logPrefix} Failed to fetch drives: ${normalizedError.message}`,
-        error,
+        msg: `${logPrefix} Failed to fetch drives`,
+        siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
+        error: sanitizeError(error),
       });
       throw error;
     }
@@ -492,9 +503,12 @@ export class GraphApiService {
 
       return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch items for drive ${driveId}, item ${itemId}: ${normalizeError(error).message}`,
-      );
+      this.logger.error({
+        msg: 'Failed to fetch items for drive',
+        driveId,
+        itemId,
+        error: sanitizeError(error),
+      });
 
       this.logger.warn(
         `Continuing scan with results collected so far from drive ${driveId}, item ${itemId} for site ${loggedSiteId}`,

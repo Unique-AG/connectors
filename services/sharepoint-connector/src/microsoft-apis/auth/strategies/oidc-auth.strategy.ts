@@ -2,10 +2,9 @@ import assert from 'node:assert';
 import { DefaultAzureCredential } from '@azure/identity';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { serializeError } from 'serialize-error-cjs';
 import { z } from 'zod';
 import { Config } from '../../../config';
-import { normalizeError } from '../../../utils/normalize-error';
+import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenAcquisitionResult } from '../types';
 import { AuthStrategy } from './auth-strategy.interface';
 
@@ -45,7 +44,7 @@ export class OidcAuthStrategy implements AuthStrategy {
     } catch (error) {
       this.logger.error({
         msg: 'Failed to acquire Graph API token using OIDC',
-        error: serializeError(normalizeError(error)),
+        error: sanitizeError(error),
       });
 
       throw error;
