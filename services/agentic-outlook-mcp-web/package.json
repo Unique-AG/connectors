@@ -10,10 +10,8 @@
     "dev": "vite",
     "register-client": "node scripts/register-oauth-client.js",
     "codegen": "rm -rf src/@generated && orval --config orval.config.ts",
-    "lint": "biome check .",
-    "lint:fix": "biome check . --write",
-    "format": "biome format .",
-    "format:fix": "biome format . --write"
+    "style": "biome check .",
+    "style:fix": "biome check . --write"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

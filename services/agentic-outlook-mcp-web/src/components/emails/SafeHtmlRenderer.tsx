@@ -80,7 +80,7 @@ export const SafeHtmlRenderer = ({ html, className = '' }: SafeHtmlRendererProps
         body?.scrollHeight || 0,
         body?.offsetHeight || 0,
         html?.scrollHeight || 0,
-        html?.offsetHeight || 0
+        html?.offsetHeight || 0,
       );
       setIframeHeight(height);
     };
@@ -118,7 +118,7 @@ function sanitizeEmailHtml(html: string): string {
   tempDiv.innerHTML = html;
 
   const dangerousElements = tempDiv.querySelectorAll(
-    'script, style, iframe, object, embed, link[rel="stylesheet"], base, meta[http-equiv]'
+    'script, style, iframe, object, embed, link[rel="stylesheet"], base, meta[http-equiv]',
   );
   dangerousElements.forEach((el) => {
     el.remove();
@@ -174,4 +174,3 @@ function sanitizeEmailHtml(html: string): string {
 
   return tempDiv.innerHTML;
 }
-
