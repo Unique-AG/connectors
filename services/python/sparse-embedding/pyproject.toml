@@ -1,7 +1,7 @@
 [project]
-name = "agentic-outlook-mcp"
+name = "sparse-embedding"
 version = "0.1.0"
-description = "Add your description here"
+description = "Sparse Embedding Service"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
