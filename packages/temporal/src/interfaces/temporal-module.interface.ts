@@ -6,18 +6,10 @@ import { TemporalModuleOptions } from './temporal-module-options.interface';
 export interface ITemporalModule {
   forRoot(workerConfig: WorkerOptions): DynamicModule;
   forRoot(configKey: string, workerConfig: WorkerOptions): DynamicModule;
-  forRoot(
-    keyOrConfig: string | WorkerOptions,
-    workerConfig: WorkerOptions,
-  ): DynamicModule;
+  forRoot(keyOrConfig: string | WorkerOptions, workerConfig: WorkerOptions): DynamicModule;
 
-  forRootAsync(
-    asyncWorkerConfig: SharedWorkerAsyncConfiguration,
-  ): DynamicModule;
-  forRootAsync(
-    configKey: string,
-    asyncWorkerConfig: SharedWorkerAsyncConfiguration,
-  ): DynamicModule;
+  forRootAsync(asyncWorkerConfig: SharedWorkerAsyncConfiguration): DynamicModule;
+  forRootAsync(configKey: string, asyncWorkerConfig: SharedWorkerAsyncConfiguration): DynamicModule;
   forRootAsync(
     configKey: string | SharedWorkerAsyncConfiguration,
     asyncWorkerConfig?: SharedWorkerAsyncConfiguration,

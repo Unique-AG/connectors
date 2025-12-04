@@ -8,13 +8,9 @@ export interface WorkflowMethodOptions {
 export function WorkflowMethod(): MethodDecorator;
 export function WorkflowMethod(name: string): MethodDecorator;
 export function WorkflowMethod(options: WorkflowMethodOptions): MethodDecorator;
-export function WorkflowMethod(
-  nameOrOptions?: string | WorkflowMethodOptions,
-): MethodDecorator {
+export function WorkflowMethod(nameOrOptions?: string | WorkflowMethodOptions): MethodDecorator {
   const options =
-    nameOrOptions && typeof nameOrOptions === 'object'
-      ? nameOrOptions
-      : { name: nameOrOptions };
+    nameOrOptions && typeof nameOrOptions === 'object' ? nameOrOptions : { name: nameOrOptions };
 
   return SetMetadata(TEMPORAL_MODULE_WORKFLOW_METHOD, options || {});
 }

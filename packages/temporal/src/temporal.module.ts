@@ -1,10 +1,7 @@
 /** biome-ignore-all lint/complexity/noThisInStatic: Fork of KurtzL/nestjs-temporal */
 import { DynamicModule, Module } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
-import {
-  SharedWorkflowClientOptions,
-  TemporalModuleOptions,
-} from './interfaces';
+import { SharedWorkflowClientOptions, TemporalModuleOptions } from './interfaces';
 import { TemporalExplorer } from './temporal.explorer';
 import {
   ConfigurableModuleClass,
@@ -31,21 +28,14 @@ export class TemporalModule extends ConfigurableModuleClass {
    *
    * @deprecated Use registerWorker.
    */
-  public static forRootAsync(
-    options: typeof TEMPORAL_MODULE_ASYNC_OPTIONS_TYPE,
-  ): DynamicModule {
+  public static forRootAsync(options: typeof TEMPORAL_MODULE_ASYNC_OPTIONS_TYPE): DynamicModule {
     return TemporalModule.registerWorkerAsync(options);
   }
 
-  public static registerWorker(
-    options: typeof TEMPORAL_MODULE_OPTIONS_TYPE,
-  ): DynamicModule {
+  public static registerWorker(options: typeof TEMPORAL_MODULE_OPTIONS_TYPE): DynamicModule {
     const superDynamicModule = super.registerWorker(options);
     superDynamicModule.imports = [DiscoveryModule];
-    superDynamicModule.providers?.push(
-      TemporalExplorer,
-      TemporalMetadataAccessor,
-    );
+    superDynamicModule.providers?.push(TemporalExplorer, TemporalMetadataAccessor);
     return superDynamicModule;
   }
 
@@ -54,10 +44,7 @@ export class TemporalModule extends ConfigurableModuleClass {
   ): DynamicModule {
     const superDynamicModule = super.registerWorkerAsync(options);
     superDynamicModule.imports?.push(DiscoveryModule);
-    superDynamicModule.providers?.push(
-      TemporalExplorer,
-      TemporalMetadataAccessor,
-    );
+    superDynamicModule.providers?.push(TemporalExplorer, TemporalMetadataAccessor);
     return superDynamicModule;
   }
 
@@ -74,9 +61,7 @@ export class TemporalModule extends ConfigurableModuleClass {
   public static registerClientAsync(
     asyncSharedWorkflowClientOptions: SharedWorkflowClientOptions,
   ): DynamicModule {
-    const providers = createClientAsyncProvider(
-      asyncSharedWorkflowClientOptions,
-    );
+    const providers = createClientAsyncProvider(asyncSharedWorkflowClientOptions);
 
     return {
       global: true,

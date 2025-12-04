@@ -16,16 +16,11 @@ import {
   Worker,
   WorkerOptions,
 } from '@temporalio/worker';
-import {
-  TEMPORAL_MODULE_OPTIONS_TOKEN,
-  TemporalModuleOptions,
-} from './temporal.module-definition';
+import { TEMPORAL_MODULE_OPTIONS_TOKEN, TemporalModuleOptions } from './temporal.module-definition';
 import { TemporalMetadataAccessor } from './temporal-metadata.accessors';
 
 @Injectable()
-export class TemporalExplorer
-  implements OnModuleInit, OnModuleDestroy, OnApplicationBootstrap
-{
+export class TemporalExplorer implements OnModuleInit, OnModuleDestroy, OnApplicationBootstrap {
   private readonly logger = new Logger(TemporalExplorer.name);
   private worker?: Worker;
   private workerRunPromise?: Promise<void>;
@@ -75,14 +70,11 @@ export class TemporalExplorer
       } as WorkerOptions;
       if (connectionOptions) {
         this.logger.verbose('Connecting to the Temporal server');
-        workerOptions.connection =
-          await NativeConnection.connect(connectionOptions);
+        workerOptions.connection = await NativeConnection.connect(connectionOptions);
       }
 
       this.logger.verbose('Creating a new Worker');
-      this.worker = await Worker.create(
-        Object.assign(workerOptions, workerConfig),
-      );
+      this.worker = await Worker.create(Object.assign(workerOptions, workerConfig));
     }
   }
 
@@ -113,16 +105,12 @@ export class TemporalExplorer
     activityClasses?.forEach((wrapper) => {
       const { instance } = wrapper as InstanceWrapper;
 
-      this.metadataScanner
-        .getAllMethodNames(Object.getPrototypeOf(instance))
-        .map((key) => {
-          if (this.metadataAccessor.isActivity(instance[key])) {
-            activityMethods[key] = (activityMethods[key] || []).concat(
-              instance.constructor.name,
-            );
-          }
-          return key;
-        });
+      this.metadataScanner.getAllMethodNames(Object.getPrototypeOf(instance)).map((key) => {
+        if (this.metadataAccessor.isActivity(instance[key])) {
+          activityMethods[key] = (activityMethods[key] || []).concat(instance.constructor.name);
+        }
+        return key;
+      });
     });
 
     const violations = Object.entries(activityMethods).filter(
@@ -147,9 +135,7 @@ export class TemporalExplorer
       .filter(
         (wrapper: InstanceWrapper) =>
           this.metadataAccessor.isActivities(
-            !wrapper.metatype || wrapper.inject
-              ? wrapper.instance?.constructor
-              : wrapper.metatype,
+            !wrapper.metatype || wrapper.inject ? wrapper.instance?.constructor : wrapper.metatype,
           ) &&
           (!activityClasses || (wrapper.metatype && activityClasses.includes(wrapper.metatype))),
       );

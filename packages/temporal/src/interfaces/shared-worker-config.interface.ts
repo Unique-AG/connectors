@@ -6,8 +6,7 @@ export interface SharedWorkerConfigurationFactory {
   createSharedConfiguration(): Promise<WorkerOptions> | WorkerOptions;
 }
 
-export interface SharedWorkerAsyncConfiguration
-  extends Pick<ModuleMetadata, 'imports'> {
+export interface SharedWorkerAsyncConfiguration extends Pick<ModuleMetadata, 'imports'> {
   /**
    * Existing Provider to be used.
    */

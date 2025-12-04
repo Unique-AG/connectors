@@ -3,13 +3,10 @@ import { FactoryProvider, ModuleMetadata, Type } from '@nestjs/common';
 import { NativeConnectionOptions } from '@temporalio/worker';
 
 export interface SharedConnectionConfigurationFactory {
-  createSharedConfiguration():
-    | Promise<NativeConnectionOptions>
-    | NativeConnectionOptions;
+  createSharedConfiguration(): Promise<NativeConnectionOptions> | NativeConnectionOptions;
 }
 
-export interface SharedConnectionAsyncConfiguration
-  extends Pick<ModuleMetadata, 'imports'> {
+export interface SharedConnectionAsyncConfiguration extends Pick<ModuleMetadata, 'imports'> {
   /**
    * Existing Provider to be used.
    */
@@ -21,9 +18,7 @@ export interface SharedConnectionAsyncConfiguration
   /**
    * Factory function that returns an instance of the provider to be injected.
    */
-  useFactory?: (
-    ...args: any[]
-  ) => Promise<NativeConnectionOptions> | NativeConnectionOptions;
+  useFactory?: (...args: any[]) => Promise<NativeConnectionOptions> | NativeConnectionOptions;
   /**
    * Instance of a provider to be injected.
    */
