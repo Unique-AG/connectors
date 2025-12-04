@@ -1,8 +1,8 @@
 import { Activities, Activity } from '@unique-ag/temporal';
 import { Injectable, Logger } from '@nestjs/common';
 import { encodingForModel } from 'js-tiktoken';
+import { DenseEmbeddingService } from '../../../dense-embedding/dense-embedding.service';
 import { PointInput } from '../../../drizzle';
-import { LLMService } from '../../../llm/llm.service';
 
 export interface IEmbedDenseActivity {
   embedDense(payload: EmbedDensePayload): Promise<PointInput[]>;
@@ -24,7 +24,7 @@ const MAX_TOKENS = 32_000;
 export class EmbedDenseActivity implements IEmbedDenseActivity {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly llmService: LLMService) {}
+  public constructor(private readonly denseEmbeddingService: DenseEmbeddingService) {}
 
   @Activity()
   public async embedDense({
@@ -114,7 +114,7 @@ export class EmbedDenseActivity implements IEmbedDenseActivity {
       return [];
     }
 
-    const embeddedDocuments = await this.llmService.contextualizedEmbed(documents);
+    const embeddedDocuments = await this.denseEmbeddingService.contextualizedEmbed(documents);
     const fullOrSummaryVector = embeddedDocuments[0];
     if (!fullOrSummaryVector || !fullOrSummaryVector[0]) {
       throw new Error('Failed to get full or summary vector');
