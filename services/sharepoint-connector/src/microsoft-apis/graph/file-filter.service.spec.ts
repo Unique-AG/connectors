@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_MAX_FILE_SIZE_BYTES } from '../../constants/defaults.constants';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { FileFilterService } from './file-filter.service';
 import type { DriveItem } from './types/sharepoint.types';
@@ -90,6 +91,7 @@ describe('FileFilterService', () => {
         get: vi.fn((key: string) => {
           if (key === 'sharepoint.syncColumnName') return 'FinanceGPTKnowledge';
           if (key === 'processing.allowedMimeTypes') return ['application/pdf', 'text/plain'];
+          if (key === 'processing.maxFileSizeBytes') return DEFAULT_MAX_FILE_SIZE_BYTES;
           return undefined;
         }),
       }))
@@ -235,6 +237,21 @@ describe('FileFilterService', () => {
     it('returns false for file without FileLeafRef', () => {
       const fields = createFieldsObject({ FileLeafRef: undefined });
       expect(service.isListItemValidForIngestion(fields)).toBe(false);
+    });
+
+    it('returns false for file exceeding maxFileSizeBytes', () => {
+      const item = mockDriveItem({ size: DEFAULT_MAX_FILE_SIZE_BYTES + 1 });
+      expect(service.isFileValidForIngestion(item)).toBe(false);
+    });
+
+    it('returns true for file at maxFileSizeBytes limit', () => {
+      const item = mockDriveItem({ size: DEFAULT_MAX_FILE_SIZE_BYTES });
+      expect(service.isFileValidForIngestion(item)).toBe(true);
+    });
+
+    it('returns true for file below maxFileSizeBytes limit', () => {
+      const item = mockDriveItem({ size: 1048576 });
+      expect(service.isFileValidForIngestion(item)).toBe(true);
     });
   });
 });

@@ -157,7 +157,6 @@ export class GraphApiService {
   public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
     const logPrefix = `[DriveId: ${driveId}, ItemId: ${itemId}]`;
     this.logger.debug(`${logPrefix} Downloading file content`);
-    const maxFileSizeBytes = this.configService.get('processing.maxFileSizeBytes', { infer: true });
 
     try {
       const stream: ReadableStream = await this.makeRateLimitedRequest(() =>
@@ -165,20 +164,9 @@ export class GraphApiService {
       );
 
       const chunks: Buffer[] = [];
-      let totalSize = 0;
 
       for await (const chunk of stream) {
         const bufferChunk = Buffer.from(chunk);
-        totalSize += bufferChunk.length;
-
-        // This is how we need to cancel the download stream
-        if (totalSize > maxFileSizeBytes) {
-          const reader = stream.getReader();
-          await reader.cancel();
-          reader.releaseLock();
-          assert.fail(`${logPrefix} File size exceeds maximum limit of ${maxFileSizeBytes} bytes.`);
-        }
-
         chunks.push(bufferChunk);
       }
 
