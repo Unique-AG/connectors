@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { TypeID } from 'typeid-js';
 import { JwtGuard } from '../jwt.guard';
 import { User } from '../user.decorator';
-import { EmailService } from './email/email.service';
+import { IngestService } from './email/ingest.service';
 import { SyncService } from './sync.service';
 
 @ApiTags('sync')
@@ -14,7 +14,7 @@ import { SyncService } from './sync.service';
 export class SyncController {
   public constructor(
     private readonly syncService: SyncService,
-    private readonly emailService: EmailService,
+    private readonly ingestService: IngestService,
   ) {}
 
   @Patch()
@@ -58,7 +58,7 @@ export class SyncController {
     @Param('folderId') _folderId: string,
     @Param('emailId') emailId: string,
   ): Promise<void> {
-    return this.emailService.reprocessEmail(
+    return this.ingestService.reprocessEmail(
       TypeID.fromString(user.userProfileId, 'user_profile'),
       TypeID.fromString(emailId, 'email'),
     );
