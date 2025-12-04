@@ -19,7 +19,6 @@ import { SummarizeThreadActivity } from './activities/summarize-thread.activity'
 import { TranslateActivity } from './activities/translate.activity';
 import { UpdateStatusActivity } from './activities/update-status.activity';
 import { EmailService } from './email.service';
-import { EmailDebugController } from './email-debug.controller';
 import { EmailSyncService } from './email-sync.service';
 import { IngestService } from './ingest.service';
 import { LLMEmailCleanupService } from './lib/llm-email-cleanup/llm-email-cleanup.service';
@@ -57,7 +56,6 @@ import { LLMTranslationService } from './lib/llm-translation-service/llm-transla
       },
     }),
   ],
-  controllers: [EmailDebugController],
   providers: [
     EmailService,
     EmailSyncService,
