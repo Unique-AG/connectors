@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { chunk } from 'remeda';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   CREATE_SCOPE_ACCESSES_MUTATION,
@@ -34,14 +35,32 @@ export class UniqueScopesService {
   ): Promise<Scope[]> {
     this.logger.debug(`Creating scopes based on ${paths.length} paths`);
 
+    if (paths.length === 0) {
+      return [];
+    }
+
     const mutation = getGenerateScopesBasedOnPathsMutation(opts.includePermissions);
+    const pathBatches = chunk(paths, BATCH_SIZE);
+    const allScopes: Scope[] = [];
 
-    const result = await this.scopeManagementClient.request<
-      GenerateScopesBasedOnPathsMutationResult,
-      GenerateScopesBasedOnPathsMutationInput
-    >(mutation, { paths });
+    for (const [index, batch] of pathBatches.entries()) {
+      const batchNumber = index + 1;
+      const totalBatches = pathBatches.length;
 
-    return result.generateScopesBasedOnPaths;
+      this.logger.debug(
+        `Processing batch ${batchNumber}/${totalBatches} with ${batch.length} paths`,
+      );
+
+      const result = await this.scopeManagementClient.request<
+        GenerateScopesBasedOnPathsMutationResult,
+        GenerateScopesBasedOnPathsMutationInput
+      >(mutation, { paths: batch });
+
+      allScopes.push(...result.generateScopesBasedOnPaths);
+    }
+
+    this.logger.debug(`Created ${allScopes.length} scopes from ${paths.length} paths`);
+    return allScopes;
   }
 
   public async updateScopeExternalId(
