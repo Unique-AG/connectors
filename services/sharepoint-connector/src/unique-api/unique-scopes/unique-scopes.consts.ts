@@ -25,6 +25,7 @@ export function getGenerateScopesBasedOnPathsMutation(includePermissions: boolea
         id
         name
         parentId
+        externalId
         ${scopeAccessFields}
       }
     }
@@ -122,7 +123,33 @@ export const PAGINATED_SCOPE_QUERY = gql`
         id
         name
         parentId
+        externalId
       }
+    }
+  }
+`;
+
+export interface UpdateScopeMutationInput {
+  id: string;
+  input: {
+    externalId: string;
+  };
+}
+
+export interface UpdateScopeMutationResult {
+  updateScope: {
+    id: string;
+    name: string;
+    externalId: string | null;
+  };
+}
+
+export const UPDATE_SCOPE_MUTATION = gql`
+  mutation UpdateScope($id: String!, $input: ScopeUpdateInput!) {
+    updateScope(id: $id, input: $input) {
+      id
+      name
+      externalId
     }
   }
 `;

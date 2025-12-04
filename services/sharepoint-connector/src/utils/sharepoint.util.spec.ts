@@ -6,7 +6,6 @@ function createDriveItem(listItemWebUrl: string, itemWebUrl?: string): AnySharep
   return {
     itemType: 'driveItem',
     siteId: 'site123',
-    siteWebUrl: 'https://tenant.sharepoint.com/sites/TestSite',
     driveId: 'drive123',
     driveName: 'Shared Documents',
     folderPath: '/path/to/file',
@@ -31,7 +30,6 @@ function createListItem(webUrl: string): AnySharepointItem {
   return {
     itemType: 'listItem',
     siteId: 'site456',
-    siteWebUrl: 'https://tenant.sharepoint.com/sites/TestSite',
     driveId: 'drive456',
     driveName: 'SitePages',
     folderPath: '/news',
@@ -50,7 +48,6 @@ function createDirectoryItem(webUrl: string): AnySharepointItem {
   return {
     itemType: 'directory',
     siteId: 'site789',
-    siteWebUrl: 'https://tenant.sharepoint.com/sites/TestSite',
     driveId: 'drive789',
     driveName: 'Shared Documents',
     folderPath: '/2024/Q1',

@@ -51,7 +51,6 @@ describe('AspxProcessingStep', () => {
       itemType: 'listItem' as const,
       item: mockListItem,
       siteId: 'site-1',
-      siteWebUrl: 'https://contoso.sharepoint.com',
       driveId: 'drive-1',
       driveName: 'SitePages',
       folderPath: '/',

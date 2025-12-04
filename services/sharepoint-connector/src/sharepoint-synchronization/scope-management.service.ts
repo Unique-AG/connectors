@@ -1,16 +1,23 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { prop, pullObject } from 'remeda';
+import { isNonNullish, prop, pullObject } from 'remeda';
+import { serializeError } from 'serialize-error-cjs';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
-import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type {
+  SharepointContentItem,
+  SharepointDirectoryItem,
+} from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
-import { getUniqueParentPathFromItem } from '../utils/sharepoint.util';
+import { normalizeError } from '../utils/normalize-error';
+import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
+
+const EXTERNAL_ID_PREFIX = 'spc:' as const;
 
 @Injectable()
 export class ScopeManagementService {
@@ -127,6 +134,7 @@ export class ScopeManagementService {
 
   public async batchCreateScopes(
     items: SharepointContentItem[],
+    directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<ScopeWithPath[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
@@ -149,6 +157,14 @@ export class ScopeManagementService {
     });
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes`);
 
+    // Update newly created scopes with externalId
+    await this.updateNewlyCreatedScopesWithExternalId(
+      scopes,
+      allPathsWithParents,
+      directories,
+      context,
+    );
+
     // Add the full path to each scope object
     // The API returns scopes in the same order as the input paths
     const scopesWithPaths: ScopeWithPath[] = scopes.map((scope, index) => ({
@@ -158,6 +174,66 @@ export class ScopeManagementService {
 
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes with paths`);
     return scopesWithPaths;
+  }
+
+  /* Sets the external id on newly created scopes.
+   * This is necessary after creating a new scope to make the scope non editable for other users, essentially marking
+   * the scope as externally created.
+   */
+  private async updateNewlyCreatedScopesWithExternalId(
+    scopes: Scope[],
+    paths: string[],
+    directories: SharepointDirectoryItem[],
+    context: SharepointSyncContext,
+  ): Promise<void> {
+    // Build path -> externalId map from directories
+    const pathToExternalIdMap = this.buildPathToExternalIdMap(
+      directories,
+      context.siteId,
+      context.rootPath,
+    );
+
+    for (const [index, scope] of scopes.entries()) {
+      if (isNonNullish(scope.externalId)) {
+        continue;
+      }
+
+      const path = paths[index] ?? '';
+      /* We have a couple of known directories in sharepoint for which it's more complex to get the id: root scope,
+       * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
+       */
+      const externalId = pathToExternalIdMap.get(path) ?? scope.name;
+      const prefixedExternalId = `${EXTERNAL_ID_PREFIX}${externalId}`;
+      try {
+        const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
+          scope.id,
+          prefixedExternalId,
+        );
+        scope.externalId = updatedScope.externalId;
+        this.logger.debug(`Updated scope ${scope.id} with externalId: ${prefixedExternalId}`);
+      } catch (error) {
+        this.logger.warn({
+          msg: `Failed to update externalId for scope ${scope.id}: ${normalizeError(error).message}`,
+          error: serializeError(normalizeError(error)),
+        });
+      }
+    }
+  }
+
+  private buildPathToExternalIdMap(
+    directories: SharepointDirectoryItem[],
+    siteId: string,
+    rootPath: string,
+  ): Map<string, string> {
+    const pathToExternalIdMap = new Map<string, string>();
+
+    for (const directory of directories) {
+      const path = getUniquePathFromItem(directory, rootPath);
+      const externalId = `${siteId}/${directory.item.id}`;
+      pathToExternalIdMap.set(path, externalId);
+    }
+
+    return pathToExternalIdMap;
   }
 
   public buildItemIdToScopeIdMap(

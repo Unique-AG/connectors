@@ -101,7 +101,11 @@ export class SharepointSynchronizationService {
         if (ingestionMode === IngestionMode.Recursive) {
           try {
             // Create scopes for ALL paths (including moved file destinations)
-            scopes = await this.scopeManagementService.batchCreateScopes(items, context);
+            scopes = await this.scopeManagementService.batchCreateScopes(
+              items,
+              directories,
+              context,
+            );
           } catch (error) {
             this.logger.error({
               msg: `${logPrefix} Failed to create scopes: ${normalizeError(error).message}. Skipping site.`,

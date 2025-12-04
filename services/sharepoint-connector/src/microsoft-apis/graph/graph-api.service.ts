@@ -103,10 +103,7 @@ export class GraphApiService {
       this.logger.warn(`File scan limit set to ${maxFilesToScan} files for testing purpose.`);
     }
 
-    const [siteWebUrl, drives] = await Promise.all([
-      this.getSiteWebUrl(siteId),
-      this.getDrivesForSite(siteId),
-    ]);
+    const drives = await this.getDrivesForSite(siteId);
 
     for (const drive of drives) {
       if (!drive.id || !drive.name) continue;
@@ -121,7 +118,6 @@ export class GraphApiService {
         drive.id,
         'root',
         siteId,
-        siteWebUrl,
         drive.name,
         remainingLimit,
       );
@@ -203,10 +199,7 @@ export class GraphApiService {
 
   public async getAspxPagesForSite(siteId: string): Promise<SharepointContentItem[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
-    const [siteWebUrl, lists] = await Promise.all([
-      this.getSiteWebUrl(siteId),
-      this.getSiteLists(siteId),
-    ]);
+    const lists = await this.getSiteLists(siteId);
 
     // Scan ASPX files from SitePages list
     const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
@@ -219,7 +212,6 @@ export class GraphApiService {
       const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
         siteId,
         sitePagesList.id,
-        siteWebUrl,
       );
       this.logger.log(
         `${logPrefix} Found ${aspxSharepointContentItems.length} ASPX files from SitePages`,
@@ -255,11 +247,7 @@ export class GraphApiService {
     }
   }
 
-  public async getAspxListItems(
-    siteId: string,
-    listId: string,
-    siteWebUrl: string,
-  ): Promise<SharepointContentItem[]> {
+  public async getAspxListItems(siteId: string, listId: string): Promise<SharepointContentItem[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const aspxItems: SharepointContentItem[] = [];
@@ -284,7 +272,6 @@ export class GraphApiService {
           itemType: 'listItem',
           item,
           siteId,
-          siteWebUrl,
           driveId: listId,
           driveName: 'SitePages',
           folderPath: item.webUrl,
@@ -443,7 +430,6 @@ export class GraphApiService {
     driveId: string,
     itemId: string,
     siteId: string,
-    siteWebUrl: string,
     driveName: string,
     maxFiles?: number,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
@@ -470,7 +456,6 @@ export class GraphApiService {
             driveId,
             driveItem.id,
             siteId,
-            siteWebUrl,
             driveName,
             remainingLimit,
           );
@@ -485,7 +470,6 @@ export class GraphApiService {
             itemType: 'directory',
             item: driveItem,
             siteId,
-            siteWebUrl,
             driveId,
             driveName,
             folderPath: this.extractFolderPath(driveItem),
@@ -498,7 +482,6 @@ export class GraphApiService {
             itemType: 'driveItem',
             item: driveItem,
             siteId,
-            siteWebUrl,
             driveId,
             driveName,
             folderPath,

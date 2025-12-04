@@ -54,7 +54,6 @@ describe('ContentRegistrationStep', () => {
       itemType: 'listItem',
       item: createMockListItem(),
       siteId: 'site',
-      siteWebUrl: 'https://contoso.sharepoint.com/sites/Engineering',
       driveId: 'drive',
       driveName: 'Documents',
       folderPath: '/test',

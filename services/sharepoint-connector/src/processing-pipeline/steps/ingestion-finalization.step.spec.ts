@@ -69,7 +69,6 @@ describe('IngestionFinalizationStep', () => {
         itemType: 'listItem',
         item: listItem,
         siteId: 'site-1',
-        siteWebUrl: 'https://contoso.sharepoint.com/sites/Engineering',
         driveId: 'drive-1',
         driveName: 'Documents',
         folderPath: '/test',

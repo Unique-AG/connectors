@@ -13,6 +13,9 @@ import {
   PAGINATED_SCOPE_QUERY,
   PaginatedScopeQueryInput,
   PaginatedScopeQueryResult,
+  UPDATE_SCOPE_MUTATION,
+  UpdateScopeMutationInput,
+  UpdateScopeMutationResult,
 } from './unique-scopes.consts';
 import { Scope, ScopeAccess } from './unique-scopes.types';
 
@@ -39,6 +42,21 @@ export class UniqueScopesService {
     >(mutation, { paths });
 
     return result.generateScopesBasedOnPaths;
+  }
+
+  public async updateScopeExternalId(
+    scopeId: string,
+    externalId: string,
+  ): Promise<{ id: string; externalId: string | null }> {
+    const result = await this.scopeManagementClient.request<
+      UpdateScopeMutationResult,
+      UpdateScopeMutationInput
+    >(UPDATE_SCOPE_MUTATION, {
+      id: scopeId,
+      input: { externalId },
+    });
+
+    return result.updateScope;
   }
 
   public async createScopeAccesses(

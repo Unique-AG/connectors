@@ -103,7 +103,6 @@ describe('ContentFetchingStep', () => {
         itemType: 'driveItem',
         item: driveItem,
         siteId: 'site1',
-        siteWebUrl: 'https://sharepoint.example.com',
         driveId: 'drive1',
         driveName: 'Documents',
         folderPath: '/test',
