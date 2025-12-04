@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MetricsModule } from '../metrics/metrics.module';
 import { MicrosoftApisModule } from '../microsoft-apis/microsoft-apis.module';
+import { HttpClientService } from '../shared/services/http-client.service';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ItemProcessingOrchestratorService } from './item-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
@@ -21,6 +22,7 @@ import { StorageUploadStep } from './steps/storage-upload.step';
     ContentRegistrationStep,
     StorageUploadStep,
     IngestionFinalizationStep,
+    HttpClientService,
   ],
   exports: [ProcessingPipelineService, ItemProcessingOrchestratorService],
 })

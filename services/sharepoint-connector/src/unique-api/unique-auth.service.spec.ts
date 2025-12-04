@@ -1,12 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { HttpClientService } from '../shared/services/http-client.service';
 import { Redacted } from '../utils/redacted';
 import { UniqueAuthService } from './unique-auth.service';
-
-vi.mock('undici', () => ({
-  request: vi.fn(),
-}));
 
 const MOCK_UNIQUE_CONFIG = Object.freeze({
   serviceAuthMode: 'external' as const,
@@ -26,19 +23,20 @@ describe('UniqueAuthService', () => {
   let service: UniqueAuthService;
 
   beforeEach(async () => {
-    const { request } = await import('undici');
-    vi.mocked(request).mockResolvedValue({
-      statusCode: 200,
-      body: {
-        text: vi.fn().mockResolvedValue(''),
-        json: vi.fn().mockResolvedValue({
-          access_token: 'jwt-token',
-          expires_in: 600,
-          token_type: 'Bearer',
-          id_token: 'id',
-        }),
-      },
-    } as never);
+    const mockHttpClientService = {
+      request: vi.fn().mockResolvedValue({
+        statusCode: 200,
+        body: {
+          text: vi.fn().mockResolvedValue(''),
+          json: vi.fn().mockResolvedValue({
+            access_token: 'jwt-token',
+            expires_in: 600,
+            token_type: 'Bearer',
+            id_token: 'id',
+          }),
+        },
+      }),
+    };
 
     const { unit } = await TestBed.solitary(UniqueAuthService)
       .mock(ConfigService)
@@ -51,15 +49,16 @@ describe('UniqueAuthService', () => {
           return undefined;
         }),
       }))
+      .mock(HttpClientService)
+      .impl(() => mockHttpClientService)
       .compile();
     service = unit;
   });
 
   it('gets a token from Zitadel', async () => {
-    const { request } = await import('undici');
     const token = await service.getToken();
     expect(token).toBe('jwt-token');
-    expect(request).toHaveBeenCalledWith(
+    expect(service.httpClientService.request).toHaveBeenCalledWith(
       'https://auth.example.com/oauth/token',
       expect.objectContaining({
         method: 'POST',
