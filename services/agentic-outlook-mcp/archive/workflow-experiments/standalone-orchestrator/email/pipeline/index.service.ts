@@ -98,7 +98,6 @@ export class IndexService extends PipelineStageBase<IndexMessage> {
       return;
     }
 
-
     const collection = await this.qdrantService.ensureCollection({
       name: 'emails',
       vectors: {
@@ -155,7 +154,6 @@ export class IndexService extends PipelineStageBase<IndexMessage> {
       };
       points.push(pointStruct);
     }
-
 
     await this.qdrantService.upsert('emails', points);
 

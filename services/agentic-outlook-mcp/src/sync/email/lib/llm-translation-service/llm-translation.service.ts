@@ -26,7 +26,7 @@ const promptConfig = z.object({
 export type TranslationOutput = {
   body: string;
   subject: string | null;
-}
+};
 
 export class TranslationError extends Error {
   public constructor(
@@ -52,7 +52,13 @@ export class LLMTranslationService implements OnModuleInit {
     await this.ensurePromptTemplates();
   }
 
-  public async translate({ subject, body }: { subject: string | null; body: string }): Promise<TranslationOutput> {
+  public async translate({
+    subject,
+    body,
+  }: {
+    subject: string | null;
+    body: string;
+  }): Promise<TranslationOutput> {
     try {
       const prompt = await this.langfuse.prompt.get(PROMPT_TEMPLATE_NAME, { type: 'chat' });
       const [systemMessage, userMessage] = prompt.compile({
@@ -61,14 +67,17 @@ export class LLMTranslationService implements OnModuleInit {
       });
       const config = promptConfig.parse(prompt.config);
 
-      const response = await this.llmService.generateObject({
-        ...config,
-        messages: [systemMessage, userMessage],
-        schema: translationOutputSchema,
-      }, {
-        generationName: 'translate',
-        langfusePrompt: prompt,
-      });
+      const response = await this.llmService.generateObject(
+        {
+          ...config,
+          messages: [systemMessage, userMessage],
+          schema: translationOutputSchema,
+        },
+        {
+          generationName: 'translate',
+          langfusePrompt: prompt,
+        },
+      );
 
       return {
         body: response.translated_body,

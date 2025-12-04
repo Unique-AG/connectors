@@ -26,7 +26,6 @@ import { LLMEmailCleanupService } from './lib/llm-email-cleanup/llm-email-cleanu
 import { LLMSummarizationService } from './lib/llm-summarization-service/llm-summarization.service';
 import { LLMTranslationService } from './lib/llm-translation-service/llm-translation.service';
 
-
 @Module({
   imports: [
     DrizzleModule,
@@ -41,9 +40,9 @@ import { LLMTranslationService } from './lib/llm-translation-service/llm-transla
               otel: {
                 url: configService.get(AppSettings.OTEL_EXPORTER_OTLP_ENDPOINT),
                 metricsExportInterval: '1s',
-              }
-            }
-          }
+              },
+            },
+          },
         },
         workerOptions: {
           taskQueue: 'default',
@@ -54,8 +53,8 @@ import { LLMTranslationService } from './lib/llm-translation-service/llm-transla
     }),
     TemporalModule.registerClient({
       workflowOptions: {
-        interceptors: [new OpenTelemetryWorkflowClientInterceptor()]
-      }
+        interceptors: [new OpenTelemetryWorkflowClientInterceptor()],
+      },
     }),
   ],
   controllers: [EmailDebugController],

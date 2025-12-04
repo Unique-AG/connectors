@@ -1,6 +1,6 @@
-import { WorkflowRuntime } from "@dapr/dapr";
-import { Injectable, OnModuleInit } from "@nestjs/common";
-import { ingestWorkflow } from "./ingest.workflow";
+import { WorkflowRuntime } from '@dapr/dapr';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ingestWorkflow } from './ingest.workflow';
 
 @Injectable()
 export class WorkflowRegistrationService implements OnModuleInit {

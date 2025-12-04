@@ -63,16 +63,20 @@ export class QdrantService {
         }
       }
 
-       const existingSparseVectors = collection.config.params.sparse_vectors;
+      const existingSparseVectors = collection.config.params.sparse_vectors;
 
-       if (sparseVectors) {
-       for (const [sparseVectorName, _] of Object.entries(sparseVectors)) {
-        const existingSparseVector = existingSparseVectors?.[sparseVectorName as keyof typeof existingSparseVectors];
+      if (sparseVectors) {
+        for (const [sparseVectorName, _] of Object.entries(sparseVectors)) {
+          const existingSparseVector =
+            existingSparseVectors?.[sparseVectorName as keyof typeof existingSparseVectors];
 
-        if (!existingSparseVector || typeof existingSparseVector !== 'object') {
-          throw new Error(`Collection ${name} is missing required sparse vector: ${sparseVectorName}`);
+          if (!existingSparseVector || typeof existingSparseVector !== 'object') {
+            throw new Error(
+              `Collection ${name} is missing required sparse vector: ${sparseVectorName}`,
+            );
+          }
         }
-      }}
+      }
 
       if (collection.status !== 'green' && collection.status !== 'yellow') {
         throw new Error(`Collection ${name} is not ready`);
@@ -115,7 +119,7 @@ export class QdrantService {
         type: 'keyword',
         is_tenant: true,
       },
-    })
+    });
 
     const collection = await this.client.getCollection(name);
 
@@ -123,20 +127,14 @@ export class QdrantService {
   }
 
   @Span('qdrant.upsert')
-  public async upsert(
-    collectionName: string,
-    points: components['schemas']['PointStruct'][],
-  ) {
+  public async upsert(collectionName: string, points: components['schemas']['PointStruct'][]) {
     return this.client.upsert(collectionName, {
       points,
     });
   }
 
   @Span('qdrant.query')
-  public async query(
-    collectionName: string,
-    request: components['schemas']['QueryRequest'],
-  ) {
+  public async query(collectionName: string, request: components['schemas']['QueryRequest']) {
     return this.client.query(collectionName, request);
   }
 }

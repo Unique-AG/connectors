@@ -1,21 +1,16 @@
-import { AmqpConnection, RabbitSubscribe } from "@golevelup/nestjs-rabbitmq";
-import { Inject, Injectable, Logger } from "@nestjs/common";
-import { Span, SpanStatusCode } from "@opentelemetry/api";
-import { ConsumeMessage } from "amqplib";
-import { and, asc, eq } from "drizzle-orm";
-import {
-  DRIZZLE,
-  DrizzleDatabase,
-  Email,
-  emails as emailsTable,
-} from "../../../drizzle";
-import { addSpanEvent } from "../../../utils/add-span-event";
-import { LLMEmailCleanupService } from "../lib/llm-email-cleanup/llm-email-cleanup.service";
-import { LLMSummarizationService } from "../lib/llm-summarization-service/llm-summarization.service";
-import { OrchestratorEventType } from "../orchestrator.messages";
-import { RetryService } from "../retry.service";
-import { TracePropagationService } from "../trace-propagation.service";
-import { PipelineStageBase, PipelineStageConfig } from "./pipeline-stage.base";
+import { AmqpConnection, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Span, SpanStatusCode } from '@opentelemetry/api';
+import { ConsumeMessage } from 'amqplib';
+import { and, asc, eq } from 'drizzle-orm';
+import { DRIZZLE, DrizzleDatabase, Email, emails as emailsTable } from '../../../drizzle';
+import { addSpanEvent } from '../../../utils/add-span-event';
+import { LLMEmailCleanupService } from '../lib/llm-email-cleanup/llm-email-cleanup.service';
+import { LLMSummarizationService } from '../lib/llm-summarization-service/llm-summarization.service';
+import { OrchestratorEventType } from '../orchestrator.messages';
+import { RetryService } from '../retry.service';
+import { TracePropagationService } from '../trace-propagation.service';
+import { PipelineStageBase, PipelineStageConfig } from './pipeline-stage.base';
 
 interface ProcessMessage {
   userProfileId: string;
@@ -34,8 +29,8 @@ const SUMMARIZATION_THRESHOLD_CHARS = 1_600;
 export class ProcessService extends PipelineStageBase<ProcessMessage> {
   protected readonly logger = new Logger(this.constructor.name);
   protected readonly config: PipelineStageConfig = {
-    spanName: "email.pipeline.process",
-    retryRoutingKey: "email.process.retry",
+    spanName: 'email.pipeline.process',
+    retryRoutingKey: 'email.process.retry',
     successEvent: OrchestratorEventType.ProcessingCompleted,
     failureEvent: OrchestratorEventType.ProcessingFailed,
   };
@@ -46,29 +41,22 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
     retryService: RetryService,
     private readonly llmEmailCleanupService: LLMEmailCleanupService,
     private readonly llmSummarizationService: LLMSummarizationService,
-    tracePropagation: TracePropagationService
+    tracePropagation: TracePropagationService,
   ) {
     super(amqpConnection, retryService, tracePropagation);
   }
 
   @RabbitSubscribe({
-    exchange: "email.pipeline",
-    routingKey: "email.process",
-    queue: "q.email.process",
+    exchange: 'email.pipeline',
+    routingKey: 'email.process',
+    queue: 'q.email.process',
   })
-  public async process(
-    processMessage: ProcessMessage,
-    amqpMessage: ConsumeMessage
-  ) {
-    return this.executeStage(
-      processMessage,
-      amqpMessage,
-      {
-        "email.id": processMessage.emailId,
-        "user.id": processMessage.userProfileId,
-        "pipeline.step": "process",
-      },
-    );
+  public async process(processMessage: ProcessMessage, amqpMessage: ConsumeMessage) {
+    return this.executeStage(processMessage, amqpMessage, {
+      'email.id': processMessage.emailId,
+      'user.id': processMessage.userProfileId,
+      'pipeline.step': 'process',
+    });
   }
 
   protected getMessageIdentifiers(message: ProcessMessage) {
@@ -98,17 +86,14 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
     span: Span,
   ): Promise<void> {
     const { userProfileId, emailId } = message;
-    
+
     const email = await this.db.query.emails.findFirst({
-      where: and(
-        eq(emailsTable.id, emailId),
-        eq(emailsTable.userProfileId, userProfileId)
-      ),
+      where: and(eq(emailsTable.id, emailId), eq(emailsTable.userProfileId, userProfileId)),
     });
 
     if (!email) {
-      this.logger.warn("Email not found, skipping processing");
-      addSpanEvent(span, "email.not_found", { emailId, userProfileId });
+      this.logger.warn('Email not found, skipping processing');
+      addSpanEvent(span, 'email.not_found', { emailId, userProfileId });
       span.setStatus({ code: SpanStatusCode.OK });
       return;
     }
@@ -118,15 +103,11 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
       emailId,
       userProfileId,
     });
-    const summarizedBody = await this.summarizeBody(
-      email,
-      processedBody,
-      {
-        span,
-        emailId,
-        userProfileId,
-      }
-    );
+    const summarizedBody = await this.summarizeBody(email, processedBody, {
+      span,
+      emailId,
+      userProfileId,
+    });
     const threadSummary = await this.summarizeThread(email, {
       span,
       emailId,
@@ -134,14 +115,14 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
     });
 
     this.logger.debug({
-      msg: "Email processed",
+      msg: 'Email processed',
       emailId: emailId,
       userProfileId: userProfileId,
     });
 
     addSpanEvent(
       span,
-      "email.processed",
+      'email.processed',
       { emailId, userProfileId },
       { language },
       {
@@ -158,18 +139,18 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
 
   private async cleanupBody(
     email: Email,
-    options: ProcessMetadata
+    options: ProcessMetadata,
   ): Promise<{
     processedBody: string;
     language: string;
   }> {
     if (email.processedBody && email.language) {
       this.logger.log({
-        msg: "Email body already cleaned, skipping",
+        msg: 'Email body already cleaned, skipping',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
-      addSpanEvent(options.span, "email.body_already_cleaned", {
+      addSpanEvent(options.span, 'email.body_already_cleaned', {
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
@@ -190,8 +171,8 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
       .where(
         and(
           eq(emailsTable.id, options.emailId),
-          eq(emailsTable.userProfileId, options.userProfileId)
-        )
+          eq(emailsTable.userProfileId, options.userProfileId),
+        ),
       );
     return { processedBody: cleanMarkdown, language };
   }
@@ -199,15 +180,15 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
   private async summarizeBody(
     email: Email,
     processedBody: string,
-    options: ProcessMetadata
+    options: ProcessMetadata,
   ): Promise<string> {
     if (email.summarizedBody) {
       this.logger.log({
-        msg: "Email already summarized, skipping",
+        msg: 'Email already summarized, skipping',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
-      addSpanEvent(options.span, "email.already_summarized", {
+      addSpanEvent(options.span, 'email.already_summarized', {
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
@@ -216,20 +197,18 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
 
     if (processedBody.length < SUMMARIZATION_THRESHOLD_CHARS) {
       this.logger.log({
-        msg: "Processed body is too short, skipping summarization",
+        msg: 'Processed body is too short, skipping summarization',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
-      addSpanEvent(options.span, "email.processed_body_too_short", {
+      addSpanEvent(options.span, 'email.processed_body_too_short', {
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
       return processedBody;
     }
 
-    const summarization = await this.llmSummarizationService.summarize(
-      processedBody
-    );
+    const summarization = await this.llmSummarizationService.summarize(processedBody);
 
     await this.db
       .update(emailsTable)
@@ -239,8 +218,8 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
       .where(
         and(
           eq(emailsTable.id, options.emailId),
-          eq(emailsTable.userProfileId, options.userProfileId)
-        )
+          eq(emailsTable.userProfileId, options.userProfileId),
+        ),
       );
 
     return summarization.summarizedBody;
@@ -248,15 +227,15 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
 
   private async summarizeThread(
     email: Email,
-    options: ProcessMetadata
+    options: ProcessMetadata,
   ): Promise<string | undefined> {
     if (email.threadSummary) {
       this.logger.log({
-        msg: "Thread already summarized, skipping",
+        msg: 'Thread already summarized, skipping',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
-      addSpanEvent(options.span, "thread.already_summarized", {
+      addSpanEvent(options.span, 'thread.already_summarized', {
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
@@ -265,11 +244,11 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
 
     if (!email.conversationId) {
       this.logger.log({
-        msg: "Email has no conversation ID, skipping thread summarization",
+        msg: 'Email has no conversation ID, skipping thread summarization',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
-      addSpanEvent(options.span, "email.no_conversation_id", {
+      addSpanEvent(options.span, 'email.no_conversation_id', {
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
@@ -279,28 +258,26 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
     const thread = await this.db.query.emails.findMany({
       where: and(
         eq(emailsTable.conversationId, email.conversationId),
-        eq(emailsTable.userProfileId, email.userProfileId)
+        eq(emailsTable.userProfileId, email.userProfileId),
       ),
       orderBy: [asc(emailsTable.receivedAt)],
     });
 
     if (thread.length <= 1) {
       this.logger.log({
-        msg: "Thread has only one email, skipping thread summarization",
+        msg: 'Thread has only one email, skipping thread summarization',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
-      addSpanEvent(options.span, "thread.only_one_email", {
+      addSpanEvent(options.span, 'thread.only_one_email', {
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
       return;
     }
 
-    const threadText = thread.map((email) => email.processedBody).join("\n");
-    const threadSummary = await this.llmSummarizationService.summarize(
-      threadText
-    );
+    const threadText = thread.map((email) => email.processedBody).join('\n');
+    const threadSummary = await this.llmSummarizationService.summarize(threadText);
 
     await this.db
       .update(emailsTable)
@@ -310,8 +287,8 @@ export class ProcessService extends PipelineStageBase<ProcessMessage> {
       .where(
         and(
           eq(emailsTable.id, options.emailId),
-          eq(emailsTable.userProfileId, options.userProfileId)
-        )
+          eq(emailsTable.userProfileId, options.userProfileId),
+        ),
       );
     return threadSummary.summarizedBody;
   }

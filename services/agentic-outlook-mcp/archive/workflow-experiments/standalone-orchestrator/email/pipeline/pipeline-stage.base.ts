@@ -18,7 +18,7 @@ export interface PipelineStageConfig {
 export abstract class PipelineStageBase<TMessage> {
   protected abstract readonly logger: Logger;
   protected abstract readonly config: PipelineStageConfig;
-  
+
   protected constructor(
     protected readonly amqpConnection: AmqpConnection,
     protected readonly retryService: RetryService,
@@ -46,9 +46,9 @@ export abstract class PipelineStageBase<TMessage> {
 
         try {
           const result = await this.processMessage(message, amqpMessage, span);
-          
+
           span.setStatus({ code: SpanStatusCode.OK });
-          
+
           await this.publishSuccessEvent(message, amqpMessage, result);
         } catch (error) {
           await this.handleError(message, amqpMessage, span, error);
@@ -74,10 +74,7 @@ export abstract class PipelineStageBase<TMessage> {
     additionalData?: unknown,
   ): Record<string, unknown>;
 
-  protected abstract buildFailurePayload(
-    message: TMessage,
-    error: string,
-  ): Record<string, unknown>;
+  protected abstract buildFailurePayload(message: TMessage, error: string): Record<string, unknown>;
 
   private handleRetry(message: TMessage, attempt: number, span: Span): void {
     const identifiers = this.getMessageIdentifiers(message);
@@ -96,7 +93,7 @@ export abstract class PipelineStageBase<TMessage> {
   ): Promise<void> {
     const traceHeaders = this.tracePropagation.extractTraceHeaders(amqpMessage);
     const payload = this.buildSuccessPayload(message, additionalData);
-    
+
     await this.amqpConnection.publish(
       'email.orchestrator',
       'orchestrator',
@@ -116,7 +113,7 @@ export abstract class PipelineStageBase<TMessage> {
   }> {
     const chain: Array<{ name: string; message: string; stack?: string }> = [];
     let currentError: unknown = error;
-    
+
     while (currentError) {
       if (currentError instanceof Error) {
         chain.push({
@@ -133,7 +130,7 @@ export abstract class PipelineStageBase<TMessage> {
         break;
       }
     }
-    
+
     return chain;
   }
 
@@ -146,22 +143,22 @@ export abstract class PipelineStageBase<TMessage> {
     const errorChain = this.extractErrorChain(error);
     const rootError = errorChain[0];
     const identifiers = this.getMessageIdentifiers(message);
-    
+
     span.setStatus({
       code: SpanStatusCode.ERROR,
       message: rootError?.message,
     });
     span.recordException(error as Error);
-    
+
     const spanAttributes: Record<string, string> = {
       'error.type': rootError?.name || '',
       'error.message': rootError?.message || '',
       'error.stack': rootError?.stack || '',
     };
-    
+
     errorChain.forEach((err, index) => {
       if (index === 0) return;
-      
+
       const prefix = index === 1 ? 'error.cause' : `error.cause.${index - 1}`;
       spanAttributes[`${prefix}.type`] = err.name;
       spanAttributes[`${prefix}.message`] = err.message;
@@ -169,9 +166,9 @@ export abstract class PipelineStageBase<TMessage> {
         spanAttributes[`${prefix}.stack`] = err.stack;
       }
     });
-    
+
     span.setAttributes(spanAttributes);
-    
+
     const errorDetails: Record<string, unknown> = {
       ...identifiers,
       errorChain: errorChain.map((err, index) => ({
@@ -181,7 +178,7 @@ export abstract class PipelineStageBase<TMessage> {
         stack: err.stack,
       })),
     };
-    
+
     startObservation(
       'error',
       {
@@ -191,8 +188,7 @@ export abstract class PipelineStageBase<TMessage> {
       },
       { asType: 'event', parentSpanContext: span.spanContext() },
     ).end();
-  
-    
+
     await this.retryService.handleError({
       message,
       amqpMessage,
@@ -201,7 +197,7 @@ export abstract class PipelineStageBase<TMessage> {
       retryRoutingKey: this.config.retryRoutingKey,
       onMaxRetriesExceeded: async (_msg, errorStr, traceHeaders) => {
         const payload = this.buildFailurePayload(message, errorStr);
-        
+
         await this.amqpConnection.publish(
           'email.orchestrator',
           'orchestrator',
@@ -211,7 +207,7 @@ export abstract class PipelineStageBase<TMessage> {
             timestamp: new Date().toISOString(),
             error: errorStr,
             errorType: rootError?.name,
-            errorChain: errorChain.map(err => ({
+            errorChain: errorChain.map((err) => ({
               type: err.name,
               message: typeof err.message === 'object' ? JSON.stringify(err.message) : err.message,
             })),

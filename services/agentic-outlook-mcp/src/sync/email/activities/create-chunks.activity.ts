@@ -1,6 +1,6 @@
-import { Activities, Activity } from "@unique-ag/temporal";
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { Injectable, Logger } from "@nestjs/common";
+import { Activities, Activity } from '@unique-ag/temporal';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { Injectable, Logger } from '@nestjs/common';
 
 export interface ICreateChunksActivity {
   createChunks(payload: CreateChunksPayload): Promise<string[]>;

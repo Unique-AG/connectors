@@ -7,12 +7,7 @@ import { and, eq } from 'drizzle-orm';
 import { debounce } from 'lodash';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
-import {
-  DRIZZLE,
-  DrizzleDatabase,
-  Folder,
-  folders as foldersTable,
-} from '../../drizzle';
+import { DRIZZLE, DrizzleDatabase, Folder, folders as foldersTable } from '../../drizzle';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import { normalizeError } from '../../utils/normalize-error';
 import { SubscriptionEvent } from '../subscription/subscription.events';
@@ -279,22 +274,15 @@ export class EmailSyncService {
             foldersMap,
           });
 
-          emailId = await this.emailService.upsertEmail(
-            userProfileId,
-            folder.id,
-            mappedEmail,
-          );
+          emailId = await this.emailService.upsertEmail(userProfileId, folder.id, mappedEmail);
         }
 
         if (!emailId) throw new Error('Email ID not found');
 
-        const workflowId = await this.workflowClient.scheduleNewWorkflow(
-          'ingestWorkflow',
-          {
-            userProfileId: userProfileId.toString(),
-            emailId: emailId.toString(),
-          }
-        )
+        const workflowId = await this.workflowClient.scheduleNewWorkflow('ingestWorkflow', {
+          userProfileId: userProfileId.toString(),
+          emailId: emailId.toString(),
+        });
 
         this.logger.debug({
           msg: 'Ingest workflow scheduled',

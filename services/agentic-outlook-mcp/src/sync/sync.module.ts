@@ -8,13 +8,7 @@ import { SyncService } from './sync.service';
 import { UserModule } from './user/user.module';
 
 @Module({
-  imports: [
-    DrizzleModule,
-    UserModule,
-    FolderModule,
-    SubscriptionModule,
-    EmailModule,
-  ],
+  imports: [DrizzleModule, UserModule, FolderModule, SubscriptionModule, EmailModule],
   controllers: [SyncController],
   providers: [SyncService],
   exports: [UserModule, FolderModule, SubscriptionModule],

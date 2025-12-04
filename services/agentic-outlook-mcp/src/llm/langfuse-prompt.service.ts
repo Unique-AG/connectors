@@ -77,12 +77,14 @@ export class LangfusePromptService {
     return existing.every((existingMsg, index) => {
       const incomingMsg = incoming[index];
       if (!('role' in existingMsg) || !('content' in existingMsg)) return false;
-      const isSame = existingMsg.role === incomingMsg?.role && existingMsg.content === incomingMsg?.content;
-      if (!isSame) this.logger.warn({
-        msg: 'Prompt message mismatch',
-        existingMsg,
-        incomingMsg,
-      });
+      const isSame =
+        existingMsg.role === incomingMsg?.role && existingMsg.content === incomingMsg?.content;
+      if (!isSame)
+        this.logger.warn({
+          msg: 'Prompt message mismatch',
+          existingMsg,
+          incomingMsg,
+        });
       return isSame;
     });
   }

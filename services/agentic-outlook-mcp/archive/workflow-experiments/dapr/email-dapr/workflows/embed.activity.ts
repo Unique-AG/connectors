@@ -25,7 +25,7 @@ const MAX_TOKENS = 32_000;
 @Injectable()
 export class EmbedActivity implements OnModuleInit {
   private readonly logger = new Logger(this.constructor.name);
-  
+
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly llmService: LLMService,
@@ -84,10 +84,7 @@ export class EmbedActivity implements OnModuleInit {
     return tokens.length;
   }
 
-  private async createVectors(
-    email: Email,
-    chunks: string[],
-  ): Promise<Point[]> {
+  private async createVectors(email: Email, chunks: string[]): Promise<Point[]> {
     const pointInputs: PointInput[] = [];
     const documents = [];
 
