@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OpenTelemetryWorkflowClientInterceptor } from '@temporalio/interceptors-opentelemetry';
 import { AppConfig, AppSettings } from '../../app-settings';
+import { DenseEmbeddingModule } from '../../dense-embedding/dense-embedding.module';
 import { DrizzleModule } from '../../drizzle/drizzle.module';
 import { LLMModule } from '../../llm/llm.module';
 import { MsGraphModule } from '../../msgraph/msgraph.module';
@@ -30,6 +31,7 @@ import { LLMTranslationService } from './lib/llm-translation-service/llm-transla
     DrizzleModule,
     MsGraphModule,
     LLMModule,
+    DenseEmbeddingModule,
     QdrantModule,
     TemporalModule.registerWorkerAsync({
       useFactory: (configService: ConfigService<AppConfig, true>) => ({
