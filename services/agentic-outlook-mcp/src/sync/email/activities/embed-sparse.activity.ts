@@ -1,4 +1,4 @@
-import { PointInput } from "../../../drizzle";
+import { PointInput } from '../../../drizzle';
 
 export interface IEmbedSparseActivity {
   embedSparse(payload: EmbedSparsePayload): Promise<PointInput[]>;
@@ -12,4 +12,3 @@ export interface EmbedSparsePayload {
   summarizedBody: string | null;
   chunks: string[];
 }
-

@@ -72,7 +72,8 @@ import { AppConfig, AppSettings } from '../../app-settings';
             routingKey: 'email.index',
             options: { durable: true },
           },
-          { name: 'q.email.index.retry',
+          {
+            name: 'q.email.index.retry',
             exchange: 'email.pipeline.retry',
             routingKey: 'email.index.retry',
             options: {

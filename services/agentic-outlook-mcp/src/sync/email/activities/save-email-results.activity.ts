@@ -65,4 +65,3 @@ export class SaveEmailResultsActivity implements ISaveEmailResultsActivity {
     });
   }
 }
-

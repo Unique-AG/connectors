@@ -6,4 +6,3 @@ import { SparseEmbeddingGrpcClient } from './sparse-embedding-grpc.client';
   exports: [SparseEmbeddingGrpcClient],
 })
 export class SparseEmbeddingModule {}
-

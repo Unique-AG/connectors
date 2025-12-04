@@ -21,10 +21,7 @@ export class LoadEmailActivity implements ILoadEmailActivity {
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
   @Activity()
-  public async loadEmail({
-    userProfileId,
-    emailId,
-  }: LoadEmailPayload): Promise<Email> {
+  public async loadEmail({ userProfileId, emailId }: LoadEmailPayload): Promise<Email> {
     const contextInfo = Context.current().info;
 
     this.logger.debug({
@@ -49,4 +46,3 @@ export class LoadEmailActivity implements ILoadEmailActivity {
     return email;
   }
 }
-

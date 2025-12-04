@@ -1,5 +1,5 @@
-import { startObservation } from "@langfuse/tracing";
-import { Attributes, Span, SpanContext } from "@opentelemetry/api";
+import { startObservation } from '@langfuse/tracing';
+import { Attributes, Span, SpanContext } from '@opentelemetry/api';
 
 /**
  * Langfuse does not support OTEL events, so we issue a separate Langfuse observation to track the event.
@@ -9,7 +9,7 @@ export function addSpanEvent(
   name: string,
   langfuseMetadata?: Record<string, unknown>,
   attributes?: Attributes,
-  langfuseAttributes?: Record<string, unknown>
+  langfuseAttributes?: Record<string, unknown>,
 ) {
   span.addEvent(name, attributes);
 

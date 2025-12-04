@@ -76,7 +76,10 @@ export class IndexActivity {
     };
 
     for (const point of email.points) {
-      if (point.vector.length === 0 && (!point.sparseVector || point.sparseVector.indices.length === 0)) {
+      if (
+        point.vector.length === 0 &&
+        (!point.sparseVector || point.sparseVector.indices.length === 0)
+      ) {
         this.logger.warn('Point has no vector or sparse vector, skipping index');
         continue;
       }
@@ -117,4 +120,3 @@ export class IndexActivity {
     await this.qdrantService.upsert('emails', points);
   }
 }
-

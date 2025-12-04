@@ -35,7 +35,7 @@ export class SavePointsActivity {
 
     const mergedPoints = densePoints.map((densePoint) => {
       const matchingSparsePoint = sparsePoints.find(
-        (sp) => sp.pointType === densePoint.pointType && sp.index === densePoint.index
+        (sp) => sp.pointType === densePoint.pointType && sp.index === densePoint.index,
       );
       return {
         ...densePoint,

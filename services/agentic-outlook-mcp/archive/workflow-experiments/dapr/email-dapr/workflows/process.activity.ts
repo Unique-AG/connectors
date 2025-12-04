@@ -1,12 +1,7 @@
 import { WorkflowActivityContext, WorkflowRuntime } from '@dapr/dapr';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
-import {
-  DRIZZLE,
-  DrizzleDatabase,
-  Email,
-  emails as emailsTable,
-} from '../../../drizzle';
+import { DRIZZLE, DrizzleDatabase, Email, emails as emailsTable } from '../../../drizzle';
 import { LLMEmailCleanupService } from '../lib/llm-email-cleanup/llm-email-cleanup.service';
 import { LLMSummarizationService } from '../lib/llm-summarization-service/llm-summarization.service';
 
@@ -25,7 +20,7 @@ const SUMMARIZATION_THRESHOLD_CHARS = 1_600;
 @Injectable()
 export class ProcessActivity implements OnModuleInit {
   private readonly logger = new Logger(this.constructor.name);
-  
+
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly llmEmailCleanupService: LLMEmailCleanupService,
@@ -42,14 +37,11 @@ export class ProcessActivity implements OnModuleInit {
 
   public async process({ userProfileId, emailId }: ProcessPayload) {
     const email = await this.db.query.emails.findFirst({
-      where: and(
-        eq(emailsTable.id, emailId),
-        eq(emailsTable.userProfileId, userProfileId)
-      ),
+      where: and(eq(emailsTable.id, emailId), eq(emailsTable.userProfileId, userProfileId)),
     });
 
     if (!email) {
-      this.logger.warn("Email not found, skipping processing");
+      this.logger.warn('Email not found, skipping processing');
       return;
     }
 
@@ -58,14 +50,10 @@ export class ProcessActivity implements OnModuleInit {
       userProfileId,
     });
 
-    await this.summarizeBody(
-      email,
-      processedBody,
-      {
-        emailId,
-        userProfileId,
-      }
-    );
+    await this.summarizeBody(email, processedBody, {
+      emailId,
+      userProfileId,
+    });
 
     await this.summarizeThread(email, {
       emailId,
@@ -73,7 +61,7 @@ export class ProcessActivity implements OnModuleInit {
     });
 
     this.logger.debug({
-      msg: "Email processed",
+      msg: 'Email processed',
       emailId: emailId,
       userProfileId: userProfileId,
     });
@@ -81,14 +69,14 @@ export class ProcessActivity implements OnModuleInit {
 
   private async cleanupBody(
     email: Email,
-    options: ProcessMetadata
+    options: ProcessMetadata,
   ): Promise<{
     processedBody: string;
     language: string;
   }> {
     if (email.processedBody && email.language) {
       this.logger.log({
-        msg: "Email body already cleaned, skipping",
+        msg: 'Email body already cleaned, skipping',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
@@ -109,8 +97,8 @@ export class ProcessActivity implements OnModuleInit {
       .where(
         and(
           eq(emailsTable.id, options.emailId),
-          eq(emailsTable.userProfileId, options.userProfileId)
-        )
+          eq(emailsTable.userProfileId, options.userProfileId),
+        ),
       );
     return { processedBody: cleanMarkdown, language };
   }
@@ -118,11 +106,11 @@ export class ProcessActivity implements OnModuleInit {
   private async summarizeBody(
     email: Email,
     processedBody: string,
-    options: ProcessMetadata
+    options: ProcessMetadata,
   ): Promise<string> {
     if (email.summarizedBody) {
       this.logger.log({
-        msg: "Email already summarized, skipping",
+        msg: 'Email already summarized, skipping',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
@@ -131,16 +119,14 @@ export class ProcessActivity implements OnModuleInit {
 
     if (processedBody.length < SUMMARIZATION_THRESHOLD_CHARS) {
       this.logger.log({
-        msg: "Processed body is too short, skipping summarization",
+        msg: 'Processed body is too short, skipping summarization',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
       return processedBody;
     }
 
-    const summarization = await this.llmSummarizationService.summarize(
-      processedBody
-    );
+    const summarization = await this.llmSummarizationService.summarize(processedBody);
 
     await this.db
       .update(emailsTable)
@@ -150,8 +136,8 @@ export class ProcessActivity implements OnModuleInit {
       .where(
         and(
           eq(emailsTable.id, options.emailId),
-          eq(emailsTable.userProfileId, options.userProfileId)
-        )
+          eq(emailsTable.userProfileId, options.userProfileId),
+        ),
       );
 
     return summarization.summarizedBody;
@@ -159,11 +145,11 @@ export class ProcessActivity implements OnModuleInit {
 
   private async summarizeThread(
     email: Email,
-    options: ProcessMetadata
+    options: ProcessMetadata,
   ): Promise<string | undefined> {
     if (email.threadSummary) {
       this.logger.log({
-        msg: "Thread already summarized, skipping",
+        msg: 'Thread already summarized, skipping',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
@@ -172,7 +158,7 @@ export class ProcessActivity implements OnModuleInit {
 
     if (!email.conversationId) {
       this.logger.log({
-        msg: "Email has no conversation ID, skipping thread summarization",
+        msg: 'Email has no conversation ID, skipping thread summarization',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
@@ -182,24 +168,22 @@ export class ProcessActivity implements OnModuleInit {
     const thread = await this.db.query.emails.findMany({
       where: and(
         eq(emailsTable.conversationId, email.conversationId),
-        eq(emailsTable.userProfileId, email.userProfileId)
+        eq(emailsTable.userProfileId, email.userProfileId),
       ),
       orderBy: [asc(emailsTable.receivedAt)],
     });
 
     if (thread.length <= 1) {
       this.logger.log({
-        msg: "Thread has only one email, skipping thread summarization",
+        msg: 'Thread has only one email, skipping thread summarization',
         emailId: options.emailId,
         userProfileId: options.userProfileId,
       });
       return;
     }
 
-    const threadText = thread.map((email) => email.processedBody).join("\n");
-    const threadSummary = await this.llmSummarizationService.summarize(
-      threadText
-    );
+    const threadText = thread.map((email) => email.processedBody).join('\n');
+    const threadSummary = await this.llmSummarizationService.summarize(threadText);
 
     await this.db
       .update(emailsTable)
@@ -209,8 +193,8 @@ export class ProcessActivity implements OnModuleInit {
       .where(
         and(
           eq(emailsTable.id, options.emailId),
-          eq(emailsTable.userProfileId, options.userProfileId)
-        )
+          eq(emailsTable.userProfileId, options.userProfileId),
+        ),
       );
     return threadSummary.summarizedBody;
   }

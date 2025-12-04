@@ -48,16 +48,12 @@ export class IngestService extends PipelineStageBase<IngestMessage> {
     queue: 'q.email.ingest',
   })
   public async ingest(ingestMessage: IngestMessage, amqpMessage: ConsumeMessage) {
-    return this.executeStage(
-      ingestMessage,
-      amqpMessage,
-      {
-        'email.id': ingestMessage.emailId,
-        'user.id': ingestMessage.userProfileId,
-        'folder.id': ingestMessage.folderId,
-        'pipeline.step': 'ingest',
-      },
-    );
+    return this.executeStage(ingestMessage, amqpMessage, {
+      'email.id': ingestMessage.emailId,
+      'user.id': ingestMessage.userProfileId,
+      'folder.id': ingestMessage.folderId,
+      'pipeline.step': 'ingest',
+    });
   }
 
   protected getMessageIdentifiers(message: IngestMessage) {
@@ -97,7 +93,7 @@ export class IngestService extends PipelineStageBase<IngestMessage> {
     const { message: graphMessage, userProfileId, folderId } = message;
     // biome-ignore lint/style/noNonNullAssertion: All messages always have an id. The MS type is faulty.
     const messageId = graphMessage.id!;
-    
+
     // This can cause data inconsistency if a folder is changed while ingesting.
     await this.ensureFoldersMap();
 
@@ -119,7 +115,7 @@ export class IngestService extends PipelineStageBase<IngestMessage> {
     );
 
     addSpanEvent(span, 'email.saved', { 'email.id': savedId.toString() });
-    
+
     return { savedId: savedId.toString() };
   }
 
