@@ -57,25 +57,29 @@ export const FolderItem: FC<FolderItemProps> = ({
         style={{ paddingLeft: `${level * 12 + 8}px` }}
         onClick={() => onFolderSelect(folder.id)}
       >
-      {hasChildren && (
-        // biome-ignore lint/a11y/noStaticElementInteractions: Cannot use nested button, using div with keyboard support instead
-        <div
-          className="flex-shrink-0 h-4 w-4 flex items-center justify-center hover:bg-muted rounded cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsExpanded(!isExpanded);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
+        {hasChildren && (
+          // biome-ignore lint/a11y/noStaticElementInteractions: Cannot use nested button, using div with keyboard support instead
+          <div
+            className="flex-shrink-0 h-4 w-4 flex items-center justify-center hover:bg-muted rounded cursor-pointer"
+            onClick={(e) => {
               e.stopPropagation();
               setIsExpanded(!isExpanded);
-            }
-          }}
-        >
-          {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        </div>
-      )}
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }
+            }}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+          </div>
+        )}
 
         <div className="flex-shrink-0">
           {hasChildren ? (

@@ -38,4 +38,3 @@ export function parseFromField(from: string | null): { name: string; email: stri
     return { name: from, email: from };
   }
 }
-

@@ -29,4 +29,3 @@ export const ErrorDialog = ({ open, onOpenChange, error }: ErrorDialogProps) => 
     </Dialog>
   );
 };
-

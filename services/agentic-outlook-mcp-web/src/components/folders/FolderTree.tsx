@@ -91,12 +91,7 @@ export const FolderTree = ({
             <FolderOpen className="h-5 w-5 text-primary" />
             Folders
           </h2>
-          <Button
-            onClick={onResync}
-            variant="ghost"
-            size="sm"
-            disabled={isRefreshing}
-          >
+          <Button onClick={onResync} variant="ghost" size="sm" disabled={isRefreshing}>
             <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
           </Button>
         </div>

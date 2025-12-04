@@ -5,15 +5,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { EmailDetail, EmailList, ErrorDialog } from '@/components/emails';
 import { FolderTree } from '@/components/folders/FolderTree';
 import { GlobalControls } from '@/components/folders/GlobalControls';
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from '@/components/ui/resizable';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useCallApi } from '@/hooks/use-call-api';
 import { useToast } from '@/hooks/use-toast';
 import { EmailThread } from '@/types/email';
-import { deleteAllUserData, reprocessEmail, syncFolderEmails, syncFolders } from '../@generated/sync/sync';
+import {
+  deleteAllUserData,
+  reprocessEmail,
+  syncFolderEmails,
+  syncFolders,
+} from '../@generated/sync/sync';
 import { db } from '../lib/powersync/database';
 import {
   Email,

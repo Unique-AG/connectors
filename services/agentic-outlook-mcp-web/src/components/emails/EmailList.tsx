@@ -18,7 +18,6 @@ import { FolderWithEmails } from '@/lib/powersync/schema';
 import { cn } from '@/lib/utils';
 import { EmailThread, getProcessingStatus, ProcessingStatus, parseFromField } from '@/types/email';
 
-
 interface EmailListProps {
   threads: EmailThread[];
   selectedFolder?: FolderWithEmails;
@@ -40,8 +39,6 @@ export const EmailList = ({
   onWipeFolder,
   onResyncFolder,
 }: EmailListProps) => {
-  
-
   const syncEnabled = selectedFolder?.activatedAt && !selectedFolder?.deactivatedAt;
 
   return (
@@ -51,7 +48,9 @@ export const EmailList = ({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold">{selectedFolder.name}</h2>
-              <p className="text-sm text-muted-foreground">{numeral(threads.length).format('0,0')} threads</p>
+              <p className="text-sm text-muted-foreground">
+                {numeral(threads.length).format('0,0')} threads
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <Switch
@@ -74,21 +73,28 @@ export const EmailList = ({
             {syncEnabled && selectedFolder.lastSyncedAt && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>Last sync: {format(new Date(selectedFolder.lastSyncedAt), 'MMM d, yyyy h:mm a')}</span>
+                <span>
+                  Last sync: {format(new Date(selectedFolder.lastSyncedAt), 'MMM d, yyyy h:mm a')}
+                </span>
               </div>
             )}
 
             {syncEnabled && selectedFolder.activatedAt && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>Activated: {format(new Date(selectedFolder.activatedAt), 'MMM d, yyyy h:mm a')}</span>
+                <span>
+                  Activated: {format(new Date(selectedFolder.activatedAt), 'MMM d, yyyy h:mm a')}
+                </span>
               </div>
             )}
 
             {!syncEnabled && selectedFolder.deactivatedAt && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>Deactivated: {format(new Date(selectedFolder.deactivatedAt), 'MMM d, yyyy h:mm a')}</span>
+                <span>
+                  Deactivated:{' '}
+                  {format(new Date(selectedFolder.deactivatedAt), 'MMM d, yyyy h:mm a')}
+                </span>
               </div>
             )}
           </div>
