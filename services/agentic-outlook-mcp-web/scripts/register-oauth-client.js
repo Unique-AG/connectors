@@ -42,13 +42,10 @@ async function registerClient() {
     console.log(`Client Name: ${result.client_name}`);
     console.log('');
     console.log('📝 Next steps:');
-    console.log('1. Update src/config/oidc.config.ts with the client_id:');
-    console.log(`   client_id: '${result.client_id}',`);
+    console.log('1. Update the .env file with the client_id:');
+    console.log(`   VITE_OAUTH_CLIENT_ID=${result.client_id}`);
     console.log('');
-    console.log('2. Create a .env file in the web project root:');
-    console.log(`   VITE_BACKEND_URL=${BACKEND_URL}`);
-    console.log('');
-    console.log('3. Start the development server:');
+    console.log('2. Start the development server:');
     console.log('   pnpm dev');
   } catch (error) {
     console.error('❌ Failed to register client:', error.message);
