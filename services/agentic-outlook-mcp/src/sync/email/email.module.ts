@@ -75,6 +75,6 @@ import { LLMTranslationService } from './lib/llm-translation-service/llm-transla
     TranslateActivity,
     UpdateStatusActivity,
   ],
-  exports: [EmailService, EmailSyncService],
+  exports: [EmailService, EmailSyncService, IngestService],
 })
 export class EmailModule {}
