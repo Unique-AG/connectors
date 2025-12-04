@@ -8,13 +8,9 @@ export interface ActivityOptions {
 export function Activity(): MethodDecorator;
 export function Activity(name: string): MethodDecorator;
 export function Activity(options: ActivityOptions): MethodDecorator;
-export function Activity(
-  nameOrOptions?: string | ActivityOptions,
-): MethodDecorator {
+export function Activity(nameOrOptions?: string | ActivityOptions): MethodDecorator {
   const options =
-    nameOrOptions && typeof nameOrOptions === 'object'
-      ? nameOrOptions
-      : { name: nameOrOptions };
+    nameOrOptions && typeof nameOrOptions === 'object' ? nameOrOptions : { name: nameOrOptions };
 
   return SetMetadata(TEMPORAL_MODULE_ACTIVITY, options || {});
 }

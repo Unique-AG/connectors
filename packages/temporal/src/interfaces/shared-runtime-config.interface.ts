@@ -6,8 +6,7 @@ export interface SharedRuntimeConfigurationFactory {
   createSharedConfiguration(): Promise<RuntimeOptions> | RuntimeOptions;
 }
 
-export interface SharedRuntimeAsyncConfiguration
-  extends Pick<ModuleMetadata, 'imports'> {
+export interface SharedRuntimeAsyncConfiguration extends Pick<ModuleMetadata, 'imports'> {
   /**
    * Existing Provider to be used.
    */

@@ -18,12 +18,8 @@ export interface ActivitiesOptions extends ActivityOptions {
 
 export function Activities(): ClassDecorator;
 export function Activities(queueName: string): ClassDecorator;
-export function Activities(
-  activitiesOptions: ActivitiesOptions,
-): ClassDecorator;
-export function Activities(
-  queueNameOrOptions?: string | ActivitiesOptions,
-): ClassDecorator {
+export function Activities(activitiesOptions: ActivitiesOptions): ClassDecorator;
+export function Activities(queueNameOrOptions?: string | ActivitiesOptions): ClassDecorator {
   const options =
     queueNameOrOptions && typeof queueNameOrOptions === 'object'
       ? queueNameOrOptions

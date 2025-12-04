@@ -31,9 +31,7 @@ export function createAsyncProvider(
   };
 }
 
-export function createClientAsyncProvider(
-  asyncOptions: SharedWorkflowClientOptions,
-): Provider[] {
+export function createClientAsyncProvider(asyncOptions: SharedWorkflowClientOptions): Provider[] {
   const name = asyncOptions.name ? asyncOptions.name : undefined;
   const optionsProvide = getAsyncQueueToken(name);
   const clientProvide = getQueueToken(name);
@@ -41,8 +39,7 @@ export function createClientAsyncProvider(
     createAsyncProvider(optionsProvide, asyncOptions),
     {
       provide: clientProvide,
-      useFactory: (options?: WorkflowClientOptions) =>
-        getWorkflowClient(options),
+      useFactory: (options?: WorkflowClientOptions) => getWorkflowClient(options),
       inject: [optionsProvide],
     },
   ];

@@ -1,9 +1,5 @@
 import { ConfigurableModuleBuilder } from '@nestjs/common';
-import {
-  NativeConnectionOptions,
-  RuntimeOptions,
-  WorkerOptions,
-} from '@temporalio/worker';
+import { NativeConnectionOptions, RuntimeOptions, WorkerOptions } from '@temporalio/worker';
 
 export interface TemporalModuleOptions {
   workerOptions: WorkerOptions;
