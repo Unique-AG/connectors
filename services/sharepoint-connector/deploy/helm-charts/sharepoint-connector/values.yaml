@@ -189,6 +189,10 @@ connectorConfig:
     serviceExtraHeaders:
       x-company-id: unset_default_value
       x-user-id: unset_default_value
+    # -- Object containing config to pass when submitting file for ingestion
+    # ingestionConfig:
+    #   uniqueIngestionMode: SKIP_INGESTION
+    #   customProperty: value
     # -- Zitadel authentication configuration (required when authMode is external)
     zitadel:
       # -- Zitadel client ID

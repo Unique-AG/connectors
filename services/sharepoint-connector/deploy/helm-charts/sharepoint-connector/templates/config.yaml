@@ -49,6 +49,9 @@ data:
   {{- if eq .Values.connectorConfig.unique.authMode "cluster_local" }}
   UNIQUE_SERVICE_EXTRA_HEADERS: {{ .Values.connectorConfig.unique.serviceExtraHeaders | toJson | quote }}
   {{- end }}
+  {{- if .Values.connectorConfig.unique.ingestionConfig }}
+  UNIQUE_INGESTION_CONFIG: {{ .Values.connectorConfig.unique.ingestionConfig | toJson | quote }}
+  {{- end }}
   {{- if eq .Values.connectorConfig.unique.authMode "external" }}
   ZITADEL_CLIENT_ID: {{ .Values.connectorConfig.unique.zitadel.clientId | quote }}
   ZITADEL_OAUTH_TOKEN_URL: {{ .Values.connectorConfig.unique.zitadel.oauthTokenUrl | quote }}
