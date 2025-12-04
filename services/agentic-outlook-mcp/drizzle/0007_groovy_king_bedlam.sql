@@ -1,1 +1,0 @@
-ALTER TABLE "emails" ADD COLUMN "has_attachments" boolean DEFAULT false NOT NULL;

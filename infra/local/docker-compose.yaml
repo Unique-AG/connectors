@@ -316,21 +316,6 @@ services:
       - traefik.http.routers.temporal-ui.service=temporal-ui
       - traefik.http.services.temporal-ui.loadbalancer.server.port=8080
 
-  dapr-placement:
-    image: "daprio/placement"
-    command: ["./placement"]
-    ports:
-      - "50005:50005"
-
-  dapr-scheduler:
-    image: "daprio/scheduler"
-    command: ["./scheduler", "--override-broadcast-host-port", "localhost:50006", "--etcd-data-dir", "/data"]
-    ports:
-      - "50006:50006"
-    user: root
-    volumes:
-      - dapr-etcd-data:/data
-
 volumes:
   postgres:
   rabbitmq:
