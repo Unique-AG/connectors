@@ -33,7 +33,7 @@ async def main():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
-    logging.info("Starting services...")
+    logging.info("Starting sparse embedding services...")
     logging.info(f"gRPC port: {settings.grpc_port}")
     logging.info(f"Temporal task queue: {settings.temporal_task_queue}")
 
