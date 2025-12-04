@@ -1,6 +1,6 @@
 {
-  "id": "fbd3f0e9-686e-4bba-8217-c660a76e5782",
-  "prevId": "0a594b44-e425-4d30-8024-3904330b67ac",
+  "id": "f99879ed-1e4c-4dda-98cc-dd3a8d07da7e",
+  "prevId": "da4c665d-91cd-4b48-9c0e-9662ea5f8a79",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -507,102 +507,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.user_profiles": {
-      "name": "user_profiles",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "varchar",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "provider": {
-          "name": "provider",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_user_id": {
-          "name": "provider_user_id",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "username": {
-          "name": "username",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "email": {
-          "name": "email",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "display_name": {
-          "name": "display_name",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "avatar_url": {
-          "name": "avatar_url",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "raw": {
-          "name": "raw",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "access_token": {
-          "name": "access_token",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refresh_token": {
-          "name": "refresh_token",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "user_profiles_provider_providerUserId_unique": {
-          "name": "user_profiles_provider_providerUserId_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "provider_user_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.emails": {
       "name": "emails",
       "schema": "",
@@ -633,6 +537,12 @@
         },
         "web_link": {
           "name": "web_link",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
           "type": "varchar",
           "primaryKey": false,
           "notNull": false
@@ -712,6 +622,48 @@
           "primaryKey": false,
           "notNull": false
         },
+        "unique_body_text": {
+          "name": "unique_body_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unique_body_html": {
+          "name": "unique_body_html",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "processed_body": {
+          "name": "processed_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "translated_body": {
+          "name": "translated_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "translated_subject": {
+          "name": "translated_subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summarized_body": {
+          "name": "summarized_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "thread_summary": {
+          "name": "thread_summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_read": {
           "name": "is_read",
           "type": "boolean",
@@ -737,6 +689,19 @@
           "type": "text[]",
           "primaryKey": false,
           "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "has_attachments": {
+          "name": "has_attachments",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "attachments": {
           "name": "attachments",
@@ -769,6 +734,24 @@
           "type": "varchar",
           "primaryKey": false,
           "notNull": true
+        },
+        "ingestion_last_error": {
+          "name": "ingestion_last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ingestion_last_attempt_at": {
+          "name": "ingestion_last_attempt_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ingestion_completed_at": {
+          "name": "ingestion_completed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -936,11 +919,12 @@
           "notNull": true,
           "default": 0
         },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "varchar",
+        "total_item_count": {
+          "name": "total_item_count",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": 0
         },
         "sync_token": {
           "name": "sync_token",
@@ -986,11 +970,13 @@
           "notNull": true,
           "default": "now()"
         },
-        "sync_job_id": {
-          "name": "sync_job_id",
-          "type": "varchar",
+        "subscription_type": {
+          "name": "subscription_type",
+          "type": "subscription_for_type",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false,
+          "default": "'folder'"
         }
       },
       "indexes": {},
@@ -1001,19 +987,6 @@
           "tableTo": "user_profiles",
           "columnsFrom": [
             "user_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "folders_sync_job_id_sync_jobs_id_fk": {
-          "name": "folders_sync_job_id_sync_jobs_id_fk",
-          "tableFrom": "folders",
-          "tableTo": "sync_jobs",
-          "columnsFrom": [
-            "sync_job_id"
           ],
           "columnsTo": [
             "id"
@@ -1036,8 +1009,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.sync_jobs": {
-      "name": "sync_jobs",
+    "public.points": {
+      "name": "points",
       "schema": "",
       "columns": {
         "id": {
@@ -1046,17 +1019,136 @@
           "primaryKey": true,
           "notNull": true
         },
-        "last_synced_at": {
-          "name": "last_synced_at",
+        "qdrant_id": {
+          "name": "qdrant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "point_type": {
+          "name": "point_type",
+          "type": "point_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vector": {
+          "name": "vector",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sparse_vector": {
+          "name": "sparse_vector",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "index": {
+          "name": "index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email_id": {
+          "name": "email_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "points_email_id_emails_id_fk": {
+          "name": "points_email_id_emails_id_fk",
+          "tableFrom": "points",
+          "tableTo": "emails",
+          "columnsFrom": [
+            "email_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "points_qdrantId_unique": {
+          "name": "points_qdrantId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "qdrant_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.subscriptions": {
+      "name": "subscriptions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "subscription_id": {
+          "name": "subscription_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resource": {
+          "name": "resource",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
-        "deactivated_at": {
-          "name": "deactivated_at",
-          "type": "timestamp",
+        "change_type": {
+          "name": "change_type",
+          "type": "varchar",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'created,updated,deleted'"
+        },
+        "for_id": {
+          "name": "for_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "for_type": {
+          "name": "for_type",
+          "type": "subscription_for_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
         },
         "user_profile_id": {
           "name": "user_profile_id",
@@ -1081,9 +1173,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "sync_jobs_user_profile_id_user_profiles_id_fk": {
-          "name": "sync_jobs_user_profile_id_user_profiles_id_fk",
-          "tableFrom": "sync_jobs",
+        "subscriptions_user_profile_id_user_profiles_id_fk": {
+          "name": "subscriptions_user_profile_id_user_profiles_id_fk",
+          "tableFrom": "subscriptions",
           "tableTo": "user_profiles",
           "columnsFrom": [
             "user_profile_id"
@@ -1096,7 +1188,129 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "subscriptions_subscriptionId_unique": {
+          "name": "subscriptions_subscriptionId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "subscription_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_profiles": {
+      "name": "user_profiles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_user_id": {
+          "name": "provider_user_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avatar_url": {
+          "name": "avatar_url",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw": {
+          "name": "raw",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_token": {
+          "name": "access_token",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token": {
+          "name": "refresh_token",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_activated_at": {
+          "name": "sync_activated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_deactivated_at": {
+          "name": "sync_deactivated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_last_synced_at": {
+          "name": "sync_last_synced_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "user_profiles_provider_providerUserId_unique": {
+          "name": "user_profiles_provider_providerUserId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "provider",
+            "provider_user_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1109,6 +1323,22 @@
       "values": [
         "ACCESS",
         "REFRESH"
+      ]
+    },
+    "public.point_type": {
+      "name": "point_type",
+      "schema": "public",
+      "values": [
+        "chunk",
+        "summary",
+        "full"
+      ]
+    },
+    "public.subscription_for_type": {
+      "name": "subscription_for_type",
+      "schema": "public",
+      "values": [
+        "folder"
       ]
     }
   },
