@@ -43,6 +43,7 @@ export async function runWithInstrumentation(fn: () => Promise<void>, name = 'un
       span.setStatus({
         code: SpanStatusCode.OK,
       });
+      span.end();
     } catch (error) {
       console.error(`[${name}] execution error\n%o`, error);
       // biome-ignore lint/suspicious/noExplicitAny: We have a safe fallback for exitCode
@@ -55,8 +56,6 @@ export async function runWithInstrumentation(fn: () => Promise<void>, name = 'un
       });
       span.end();
       await exitAfterCleanup(exitCode);
-    } finally {
-      span.end();
     }
   });
 }
