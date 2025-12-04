@@ -7,10 +7,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { TypeID } from 'typeid-js';
+import { AppEvents } from '../../app.events';
 import { AppConfig, AppSettings } from '../../app-settings';
 import { DRIZZLE, DrizzleDatabase, Folder, Subscription, subscriptions } from '../../drizzle';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
@@ -36,17 +37,17 @@ export class SubscriptionService implements BeforeApplicationShutdown {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  // @OnEvent(AppEvents.AppReady)
-  // public async onAppReady() {
-  //   const subscriptionsList = await this.db.select().from(subscriptions);
-  //   this.logger.log({
-  //     msg: 'Creating subscriptions',
-  //     count: subscriptionsList.length,
-  //   });
-  //   for (const subscription of subscriptionsList) {
-  //     await this.startSubscription(subscription);
-  //   }
-  // }
+  @OnEvent(AppEvents.AppReady)
+  public async onAppReady() {
+    const subscriptionsList = await this.db.select().from(subscriptions);
+    this.logger.log({
+      msg: 'Creating subscriptions',
+      count: subscriptionsList.length,
+    });
+    for (const subscription of subscriptionsList) {
+      await this.startSubscription(subscription);
+    }
+  }
 
   // Cleanup via in-memory map, as other replicas of this service could hold other subscriptions.
   public async beforeApplicationShutdown() {
