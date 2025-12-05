@@ -10,7 +10,7 @@ export interface BatchProcessorOptions<TInput, TOutput> {
   batchSize: number;
   // Function to process each batch, returns results for that batch
   processor: (batch: TInput[], batchIndex: number) => Promise<TOutput[]>;
-  // Passing the loger here to have the log context of the service that's sending the request instead of the BatchProcessor service 
+  // Passing the loger here to have the log context of the service that's sending the request instead of the BatchProcessor service
   logger: Logger;
   logPrefix?: string;
 }
