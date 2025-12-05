@@ -159,10 +159,10 @@ export class ContentSyncService {
     // If the file diff indicated we should delete all files, it most probably means that we have
     // some kind of bug and we should not proceed with the sync to avoid costly re-ingestions. In
     // case user actually wants to delete all files, they should add one dummy file to the site.
-    assert.notEqual(
-      fileDiffItems.length,
-      fileDiffResult.deletedFiles.length,
-      'File diff would delete all files',
+    // Only check if there are files currently in SharePoint - empty sites are valid.
+    assert.ok(
+      fileDiffItems.length === 0 || fileDiffResult.deletedFiles.length !== fileDiffItems.length,
+      `File diff would delete all ${fileDiffItems.length} files`,
     );
     return fileDiffResult;
   }

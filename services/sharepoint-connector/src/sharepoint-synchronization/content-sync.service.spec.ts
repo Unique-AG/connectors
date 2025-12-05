@@ -482,5 +482,28 @@ describe('ContentSyncService', () => {
         'File diff would delete all files',
       );
     });
+
+    it('does not throw an error for empty site with no deleted files', async () => {
+      const siteId = 'site-id';
+      const items = [] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
+
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: [],
+        updatedFiles: [],
+        movedFiles: [],
+        deletedFiles: [],
+      });
+
+      vi.spyOn(configService, 'get').mockImplementation(() => null);
+
+      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
+    });
   });
 });
