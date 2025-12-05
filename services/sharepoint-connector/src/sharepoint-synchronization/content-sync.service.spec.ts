@@ -479,7 +479,7 @@ describe('ContentSyncService', () => {
       vi.spyOn(configService, 'get').mockImplementation(() => null);
 
       await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
-        'File diff would delete all files',
+        'File diff would delete all 2 files',
       );
     });
 
