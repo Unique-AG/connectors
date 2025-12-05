@@ -12,17 +12,16 @@ connector:
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
-  envVars:
-    # -- loading of Zitadel Secret, Users can supersede this with
-    # their own secret that contains UNIQUE_ZITADEL_CLIENT_SECRET or use
-    # https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load
-    # completely arbitrary secret mappings.
-    # See also below in connectorConfig.unique.zitadel.clientSecret.
-    - name: UNIQUE_ZITADEL_CLIENT_SECRET
-      valueFrom:
-        secretKeyRef:
-          name: sharepoint-connector-secret
-          key: UNIQUE_ZITADEL_CLIENT_SECRET
+  # -- Environment variables from secrets. Required when authMode is 'external'.
+  # When using external authMode, add the following to load the Zitadel client secret:
+  #   envVars:
+  #     - name: UNIQUE_ZITADEL_CLIENT_SECRET
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: sharepoint-connector-secret
+  #           key: UNIQUE_ZITADEL_CLIENT_SECRET
+  # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
+  envVars: []
   extraEnvCM:
     - sharepoint-connector-config
   image:
