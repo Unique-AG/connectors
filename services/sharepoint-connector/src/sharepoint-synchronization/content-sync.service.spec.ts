@@ -440,5 +440,47 @@ describe('ContentSyncService', () => {
 
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
+
+    it('throws an error when file diff would delete all files', async () => {
+      const siteId = 'site-id';
+      const items = [
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '1',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/1',
+          },
+        },
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '2',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/2',
+          },
+        },
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
+
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: [],
+        updatedFiles: [],
+        movedFiles: [],
+        deletedFiles: ['1', '2'],
+      });
+
+      vi.spyOn(configService, 'get').mockImplementation(() => null);
+
+      await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
+        'File diff would delete all files',
+      );
+    });
   });
 });

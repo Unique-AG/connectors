@@ -152,7 +152,19 @@ export class ContentSyncService {
       },
     );
 
-    return await this.uniqueFileIngestionService.performFileDiff(fileDiffItems, siteId);
+    const fileDiffResult = await this.uniqueFileIngestionService.performFileDiff(
+      fileDiffItems,
+      siteId,
+    );
+    // If the file diff indicated we should delete all files, it most probably means that we have
+    // some kind of bug and we should not proceed with the sync to avoid costly re-ingestions. In
+    // case user actually wants to delete all files, they should add one dummy file to the site.
+    assert.notEqual(
+      fileDiffItems.length,
+      fileDiffResult.deletedFiles.length,
+      'File diff would delete all files',
+    );
+    return fileDiffResult;
   }
 
   private async deleteRemovedFiles(siteId: string, deletedFileKeys: string[]): Promise<void> {
