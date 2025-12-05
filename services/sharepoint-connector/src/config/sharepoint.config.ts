@@ -81,6 +81,7 @@ const baseConfig = z.object({
         }),
       ),
     )
+    .transform((uuids) => uuids.map((uuid) => uuid.toLowerCase()))
     .describe('Comma-separated list of SharePoint site IDs to scan'),
   syncColumnName: z
     .string()
