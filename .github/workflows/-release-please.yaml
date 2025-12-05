@@ -28,7 +28,9 @@ jobs:
       - name: Debug release outputs
         continue-on-error: true
         run: |
-          echo "Release outputs: ${{ toJson(steps.release.outputs) }}"
+          cat <<'EOF'
+          Release outputs: ${{ toJson(steps.release.outputs) }}
+          EOF
 
   release-factset-mcp:
     needs: release-please
