@@ -70,11 +70,16 @@ const baseConfig = z.object({
     .prefault('')
     .transform((val) =>
       val
-        ? val
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [],
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean),
+    )
+    .pipe(
+      z.array(
+        z.uuidv4({
+          message: 'Each site ID must be a valid UUIDv4',
+        }),
+      ),
     )
     .describe('Comma-separated list of SharePoint site IDs to scan'),
   syncColumnName: z
@@ -91,7 +96,8 @@ const SharepointConfig = z
   ])
   .and(baseConfig);
 
+export { SharepointConfig };
 export const sharepointConfig = registerConfig('sharepoint', SharepointConfig);
 
 export type SharepointConfigNamespaced = NamespacedConfigType<typeof sharepointConfig>;
-export type SharepointConfig = ConfigType<typeof sharepointConfig>;
+export type SharepointConfigType = ConfigType<typeof sharepointConfig>;
