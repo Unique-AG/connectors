@@ -29,6 +29,7 @@ import {
   SiteGroupMembership,
 } from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
 import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
+import { sanitizeError } from '../utils/normalize-error';
 import type {
   GroupDistinctId,
   GroupMembership,
@@ -240,9 +241,11 @@ export class FetchGroupsWithMembershipsQuery {
           return [];
         }
 
-        this.logger.error(
-          `${logPrefix} Failed to fetch memberships for group ${this.shouldConcealLogs ? redact(group.id) : group.id}: ${error.message}`,
-        );
+        this.logger.error({
+          msg: `${logPrefix} Failed to fetch memberships for group`,
+          groupId: this.shouldConcealLogs ? redact(group.id) : group.id,
+          error: sanitizeError(error),
+        });
         throw error;
       });
       groupMembershipsMappings.push(...zip(chunkIds, chunkItemPermissions));

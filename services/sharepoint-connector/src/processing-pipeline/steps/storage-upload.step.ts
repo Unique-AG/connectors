@@ -1,11 +1,11 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { request } from 'undici';
 import { Config } from '../../config';
 import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
+import { HttpClientService } from '../../shared/services/http-client.service';
 import { redact, shouldConcealLogs, smear } from '../../utils/logging.util';
-import { normalizeError } from '../../utils/normalize-error';
+import { sanitizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -16,7 +16,10 @@ export class StorageUploadStep implements IPipelineStep {
   public readonly stepName = PipelineStep.StorageUpload;
   private readonly shouldConcealLogs: boolean;
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {
+  public constructor(
+    private readonly configService: ConfigService<Config, true>,
+    private readonly httpClientService: HttpClientService,
+  ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
@@ -34,8 +37,16 @@ export class StorageUploadStep implements IPipelineStep {
 
       return context;
     } catch (error) {
-      const message = normalizeError(error).message;
-      this.logger.error(`${logPrefix} Storage upload failed: ${message}`);
+      this.logger.error({
+        msg: `${logPrefix} Storage upload failed`,
+        correlationId: context.correlationId,
+        itemId: context.pipelineItem.item.id,
+        driveId: context.pipelineItem.driveId,
+        siteId: this.shouldConcealLogs
+          ? smear(context.pipelineItem.siteId)
+          : context.pipelineItem.siteId,
+        error: sanitizeError(error),
+      });
       throw error;
     }
   }
@@ -68,7 +79,7 @@ export class StorageUploadStep implements IPipelineStep {
 
     const mimeType = context.mimeType;
     try {
-      const response = await request(context.uploadUrl, {
+      const response = await this.httpClientService.request(context.uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': mimeType, 'x-ms-blob-type': 'BlockBlob' },
         body: context.contentBuffer,
@@ -83,8 +94,11 @@ export class StorageUploadStep implements IPipelineStep {
 
       this.logger.debug(`${logPrefix} Upload completed successfully`);
     } catch (error) {
-      const message = normalizeError(error).message;
-      this.logger.error(`${logPrefix} Upload failed: ${message}`);
+      this.logger.error({
+        msg: `${logPrefix} Upload failed`,
+        correlationId: context.correlationId,
+        error: sanitizeError(error),
+      });
       throw error;
     }
   }

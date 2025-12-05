@@ -1,9 +1,9 @@
 import * as assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { request } from 'undici';
 import { Config } from '../config';
-import { normalizeError } from '../utils/normalize-error';
+import { HttpClientService } from '../shared/services/http-client.service';
+import { sanitizeError } from '../utils/normalize-error';
 
 @Injectable()
 export class UniqueAuthService {
@@ -12,7 +12,10 @@ export class UniqueAuthService {
   protected cachedToken?: string;
   private tokenExpirationTime?: number;
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {}
+  public constructor(
+    private readonly configService: ConfigService<Config, true>,
+    private readonly httpClientService: HttpClientService,
+  ) {}
 
   public async getToken(): Promise<string> {
     if (this.isTokenValid()) {
@@ -40,7 +43,7 @@ export class UniqueAuthService {
       const basicAuth = Buffer.from(`${zitadelClientId}:${zitadelClientSecret.value}`).toString(
         'base64',
       );
-      const { statusCode, body } = await request(zitadelOauthTokenUrl, {
+      const { statusCode, body } = await this.httpClientService.request(zitadelOauthTokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -64,8 +67,10 @@ export class UniqueAuthService {
       this.tokenExpirationTime = Date.now() + tokenData.expires_in * 1000;
       return tokenData.access_token;
     } catch (error) {
-      const normalized = normalizeError(error);
-      this.logger.error('Failed to acquire Unique API token from Zitadel:', normalized.message);
+      this.logger.error({
+        msg: 'Failed to acquire Unique API token from Zitadel',
+        error: sanitizeError(error),
+      });
       throw error;
     }
   }

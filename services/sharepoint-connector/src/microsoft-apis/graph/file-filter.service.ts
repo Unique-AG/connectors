@@ -20,6 +20,7 @@ export class FileFilterService {
     const fields = item.listItem?.fields as Record<string, unknown>;
     const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
     const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
+    const maxFileSizeBytes = this.configService.get('processing.maxFileSizeBytes', { infer: true });
 
     if (
       !item.file ||
@@ -31,6 +32,10 @@ export class FileFilterService {
       !item.listItem?.fields ||
       item.size === 0
     ) {
+      return false;
+    }
+
+    if (item.size > maxFileSizeBytes) {
       return false;
     }
 

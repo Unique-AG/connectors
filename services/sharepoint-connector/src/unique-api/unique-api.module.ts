@@ -7,6 +7,8 @@ import {
   SPC_UNIQUE_GRAPHQL_API_SLOW_REQUESTS_TOTAL,
 } from '../metrics';
 import { MetricsModule } from '../metrics/metrics.module';
+import { BatchProcessorService } from '../shared/services/batch-processor.service';
+import { HttpClientService } from '../shared/services/http-client.service';
 import { BottleneckFactory } from '../utils/bottleneck.factory';
 import { IngestionHttpClient } from './clients/ingestion-http.client';
 import {
@@ -30,7 +32,9 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
     UniqueFileIngestionService,
     UniqueFilesService,
     UniqueScopesService,
+    BatchProcessorService,
     BottleneckFactory,
+    HttpClientService,
     IngestionHttpClient,
     {
       provide: SCOPE_MANAGEMENT_CLIENT,

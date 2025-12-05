@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BatchProcessorService } from '../../shared/services/batch-processor.service';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   CREATE_SCOPE_ACCESSES_MUTATION,
@@ -26,6 +27,7 @@ export class UniqueScopesService {
   private readonly logger = new Logger(this.constructor.name);
   public constructor(
     @Inject(SCOPE_MANAGEMENT_CLIENT) private readonly scopeManagementClient: UniqueGraphqlClient,
+    private readonly batchProcessor: BatchProcessorService,
   ) {}
 
   public async createScopesBasedOnPaths(
@@ -34,14 +36,29 @@ export class UniqueScopesService {
   ): Promise<Scope[]> {
     this.logger.debug(`Creating scopes based on ${paths.length} paths`);
 
+    if (paths.length === 0) {
+      return [];
+    }
+
     const mutation = getGenerateScopesBasedOnPathsMutation(opts.includePermissions);
 
-    const result = await this.scopeManagementClient.request<
-      GenerateScopesBasedOnPathsMutationResult,
-      GenerateScopesBasedOnPathsMutationInput
-    >(mutation, { paths });
+    const allScopes = await this.batchProcessor.processInBatches({
+      items: paths,
+      batchSize: BATCH_SIZE,
+      processor: async (batch) => {
+        const result = await this.scopeManagementClient.request<
+          GenerateScopesBasedOnPathsMutationResult,
+          GenerateScopesBasedOnPathsMutationInput
+        >(mutation, { paths: batch });
 
-    return result.generateScopesBasedOnPaths;
+        return result.generateScopesBasedOnPaths;
+      },
+      logger: this.logger,
+      logPrefix: '[createScopesBasedOnPaths]',
+    });
+
+    this.logger.debug(`Created ${allScopes.length} scopes from ${paths.length} paths`);
+    return allScopes;
   }
 
   public async updateScopeExternalId(

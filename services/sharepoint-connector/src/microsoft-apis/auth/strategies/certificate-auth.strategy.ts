@@ -4,9 +4,8 @@ import { readFileSync } from 'node:fs';
 import { ConfidentialClientApplication, type Configuration } from '@azure/msal-node';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { serializeError } from 'serialize-error-cjs';
 import { Config } from '../../../config';
-import { normalizeError } from '../../../utils/normalize-error';
+import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenAcquisitionResult } from '../types';
 import { AuthStrategy } from './auth-strategy.interface';
 
@@ -83,7 +82,7 @@ export class CertificateAuthStrategy implements AuthStrategy {
     } catch (error) {
       this.logger.error({
         msg: 'Failed to acquire Graph API token using client certificate',
-        error: serializeError(normalizeError(error)),
+        error: sanitizeError(error),
       });
 
       throw error;

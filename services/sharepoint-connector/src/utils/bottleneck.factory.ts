@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
+import { sanitizeError } from './normalize-error';
 
 export interface BottleneckConfig {
   reservoir: number;
@@ -38,7 +39,10 @@ export class BottleneckFactory {
 
     // Log errors
     limiter.on('error', (error) => {
-      this.logger.error(`${contextName}: Rate limit bottleneck error: ${error.message}`, error);
+      this.logger.error({
+        msg: `${contextName}: Rate limit bottleneck error`,
+        error: sanitizeError(error),
+      });
     });
   }
 }

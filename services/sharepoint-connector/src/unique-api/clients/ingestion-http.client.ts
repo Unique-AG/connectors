@@ -12,7 +12,7 @@ import {
   SPC_UNIQUE_REST_API_SLOW_REQUESTS_TOTAL,
 } from '../../metrics';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
-import { normalizeError } from '../../utils/normalize-error';
+import { sanitizeError } from '../../utils/normalize-error';
 import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
 import { UniqueAuthService } from '../unique-auth.service';
 
@@ -168,8 +168,8 @@ export class IngestionHttpClient implements OnModuleDestroy {
         }
 
         this.logger.error({
-          msg: `Failed ingestion HTTP request: ${normalizeError(error).message}`,
-          error,
+          msg: 'Failed ingestion HTTP request',
+          error: sanitizeError(error),
         });
         throw error;
       }

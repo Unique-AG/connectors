@@ -6,7 +6,7 @@ import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/in
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
-import { normalizeError } from '../../utils/normalize-error';
+import { sanitizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -58,7 +58,6 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
       return context;
     } catch (error) {
-      const message = normalizeError(error).message;
       this.logger.error({
         msg: 'Ingestion finalization failed',
         correlationId: context.correlationId,
@@ -67,7 +66,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
         siteId: this.shouldConcealLogs
           ? smear(context.pipelineItem.siteId)
           : context.pipelineItem.siteId,
-        error: message,
+        error: sanitizeError(error),
       });
       throw error;
     }

@@ -2,15 +2,16 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { describe, expect, it, vi } from 'vitest';
 import type { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
+import { HttpClientService } from '../../shared/services/http-client.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { StorageUploadStep } from './storage-upload.step';
 
-vi.mock('undici', () => ({
-  request: vi.fn(async () => ({ statusCode: 200 })),
-}));
-
 describe('StorageUploadStep', () => {
   it('uploads buffer to storage', async () => {
+    const mockHttpClientService = {
+      request: vi.fn().mockResolvedValue({ statusCode: 200 }),
+    };
+
     const { unit: step } = await TestBed.solitary(StorageUploadStep)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -20,6 +21,8 @@ describe('StorageUploadStep', () => {
           return 'default-value';
         }),
       }))
+      .mock(HttpClientService)
+      .impl(() => mockHttpClientService)
       .compile();
 
     const driveItem: DriveItem = {

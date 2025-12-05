@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
+import { BatchProcessorService } from '../../shared/services/batch-processor.service';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -31,6 +32,7 @@ export class UniqueFilesService {
   public constructor(
     @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
     private readonly configService: ConfigService<Config, true>,
+    private readonly batchProcessor: BatchProcessorService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -129,25 +131,55 @@ export class UniqueFilesService {
   }
 
   public async addAccesses(scopeId: string, fileAccesses: UniqueFileAccessInput[]): Promise<void> {
-    await this.ingestionClient.request<AddAccessesMutationResult, AddAccessesMutationInput>(
-      ADD_ACCESSES_MUTATION,
-      {
-        scopeId,
-        fileAccesses,
+    if (fileAccesses.length === 0) {
+      return;
+    }
+
+    const logPrefix = `[Scope: ${scopeId}]`;
+
+    await this.batchProcessor.processInBatches({
+      items: fileAccesses,
+      batchSize: BATCH_SIZE,
+      processor: async (batch) => {
+        await this.ingestionClient.request<AddAccessesMutationResult, AddAccessesMutationInput>(
+          ADD_ACCESSES_MUTATION,
+          {
+            scopeId,
+            fileAccesses: batch,
+          },
+        );
+        return []; // No results to return for mutations
       },
-    );
+      logger: this.logger,
+      logPrefix,
+    });
   }
 
   public async removeAccesses(
     scopeId: string,
     fileAccesses: UniqueFileAccessInput[],
   ): Promise<void> {
-    await this.ingestionClient.request<RemoveAccessesMutationResult, RemoveAccessesMutationInput>(
-      REMOVE_ACCESSES_MUTATION,
-      {
-        scopeId,
-        fileAccesses,
+    if (fileAccesses.length === 0) {
+      return;
+    }
+
+    const logPrefix = `[Scope: ${scopeId}]`;
+
+    await this.batchProcessor.processInBatches({
+      items: fileAccesses,
+      batchSize: BATCH_SIZE,
+      processor: async (batch) => {
+        await this.ingestionClient.request<
+          RemoveAccessesMutationResult,
+          RemoveAccessesMutationInput
+        >(REMOVE_ACCESSES_MUTATION, {
+          scopeId,
+          fileAccesses: batch,
+        });
+        return []; // No results to return for mutations
       },
-    );
+      logger: this.logger,
+      logPrefix,
+    });
   }
 }

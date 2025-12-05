@@ -15,7 +15,7 @@ import {
   ContentRegistrationRequest,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../../utils/logging.util';
-import { normalizeError } from '../../utils/normalize-error';
+import { sanitizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -106,7 +106,6 @@ export class ContentRegistrationStep implements IPipelineStep {
 
       return context;
     } catch (error) {
-      const message = normalizeError(error).message;
       this.logger.error({
         msg: 'Content registration failed',
         correlationId: context.correlationId,
@@ -115,7 +114,7 @@ export class ContentRegistrationStep implements IPipelineStep {
         siteId: this.shouldConcealLogs
           ? smear(context.pipelineItem.siteId)
           : context.pipelineItem.siteId,
-        error: message,
+        error: sanitizeError(error),
       });
       throw error;
     }

@@ -2,7 +2,7 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { Logger } from '@nestjs/common';
 import { chunk, isArray, isNonNullish, isObjectType } from 'remeda';
 import type { Dispatcher } from 'undici';
-import { normalizeError } from '../../utils/normalize-error';
+import { sanitizeError } from '../../utils/normalize-error';
 
 // This interceptor was mostly vibe-coded based on TokenRefreshMiddleware from graph API.
 export function createTokenRefreshInterceptor(
@@ -89,7 +89,7 @@ export function createTokenRefreshInterceptor(
             .catch((error) => {
               logger.error({
                 msg: 'Failed to refresh token or retry request',
-                error: normalizeError(error).message,
+                error: sanitizeError(error),
               });
               handler.onResponseEnd?.(controller, trailers);
             });
