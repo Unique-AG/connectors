@@ -140,6 +140,9 @@ export class ContentSyncService {
     sharepointContentItems: SharepointContentItem[],
     siteId: string,
   ): Promise<FileDiffResponse> {
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
+
     const fileDiffItems: FileDiffItem[] = sharepointContentItems.map(
       (sharepointContentItem: SharepointContentItem) => {
         const key = buildFileDiffKey(sharepointContentItem);
@@ -159,11 +162,22 @@ export class ContentSyncService {
     // If the file diff indicated we should delete all files, it most probably means that we have
     // some kind of bug and we should not proceed with the sync to avoid costly re-ingestions. In
     // case user actually wants to delete all files, they should add one dummy file to the site.
-    // Only check if there are files currently in SharePoint - empty sites are valid.
-    assert.ok(
-      fileDiffItems.length === 0 || fileDiffResult.deletedFiles.length !== fileDiffItems.length,
-      `File diff would delete all ${fileDiffItems.length} files`,
-    );
+    if (fileDiffItems.length > 0 && fileDiffResult.deletedFiles.length === fileDiffItems.length) {
+      this.logger.error({
+        msg:
+          `${logPrefix} File diff declares all ${fileDiffItems.length} files as to be deleted. ` +
+          `Aborting sync. If you wish to delete all files, add a dummy file to the site and mark ` +
+          `it for synchronization.`,
+        siteId: logSiteId,
+        itemsLength: fileDiffItems.length,
+        fileDiffResult,
+      });
+      assert.fail(
+        `${logPrefix} File diff declares all ${fileDiffItems.length} files as to be deleted. ` +
+          `Sync aborted.`,
+      );
+    }
+
     return fileDiffResult;
   }
 
