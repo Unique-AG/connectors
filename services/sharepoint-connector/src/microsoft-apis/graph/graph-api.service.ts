@@ -319,7 +319,7 @@ export class GraphApiService {
         msg: 'Failed to fetch site page content for item',
         itemId,
         siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
-        driveId: listId,
+        listId,
         error: sanitizeError(error),
       });
       throw error;
