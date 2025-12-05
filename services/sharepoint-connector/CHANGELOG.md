@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.0.0-beta.4](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.3...sharepoint-connector@v2.0.0-beta.4) (2025-12-05)
+
+
+### Features
+
+* **sharepoint connector:** un-14015 improvements of code: error messages, chunking, etc ([#151](https://github.com/Unique-AG/connectors/issues/151)) ([1be3640](https://github.com/Unique-AG/connectors/commit/1be36404b5ec89d03704ba801d50f4a396f29a80))
+* **sharepoint-connector:** add dashboard and two basic alerts 🔔  ([#144](https://github.com/Unique-AG/connectors/issues/144)) ([2c9cd73](https://github.com/Unique-AG/connectors/commit/2c9cd73e353e5c4d8ec36138ba9c1936336b080c))
+* **sharepoint-connector:** add ingestion config env variable ([#149](https://github.com/Unique-AG/connectors/issues/149)) ([5f94f79](https://github.com/Unique-AG/connectors/commit/5f94f79cf3ab8667337971147d861e4fc1694ed8))
+* **sharepoint-connector:** add runbooks to alerts ([#150](https://github.com/Unique-AG/connectors/issues/150)) ([55c3558](https://github.com/Unique-AG/connectors/commit/55c3558a6472696a322b51744864375df6bde97d))
+* **sharepoint-connector:** set externalId on SharePoint scopes ([#141](https://github.com/Unique-AG/connectors/issues/141)) ([aadb96e](https://github.com/Unique-AG/connectors/commit/aadb96ec8080f9dabb74eb8ca8bac3ece05a87b0))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** metrics path extractor improvements ([#146](https://github.com/Unique-AG/connectors/issues/146)) ([09fb08b](https://github.com/Unique-AG/connectors/commit/09fb08b95e80e28d4bf8b5fd6779a79678007d89))
+* **sharepoint-connector:** retry SP REST API batch requests ([#148](https://github.com/Unique-AG/connectors/issues/148)) ([fe772b1](https://github.com/Unique-AG/connectors/commit/fe772b12f3de5e503103435ff854a6546757ae65))
+* **sharepoint-connector:** revert "experimental re-write of MS Graph API client ([#140](https://github.com/Unique-AG/connectors/issues/140))" ([#143](https://github.com/Unique-AG/connectors/issues/143)) ([021e50c](https://github.com/Unique-AG/connectors/commit/021e50c5df93d80cb95cf7a0a47ea391d38926e8))
+
 ## [2.0.0-beta.3](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.2...sharepoint-connector@v2.0.0-beta.3) (2025-12-01)
 
 
