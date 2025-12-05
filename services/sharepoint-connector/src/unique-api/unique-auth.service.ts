@@ -14,7 +14,7 @@ export class UniqueAuthService {
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
-    public readonly httpClientService: HttpClientService,
+    private readonly httpClientService: HttpClientService,
   ) {}
 
   public async getToken(): Promise<string> {

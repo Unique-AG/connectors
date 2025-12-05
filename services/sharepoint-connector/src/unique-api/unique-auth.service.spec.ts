@@ -21,9 +21,10 @@ const MOCK_UNIQUE_CONFIG = Object.freeze({
 
 describe('UniqueAuthService', () => {
   let service: UniqueAuthService;
+  let mockHttpClientService: { request: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    const mockHttpClientService = {
+    mockHttpClientService = {
       request: vi.fn().mockResolvedValue({
         statusCode: 200,
         body: {
@@ -58,7 +59,7 @@ describe('UniqueAuthService', () => {
   it('gets a token from Zitadel', async () => {
     const token = await service.getToken();
     expect(token).toBe('jwt-token');
-    expect(service.httpClientService.request).toHaveBeenCalledWith(
+    expect(mockHttpClientService.request).toHaveBeenCalledWith(
       'https://auth.example.com/oauth/token',
       expect.objectContaining({
         method: 'POST',

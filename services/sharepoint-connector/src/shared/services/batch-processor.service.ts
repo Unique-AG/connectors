@@ -10,8 +10,8 @@ export interface BatchProcessorOptions<TInput, TOutput> {
   batchSize: number;
   /** Function to process each batch, returns results for that batch */
   processor: (batch: TInput[], batchIndex: number) => Promise<TOutput[]>;
-  /** Optional logger for progress tracking */
-  logger?: Logger;
+  /** Logger for progress tracking and error reporting */
+  logger: Logger;
   logPrefix?: string;
 }
 
@@ -30,9 +30,7 @@ export class BatchProcessorService {
     const chunks = chunk(items, batchSize);
     const allResults: TOutput[] = [];
 
-    // Only log progress when there are multiple chunks and logger is provided
-    const shouldLogProgress = chunks.length > 1 && logger;
-
+    const shouldLogProgress = chunks.length > 1;
     if (shouldLogProgress) {
       logger.debug(`${logPrefix} Processing ${items.length} items in ${chunks.length} chunks`);
     }
@@ -41,7 +39,7 @@ export class BatchProcessorService {
     for (const [index, batch] of chunks.entries()) {
       if (shouldLogProgress) {
         logger.debug(
-          `${logPrefix} Processing chunk ${index + 1} of ${chunks.length} (${batch.length} items)`,
+          `${logPrefix} Processing chunk ${index + 1}/${chunks.length} (${batch.length} items)`,
         );
       }
 
@@ -49,8 +47,7 @@ export class BatchProcessorService {
         const results = await processor(batch, index);
         allResults.push(...results);
       } catch (error) {
-        // Log error context if logging is enabled
-        logger?.error({
+        logger.error({
           msg: `${logPrefix} Failed to process batch ${index + 1}`,
           batchIndex: index,
           batchSize: batch.length,

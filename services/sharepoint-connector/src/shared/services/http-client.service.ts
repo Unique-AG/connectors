@@ -6,34 +6,8 @@ export class HttpClientService implements OnModuleDestroy {
   private readonly httpAgent: Dispatcher;
 
   public constructor() {
-    const interceptorsInCallingOrder = [
-      interceptors.redirect({
-        maxRedirections: 10,
-      }),
-      interceptors.retry({
-        maxRetries: 3,
-        minTimeout: 1_000,
-        errorCodes: [
-          'ETIMEDOUT',
-          'ECONNRESET',
-          'ECONNREFUSED',
-          'ENOTFOUND',
-          'ENETDOWN',
-          'ENETUNREACH',
-          'EHOSTDOWN',
-          'EHOSTUNREACH',
-          'EPIPE',
-          'UND_ERR_SOCKET',
-        ],
-      }),
-    ];
-
-    const agent = new Agent({
-      bodyTimeout: 60_000,
-      headersTimeout: 30_000,
-      connectTimeout: 15_000,
-    });
-    this.httpAgent = agent.compose(interceptorsInCallingOrder.reverse());
+    const agent = new Agent();
+    this.httpAgent = agent.compose([interceptors.retry(), interceptors.redirect()]);
   }
 
   public async onModuleDestroy(): Promise<void> {

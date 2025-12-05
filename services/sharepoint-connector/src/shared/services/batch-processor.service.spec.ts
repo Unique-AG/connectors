@@ -1,5 +1,6 @@
+import { Logger } from '@nestjs/common';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BatchProcessorService } from './batch-processor.service';
 
 describe('BatchProcessorService', () => {
@@ -15,6 +16,16 @@ describe('BatchProcessorService', () => {
       const items = [1, 2, 3, 4, 5, 6, 7];
       const batchSize = 3;
       const processedBatches: number[][] = [];
+      const mockLogger = {
+        debug: vi.fn(),
+        error: vi.fn(),
+        log: vi.fn(),
+        warn: vi.fn(),
+        verbose: vi.fn(),
+        fatal: vi.fn(),
+        setLogLevels: vi.fn(),
+        setContext: vi.fn(),
+      } as unknown as Logger;
 
       const result = await service.processInBatches({
         items,
@@ -23,6 +34,7 @@ describe('BatchProcessorService', () => {
           processedBatches.push([...batch]);
           return batch.map((n) => n * 2);
         },
+        logger: mockLogger,
       });
 
       expect(processedBatches).toEqual([[1, 2, 3], [4, 5, 6], [7]]);
@@ -30,21 +42,45 @@ describe('BatchProcessorService', () => {
     });
 
     it('handles empty input array', async () => {
+      const mockLogger = {
+        debug: vi.fn(),
+        error: vi.fn(),
+        log: vi.fn(),
+        warn: vi.fn(),
+        verbose: vi.fn(),
+        fatal: vi.fn(),
+        setLogLevels: vi.fn(),
+        setContext: vi.fn(),
+      } as unknown as Logger;
+
       const result = await service.processInBatches({
         items: [],
         batchSize: 5,
         processor: async () => [],
+        logger: mockLogger,
       });
 
       expect(result).toEqual([]);
     });
 
     it('validates input parameters', async () => {
+      const mockLogger = {
+        debug: vi.fn(),
+        error: vi.fn(),
+        log: vi.fn(),
+        warn: vi.fn(),
+        verbose: vi.fn(),
+        fatal: vi.fn(),
+        setLogLevels: vi.fn(),
+        setContext: vi.fn(),
+      } as unknown as Logger;
+
       await expect(
         service.processInBatches({
           items: null as unknown as number[],
           batchSize: 5,
           processor: async () => [],
+          logger: mockLogger,
         }),
       ).rejects.toThrow('items must be an array');
 
@@ -53,6 +89,7 @@ describe('BatchProcessorService', () => {
           items: [1, 2, 3],
           batchSize: 0,
           processor: async () => [],
+          logger: mockLogger,
         }),
       ).rejects.toThrow('batchSize must be a positive integer');
 
@@ -61,22 +98,9 @@ describe('BatchProcessorService', () => {
           items: [1, 2, 3],
           batchSize: -1,
           processor: async () => [],
+          logger: mockLogger,
         }),
       ).rejects.toThrow('batchSize must be a positive integer');
-    });
-
-    it('does not log when no logger is provided', async () => {
-      const items = [1, 2, 3, 4, 5, 6, 7];
-
-      await service.processInBatches({
-        items,
-        batchSize: 2, // Creates multiple batches
-        processor: async (batch) => batch,
-        // No logger provided
-      });
-
-      // Should not throw and should work without logging
-      expect(true).toBe(true); // Just verify it completes successfully
     });
   });
 });
