@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { chunk } from 'remeda';
+import { BatchProcessorService } from '../../shared/services/batch-processor.service';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   CREATE_SCOPE_ACCESSES_MUTATION,
@@ -27,6 +27,7 @@ export class UniqueScopesService {
   private readonly logger = new Logger(this.constructor.name);
   public constructor(
     @Inject(SCOPE_MANAGEMENT_CLIENT) private readonly scopeManagementClient: UniqueGraphqlClient,
+    private readonly batchProcessor: BatchProcessorService,
   ) {}
 
   public async createScopesBasedOnPaths(
@@ -40,24 +41,21 @@ export class UniqueScopesService {
     }
 
     const mutation = getGenerateScopesBasedOnPathsMutation(opts.includePermissions);
-    const pathBatches = chunk(paths, BATCH_SIZE);
-    const allScopes: Scope[] = [];
 
-    for (const [index, batch] of pathBatches.entries()) {
-      const batchNumber = index + 1;
-      const totalBatches = pathBatches.length;
+    const allScopes = await this.batchProcessor.processInBatches({
+      items: paths,
+      batchSize: BATCH_SIZE,
+      processor: async (batch) => {
+        const result = await this.scopeManagementClient.request<
+          GenerateScopesBasedOnPathsMutationResult,
+          GenerateScopesBasedOnPathsMutationInput
+        >(mutation, { paths: batch });
 
-      this.logger.debug(
-        `[createScopesBasedOnPaths] Processing batch ${batchNumber}/${totalBatches} with ${batch.length} paths (${paths.length} total, batch size: ${BATCH_SIZE})`,
-      );
-
-      const result = await this.scopeManagementClient.request<
-        GenerateScopesBasedOnPathsMutationResult,
-        GenerateScopesBasedOnPathsMutationInput
-      >(mutation, { paths: batch });
-
-      allScopes.push(...result.generateScopesBasedOnPaths);
-    }
+        return result.generateScopesBasedOnPaths;
+      },
+      logger: this.logger,
+      logPrefix: '[createScopesBasedOnPaths]',
+    });
 
     this.logger.debug(`Created ${allScopes.length} scopes from ${paths.length} paths`);
     return allScopes;

@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { chunk } from 'remeda';
 import { Config } from '../../config';
+import { BatchProcessorService } from '../../shared/services/batch-processor.service';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -32,6 +32,7 @@ export class UniqueFilesService {
   public constructor(
     @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
     private readonly configService: ConfigService<Config, true>,
+    private readonly batchProcessor: BatchProcessorService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -134,33 +135,24 @@ export class UniqueFilesService {
       return;
     }
 
-    const chunks = chunk(fileAccesses, BATCH_SIZE);
     const logPrefix = `[Scope: ${scopeId}]`;
-    const shouldLogChunks = chunks.length > 1;
 
-    // Only log when multiple chunks exist
-    if (shouldLogChunks) {
-      this.logger.debug(
-        `${logPrefix} Processing ${fileAccesses.length} file accesses in ${chunks.length} chunks`,
-      );
-    }
-
-    // Process each chunk sequentially - chunks is an array of arrays, where each inner array
-    // contains up to BATCH_SIZE items. This loop sends a separate API request for each chunk.
-    for (const [index, chunk] of chunks.entries()) {
-      if (shouldLogChunks) {
-        this.logger.debug(
-          `${logPrefix} Processing chunk ${index + 1} of ${chunks.length} (${chunk.length} items)`,
+    await this.batchProcessor.processInBatches({
+      items: fileAccesses,
+      batchSize: BATCH_SIZE,
+      processor: async (batch) => {
+        await this.ingestionClient.request<AddAccessesMutationResult, AddAccessesMutationInput>(
+          ADD_ACCESSES_MUTATION,
+          {
+            scopeId,
+            fileAccesses: batch,
+          },
         );
-      }
-      await this.ingestionClient.request<AddAccessesMutationResult, AddAccessesMutationInput>(
-        ADD_ACCESSES_MUTATION,
-        {
-          scopeId,
-          fileAccesses: chunk,
-        },
-      );
-    }
+        return []; // No results to return for mutations
+      },
+      logger: this.logger,
+      logPrefix,
+    });
   }
 
   public async removeAccesses(
@@ -171,33 +163,23 @@ export class UniqueFilesService {
       return;
     }
 
-    const chunks = chunk(fileAccesses, BATCH_SIZE);
     const logPrefix = `[Scope: ${scopeId}]`;
-    const shouldLogChunks = chunks.length > 1;
 
-    // Only log when multiple chunks exist
-    if (shouldLogChunks) {
-      this.logger.debug(
-        `${logPrefix} Processing ${fileAccesses.length} file accesses in ${chunks.length} chunks`,
-      );
-    }
-
-    // Process each chunk sequentially - chunks is an array of arrays, where each inner array
-    // contains up to BATCH_SIZE items. This loop sends a separate API request for each chunk.
-    for (const [index, chunk] of chunks.entries()) {
-      // Only log when multiple chunks exist
-      if (shouldLogChunks) {
-        this.logger.debug(
-          `${logPrefix} Processing chunk ${index + 1} of ${chunks.length} (${chunk.length} items)`,
-        );
-      }
-      await this.ingestionClient.request<RemoveAccessesMutationResult, RemoveAccessesMutationInput>(
-        REMOVE_ACCESSES_MUTATION,
-        {
+    await this.batchProcessor.processInBatches({
+      items: fileAccesses,
+      batchSize: BATCH_SIZE,
+      processor: async (batch) => {
+        await this.ingestionClient.request<
+          RemoveAccessesMutationResult,
+          RemoveAccessesMutationInput
+        >(REMOVE_ACCESSES_MUTATION, {
           scopeId,
-          fileAccesses: chunk,
-        },
-      );
-    }
+          fileAccesses: batch,
+        });
+        return []; // No results to return for mutations
+      },
+      logger: this.logger,
+      logPrefix,
+    });
   }
 }
