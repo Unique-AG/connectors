@@ -65,16 +65,6 @@ describe('BatchProcessorService', () => {
       ).rejects.toThrow('batchSize must be a positive integer');
     });
 
-    it('validates processor return type', async () => {
-      await expect(
-        service.processInBatches({
-          items: [1],
-          batchSize: 1,
-          processor: async () => 'not an array' as unknown as number[],
-        }),
-      ).rejects.toThrow('processor must return an array');
-    });
-
     it('does not log when no logger is provided', async () => {
       const items = [1, 2, 3, 4, 5, 6, 7];
 

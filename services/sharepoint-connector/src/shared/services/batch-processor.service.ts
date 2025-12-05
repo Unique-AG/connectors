@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { chunk } from 'remeda';
+import { sanitizeError } from '../../utils/normalize-error';
 
 export interface BatchProcessorOptions<TInput, TOutput> {
   /** Array of items to process in batches */
@@ -53,7 +54,7 @@ export class BatchProcessorService {
           msg: `${logPrefix} Failed to process batch ${index + 1}`,
           batchIndex: index,
           batchSize: batch.length,
-          error,
+          error: sanitizeError(error),
         });
         throw error;
       }
