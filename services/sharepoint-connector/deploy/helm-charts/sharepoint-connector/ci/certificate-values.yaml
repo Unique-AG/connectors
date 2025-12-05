@@ -15,7 +15,7 @@ connector:
   serviceAccount:
     workloadIdentity:
       clientId: 00000000-0000-0000-0000-000000000000
-  # Secret only added for testing and demonstration
+  # Secret only added for testing and demonstration (certificate for SharePoint auth)
   extraObjects:
     - apiVersion: v1
       kind: Secret
@@ -23,7 +23,6 @@ connector:
         name: sharepoint-connector-secret
       type: Opaque
       stringData:
-        UNIQUE_ZITADEL_CLIENT_SECRET: fake-client-secret-value
         key.pem: |
           -----BEGIN PRIVATE KEY-----
           -----END PRIVATE KEY-----

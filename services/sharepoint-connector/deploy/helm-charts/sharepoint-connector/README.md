@@ -76,7 +76,7 @@ spec:
 | connector.env.OTEL_EXPORTER_PROMETHEUS_HOST | string | `"0.0.0.0"` |  |
 | connector.env.OTEL_EXPORTER_PROMETHEUS_PORT | string | `"51346"` |  |
 | connector.env.OTEL_METRICS_EXPORTER | string | `"prometheus"` |  |
-| connector.envVars[0] | object | `{"name":"UNIQUE_ZITADEL_CLIENT_SECRET","valueFrom":{"secretKeyRef":{"key":"UNIQUE_ZITADEL_CLIENT_SECRET","name":"sharepoint-connector-secret"}}}` | loading of Zitadel Secret, Users can supersede this with their own secret that contains UNIQUE_ZITADEL_CLIENT_SECRET or use https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars to load completely arbitrary secret mappings. See also below in connectorConfig.unique.zitadel.clientSecret. |
+| connector.envVars | list | `[]` | Environment variables from secrets. Required when authMode is 'external'. When using external authMode, add UNIQUE_ZITADEL_CLIENT_SECRET from a secret. See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options. |
 | connector.extraEnvCM[0] | string | `"sharepoint-connector-config"` |  |
 | connector.image.repository | string | `"ghcr.io/unique-ag/connectors/services/sharepoint-connector"` |  |
 | connector.image.tag | string | `"2.0.0-beta.3"` |  |
