@@ -15,7 +15,7 @@ describe('BatchProcessorService', () => {
     it('processes items in correct batch sizes', async () => {
       const items = [1, 2, 3, 4, 5, 6, 7];
       const batchSize = 3;
-      const processedBatches: number[][] = [];
+
       const mockLogger = {
         debug: vi.fn(),
         error: vi.fn(),

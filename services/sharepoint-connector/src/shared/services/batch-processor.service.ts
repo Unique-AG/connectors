@@ -4,13 +4,13 @@ import { chunk } from 'remeda';
 import { sanitizeError } from '../../utils/normalize-error';
 
 export interface BatchProcessorOptions<TInput, TOutput> {
-  /** Array of items to process in batches */
+  // Array of items to process in batches
   items: TInput[];
-  /** Maximum number of items per batch */
+  // Maximum number of items per batch
   batchSize: number;
-  /** Function to process each batch, returns results for that batch */
+  // Function to process each batch, returns results for that batch
   processor: (batch: TInput[], batchIndex: number) => Promise<TOutput[]>;
-  /** Logger for progress tracking and error reporting */
+  // Passing the loger here to have the log context of the service that's sending the request instead of the BatchProcessor service 
   logger: Logger;
   logPrefix?: string;
 }
