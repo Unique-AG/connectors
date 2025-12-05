@@ -138,6 +138,7 @@ export class UniqueFilesService {
     const logPrefix = `[Scope: ${scopeId}]`;
     const shouldLogChunks = chunks.length > 1;
 
+    // Only log when multiple chunks exist
     if (shouldLogChunks) {
       this.logger.debug(
         `${logPrefix} Processing ${fileAccesses.length} file accesses in ${chunks.length} chunks`,
@@ -174,6 +175,7 @@ export class UniqueFilesService {
     const logPrefix = `[Scope: ${scopeId}]`;
     const shouldLogChunks = chunks.length > 1;
 
+    // Only log when multiple chunks exist
     if (shouldLogChunks) {
       this.logger.debug(
         `${logPrefix} Processing ${fileAccesses.length} file accesses in ${chunks.length} chunks`,
@@ -183,6 +185,7 @@ export class UniqueFilesService {
     // Process each chunk sequentially - chunks is an array of arrays, where each inner array
     // contains up to BATCH_SIZE items. This loop sends a separate API request for each chunk.
     for (const [index, chunk] of chunks.entries()) {
+      // Only log when multiple chunks exist
       if (shouldLogChunks) {
         this.logger.debug(
           `${logPrefix} Processing chunk ${index + 1} of ${chunks.length} (${chunk.length} items)`,

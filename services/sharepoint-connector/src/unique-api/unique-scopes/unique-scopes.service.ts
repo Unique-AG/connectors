@@ -48,7 +48,7 @@ export class UniqueScopesService {
       const totalBatches = pathBatches.length;
 
       this.logger.debug(
-        `Processing batch ${batchNumber}/${totalBatches} with ${batch.length} paths`,
+        `[createScopesBasedOnPaths] Processing batch ${batchNumber}/${totalBatches} with ${batch.length} paths (${paths.length} total, batch size: ${BATCH_SIZE})`,
       );
 
       const result = await this.scopeManagementClient.request<
