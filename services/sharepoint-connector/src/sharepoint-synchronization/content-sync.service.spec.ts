@@ -45,6 +45,7 @@ describe('ContentSyncService', () => {
           useValue: {
             getFilesByKeys: vi.fn(),
             deleteFile: vi.fn(),
+            getFilesCountForSite: vi.fn(),
           },
         },
         {
@@ -214,7 +215,16 @@ describe('ContentSyncService', () => {
 
     it('does not throw an error when no files need to be ingested', async () => {
       const siteId = 'site-id';
-      const items = [] as SharepointContentItem[];
+      const items = [
+        {
+          itemType: 'driveItem',
+          item: {
+            id: 'existing-file',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/existing-file',
+          },
+        },
+      ] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
@@ -239,6 +249,8 @@ describe('ContentSyncService', () => {
           ownerId: 'user-id',
         },
       ]);
+
+      vi.spyOn(uniqueFilesService, 'getFilesCountForSite').mockResolvedValue(5);
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
         if (key === 'unique.maxIngestedFiles') {
@@ -441,7 +453,7 @@ describe('ContentSyncService', () => {
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
-    it('throws an error when file diff would delete all files', async () => {
+    it('throws an error when file diff would delete all files in Unique', async () => {
       const siteId = 'site-id';
       const items = [
         {
@@ -476,11 +488,82 @@ describe('ContentSyncService', () => {
         deletedFiles: ['1', '2'],
       });
 
+      vi.spyOn(uniqueFilesService, 'getFilesCountForSite').mockResolvedValue(2);
+
       vi.spyOn(configService, 'get').mockImplementation(() => null);
 
       await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
-        '[Site: site-id] File diff declares all 2 files as to be deleted. Sync aborted.',
+        '[Site: site-id] File diff declares all 2 files stored in Unique as to be deleted. Aborting sync to prevent accidental full deletion.',
       );
+    });
+
+    it('throws an error when 0 files are submitted but file diff indicates deletions', async () => {
+      const siteId = 'site-id';
+      const items = [] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
+
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: [],
+        updatedFiles: [],
+        movedFiles: [],
+        deletedFiles: ['1', '2'],
+      });
+
+      vi.spyOn(configService, 'get').mockImplementation(() => null);
+
+      await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
+        '[Site: site-id] We submitted 0 files to the file diff and that would result in all 2 files being deleted. Aborting sync to prevent accidental full deletion.',
+      );
+    });
+
+    it('does not throw an error when partial deletions occur', async () => {
+      const siteId = 'site-id';
+      const items = [
+        {
+          itemType: 'driveItem',
+          item: {
+            id: '1',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/1',
+          },
+        },
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootScopeId: 'scope-id',
+        rootPath: '/root',
+        siteId,
+      };
+
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: [],
+        updatedFiles: [],
+        movedFiles: [],
+        deletedFiles: ['2'],
+      });
+
+      vi.spyOn(uniqueFilesService, 'getFilesByKeys').mockResolvedValue([
+        {
+          id: 'deleted-file-id',
+          key: 'site-id/2',
+          fileAccess: [],
+          ownerType: 'user',
+          ownerId: 'user-id',
+        },
+      ]);
+
+      vi.spyOn(uniqueFilesService, 'getFilesCountForSite').mockResolvedValue(5);
+
+      vi.spyOn(configService, 'get').mockImplementation(() => null);
+
+      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
     it('does not throw an error for empty site with no deleted files', async () => {
