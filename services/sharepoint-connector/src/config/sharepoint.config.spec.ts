@@ -73,24 +73,37 @@ describe('SharepointConfigSchema - siteIds validation', () => {
   });
 
   describe('invalid UUIDv4 entries', () => {
+    const expectSiteIdsValidationError = ({
+      config,
+      errorIndexes,
+    }: {
+      config: unknown;
+      errorIndexes: number[];
+    }) => {
+      const expectedMessage = 'Each site ID must be a valid UUIDv4';
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+      try {
+        SharepointConfigSchema.parse(config);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          expect(error.issues).toHaveLength(errorIndexes.length);
+          errorIndexes.forEach((expectedIndex, i) => {
+            expect(error.issues?.[i]?.path).toEqual(['siteIds', expectedIndex]);
+            expect(error.issues?.[i]?.message).toBe(expectedMessage);
+          });
+        } else {
+          throw error;
+        }
+      }
+    };
+
     it('rejects single invalid UUID', () => {
       const config = {
         ...validConfigBase,
         siteIds: 'invalid-uuid',
       };
 
-      expect(() => SharepointConfigSchema.parse(config)).toThrow();
-      try {
-        SharepointConfigSchema.parse(config);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          expect(error.issues).toHaveLength(1);
-          expect(error.issues?.[0]?.path).toEqual(['siteIds', 0]);
-          expect(error.issues?.[0]?.message).toBe('Each site ID must be a valid UUIDv4');
-        } else {
-          throw error;
-        }
-      }
+      expectSiteIdsValidationError({ config, errorIndexes: [0] });
     });
 
     it('rejects multiple invalid UUIDs with position information', () => {
@@ -99,20 +112,7 @@ describe('SharepointConfigSchema - siteIds validation', () => {
         siteIds: 'invalid-1,invalid-2,also-invalid',
       };
 
-      expect(() => SharepointConfigSchema.parse(config)).toThrow();
-      try {
-        SharepointConfigSchema.parse(config);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          expect(error.issues).toHaveLength(3);
-          expect(error.issues?.[0]?.path).toEqual(['siteIds', 0]);
-          expect(error.issues?.[1]?.path).toEqual(['siteIds', 1]);
-          expect(error.issues?.[2]?.path).toEqual(['siteIds', 2]);
-          expect(error.issues?.[0]?.message).toBe('Each site ID must be a valid UUIDv4');
-        } else {
-          throw error;
-        }
-      }
+      expectSiteIdsValidationError({ config, errorIndexes: [0, 1, 2] });
     });
 
     it('rejects mixed valid and invalid UUIDs', () => {
@@ -122,18 +122,7 @@ describe('SharepointConfigSchema - siteIds validation', () => {
           '550e8400-e29b-41d4-a716-446655440000,invalid-uuid,550e8400-e29b-41d4-a716-446655440001',
       };
 
-      expect(() => SharepointConfigSchema.parse(config)).toThrow();
-      try {
-        SharepointConfigSchema.parse(config);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          expect(error.issues).toHaveLength(1);
-          expect(error.issues?.[0]?.path).toEqual(['siteIds', 1]);
-          expect(error.issues?.[0]?.message).toBe('Each site ID must be a valid UUIDv4');
-        } else {
-          throw error;
-        }
-      }
+      expectSiteIdsValidationError({ config, errorIndexes: [1] });
     });
 
     it('rejects UUIDv3 format', () => {
@@ -142,18 +131,7 @@ describe('SharepointConfigSchema - siteIds validation', () => {
         siteIds: 'a3bb189e-8bf9-3888-9912-ace4e6543002', // UUIDv3
       };
 
-      expect(() => SharepointConfigSchema.parse(config)).toThrow();
-      try {
-        SharepointConfigSchema.parse(config);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          expect(error.issues).toHaveLength(1);
-          expect(error.issues?.[0]?.path).toEqual(['siteIds', 0]);
-          expect(error.issues?.[0]?.message).toBe('Each site ID must be a valid UUIDv4');
-        } else {
-          throw error;
-        }
-      }
+      expectSiteIdsValidationError({ config, errorIndexes: [0] });
     });
 
     it('rejects UUID with wrong version', () => {
@@ -162,18 +140,7 @@ describe('SharepointConfigSchema - siteIds validation', () => {
         siteIds: '550e8400-e29b-11d4-a716-446655440000', // UUIDv1
       };
 
-      expect(() => SharepointConfigSchema.parse(config)).toThrow();
-      try {
-        SharepointConfigSchema.parse(config);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          expect(error.issues).toHaveLength(1);
-          expect(error.issues?.[0]?.path).toEqual(['siteIds', 0]);
-          expect(error.issues?.[0]?.message).toBe('Each site ID must be a valid UUIDv4');
-        } else {
-          throw error;
-        }
-      }
+      expectSiteIdsValidationError({ config, errorIndexes: [0] });
     });
 
     it('rejects UUID with invalid variant', () => {
@@ -182,18 +149,7 @@ describe('SharepointConfigSchema - siteIds validation', () => {
         siteIds: '550e8400-e29b-41d4-c716-446655440000', // Invalid variant (c instead of 8-9,a-f)
       };
 
-      expect(() => SharepointConfigSchema.parse(config)).toThrow();
-      try {
-        SharepointConfigSchema.parse(config);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          expect(error.issues).toHaveLength(1);
-          expect(error.issues?.[0]?.path).toEqual(['siteIds', 0]);
-          expect(error.issues?.[0]?.message).toBe('Each site ID must be a valid UUIDv4');
-        } else {
-          throw error;
-        }
-      }
+      expectSiteIdsValidationError({ config, errorIndexes: [0] });
     });
 
     it('filters out empty entries but validates remaining ones', () => {
@@ -202,18 +158,7 @@ describe('SharepointConfigSchema - siteIds validation', () => {
         siteIds: ',550e8400-e29b-41d4-a716-446655440000,,invalid-uuid,',
       };
 
-      expect(() => SharepointConfigSchema.parse(config)).toThrow();
-      try {
-        SharepointConfigSchema.parse(config);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          expect(error.issues).toHaveLength(1);
-          expect(error.issues?.[0]?.path).toEqual(['siteIds', 1]);
-          expect(error.issues?.[0]?.message).toBe('Each site ID must be a valid UUIDv4');
-        } else {
-          throw error;
-        }
-      }
+      expectSiteIdsValidationError({ config, errorIndexes: [1] });
     });
   });
 });
