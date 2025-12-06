@@ -99,4 +99,4 @@ export const SharepointConfigSchema = z
 export const sharepointConfig = registerConfig('sharepoint', SharepointConfigSchema);
 
 export type SharepointConfigNamespaced = NamespacedConfigType<typeof sharepointConfig>;
-export type SharepointConfigType = ConfigType<typeof sharepointConfig>;
+export type SharepointConfig = ConfigType<typeof sharepointConfig>;
