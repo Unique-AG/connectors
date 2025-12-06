@@ -199,11 +199,11 @@ export class ContentSyncService {
       );
     }
 
-    // If the file diff indicated we should delete all files by having submitted no files to the
-    // diff, it most probably means that we have some kind of bug in fetching the files from
-    // Sharepoint and we should not proceed with the sync to avoid costly re-ingestions. In case
-    // user actually wants to delete all files from a site, they should add one dummy file to the
-    // site and mark it for synchronization.
+    // If the file diff indicated we should delete all files even when we submitted some files to
+    // diff, it most probably means that we have some kind of bug in file diff or something
+    // unexpected changed in the logic. We should not proceed with the sync to avoid costly
+    // re-ingestions. If user actually deleted all the files from the site and uploaded new ones,
+    // they should recursively delete the site data from Unique first via GraphQL API.
     const totalFilesForSiteInUnique = await this.uniqueFilesService.getFilesCountForSite(siteId);
     if (fileDiffResult.deletedFiles.length === totalFilesForSiteInUnique) {
       this.logger.error({
