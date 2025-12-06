@@ -14,7 +14,10 @@ import {
   ContentDeleteMutationResult,
   ContentUpdateMutationInput,
   ContentUpdateMutationResult,
+  PAGINATED_CONTENT_COUNT_QUERY,
   PAGINATED_CONTENT_QUERY,
+  PaginatedContentCountQueryInput,
+  PaginatedContentCountQueryResult,
   PaginatedContentQueryInput,
   PaginatedContentQueryResult,
   REMOVE_ACCESSES_MUTATION,
@@ -128,6 +131,24 @@ export class UniqueFilesService {
     } while (batchCount === BATCH_SIZE);
 
     return files;
+  }
+
+  public async getFilesCountForSite(siteId: string): Promise<number> {
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    this.logger.debug(`${logPrefix} Fetching files count`);
+
+    const result = await this.ingestionClient.request<
+      PaginatedContentCountQueryResult,
+      PaginatedContentCountQueryInput
+    >(PAGINATED_CONTENT_COUNT_QUERY, {
+      where: {
+        key: {
+          startsWith: `${siteId}/`,
+        },
+      },
+    });
+
+    return result.paginatedContent.totalCount;
   }
 
   public async addAccesses(scopeId: string, fileAccesses: UniqueFileAccessInput[]): Promise<void> {

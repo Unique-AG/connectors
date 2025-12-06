@@ -74,6 +74,31 @@ export const PAGINATED_CONTENT_QUERY = gql`
   }
 `;
 
+export interface PaginatedContentCountQueryInput {
+  where: {
+    key?: {
+      startsWith?: string;
+      in?: string[];
+    };
+  };
+}
+
+export interface PaginatedContentCountQueryResult {
+  paginatedContent: {
+    totalCount: number;
+  };
+}
+
+// The GraphQL API doesn't have an optimization for count-only queries, so we pass 0 for both
+// skip and take to avoid fetching any items while still getting the total count.
+export const PAGINATED_CONTENT_COUNT_QUERY = gql`
+  query PaginatedContentCount($where: ContentWhereInput) {
+    paginatedContent(where: $where, skip: 0, take: 0) {
+      totalCount
+    }
+  }
+`;
+
 export interface AddAccessesMutationInput {
   scopeId: string;
   fileAccesses: UniqueFileAccessInput[];
