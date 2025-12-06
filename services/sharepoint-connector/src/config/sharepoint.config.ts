@@ -88,7 +88,7 @@ const baseConfig = z.object({
     .describe('Name of the SharePoint column indicating sync flag'),
 });
 
-const SharepointConfig = z
+export const SharepointConfigSchema = z
   .discriminatedUnion('authMode', [
     oidcAuthModeConfig,
     clientSecretAuthModeConfig,
@@ -96,8 +96,7 @@ const SharepointConfig = z
   ])
   .and(baseConfig);
 
-export { SharepointConfig };
-export const sharepointConfig = registerConfig('sharepoint', SharepointConfig);
+export const sharepointConfig = registerConfig('sharepoint', SharepointConfigSchema);
 
 export type SharepointConfigNamespaced = NamespacedConfigType<typeof sharepointConfig>;
 export type SharepointConfigType = ConfigType<typeof sharepointConfig>;

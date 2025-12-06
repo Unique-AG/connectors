@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { SharepointConfig } from './sharepoint.config';
+import { SharepointConfigSchema } from './sharepoint.config';
 
-describe('SharepointConfig - siteIds validation', () => {
+describe('SharepointConfigSchema - siteIds validation', () => {
   const validConfigBase = {
     authMode: 'client-secret' as const,
     authClientId: '550e8400-e29b-41d4-a716-446655440000',
@@ -19,7 +19,7 @@ describe('SharepointConfig - siteIds validation', () => {
         siteIds: '550e8400-e29b-41d4-a716-446655440000',
       };
 
-      const result = SharepointConfig.parse(config);
+      const result = SharepointConfigSchema.parse(config);
       expect(result.siteIds).toEqual(['550e8400-e29b-41d4-a716-446655440000']);
     });
 
@@ -30,7 +30,7 @@ describe('SharepointConfig - siteIds validation', () => {
           '550e8400-e29b-41d4-a716-446655440000,550e8400-e29b-41d4-a716-446655440001,550e8400-e29b-41d4-a716-446655440002',
       };
 
-      const result = SharepointConfig.parse(config);
+      const result = SharepointConfigSchema.parse(config);
       expect(result.siteIds).toEqual([
         '550e8400-e29b-41d4-a716-446655440000',
         '550e8400-e29b-41d4-a716-446655440001',
@@ -44,7 +44,7 @@ describe('SharepointConfig - siteIds validation', () => {
         siteIds: ' 550e8400-e29b-41d4-a716-446655440000 , 550e8400-e29b-41d4-a716-446655440001 ',
       };
 
-      const result = SharepointConfig.parse(config);
+      const result = SharepointConfigSchema.parse(config);
       expect(result.siteIds).toEqual([
         '550e8400-e29b-41d4-a716-446655440000',
         '550e8400-e29b-41d4-a716-446655440001',
@@ -57,7 +57,7 @@ describe('SharepointConfig - siteIds validation', () => {
         siteIds: '',
       };
 
-      const result = SharepointConfig.parse(config);
+      const result = SharepointConfigSchema.parse(config);
       expect(result.siteIds).toEqual([]);
     });
 
@@ -67,7 +67,7 @@ describe('SharepointConfig - siteIds validation', () => {
         siteIds: '550E8400-E29B-41D4-A716-446655440000',
       };
 
-      const result = SharepointConfig.parse(config);
+      const result = SharepointConfigSchema.parse(config);
       expect(result.siteIds).toEqual(['550E8400-E29B-41D4-A716-446655440000']);
     });
   });
@@ -79,9 +79,9 @@ describe('SharepointConfig - siteIds validation', () => {
         siteIds: 'invalid-uuid',
       };
 
-      expect(() => SharepointConfig.parse(config)).toThrow();
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
       try {
-        SharepointConfig.parse(config);
+        SharepointConfigSchema.parse(config);
       } catch (error) {
         if (error instanceof z.ZodError) {
           expect(error.issues).toHaveLength(1);
@@ -99,9 +99,9 @@ describe('SharepointConfig - siteIds validation', () => {
         siteIds: 'invalid-1,invalid-2,also-invalid',
       };
 
-      expect(() => SharepointConfig.parse(config)).toThrow();
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
       try {
-        SharepointConfig.parse(config);
+        SharepointConfigSchema.parse(config);
       } catch (error) {
         if (error instanceof z.ZodError) {
           expect(error.issues).toHaveLength(3);
@@ -122,9 +122,9 @@ describe('SharepointConfig - siteIds validation', () => {
           '550e8400-e29b-41d4-a716-446655440000,invalid-uuid,550e8400-e29b-41d4-a716-446655440001',
       };
 
-      expect(() => SharepointConfig.parse(config)).toThrow();
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
       try {
-        SharepointConfig.parse(config);
+        SharepointConfigSchema.parse(config);
       } catch (error) {
         if (error instanceof z.ZodError) {
           expect(error.issues).toHaveLength(1);
@@ -142,9 +142,9 @@ describe('SharepointConfig - siteIds validation', () => {
         siteIds: 'a3bb189e-8bf9-3888-9912-ace4e6543002', // UUIDv3
       };
 
-      expect(() => SharepointConfig.parse(config)).toThrow();
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
       try {
-        SharepointConfig.parse(config);
+        SharepointConfigSchema.parse(config);
       } catch (error) {
         if (error instanceof z.ZodError) {
           expect(error.issues).toHaveLength(1);
@@ -162,9 +162,9 @@ describe('SharepointConfig - siteIds validation', () => {
         siteIds: '550e8400-e29b-11d4-a716-446655440000', // UUIDv1
       };
 
-      expect(() => SharepointConfig.parse(config)).toThrow();
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
       try {
-        SharepointConfig.parse(config);
+        SharepointConfigSchema.parse(config);
       } catch (error) {
         if (error instanceof z.ZodError) {
           expect(error.issues).toHaveLength(1);
@@ -182,9 +182,9 @@ describe('SharepointConfig - siteIds validation', () => {
         siteIds: '550e8400-e29b-41d4-c716-446655440000', // Invalid variant (c instead of 8-9,a-f)
       };
 
-      expect(() => SharepointConfig.parse(config)).toThrow();
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
       try {
-        SharepointConfig.parse(config);
+        SharepointConfigSchema.parse(config);
       } catch (error) {
         if (error instanceof z.ZodError) {
           expect(error.issues).toHaveLength(1);
@@ -202,9 +202,9 @@ describe('SharepointConfig - siteIds validation', () => {
         siteIds: ',550e8400-e29b-41d4-a716-446655440000,,invalid-uuid,',
       };
 
-      expect(() => SharepointConfig.parse(config)).toThrow();
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
       try {
-        SharepointConfig.parse(config);
+        SharepointConfigSchema.parse(config);
       } catch (error) {
         if (error instanceof z.ZodError) {
           expect(error.issues).toHaveLength(1);

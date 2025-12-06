@@ -1,7 +1,7 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
 
-const AppConfigSchema = z
+export const AppConfigSchema = z
   .object({
     nodeEnv: z
       .enum(['development', 'production', 'test'])
