@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
+import { length, mapValues } from 'remeda';
 import { Config } from '../config';
 import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
@@ -140,9 +141,6 @@ export class ContentSyncService {
     sharepointContentItems: SharepointContentItem[],
     siteId: string,
   ): Promise<FileDiffResponse> {
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
-
     const fileDiffItems: FileDiffItem[] = sharepointContentItems.map(
       (sharepointContentItem: SharepointContentItem) => {
         const key = buildFileDiffKey(sharepointContentItem);
@@ -159,26 +157,70 @@ export class ContentSyncService {
       fileDiffItems,
       siteId,
     );
-    // If the file diff indicated we should delete all files, it most probably means that we have
-    // some kind of bug and we should not proceed with the sync to avoid costly re-ingestions. In
-    // case user actually wants to delete all files, they should add one dummy file to the site.
-    if (fileDiffItems.length > 0 && fileDiffResult.deletedFiles.length === fileDiffItems.length) {
+
+    await this.validateNoAccidentalFullDeletion(fileDiffItems, fileDiffResult, siteId);
+
+    return fileDiffResult;
+  }
+
+  private async validateNoAccidentalFullDeletion(
+    fileDiffItems: FileDiffItem[],
+    fileDiffResult: FileDiffResponse,
+    siteId: string,
+  ): Promise<void> {
+    // If there are no files to be deleted, there's no point in checking further, we will surely not
+    // perform full deletion.
+    if (fileDiffResult.deletedFiles.length === 0) {
+      return;
+    }
+
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
+
+    // If the file diff indicated we should delete all files by having submitted no files to the
+    // diff, it most probably means that we have some kind of bug in fetching the files from
+    // Sharepoint and we should not proceed with the sync to avoid costly re-ingestions. In case
+    // user actually wants to delete all files from a site, they should add one dummy file to the
+    // site and mark it for synchronization.
+    if (fileDiffItems.length === 0) {
       this.logger.error({
         msg:
-          `${logPrefix} File diff declares all ${fileDiffItems.length} files as to be deleted. ` +
-          `Aborting sync. If you wish to delete all files, add a dummy file to the site and mark ` +
-          `it for synchronization.`,
+          `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files as to ` +
+          `be deleted. Aborting sync to prevent accidental full deletion. If you wish to delete ` +
+          `all files, add a dummy file to the site and mark it for synchronization.`,
         siteId: logSiteId,
         itemsLength: fileDiffItems.length,
-        fileDiffResult,
+        fileDiffResultCounts: mapValues(fileDiffResult, length()),
       });
       assert.fail(
-        `${logPrefix} File diff declares all ${fileDiffItems.length} files as to be deleted. ` +
-          `Sync aborted.`,
+        `${logPrefix} We submitted 0 files to the file diff and that would result in all ` +
+          `${fileDiffResult.deletedFiles.length} files being deleted. Aborting sync to prevent ` +
+          `accidental full deletion.`,
       );
     }
 
-    return fileDiffResult;
+    // If the file diff indicated we should delete all files by having submitted no files to the
+    // diff, it most probably means that we have some kind of bug in fetching the files from
+    // Sharepoint and we should not proceed with the sync to avoid costly re-ingestions. In case
+    // user actually wants to delete all files from a site, they should add one dummy file to the
+    // site and mark it for synchronization.
+    const totalFilesForSiteInUnique = await this.uniqueFilesService.getFilesCountForSite(siteId);
+    if (fileDiffResult.deletedFiles.length === totalFilesForSiteInUnique) {
+      this.logger.error({
+        msg:
+          `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files ` +
+          `stored in Unique as to be deleted. Aborting sync to prevent accidental full deletion. ` +
+          `If you wish to delete all files, add a dummy file to the site and mark it for ` +
+          `synchronization.`,
+        siteId: logSiteId,
+        totalFilesForSiteInUnique,
+        fileDiffResultCounts: mapValues(fileDiffResult, length()),
+      });
+      assert.fail(
+        `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files stored ` +
+          `in Unique as to be deleted. Aborting sync to prevent accidental full deletion.`,
+      );
+    }
   }
 
   private async deleteRemovedFiles(siteId: string, deletedFileKeys: string[]): Promise<void> {
