@@ -8,7 +8,7 @@ import {
   DEFAULT_STEP_TIMEOUT_SECONDS,
 } from '../constants/defaults.constants';
 
-const ProcessingConfigSchema = z.object({
+export const ProcessingConfigSchema = z.object({
   syncMode: z
     .enum(['content_only', 'content_and_permissions'])
     .describe(
