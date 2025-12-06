@@ -13,6 +13,7 @@ import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-sc
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
+import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
 
@@ -198,6 +199,16 @@ export class ScopeManagementService {
       }
 
       const path = paths[index] ?? '';
+
+      // Skip setting external ID for scopes that are ancestors of the root ingestion folder
+      if (isAncestorOfRootPath(path, context.rootPath)) {
+        this.logger.debug(
+          `Skipping externalId update for scope ${scope.id} because it is ancestor to the ` +
+            `ingestion root scope`,
+        );
+        continue;
+      }
+
       /* We have a couple of known directories in sharepoint for which it's more complex to get the id: root scope,
        * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
        */
