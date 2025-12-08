@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
@@ -214,13 +215,13 @@ export class ScopeManagementService {
       /* We have a couple of known directories in sharepoint for which it's more complex to get the id: root scope,
        * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
        */
-      const externalId = pathToExternalIdMap[path];
+      let externalId = pathToExternalIdMap[path];
       if (isNullish(externalId)) {
         this.logger.warn(
           `${logPrefix} No external ID found for path ` +
             `${this.shouldConcealLogs ? smearPath(path) : path}`,
         );
-        continue;
+        externalId = `${EXTERNAL_ID_PREFIX}unknown:${context.siteId}/${scope.name}-${randomUUID()}`;
       }
 
       try {

@@ -323,7 +323,7 @@ describe('ScopeManagementService', () => {
       });
     });
 
-    it('logs warning when no externalId found for path', async () => {
+    it('creates fallback externalId when no externalId found for path', async () => {
       const scopes = [
         { id: 'scope-1', name: 'TestScope', externalId: null },
         { id: 'scope-2', name: 'AnotherScope', externalId: null },
@@ -339,7 +339,15 @@ describe('ScopeManagementService', () => {
         mockContext,
       );
 
-      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+        'scope-1',
+        expect.stringMatching(/^spc:unknown:site-123\/TestScope-/),
+      );
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+        'scope-2',
+        expect.stringMatching(/^spc:unknown:site-123\/AnotherScope-/),
+      );
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].warn).toHaveBeenCalledWith(
         expect.stringContaining('No external ID found for path'),
@@ -402,11 +410,15 @@ describe('ScopeManagementService', () => {
         mockContext,
       );
 
-      // Root path gets externalId (special case), ChildScope doesn't exist in map so gets warning
-      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
+      // Root path gets externalId (special case), ChildScope gets fallback externalId
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-1',
         expect.stringMatching(/^spc:root-/),
+      );
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+        'scope-2',
+        expect.stringMatching(/^spc:unknown:site-123\/ChildScope-/),
       );
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].warn).toHaveBeenCalledWith(
