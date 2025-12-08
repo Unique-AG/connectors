@@ -4,10 +4,10 @@ import { LangfuseClient } from '@langfuse/client';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { serializeError } from 'serialize-error-cjs';
 import * as z from 'zod';
-import { Email } from '../../../../drizzle';
-import { LangfusePromptService } from '../../../../llm/langfuse-prompt.service';
-import { LLMService } from '../../../../llm/llm.service';
-import { normalizeError } from '../../../../utils/normalize-error';
+import { Email } from '../../../drizzle';
+import { normalizeError } from '../../../utils/normalize-error';
+import { LangfusePromptService } from '../../langfuse-prompt.service';
+import { LLMService } from '../../llm.service';
 
 const MODEL = 'openai-gpt-oss-120b';
 

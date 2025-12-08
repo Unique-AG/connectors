@@ -1,7 +1,7 @@
 import { Activities, Activity } from '@unique-ag/temporal';
 import { Injectable, Logger } from '@nestjs/common';
 import { Context } from '@temporalio/activity';
-import { LLMTranslationService } from '../lib/llm-translation-service/llm-translation.service';
+import { LLMEmailTranslationService } from '../../../llm';
 
 export interface ITranslateActivity {
   translateEmail(payload: TranslatePayload): Promise<TranslateResult>;
@@ -26,7 +26,7 @@ interface TranslateResult {
 export class TranslateActivity implements ITranslateActivity {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly llmTranslationService: LLMTranslationService) {}
+  public constructor(private readonly llmEmailTranslationService: LLMEmailTranslationService) {}
 
   @Activity()
   public async translateEmail({
@@ -62,7 +62,7 @@ export class TranslateActivity implements ITranslateActivity {
       return { translatedBody, translatedSubject };
     }
 
-    const translation = await this.llmTranslationService.translate({
+    const translation = await this.llmEmailTranslationService.translateEmail({
       subject,
       body: processedBody,
     });

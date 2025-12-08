@@ -1,7 +1,7 @@
 import { Activities, Activity } from '@unique-ag/temporal';
 import { Injectable, Logger } from '@nestjs/common';
 import { Context } from '@temporalio/activity';
-import { LLMSummarizationService } from '../lib/llm-summarization-service/llm-summarization.service';
+import { LLMSummarizationService } from '../../../llm';
 
 export interface ISummarizeBodyActivity {
   summarizeBody(payload: SummarizeBodyPayload): Promise<SummarizeBodyResult>;

@@ -1,33 +1,47 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { LangfuseClient } from '@langfuse/client';
-import { observeOpenAI } from '@langfuse/openai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { serializeError } from 'serialize-error-cjs';
-import { getFirstTextFromResponse } from '../../../../llm';
-import { LangfusePromptService } from '../../../../llm/langfuse-prompt.service';
-import { LLMService } from '../../../../llm/llm.service';
-import { normalizeError } from '../../../../utils/normalize-error';
+import * as z from 'zod';
+import { normalizeError } from '../../../utils/normalize-error';
+import { LangfusePromptService } from '../../langfuse-prompt.service';
+import { LLMService } from '../../llm.service';
 
 const MODEL = 'openai-gpt-oss-120b';
-const PROMPT_TEMPLATE_NAME = 'email-summarization';
+const PROMPT_TEMPLATE_NAME = 'text-translation';
 
-export interface SummarizationOutput {
-  summarizedBody: string;
-}
+export const translationOutputSchema = z.object({
+  translated_text: z.string(),
+  was_translated: z.boolean(),
+  detected_language: z.string().nullable(),
+});
 
-export class SummarizationError extends Error {
+const promptConfig = z.object({
+  model: z.literal(MODEL),
+  temperature: z.number().min(0).max(1).default(0.3),
+  top_p: z.number().min(0).max(1).default(1.0),
+  max_tokens: z.number().int().positive().default(10_000),
+});
+
+export type TranslationOutput = {
+  translatedText: string;
+  wasTranslated: boolean;
+  detectedLanguage: string | null;
+};
+
+export class TranslationError extends Error {
   public constructor(
     message: string,
     public readonly cause?: unknown,
   ) {
     super(message);
-    this.name = 'SummarizationError';
+    this.name = 'TranslationError';
   }
 }
 
 @Injectable()
-export class LLMSummarizationService implements OnModuleInit {
+export class LLMTranslationService implements OnModuleInit {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
@@ -40,34 +54,37 @@ export class LLMSummarizationService implements OnModuleInit {
     await this.ensurePromptTemplates();
   }
 
-  public async summarize(text: string): Promise<SummarizationOutput> {
+  public async translate(text: string): Promise<TranslationOutput> {
     try {
       const prompt = await this.langfuse.prompt.get(PROMPT_TEMPLATE_NAME, { type: 'chat' });
       const [systemMessage, userMessage] = prompt.compile({
-        EMAIL_TEXT: text,
+        TEXT: text,
       });
+      const config = promptConfig.parse(prompt.config);
 
-      const response = await observeOpenAI(this.llmService.rawClient, {
-        generationName: 'summarize',
-        langfusePrompt: prompt,
-      }).responses.create({
-        model: MODEL,
-        instructions: systemMessage.content,
-        input: userMessage.content,
-      });
-
-      const output = getFirstTextFromResponse(response);
-      if (!output) throw new SummarizationError('No output text found in response');
+      const response = await this.llmService.generateObject(
+        {
+          ...config,
+          messages: [systemMessage, userMessage],
+          schema: translationOutputSchema,
+        },
+        {
+          generationName: 'translate-text',
+          langfusePrompt: prompt,
+        },
+      );
 
       return {
-        summarizedBody: output,
+        translatedText: response.translated_text,
+        wasTranslated: response.was_translated,
+        detectedLanguage: response.detected_language,
       };
     } catch (error) {
       this.logger.error({
-        msg: 'Failed to summarize body',
+        msg: 'Failed to translate text',
         error: serializeError(normalizeError(error)),
       });
-      throw new SummarizationError('Failed to summarize body', error);
+      throw new TranslationError('Failed to translate text', error);
     }
   }
 
@@ -85,10 +102,11 @@ export class LLMSummarizationService implements OnModuleInit {
       labels: ['production', MODEL],
       config: {
         model: MODEL,
-        temperature: 1.0,
+        temperature: 0.3,
         top_p: 1.0,
         max_tokens: 10_000,
       },
     });
   }
 }
+

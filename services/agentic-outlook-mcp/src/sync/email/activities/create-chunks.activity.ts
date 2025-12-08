@@ -11,6 +11,7 @@ export interface CreateChunksPayload {
 }
 
 const CHUNK_SIZE = 3_200;
+const CHUNK_OVERLAP = 400; // ~12.5% overlap, roughly 1-2 sentences
 
 @Injectable()
 @Activities()
@@ -23,7 +24,7 @@ export class CreateChunksActivity implements ICreateChunksActivity {
 
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize: CHUNK_SIZE,
-      chunkOverlap: 0,
+      chunkOverlap: CHUNK_OVERLAP,
     });
 
     const chunks = await splitter.splitText(body);
