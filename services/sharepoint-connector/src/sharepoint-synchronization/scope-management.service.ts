@@ -212,7 +212,7 @@ export class ScopeManagementService {
       /* We have a couple of known directories in sharepoint for which it's more complex to get the id: root scope,
        * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
        */
-      const externalId = pathToExternalIdMap.get(path) ?? scope.name;
+      const externalId = pathToExternalIdMap.get(path) ?? `${context.siteId}/${scope.name}`;
       const prefixedExternalId = `${EXTERNAL_ID_PREFIX}${externalId}`;
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
