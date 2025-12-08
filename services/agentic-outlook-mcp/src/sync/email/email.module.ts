@@ -45,6 +45,7 @@ import { IngestService } from './ingest.service';
         workerOptions: {
           taskQueue: 'default',
           workflowsPath: require.resolve('./temporal/ingest.workflow'),
+          maxConcurrentActivityTaskExecutions: 5,
         },
       }),
       inject: [ConfigService],
