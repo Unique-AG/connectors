@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-beta.5](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.4...sharepoint-connector@v2.0.0-beta.5) (2025-12-08)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** prefix external ids with siteId to obey constraint ([#157](https://github.com/Unique-AG/connectors/issues/157)) ([19d27f0](https://github.com/Unique-AG/connectors/commit/19d27f0962270b8da592bbbaeb54bdf59262ef1b))
+
 ## [2.0.0-beta.4](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.3...sharepoint-connector@v2.0.0-beta.4) (2025-12-08)
 
 
