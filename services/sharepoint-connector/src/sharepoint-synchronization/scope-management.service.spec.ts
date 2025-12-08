@@ -383,7 +383,7 @@ describe('ScopeManagementService', () => {
       );
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', 'spc::site-123/sitePages');
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', 'spc:site-123/sitePages');
     });
 
     it('skips scopes that are ancestors of root path', async () => {

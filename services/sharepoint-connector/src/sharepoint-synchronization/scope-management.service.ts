@@ -193,7 +193,7 @@ export class ScopeManagementService {
     // folders.
     pathToExternalIdMap[context.rootPath] = `${EXTERNAL_ID_PREFIX}root-${Date.now()}`;
     pathToExternalIdMap[`${context.rootPath}/${context.siteName}/SitePages`] =
-      `${EXTERNAL_ID_PREFIX}:${context.siteId}/sitePages`;
+      `${EXTERNAL_ID_PREFIX}${context.siteId}/sitePages`;
 
     for (const [index, scope] of scopes.entries()) {
       if (isNonNullish(scope.externalId)) {
