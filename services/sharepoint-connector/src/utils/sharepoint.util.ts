@@ -3,19 +3,7 @@ import type {
   AnySharepointItem,
   SharepointContentItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-
-export const normalizeSlashes = (value: string): string => {
-  // 1. Remove leading/trailing whitespace
-  let result = value.trim();
-
-  // 2. Remove leading and trailing slashes
-  result = result.replace(/^\/+|\/+$/g, '');
-
-  // 3. Replace multiple consecutive slashes with single slash
-  result = result.replace(/\/+/g, '/');
-
-  return result;
-};
+import { normalizeSlashes } from './paths.util';
 
 /**
  * Gets the web URL for a SharePoint item with ?web=1 parameter.

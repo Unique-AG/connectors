@@ -22,11 +22,8 @@ import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../utils/logging.util';
-import {
-  buildIngestionItemKey,
-  getUniquePathFromItem,
-  normalizeSlashes,
-} from '../utils/sharepoint.util';
+import { isAncestorOfRootPath, normalizeSlashes } from '../utils/paths.util';
+import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -77,7 +74,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     );
 
     const uniqueFoldersToProcess = unique.folders.filter(
-      (folder) => !this.isParentOfRootFolder(folder.path, rootPath),
+      (folder) => !isAncestorOfRootPath(folder.path, rootPath),
     );
 
     this.logger.log(
@@ -150,19 +147,6 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     rootPath: string,
   ): Record<string, SharepointDirectoryItem> {
     return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootPath));
-  }
-
-  private isParentOfRootFolder(path: string, rootPath: string): boolean {
-    // A path is a parent of the root folder if the root path starts with the path
-    // but they are not equal. We need to ensure we're comparing full path segments.
-    // Example: if rootPath is /Top/Middle/IngestionRoot, then /Top and /Top/Middle are parents
-    // but /Top/Middle/IngestionRoot is not a parent (it's the root itself)
-    // and /Top/Middle/IngestionRoot/Folder is not a parent (it's a child)
-    if (path === rootPath) {
-      return false;
-    }
-    // Check if the normalized root path starts with this path followed by a slash
-    return rootPath.startsWith(`${path}/`);
   }
 
   private isTopFolder(path: string, rootPath: string): boolean {
