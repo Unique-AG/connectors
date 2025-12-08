@@ -1,5 +1,5 @@
-import { Module } from "@nestjs/common";
-import { DenseEmbeddingService } from "./dense-embedding.service";
+import { Module } from '@nestjs/common';
+import { DenseEmbeddingService } from './dense-embedding.service';
 
 @Module({
   providers: [DenseEmbeddingService],
