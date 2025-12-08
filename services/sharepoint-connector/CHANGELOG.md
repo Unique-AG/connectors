@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-beta.6](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.5...sharepoint-connector@v2.0.0-beta.6) (2025-12-08)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** Removed hardcoded value from sitePages pre-processing checks ([#161](https://github.com/Unique-AG/connectors/issues/161)) ([0ee6a8b](https://github.com/Unique-AG/connectors/commit/0ee6a8b9c4aa8c88bd5a53319b6dbafb6eeba8ff))
+
 ## [2.0.0-beta.5](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.4...sharepoint-connector@v2.0.0-beta.5) (2025-12-08)
 
 
