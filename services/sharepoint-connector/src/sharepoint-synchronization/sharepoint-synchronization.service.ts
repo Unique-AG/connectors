@@ -82,6 +82,7 @@ export class SharepointSynchronizationService {
         const context: SharepointSyncContext = {
           ...baseContext,
           siteId,
+          siteName: await this.graphApiService.getSiteName(siteId),
         };
 
         const { items, directories } = await this.graphApiService.getAllSiteItems(siteId);

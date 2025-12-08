@@ -10,4 +10,6 @@ export interface BaseSyncContext {
 export interface SharepointSyncContext extends BaseSyncContext {
   // SharePoint Site ID being processed
   siteId: string;
+  // SharePoint Site Name being processed
+  siteName: string;
 }

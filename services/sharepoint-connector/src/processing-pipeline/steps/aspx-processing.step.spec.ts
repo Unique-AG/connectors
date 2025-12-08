@@ -46,6 +46,7 @@ describe('AspxProcessingStep', () => {
       rootScopeId: 'root-scope-1',
       rootPath: '/Root',
       siteId: 'site-1',
+      siteName: 'test-site',
     },
     pipelineItem: {
       itemType: 'listItem' as const,

@@ -98,6 +98,7 @@ describe('ContentFetchingStep', () => {
         rootScopeId: 'root-scope-1',
         rootPath: '/Root',
         siteId: 'site1',
+        siteName: 'test-site',
       },
       pipelineItem: {
         itemType: 'driveItem',

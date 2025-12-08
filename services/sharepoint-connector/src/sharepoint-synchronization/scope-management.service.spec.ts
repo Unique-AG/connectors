@@ -111,6 +111,7 @@ describe('ScopeManagementService', () => {
     rootScopeId: 'root-scope-123',
     rootPath: '/test1',
     siteId: 'site-123',
+    siteName: 'test-site',
   };
 
   let service: ScopeManagementService;

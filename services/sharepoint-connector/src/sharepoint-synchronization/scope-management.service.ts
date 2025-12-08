@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { isNonNullish, prop, pullObject } from 'remeda';
+import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
@@ -11,7 +11,7 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
+import { redact, shouldConcealLogs, smear, smearPath } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
@@ -186,12 +186,14 @@ export class ScopeManagementService {
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<void> {
-    // Build path -> externalId map from directories
-    const pathToExternalIdMap = this.buildPathToExternalIdMap(
-      directories,
-      context.siteId,
-      context.rootPath,
-    );
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
+    const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
+    // We're adding two cases that are special - the root scope that we want to have explicitly
+    // marked as root and site pages that is a special colection we fetch for ASPX pages, but has no
+    // folders.
+    pathToExternalIdMap[context.rootPath] = `${EXTERNAL_ID_PREFIX}root-${Date.now()}`;
+    pathToExternalIdMap[`${context.rootPath}/${context.siteName}/SitePages`] =
+      `${EXTERNAL_ID_PREFIX}:${context.siteId}/sitePages`;
 
     for (const [index, scope] of scopes.entries()) {
       if (isNonNullish(scope.externalId)) {
@@ -203,8 +205,8 @@ export class ScopeManagementService {
       // Skip setting external ID for scopes that are ancestors of the root ingestion folder
       if (isAncestorOfRootPath(path, context.rootPath)) {
         this.logger.debug(
-          `Skipping externalId update for scope ${scope.id} because it is ancestor to the ` +
-            `ingestion root scope`,
+          `${logPrefix} Skipping externalId update for scope ${scope.id} because it is ancestor ` +
+            `to the ingestion root scope`,
         );
         continue;
       }
@@ -212,15 +214,22 @@ export class ScopeManagementService {
       /* We have a couple of known directories in sharepoint for which it's more complex to get the id: root scope,
        * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
        */
-      const externalId = pathToExternalIdMap.get(path) ?? `${context.siteId}/${scope.name}`;
-      const prefixedExternalId = `${EXTERNAL_ID_PREFIX}${externalId}`;
+      const externalId = pathToExternalIdMap[path];
+      if (isNullish(externalId)) {
+        this.logger.warn(
+          `${logPrefix} No external ID found for path ` +
+            `${this.shouldConcealLogs ? smearPath(path) : path}`,
+        );
+        continue;
+      }
+
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           scope.id,
-          prefixedExternalId,
+          externalId,
         );
         scope.externalId = updatedScope.externalId;
-        this.logger.debug(`Updated scope ${scope.id} with externalId: ${prefixedExternalId}`);
+        this.logger.debug(`Updated scope ${scope.id} with externalId: ${externalId}`);
       } catch (error) {
         this.logger.warn({
           msg: `Failed to update externalId for scope ${scope.id}`,
@@ -232,15 +241,24 @@ export class ScopeManagementService {
 
   private buildPathToExternalIdMap(
     directories: SharepointDirectoryItem[],
-    siteId: string,
     rootPath: string,
-  ): Map<string, string> {
-    const pathToExternalIdMap = new Map<string, string>();
+  ): Record<string, string> {
+    const pathToExternalIdMap: Record<string, string> = {};
 
     for (const directory of directories) {
       const path = getUniquePathFromItem(directory, rootPath);
-      const externalId = `${siteId}/${directory.item.id}`;
-      pathToExternalIdMap.set(path, externalId);
+      if (isAncestorOfRootPath(path, rootPath) || path === rootPath) {
+        continue;
+      }
+
+      const pathWithoutRoot = path.substring(rootPath.length);
+      const segments = pathWithoutRoot.split('/').filter(Boolean);
+      pathToExternalIdMap[path] =
+        `${EXTERNAL_ID_PREFIX}folder:${directory.siteId}/${directory.item.id}`;
+      pathToExternalIdMap[`${rootPath}/${segments[0]}`] ??=
+        `${EXTERNAL_ID_PREFIX}site:${directory.siteId}`;
+      pathToExternalIdMap[`${rootPath}/${segments[0]}/${segments[1]}`] ??=
+        `${EXTERNAL_ID_PREFIX}drive:${directory.siteId}/${directory.driveId}`;
     }
 
     return pathToExternalIdMap;
