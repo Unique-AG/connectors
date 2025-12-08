@@ -4,6 +4,7 @@ import type { Scope } from './unique-scopes.types';
 
 export interface GenerateScopesBasedOnPathsMutationInput {
   paths: string[];
+  inheritAccess: boolean;
 }
 
 export type GenerateScopesBasedOnPathsMutationResult = {
@@ -20,8 +21,8 @@ export function getGenerateScopesBasedOnPathsMutation(includePermissions: boolea
     : '';
 
   return gql`
-    mutation GenerateScopesBasedOnPaths($paths: [String!]!) {
-      generateScopesBasedOnPaths(paths: $paths) {
+    mutation GenerateScopesBasedOnPaths($paths: [String!]!, $inheritAccess: Boolean) {
+      generateScopesBasedOnPaths(paths: $paths, inheritAccess: $inheritAccess) {
         id
         name
         parentId

@@ -133,6 +133,19 @@ export class ScopeManagementService {
     });
   }
 
+  private resolveInheritAccess(): boolean {
+    const configuredInheritAccess = this.configService.get('unique.scopeGenerationInheritAccess', {
+      infer: true,
+    });
+
+    if (isNonNullish(configuredInheritAccess)) {
+      return configuredInheritAccess;
+    }
+
+    const syncMode = this.configService.get('processing.syncMode', { infer: true });
+    return syncMode !== 'content_and_permissions';
+  }
+
   public async batchCreateScopes(
     items: SharepointContentItem[],
     directories: SharepointDirectoryItem[],
@@ -153,8 +166,10 @@ export class ScopeManagementService {
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
+    const inheritAccess = this.resolveInheritAccess();
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
+      inheritAccess,
     });
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes`);
 

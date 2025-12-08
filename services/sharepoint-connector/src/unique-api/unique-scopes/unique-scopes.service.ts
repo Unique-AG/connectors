@@ -32,7 +32,10 @@ export class UniqueScopesService {
 
   public async createScopesBasedOnPaths(
     paths: string[],
-    opts: { includePermissions: boolean } = { includePermissions: false },
+    opts: { includePermissions: boolean; inheritAccess: boolean } = {
+      includePermissions: false,
+      inheritAccess: true,
+    },
   ): Promise<Scope[]> {
     this.logger.debug(`Creating scopes based on ${paths.length} paths`);
 
@@ -49,7 +52,7 @@ export class UniqueScopesService {
         const result = await this.scopeManagementClient.request<
           GenerateScopesBasedOnPathsMutationResult,
           GenerateScopesBasedOnPathsMutationInput
-        >(mutation, { paths: batch });
+        >(mutation, { paths: batch, inheritAccess: opts.inheritAccess });
 
         return result.generateScopesBasedOnPaths;
       },

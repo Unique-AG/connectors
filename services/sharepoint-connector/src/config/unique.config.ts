@@ -75,6 +75,12 @@ const baseConfig = z.object({
     .refine((url) => !url.endsWith('/'), {
       message: 'scopeManagementServiceBaseUrl must not end with a trailing slash',
     }),
+  scopeGenerationInheritAccess: z.coerce
+    .boolean()
+    .optional()
+    .describe(
+      'Whether scopes created from generated paths inherit access from their parent scope. If unset, the connector enables inheritance for content_only sync mode and disables it for content_and_permissions.',
+    ),
   apiRateLimitPerMinute: z.coerce
     .number()
     .int()
