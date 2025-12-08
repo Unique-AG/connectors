@@ -24,13 +24,14 @@ import { inArray } from 'drizzle-orm';
 import { MetricService, Span, TraceService } from 'nestjs-otel';
 import { serializeError } from 'serialize-error-cjs';
 import * as z from 'zod';
+import { DenseEmbeddingService } from '../../../dense-embedding/dense-embedding.service';
 import {
   addressToString,
   DRIZZLE,
   type DrizzleDatabase,
   emails as emailsTable,
 } from '../../../drizzle';
-import { LLMService } from '../../../llm/llm.service';
+import { LLMTranslationService } from '../../../llm';
 import { QdrantService } from '../../../qdrant/qdrant.service';
 import { SparseEmbeddingGrpcClient } from '../../../sparse-embedding/sparse-embedding-grpc.client';
 import { addSpanEvent } from '../../../utils/add-span-event';
@@ -86,10 +87,11 @@ export class SemanticSearchEmailsTool {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly qdrantService: QdrantService,
-    private readonly llmService: LLMService,
+    private readonly denseEmbeddingService: DenseEmbeddingService,
     private readonly sparseEmbeddingClient: SparseEmbeddingGrpcClient,
     metricService: MetricService,
     private readonly traceService: TraceService,
+    private readonly llmTranslationService: LLMTranslationService,
   ) {
     this.semanticSearchCounter = metricService.getCounter('semantic_search_total', {
       description: 'Total number of semantic email searches',
@@ -147,14 +149,15 @@ export class SemanticSearchEmailsTool {
     this.incrementSearchCounter();
 
     try {
+      const translatedQuery = await this.llmTranslationService.translate(query);
       const [queryEmbedding, querySparseVector] = await Promise.all([
-        this.generateQueryEmbedding(query),
-        this.generateQuerySparseVector(query),
+        this.generateQueryEmbedding(translatedQuery.translatedText),
+        this.generateQuerySparseVector(translatedQuery.translatedText),
       ]);
 
       if (span) {
         addSpanEvent(span, 'embedding.generated', {
-          query,
+          query: translatedQuery.translatedText,
           userProfileId,
           embeddingSize: queryEmbedding.length,
           sparseVectorSize: querySparseVector.indices.length,
@@ -185,7 +188,7 @@ export class SemanticSearchEmailsTool {
 
       if (span)
         addSpanEvent(span, 'emails.reranked', {
-          query,
+          query: translatedQuery.translatedText,
           userProfileId,
           totalPoints: queryResults.points.length,
           uniqueEmails: rankedEmails.length,
@@ -195,7 +198,8 @@ export class SemanticSearchEmailsTool {
 
       this.logger.debug({
         msg: 'Semantic search completed',
-        query,
+        originalQuery: query,
+        translatedQuery: translatedQuery.translatedText,
         totalPoints: queryResults.points.length,
         uniqueEmails: rankedEmails.length,
         returnedEmails: topEmails.length,
@@ -253,7 +257,8 @@ export class SemanticSearchEmailsTool {
 
       return {
         results: filteredResults,
-        query,
+        originalQuery: query,
+        translatedQuery: translatedQuery.translatedText,
         totalMatches: rankedEmails.length,
         rerankingStrategy,
       };
@@ -272,9 +277,13 @@ export class SemanticSearchEmailsTool {
 
   private async generateQueryEmbedding(query: string): Promise<number[]> {
     try {
-      const embeddings = await this.llmService.contextualizedEmbed([[query]], 'query', {
-        generationName: 'semantic-search-query-embedding',
-      });
+      const embeddings = await this.denseEmbeddingService.embed(
+        [[query]],
+        'Given an email query, retrieve relevant emails that answer the query',
+        {
+          generationName: 'semantic-search-dense-query-embedding',
+        },
+      );
 
       if (!embeddings[0]?.[0]) throw new Error('Failed to generate query embedding');
 

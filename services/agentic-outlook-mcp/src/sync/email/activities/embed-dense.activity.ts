@@ -65,7 +65,7 @@ export class EmbedDenseActivity implements IEmbedDenseActivity {
     chunks: string[],
   ): Promise<PointInput[]> {
     const pointInputs: PointInput[] = [];
-    const documents = [];
+    const documents: string[][] = [];
 
     // We do not prefix or add the subject to the chunks as we have other vectors that will include the subject.
     // We're trying to not duplicate information in the vectors to avoid an overweight.
@@ -114,7 +114,7 @@ export class EmbedDenseActivity implements IEmbedDenseActivity {
       return [];
     }
 
-    const embeddedDocuments = await this.denseEmbeddingService.contextualizedEmbed(documents);
+    const embeddedDocuments = await this.denseEmbeddingService.embed(documents);
     const fullOrSummaryVector = embeddedDocuments[0];
     if (!fullOrSummaryVector || !fullOrSummaryVector[0]) {
       throw new Error('Failed to get full or summary vector');

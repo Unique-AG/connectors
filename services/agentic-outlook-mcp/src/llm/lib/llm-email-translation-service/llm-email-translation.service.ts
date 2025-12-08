@@ -4,14 +4,14 @@ import { LangfuseClient } from '@langfuse/client';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { serializeError } from 'serialize-error-cjs';
 import * as z from 'zod';
-import { LangfusePromptService } from '../../../../llm/langfuse-prompt.service';
-import { LLMService } from '../../../../llm/llm.service';
-import { normalizeError } from '../../../../utils/normalize-error';
+import { normalizeError } from '../../../utils/normalize-error';
+import { LangfusePromptService } from '../../langfuse-prompt.service';
+import { LLMService } from '../../llm.service';
 
 const MODEL = 'openai-gpt-oss-120b';
 const PROMPT_TEMPLATE_NAME = 'email-translation';
 
-export const translationOutputSchema = z.object({
+export const emailTranslationOutputSchema = z.object({
   translated_body: z.string(),
   translated_subject: z.string().nullable(),
 });
@@ -23,12 +23,12 @@ const promptConfig = z.object({
   max_tokens: z.number().int().positive().default(30_000),
 });
 
-export type TranslationOutput = {
+export type EmailTranslationOutput = {
   body: string;
   subject: string | null;
 };
 
-export class TranslationError extends Error {
+export class EmailTranslationError extends Error {
   public constructor(
     message: string,
     public readonly cause?: unknown,
@@ -39,7 +39,7 @@ export class TranslationError extends Error {
 }
 
 @Injectable()
-export class LLMTranslationService implements OnModuleInit {
+export class LLMEmailTranslationService implements OnModuleInit {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
@@ -52,13 +52,13 @@ export class LLMTranslationService implements OnModuleInit {
     await this.ensurePromptTemplates();
   }
 
-  public async translate({
+  public async translateEmail({
     subject,
     body,
   }: {
     subject: string | null;
     body: string;
-  }): Promise<TranslationOutput> {
+  }): Promise<EmailTranslationOutput> {
     try {
       const prompt = await this.langfuse.prompt.get(PROMPT_TEMPLATE_NAME, { type: 'chat' });
       const [systemMessage, userMessage] = prompt.compile({
@@ -71,7 +71,7 @@ export class LLMTranslationService implements OnModuleInit {
         {
           ...config,
           messages: [systemMessage, userMessage],
-          schema: translationOutputSchema,
+          schema: emailTranslationOutputSchema,
         },
         {
           generationName: 'translate',
@@ -88,7 +88,7 @@ export class LLMTranslationService implements OnModuleInit {
         msg: 'Failed to translate text',
         error: serializeError(normalizeError(error)),
       });
-      throw new TranslationError('Failed to translate text', error);
+      throw new EmailTranslationError('Failed to translate text', error);
     }
   }
 

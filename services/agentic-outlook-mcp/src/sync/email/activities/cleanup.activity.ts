@@ -2,7 +2,7 @@ import { Activities, Activity } from '@unique-ag/temporal';
 import { Injectable, Logger } from '@nestjs/common';
 import { Context } from '@temporalio/activity';
 import { Email } from '../../../drizzle';
-import { LLMEmailCleanupService } from '../lib/llm-email-cleanup/llm-email-cleanup.service';
+import { LLMEmailCleanupService } from '../../../llm';
 
 export interface ICleanupActivity {
   cleanupEmail(payload: CleanupPayload): Promise<CleanupResult>;

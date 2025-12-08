@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Context } from '@temporalio/activity';
 import { and, asc, eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDatabase, Email, emails as emailsTable } from '../../../drizzle';
-import { LLMSummarizationService } from '../lib/llm-summarization-service/llm-summarization.service';
+import { LLMSummarizationService } from '../../../llm';
 
 export interface ISummarizeThreadActivity {
   summarizeThread(payload: SummarizeThreadPayload): Promise<SummarizeThreadResult | null>;

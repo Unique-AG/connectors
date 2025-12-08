@@ -1,0 +1,11 @@
+Translate the following text to English. If it is already in English, return it unchanged:
+
+{{TEXT}}
+
+Output:
+{
+  "translated_text": "string",
+  "was_translated": boolean,
+  "detected_language": "string | null"
+}
+

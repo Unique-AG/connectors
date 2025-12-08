@@ -82,7 +82,7 @@ const appSettingsSchema = z.object({
     .describe('A random webhook secret to validate webhooks signed and sent by Microsoft.'),
   LITELLM_API_KEY: z.string().describe('The API key for Litellm.'),
   LITELLM_BASE_URL: z.url().describe('The base URL for Litellm.'),
-  VOYAGE_API_KEY: z.string().describe('The API key for Voyage.'),
+  VOYAGE_API_KEY: z.string().optional().describe('The API key for Voyage.'),
   OTEL_EXPORTER_OTLP_ENDPOINT: z
     .url()
     .describe('The endpoint for the OpenTelemetry OTLP exporter.'),

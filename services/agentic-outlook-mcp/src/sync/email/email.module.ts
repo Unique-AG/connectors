@@ -22,9 +22,6 @@ import { UpdateStatusActivity } from './activities/update-status.activity';
 import { EmailService } from './email.service';
 import { EmailSyncService } from './email-sync.service';
 import { IngestService } from './ingest.service';
-import { LLMEmailCleanupService } from './lib/llm-email-cleanup/llm-email-cleanup.service';
-import { LLMSummarizationService } from './lib/llm-summarization-service/llm-summarization.service';
-import { LLMTranslationService } from './lib/llm-translation-service/llm-translation.service';
 
 @Module({
   imports: [
@@ -66,9 +63,6 @@ import { LLMTranslationService } from './lib/llm-translation-service/llm-transla
     EmbedDenseActivity,
     IndexActivity,
     IngestService,
-    LLMEmailCleanupService,
-    LLMSummarizationService,
-    LLMTranslationService,
     LoadEmailActivity,
     SaveEmailResultsActivity,
     SavePointsActivity,
