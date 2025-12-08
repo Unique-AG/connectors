@@ -322,20 +322,13 @@ describe('ScopeManagementService', () => {
       });
     });
 
-    it('sets externalId using directory item id when directory exists', async () => {
+    it('sets externalId with siteId prefix when falling back to scope name', async () => {
       const scopes = [
         { id: 'scope-1', name: 'TestScope', externalId: null },
         { id: 'scope-2', name: 'AnotherScope', externalId: null },
       ];
       const paths = ['/test1/TestScope', '/test1/AnotherScope'];
-      const directories = [
-        {
-          item: { id: 'dir-1' },
-          siteId: 'site-123',
-          driveId: 'drive-1',
-          folderPath: '/test1/TestScope',
-        } as SharepointDirectoryItem,
-      ];
+      const directories: SharepointDirectoryItem[] = []; // No directories provided
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
       await (service as any).updateNewlyCreatedScopesWithExternalId(
@@ -345,7 +338,7 @@ describe('ScopeManagementService', () => {
         mockContext,
       );
 
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-1', 'spc:site-123/dir-1');
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-1', 'spc:site-123/TestScope');
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-2',
         'spc:site-123/AnotherScope',
@@ -414,7 +407,8 @@ describe('ScopeManagementService', () => {
         mockContext,
       );
 
-      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-1', 'spc:site-123/test1');
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', 'spc:site-123/ChildScope');
     });
 
