@@ -29,7 +29,11 @@ export class DenseEmbeddingService {
     });
   }
 
-  public async embed(input: string[][], instruction?: string, config?: LangfuseConfig): Promise<number[][][]> {
+  public async embed(
+    input: string[][],
+    instruction?: string,
+    config?: LangfuseConfig,
+  ): Promise<number[][][]> {
     const span = startObservation(
       config?.generationName ?? 'Dense-embedding',
       {
@@ -88,7 +92,10 @@ export class DenseEmbeddingService {
 
       const result: number[][][] = [];
       for (const metadata of groupMetadata) {
-        const groupEmbeddings = allEmbeddings.slice(metadata.startIndex, metadata.startIndex + metadata.count);
+        const groupEmbeddings = allEmbeddings.slice(
+          metadata.startIndex,
+          metadata.startIndex + metadata.count,
+        );
         result.push(groupEmbeddings);
       }
 

@@ -13,7 +13,6 @@ export class SyncService {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly eventEmitter: EventEmitter2,
-    
   ) {}
 
   public async syncFolders(userProfileId: TypeID<'user_profile'>) {
