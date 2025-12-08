@@ -30,19 +30,21 @@ import {
   encryptionConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
+  uniqueConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
 import { TranscriptModule } from './transcript/transcript.module';
+import { UniqueModule } from './unique/unique.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
-      load: [amqpConfig, appConfig, authConfig, databaseConfig, encryptionConfig, microsoftConfig],
+      load: [amqpConfig, appConfig, authConfig, databaseConfig, encryptionConfig, microsoftConfig, uniqueConfig],
     }),
     LoggerModule.forRootAsync({
       inject: [appConfig.KEY],
@@ -129,6 +131,7 @@ import { TranscriptModule } from './transcript/transcript.module';
     MsGraphModule,
     AMQPModule,
     TranscriptModule,
+    UniqueModule
   ],
   controllers: [ManifestController],
   providers: [

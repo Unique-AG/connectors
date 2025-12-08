@@ -4,3 +4,4 @@ export * from './auth.config';
 export * from './database.config';
 export * from './encryption.config';
 export * from './microsoft.config';
+export * from './unique.config';
