@@ -65,7 +65,6 @@ export interface ListItem {
   createdBy: { user: SharePointUser };
   fields: {
     '@odata.etag': string;
-    FinanceGPTKnowledge: boolean;
     _ModerationStatus: ModerationStatusValue;
     CanvasContent1?: string; // This is the HTML content of the page for modern pages
     WikiField?: string; // This is the wiki content of the page for classic pages
@@ -134,7 +133,6 @@ export interface DriveItem {
 // Typing built from the response of the MS Graph API
 export interface DriveItemFields {
   '@odata.etag': string;
-  FinanceGPTKnowledge: boolean;
   FileLeafRef: string;
   Modified: string;
   Created: string;

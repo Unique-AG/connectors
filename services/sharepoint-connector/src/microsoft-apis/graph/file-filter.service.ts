@@ -9,9 +9,10 @@ export class FileFilterService {
   public constructor(private readonly configService: ConfigService<Config, true>) {}
 
   public isListItemValidForIngestion(fields: ListItem['fields']) {
+    const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
     return Boolean(
       fields.FileLeafRef?.toLowerCase().endsWith('.aspx') &&
-        fields.FinanceGPTKnowledge === true &&
+        fields[syncColumnName] === true &&
         isModerationStatusApproved(fields._ModerationStatus),
     );
   }
