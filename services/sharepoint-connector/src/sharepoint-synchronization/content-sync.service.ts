@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
+import { length, mapValues } from 'remeda';
 import { Config } from '../config';
 import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
@@ -152,7 +153,74 @@ export class ContentSyncService {
       },
     );
 
-    return await this.uniqueFileIngestionService.performFileDiff(fileDiffItems, siteId);
+    const fileDiffResult = await this.uniqueFileIngestionService.performFileDiff(
+      fileDiffItems,
+      siteId,
+    );
+
+    await this.validateNoAccidentalFullDeletion(fileDiffItems, fileDiffResult, siteId);
+
+    return fileDiffResult;
+  }
+
+  private async validateNoAccidentalFullDeletion(
+    fileDiffItems: FileDiffItem[],
+    fileDiffResult: FileDiffResponse,
+    siteId: string,
+  ): Promise<void> {
+    // If there are no files to be deleted, there's no point in checking further, we will surely not
+    // perform full deletion.
+    if (fileDiffResult.deletedFiles.length === 0) {
+      return;
+    }
+
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
+
+    // If the file diff indicated we should delete all files by having submitted no files to the
+    // diff, it most probably means that we have some kind of bug in fetching the files from
+    // Sharepoint and we should not proceed with the sync to avoid costly re-ingestions. In case
+    // user actually wants to delete all files from a site, they should add one dummy file to the
+    // site and mark it for synchronization.
+    if (fileDiffItems.length === 0) {
+      this.logger.error({
+        msg:
+          `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files as to ` +
+          `be deleted. Aborting sync to prevent accidental full deletion. If you wish to delete ` +
+          `all files, add a dummy file to the site and mark it for synchronization.`,
+        siteId: logSiteId,
+        itemsLength: fileDiffItems.length,
+        fileDiffResultCounts: mapValues(fileDiffResult, length()),
+      });
+      assert.fail(
+        `${logPrefix} We submitted 0 files to the file diff and that would result in all ` +
+          `${fileDiffResult.deletedFiles.length} files being deleted. Aborting sync to prevent ` +
+          `accidental full deletion.`,
+      );
+    }
+
+    // If the file diff indicated we should delete all files even when we submitted some files to
+    // diff, it most probably means that we have some kind of bug in file diff or something
+    // unexpected changed in the logic. We should not proceed with the sync to avoid costly
+    // re-ingestions. If user actually deleted all the files from the site and uploaded new ones,
+    // they should recursively delete the site data from Unique first via GraphQL API.
+    const totalFilesForSiteInUnique = await this.uniqueFilesService.getFilesCountForSite(siteId);
+    if (fileDiffResult.deletedFiles.length === totalFilesForSiteInUnique) {
+      this.logger.error({
+        msg:
+          `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files ` +
+          `stored in Unique as to be deleted. Aborting sync to prevent accidental full deletion. ` +
+          `If you wish to delete all files, add a dummy file to the site and mark it for ` +
+          `synchronization.`,
+        siteId: logSiteId,
+        totalFilesForSiteInUnique,
+        fileDiffResultCounts: mapValues(fileDiffResult, length()),
+      });
+      assert.fail(
+        `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files stored ` +
+          `in Unique as to be deleted. Aborting sync to prevent accidental full deletion.`,
+      );
+    }
   }
 
   private async deleteRemovedFiles(siteId: string, deletedFileKeys: string[]): Promise<void> {
