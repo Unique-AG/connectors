@@ -103,11 +103,11 @@ const baseConfig = z.object({
     ),
 });
 
-const UniqueConfig = z
+export const UniqueConfigSchema = z
   .discriminatedUnion('serviceAuthMode', [clusterLocalConfig, externalConfig])
   .and(baseConfig);
 
-export const uniqueConfig = registerConfig('unique', UniqueConfig, {
+export const uniqueConfig = registerConfig('unique', UniqueConfigSchema, {
   whitelistKeys: new Set([
     'ZITADEL_OAUTH_TOKEN_URL',
     'ZITADEL_PROJECT_ID',

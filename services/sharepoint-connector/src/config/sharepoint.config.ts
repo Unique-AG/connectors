@@ -70,11 +70,16 @@ const baseConfig = z.object({
     .prefault('')
     .transform((val) =>
       val
-        ? val
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [],
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean),
+    )
+    .pipe(
+      z.array(
+        z.uuidv4({
+          message: 'Each site ID must be a valid UUIDv4',
+        }),
+      ),
     )
     .describe('Comma-separated list of SharePoint site IDs to scan'),
   syncColumnName: z
@@ -83,7 +88,7 @@ const baseConfig = z.object({
     .describe('Name of the SharePoint column indicating sync flag'),
 });
 
-const SharepointConfig = z
+export const SharepointConfigSchema = z
   .discriminatedUnion('authMode', [
     oidcAuthModeConfig,
     clientSecretAuthModeConfig,
@@ -91,7 +96,7 @@ const SharepointConfig = z
   ])
   .and(baseConfig);
 
-export const sharepointConfig = registerConfig('sharepoint', SharepointConfig);
+export const sharepointConfig = registerConfig('sharepoint', SharepointConfigSchema);
 
 export type SharepointConfigNamespaced = NamespacedConfigType<typeof sharepointConfig>;
 export type SharepointConfig = ConfigType<typeof sharepointConfig>;
