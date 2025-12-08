@@ -93,6 +93,7 @@ describe('SharepointSynchronizationService', () => {
   beforeEach(async () => {
     mockGraphApiService = {
       getAllSiteItems: vi.fn().mockResolvedValue({ items: [mockFile], directories: [] }),
+      getSiteName: vi.fn().mockResolvedValue('test-site-name'),
     };
 
     mockContentSyncService = {
@@ -105,8 +106,9 @@ describe('SharepointSynchronizationService', () => {
 
     mockScopeManagementService = {
       initializeRootScope: vi.fn().mockResolvedValue({
-        scopeId: 'test-scope-id',
-        ingestionMode: IngestionMode.Flat,
+        serviceUserId: 'user-123',
+        rootScopeId: 'test-scope-id',
+        rootPath: '/test-root',
       }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
     };
@@ -154,8 +156,8 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-        scopeId: 'test-scope-id',
-        ingestionMode: IngestionMode.Flat,
+        rootScopeId: 'test-scope-id',
+        siteName: 'test-site-name',
       }),
     );
   });
@@ -168,8 +170,8 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-        scopeId: 'test-scope-id',
-        ingestionMode: IngestionMode.Flat,
+        rootScopeId: 'test-scope-id',
+        siteName: 'test-site-name',
       }),
     );
   });
@@ -267,8 +269,8 @@ describe('SharepointSynchronizationService', () => {
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
       context: expect.objectContaining({
         siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-        scopeId: 'test-scope-id',
-        ingestionMode: IngestionMode.Flat,
+        rootScopeId: 'test-scope-id',
+        siteName: 'test-site-name',
       }),
       sharePoint: { items: [mockFile], directories: [] },
       unique: { folders: null },

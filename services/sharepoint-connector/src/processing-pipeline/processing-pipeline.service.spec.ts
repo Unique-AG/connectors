@@ -152,6 +152,7 @@ describe('ProcessingPipelineService', () => {
     rootScopeId: 'root-scope-1',
     rootPath: '/Root',
     siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+    siteName: 'test-site',
   };
 
   it('processes file through all pipeline steps successfully', async () => {

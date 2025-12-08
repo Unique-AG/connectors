@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import type { Config } from '../config';
+import { normalizeSlashes } from './paths.util';
 
 export function smear(text: string | null | undefined, leaveOver = 4) {
   if (text === undefined || text === null) {
@@ -13,6 +14,19 @@ export function smear(text: string | null | undefined, leaveOver = 4) {
   const end = text.substring(text.length - leaveOver, text.length);
   const toSmear = text.substring(0, text.length - leaveOver);
   return `${toSmear.replaceAll(/[a-zA-Z0-9_]/g, '*')}${end}`;
+}
+
+export function smearPath(path: string | null | undefined, leaveOver = 4): string {
+  if (path === undefined || path === null) {
+    return '__erroneous__';
+  }
+  const normalizedPath = normalizeSlashes(path);
+  const smearedNormalizedPath = normalizedPath
+    .split('/')
+    .map((segment) => smear(segment, leaveOver))
+    .join('/');
+
+  return `/${smearedNormalizedPath}`;
 }
 
 export function redact(text: string | null | undefined, ends = 2): string {

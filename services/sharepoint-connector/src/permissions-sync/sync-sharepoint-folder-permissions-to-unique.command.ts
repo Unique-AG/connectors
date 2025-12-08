@@ -302,10 +302,12 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
       ({ entityType, entityId }) => !(entityType === 'USER' && entityId === unique.serviceUserId),
     );
 
-    this.logger.debug(
-      `${logPrefix} Adding ${scopeAccessesToAdd.length} and removing ` +
-        `${scopeAccessesToRemove.length} scope accesses`,
-    );
+    if (scopeAccessesToAdd.length > 0 || scopeAccessesToRemove.length > 0) {
+      this.logger.debug(
+        `${logPrefix} Adding ${scopeAccessesToAdd.length} and removing ` +
+          `${scopeAccessesToRemove.length} scope accesses`,
+      );
+    }
     if (scopeAccessesToAdd.length > 0) {
       await this.uniqueScopesService.createScopeAccesses(unique.folder.id, scopeAccessesToAdd);
     }

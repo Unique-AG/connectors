@@ -49,6 +49,7 @@ describe('ContentRegistrationStep', () => {
       rootScopeId: 'root-scope-1',
       rootPath: '/Root',
       siteId: 'site',
+      siteName: 'test-site',
     },
     pipelineItem: {
       itemType: 'listItem',

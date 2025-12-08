@@ -112,6 +112,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -151,6 +152,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -191,6 +193,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -231,6 +234,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -280,6 +284,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -336,6 +341,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -383,6 +389,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -431,6 +438,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -479,6 +487,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -506,6 +515,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -540,6 +550,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -575,6 +586,7 @@ describe('ContentSyncService', () => {
         rootScopeId: 'scope-id',
         rootPath: '/root',
         siteId,
+        siteName: 'test-site',
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
