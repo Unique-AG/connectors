@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
 import { HttpClientService } from '../../shared/services/http-client.service';
+import { UniqueFilesService } from '../../unique-api/unique-files/unique-files.service';
 import { redact, shouldConcealLogs, smear } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
 import type { ProcessingContext } from '../types/processing-context';
@@ -19,6 +20,7 @@ export class StorageUploadStep implements IPipelineStep {
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly httpClientService: HttpClientService,
+    private readonly uniqueFilesService: UniqueFilesService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -33,6 +35,7 @@ export class StorageUploadStep implements IPipelineStep {
 
     try {
       await this.performUpload(context);
+      context.uploadSucceeded = true;
       const _stepDuration = Date.now() - stepStartTime;
 
       return context;
@@ -52,7 +55,26 @@ export class StorageUploadStep implements IPipelineStep {
   }
 
   public async cleanup(context: ProcessingContext): Promise<void> {
-    const logPrefix = `[CorrelationId: ${context.correlationId}]`;
+    const logPrefix = `[CorrelationId: ${context.correlationId}, SiteId: ${this.shouldConcealLogs ? smear(context.pipelineItem.siteId) : context.pipelineItem.siteId}]`;
+
+    if (!context.uploadSucceeded && context.uniqueContentId) {
+      try {
+        await this.uniqueFilesService.deleteFile(context.uniqueContentId);
+        this.logger.warn({
+          msg: `${logPrefix} Removed registered content after failed upload`,
+          correlationId: context.correlationId,
+          contentId: context.uniqueContentId,
+        });
+      } catch (error) {
+        this.logger.error({
+          msg: `${logPrefix} Failed to delete registered content after upload failure`,
+          correlationId: context.correlationId,
+          contentId: context.uniqueContentId,
+          error: sanitizeError(error),
+        });
+      }
+    }
+
     if (context.contentBuffer) {
       context.contentBuffer = undefined;
       delete context.contentBuffer;
