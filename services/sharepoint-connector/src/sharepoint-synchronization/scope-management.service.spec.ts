@@ -323,7 +323,7 @@ describe('ScopeManagementService', () => {
       });
     });
 
-    it('sets externalId with siteId prefix when falling back to scope name', async () => {
+    it('logs warning when no externalId found for path', async () => {
       const scopes = [
         { id: 'scope-1', name: 'TestScope', externalId: null },
         { id: 'scope-2', name: 'AnotherScope', externalId: null },
@@ -339,43 +339,17 @@ describe('ScopeManagementService', () => {
         mockContext,
       );
 
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-1', 'spc:site-123/TestScope');
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-2',
-        'spc:site-123/AnotherScope',
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.stringContaining('No external ID found for path'),
       );
     });
 
-    it('sets externalId using siteId/scopeName when no directory exists', async () => {
-      const scopes = [
-        { id: 'scope-1', name: 'TestScope', externalId: null },
-        { id: 'scope-2', name: 'AnotherScope', externalId: null },
-      ];
-      const paths = ['/test1/TestScope', '/test1/AnotherScope'];
+    it('sets externalId for root path when no directories provided', async () => {
+      const scopes = [{ id: 'scope-1', name: 'test1', externalId: null }];
+      const paths = ['/test1'];
       const directories: SharepointDirectoryItem[] = []; // No directories provided
-
-      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
-      await (service as any).updateNewlyCreatedScopesWithExternalId(
-        scopes,
-        paths,
-        directories,
-        mockContext,
-      );
-
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-1', 'spc:site-123/TestScope');
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-2',
-        'spc:site-123/AnotherScope',
-      );
-    });
-
-    it('skips scopes that already have externalId', async () => {
-      const scopes = [
-        { id: 'scope-1', name: 'TestScope', externalId: 'existing-external-id' },
-        { id: 'scope-2', name: 'AnotherScope', externalId: null },
-      ];
-      const paths = ['/test1/TestScope', '/test1/AnotherScope'];
-      const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
       await (service as any).updateNewlyCreatedScopesWithExternalId(
@@ -387,14 +361,34 @@ describe('ScopeManagementService', () => {
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-2',
-        'spc:site-123/AnotherScope',
+        'scope-1',
+        expect.stringMatching(/^spc:root-/),
       );
+    });
+
+    it('skips scopes that already have externalId', async () => {
+      const scopes = [
+        { id: 'scope-1', name: 'test1', externalId: 'existing-external-id' },
+        { id: 'scope-2', name: 'SitePages', externalId: null },
+      ];
+      const paths = ['/test1', '/test1/test-site/SitePages'];
+      const directories: SharepointDirectoryItem[] = [];
+
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).updateNewlyCreatedScopesWithExternalId(
+        scopes,
+        paths,
+        directories,
+        mockContext,
+      );
+
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', 'spc::site-123/sitePages');
     });
 
     it('skips scopes that are ancestors of root path', async () => {
       const scopes = [
-        { id: 'scope-1', name: 'test1', externalId: null }, // This is ancestor of root path /test1
+        { id: 'scope-1', name: 'test1', externalId: null }, // This is the root path itself
         { id: 'scope-2', name: 'ChildScope', externalId: null },
       ];
       const paths = ['/test1', '/test1/ChildScope'];
@@ -408,14 +402,21 @@ describe('ScopeManagementService', () => {
         mockContext,
       );
 
-      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-1', 'spc:site-123/test1');
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', 'spc:site-123/ChildScope');
+      // Root path gets externalId (special case), ChildScope doesn't exist in map so gets warning
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+        'scope-1',
+        expect.stringMatching(/^spc:root-/),
+      );
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.stringContaining('No external ID found for path /test1/ChildScope'),
+      );
     });
 
     it('logs debug message when updating externalId', async () => {
-      const scopes = [{ id: 'scope-1', name: 'TestScope', externalId: null }];
-      const paths = ['/test1/TestScope'];
+      const scopes = [{ id: 'scope-1', name: 'test1', externalId: null }];
+      const paths = ['/test1'];
       const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
@@ -428,14 +429,14 @@ describe('ScopeManagementService', () => {
 
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
-        'Updated scope scope-1 with externalId: spc:site-123/TestScope',
+        expect.stringMatching(/^Updated scope scope-1 with externalId: spc:root-/),
       );
     });
 
     it('logs warning when externalId update fails', async () => {
       updateScopeExternalIdMock.mockRejectedValue(new Error('Update failed'));
-      const scopes = [{ id: 'scope-1', name: 'TestScope', externalId: null }];
-      const paths = ['/test1/TestScope'];
+      const scopes = [{ id: 'scope-1', name: 'test1', externalId: null }];
+      const paths = ['/test1'];
       const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
