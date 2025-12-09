@@ -36,7 +36,9 @@ export class UniqueService {
     // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
     const formattedDate = happenedAt.toISOString().split('T').at(0)!;
     // TODO: remove any non-alpha numeric characters from subject
-    return recurring ? `/${rootScopePath}/${subject}/${formattedDate}` : `/${rootScopePath}/${subject} - ${formattedDate}`;
+    return recurring
+      ? `/${rootScopePath}/${subject}/${formattedDate}`
+      : `/${rootScopePath}/${subject} - ${formattedDate}`;
   }
 
   private async fetchUserForScopeAccess(email: string): Promise<PublicUserResult | null> {
@@ -45,7 +47,7 @@ export class UniqueService {
     // Build query params from payload
     const params = new URLSearchParams();
     Object.entries(payload).forEach(([key, value]) => {
-        params.append(key, String(value));
+      params.append(key, String(value));
     });
 
     // Append to endpoint
@@ -54,7 +56,10 @@ export class UniqueService {
       endpoint.search = qs;
     }
 
-    this.logger.debug({ qs, endpoint }, 'calling')
+    this.logger.debug(
+      { endpoint: endpoint.origin + endpoint.pathname },
+      'Fetching user from Unique API',
+    );
 
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -68,20 +73,32 @@ export class UniqueService {
     });
 
     if (!response.ok) {
-      this.logger.error({ status: response.status, body: await response.text() }, 'Unique Public API return an error');
+      this.logger.error(
+        { status: response.status, endpoint: endpoint.origin + endpoint.pathname },
+        'Unique Public API returned an error for user fetch',
+      );
       throw new Error('Unique Public API return an error ');
     }
     const body = await response.json();
     const result = PublicUsersResultSchema.parse(body);
 
-    return result.users.at(0) ?? null;
+    const userFound = result.users.at(0) ?? null;
+    this.logger.debug(
+      { found: !!userFound, userCount: result.users.length },
+      'User fetch completed',
+    );
+
+    return userFound;
   }
 
   private async createScope(path: string): Promise<Scope> {
     const payload = PublicCreateScopeRequestSchema.encode({ paths: [path] });
     const endpoint = new URL('folder', this.config.get('unique.apiBaseUrl', { infer: true }));
 
-    this.logger.debug({ payload, endpoint: endpoint.toString() }, 'calling create scope ')
+    this.logger.debug(
+      { endpoint: endpoint.href, pathCount: payload.paths.length },
+      'Creating scope',
+    );
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -97,18 +114,27 @@ export class UniqueService {
     });
 
     if (!response.ok) {
-      this.logger.error({ status: response.status, body: await response.text() }, 'Unique Public API return an error');
+      this.logger.error(
+        { status: response.status, endpoint: endpoint.href },
+        'Unique Public API returned an error for scope creation',
+      );
       throw new Error('Unique Public API return an error');
     }
     const body = await response.json();
-    this.logger.debug({ body }, 'scopes created');
     const result = PublicCreateScopeResultSchema.refine(
       (s) => s.createdFolders.length > 0,
       'no scopes were created',
     ).parse(body);
 
     // biome-ignore lint/style/noNonNullAssertion: we assert with zod above
-    return result.createdFolders[0]!;
+    const createdScope = result.createdFolders[0]!;
+    this.logger.log(
+      { scopeId: createdScope.id, foldersCreated: result.createdFolders.length },
+      'Scope created successfully',
+    );
+    this.logger.debug({ createdFolders: result.createdFolders }, 'Scope creation details');
+
+    return createdScope;
   }
 
   private async addScopeAccesses(
@@ -124,6 +150,12 @@ export class UniqueService {
       'folder/add-access',
       this.config.get('unique.apiBaseUrl', { infer: true }),
     );
+
+    this.logger.debug(
+      { endpoint: endpoint.href, scopeId: scope, accessCount: accesses.length },
+      'Adding scope accesses',
+    );
+
     const response = await fetch(endpoint, {
       method: 'PATCH',
       headers: {
@@ -138,11 +170,19 @@ export class UniqueService {
     });
 
     if (!response.ok) {
-      this.logger.error({ status: response.status, body: await response.text() }, 'Unique Public API return an error');
+      this.logger.error(
+        { status: response.status, endpoint: endpoint.href, scopeId: scope },
+        'Unique Public API returned an error for adding scope accesses',
+      );
       throw new Error('Unique Public API return an error');
     }
     const body = await response.json();
     const result = PublicAddScopeAccessResultSchema.parse(body);
+
+    this.logger.log(
+      { scopeId: scope, accessesAdded: accesses.length },
+      'Scope accesses added successfully',
+    );
 
     return result;
   }
@@ -155,6 +195,19 @@ export class UniqueService {
       'content/upsert',
       this.config.get('unique.apiBaseUrl', { infer: true }),
     );
+
+    this.logger.debug(
+      {
+        endpoint: endpoint.href,
+        scopeId: content.scopeId,
+        contentKey: content.input.key,
+        mimeType: content.input.mimeType,
+        storeInternally: content.storeInternally,
+        hasFileUrl: !!content.fileUrl,
+      },
+      'Upserting content',
+    );
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -169,12 +222,30 @@ export class UniqueService {
     });
 
     if (!response.ok) {
-      this.logger.error({ status: response.status, body: await response.text() }, 'Unique Public API return an error');
+      this.logger.error(
+        {
+          status: response.status,
+          endpoint: endpoint.href,
+          scopeId: content.scopeId,
+          contentKey: content.input.key,
+        },
+        'Unique Public API returned an error for content upsert',
+      );
       throw new Error('Unique Public API return an error');
     }
     const body = await response.json();
-    this.logger.debug({ body }, 'upsert content')
     const result = PublicContentUpsertResultSchema.parse(body);
+
+    this.logger.log(
+      {
+        scopeId: content.scopeId,
+        contentKey: content.input.key,
+        mimeType: content.input.mimeType,
+        hasWriteUrl: !!result.writeUrl,
+        hasReadUrl: !!result.readUrl,
+      },
+      'Content upserted successfully',
+    );
 
     return result;
   }
@@ -183,6 +254,12 @@ export class UniqueService {
     writeUrl: string,
     content: ReadableStream<Uint8Array<ArrayBuffer>>,
   ): Promise<void> {
+    // Extract only the storage account hostname for logging (no query params or paths with sensitive data)
+    const urlObj = new URL(writeUrl);
+    const storageEndpoint = `${urlObj.protocol}//${urlObj.hostname}`;
+
+    this.logger.debug({ storageEndpoint }, 'Uploading content to storage');
+
     const response = await fetch(writeUrl, {
       method: 'PUT',
       headers: {
@@ -191,13 +268,18 @@ export class UniqueService {
       },
       body: content,
       // @ts-expect-error: this is nodejs fetch
-      duplex: 'half'
+      duplex: 'half',
     });
 
     if (!response.ok) {
-      this.logger.error({ status: response.status, body: await response.text() }, 'Unique Public API storage return an error');
+      this.logger.error(
+        { status: response.status, storageEndpoint },
+        'Unique Public API storage returned an error',
+      );
       throw new Error('Unique Public API storage return an error');
     }
+
+    this.logger.debug({ storageEndpoint }, 'Content uploaded to storage successfully');
   }
 
   public async onTranscript(
@@ -211,6 +293,16 @@ export class UniqueService {
     transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
     recording?: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
   ): Promise<void> {
+    this.logger.log(
+      {
+        transcriptId: transcript.id,
+        recordingId: recording?.id,
+        participantCount: meeting.participants.length,
+        meetingDate: meeting.startDateTime.toISOString(),
+      },
+      'Processing meeting transcript',
+    );
+
     const participantsPromises = meeting.participants.map((p) =>
       this.fetchUserForScopeAccess(p.email),
     );
@@ -218,12 +310,19 @@ export class UniqueService {
     const owner = await this.fetchUserForScopeAccess(meeting.owner.email);
 
     if (!owner) {
-      this.logger.warn({}, "owner of the meeting couldn't be found");
+      this.logger.warn(
+        { participantCount: meeting.participants.length },
+        "Owner of the meeting couldn't be found in Unique",
+      );
       return;
     }
 
+    this.logger.debug(
+      { foundParticipants: participants.length, totalParticipants: meeting.participants.length },
+      'Participants resolved',
+    );
+
     const path = this.mapMeetingToScope(meeting.subject, meeting.startDateTime);
-    this.logger.debug({path}, 'scope')
     const scope = await this.createScope(path);
 
     // REVIEW: verify that organizer is also in the participants lists for a READ access
@@ -238,6 +337,8 @@ export class UniqueService {
       type: ScopeAccessType.Write,
     });
     await this.addScopeAccesses(scope.id, accesses);
+
+    this.logger.log({ transcriptId: transcript.id, scopeId: scope.id }, 'Uploading transcript');
 
     const transcriptUpload = await this.upsertContent({
       storeInternally: true,
@@ -266,12 +367,14 @@ export class UniqueService {
     });
 
     if (recording) {
+      this.logger.log({ recordingId: recording.id, scopeId: scope.id }, 'Uploading recording');
+
       const recordingUpload = await this.upsertContent({
         storeInternally: true,
         scopeId: scope.id,
         input: {
           key: recording.id,
-          mimeType: 'text/vtt',
+          mimeType: 'video/mp4',
           title: meeting.subject,
           byteSize: 1,
           metadata: {
@@ -284,6 +387,25 @@ export class UniqueService {
         },
       });
       await this.uploadToStorage(recordingUpload.writeUrl, recording.content);
+      await this.upsertContent({
+        storeInternally: true,
+        scopeId: scope.id,
+        fileUrl: recordingUpload.readUrl,
+        input: {
+          key: transcript.id,
+          mimeType: 'video/mp4',
+          title: meeting.subject,
+        },
+      });
     }
+
+    this.logger.log(
+      {
+        transcriptId: transcript.id,
+        recordingId: recording?.id,
+        scopeId: scope.id,
+      },
+      'Meeting transcript processing completed',
+    );
   }
 }
