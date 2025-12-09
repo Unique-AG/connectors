@@ -1,4 +1,4 @@
-name: Release-Please
+name: "Release, Please 🤖"
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   release-please:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       issues: write
@@ -22,13 +22,19 @@ jobs:
       "services/sharepoint-connector--version": ${{ steps.release.outputs['services/sharepoint-connector--version'] }}
 
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
         id: release
 
       - name: Debug release outputs
-        continue-on-error: true
+        continue-on-error: true # even if the nice printout fails, we want to continue
+        env:
+          RELEASE_OUTPUTS: ${{ toJson(steps.release.outputs) }}
         run: |
-          echo "Release outputs: ${{ toJson(steps.release.outputs) }}"
+          echo "$RELEASE_OUTPUTS" | jq
+          echo '## Release Please Outputs' >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo "$RELEASE_OUTPUTS" | jq . >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
   release-factset-mcp:
     needs: release-please
