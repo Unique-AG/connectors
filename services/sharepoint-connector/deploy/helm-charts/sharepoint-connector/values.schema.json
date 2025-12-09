@@ -516,7 +516,7 @@
             },
             "maxFilesToScan": {
               "type": "integer",
-              "description": "Maximum number of files to scan"
+              "description": "Maximum number of files and items to scan"
             },
             "maxFileSizeBytes": {
               "type": [
