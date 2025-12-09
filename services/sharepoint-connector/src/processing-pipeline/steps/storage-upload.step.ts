@@ -55,7 +55,7 @@ export class StorageUploadStep implements IPipelineStep {
   }
 
   public async cleanup(context: ProcessingContext): Promise<void> {
-    const logPrefix = `[CorrelationId: ${context.correlationId}, SiteId: ${this.shouldConcealLogs ? smear(context.pipelineItem.siteId) : context.pipelineItem.siteId}]`;
+    const logPrefix = `[CorrelationId: ${context.correlationId}, Site: ${this.shouldConcealLogs ? smear(context.pipelineItem.siteId) : context.pipelineItem.siteId}]`;
 
     if (!context.uploadSucceeded && context.uniqueContentId) {
       try {
