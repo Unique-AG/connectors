@@ -22,7 +22,7 @@ spec:
         - alert: SharepointConnectorSyncFailures
           annotations:
             summary: "SharePoint Connector sync failures detected"
-            description: "The SharePoint Connector is experiencing sync failures. Sync type: {{ "{{ $labels.sync_type }}" }}."
+            description: "The SharePoint Connector is experiencing sync failures. Current failure rate: {{ "{{ $value | humanizePercentage }}" }}."
             runbook: |
               1. Inspect application logs for specific error messages
               2. Check the failure_step label to identify where the sync failed
@@ -30,7 +30,11 @@ spec:
               4. Check for rate limiting or throttling issues
               5. Check for recent changes to the deployment as well as its underlying infrastructure
           expr: |
-            spc_sync_duration_seconds_count{result="failure"} > {{ dig "SharepointConnectorSyncFailures" "threshold" 0.01 (.Values.alerts.defaultAlerts.syncs.customRules | default dict) }}
+            (
+              sum(rate(spc_sync_duration_seconds_count{result="failure"}[5m]))
+              /
+              sum(rate(spc_sync_duration_seconds_count[5m]))
+            ) > {{ dig "SharepointConnectorSyncFailures" "threshold" 0.01 (.Values.alerts.defaultAlerts.syncs.customRules | default dict) }}
           for: {{ dig "SharepointConnectorSyncFailures" "for" "30s" (.Values.alerts.defaultAlerts.syncs.customRules | default dict) }}
           labels:
             severity: {{ dig "SharepointConnectorSyncFailures" "severity" "warning" (.Values.alerts.defaultAlerts.syncs.customRules | default dict) }}
