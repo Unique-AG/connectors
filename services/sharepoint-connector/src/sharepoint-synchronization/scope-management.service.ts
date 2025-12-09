@@ -138,8 +138,11 @@ export class ScopeManagementService {
       infer: true,
     });
 
-    if (isNonNullish(configuredInheritAccess)) {
-      return configuredInheritAccess;
+    if (configuredInheritAccess === 'inherit') {
+      return true;
+    }
+    if (configuredInheritAccess === 'do_not_inherit') {
+      return false;
     }
 
     const syncMode = this.configService.get('processing.syncMode', { infer: true });

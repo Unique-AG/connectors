@@ -362,10 +362,15 @@
             },
             "scopeGenerationInheritAccess": {
               "type": [
-                "boolean",
+                "string",
                 "null"
               ],
-              "description": "Whether scopes generated from paths inherit access from their parent scope. If unset, inheritance is enabled for content_only sync mode and disabled for content_and_permissions."
+              "enum": [
+                "inherit",
+                "do_not_inherit",
+                null
+              ],
+              "description": "Whether scopes generated from paths inherit access from their parent scope. Allowed values: inherit, do_not_inherit. If unset, inheritance is enabled for content_only sync mode and disabled for content_and_permissions."
             },
             "ingestionMode": {
               "type": "string",

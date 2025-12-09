@@ -134,12 +134,8 @@ describe('ScopeManagementService', () => {
 
     configServiceMock = {
       get: vi.fn((key: string) => {
-        if (key === 'processing.syncMode') {
-          return 'content_only';
-        }
-        if (key === 'unique.scopeGenerationInheritAccess') {
-          return undefined;
-        }
+        if (key === 'processing.syncMode') return 'content_only';
+        if (key === 'unique.scopeGenerationInheritAccess') return undefined;
         if (key === 'app.logsDiagnosticsDataPolicy') {
           return 'conceal';
         }
@@ -255,15 +251,9 @@ describe('ScopeManagementService', () => {
 
     it('disables inheritance when permission sync mode is enabled', async () => {
       configServiceMock.get.mockImplementation((key: string) => {
-        if (key === 'processing.syncMode') {
-          return 'content_and_permissions';
-        }
-        if (key === 'unique.scopeGenerationInheritAccess') {
-          return undefined;
-        }
-        if (key === 'app.logsDiagnosticsDataPolicy') {
-          return 'conceal';
-        }
+        if (key === 'processing.syncMode') return 'content_and_permissions';
+        if (key === 'unique.scopeGenerationInheritAccess') return undefined;
+        if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
         return undefined;
       });
 
@@ -282,15 +272,9 @@ describe('ScopeManagementService', () => {
 
     it('uses explicit inheritAccess configuration when provided', async () => {
       configServiceMock.get.mockImplementation((key: string) => {
-        if (key === 'unique.scopeGenerationInheritAccess') {
-          return true;
-        }
-        if (key === 'processing.syncMode') {
-          return 'content_and_permissions';
-        }
-        if (key === 'app.logsDiagnosticsDataPolicy') {
-          return 'conceal';
-        }
+        if (key === 'unique.scopeGenerationInheritAccess') return 'inherit';
+        if (key === 'processing.syncMode') return 'content_and_permissions';
+        if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
         return undefined;
       });
 
@@ -378,15 +362,9 @@ describe('ScopeManagementService', () => {
 
       const configService = {
         get: vi.fn((key: string) => {
-          if (key === 'processing.syncMode') {
-            return 'content_only';
-          }
-          if (key === 'unique.scopeGenerationInheritAccess') {
-            return undefined;
-          }
-          if (key === 'app.logsDiagnosticsDataPolicy') {
-            return 'conceal';
-          }
+          if (key === 'processing.syncMode') return 'content_only';
+          if (key === 'unique.scopeGenerationInheritAccess') return undefined;
+          if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
           return undefined;
         }),
       };

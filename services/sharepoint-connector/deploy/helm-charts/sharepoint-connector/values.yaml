@@ -169,6 +169,7 @@ connectorConfig:
     # example: http://node-scope-management.finance-gpt:8094
     scopeManagementServiceBaseUrl: unset_default_value
     # -- Whether generated scopes inherit access from their parent.
+    # Allowed values: inherit, do_not_inherit.
     # When unset, inheritance is enabled for content_only sync mode and disabled for content_and_permissions.
     scopeGenerationInheritAccess: null
     # -- ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy (path-based ingestion)
