@@ -104,13 +104,7 @@ pnpm check-types
 
 ### Release
 
-```bash
-# Bump version and create release
-./version-bump.sh <service-name> <new-version>
-
-# Example:
-./version-bump.sh outlook-mcp 0.0.3
-```
+Releases are handled by [release-please](https://github.com/googleapis/release-please).
 
 ## Project Structure
 
@@ -124,13 +118,6 @@ Shared packages used across services:
 - **[mcp-oauth](./packages/mcp-oauth/README.md)** - OAuth 2.1 Authorization Code + PKCE flow for MCP servers
 - **[mcp-server-module](./packages/mcp-server-module/README.md)** - NestJS module for creating MCP servers
 - **[probe](./packages/probe/)** - Health check and monitoring utilities
-
-### Services
-
-MCP server implementations:
-
-- **[factset-mcp](./services/factset-mcp/README.md)** - FactSet financial data MCP server
-- **[outlook-mcp](./services/outlook-mcp/README.md)** - Microsoft Outlook MCP server
 
 ## Contributing
 

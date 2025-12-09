@@ -19,21 +19,26 @@ on:
 jobs:
   # Build and push container to registry
   containerize:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
     permissions:
       packages: write
+      id-token: write
+    environment: uniquecr-github-oidc
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
-      CHART_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}
+      GHCR_REGISTRY: ghcr.io
+      GHCR_REPO: unique-ag/connectors/services/${{ inputs.service-name }}
+      UNIQUECR_REGISTRY: uniquecr.azurecr.io
+      UNIQUECR_REPO: connectors/services/${{ inputs.service-name }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           fetch-depth: 2
 
       - name: Setup docker buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
       # TODO: remove me and let `corepack` do its job to use and setup the correct package manager in the dockerfile
       - name: Extract PNPM version for build
@@ -44,34 +49,69 @@ jobs:
 
       - name: Add docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
-          images: ${{ env.CHART_REPO }}
+          images: |
+            ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}
+            ${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_REPO }}
           tags: |
             type=raw,value=${{ inputs.service-version }}
 
-      - name: Login to registry hub
-        uses: docker/login-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
-          registry: ghcr.io
+          registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push container
-        uses: docker/build-push-action@v6
+      - name: Login to Azure with OIDC
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # Azure Login Action v2.3.0
         with:
-          file: ${{ inputs.dockerfile }}
+          client-id: ${{ vars.CLIENT_ID }}
+          tenant-id: ${{ vars.TENANT_ID }}
+          subscription-id: ${{ vars.SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        uses: azure/cli@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # GitHub Action for Azure CLI v2.2.0
+        with:
+          azcliversion: 2.81.0
+          inlineScript: |
+            az acr login --name ${UNIQUECR_REGISTRY%%.*}
+
+      - name: Build and push container
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        id: build-and-push
+        with:
           context: .
+          file: ${{ inputs.dockerfile }}
+          labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
+          provenance: mode=max
           push: true
-          provenance: false
+          sbom: true
+          tags: ${{ steps.meta.outputs.tags }}
           cache-from: |
             type=gha,scope=${{ inputs.service-name }}
-            type=registry,ref=${{ env.CHART_REPO }}:cache
+            type=registry,ref=${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:cache
           cache-to: |
-            type=registry,ref=${{ env.CHART_REPO }}:cache,mode=min
+            type=registry,ref=${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:cache,mode=min
           build-args: |
             APP_NAME=${{ inputs.service-name }}
             PNPM_VERSION=${{ steps.pnpm-version.outputs.version }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+
+      - name: Sign and verify the images with GitHub OIDC Token
+        env:
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
+          cosign verify ${images} \
+          --certificate-identity=https://github.com/${{ github.workflow_ref }} \
+          --certificate-oidc-issuer=https://token.actions.githubusercontent.com
