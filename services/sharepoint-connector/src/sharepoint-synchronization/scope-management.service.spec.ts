@@ -307,9 +307,7 @@ describe('ScopeManagementService', () => {
 
       // The logger is globally mocked, so we can check the mock calls
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].log).toHaveBeenCalledWith(
-        expect.stringContaining('[Site:'),
-      );
+      expect(service['logger'].log).toHaveBeenCalledWith(expect.stringContaining('[Site:'));
     });
   });
 

@@ -56,6 +56,9 @@ describe('GraphApiService', () => {
       isFileValidForIngestion: vi
         .fn()
         .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'],
+      isListItemValidForIngestion: vi
+        .fn()
+        .mockReturnValue(true) as unknown as FileFilterService['isListItemValidForIngestion'],
     };
 
     const { unit } = await TestBed.solitary(GraphApiService)
