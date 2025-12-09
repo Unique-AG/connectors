@@ -1,0 +1,42 @@
+{{- if and .Values.alerts.defaultAlerts .Values.alerts.defaultAlerts.syncs .Values.alerts.defaultAlerts.syncs.enabled .Values.alerts.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1") }}
+
+{{- $fullName := include "chart.fullname" . -}}
+{{- $labels := include "chart.labels" . -}}
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $fullName }}-syncs-alerts
+  labels:
+    {{- $labels | nindent 4 }}
+    role: alert-rules
+    alertGroup: sharepoint-connector
+    {{- with .Values.alerts.defaultAlerts.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: {{ $fullName }}-syncs
+      rules:
+        {{- if not (dig "SharepointConnectorSyncFailures" false (.Values.alerts.defaultAlerts.syncs.disabled | default dict)) }}
+        - alert: SharepointConnectorSyncFailures
+          annotations:
+            summary: "SharePoint Connector sync failures detected"
+            description: "The SharePoint Connector is experiencing sync failures. Sync type: {{ "{{ $labels.sync_type }}" }}."
+            runbook: |
+              1. Inspect application logs for specific error messages
+              2. Check the failure_step label to identify where the sync failed
+              3. Verify SharePoint connectivity and permissions
+              4. Check for rate limiting or throttling issues
+              5. Check for recent changes to the deployment as well as its underlying infrastructure
+          expr: |
+            spc_sync_duration_seconds_count{result="failure"} > {{ dig "SharepointConnectorSyncFailures" "threshold" 0.01 (.Values.alerts.defaultAlerts.syncs.customRules | default dict) }}
+          for: {{ dig "SharepointConnectorSyncFailures" "for" "30s" (.Values.alerts.defaultAlerts.syncs.customRules | default dict) }}
+          labels:
+            severity: {{ dig "SharepointConnectorSyncFailures" "severity" "warning" (.Values.alerts.defaultAlerts.syncs.customRules | default dict) }}
+            alertGroup: sharepoint-connector
+            {{- with .Values.alerts.defaultAlerts.additionalLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        {{- end }}
+{{- end }}

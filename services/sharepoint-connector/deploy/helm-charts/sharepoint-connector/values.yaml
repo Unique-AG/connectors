@@ -115,6 +115,18 @@ alerts:
         #   for: "15s"
         #   severity: "critical"
         #   threshold: 0.05
+    # -- Enable sync failure alerts
+    syncs:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # SharepointConnectorSyncFailures: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # SharepointConnectorSyncFailures:
+        #   for: "15s"
+        #   severity: "critical"
+        #   threshold: 0.05
     # -- Additional labels to add to all default alerts
     additionalLabels: {}
       # environment: production

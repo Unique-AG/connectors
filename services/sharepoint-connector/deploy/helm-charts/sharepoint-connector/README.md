@@ -57,12 +57,15 @@ spec:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| alerts | object | `{"defaultAlerts":{"additionalLabels":{},"graphql":{"customRules":{},"disabled":{},"enabled":true},"uniqueApi":{"customRules":{},"disabled":{},"enabled":true}},"enabled":false}` | Prometheus alerting rules configuration |
-| alerts.defaultAlerts | object | `{"additionalLabels":{},"graphql":{"customRules":{},"disabled":{},"enabled":true},"uniqueApi":{"customRules":{},"disabled":{},"enabled":true}}` | Default alert definitions |
+| alerts | object | `{"defaultAlerts":{"additionalLabels":{},"graphql":{"customRules":{},"disabled":{},"enabled":true},"syncs":{"customRules":{},"disabled":{},"enabled":true},"uniqueApi":{"customRules":{},"disabled":{},"enabled":true}},"enabled":false}` | Prometheus alerting rules configuration |
+| alerts.defaultAlerts | object | `{"additionalLabels":{},"graphql":{"customRules":{},"disabled":{},"enabled":true},"syncs":{"customRules":{},"disabled":{},"enabled":true},"uniqueApi":{"customRules":{},"disabled":{},"enabled":true}}` | Default alert definitions |
 | alerts.defaultAlerts.additionalLabels | object | `{}` | Additional labels to add to all default alerts |
 | alerts.defaultAlerts.graphql | object | `{"customRules":{},"disabled":{},"enabled":true}` | Enable GraphQL API error rate alerts |
 | alerts.defaultAlerts.graphql.customRules | object | `{}` | Override alert rules with custom values (for duration, severity, threshold, etc.) |
 | alerts.defaultAlerts.graphql.disabled | object | `{}` | Disable specific alerts by setting them to true |
+| alerts.defaultAlerts.syncs | object | `{"customRules":{},"disabled":{},"enabled":true}` | Enable sync failure alerts |
+| alerts.defaultAlerts.syncs.customRules | object | `{}` | Override alert rules with custom values (for duration, severity, threshold, etc.) |
+| alerts.defaultAlerts.syncs.disabled | object | `{}` | Disable specific alerts by setting them to true |
 | alerts.defaultAlerts.uniqueApi | object | `{"customRules":{},"disabled":{},"enabled":true}` | Enable Unique REST API error rate alerts |
 | alerts.defaultAlerts.uniqueApi.customRules | object | `{}` | Override alert rules with custom values (for duration, severity, threshold, etc.) |
 | alerts.defaultAlerts.uniqueApi.disabled | object | `{}` | Disable specific alerts by setting them to true |
@@ -76,10 +79,10 @@ spec:
 | connector.env.OTEL_EXPORTER_PROMETHEUS_HOST | string | `"0.0.0.0"` |  |
 | connector.env.OTEL_EXPORTER_PROMETHEUS_PORT | string | `"51346"` |  |
 | connector.env.OTEL_METRICS_EXPORTER | string | `"prometheus"` |  |
-| connector.envVars | list | `[]` | Environment variables from secrets. Required when authMode is 'external'. When using external authMode, add UNIQUE_ZITADEL_CLIENT_SECRET from a secret. See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options. |
+| connector.envVars | list | `[]` | Environment variables from secrets. Required when authMode is 'external'. When using external authMode, add the following to load the Zitadel client secret:   envVars:     - name: UNIQUE_ZITADEL_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: sharepoint-connector-secret           key: UNIQUE_ZITADEL_CLIENT_SECRET See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options. |
 | connector.extraEnvCM[0] | string | `"sharepoint-connector-config"` |  |
 | connector.image.repository | string | `"ghcr.io/unique-ag/connectors/services/sharepoint-connector"` |  |
-| connector.image.tag | string | `"2.0.0-beta.3"` |  |
+| connector.image.tag | string | `"2.0.0-beta.6"` |  |
 | connector.networkPolicy.egress | string | `nil` |  |
 | connector.networkPolicy.enabled | bool | `true` |  |
 | connector.networkPolicy.policyTypes[0] | string | `"Ingress"` |  |
