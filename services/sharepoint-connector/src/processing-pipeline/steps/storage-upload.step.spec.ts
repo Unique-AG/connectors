@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { describe, expect, it, vi } from 'vitest';
@@ -356,7 +357,7 @@ describe('StorageUploadStep', () => {
       .impl(() => mockUniqueFilesService)
       .compile();
 
-    const loggerErrorSpy = vi.spyOn(step['logger'], 'error');
+    const loggerErrorSpy = vi.spyOn((step as unknown as { logger: Logger }).logger, 'error');
 
     const context: ProcessingContext = {
       correlationId: 'c1',
