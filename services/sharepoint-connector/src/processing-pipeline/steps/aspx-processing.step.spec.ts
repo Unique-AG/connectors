@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { Mocked, TestBed } from '@suites/unit';
+import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
@@ -12,7 +12,7 @@ describe('AspxProcessingStep', () => {
   let mockConfigService: {
     get: ReturnType<typeof vi.fn>;
   };
-  let mockApiService: Mocked<GraphApiService>;
+  let mockApiService: GraphApiService;
 
   const mockListItem: ListItem = {
     id: 'f1',
@@ -84,7 +84,7 @@ describe('AspxProcessingStep', () => {
       .compile();
 
     step = unit;
-    mockApiService = unitRef.get(GraphApiService);
+    mockApiService = unitRef.get(GraphApiService) as unknown as GraphApiService;
   });
 
   describe('execute', () => {
@@ -124,7 +124,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('converts relative links to absolute links', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: '<a href="/sites/test/page.aspx">Link</a>',
         wikiField: undefined,
         title: 'Test',
@@ -138,7 +138,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('converts multiple relative links in same content', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: '<a href="/page1.aspx">Link 1</a><a href="/page2.aspx">Link 2</a>',
         wikiField: undefined,
         title: 'Test',
@@ -155,7 +155,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('handles links with query parameters', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: '<a href="/page.aspx?id=123&type=test">Link</a>',
         wikiField: undefined,
         title: 'Test',
@@ -169,7 +169,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('handles links with fragments', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: '<a href="/page.aspx#section">Link</a>',
         wikiField: undefined,
         title: 'Test',
@@ -183,7 +183,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('does not convert non-href attributes', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: '<img src="/sites/test/image.png">',
         wikiField: undefined,
         title: 'Test',
@@ -195,7 +195,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('preserves absolute links', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: '<a href="https://external.com/page">External</a>',
         wikiField: undefined,
         title: 'Test',
@@ -207,7 +207,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('handles deeply nested relative paths', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: '<a href="/sites/team/docs/subfolder/document.aspx">Link</a>',
         wikiField: undefined,
         title: 'Test',
@@ -221,7 +221,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('handles empty href values', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: '<a href="">Empty Link</a>',
         wikiField: undefined,
         title: 'Test',
@@ -233,7 +233,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('handles mixed relative and absolute links', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent:
           '<a href="/relative.aspx">Relative</a><a href="https://absolute.com">Absolute</a>',
         wikiField: undefined,
@@ -249,7 +249,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('handles baseUrl without trailing slash correctly', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: '<a href="/page.aspx">Link</a>',
         wikiField: undefined,
         title: 'Test',
@@ -263,7 +263,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('handles empty content from API', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: undefined,
         wikiField: undefined,
         title: 'Test',
@@ -277,7 +277,7 @@ describe('AspxProcessingStep', () => {
     });
 
     it('uses wikiField when canvasContent is undefined', async () => {
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: undefined,
         wikiField: '<p>Wiki content</p>',
         title: 'Test',
@@ -337,7 +337,7 @@ describe('AspxProcessingStep', () => {
         return undefined;
       });
 
-      mockApiService.getAspxPageContent.mockResolvedValue({
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
         canvasContent: '<a href="/sites/test">Link</a>',
         wikiField: undefined,
         title: 'Test',

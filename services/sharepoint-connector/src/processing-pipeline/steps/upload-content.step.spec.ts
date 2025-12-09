@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream';
 import { ConfigService } from '@nestjs/config';
-import { Mocked, TestBed } from '@suites/unit';
+import { TestBed } from '@suites/unit';
 import { Dispatcher } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
@@ -13,9 +13,9 @@ import { UploadContentStep } from './upload-content.step';
 
 describe('UploadContentStep', () => {
   let step: UploadContentStep;
-  let mockHttpClientService: Mocked<HttpClientService>;
-  let mockUniqueFilesService: Mocked<UniqueFilesService>;
-  let mockApiService: Mocked<GraphApiService>;
+  let mockHttpClientService: HttpClientService;
+  let mockUniqueFilesService: UniqueFilesService;
+  let mockApiService: GraphApiService;
 
   const mockDriveItem: DriveItem = {
     '@odata.etag': '"82009a9a-6cb2-4fe2-88fa-37d935120df6,7"',
@@ -179,6 +179,7 @@ describe('UploadContentStep', () => {
       .mock(HttpClientService)
       .impl((stub) => ({
         ...stub(),
+        httpAgent: {} as Dispatcher,
         request: vi.fn().mockResolvedValue({
           statusCode: 201,
           body: createMockResponseBody(),
@@ -197,16 +198,16 @@ describe('UploadContentStep', () => {
       .compile();
 
     step = unit;
-    mockHttpClientService = unitRef.get(HttpClientService);
-    mockUniqueFilesService = unitRef.get(UniqueFilesService);
-    mockApiService = unitRef.get(GraphApiService);
+    mockHttpClientService = unitRef.get(HttpClientService) as unknown as HttpClientService;
+    mockUniqueFilesService = unitRef.get(UniqueFilesService) as unknown as UniqueFilesService;
+    mockApiService = unitRef.get(GraphApiService) as unknown as GraphApiService;
   });
 
   describe('execute', () => {
     describe('driveItem uploads', () => {
       it('streams file content directly to storage', async () => {
         const mockStream = Readable.from(Buffer.from('test file content'));
-        mockApiService.getFileContentStream.mockResolvedValue(mockStream);
+        vi.mocked(mockApiService.getFileContentStream).mockResolvedValue(mockStream);
 
         const result = await step.execute({ ...baseDriveItemContext });
 
@@ -283,7 +284,7 @@ describe('UploadContentStep', () => {
       });
 
       it('throws on upload failure with non-2xx status', async () => {
-        mockHttpClientService.request.mockResolvedValue({
+        vi.mocked(mockHttpClientService.request).mockResolvedValue({
           statusCode: 500,
           body: {
             text: vi.fn().mockResolvedValue('Internal Server Error'),
@@ -392,7 +393,7 @@ describe('UploadContentStep', () => {
     });
 
     it('handles delete failure gracefully', async () => {
-      mockUniqueFilesService.deleteFile.mockRejectedValue(new Error('Delete failed'));
+      vi.mocked(mockUniqueFilesService.deleteFile).mockRejectedValue(new Error('Delete failed'));
 
       const context: ProcessingContext = {
         ...baseDriveItemContext,
@@ -420,9 +421,9 @@ describe('UploadContentStep', () => {
         },
       });
 
-      mockApiService.getFileContentStream.mockResolvedValue(testStream);
+      vi.mocked(mockApiService.getFileContentStream).mockResolvedValue(testStream);
 
-      mockHttpClientService.request.mockImplementation(async () => {
+      vi.mocked(mockHttpClientService.request).mockImplementation(async () => {
         // If streaming properly, source stream should NOT be consumed yet
         // If buffering, source stream WILL be fully consumed before upload
         expect(streamConsumedFully).toBe(false);
