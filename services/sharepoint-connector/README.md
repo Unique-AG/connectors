@@ -59,3 +59,13 @@ connector:
             matchLabels:
                 app.kubernetes.io/managed-by: prometheus-operator
 ```
+
+## Unique Inherit Modes
+| Mode | Description | inheritScopes | inheritFiles |
+|------|-------------|---------------|--------------|
+| `none` | Disables all inheritance | `false` | `false` |
+| `inherit_scopes` | Enables scope inheritance only | `true` | `false` |
+| `inherit_files` | Enables file inheritance only | `false` | `true` |
+| `default` (empty/unset) | Enables both scope and file inheritance | `true` | `true` |
+| `inherit_scopes`, `inherit_files` | Enables both scope and file inheritance | `true` | `true` |
+- **Sync Mode Dependency**: Inheritance modes are completely ignored when using `content_and_permissions` sync mode - inheritance is always disabled
