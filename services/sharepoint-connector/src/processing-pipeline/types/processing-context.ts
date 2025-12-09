@@ -12,6 +12,7 @@ export interface ProcessingContext {
   scopeId: string;
   uploadUrl?: string;
   uniqueContentId?: string;
+  uploadSucceeded?: boolean;
   contentBuffer?: Buffer;
   fileSize?: number;
   startTime: Date;

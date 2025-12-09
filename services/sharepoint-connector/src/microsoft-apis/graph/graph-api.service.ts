@@ -254,6 +254,7 @@ export class GraphApiService {
     listId: string,
     maxItemsToScan?: number,
   ): Promise<SharepointContentItem[]> {
+    const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const aspxItems: SharepointContentItem[] = [];
@@ -265,7 +266,7 @@ export class GraphApiService {
             .api(url)
             .select('id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy')
             .expand(
-              'fields($select=FileLeafRef,FinanceGPTKnowledge,FileSizeDisplay,_ModerationStatus,Title,AuthorLookupId,EditorLookupId)',
+              `fields($select=${syncColumnName},FileLeafRef,FileSizeDisplay,_ModerationStatus,Title,AuthorLookupId,EditorLookupId)`,
             )
             .top(GRAPH_API_PAGE_SIZE)
             .get(),

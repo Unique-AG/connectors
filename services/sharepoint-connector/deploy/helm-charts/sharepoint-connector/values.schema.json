@@ -95,7 +95,7 @@
                         "for": {
                           "type": "string",
                           "description": "Duration the condition must be true before firing",
-                          "default": "5m"
+                          "default": "30s"
                         },
                         "severity": {
                           "type": "string",
@@ -152,7 +152,7 @@
                         "for": {
                           "type": "string",
                           "description": "Duration the condition must be true before firing",
-                          "default": "5m"
+                          "default": "30s"
                         },
                         "severity": {
                           "type": "string",

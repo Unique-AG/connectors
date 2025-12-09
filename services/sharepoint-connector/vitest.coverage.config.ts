@@ -11,14 +11,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       enabled: true,
-      reporter: [
-        'text',
-        'text-summary',
-        'html',
-        'json',
-        'json-summary',
-        'lcov'
-      ],
+      reporter: ['text', 'text-summary', 'html', 'json', 'json-summary', 'lcov'],
       reportsDirectory: './coverage',
       include: ['src/**/*.ts'],
       exclude: [
@@ -40,8 +33,8 @@ export default defineConfig({
         lines: [70, 85],
         functions: [70, 85],
         branches: [70, 85],
-        statements: [70, 85]
-      }
+        statements: [70, 85],
+      },
     },
   },
 });
