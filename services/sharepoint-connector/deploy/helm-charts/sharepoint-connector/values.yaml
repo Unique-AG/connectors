@@ -100,7 +100,7 @@ alerts:
       # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
       customRules: {}
         # SharepointConnectorGraphQLErrors:
-        #   for: "10m"
+        #   for: "15s"
         #   severity: "critical"
         #   threshold: 0.05
     # -- Enable Unique REST API error rate alerts
@@ -112,7 +112,7 @@ alerts:
       # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
       customRules: {}
         # SharepointConnectorUniqueAPIErrors:
-        #   for: "10m"
+        #   for: "15s"
         #   severity: "critical"
         #   threshold: 0.05
     # -- Additional labels to add to all default alerts
