@@ -68,13 +68,15 @@ const baseConfig = z.object({
     .describe("Your company's sharepoint URL"),
   siteIds: z
     .string()
-    .transform(parseCommaSeparatedArray)
+    .transform((val) => parseCommaSeparatedArray(val))
     .pipe(
-      z.array(
-        z.uuidv4({
-          message: 'Each site ID must be a valid UUIDv4',
-        }),
-      ),
+      z
+        .array(
+          z.uuidv4({
+            message: 'Each site ID must be a valid UUIDv4',
+          }),
+        )
+        .min(1, 'At least one site ID must be specified'),
     )
     .describe('Comma-separated list of SharePoint site IDs to scan'),
   syncColumnName: z
