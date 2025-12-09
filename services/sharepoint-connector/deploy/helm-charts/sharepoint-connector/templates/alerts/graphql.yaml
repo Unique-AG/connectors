@@ -35,7 +35,7 @@ spec:
               /
               sum(rate(spc_unique_graphql_api_request_duration_seconds_count[5m]))
             ) > {{ dig "SharepointConnectorGraphQLErrors" "threshold" 0.01 (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
-          for: {{ dig "SharepointConnectorGraphQLErrors" "for" "5m" (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
+          for: {{ dig "SharepointConnectorGraphQLErrors" "for" "30s" (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
           labels:
             severity: {{ dig "SharepointConnectorGraphQLErrors" "severity" "warning" (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
             alertGroup: sharepoint-connector
