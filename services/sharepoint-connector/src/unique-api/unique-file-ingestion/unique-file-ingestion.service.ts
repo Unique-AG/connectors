@@ -76,7 +76,6 @@ export class UniqueFileIngestionService {
         ownerType: UniqueOwnerType.Scope,
         byteSize: request.byteSize,
         url: request.url,
-        metadata: request.metadata,
       },
       scopeId: request.scopeId,
       sourceOwnerType: request.sourceOwnerType,
