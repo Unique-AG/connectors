@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
-import { parseJsonEnvironmentVariable } from '../utils/config.util';
+import { parseCommaSeparatedArray, parseJsonEnvironmentVariable } from '../utils/config.util';
 import { Redacted } from '../utils/redacted';
 
 // ==== Config for local in-cluster communication with Unique API services ====
@@ -51,6 +51,14 @@ const externalConfig = z.object({
 // ==== Config common for both cluster_local and external authentication modes ====
 
 const baseConfig = z.object({
+  inheritModes: z
+    .preprocess(
+      parseCommaSeparatedArray,
+      z.array(z.enum(['none', 'inherit_scopes', 'inherit_files'] as const)).optional(),
+    )
+    .describe(
+      'List of inheritance options for generated scopes and ingested files. Allowed values: none, inherit_scopes, inherit_files. When empty or unset, scopes and files inherit in content_only mode; ignored in content_and_permissions mode.',
+    ),
   ingestionMode: z
     .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
     .describe(
@@ -75,12 +83,6 @@ const baseConfig = z.object({
     .refine((url) => !url.endsWith('/'), {
       message: 'scopeManagementServiceBaseUrl must not end with a trailing slash',
     }),
-  scopeGenerationInheritAccess: z
-    .enum(['inherit', 'do_not_inherit'])
-    .optional()
-    .describe(
-      'Whether scopes created from generated paths inherit access from their parent scope. If unset, the connector enables inheritance for content_only sync mode and disables it for content_and_permissions.',
-    ),
   apiRateLimitPerMinute: z.coerce
     .number()
     .int()

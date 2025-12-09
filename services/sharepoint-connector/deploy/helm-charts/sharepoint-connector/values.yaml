@@ -168,10 +168,10 @@ connectorConfig:
     # example: https://api.unique.app/scope-management
     # example: http://node-scope-management.finance-gpt:8094
     scopeManagementServiceBaseUrl: unset_default_value
-    # -- Whether generated scopes inherit access from their parent.
-    # Allowed values: inherit, do_not_inherit.
-    # When unset, inheritance is enabled for content_only sync mode and disabled for content_and_permissions.
-    scopeGenerationInheritAccess: null
+    # -- List of inheritance options for scopes and files in content_only mode.
+    # Allowed values: none, inherit_scopes, inherit_files.
+    # When empty or unset, both scopes and files inherit in content_only; ignored in content_and_permissions.
+    inheritModes: []
     # -- ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy (path-based ingestion)
     # possible values: flat, recursive
     ingestionMode: recursive

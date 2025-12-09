@@ -11,3 +11,21 @@ export const parseJsonEnvironmentVariable = (fieldName: string) =>
       );
     }
   });
+
+export const parseCommaSeparatedArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed
+      ? trimmed
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [];
+  }
+
+  return [];
+};

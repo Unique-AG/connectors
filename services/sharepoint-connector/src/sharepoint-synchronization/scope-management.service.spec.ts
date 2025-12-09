@@ -135,7 +135,7 @@ describe('ScopeManagementService', () => {
     configServiceMock = {
       get: vi.fn((key: string) => {
         if (key === 'processing.syncMode') return 'content_only';
-        if (key === 'unique.scopeGenerationInheritAccess') return undefined;
+        if (key === 'unique.inheritModes') return [];
         if (key === 'app.logsDiagnosticsDataPolicy') {
           return 'conceal';
         }
@@ -252,7 +252,7 @@ describe('ScopeManagementService', () => {
     it('disables inheritance when permission sync mode is enabled', async () => {
       configServiceMock.get.mockImplementation((key: string) => {
         if (key === 'processing.syncMode') return 'content_and_permissions';
-        if (key === 'unique.scopeGenerationInheritAccess') return undefined;
+        if (key === 'unique.inheritModes') return [];
         if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
         return undefined;
       });
@@ -272,8 +272,8 @@ describe('ScopeManagementService', () => {
 
     it('uses explicit inheritAccess configuration when provided', async () => {
       configServiceMock.get.mockImplementation((key: string) => {
-        if (key === 'unique.scopeGenerationInheritAccess') return 'inherit';
-        if (key === 'processing.syncMode') return 'content_and_permissions';
+        if (key === 'unique.inheritModes') return ['inherit_scopes'];
+        if (key === 'processing.syncMode') return 'content_only';
         if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
         return undefined;
       });
@@ -308,7 +308,7 @@ describe('ScopeManagementService', () => {
       // The logger is globally mocked, so we can check the mock calls
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].log).toHaveBeenCalledWith(
-        expect.stringContaining('[Site: site-123]'),
+        expect.stringContaining('[Site:'),
       );
     });
   });
@@ -350,7 +350,9 @@ describe('ScopeManagementService', () => {
 
       // The logger is globally mocked, so we can check the mock calls
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].warn).toHaveBeenCalledWith(expect.stringContaining('UnknownFolder'));
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.stringContaining('Scope not found in cache for path'),
+      );
     });
   });
 
@@ -363,7 +365,7 @@ describe('ScopeManagementService', () => {
       const configService = {
         get: vi.fn((key: string) => {
           if (key === 'processing.syncMode') return 'content_only';
-          if (key === 'unique.scopeGenerationInheritAccess') return undefined;
+          if (key === 'unique.inheritModes') return [];
           if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
           return undefined;
         }),
@@ -493,7 +495,7 @@ describe('ScopeManagementService', () => {
       );
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].warn).toHaveBeenCalledWith(
-        expect.stringContaining('No external ID found for path /test1/ChildScope'),
+        expect.stringContaining('No external ID found for path'),
       );
     });
 

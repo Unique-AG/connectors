@@ -2,6 +2,7 @@ import { ConfigType } from '@nestjs/config';
 import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
 import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
+import { parseCommaSeparatedArray } from '../utils/config.util';
 import { Redacted } from '../utils/redacted';
 
 const oidcAuthModeConfig = z.object({
@@ -67,13 +68,7 @@ const baseConfig = z.object({
     .describe("Your company's sharepoint URL"),
   siteIds: z
     .string()
-    .prefault('')
-    .transform((val) =>
-      val
-        .split(',')
-        .map((id) => id.trim())
-        .filter(Boolean),
-    )
+    .transform(parseCommaSeparatedArray)
     .pipe(
       z.array(
         z.uuidv4({

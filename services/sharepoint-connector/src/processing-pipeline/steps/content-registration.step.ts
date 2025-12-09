@@ -14,6 +14,7 @@ import {
   ContentMetadata,
   ContentRegistrationRequest,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
+import { resolveInheritanceSettings } from '../../utils/inheritance.util';
 import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
@@ -59,9 +60,10 @@ export class ContentRegistrationStep implements IPipelineStep {
     context.metadata = contentRegistrationRequest.metadata;
 
     const syncMode = this.configService.get('processing.syncMode', { infer: true });
+    const { inheritFiles } = resolveInheritanceSettings(this.configService);
     // We add permissions only for new files, because existing ones should already have correct
     // permissions (including service user permissions) and we don't want to override them.
-    if (syncMode === 'content_and_permissions' && context.fileStatus === 'new') {
+    if ((!inheritFiles || syncMode === 'content_and_permissions') && context.fileStatus === 'new') {
       contentRegistrationRequest.fileAccess = [
         `u:${context.syncContext.serviceUserId}R`,
         `u:${context.syncContext.serviceUserId}W`,

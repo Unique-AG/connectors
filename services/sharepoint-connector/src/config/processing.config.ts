@@ -7,6 +7,7 @@ import {
   DEFAULT_PROCESSING_CONCURRENCY,
   DEFAULT_STEP_TIMEOUT_SECONDS,
 } from '../constants/defaults.constants';
+import { parseCommaSeparatedArray } from '../utils/config.util';
 
 export const ProcessingConfigSchema = z.object({
   syncMode: z
@@ -40,14 +41,8 @@ export const ProcessingConfigSchema = z.object({
     ),
   allowedMimeTypes: z
     .string()
-    .transform((val) =>
-      val
-        ? val
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [],
-    )
+    .transform(parseCommaSeparatedArray)
+    .pipe(z.array(z.string()))
     .describe('Comma-separated list of allowed MIME types for files to sync'),
   maxFilesToScan: z
     .preprocess(

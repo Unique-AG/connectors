@@ -4,7 +4,7 @@ import type { Scope } from './unique-scopes.types';
 
 export interface GenerateScopesBasedOnPathsMutationInput {
   paths: string[];
-  inheritAccess: boolean;
+  inheritAccess?: boolean;
 }
 
 export type GenerateScopesBasedOnPathsMutationResult = {

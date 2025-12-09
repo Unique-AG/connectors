@@ -360,17 +360,17 @@
                 "https://api.unique.app/scope-management"
               ]
             },
-            "scopeGenerationInheritAccess": {
-              "type": [
-                "string",
-                "null"
-              ],
-              "enum": [
-                "inherit",
-                "do_not_inherit",
-                null
-              ],
-              "description": "Whether scopes generated from paths inherit access from their parent scope. Allowed values: inherit, do_not_inherit. If unset, inheritance is enabled for content_only sync mode and disabled for content_and_permissions."
+            "inheritModes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "inherit_scopes",
+                  "inherit_files"
+                ]
+              },
+              "description": "When empty or unset, scopes and files inherit in content_only mode by default. It is ignored in content_and_permissions ingestion mode. List of inheritance options for generated scopes and ingested files. Allowed values: none, inherit_scopes, inherit_files."
             },
             "ingestionMode": {
               "type": "string",

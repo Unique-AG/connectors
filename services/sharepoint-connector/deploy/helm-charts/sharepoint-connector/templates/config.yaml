@@ -38,8 +38,8 @@ data:
   UNIQUE_INGESTION_MODE: {{ .Values.connectorConfig.unique.ingestionMode | quote }}
   UNIQUE_INGESTION_SERVICE_BASE_URL: {{ .Values.connectorConfig.unique.ingestionServiceBaseUrl | quote }}
   UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL: {{ .Values.connectorConfig.unique.scopeManagementServiceBaseUrl | quote }}
-  {{- if ne .Values.connectorConfig.unique.scopeGenerationInheritAccess nil }}
-  UNIQUE_SCOPE_GENERATION_INHERIT_ACCESS: {{ .Values.connectorConfig.unique.scopeGenerationInheritAccess | quote }}
+  {{- if .Values.connectorConfig.unique.inheritModes }}
+  UNIQUE_INHERIT_MODES: {{ .Values.connectorConfig.unique.inheritModes | join "," | quote }}
   {{- end }}
   {{- if .Values.connectorConfig.unique.apiRateLimitPerMinute }}
   UNIQUE_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.unique.apiRateLimitPerMinute | quote }}

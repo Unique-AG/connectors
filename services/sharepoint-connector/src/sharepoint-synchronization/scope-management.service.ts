@@ -12,6 +12,7 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
+import { resolveInheritanceSettings } from '../utils/inheritance.util';
 import { redact, shouldConcealLogs, smear, smearPath } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
@@ -133,22 +134,6 @@ export class ScopeManagementService {
     });
   }
 
-  private resolveInheritAccess(): boolean {
-    const configuredInheritAccess = this.configService.get('unique.scopeGenerationInheritAccess', {
-      infer: true,
-    });
-
-    if (configuredInheritAccess === 'inherit') {
-      return true;
-    }
-    if (configuredInheritAccess === 'do_not_inherit') {
-      return false;
-    }
-
-    const syncMode = this.configService.get('processing.syncMode', { infer: true });
-    return syncMode !== 'content_and_permissions';
-  }
-
   public async batchCreateScopes(
     items: SharepointContentItem[],
     directories: SharepointDirectoryItem[],
@@ -169,10 +154,10 @@ export class ScopeManagementService {
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
-    const inheritAccess = this.resolveInheritAccess();
+    const { inheritScopes } = resolveInheritanceSettings(this.configService);
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
-      inheritAccess,
+      inheritAccess: inheritScopes,
     });
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes`);
 

@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { isNullish } from 'remeda';
 import { BatchProcessorService } from '../../shared/services/batch-processor.service';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -49,10 +50,16 @@ export class UniqueScopesService {
       items: paths,
       batchSize: BATCH_SIZE,
       processor: async (batch) => {
+        const variables: GenerateScopesBasedOnPathsMutationInput = { paths: batch };
+
+        if (!isNullish(opts.inheritAccess)) {
+          variables.inheritAccess = opts.inheritAccess;
+        }
+
         const result = await this.scopeManagementClient.request<
           GenerateScopesBasedOnPathsMutationResult,
           GenerateScopesBasedOnPathsMutationInput
-        >(mutation, { paths: batch, inheritAccess: opts.inheritAccess });
+        >(mutation, variables);
 
         return result.generateScopesBasedOnPaths;
       },
