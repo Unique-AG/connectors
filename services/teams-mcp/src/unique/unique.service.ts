@@ -31,6 +31,31 @@ export class UniqueService {
     private readonly trace: TraceService,
   ) {}
 
+  private getAuthHeaders(): Record<string, string> {
+    const uniqueConfig = this.config.get('unique', { infer: true });
+    const baseHeaders: Record<string, string> = {
+      'x-api-version': uniqueConfig.apiVersion,
+    };
+
+    if (uniqueConfig.serviceAuthMode === 'cluster_local') {
+      // For cluster_local mode, use the extra headers from config
+      const extraHeaders = uniqueConfig.serviceExtraHeaders;
+      return {
+        ...baseHeaders,
+        ...extraHeaders,
+      };
+    }
+
+    // For external mode, use app key and other auth details
+    return {
+      ...baseHeaders,
+      Authorization: `Bearer ${uniqueConfig.appKey.value}`,
+      'x-app-id': uniqueConfig.appId,
+      'x-company-id': uniqueConfig.authCompanyId,
+      'x-user-id': uniqueConfig.authUserId,
+    };
+  }
+
   private mapMeetingToScope(subject: string, happenedAt: Date, recurring = false): string {
     const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
     // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
@@ -63,13 +88,7 @@ export class UniqueService {
 
     const response = await fetch(endpoint, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${this.config.get('unique.appKey', { infer: true }).value}`,
-        'x-app-id': this.config.get('unique.appId', { infer: true }),
-        'x-api-version': this.config.get('unique.apiVersion', { infer: true }),
-        'x-company-id': this.config.get('unique.authCompanyId', { infer: true }),
-        'x-user-id': this.config.get('unique.authUserId', { infer: true }),
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -104,11 +123,7 @@ export class UniqueService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.get('unique.appKey', { infer: true }).value}`,
-        'x-app-id': this.config.get('unique.appId', { infer: true }),
-        'x-api-version': this.config.get('unique.apiVersion', { infer: true }),
-        'x-company-id': this.config.get('unique.authCompanyId', { infer: true }),
-        'x-user-id': this.config.get('unique.authUserId', { infer: true }),
+        ...this.getAuthHeaders(),
       },
       body: JSON.stringify(payload),
     });
@@ -160,11 +175,7 @@ export class UniqueService {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.get('unique.appKey', { infer: true }).value}`,
-        'x-app-id': this.config.get('unique.appId', { infer: true }),
-        'x-api-version': this.config.get('unique.apiVersion', { infer: true }),
-        'x-company-id': this.config.get('unique.authCompanyId', { infer: true }),
-        'x-user-id': this.config.get('unique.authUserId', { infer: true }),
+        ...this.getAuthHeaders(),
       },
       body: JSON.stringify(payload),
     });
@@ -212,11 +223,7 @@ export class UniqueService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.get('unique.appKey', { infer: true }).value}`,
-        'x-app-id': this.config.get('unique.appId', { infer: true }),
-        'x-api-version': this.config.get('unique.apiVersion', { infer: true }),
-        'x-company-id': this.config.get('unique.authCompanyId', { infer: true }),
-        'x-user-id': this.config.get('unique.authUserId', { infer: true }),
+        ...this.getAuthHeaders(),
       },
       body: JSON.stringify(payload),
     });
