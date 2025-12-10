@@ -1,0 +1,63 @@
+{{- if .Values.mcpConfig.enabled }}
+# We quote everything, small adoption start of KYAML; also less prone to errors later
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: teams-mcp-config
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+data:
+  # App configuration
+  SELF_URL: {{ .Values.mcpConfig.app.selfUrl | quote }}
+  {{- if .Values.mcpConfig.app.port }}
+  PORT: {{ .Values.mcpConfig.app.port | quote }}
+  {{- end }}
+
+  # AMQP configuration
+  AMQP_URL: {{ .Values.mcpConfig.amqp.url | quote }}
+
+  # Microsoft Graph configuration
+  MICROSOFT_CLIENT_ID: {{ .Values.mcpConfig.microsoft.clientId | quote }}
+  MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
+
+  # Unique API configuration
+  UNIQUE_SERVICE_AUTH_MODE: {{ .Values.mcpConfig.unique.serviceAuthMode | quote }}
+  UNIQUE_API_BASE_URL: {{ .Values.mcpConfig.unique.apiBaseUrl | quote }}
+  {{- if .Values.mcpConfig.unique.apiVersion }}
+  UNIQUE_API_VERSION: {{ .Values.mcpConfig.unique.apiVersion | quote }}
+  {{- end }}
+  {{- if .Values.mcpConfig.unique.rootScopePath }}
+  UNIQUE_ROOT_SCOPE_PATH: {{ .Values.mcpConfig.unique.rootScopePath | quote }}
+  {{- end }}
+
+  # Unique cluster_local mode configuration
+  {{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
+  {{- if .Values.mcpConfig.unique.serviceExtraHeaders }}
+  UNIQUE_SERVICE_EXTRA_HEADERS: {{ .Values.mcpConfig.unique.serviceExtraHeaders | toJson | quote }}
+  {{- end }}
+  {{- if .Values.mcpConfig.unique.ingestionServiceBaseUrl }}
+  UNIQUE_INGESTION_SERVICE_BASE_URL: {{ .Values.mcpConfig.unique.ingestionServiceBaseUrl | quote }}
+  {{- end }}
+  {{- end }}
+
+  # Unique external mode configuration
+  {{- if eq .Values.mcpConfig.unique.serviceAuthMode "external" }}
+  {{- if .Values.mcpConfig.unique.appId }}
+  UNIQUE_APP_ID: {{ .Values.mcpConfig.unique.appId | quote }}
+  {{- end }}
+  {{- if .Values.mcpConfig.unique.authUserId }}
+  UNIQUE_AUTH_USER_ID: {{ .Values.mcpConfig.unique.authUserId | quote }}
+  {{- end }}
+  {{- if .Values.mcpConfig.unique.authCompanyId }}
+  UNIQUE_AUTH_COMPANY_ID: {{ .Values.mcpConfig.unique.authCompanyId | quote }}
+  {{- end }}
+  {{- end }}
+
+  # Auth configuration
+  {{- if .Values.mcpConfig.auth.accessTokenExpiresInSeconds }}
+  AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.accessTokenExpiresInSeconds | quote }}
+  {{- end }}
+  {{- if .Values.mcpConfig.auth.refreshTokenExpiresInSeconds }}
+  AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.refreshTokenExpiresInSeconds | quote }}
+  {{- end }}
+{{- end }}
