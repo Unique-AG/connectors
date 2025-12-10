@@ -169,7 +169,7 @@ connectorConfig:
       # -- SHA1 thumbprint of the Azure AD application certificate
       # users of the sharepoint-connector-secrets terraform module can get this from the modules outputs (thumbprint_sha1)
       # users that provision their application registration manually can get this from the Azure portal
-      thumbprintSha1: null
+      thumbprintSha1: unset_default_value
     graph:
       apiRateLimitPerMinute: 780000
 
