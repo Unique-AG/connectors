@@ -16,14 +16,8 @@ data:
   {{- if eq .Values.connectorConfig.sharepoint.auth.mode "certificate" }}
   SHAREPOINT_AUTH_CLIENT_ID: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
   SHAREPOINT_AUTH_PRIVATE_KEY_PATH: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPath | quote }}
-  {{- if .Values.connectorConfig.sharepoint.auth.privateKeyPassword }}
-  SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPassword | quote }}
-  {{- end }}
   {{- if .Values.connectorConfig.sharepoint.auth.thumbprintSha1 }}
   SHAREPOINT_AUTH_THUMBPRINT_SHA1: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha1 | quote }}
-  {{- end }}
-  {{- if .Values.connectorConfig.sharepoint.auth.thumbprintSha256 }}
-  SHAREPOINT_AUTH_THUMBPRINT_SHA256: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha256 | quote }}
   {{- end }}
   {{- end }}
   # General SharePoint config

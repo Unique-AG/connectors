@@ -164,10 +164,12 @@ connectorConfig:
       # this closely relates to the volumeMounts and volume definitions in the connector section
       # users wanting to use another path can override this value and unset the volumeMounts and
       # volume definitions
+      # if the key is encrypted, the password must be via a secret into a SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD environment variable
       privateKeyPath: /app/key.pem
-      privateKeyPassword: null
+      # -- SHA1 thumbprint of the Azure AD application certificate
+      # users of the sharepoint-connector-secrets terraform module can get this from the modules outputs (thumbprint_sha1)
+      # users that provision their application registration manually can get this from the Azure portal
       thumbprintSha1: null
-      thumbprintSha256: null
     graph:
       apiRateLimitPerMinute: 780000
 
