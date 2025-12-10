@@ -436,7 +436,7 @@ export class UniqueService {
     if (!key) throw new Error('writeUrl is missing key parameter');
 
     return new URL(
-      `/scoped/upload?key=${encodeURIComponent(key)}`,
+      `scoped/upload?key=${encodeURIComponent(key)}`,
       uniqueConfig.ingestionServiceBaseUrl,
     ).toString();
   }
