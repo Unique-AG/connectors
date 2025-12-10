@@ -13,7 +13,7 @@ export interface ProcessingContext {
   uploadUrl?: string;
   uniqueContentId?: string;
   uploadSucceeded?: boolean;
-  contentBuffer?: Buffer;
+  htmlContent?: string;
   fileSize?: number;
   startTime: Date;
   mimeType?: string;
@@ -28,10 +28,9 @@ export interface PipelineResult {
 }
 
 export const PipelineStep = {
-  ContentFetching: 'ContentFetching',
   AspxProcessing: 'AspxProcessing',
   ContentRegistration: 'ContentRegistration',
-  StorageUpload: 'StorageUpload',
+  UploadContent: 'UploadContent',
   IngestionFinalization: 'IngestionFinalization',
 } as const;
 export type PipelineStep = (typeof PipelineStep)[keyof typeof PipelineStep];

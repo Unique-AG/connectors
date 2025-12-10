@@ -278,41 +278,6 @@ describe('GraphApiService', () => {
     });
   });
 
-  describe('downloadFileContent', () => {
-    it('downloads file content successfully', async () => {
-      const mockChain = mockGraphClient.api();
-      const content = Buffer.from('test content');
-
-      async function* mockStream() {
-        yield content;
-      }
-
-      mockChain.getStream.mockResolvedValue(mockStream());
-
-      const result = await service.downloadFileContent('drive-1', 'file-1');
-
-      expect(result).toEqual(content);
-      expect(mockGraphClient.api).toHaveBeenCalledWith('/drives/drive-1/items/file-1/content');
-    });
-
-    it('handles multiple chunks correctly', async () => {
-      const mockChain = mockGraphClient.api();
-      const chunk1 = Buffer.from('first');
-      const chunk2 = Buffer.from('second');
-
-      async function* mockStream() {
-        yield chunk1;
-        yield chunk2;
-      }
-
-      mockChain.getStream.mockResolvedValue(mockStream());
-
-      const result = await service.downloadFileContent('drive-1', 'file-1');
-
-      expect(result).toEqual(Buffer.concat([chunk1, chunk2]));
-    });
-  });
-
   describe('getSitePageContent', () => {
     it('retrieves page content with canvas and wiki content', async () => {
       const mockChain = mockGraphClient.api();

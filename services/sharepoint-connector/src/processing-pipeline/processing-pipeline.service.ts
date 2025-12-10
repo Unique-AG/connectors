@@ -12,11 +12,10 @@ import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { normalizeError, sanitizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
-import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
 import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
 import type { IPipelineStep } from './steps/pipeline-step.interface';
-import { StorageUploadStep } from './steps/storage-upload.step';
+import { UploadContentStep } from './steps/upload-content.step';
 import type { PipelineResult, ProcessingContext } from './types/processing-context';
 
 @Injectable()
@@ -28,20 +27,18 @@ export class ProcessingPipelineService {
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
-    private readonly contentFetchingStep: ContentFetchingStep,
     private readonly aspxProcessingStep: AspxProcessingStep,
     private readonly contentRegistrationStep: ContentRegistrationStep,
-    private readonly storageUploadStep: StorageUploadStep,
+    private readonly uploadContentStep: UploadContentStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
     @Inject(SPC_INGESTION_FILE_PROCESSED_TOTAL)
     private readonly spcIngestionFileProcessedTotal: Counter,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
     this.pipelineSteps = [
-      this.contentFetchingStep,
       this.aspxProcessingStep,
       this.contentRegistrationStep,
-      this.storageUploadStep,
+      this.uploadContentStep,
       this.ingestionFinalizationStep,
     ];
     this.stepTimeoutMs =
@@ -154,9 +151,9 @@ export class ProcessingPipelineService {
   }
 
   private finalCleanup(context: ProcessingContext) {
-    if (context.contentBuffer) {
-      context.contentBuffer = undefined;
-      delete context.contentBuffer;
+    if (context.htmlContent) {
+      context.htmlContent = undefined;
+      delete context.htmlContent;
     }
   }
 }
