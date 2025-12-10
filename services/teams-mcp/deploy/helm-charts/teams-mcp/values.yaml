@@ -1,0 +1,258 @@
+server:
+  deployment:
+    metadata:
+      annotations:
+        reloader.stakater.com/auto: "true"
+  # Database migration hook for PostgreSQL (from outlook-mcp)
+  hooks:
+    migration:
+      enabled: true
+      command: |
+        pnpm run db:migrate
+  # External Ingress endpoint (from outlook-mcp)
+  extraObjects:
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: apps-mcp-server-teams-mcp
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt
+          external-dns.alpha.kubernetes.io/hostname: teams.mcp.unique.app
+          konghq.com/plugins: unique-route-metrics
+      spec:
+        ingressClassName: kong
+        tls:
+          - hosts:
+              - teams.mcp.unique.app
+            secretName: apps-mcp-server-teams-mcp-tls
+        rules:
+          - host: teams.mcp.unique.app
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: apps-mcp-server-teams
+                      port:
+                        number: 80
+  env:
+    LOG_LEVEL: info
+    LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+    MAX_FILE_SIZE_BYTES: "209715200"
+    MAX_HEAP_MB: 1920
+    NODE_ENV: production
+    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+    OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
+    OTEL_METRICS_EXPORTER: "prometheus"
+  # -- Environment variables from secrets.
+  # Required secrets that must be loaded from Kubernetes secrets:
+  #   envVars:
+  #     - name: DATABASE_URL
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: teams-mcp-secret
+  #           key: DATABASE_URL
+  #     - name: MICROSOFT_CLIENT_SECRET
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: teams-mcp-secret
+  #           key: MICROSOFT_CLIENT_SECRET
+  #     - name: MICROSOFT_WEBHOOK_SECRET
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: teams-mcp-secret
+  #           key: MICROSOFT_WEBHOOK_SECRET
+  #     - name: AUTH_HMAC_SECRET
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: teams-mcp-secret
+  #           key: AUTH_HMAC_SECRET
+  #     - name: ENCRYPTION_KEY
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: teams-mcp-secret
+  #           key: ENCRYPTION_KEY
+  #     # For external auth mode, also add:
+  #     - name: UNIQUE_APP_KEY
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: teams-mcp-secret
+  #           key: UNIQUE_APP_KEY
+  # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
+  envVars: []
+  extraEnvCM:
+    - teams-mcp-config
+  image:
+    repository: ghcr.io/unique-ag/connectors/services/teams-mcp
+    tag: 0.1.0 # x-release-please-version
+  networkPolicy:
+    enabled: true
+    policyTypes:
+      # - Egress # We can not yet leverage egress policies as Kubernetes flavor policies do not support FQDN and MS Graph IP-Addresses are not easily deterministic
+      - Ingress
+    egress: null
+  ports:
+    application: 51345
+    metrics: 51346
+  # Probes enabled for health checks (from outlook-mcp)
+  probes:
+    enabled: true
+  resources:
+    # Resources are granted generously as the service for now is a singleton
+    limits:
+      memory: 2048Mi
+    requests:
+      cpu: 1
+      memory: 1984Mi
+  routes:
+    paths:
+      default:
+        enabled: false
+  service:
+    enabled: false
+  serviceAccount:
+    enabled: true
+    workloadIdentity:
+      enabled: true
+      clientId: unset_default_value
+  # Prometheus metrics enabled (from outlook-mcp)
+  prometheus:
+    enabled: true
+  # The volume is needed for CorePack
+  volumes:
+    - name: tmp
+      emptyDir: {}
+  volumeMounts:
+    - name: tmp
+      mountPath: /tmp
+
+# -- Grafana dashboard configuration
+grafana:
+  dashboard:
+    # -- Enable Grafana dashboard ConfigMap creation
+    enabled: false
+    # -- Grafana folder where the dashboard will be placed
+    folder: mcp-servers
+
+# -- Prometheus alerting rules configuration
+alerts:
+  # -- Enable PrometheusRule resource creation
+  enabled: false
+  # -- Default alert definitions
+  defaultAlerts:
+    # -- Enable GraphQL API error rate alerts
+    graphql:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # TeamsMcpGraphQLErrors: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # TeamsMcpGraphQLErrors:
+        #   for: "15s"
+        #   severity: "critical"
+        #   threshold: 0.05
+    # -- Enable Unique REST API error rate alerts
+    uniqueApi:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # TeamsMcpUniqueAPIErrors: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # TeamsMcpUniqueAPIErrors:
+        #   for: "15s"
+        #   severity: "critical"
+        #   threshold: 0.05
+    # -- Additional labels to add to all default alerts
+    additionalLabels: {}
+      # environment: production
+      # team: backend
+
+# -- Configuration for the deployed Teams MCP Server, will be mapped to environment variables
+# Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
+mcpConfig:
+  # -- if disabled, server.extraEnvCM must be set to []
+  enabled: true
+
+  # -- Application configuration
+  app:
+    # -- The URL of the MCP Server. Used for OAuth callbacks.
+    # example: https://teams.mcp.unique.app
+    selfUrl: unset_default_value
+    # -- The local HTTP port to bind the server to
+    port: 51345
+
+  # -- AMQP configuration for message queue
+  amqp:
+    # -- The AMQP connection URL
+    # example: amqp://user:password@rabbitmq-host:5672/vhost
+    url: unset_default_value
+
+  # -- Microsoft Graph API configuration
+  microsoft:
+    # -- The client ID of the Microsoft App Registration
+    # example: 12345678-1234-1234-1234-123456789012
+    clientId: unset_default_value
+    # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions
+    # example: https://teams.mcp.unique.app/webhooks
+    publicWebhookUrl: unset_default_value
+    # clientSecret is loaded from a secret, see server.envVars
+    # webhookSecret is loaded from a secret, see server.envVars
+
+  # -- Unique API configuration
+  unique:
+    # -- Authentication mode for Unique API services
+    # possible values: cluster_local, external
+    # cluster_local: communicates using in-cluster URLs and requires serviceExtraHeaders
+    # external: communicates using external URLs and requires app key authentication
+    serviceAuthMode: cluster_local
+    # -- The Public API URL
+    # example: https://api.unique.app
+    # example: http://api-gateway.unique:8080
+    apiBaseUrl: unset_default_value
+    # -- The Public API version to use
+    apiVersion: "2023-12-06"
+    # -- The root scope path where to upload recordings and transcripts
+    rootScopePath: Teams-MCP
+
+    # -- Configuration for cluster_local mode
+    # Object containing extra HTTP headers for Unique API requests
+    # Required when serviceAuthMode is cluster_local. Must contain x-company-id, x-user-id, and x-service-id headers.
+    # example: {"x-company-id": "1234567890", "x-user-id": "1234567890", "x-service-id": "teams-mcp"}
+    serviceExtraHeaders:
+      x-company-id: unset_default_value
+      x-user-id: unset_default_value
+      x-service-id: unset_default_value
+    # -- Base URL for Unique ingestion service (cluster_local mode)
+    # example: http://node-ingestion.finance-gpt:8091
+    ingestionServiceBaseUrl: unset_default_value
+
+    # -- Configuration for external mode (requires UNIQUE_APP_KEY secret)
+    # -- App ID of the Chat App (external mode)
+    # example: app_bu4gokr0atzj0kfiuaaaaaaa
+    appId: null
+    # -- User ID of a Zitadel Service User (external mode)
+    # example: 123456789012345678
+    authUserId: null
+    # -- Organisation ID where the Zitadel Service User is created (external mode)
+    # example: 987654321098765432
+    authCompanyId: null
+    # appKey is loaded from a secret when using external mode, see server.envVars
+
+  # -- Authentication configuration for the MCP server
+  auth:
+    # -- Access token expiration time in seconds
+    accessTokenExpiresInSeconds: 60
+    # -- Refresh token expiration time in seconds (default: 30 days)
+    refreshTokenExpiresInSeconds: 2592000
+    # hmacSecret is loaded from a secret, see server.envVars
+
+  # Note: The following secrets must be provided via server.envVars:
+  # - DATABASE_URL: PostgreSQL connection string
+  # - MICROSOFT_CLIENT_SECRET: Microsoft App Registration client secret
+  # - MICROSOFT_WEBHOOK_SECRET: 128 character random string for webhook validation
+  # - AUTH_HMAC_SECRET: Secret key for signing HMAC tokens
+  # - ENCRYPTION_KEY: 32-byte (256-bit) secret for AES-256-GCM encryption (hex or base64)
+  # - UNIQUE_APP_KEY: API key for Chat App (only for external auth mode)
