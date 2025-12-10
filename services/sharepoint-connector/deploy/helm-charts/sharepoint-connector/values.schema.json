@@ -173,6 +173,63 @@
               },
               "additionalProperties": false
             },
+            "syncs": {
+              "type": "object",
+              "description": "Configuration for sync failure alerts",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable sync failure alerts",
+                  "default": true
+                },
+                "disabled": {
+                  "type": "object",
+                  "description": "Disable specific alerts by setting them to true",
+                  "properties": {
+                    "SharepointConnectorSyncFailures": {
+                      "type": "boolean",
+                      "description": "Disable the SharepointConnectorSyncFailures alert"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "customRules": {
+                  "type": "object",
+                  "description": "Override alert rules with custom values",
+                  "properties": {
+                    "SharepointConnectorSyncFailures": {
+                      "type": "object",
+                      "description": "Custom configuration for SharepointConnectorSyncFailures alert",
+                      "properties": {
+                        "threshold": {
+                          "type": "number",
+                          "description": "Failure count threshold",
+                          "default": 0.01
+                        },
+                        "for": {
+                          "type": "string",
+                          "description": "Duration the condition must be true before firing",
+                          "default": "30s"
+                        },
+                        "severity": {
+                          "type": "string",
+                          "enum": [
+                            "critical",
+                            "warning",
+                            "info"
+                          ],
+                          "description": "Alert severity",
+                          "default": "warning"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
             "additionalLabels": {
               "type": "object",
               "description": "Additional labels to add to all alerts and the PrometheusRule"
