@@ -9,7 +9,7 @@ metadata:
 data:
   # Sharepoint authentication config
   SHAREPOINT_AUTH_MODE: {{ .Values.connectorConfig.sharepoint.auth.mode | quote }}
-  SHAREPOINT_AUTH_TENANT_ID: {{ .Values.connectorConfig.sharepoint.auth.tenantId | quote }}
+  SHAREPOINT_AUTH_TENANT_ID: {{ .Values.connectorConfig.sharepoint.tenantId | quote }}
   {{- if eq .Values.connectorConfig.sharepoint.auth.mode "client-secret" }}
   SHAREPOINT_AUTH_CLIENT_ID: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
   {{- end }}
