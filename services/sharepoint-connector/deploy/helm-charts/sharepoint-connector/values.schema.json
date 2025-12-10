@@ -258,12 +258,20 @@
           "type": "object",
           "description": "SharePoint configuration",
           "required": [
+            "tenantId",
             "baseUrl",
             "siteIds",
             "syncColumnName",
             "graph"
           ],
           "properties": {
+            "tenantId": {
+              "type": "string",
+              "description": "Azure AD tenant ID against which the Graph API calls are made",
+              "examples": [
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            },
             "baseUrl": {
               "type": "string",
               "description": "SharePoint base URL",
@@ -299,31 +307,18 @@
               "type": "object",
               "description": "SharePoint authentication configuration",
               "required": [
-                "mode",
-                "tenantId"
+                "mode"
               ],
               "properties": {
                 "mode": {
                   "type": "string",
                   "description": "Authentication mode",
                   "enum": [
-                    "oidc",
-                    "client-secret",
                     "certificate"
                   ]
                 },
-                "tenantId": {
-                  "type": "string",
-                  "description": "Azure AD tenant ID",
-                  "examples": [
-                    "00000000-0000-0000-0000-000000000000"
-                  ]
-                },
                 "clientId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": "string",
                   "description": "Azure AD application client ID",
                   "examples": [
                     "00000000-0000-0000-0000-000000000000"
@@ -382,8 +377,7 @@
                 "apiRateLimitPerMinute": {
                   "type": "integer",
                   "description": "Rate limiting for Graph API requests per minute"
-                },
-                "additionalProperties": false
+                }
               },
               "additionalProperties": false
             }
@@ -559,16 +553,12 @@
               "type": "integer",
               "description": "Timeout in seconds for processing steps"
             },
-            "maxFilesToScan": {
-              "type": "integer",
-              "description": "Maximum number of files to scan"
-            },
             "maxFileSizeBytes": {
               "type": [
                 "integer",
                 "null"
               ],
-              "description": "Maximum number of files to scan"
+              "description": "Maximum file size in bytes"
             },
             "scanIntervalCron": {
               "type": "string",
