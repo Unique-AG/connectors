@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { DrizzleModule } from '~/drizzle/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
+import { UniqueModule } from '~/unique/unique.module';
 import { TranscriptController } from './transcript.controller';
 import { TranscriptService } from './transcript.service';
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule],
+  imports: [DrizzleModule, MsGraphModule, UniqueModule],
   providers: [TranscriptService],
   controllers: [TranscriptController],
   exports: [TranscriptService],
