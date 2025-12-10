@@ -158,7 +158,7 @@ connectorConfig:
       mode: certificate
       # -- Azure AD application client ID
       # example: 00000000-0000-0000-0000-000000000000
-      # The matching secret must be sourced from a secret
+      # The matching certificate (private key file) must be sourced and mounted from a secret
       clientId: unset_default_value
       # -- path to the private key file of the Azure AD application certificate in PEM format
       # this closely relates to the volumeMounts and volume definitions in the connector section
