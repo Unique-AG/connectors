@@ -262,6 +262,7 @@
             "baseUrl",
             "siteIds",
             "syncColumnName",
+            "auth",
             "graph"
           ],
           "properties": {
