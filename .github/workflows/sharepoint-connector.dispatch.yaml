@@ -1,0 +1,17 @@
+name: "[sharepoint-connector] Manual Release Re-Run"
+
+on:
+  workflow_dispatch:
+    inputs:
+      existing-version:
+        description: "Existing version of the service"
+        required: true
+        type: string
+
+jobs:
+  manual-release:
+    uses: ./.github/workflows/_template-cd.yaml
+    with:
+      service-name: sharepoint-connector
+      service-version: ${{ inputs.existing-version }}
+      dockerfile: services/sharepoint-connector/deploy/Dockerfile
