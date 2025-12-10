@@ -37,7 +37,6 @@ import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
 import { TranscriptModule } from './transcript/transcript.module';
-import { UniqueModule } from './unique/unique.module';
 
 @Module({
   imports: [
@@ -131,7 +130,6 @@ import { UniqueModule } from './unique/unique.module';
     MsGraphModule,
     AMQPModule,
     TranscriptModule,
-    UniqueModule
   ],
   controllers: [ManifestController],
   providers: [

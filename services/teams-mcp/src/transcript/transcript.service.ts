@@ -11,6 +11,7 @@ import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';
 import { DRIZZLE, type DrizzleDatabase, subscriptions, userProfiles } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { MicrosoftGraphErrorSchema, makeGraphError } from '~/msgraph/graph-error';
+import { UniqueService } from '~/unique/unique.service';
 import type { Redacted } from '~/utils/redacted';
 import {
   BatchRequest,
@@ -38,6 +39,7 @@ export class TranscriptService {
     private readonly trace: TraceService,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
+    private readonly unique: UniqueService,
   ) {}
 
   public isWebhookTrustedViaState(state: Redacted<string> | null): boolean {
@@ -658,23 +660,30 @@ export class TranscriptService {
 
     const transcriptContentResponse = batch.getResponseById('transcriptContent');
     if (!transcriptContentResponse.ok) {
-      const error = await transcriptContentResponse.json().then(MicrosoftGraphErrorSchema.parseAsync);
-      throw makeGraphError(error, transcriptContentResponse.status, transcriptContentResponse.headers);
+      const error = await transcriptContentResponse
+        .json()
+        .then(MicrosoftGraphErrorSchema.parseAsync);
+      throw makeGraphError(
+        error,
+        transcriptContentResponse.status,
+        transcriptContentResponse.headers,
+      );
     }
-    const vtt = Buffer.from(await transcriptContentResponse.text(), 'base64');
-    span?.addEvent('transcript content retrieved', { sizeBytes: vtt.length });
-    this.logger.debug({ sizeBytes: vtt.length }, 'transcript VTT content retrieved');
+    const vttStream = transcriptContentResponse.body;
+    span?.addEvent('transcript content retrieved', { hasVtt: !!vttStream });
+    this.logger.debug({ hasVtt: !!vttStream }, 'transcript VTT content retrieved');
+    if (!vttStream) throw new Error('expected a vtt transcript body');
 
     const transcriptMetaResponse = batch.getResponseById('transcriptMeta');
     if (!transcriptMetaResponse.ok) {
       const error = await transcriptMetaResponse.json().then(MicrosoftGraphErrorSchema.parseAsync);
       throw makeGraphError(error, transcriptMetaResponse.status, transcriptMetaResponse.headers);
     }
-    const meta = await transcriptMetaResponse.text().then(TranscriptVttMetadataSchema.parseAsync);
+    const _meta = await transcriptMetaResponse.text().then(TranscriptVttMetadataSchema.parseAsync);
     span?.addEvent('transcript metadata retrieved');
     this.logger.debug('transcript metadata retrieved');
 
-    let recording: ReadableStream<Uint8Array<ArrayBuffer>> | undefined;
+    let recordingStream: ReadableStream<Uint8Array<ArrayBuffer>> | undefined;
     try {
       this.logger.debug(
         { contentCorrelationId: transcript.contentCorrelationId },
@@ -697,7 +706,7 @@ export class TranscriptService {
       span?.setAttribute('recording.id', recordingData.id);
       this.logger.debug({ recordingId: recordingData.id }, 'found correlated recording');
 
-      recording = await client
+      recordingStream = await client
         .api(
           `/v1.0/users/${userId}/onlineMeetings/${meetingId}/recordings/${recordingData.id}/content`,
         )
@@ -714,28 +723,24 @@ export class TranscriptService {
     }
 
     span?.addEvent('transcript processing completed', {
-      hasRecording: recording !== undefined,
+      hasRecording: recordingStream !== undefined,
     });
 
-    this.logger.log(
+    await this.unique.onTranscript(
       {
-        meetingId,
-        transcriptId,
-        hasRecording: recording !== undefined,
+        subject: meeting.subject ?? '',
+        startDateTime: meeting.startDateTime,
+        endDateTime: meeting.endDateTime,
+        owner: {
+          name: meeting.participants.organizer.identity.user.displayName ?? '',
+          email: meeting.participants.organizer.upn,
+        },
+        participants: meeting.participants.attendees.map((p) => ({
+          name: p.identity.user.displayName ?? '',
+          email: p.upn,
+        })),
       },
-      'transcript created notification processed successfully',
-    );
-
-    await recording?.cancel();
-    this.logger.debug(
-      {
-        meeting,
-        transcript,
-        vtt: vtt.length,
-        recording: recording !== undefined,
-        meta,
-      },
-      'complete transcript data',
+      { id: transcript.id, content: vttStream },
     );
   }
 }

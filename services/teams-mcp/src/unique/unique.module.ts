@@ -5,6 +5,6 @@ import { UniqueService } from './unique.service';
 @Module({
   imports: [DrizzleModule],
   providers: [UniqueService],
-  exports: [],
+  exports: [UniqueService],
 })
 export class UniqueModule {}
