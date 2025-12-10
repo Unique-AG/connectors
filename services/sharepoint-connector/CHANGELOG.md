@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.0.0-beta.7](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.6...sharepoint-connector@2.0.0-beta.7) (2025-12-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sharepoint-connector,outlook-mcp,factset-mcp:** all git tags no longer include the version 'v'. In a future version, all releases will also not include the v anymore.
+
+### Features
+
+* **sharepoint-connector,outlook-mcp,factset-mcp:** remove v in tags ([#168](https://github.com/Unique-AG/connectors/issues/168)) ([2f56700](https://github.com/Unique-AG/connectors/commit/2f5670000c968d8bf0e0051eeb47766f586c84cc))
+* **sharepoint-connector:** add sync failure alert ([#169](https://github.com/Unique-AG/connectors/issues/169)) ([e8c8980](https://github.com/Unique-AG/connectors/commit/e8c8980e2784d2c1e7c4281f77618a9431e8d7ba))
+* **sharepoint-connector:** UN-15207 Added cleanup step to delete ingested files if upload fails ([#160](https://github.com/Unique-AG/connectors/issues/160)) ([afcc182](https://github.com/Unique-AG/connectors/commit/afcc1821e87387b8fc83810a44670fe4067f750c))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** shrink alert detection windows ([#166](https://github.com/Unique-AG/connectors/issues/166)) ([7a31956](https://github.com/Unique-AG/connectors/commit/7a31956534c43837b0900e8b8ef622130ff67911))
+
 ## [2.0.0-beta.6](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.5...sharepoint-connector@v2.0.0-beta.6) (2025-12-08)
 
 
