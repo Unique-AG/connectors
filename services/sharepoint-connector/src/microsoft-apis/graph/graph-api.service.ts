@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { Readable } from 'node:stream';
 import { Client } from '@microsoft/microsoft-graph-client';
 import type { Drive, List } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
@@ -154,36 +155,19 @@ export class GraphApiService {
     return { items: sharepointContentFilesToSync, directories: sharepointDirectoryItemsToSync };
   }
 
-  public async downloadFileContent(driveId: string, itemId: string): Promise<Buffer> {
+  public async getFileContentStream(driveId: string, itemId: string): Promise<Readable> {
     const logPrefix = `[DriveId: ${driveId}, ItemId: ${itemId}]`;
-    this.logger.debug(`${logPrefix} Downloading file content`);
+    this.logger.debug(`${logPrefix} Getting file content stream`);
 
     try {
-      const stream: ReadableStream = await this.makeRateLimitedRequest(() =>
-        this.graphClient.api(`/drives/${driveId}/items/${itemId}/content`).getStream(),
+      return await this.makeRateLimitedRequest(async () =>
+        Readable.fromWeb(
+          await this.graphClient.api(`/drives/${driveId}/items/${itemId}/content`).getStream(),
+        ),
       );
-
-      const chunks: Buffer[] = [];
-
-      for await (const chunk of stream) {
-        const bufferChunk = Buffer.from(chunk);
-        chunks.push(bufferChunk);
-      }
-
-      // TODO (UN-14011) replace with a metric
-      this.logger.debug(`${logPrefix} Starting Buffer.concat for ${chunks.length} chunks`);
-      const concatStartTime = Date.now();
-
-      const finalBuffer = Buffer.concat(chunks);
-
-      this.logger.debug(
-        `${logPrefix} Buffer.concat completed in ${Date.now() - concatStartTime}ms`,
-      );
-
-      return finalBuffer;
     } catch (error) {
       this.logger.error({
-        msg: `${logPrefix} Failed to download file content`,
+        msg: `${logPrefix} Failed to get file content stream`,
         itemId,
         driveId,
         error: sanitizeError(error),

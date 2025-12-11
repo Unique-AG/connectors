@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
+import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import type { ProcessingContext } from '../types/processing-context';
 import { AspxProcessingStep } from './aspx-processing.step';
@@ -11,6 +12,7 @@ describe('AspxProcessingStep', () => {
   let mockConfigService: {
     get: ReturnType<typeof vi.fn>;
   };
+  let mockApiService: GraphApiService;
 
   const mockListItem: ListItem = {
     id: 'f1',
@@ -67,12 +69,22 @@ describe('AspxProcessingStep', () => {
       }),
     };
 
-    const { unit } = await TestBed.solitary(AspxProcessingStep)
+    const { unit, unitRef } = await TestBed.solitary(AspxProcessingStep)
       .mock(ConfigService)
       .impl(() => mockConfigService)
+      .mock(GraphApiService)
+      .impl((stub) => ({
+        ...stub(),
+        getAspxPageContent: vi.fn().mockResolvedValue({
+          canvasContent: '<p>Test content</p>',
+          wikiField: undefined,
+          title: 'Test Page',
+        }),
+      }))
       .compile();
 
     step = unit;
+    mockApiService = unitRef.get(GraphApiService) as unknown as GraphApiService;
   });
 
   describe('execute', () => {
@@ -89,184 +101,191 @@ describe('AspxProcessingStep', () => {
       const result = await step.execute(contextWithDriveItem);
 
       expect(result).toBe(contextWithDriveItem);
+      expect(mockApiService.getAspxPageContent).not.toHaveBeenCalled();
     });
 
-    it('processes listItem and returns context with HTML content', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from('<p>Test content</p>', 'utf-8'),
-      };
+    it('fetches ASPX content and returns context with HTML content', async () => {
+      const result = await step.execute(mockContext);
 
-      const result = await step.execute(contextWithContent);
-
+      expect(mockApiService.getAspxPageContent).toHaveBeenCalledWith('site-1', 'drive-1', 'f1');
       expect(result.mimeType).toBe('text/html');
-      expect(result.contentBuffer).toBeDefined();
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<h2>Test Page</h2>');
-      expect(html).toContain('<h4>Test User</h4>');
-      expect(html).toContain('<p>Test content</p>');
+      expect(result.htmlContent).toBeDefined();
+      expect(result.htmlContent).toContain('<h2>Test Page</h2>');
+      expect(result.htmlContent).toContain('<h4>Test User</h4>');
+      expect(result.htmlContent).toContain('<p>Test content</p>');
     });
 
     it('wraps HTML content in proper structure', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from('<p>Test</p>', 'utf-8'),
-      };
+      const result = await step.execute(mockContext);
 
-      const result = await step.execute(contextWithContent);
-
-      const html = result.contentBuffer?.toString();
-      expect(html).toMatch(/^<div>.*<\/div>$/);
-      expect(html).toContain('<h2>Test Page</h2>');
-      expect(html).toContain('<h4>Test User</h4>');
+      expect(result.htmlContent).toMatch(/^<div>.*<\/div>$/);
+      expect(result.htmlContent).toContain('<h2>Test Page</h2>');
+      expect(result.htmlContent).toContain('<h4>Test User</h4>');
     });
 
     it('converts relative links to absolute links', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from('<a href="/sites/test/page.aspx">Link</a>', 'utf-8'),
-      };
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: '<a href="/sites/test/page.aspx">Link</a>',
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain(
+      expect(result.htmlContent).toContain(
         '<a href="https://contoso.sharepoint.com/sites/test/page.aspx">Link</a>',
       );
     });
 
     it('converts multiple relative links in same content', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from(
-          '<a href="/page1.aspx">Link 1</a><a href="/page2.aspx">Link 2</a>',
-          'utf-8',
-        ),
-      };
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: '<a href="/page1.aspx">Link 1</a><a href="/page2.aspx">Link 2</a>',
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<a href="https://contoso.sharepoint.com/page1.aspx">Link 1</a>');
-      expect(html).toContain('<a href="https://contoso.sharepoint.com/page2.aspx">Link 2</a>');
+      expect(result.htmlContent).toContain(
+        '<a href="https://contoso.sharepoint.com/page1.aspx">Link 1</a>',
+      );
+      expect(result.htmlContent).toContain(
+        '<a href="https://contoso.sharepoint.com/page2.aspx">Link 2</a>',
+      );
     });
 
     it('handles links with query parameters', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from('<a href="/page.aspx?id=123&type=test">Link</a>', 'utf-8'),
-      };
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: '<a href="/page.aspx?id=123&type=test">Link</a>',
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain(
+      expect(result.htmlContent).toContain(
         '<a href="https://contoso.sharepoint.com/page.aspx?id=123&type=test">Link</a>',
       );
     });
 
     it('handles links with fragments', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from('<a href="/page.aspx#section">Link</a>', 'utf-8'),
-      };
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: '<a href="/page.aspx#section">Link</a>',
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<a href="https://contoso.sharepoint.com/page.aspx#section">Link</a>');
+      expect(result.htmlContent).toContain(
+        '<a href="https://contoso.sharepoint.com/page.aspx#section">Link</a>',
+      );
     });
 
     it('does not convert non-href attributes', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from('<img src="/sites/test/image.png">', 'utf-8'),
-      };
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: '<img src="/sites/test/image.png">',
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<img src="/sites/test/image.png">');
+      expect(result.htmlContent).toContain('<img src="/sites/test/image.png">');
     });
 
     it('preserves absolute links', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from('<a href="https://external.com/page">External</a>', 'utf-8'),
-      };
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: '<a href="https://external.com/page">External</a>',
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<a href="https://external.com/page">External</a>');
+      expect(result.htmlContent).toContain('<a href="https://external.com/page">External</a>');
     });
 
     it('handles deeply nested relative paths', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from(
-          '<a href="/sites/team/docs/subfolder/document.aspx">Link</a>',
-          'utf-8',
-        ),
-      };
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: '<a href="/sites/team/docs/subfolder/document.aspx">Link</a>',
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain(
+      expect(result.htmlContent).toContain(
         '<a href="https://contoso.sharepoint.com/sites/team/docs/subfolder/document.aspx">Link</a>',
       );
     });
 
     it('handles empty href values', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from('<a href="">Empty Link</a>', 'utf-8'),
-      };
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: '<a href="">Empty Link</a>',
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<a href="">Empty Link</a>');
+      expect(result.htmlContent).toContain('<a href="">Empty Link</a>');
     });
 
     it('handles mixed relative and absolute links', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from(
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent:
           '<a href="/relative.aspx">Relative</a><a href="https://absolute.com">Absolute</a>',
-          'utf-8',
-        ),
-      };
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<a href="https://contoso.sharepoint.com/relative.aspx">Relative</a>');
-      expect(html).toContain('<a href="https://absolute.com">Absolute</a>');
+      expect(result.htmlContent).toContain(
+        '<a href="https://contoso.sharepoint.com/relative.aspx">Relative</a>',
+      );
+      expect(result.htmlContent).toContain('<a href="https://absolute.com">Absolute</a>');
     });
 
     it('handles baseUrl without trailing slash correctly', async () => {
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from('<a href="/page.aspx">Link</a>', 'utf-8'),
-      };
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: '<a href="/page.aspx">Link</a>',
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<a href="https://contoso.sharepoint.com/page.aspx">Link</a>');
+      expect(result.htmlContent).toContain(
+        '<a href="https://contoso.sharepoint.com/page.aspx">Link</a>',
+      );
     });
 
-    it('handles context with missing contentBuffer', async () => {
-      const contextWithoutContent = { ...mockContext };
+    it('handles empty content from API', async () => {
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: undefined,
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithoutContent);
+      const result = await step.execute(mockContext);
 
       expect(result.mimeType).toBe('text/html');
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<h2>Test Page</h2>');
-      expect(html).toContain('<h4>Test User</h4>');
+      expect(result.htmlContent).toContain('<h2>Test Page</h2>');
+      expect(result.htmlContent).toContain('<h4>Test User</h4>');
+    });
+
+    it('uses wikiField when canvasContent is undefined', async () => {
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: undefined,
+        wikiField: '<p>Wiki content</p>',
+        title: 'Test',
+      });
+
+      const result = await step.execute(mockContext);
+
+      expect(result.htmlContent).toContain('<p>Wiki content</p>');
     });
 
     it('uses filename when Title field is missing', async () => {
@@ -280,19 +299,17 @@ describe('AspxProcessingStep', () => {
               '@odata.etag': 'etag1',
               FinanceGPTKnowledge: false,
               _ModerationStatus: ModerationStatus.Approved,
-              Title: '', // Empty title will fallback to filename
+              Title: '',
               FileSizeDisplay: '512',
               FileLeafRef: 'test.aspx',
             },
           },
         },
-        contentBuffer: Buffer.from('<p>Content</p>', 'utf-8'),
       } as ProcessingContext;
 
       const result = await step.execute(contextWithMissingTitle);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<h2>test.aspx</h2>');
+      expect(result.htmlContent).toContain('<h2>test.aspx</h2>');
     });
 
     it('handles empty author displayName', async () => {
@@ -307,13 +324,11 @@ describe('AspxProcessingStep', () => {
             },
           },
         },
-        contentBuffer: Buffer.from('<p>Content</p>', 'utf-8'),
       } as ProcessingContext;
 
       const result = await step.execute(contextWithEmptyAuthor);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<h4></h4>');
+      expect(result.htmlContent).toContain('<h4></h4>');
     });
 
     it('normalizes baseUrl with trailing slash before converting links', async () => {
@@ -322,15 +337,17 @@ describe('AspxProcessingStep', () => {
         return undefined;
       });
 
-      const contextWithContent = {
-        ...mockContext,
-        contentBuffer: Buffer.from('<a href="/sites/test">Link</a>', 'utf-8'),
-      };
+      vi.mocked(mockApiService.getAspxPageContent).mockResolvedValue({
+        canvasContent: '<a href="/sites/test">Link</a>',
+        wikiField: undefined,
+        title: 'Test',
+      });
 
-      const result = await step.execute(contextWithContent);
+      const result = await step.execute(mockContext);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<a href="https://contoso.sharepoint.com/sites/test">Link</a>');
+      expect(result.htmlContent).toContain(
+        '<a href="https://contoso.sharepoint.com/sites/test">Link</a>',
+      );
     });
 
     it('handles null author createdBy', async () => {
@@ -343,13 +360,17 @@ describe('AspxProcessingStep', () => {
             createdBy: null as unknown as ListItem['createdBy'],
           },
         },
-        contentBuffer: Buffer.from('<p>Content</p>', 'utf-8'),
       } as ProcessingContext;
 
       const result = await step.execute(contextWithNullCreatedBy);
 
-      const html = result.contentBuffer?.toString();
-      expect(html).toContain('<h4>unknown-author</h4>');
+      expect(result.htmlContent).toContain('<h4>unknown-author</h4>');
+    });
+
+    it('sets correct fileSize based on HTML content byte length', async () => {
+      const result = await step.execute(mockContext);
+
+      expect(result.fileSize).toBe(Buffer.byteLength(result.htmlContent ?? '', 'utf-8'));
     });
   });
 });
