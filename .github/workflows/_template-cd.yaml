@@ -89,7 +89,7 @@ jobs:
 
       - name: Login to both helm registries
         run: |
-          echo "${{ steps.acr-token.outputs.token }}" | helm registry login ${UNIQUECR_REGISTRY%%.*} --username 00000000-0000-0000-0000-000000000000 --password-stdin
+          echo "${{ steps.acr-token.outputs.token }}" | helm registry login ${{ env.UNIQUECR_REGISTRY }} --username 00000000-0000-0000-0000-000000000000 --password-stdin
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.GHCR_REGISTRY }} --username ${{ github.actor }} --password-stdin
 
       - name: Build and push container
