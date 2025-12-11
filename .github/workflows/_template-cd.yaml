@@ -120,5 +120,5 @@ jobs:
           done
           cosign sign --yes ${images}
           cosign verify ${images} \
-          --certificate-identity=https://github.com/${{ github.workflow_ref }} \
+          --certificate-identity-regexp="^https://github.com/${{ github.repository }}/\.github/workflows/.*@refs/heads/main$" \
           --certificate-oidc-issuer=https://token.actions.githubusercontent.com

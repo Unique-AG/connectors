@@ -9,22 +9,11 @@ metadata:
 data:
   # Sharepoint authentication config
   SHAREPOINT_AUTH_MODE: {{ .Values.connectorConfig.sharepoint.auth.mode | quote }}
-  SHAREPOINT_AUTH_TENANT_ID: {{ .Values.connectorConfig.sharepoint.auth.tenantId | quote }}
-  {{- if eq .Values.connectorConfig.sharepoint.auth.mode "client-secret" }}
-  SHAREPOINT_AUTH_CLIENT_ID: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
-  {{- end }}
+  SHAREPOINT_AUTH_TENANT_ID: {{ .Values.connectorConfig.sharepoint.tenantId | quote }}
   {{- if eq .Values.connectorConfig.sharepoint.auth.mode "certificate" }}
   SHAREPOINT_AUTH_CLIENT_ID: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
   SHAREPOINT_AUTH_PRIVATE_KEY_PATH: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPath | quote }}
-  {{- if .Values.connectorConfig.sharepoint.auth.privateKeyPassword }}
-  SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPassword | quote }}
-  {{- end }}
-  {{- if .Values.connectorConfig.sharepoint.auth.thumbprintSha1 }}
   SHAREPOINT_AUTH_THUMBPRINT_SHA1: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha1 | quote }}
-  {{- end }}
-  {{- if .Values.connectorConfig.sharepoint.auth.thumbprintSha256 }}
-  SHAREPOINT_AUTH_THUMBPRINT_SHA256: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha256 | quote }}
-  {{- end }}
   {{- end }}
   # General SharePoint config
   {{- if .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute }}
@@ -62,9 +51,6 @@ data:
   PROCESSING_STEP_TIMEOUT_SECONDS: {{ .Values.connectorConfig.processing.stepTimeoutSeconds | quote }}
   PROCESSING_ALLOWED_MIME_TYPES: {{ .Values.connectorConfig.processing.allowedMimeTypes | join "," }}
   PROCESSING_CONCURRENCY: {{ .Values.connectorConfig.processing.concurrency | quote }}
-  {{- if .Values.connectorConfig.processing.maxFilesToScan }}
-  PROCESSING_MAX_FILES_TO_SCAN: {{ .Values.connectorConfig.processing.maxFilesToScan | quote }}
-  {{- end }}
   {{- if .Values.connectorConfig.processing.maxFileSizeBytes }}
   PROCESSING_MAX_FILE_SIZE_BYTES: {{ .Values.connectorConfig.processing.maxFileSizeBytes | quote }}
   {{- end }}

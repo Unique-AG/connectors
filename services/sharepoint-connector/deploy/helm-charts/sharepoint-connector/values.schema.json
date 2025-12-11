@@ -258,12 +258,21 @@
           "type": "object",
           "description": "SharePoint configuration",
           "required": [
+            "tenantId",
             "baseUrl",
             "siteIds",
             "syncColumnName",
+            "auth",
             "graph"
           ],
           "properties": {
+            "tenantId": {
+              "type": "string",
+              "description": "Azure AD tenant ID against which the Graph API calls are made",
+              "examples": [
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            },
             "baseUrl": {
               "type": "string",
               "description": "SharePoint base URL",
@@ -300,30 +309,20 @@
               "description": "SharePoint authentication configuration",
               "required": [
                 "mode",
-                "tenantId"
+                "clientId",
+                "privateKeyPath",
+                "thumbprintSha1"
               ],
               "properties": {
                 "mode": {
                   "type": "string",
                   "description": "Authentication mode",
                   "enum": [
-                    "oidc",
-                    "client-secret",
                     "certificate"
                   ]
                 },
-                "tenantId": {
-                  "type": "string",
-                  "description": "Azure AD tenant ID",
-                  "examples": [
-                    "00000000-0000-0000-0000-000000000000"
-                  ]
-                },
                 "clientId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": "string",
                   "description": "Azure AD application client ID",
                   "examples": [
                     "00000000-0000-0000-0000-000000000000"
@@ -337,39 +336,19 @@
                   "description": "Azure AD application client secret"
                 },
                 "privateKeyPath": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": "string",
                   "description": "Path to the private key file of the Azure AD application certificate in PEM format",
                   "examples": [
                     "/app/key.pem",
                     "/my/custom/mount/path/key.pem"
                   ]
                 },
-                "privateKeyPassword": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "description": "Password for the private key file of the Azure AD application certificate (if the key is encrypted)"
-                },
                 "thumbprintSha1": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": "string",
                   "description": "SHA1 thumbprint of the Azure AD application certificate",
                   "examples": [
                     "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"
                   ]
-                },
-                "thumbprintSha256": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "description": "SHA256 thumbprint of the Azure AD application certificate"
                 }
               },
               "additionalProperties": false
@@ -382,8 +361,7 @@
                 "apiRateLimitPerMinute": {
                   "type": "integer",
                   "description": "Rate limiting for Graph API requests per minute"
-                },
-                "additionalProperties": false
+                }
               },
               "additionalProperties": false
             }
@@ -559,16 +537,12 @@
               "type": "integer",
               "description": "Timeout in seconds for processing steps"
             },
-            "maxFilesToScan": {
-              "type": "integer",
-              "description": "Maximum number of files to scan"
-            },
             "maxFileSizeBytes": {
               "type": [
                 "integer",
                 "null"
               ],
-              "description": "Maximum number of files to scan"
+              "description": "Maximum file size in bytes"
             },
             "scanIntervalCron": {
               "type": "string",

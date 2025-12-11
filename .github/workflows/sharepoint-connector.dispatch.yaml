@@ -1,5 +1,8 @@
 name: "[sharepoint-connector] Manual Release Re-Run"
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:

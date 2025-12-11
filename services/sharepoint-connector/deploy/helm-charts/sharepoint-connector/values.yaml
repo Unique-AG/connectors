@@ -138,6 +138,9 @@ connectorConfig:
   # -- if disabled, connector.extraEnvCM must be set to []
   enabled: true
   sharepoint:
+    # -- tenant id against which the graph api calls are made
+    # example: 12345678-1234-1234-1234-123456789012
+    tenantId: unset_default_value
     # -- base url of the sharepoint instance
     # example: https://acme.sharepoint.com
     baseUrl: unset_default_value
@@ -150,19 +153,23 @@ connectorConfig:
     # example: FinanceGPTKnowledge
     syncColumnName: unset_default_value
     auth:
-      mode: certificate # oidc, client-secret, certificate
-      # -- tenant id against which the graph api calls are made
-      # example: 12345678-1234-1234-1234-123456789012
-      tenantId: unset_default_value
-      clientId: null
+      # -- authentication mode
+      # possible values: certificate
+      mode: certificate
+      # -- Azure AD application client ID
+      # example: 00000000-0000-0000-0000-000000000000
+      # The matching certificate (private key file) must be sourced and mounted from a secret
+      clientId: unset_default_value
       # -- path to the private key file of the Azure AD application certificate in PEM format
       # this closely relates to the volumeMounts and volume definitions in the connector section
       # users wanting to use another path can override this value and unset the volumeMounts and
       # volume definitions
+      # if the key is encrypted, the password must be via a secret into a SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD environment variable
       privateKeyPath: /app/key.pem
-      privateKeyPassword: null
-      thumbprintSha1: null
-      thumbprintSha256: null
+      # -- SHA1 thumbprint of the Azure AD application certificate
+      # users of the sharepoint-connector-secrets terraform module can get this from the modules outputs (thumbprint_sha1)
+      # users that provision their application registration manually can get this from the Azure portal
+      thumbprintSha1: unset_default_value
     graph:
       apiRateLimitPerMinute: 780000
 
