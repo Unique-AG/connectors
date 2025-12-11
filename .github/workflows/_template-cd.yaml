@@ -140,7 +140,7 @@ jobs:
           --allow-run \
           --allow-read \
           --allow-write=${{ env.DESTINATION }} \
-          .github/actions/helm-package-push-action/helm-package-push.ts \
+          scripts/helm-package-push.ts \
           --chart services/${{ inputs.service-name }}/deploy/helm-charts/${{ inputs.service-name }} \
           --destination ${{ env.DESTINATION }} \
           --registry oci://${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_CHART_REPO }} \
