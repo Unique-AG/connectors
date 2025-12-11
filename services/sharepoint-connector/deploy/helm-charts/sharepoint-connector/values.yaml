@@ -168,7 +168,7 @@ connectorConfig:
     # example: https://api.unique.app/scope-management
     # example: http://node-scope-management.finance-gpt:8094
     scopeManagementServiceBaseUrl: unset_default_value
-    # -- Inheritance mode for scopes and files in content_only mode.
+    # -- THIS CONFIG HAS EFFECT ONLY IN CONTENT_ONLY SYNC MODE: inheritance mode for scopes and files.
     # Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.
     # When unset, defaults to inherit_scopes_and_files; ignored in content_and_permissions.
     inheritModes: inherit_scopes_and_files

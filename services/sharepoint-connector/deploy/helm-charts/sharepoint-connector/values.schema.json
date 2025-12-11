@@ -368,7 +368,7 @@
                 "inherit_files",
                 "none"
               ],
-              "description": "This config has effect only in content_only sync mode. It indicates whether we should inherit permissions for newly created scopes and files in Unique Knowledge Base. Allowed values: none, inherit_scopes, inherit_files, inherit_scopes_and_files",
+              "description": "This config has effect only in CONTENT_ONLY sync mode. It indicates whether we should inherit permissions for newly created scopes and files in Unique Knowledge Base. Allowed values: none, inherit_scopes, inherit_files, inherit_scopes_and_files",
               "default": "inherit_scopes_and_files"
             },
             "ingestionMode": {

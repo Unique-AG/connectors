@@ -28,6 +28,7 @@ export const resolveInheritanceSettings = (
     return INHERITANCE_PRESETS.none;
   }
 
-  const inheritModes = configService.get('unique.inheritModes', { infer: true }) ?? 'inherit_scopes_and_files'; 
+  const inheritModes =
+    configService.get('unique.inheritModes', { infer: true }) ?? 'inherit_scopes_and_files';
   return INHERITANCE_PRESETS[inheritModes];
 };
