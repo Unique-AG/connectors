@@ -4,6 +4,7 @@
 node_modules
 .pnp
 .pnp.js
+deno.lock
 
 # Local env files
 .env
