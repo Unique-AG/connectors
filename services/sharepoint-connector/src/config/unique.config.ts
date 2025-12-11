@@ -5,6 +5,7 @@ import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { parseJsonEnvironmentVariable } from '../utils/config.util';
+import { INHERITANCE_PRESETS } from '../utils/inheritance.constants';
 import { Redacted } from '../utils/redacted';
 
 // ==== Config for local in-cluster communication with Unique API services ====
@@ -54,6 +55,7 @@ const baseConfig = z.object({
   inheritModes: z
     .enum(['inherit_scopes_and_files', 'inherit_scopes', 'inherit_files', 'none'] as const)
     .default('inherit_scopes_and_files')
+    .transform((mode) => INHERITANCE_PRESETS[mode])
     .describe(
       'Inheritance mode for generated scopes and ingested files in content_only mode; ignored in content_and_permissions mode. Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.',
     ),

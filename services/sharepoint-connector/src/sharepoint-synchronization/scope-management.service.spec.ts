@@ -272,7 +272,7 @@ describe('ScopeManagementService', () => {
 
     it('uses explicit inheritAccess configuration when provided', async () => {
       configServiceMock.get.mockImplementation((key: string) => {
-        if (key === 'unique.inheritModes') return 'inherit_scopes';
+        if (key === 'unique.inheritModes') return { inheritScopes: true, inheritFiles: false };
         if (key === 'processing.syncMode') return 'content_only';
         if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
         return undefined;
