@@ -1,5 +1,42 @@
 # Changelog
 
+## [2.0.0-beta.8](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.7...sharepoint-connector@2.0.0-beta.8) (2025-12-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sharepoint-connector:** restructure auth config and fix schema issues ([#178](https://github.com/Unique-AG/connectors/issues/178))
+* tenantId moved from sharepoint.auth to sharepoint level     - Move tenantId from auth section to sharepoint root for clarity
+    - Remove unused oidc and client-secret auth modes (only certificate
+    supported)
+        - Change clientId from nullable to required string with default
+    - Fix maxFileSizeBytes description (was incorrectly "max files to scan")
+        - Remove deprecated maxFilesToScan from schema
+        - Fix misplaced additionalProperties in graph schema
+* **sharepoint-connector:** removes settings from helm chart (but they werent used)
+
+### Features
+
+* **sharepoint-connector:** add certificate thumbprint outputs ([b439004](https://github.com/Unique-AG/connectors/commit/b43900475ad2e43762d7fc592c201b4ee862ee73))
+* **sharepoint-connector:** stream file to storage instead of buffering ([#172](https://github.com/Unique-AG/connectors/issues/172)) ([6dcd54a](https://github.com/Unique-AG/connectors/commit/6dcd54a911e1f934c4a7733307d051e32f61d52a))
+
+
+### Bug Fixes
+
+* **ci:** use certificate-identity-regexp for cosign signature ([b439004](https://github.com/Unique-AG/connectors/commit/b43900475ad2e43762d7fc592c201b4ee862ee73))
+* **sharepoint-connector:** restructure auth config and fix schema issues ([#178](https://github.com/Unique-AG/connectors/issues/178)) ([b439004](https://github.com/Unique-AG/connectors/commit/b43900475ad2e43762d7fc592c201b4ee862ee73))
+* **sharepoint-connector:** store internally enabled by default ([#182](https://github.com/Unique-AG/connectors/issues/182)) ([109d1fd](https://github.com/Unique-AG/connectors/commit/109d1fdf8f9551441f931180b92ff4938b534331))
+
+
+### Documentation
+
+* add signed artifact verification instructions ([b439004](https://github.com/Unique-AG/connectors/commit/b43900475ad2e43762d7fc592c201b4ee862ee73))
+
+
+### Miscellaneous Chores
+
+* **sharepoint-connector:** remove keypassword and sha256 thumbprint ([b439004](https://github.com/Unique-AG/connectors/commit/b43900475ad2e43762d7fc592c201b4ee862ee73))
+
 ## [2.0.0-beta.7](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@v2.0.0-beta.6...sharepoint-connector@2.0.0-beta.7) (2025-12-10)
 
 
