@@ -29,8 +29,8 @@ async function exec(
 
 async function getChartMetadata(chartPath: string): Promise<{ name: string; version: string }> {
   const chartYaml = await Deno.readTextFile(join(chartPath, "Chart.yaml"));
-  const nameMatch = chartYaml.match(/^name:\s*(.+)$/m);
-  const versionMatch = chartYaml.match(/^version:\s*(.+)$/m);
+  const nameMatch = chartYaml.match(/^name:\s*([^#\n]+)/m);
+  const versionMatch = chartYaml.match(/^version:\s*([^#\n]+)/m);
   if (!nameMatch) throw new Error("Could not find chart name in Chart.yaml");
   if (!versionMatch) throw new Error("Could not find chart version in Chart.yaml");
   return { name: nameMatch[1].trim(), version: versionMatch[1].trim() };
