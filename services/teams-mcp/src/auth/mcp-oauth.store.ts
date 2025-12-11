@@ -170,7 +170,7 @@ export class McpOAuthStore implements IOAuthStore {
     const event = UserUpsertEvent.encode({
       type: 'user.upsert',
       id: TypeID.fromString(saved.id, 'user_profile'),
-    })
+    });
     const published = this.emitter.emit(event.type, event);
     if (published === false) throw new Error('Could not publish event');
 

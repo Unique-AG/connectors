@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TraceService } from 'nestjs-otel';
 import type { UniqueConfigNamespaced } from '~/config';
 import {
   PublicAddScopeAccessRequestSchema,
@@ -28,7 +27,6 @@ export class UniqueService {
 
   public constructor(
     private readonly config: ConfigService<UniqueConfigNamespaced, true>,
-    private readonly trace: TraceService,
   ) {}
 
   private getAuthHeaders(): Record<string, string> {
@@ -256,7 +254,7 @@ export class UniqueService {
 
     return {
       ...result,
-      writeUrl: this.correctWriteUrl(result.writeUrl)
+      writeUrl: this.correctWriteUrl(result.writeUrl),
     };
   }
 

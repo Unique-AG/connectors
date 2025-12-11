@@ -43,7 +43,15 @@ import { TranscriptModule } from './transcript/transcript.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
-      load: [amqpConfig, appConfig, authConfig, databaseConfig, encryptionConfig, microsoftConfig, uniqueConfig],
+      load: [
+        amqpConfig,
+        appConfig,
+        authConfig,
+        databaseConfig,
+        encryptionConfig,
+        microsoftConfig,
+        uniqueConfig,
+      ],
     }),
     LoggerModule.forRootAsync({
       inject: [appConfig.KEY],
@@ -83,7 +91,14 @@ import { TranscriptModule } from './transcript/transcript.module';
     EventEmitterModule.forRoot(),
     McpOAuthModule.forRootAsync({
       imports: [DrizzleModule],
-      inject: [ConfigService, AesGcmEncryptionService, DRIZZLE, CACHE_MANAGER, MetricService, EventEmitter2],
+      inject: [
+        ConfigService,
+        AesGcmEncryptionService,
+        DRIZZLE,
+        CACHE_MANAGER,
+        MetricService,
+        EventEmitter2,
+      ],
       useFactory: async (
         configService: ConfigService<
           AppConfigNamespaced & MicrosoftConfigNamespaced & AuthConfigNamespaced,
@@ -93,7 +108,7 @@ import { TranscriptModule } from './transcript/transcript.module';
         drizzle: DrizzleDatabase,
         cacheManager: Cache,
         metricService: MetricService,
-        emitter: EventEmitter2
+        emitter: EventEmitter2,
       ) => ({
         provider: MicrosoftOAuthProvider,
 
@@ -102,7 +117,7 @@ import { TranscriptModule } from './transcript/transcript.module';
         hmacSecret: configService.get('auth.hmacSecret', { infer: true }).value,
 
         serverUrl: configService.get('app.selfUrl', { infer: true }).toString().slice(0, -1),
-        resource: new URL("/mcp", configService.get('app.selfUrl', { infer: true })).toString(),
+        resource: new URL('/mcp', configService.get('app.selfUrl', { infer: true })).toString(),
 
         accessTokenExpiresIn: configService.get('auth.accessTokenExpiresInSeconds', {
           infer: true,

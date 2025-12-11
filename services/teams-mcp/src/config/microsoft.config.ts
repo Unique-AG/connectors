@@ -18,8 +18,8 @@ const ConfigSchema = z.object({
     'The webhook secret for validating subscriptions hooks (spoof protection). Must be a 128 random characters.',
   ),
   publicWebhookUrl: stringToURL().describe(
-    'The public webhook URL reachable from external network used by Microsoft Graph subscription for pushes.'
-  )
+    'The public webhook URL reachable from external network used by Microsoft Graph subscription for pushes.',
+  ),
 });
 
 export const microsoftConfig = registerConfig('microsoft', ConfigSchema);
