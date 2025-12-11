@@ -135,7 +135,7 @@ describe('ScopeManagementService', () => {
     configServiceMock = {
       get: vi.fn((key: string) => {
         if (key === 'processing.syncMode') return 'content_only';
-        if (key === 'unique.inheritModes') return [];
+        if (key === 'unique.inheritModes') return undefined;
         if (key === 'app.logsDiagnosticsDataPolicy') {
           return 'conceal';
         }
@@ -252,7 +252,7 @@ describe('ScopeManagementService', () => {
     it('disables inheritance when permission sync mode is enabled', async () => {
       configServiceMock.get.mockImplementation((key: string) => {
         if (key === 'processing.syncMode') return 'content_and_permissions';
-        if (key === 'unique.inheritModes') return [];
+        if (key === 'unique.inheritModes') return undefined;
         if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
         return undefined;
       });
@@ -272,7 +272,7 @@ describe('ScopeManagementService', () => {
 
     it('uses explicit inheritAccess configuration when provided', async () => {
       configServiceMock.get.mockImplementation((key: string) => {
-        if (key === 'unique.inheritModes') return ['inherit_scopes'];
+        if (key === 'unique.inheritModes') return 'inherit_scopes';
         if (key === 'processing.syncMode') return 'content_only';
         if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
         return undefined;
@@ -363,7 +363,7 @@ describe('ScopeManagementService', () => {
       const configService = {
         get: vi.fn((key: string) => {
           if (key === 'processing.syncMode') return 'content_only';
-          if (key === 'unique.inheritModes') return [];
+          if (key === 'unique.inheritModes') return undefined;
           if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
           return undefined;
         }),

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
-import { parseCommaSeparatedArray, parseJsonEnvironmentVariable } from '../utils/config.util';
+import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { Redacted } from '../utils/redacted';
 
 // ==== Config for local in-cluster communication with Unique API services ====
@@ -52,12 +52,10 @@ const externalConfig = z.object({
 
 const baseConfig = z.object({
   inheritModes: z
-    .preprocess(
-      parseCommaSeparatedArray,
-      z.array(z.enum(['none', 'inherit_scopes', 'inherit_files'] as const)).optional(),
-    )
+    .enum(['inherit_scopes_and_files', 'inherit_scopes', 'inherit_files', 'none'] as const)
+    .default('inherit_scopes_and_files')
     .describe(
-      'List of inheritance options for generated scopes and ingested files. Allowed values: none, inherit_scopes, inherit_files. When empty or unset, scopes and files inherit in content_only mode; ignored in content_and_permissions mode.',
+      'Inheritance mode for generated scopes and ingested files in content_only mode; ignored in content_and_permissions mode. Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.',
     ),
   ingestionMode: z
     .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)

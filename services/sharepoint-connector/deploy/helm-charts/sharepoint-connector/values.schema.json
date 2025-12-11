@@ -361,16 +361,15 @@
               ]
             },
             "inheritModes": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "none",
-                  "inherit_scopes",
-                  "inherit_files"
-                ]
-              },
-              "description": "When empty or unset, scopes and files inherit in content_only mode by default. It is ignored in content_and_permissions ingestion mode. List of inheritance options for generated scopes and ingested files. Allowed values: none, inherit_scopes, inherit_files."
+              "type": "string",
+              "enum": [
+                "inherit_scopes_and_files",
+                "inherit_scopes",
+                "inherit_files",
+                "none"
+              ],
+              "description": "This config has effect only in content_only sync mode. It indicates whether we should inherit permissions for newly created scopes and files in Unique Knowledge Base. Allowed values: none, inherit_scopes, inherit_files, inherit_scopes_and_files",
+              "default": "inherit_scopes_and_files"
             },
             "ingestionMode": {
               "type": "string",
@@ -516,14 +515,14 @@
             },
             "maxFilesToScan": {
               "type": "integer",
-              "description": "Maximum number of files and items to scan"
+              "description": "Maximum number of files and site pages to scan"
             },
             "maxFileSizeBytes": {
               "type": [
                 "integer",
                 "null"
               ],
-              "description": "Maximum number of files to scan"
+              "description": "Maximum allowed file size in bytes"
             },
             "scanIntervalCron": {
               "type": "string",
