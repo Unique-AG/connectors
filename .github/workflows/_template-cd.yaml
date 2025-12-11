@@ -28,10 +28,10 @@ jobs:
     env:
       GHCR_REGISTRY: ghcr.io
       GHCR_REPO: unique-ag/connectors/services/${{ inputs.service-name }}
-      GHCR_CHART_REPO: unique-ag/connectors/helm/${{ inputs.service-name }}
+      GHCR_CHART_REPO: unique-ag/connectors/helm
       UNIQUECR_REGISTRY: uniquecr.azurecr.io
       UNIQUECR_REPO: connectors/services/${{ inputs.service-name }}
-      UNIQUECR_CHART_REPO: connectors/helm/${{ inputs.service-name }}
+      UNIQUECR_CHART_REPO: connectors/helm
 
     steps:
       - name: Checkout code
