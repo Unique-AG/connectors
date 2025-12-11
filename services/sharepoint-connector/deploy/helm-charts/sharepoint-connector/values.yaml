@@ -191,7 +191,7 @@ connectorConfig:
     maxIngestedFiles: 1000
     # -- Whether to store content internally in Unique or not.
     # possible values: enabled, disabled
-    storeInternally: disabled
+    storeInternally: enabled
     # -- Number of Unique API requests allowed per minute
     apiRateLimitPerMinute: 100
     # -- Object containing extra HTTP headers for Unique API requests (GraphQL and REST)
