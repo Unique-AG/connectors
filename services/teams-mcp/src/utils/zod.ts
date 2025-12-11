@@ -12,7 +12,7 @@ export const json = <S extends z.core.$ZodType>(schema: S) =>
           code: 'invalid_format',
           format: 'json',
           input: jsonString,
-          message:  err instanceof Error ? err.message : String(err),
+          message: err instanceof Error ? err.message : String(err),
         });
         return z.NEVER;
       }
@@ -25,7 +25,7 @@ export const json = <S extends z.core.$ZodType>(schema: S) =>
           code: 'invalid_format',
           format: 'json',
           input: String(value),
-          message:  err instanceof Error ? err.message : String(err),
+          message: err instanceof Error ? err.message : String(err),
         });
         return z.NEVER;
       }

@@ -28,8 +28,7 @@ const clusterLocalConfig = z.object({
       'JSON string of extra HTTP headers for API requests ' +
         '(e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>", "x-service-id": "<service-id>"})',
     ),
-  ingestionServiceBaseUrl: stringToURL()
-    .describe('Base URL for Unique ingestion service'),
+  ingestionServiceBaseUrl: stringToURL().describe('Base URL for Unique ingestion service'),
 });
 
 // ==== Config for external communication with Unique API services via app key ====
