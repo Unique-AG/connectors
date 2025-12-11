@@ -21,3 +21,5 @@
 **/dist/
 **/coverage/
 **/.turbo/
+
+deno.lock
