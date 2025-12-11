@@ -360,7 +360,7 @@
                 "https://api.unique.app/scope-management"
               ]
             },
-            "inheritModes": {
+            "permissionsInheritanceMode": {
               "type": "string",
               "enum": [
                 "inherit_scopes_and_files",

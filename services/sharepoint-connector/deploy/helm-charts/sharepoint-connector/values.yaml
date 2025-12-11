@@ -171,7 +171,7 @@ connectorConfig:
     # -- THIS CONFIG HAS EFFECT ONLY IN CONTENT_ONLY SYNC MODE: inheritance mode for scopes and files.
     # Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.
     # When unset, defaults to inherit_scopes_and_files; ignored in content_and_permissions.
-    inheritModes: inherit_scopes_and_files
+    permissionsInheritanceMode: inherit_scopes_and_files
     # -- ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy (path-based ingestion)
     # possible values: flat, recursive
     ingestionMode: recursive

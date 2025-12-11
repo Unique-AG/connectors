@@ -52,7 +52,7 @@ const externalConfig = z.object({
 // ==== Config common for both cluster_local and external authentication modes ====
 
 const baseConfig = z.object({
-  inheritModes: z
+  permissionsInheritanceMode: z
     .enum(['inherit_scopes_and_files', 'inherit_scopes', 'inherit_files', 'none'] as const)
     .default('inherit_scopes_and_files')
     .transform((mode) => INHERITANCE_PRESETS[mode])
