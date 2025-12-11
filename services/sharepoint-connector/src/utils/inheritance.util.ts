@@ -14,7 +14,7 @@ export const resolveInheritanceSettings = (
     return NO_INHERITANCE_SETTINGS;
   }
 
-  const inheritSettings = configService.get('unique.inheritModes', { infer: true }) 
+  const inheritSettings = configService.get('unique.inheritModes', { infer: true });
 
   return inheritSettings ?? DEFAULT_INHERITANCE_SETTINGS;
 };
