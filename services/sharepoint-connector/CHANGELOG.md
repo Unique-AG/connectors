@@ -6,7 +6,7 @@
 ### ⚠ BREAKING CHANGES
 
 * **sharepoint-connector:** restructure auth config and fix schema issues ([#178](https://github.com/Unique-AG/connectors/issues/178))
-* tenantId moved from sharepoint.auth to sharepoint level     - Move tenantId from auth section to sharepoint root for clarity
+    - tenantId moved from sharepoint.auth to sharepoint level     - Move tenantId from auth section to sharepoint root for clarity
     - Remove unused oidc and client-secret auth modes (only certificate
     supported)
         - Change clientId from nullable to required string with default
