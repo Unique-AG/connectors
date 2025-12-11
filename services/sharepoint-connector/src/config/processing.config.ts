@@ -50,7 +50,7 @@ export const ProcessingConfigSchema = z.object({
       z.coerce.number().int().positive().optional(),
     )
     .describe(
-      'For testing purpose. Maximum number of files and items to scan. Unlimited if not set',
+      'For testing purpose. Maximum number of files and items to scan. They are treated separately, so if you set a value of 10 it will scan 10 files and 10 site pages. Unlimited if not set',
     ),
   scanIntervalCron: z
     .string()
