@@ -51,14 +51,46 @@ describe('SharepointConfigSchema - siteIds validation', () => {
       ]);
     });
 
-    it('accepts empty string and returns empty array', () => {
+    it('rejects empty string', () => {
       const config = {
         ...validConfigBase,
         siteIds: '',
       };
 
-      const result = SharepointConfigSchema.parse(config);
-      expect(result.siteIds).toEqual([]);
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+      try {
+        SharepointConfigSchema.parse(config);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          expect(error.issues).toHaveLength(1);
+          expect(error.issues[0]?.path).toEqual(['siteIds']);
+          expect(error.issues[0]?.message).toBe('At least one site ID must be specified');
+        } else {
+          throw error;
+        }
+      }
+    });
+
+    it('rejects undefined', () => {
+      const config = {
+        ...validConfigBase,
+        // siteIds is not provided (undefined)
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+      try {
+        SharepointConfigSchema.parse(config);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          expect(error.issues).toHaveLength(1);
+          expect(error.issues[0]?.path).toEqual(['siteIds']);
+          expect(error.issues[0]?.message).toBe(
+            'Invalid input: expected string, received undefined',
+          );
+        } else {
+          throw error;
+        }
+      }
     });
 
     it('accepts uppercase UUIDv4 entries', () => {
