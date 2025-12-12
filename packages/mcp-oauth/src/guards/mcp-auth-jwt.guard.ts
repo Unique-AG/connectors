@@ -1,3 +1,4 @@
+import { isRabbitContext } from '@golevelup/nestjs-rabbitmq';
 import {
   CanActivate,
   ExecutionContext,
@@ -27,6 +28,7 @@ export class McpAuthJwtGuard implements CanActivate {
   public async canActivate(context: ExecutionContext): Promise<boolean> {
     // We run the guard only on HTTP contexts (e.g. not on RabbitMQ contexts)
     if (context.getType() !== 'http') return true;
+    if (isRabbitContext(context)) return true;
 
     const request = context.switchToHttp().getRequest<McpAuthenticatedRequest>();
 

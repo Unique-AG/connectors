@@ -1,0 +1,32 @@
+{
+  "name": "@unique-ag/temporal",
+  "description": "Temporal NestJS bindings for Unique",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@temporalio/activity": "^1.13.2",
+    "@temporalio/client": "^1.13.2",
+    "@temporalio/common": "^1.13.2",
+    "@temporalio/worker": "^1.13.2",
+    "@temporalio/workflow": "^1.13.2"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/testing": "^11.1.6",
+    "@types/node": "^22.13.14",
+    "typescript": "^5.9.2"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^10 || ^11",
+    "@nestjs/core": "^10 || ^11"
+  }
+}
