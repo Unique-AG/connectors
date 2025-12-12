@@ -7,20 +7,18 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
-import { ContentFetchingStep } from './steps/content-fetching.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
 import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
 import type { IPipelineStep } from './steps/pipeline-step.interface';
-import { StorageUploadStep } from './steps/storage-upload.step';
+import { UploadContentStep } from './steps/upload-content.step';
 import { PipelineStep } from './types/processing-context';
 
 describe('ProcessingPipelineService', () => {
   let service: ProcessingPipelineService;
   let mockSteps: {
-    contentFetching: IPipelineStep & { cleanup: ReturnType<typeof vi.fn> };
     aspxProcessing: IPipelineStep & { cleanup?: ReturnType<typeof vi.fn> };
     contentRegistration: IPipelineStep;
-    storageUpload: IPipelineStep;
+    uploadContent: IPipelineStep & { cleanup: ReturnType<typeof vi.fn> };
     ingestionFinalization: IPipelineStep;
   };
 
@@ -96,11 +94,6 @@ describe('ProcessingPipelineService', () => {
     const mockExecute = () => vi.fn().mockImplementation((ctx) => Promise.resolve(ctx));
 
     mockSteps = {
-      contentFetching: {
-        stepName: PipelineStep.ContentFetching,
-        execute: mockExecute(),
-        cleanup: vi.fn(),
-      },
       aspxProcessing: {
         stepName: PipelineStep.AspxProcessing,
         execute: mockExecute(),
@@ -109,9 +102,10 @@ describe('ProcessingPipelineService', () => {
         stepName: PipelineStep.ContentRegistration,
         execute: mockExecute(),
       },
-      storageUpload: {
-        stepName: PipelineStep.StorageUpload,
+      uploadContent: {
+        stepName: PipelineStep.UploadContent,
         execute: mockExecute(),
+        cleanup: vi.fn(),
       },
       ingestionFinalization: {
         stepName: PipelineStep.IngestionFinalization,
@@ -128,14 +122,12 @@ describe('ProcessingPipelineService', () => {
           return undefined;
         }),
       }))
-      .mock(ContentFetchingStep)
-      .impl(() => mockSteps.contentFetching as unknown as ContentFetchingStep)
       .mock(AspxProcessingStep)
       .impl(() => mockSteps.aspxProcessing as unknown as AspxProcessingStep)
       .mock(ContentRegistrationStep)
       .impl(() => mockSteps.contentRegistration as unknown as ContentRegistrationStep)
-      .mock(StorageUploadStep)
-      .impl(() => mockSteps.storageUpload as unknown as StorageUploadStep)
+      .mock(UploadContentStep)
+      .impl(() => mockSteps.uploadContent as unknown as UploadContentStep)
       .mock(IngestionFinalizationStep)
       .impl(() => mockSteps.ingestionFinalization as unknown as IngestionFinalizationStep)
       .mock(SPC_INGESTION_FILE_PROCESSED_TOTAL)
@@ -159,17 +151,16 @@ describe('ProcessingPipelineService', () => {
     const result = await service.processItem(mockFile, 'test-scope-id', 'updated', mockSyncContext);
 
     expect(result.success).toBe(true);
-    expect(mockSteps.contentFetching.execute).toHaveBeenCalled();
     expect(mockSteps.aspxProcessing.execute).toHaveBeenCalled();
     expect(mockSteps.contentRegistration.execute).toHaveBeenCalled();
-    expect(mockSteps.storageUpload.execute).toHaveBeenCalled();
+    expect(mockSteps.uploadContent.execute).toHaveBeenCalled();
     expect(mockSteps.ingestionFinalization.execute).toHaveBeenCalled();
   });
 
   it('creates proper processing context', async () => {
     await service.processItem(mockFile, 'test-scope-id', 'updated', mockSyncContext);
 
-    const executeCalls = vi.mocked(mockSteps.contentFetching.execute).mock.calls;
+    const executeCalls = vi.mocked(mockSteps.aspxProcessing.execute).mock.calls;
     const context = executeCalls[0]?.[0];
 
     expect(context?.pipelineItem.item.id).toBe('01JWNC3IM2TIAIFMTM4JHYR6RX3E2REDPW');
@@ -183,7 +174,7 @@ describe('ProcessingPipelineService', () => {
   it('calls cleanup for each completed step', async () => {
     await service.processItem(mockFile, 'test-scope-id', 'updated', mockSyncContext);
 
-    expect(mockSteps.contentFetching.cleanup).toHaveBeenCalled();
+    expect(mockSteps.uploadContent.cleanup).toHaveBeenCalled();
   });
 
   it('stops pipeline and returns error when step fails', async () => {
@@ -193,21 +184,21 @@ describe('ProcessingPipelineService', () => {
     const result = await service.processItem(mockFile, 'test-scope-id', 'updated', mockSyncContext);
 
     expect(result.success).toBe(false);
-    expect(mockSteps.storageUpload.execute).not.toHaveBeenCalled();
+    expect(mockSteps.uploadContent.execute).not.toHaveBeenCalled();
   });
 
   it('calls cleanup on failed step', async () => {
-    vi.mocked(mockSteps.contentFetching.execute).mockRejectedValue(new Error('Step failed'));
+    vi.mocked(mockSteps.uploadContent.execute).mockRejectedValue(new Error('Step failed'));
 
     await service.processItem(mockFile, 'test-scope-id', 'updated', mockSyncContext);
 
-    expect(mockSteps.contentFetching.cleanup).toHaveBeenCalled();
+    expect(mockSteps.uploadContent.cleanup).toHaveBeenCalled();
   });
 
   it('handles timeout for slow steps', async () => {
     vi.useFakeTimers();
 
-    vi.mocked(mockSteps.contentFetching.execute).mockImplementation(
+    vi.mocked(mockSteps.uploadContent.execute).mockImplementation(
       () => new Promise((resolve) => setTimeout(resolve, 35000)),
     );
 
@@ -228,15 +219,15 @@ describe('ProcessingPipelineService', () => {
   });
 
   it('handles cleanup errors gracefully', async () => {
-    vi.mocked(mockSteps.contentFetching.execute).mockRejectedValue(new Error('Step failed'));
-    mockSteps.contentFetching.cleanup.mockResolvedValue(undefined);
+    vi.mocked(mockSteps.uploadContent.execute).mockRejectedValue(new Error('Step failed'));
+    mockSteps.uploadContent.cleanup.mockResolvedValue(undefined);
 
     const result = await service.processItem(mockFile, 'test-scope-id', 'updated', mockSyncContext);
 
     expect(result.success).toBe(false);
   });
 
-  it('releases content buffer in final cleanup', async () => {
+  it('releases html content in final cleanup', async () => {
     const result = await service.processItem(mockFile, 'test-scope-id', 'updated', mockSyncContext);
 
     expect(result.success).toBe(true);

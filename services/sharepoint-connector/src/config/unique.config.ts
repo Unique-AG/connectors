@@ -99,7 +99,7 @@ const baseConfig = z.object({
     ),
   storeInternally: z
     .enum([StoreInternallyMode.Enabled, StoreInternallyMode.Disabled])
-    .default(StoreInternallyMode.Disabled)
+    .default(StoreInternallyMode.Enabled)
     .describe('Whether to store content internally in Unique or not.'),
   ingestionConfig: z
     .string()

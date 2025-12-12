@@ -1,8 +1,11 @@
 import assert from 'node:assert';
+import { Readable } from 'node:stream';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
+import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
+import { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { HttpClientService } from '../../shared/services/http-client.service';
 import { UniqueFilesService } from '../../unique-api/unique-files/unique-files.service';
 import { redact, shouldConcealLogs, smear } from '../../utils/logging.util';
@@ -12,15 +15,16 @@ import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
 
 @Injectable()
-export class StorageUploadStep implements IPipelineStep {
+export class UploadContentStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
-  public readonly stepName = PipelineStep.StorageUpload;
+  public readonly stepName = PipelineStep.UploadContent;
   private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly httpClientService: HttpClientService,
     private readonly uniqueFilesService: UniqueFilesService,
+    private readonly apiService: GraphApiService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -30,18 +34,24 @@ export class StorageUploadStep implements IPipelineStep {
     const logPrefix = `[CorrelationId: ${context.correlationId}]`;
 
     this.logger.debug(
-      `${logPrefix} Starting storage upload for file: ${context.pipelineItem.item.id}`,
+      `${logPrefix} Starting streaming upload for item: ${context.pipelineItem.item.id}`,
     );
 
     try {
-      await this.performUpload(context);
+      if (context.pipelineItem.itemType === 'listItem') {
+        await this.uploadListItemContent(context);
+      } else {
+        await this.uploadDriveItemContent(context, context.pipelineItem.item);
+      }
+
       context.uploadSucceeded = true;
-      const _stepDuration = Date.now() - stepStartTime;
+      const stepDuration = Date.now() - stepStartTime;
+      this.logger.debug(`${logPrefix} Streaming upload completed in ${stepDuration}ms`);
 
       return context;
     } catch (error) {
       this.logger.error({
-        msg: `${logPrefix} Storage upload failed`,
+        msg: `${logPrefix} Streaming upload failed`,
         correlationId: context.correlationId,
         itemId: context.pipelineItem.item.id,
         driveId: context.pipelineItem.driveId,
@@ -75,20 +85,39 @@ export class StorageUploadStep implements IPipelineStep {
       }
     }
 
-    if (context.contentBuffer) {
-      context.contentBuffer = undefined;
-      delete context.contentBuffer;
-      this.logger.debug(`${logPrefix} Released content buffer memory`);
+    if (context.htmlContent) {
+      context.htmlContent = undefined;
+      delete context.htmlContent;
+      this.logger.debug(`${logPrefix} Released HTML content memory`);
     }
   }
 
-  private async performUpload(context: ProcessingContext): Promise<void> {
-    const logPrefix = `[CorrelationId: ${context.correlationId}]`;
-    assert.ok(context.contentBuffer, 'Content buffer not found - content fetching may have failed');
+  private async uploadListItemContent(context: ProcessingContext): Promise<void> {
+    assert.ok(context.htmlContent, 'HTML content not found - ASPX processing may have failed');
     assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
 
+    const contentStream = Readable.from(Buffer.from(context.htmlContent, 'utf-8'));
+    await this.streamUpload(context, contentStream);
+  }
+
+  private async uploadDriveItemContent(context: ProcessingContext, item: DriveItem): Promise<void> {
+    this.validateMimeType(item);
+    assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
+
+    const contentStream = await this.apiService.getFileContentStream(
+      context.pipelineItem.driveId,
+      context.pipelineItem.item.id,
+    );
+
+    await this.streamUpload(context, contentStream);
+  }
+
+  private async streamUpload(context: ProcessingContext, stream: Readable): Promise<void> {
+    const logPrefix = `[CorrelationId: ${context.correlationId}]`;
+    assert.ok(context.uploadUrl, 'Upload URL not found');
+
     this.logger.debug({
-      msg: 'performUpload details:',
+      msg: 'streamUpload details:',
       correlationId: context.correlationId,
       fileId: context.pipelineItem.item.id,
       driveId: context.pipelineItem.driveId,
@@ -100,11 +129,22 @@ export class StorageUploadStep implements IPipelineStep {
     });
 
     const mimeType = context.mimeType;
+    const contentLength =
+      context.pipelineItem.itemType === 'listItem'
+        ? context.fileSize
+        : context.pipelineItem.item.size;
+
+    const headers: Record<string, string> = {
+      'Content-Type': mimeType ?? 'application/octet-stream',
+      'Content-Length': String(contentLength),
+      'x-ms-blob-type': 'BlockBlob',
+    };
+
     try {
       const response = await this.httpClientService.request(context.uploadUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': mimeType, 'x-ms-blob-type': 'BlockBlob' },
-        body: context.contentBuffer,
+        headers,
+        body: stream,
       });
 
       if (response.statusCode < 200 || response.statusCode >= HTTP_STATUS_OK_MAX) {
@@ -114,14 +154,23 @@ export class StorageUploadStep implements IPipelineStep {
         );
       }
 
-      this.logger.debug(`${logPrefix} Upload completed successfully`);
+      this.logger.debug(`${logPrefix} Stream upload completed successfully`);
     } catch (error) {
       this.logger.error({
-        msg: `${logPrefix} Upload failed`,
+        msg: `${logPrefix} Stream upload failed`,
         correlationId: context.correlationId,
         error: sanitizeError(error),
       });
       throw error;
     }
+  }
+
+  private validateMimeType(item: DriveItem): void {
+    const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
+    assert.ok(item.file?.mimeType, `MIME type is missing for this item. Skipping download.`);
+    assert.ok(
+      allowedMimeTypes.includes(item.file.mimeType),
+      `MIME type ${item.file.mimeType} is not allowed. Skipping download.`,
+    );
   }
 }

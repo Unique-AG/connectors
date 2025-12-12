@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
+import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { getTitle } from '../../utils/list-item.util';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
@@ -15,7 +16,10 @@ export class AspxProcessingStep implements IPipelineStep {
   public readonly stepName = PipelineStep.AspxProcessing;
   private readonly shouldConcealLogs: boolean;
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {
+  public constructor(
+    private readonly configService: ConfigService<Config, true>,
+    private readonly apiService: GraphApiService,
+  ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
@@ -25,9 +29,10 @@ export class AspxProcessingStep implements IPipelineStep {
     }
 
     try {
-      const htmlContent = this.buildHtmlContent(context, context.pipelineItem.item);
-      context.contentBuffer = Buffer.from(htmlContent, 'utf-8');
-      context.fileSize = context.contentBuffer.length;
+      const rawContent = await this.fetchAspxContent(context);
+      const htmlContent = this.buildHtmlContent(rawContent, context.pipelineItem.item);
+      context.htmlContent = htmlContent;
+      context.fileSize = Buffer.byteLength(htmlContent, 'utf-8');
       context.mimeType = 'text/html';
 
       return context;
@@ -45,8 +50,16 @@ export class AspxProcessingStep implements IPipelineStep {
     }
   }
 
-  private buildHtmlContent(context: ProcessingContext, item: ListItem): string {
-    const rawContent = context.contentBuffer?.toString('utf-8') || '';
+  private async fetchAspxContent(context: ProcessingContext): Promise<string> {
+    const { canvasContent, wikiField } = await this.apiService.getAspxPageContent(
+      context.pipelineItem.siteId,
+      context.pipelineItem.driveId,
+      context.pipelineItem.item.id,
+    );
+    return canvasContent || wikiField || '';
+  }
+
+  private buildHtmlContent(rawContent: string, item: ListItem): string {
     const sharepointBaseUrl = this.getSharepointBaseUrl();
 
     const processedContent = this.convertRelativeLinks(rawContent, sharepointBaseUrl);
