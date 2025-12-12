@@ -1,0 +1,11 @@
+apiVersion: v2
+name: mcp-server-teams
+description: An experimental MCP server for Teams leveraging the Microsoft Graph API.
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+dependencies:
+  - alias: server
+    name: backend-service
+    repository: oci://ghcr.io/unique-ag/helm-charts
+    version: ~6.1.0
