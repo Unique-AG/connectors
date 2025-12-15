@@ -155,6 +155,7 @@ export const PublicGetUsersRequestSchema = z.object({
   skip: z.number().int().min(0).optional(),
   take: z.number().int().min(1).max(1000).optional(),
   email: z.string().optional(),
+  userName: z.string().optional(),
   displayName: z.string().optional(),
 });
 export type PublicGetUsersRequest = z.infer<typeof PublicGetUsersRequestSchema>;

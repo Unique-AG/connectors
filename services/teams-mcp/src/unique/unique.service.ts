@@ -65,43 +65,86 @@ export class UniqueService {
   }
 
   private async fetchUserForScopeAccess(email: string): Promise<PublicUserResult | null> {
-    const payload = PublicGetUsersRequestSchema.encode({ email });
-    const endpoint = new URL('users', this.config.get('unique.apiBaseUrl', { infer: true }));
-    // Build query params from payload
-    const params = new URLSearchParams();
-    Object.entries(payload).forEach(([key, value]) => {
-      params.append(key, String(value));
-    });
+    const baseUrl = this.config.get('unique.apiBaseUrl', { infer: true });
 
-    // Append to endpoint
-    const qs = params.toString();
-    if (qs) {
-      endpoint.search = qs;
-    }
+    // Create two parallel requests - one with email param, one with userName param (both using email value)
+    const fetchByEmail = async (): Promise<PublicUserResult | null> => {
+      const payload = PublicGetUsersRequestSchema.encode({ email });
+      const endpoint = new URL('users', baseUrl);
+      const params = new URLSearchParams();
+      Object.entries(payload).forEach(([key, value]) => {
+        params.append(key, String(value));
+      });
+      const qs = params.toString();
+      if (qs) {
+        endpoint.search = qs;
+      }
+
+      this.logger.debug({ endpoint: endpoint.origin + endpoint.pathname, email }, 'Fetching user by email');
+
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        this.logger.warn(
+          { status: response.status, endpoint: endpoint.origin + endpoint.pathname, email },
+          'Failed to fetch user by email',
+        );
+        return null;
+      }
+
+      const body = await response.json();
+      const result = PublicUsersResultSchema.parse(body);
+      return result.users.at(0) ?? null;
+    };
+
+    const fetchByUserName = async (): Promise<PublicUserResult | null> => {
+      const payload = PublicGetUsersRequestSchema.encode({ userName: email });
+      const endpoint = new URL('users', baseUrl);
+      const params = new URLSearchParams();
+      Object.entries(payload).forEach(([key, value]) => {
+        params.append(key, String(value));
+      });
+      const qs = params.toString();
+      if (qs) {
+        endpoint.search = qs;
+      }
+
+      this.logger.debug({ endpoint: endpoint.origin + endpoint.pathname, userName: email }, 'Fetching user by userName');
+
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        this.logger.warn(
+          { status: response.status, endpoint: endpoint.origin + endpoint.pathname, userName: email },
+          'Failed to fetch user by userName',
+        );
+        return null;
+      }
+
+      const body = await response.json();
+      const result = PublicUsersResultSchema.parse(body);
+      return result.users.at(0) ?? null;
+    };
+
+    // Execute both requests in parallel
+    const [userByEmail, userByUserName] = await Promise.all([fetchByEmail(), fetchByUserName()]);
+
+    // Return whichever found a user (prefer email match if both succeed)
+    const userFound = userByEmail ?? userByUserName;
 
     this.logger.debug(
-      { endpoint: endpoint.origin + endpoint.pathname },
-      'Fetching user from Unique API',
-    );
-
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: this.getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      this.logger.error(
-        { status: response.status, endpoint: endpoint.origin + endpoint.pathname },
-        'Unique Public API returned an error for user fetch',
-      );
-      throw new Error('Unique Public API return an error ');
-    }
-    const body = await response.json();
-    const result = PublicUsersResultSchema.parse(body);
-
-    const userFound = result.users.at(0) ?? null;
-    this.logger.debug(
-      { found: !!userFound, userCount: result.users.length },
+      {
+        found: !!userFound,
+        foundByEmail: !!userByEmail,
+        foundByUserName: !!userByUserName,
+        email
+      },
       'User fetch completed',
     );
 
