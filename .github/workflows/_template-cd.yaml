@@ -28,8 +28,10 @@ jobs:
     env:
       GHCR_REGISTRY: ghcr.io
       GHCR_REPO: unique-ag/connectors/services/${{ inputs.service-name }}
+      GHCR_CHART_REPO: unique-ag/connectors/helm
       UNIQUECR_REGISTRY: uniquecr.azurecr.io
       UNIQUECR_REPO: connectors/services/${{ inputs.service-name }}
+      UNIQUECR_CHART_REPO: connectors/helm
 
     steps:
       - name: Checkout code
@@ -85,6 +87,11 @@ jobs:
           username: 00000000-0000-0000-0000-000000000000
           password: ${{ steps.acr-token.outputs.token }}
 
+      - name: Login to both helm registries
+        run: |
+          echo "${{ steps.acr-token.outputs.token }}" | helm registry login ${{ env.UNIQUECR_REGISTRY }} --username 00000000-0000-0000-0000-000000000000 --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.GHCR_REGISTRY }} --username ${{ github.actor }} --password-stdin
+
       - name: Build and push container
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         id: build-and-push
@@ -122,3 +129,19 @@ jobs:
           cosign verify ${images} \
           --certificate-identity-regexp="^https://github.com/${{ github.repository }}/\.github/workflows/.*@refs/heads/main$" \
           --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+      - uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.3
+
+      - name: Push Helm charts
+        env:
+          DESTINATION: /tmp
+        run: |
+          deno run \
+          --allow-run \
+          --allow-read \
+          --allow-write=${{ env.DESTINATION }} \
+          scripts/helm-package-push.ts \
+          --chart services/${{ inputs.service-name }}/deploy/helm-charts/${{ inputs.service-name }} \
+          --destination ${{ env.DESTINATION }} \
+          --registry oci://${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_CHART_REPO }} \
+          --registry oci://${{ env.GHCR_REGISTRY }}/${{ env.GHCR_CHART_REPO }}
