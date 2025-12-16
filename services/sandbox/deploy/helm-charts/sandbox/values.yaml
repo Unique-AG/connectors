@@ -1,0 +1,69 @@
+server:
+  deployment:
+    metadata:
+      annotations:
+        reloader.stakater.com/auto: "true"
+  extraObjects:
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: apps-sandbox
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt
+          external-dns.alpha.kubernetes.io/hostname: sandbox.unique.app
+          konghq.com/plugins: unique-route-metrics
+      spec:
+        ingressClassName: kong
+        tls:
+          - hosts:
+              - sandbox.unique.app
+            secretName: apps-sandbox-tls
+        rules:
+          - host: sandbox.unique.app
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: apps-sandbox
+                      port:
+                        number: 80
+  image:
+    repository: ghcr.io/unique-ag/connectors/services/sandbox
+    tag: 0.1.0 # x-release-please-version
+  networkPolicy:
+    enabled: false # TODO: Policies must be defined as good practice, living documentation and as enterprise software and standard (ingress- and egress-policies)
+  ports:
+    application: 3000
+    metrics: 3001
+  probes:
+    enabled: true
+  env:
+    PORT: "3000"
+    OTEL_METRICS_EXPORTER: "prometheus"
+    OTEL_EXPORTER_PROMETHEUS_PORT: "3001"
+    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  volumes:
+    - name: tmp
+      emptyDir: {}
+  volumeMounts:
+    - name: tmp
+      mountPath: /tmp
+  prometheus:
+    enabled: true
+  routes:
+    paths:
+      default:
+        enabled: false
+
+grafana:
+  dashboard:
+    enabled: true
+    folder: "sandbox"

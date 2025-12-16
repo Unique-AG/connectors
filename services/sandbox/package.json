@@ -1,0 +1,54 @@
+{
+  "name": "@unique-ag/sandbox",
+  "description": "",
+  "version": "0.1.0",
+  "author": "",
+  "private": true,
+  "license": "Unique License v1",
+  "files": [
+    "dist",
+    "deploy"
+  ],
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start",
+    "debug": "nest start --debug --watch",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
+    "check-types": "tsc --noEmit",
+    "test": "echo 'No test specified'"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/swagger": "^11.2.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@unique-ag/instrumentation": "workspace:*",
+    "@unique-ag/logger": "workspace:*",
+    "@unique-ag/probe": "workspace:*",
+    "nestjs-otel": "^7.0.1",
+    "nestjs-pino": "^4.4.0",
+    "nestjs-zod": "^5.0.1",
+    "pako": "^2.1.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "typeid-js": "^1.2.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.10",
+    "@nestjs/schematics": "^11.0.7",
+    "@nestjs/testing": "^11.1.6",
+    "@swc/cli": "^0.7.8",
+    "@swc/core": "^1.13.5",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.13.14",
+    "@types/pako": "^2.0.4",
+    "globals": "^16.3.0",
+    "pino-http-print": "^3.1.0",
+    "source-map-support": "^0.5.21",
+    "typescript": "^5.9.2"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**/*"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    "dev": {
+      "inputs": ["$TURBO_DEFAULT$", "src/**/*"],
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true,
+      "interruptible": true
+    }
+  }
+}
+

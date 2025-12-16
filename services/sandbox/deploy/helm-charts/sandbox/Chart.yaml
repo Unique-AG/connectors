@@ -1,0 +1,11 @@
+apiVersion: v2
+name: sandbox
+description: Sandbox microservice for mirroring html content.
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+dependencies:
+  - alias: server
+    name: backend-service
+    repository: oci://ghcr.io/unique-ag/helm-charts
+    version: ~5.4.2
