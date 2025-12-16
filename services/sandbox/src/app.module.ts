@@ -49,4 +49,3 @@ import { ScopedAPIController } from './scoped/scoped-api.controller';
   providers: [],
 })
 export class AppModule {}
-

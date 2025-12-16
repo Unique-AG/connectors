@@ -56,7 +56,7 @@ export function decompressData(compressedData: string): Promise<string> {
       let buffer: Buffer;
       try {
         buffer = Buffer.from(decodeURIComponent(compressedData), 'base64');
-      } catch (decodeError) {
+      } catch (_decodeError) {
         return reject(new BadRequestException('Invalid Base64 encoding in data parameter'));
       }
 
@@ -132,7 +132,7 @@ export function decompressData(compressedData: string): Promise<string> {
         // This ensures we don't allocate the string if size is too large
         const decompressed = Buffer.from(inflator.result).toString('utf8');
         resolve(decompressed);
-      } catch (inflateError) {
+      } catch (_inflateError) {
         return reject(
           new BadRequestException(
             'Failed to decompress data: invalid or corrupted compressed data',

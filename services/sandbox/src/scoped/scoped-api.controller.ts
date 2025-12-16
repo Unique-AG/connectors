@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  Logger,
-  Query,
-  Res,
-} from '@nestjs/common';
+import { BadRequestException, Controller, Get, Logger, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { decompressData } from './decompress-data';
@@ -42,4 +35,3 @@ export class ScopedAPIController {
     }
   }
 }
-

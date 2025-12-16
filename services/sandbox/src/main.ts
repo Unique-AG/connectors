@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import { initOpenTelemetry, runWithInstrumentation } from '@unique-ag/instrumentation';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -32,4 +31,3 @@ initOpenTelemetry({
   defaultServiceVersion: packageJson.version,
 });
 void runWithInstrumentation(bootstrap, 'sandbox');
-

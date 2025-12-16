@@ -19,4 +19,3 @@ export function validateConfig(config: Record<string, unknown>): AppConfig {
   const parsed = appSettingsSchema.parse(config);
   return parsed;
 }
-
