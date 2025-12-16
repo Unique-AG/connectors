@@ -89,20 +89,12 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
 
   private async emitConfigurationsAtStartup(): Promise<void> {
     try {
-      const siteConfigs = await this.tenantConfigLoaderService.loadConfigsAsync();
+      const siteConfigs = await this.tenantConfigLoaderService.loadConfig();
 
       if (siteConfigs.length === 0) {
-        this.logger.log(
-          'No site configurations loaded. Using global configuration from environment variables.',
+        this.logger.warn(
+          'No site configurations loaded. Please configure site sources via tenant config files or SharePoint list.',
         );
-        const globalConfig = {
-          siteIds: this.configService.get('sharepoint.siteIds', { infer: true }),
-          syncColumnName: this.configService.get('sharepoint.syncColumnName', { infer: true }),
-          ingestionMode: this.configService.get('unique.ingestionMode', { infer: true }),
-          scopeId: this.configService.get('unique.scopeId', { infer: true }),
-          syncMode: this.configService.get('processing.syncMode', { infer: true }),
-        };
-        this.logger.log('Global configuration:', JSON.stringify(globalConfig, null, 2));
         return;
       }
 

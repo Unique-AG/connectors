@@ -53,38 +53,11 @@ export class SharepointSynchronizationService {
     // in case of some unexpected one-off error occurring.
     try {
       // Load site configs from configured source (configDirectory or sharePointList)
-      const siteConfigs = await this.tenantConfigLoaderService.loadConfigsAsync();
+      const siteConfigs = await this.tenantConfigLoaderService.loadConfig();
 
-      // Fallback to global config for backward compatibility
-      let sitesToProcess: { siteId: string; config: SiteConfig }[] = [];
-
-      if (siteConfigs.length > 0) {
-        sitesToProcess = siteConfigs.map((config) => ({ siteId: config.siteId, config }));
-      } else {
-        // Backward compatibility: use global config if no site configs found
-        const globalSiteIds = this.configService.get('sharepoint.siteIds', { infer: true });
-        if (globalSiteIds.length > 0) {
-          this.logger.log(
-            'No site configs found, using global SHAREPOINT_SITE_IDS for backward compatibility',
-          );
-          for (const siteId of globalSiteIds) {
-            const fallbackConfig: SiteConfig = {
-              siteId: siteId,
-              syncColumnName:
-                this.configService.get('sharepoint.syncColumnName', { infer: true }) ||
-                'FinanceGPTKnowledge',
-              ingestionMode: this.configService.get('unique.ingestionMode', { infer: true }),
-              scopeId: this.configService.get('unique.scopeId', { infer: true }),
-              syncStatus: 'active',
-            };
-            sitesToProcess.push({ siteId, config: fallbackConfig });
-          }
-        }
-      }
-
-      if (sitesToProcess.length === 0) {
+      if (siteConfigs.length === 0) {
         this.logger.error(
-          'No site IDs to scan. Please configure site sources or set SHAREPOINT_SITE_IDS.',
+          'No site configurations found. Please configure site sources via tenant config files or SharePoint list.',
         );
         this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
           sync_type: 'full',
@@ -93,6 +66,8 @@ export class SharepointSynchronizationService {
         });
         return;
       }
+
+      const sitesToProcess = siteConfigs.map((config) => ({ siteId: config.siteId, config }));
 
       this.logger.log(`Starting scan with ${sitesToProcess.length} site config(s)...`);
 

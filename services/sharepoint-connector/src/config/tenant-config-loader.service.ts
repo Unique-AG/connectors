@@ -7,12 +7,18 @@ import { ZodError } from 'zod';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { sanitizeError } from '../utils/normalize-error';
 import { Config } from './index';
-import { SiteConfig, SiteConfigSchema, TenantConfigSchema } from './tenant-config.schema';
+import {
+  SiteConfig,
+  SiteConfigSchema,
+  TenantConfig,
+  TenantConfigSchema,
+} from './tenant-config.schema';
 
 @Injectable()
 export class TenantConfigLoaderService implements OnModuleInit {
   private readonly logger = new Logger(this.constructor.name);
   private cachedConfigs: SiteConfig[] | null = null;
+  private cachedTenantConfig: TenantConfig | null = null;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -21,165 +27,109 @@ export class TenantConfigLoaderService implements OnModuleInit {
 
   public onModuleInit() {
     try {
-      this.loadConfigs();
+      this.loadTenantConfig();
     } catch (error) {
       this.logger.error({
-        msg: 'Failed to load site configs during module initialization',
+        msg: 'Failed to load tenant config during module initialization',
         error: sanitizeError(error),
       });
       throw error;
     }
   }
 
-  public async getConfigs(): Promise<SiteConfig[]> {
-    if (this.cachedConfigs !== null) {
-      return this.cachedConfigs;
-    }
-    return this.loadConfigs();
-  }
-
-  private loadConfigs(): SiteConfig[] {
-    const source = this.configService.get('app.sitesConfigurationSource', {
-      infer: true,
-    });
-
-    if (source === 'sharePointList') {
-      throw new Error(
-        'sharePointList configuration source requires async loading. Use loadConfigsAsync() instead.',
-      );
-    }
-
-    return this.loadConfigsFromDirectory();
-  }
-
-  public async loadConfigsAsync(): Promise<SiteConfig[]> {
+  public async loadConfig(): Promise<SiteConfig[]> {
     if (this.cachedConfigs !== null) {
       return this.cachedConfigs;
     }
 
-    const source = this.configService.get('app.sitesConfigurationSource', {
-      infer: true,
-    });
+    const tenantConfig = this.loadTenantConfig();
 
-    if (source === 'configDirectory') {
-      this.cachedConfigs = this.loadConfigsFromDirectory();
-    } else if (source === 'sharePointList') {
-      this.cachedConfigs = await this.loadConfigsFromSharePointList();
+    if (tenantConfig.sitesConfigurationSource === 'inline') {
+      this.cachedConfigs = this.loadSiteConfigsFromInline(tenantConfig);
+    } else if (tenantConfig.sitesConfigurationSource === 'sharePointList') {
+      this.cachedConfigs = await this.loadSiteConfigsFromSharePointList(tenantConfig);
     } else {
-      throw new Error(`Unknown configuration source: ${source}`);
+      throw new Error(
+        `Unknown site configuration source: ${tenantConfig.sitesConfigurationSource}`,
+      );
     }
 
     return this.cachedConfigs;
   }
 
-  private loadConfigsFromDirectory(): SiteConfig[] {
-    const configPath = this.configService.get('app.sitesConfigPath', {
+  private loadTenantConfig(): TenantConfig {
+    if (this.cachedTenantConfig !== null) {
+      return this.cachedTenantConfig;
+    }
+
+    const configPath = this.configService.get('app.tenantConfigDirectory', {
       infer: true,
     });
 
     if (!existsSync(configPath)) {
-      this.logger.warn(`Config directory not found at ${configPath}, returning empty configs`);
-      return [];
+      throw new Error(`Tenant config directory not found at ${configPath}`);
     }
 
     const files = readdirSync(configPath).filter(
-      (file) => file.endsWith('.json') || file.endsWith('.yaml') || file.endsWith('.yml'),
+      (file) => file.endsWith('.yaml') || file.endsWith('.yml'),
     );
 
-    const configs: SiteConfig[] = [];
-
-    for (const file of files) {
-      try {
-        const filePath = resolve(configPath, file);
-        const fileContent = readFileSync(filePath, 'utf-8');
-
-        let parsedData: unknown;
-
-        if (file.endsWith('.json')) {
-          parsedData = JSON.parse(fileContent);
-        } else if (file.endsWith('.yaml') || file.endsWith('.yml')) {
-          parsedData = loadYaml(fileContent);
-        }
-
-        // Check if this is a tenant config (has sharepointBaseUrl and ingestionServiceBaseUrl) or a direct site config
-        const parsedObj = parsedData as Record<string, unknown>;
-        if (
-          typeof parsedObj.sharepointBaseUrl === 'string' &&
-          typeof parsedObj.ingestionServiceBaseUrl === 'string'
-        ) {
-          // This is a self-contained tenant config
-          try {
-            const validatedTenant = TenantConfigSchema.parse(parsedData);
-            this.logger.debug(
-              `Loaded ${validatedTenant.sites.length} site configs from tenant file: ${file}`,
-            );
-
-            for (const siteConfig of validatedTenant.sites) {
-              configs.push(siteConfig);
-            }
-          } catch (error) {
-            if (error instanceof ZodError) {
-              this.logger.error({
-                msg: `Invalid tenant config in file: ${file}`,
-                errors: error.issues,
-              });
-              throw new Error(`Invalid tenant config in file ${file}: ${error.message}`);
-            }
-            throw error;
-          }
-        } else if (Array.isArray(parsedObj.sites)) {
-          // Legacy format: tenant config with nested sites but missing infrastructure URLs
-          this.logger.warn(
-            `File ${file} appears to be a legacy tenant config format. Please update to include sharepointBaseUrl and ingestionServiceBaseUrl.`,
-          );
-          for (const siteConfig of parsedObj.sites) {
-            try {
-              const validatedConfig = SiteConfigSchema.parse(siteConfig);
-              configs.push(validatedConfig);
-            } catch (error) {
-              if (error instanceof ZodError) {
-                this.logger.error({
-                  msg: `Invalid site config in tenant file: ${file}`,
-                  errors: error.issues,
-                });
-                throw new Error(`Invalid site config in tenant file ${file}: ${error.message}`);
-              }
-              throw error;
-            }
-          }
-        } else {
-          // This is a standalone site config file (backward compatibility)
-          const validatedConfig = SiteConfigSchema.parse(parsedData);
-          configs.push(validatedConfig);
-
-          this.logger.debug(`Loaded site config from standalone file: ${file}`);
-        }
-      } catch (error) {
-        if (error instanceof ZodError) {
-          this.logger.error({
-            msg: `Invalid config in file: ${file}`,
-            errors: error.issues,
-          });
-          throw new Error(`Invalid config in file ${file}: ${error.message}`);
-        }
-        throw error;
-      }
+    if (files.length === 0) {
+      throw new Error(`No tenant configuration files found in ${configPath}`);
     }
 
-    const activeConfigs = this.filterActiveConfigs(configs);
-    this.logger.log(`Loaded ${activeConfigs.length} active site configs from directory`);
+    const tenantFile = files[0];
+    if (!tenantFile) {
+      throw new Error(`Failed to get first tenant config file from ${configPath}`);
+    }
+
+    if (files.length > 1) {
+      this.logger.warn(
+        `Multiple tenant config files found in ${configPath}. Using the first one: ${tenantFile}`,
+      );
+    }
+
+    const filePath = resolve(configPath, tenantFile);
+    const fileContent = readFileSync(filePath, 'utf-8');
+
+    try {
+      const parsedData = loadYaml(fileContent);
+      this.cachedTenantConfig = TenantConfigSchema.parse(parsedData);
+      this.logger.debug(`Loaded tenant config from ${tenantFile}`);
+      return this.cachedTenantConfig;
+    } catch (error) {
+      if (error instanceof ZodError) {
+        this.logger.error({
+          msg: `Invalid tenant config in file: ${tenantFile}`,
+          errors: error.issues,
+        });
+        throw new Error(`Invalid tenant config in file ${tenantFile}: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  private loadSiteConfigsFromInline(tenantConfig: TenantConfig): SiteConfig[] {
+    if (!tenantConfig.sites || tenantConfig.sites.length === 0) {
+      throw new Error('No site configurations found in tenant config with inline source');
+    }
+
+    this.logger.debug(`Loaded ${tenantConfig.sites.length} site configs from inline tenant config`);
+
+    const activeConfigs = this.filterActiveConfigs(tenantConfig.sites);
+    this.logger.log(`Loaded ${activeConfigs.length} active site configs from inline configuration`);
 
     return activeConfigs;
   }
 
-  private async loadConfigsFromSharePointList(): Promise<SiteConfig[]> {
-    const listUrl = this.configService.get('app.sitesConfigSourceListUrl', {
-      infer: true,
-    });
+  private async loadSiteConfigsFromSharePointList(
+    tenantConfig: TenantConfig,
+  ): Promise<SiteConfig[]> {
+    const listUrl = tenantConfig.sitesConfigSourceListUrl;
 
     if (!listUrl) {
       throw new Error(
-        'SHAREPOINT_SITES_CONFIG_SOURCE_LIST_URL must be set when using sharePointList configuration source',
+        'sitesConfigSourceListUrl must be specified in tenant config when using sharePointList source',
       );
     }
 
@@ -199,12 +149,14 @@ export class TenantConfigLoaderService implements OnModuleInit {
           configs.push(validatedConfig);
         } catch (error) {
           if (error instanceof ZodError) {
-            this.logger.warn({
-              msg: `Skipping invalid site config from list item`,
+            this.logger.error({
+              msg: `Invalid site config from SharePoint list item`,
               itemId: item.id,
               errors: error.issues,
             });
-            continue;
+            throw new Error(
+              `Invalid site config in SharePoint list item ${item.id}: ${error.message}`,
+            );
           }
           throw error;
         }
