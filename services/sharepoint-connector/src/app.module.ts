@@ -9,6 +9,7 @@ import * as packageJson from '../package.json';
 import { AppConfig, appConfig } from './config/app.config';
 import { processingConfig } from './config/processing.config';
 import { sharepointConfig } from './config/sharepoint.config';
+import { TenantConfigModule } from './config/tenant-config.module';
 import { uniqueConfig } from './config/unique.config';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { Redacted } from './utils/redacted';
@@ -52,6 +53,7 @@ import { Redacted } from './utils/redacted';
         },
       },
     }),
+    TenantConfigModule,
     SchedulerModule,
   ],
   controllers: [],
