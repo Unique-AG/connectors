@@ -68,21 +68,24 @@ const baseConfig = z.object({
     .describe("Your company's sharepoint URL"),
   siteIds: z
     .string()
-    .transform((val) => parseCommaSeparatedArray(val))
+    .optional()
+    .transform((val) => (val ? parseCommaSeparatedArray(val) : []))
     .pipe(
-      z
-        .array(
-          z.uuidv4({
-            message: 'Each site ID must be a valid UUIDv4',
-          }),
-        )
-        .min(1, 'At least one site ID must be specified'),
+      z.array(
+        z.uuidv4({
+          message: 'Each site ID must be a valid UUIDv4',
+        }),
+      ),
     )
-    .describe('Comma-separated list of SharePoint site IDs to scan'),
+    .describe(
+      'Comma-separated list of SharePoint site IDs to scan (optional when using site configuration source)',
+    ),
   syncColumnName: z
     .string()
-    .prefault('FinanceGPTKnowledge')
-    .describe('Name of the SharePoint column indicating sync flag'),
+    .optional()
+    .describe(
+      'Name of the SharePoint column indicating sync flag (optional when using site configuration source)',
+    ),
 });
 
 export const SharepointConfigSchema = z

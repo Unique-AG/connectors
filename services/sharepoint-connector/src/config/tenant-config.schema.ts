@@ -2,11 +2,10 @@ import { z } from 'zod';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 
-// Per-site configuration
 export const SiteConfigSchema = z.object({
   siteId: z
     .string()
-    .uuid({
+    .uuidv4({
       message: 'Site ID must be a valid UUID',
     })
     .describe('SharePoint site ID for this configuration'),
@@ -98,17 +97,20 @@ export const TenantConfigSchema = z.object({
 
   // Configuration source settings
   sitesConfigurationSource: z
-    .enum(['configDirectory', 'sharePointList'])
-    .default('configDirectory')
-    .optional()
-    .describe('Source for loading site configurations'),
-  sitesConfigPath: z
+    .enum(['inline', 'sharePointList'])
+    .describe(
+      'Source for loading site configurations: inline (defined in this file) or sharePointList (from SharePoint list)',
+    ),
+  sitesConfigListUrl: z
     .string()
     .optional()
-    .describe('Path to site configuration directory when using configDirectory source'),
-
-  // Site configurations
-  sites: z.array(SiteConfigSchema).min(1).describe('Array of site configurations'),
+    .describe(
+      'Full SharePoint list URL for loading site configurations when using sharePointList source',
+    ),
+  sitesConfig: z
+    .array(SiteConfigSchema)
+    .optional()
+    .describe('Array of site configurations ONLY USED FOR INLINE SOURCE'),
 });
 
 export type TenantConfig = z.infer<typeof TenantConfigSchema>;

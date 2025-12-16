@@ -24,6 +24,11 @@ export const AppConfigSchema = z
       .describe(
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
+    tenantConfigDirectory: z
+      .string()
+      .describe(
+        'Directory containing tenant configuration YAML files. Example: /var/lib/tenant-config',
+      ),
   })
   .transform((c) => ({
     ...c,
@@ -31,7 +36,13 @@ export const AppConfigSchema = z
   }));
 
 export const appConfig = registerConfig('app', AppConfigSchema, {
-  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'LOGS_DIAGNOSTICS_DATA_POLICY']),
+  whitelistKeys: new Set([
+    'LOG_LEVEL',
+    'PORT',
+    'NODE_ENV',
+    'LOGS_DIAGNOSTICS_DATA_POLICY',
+    'SHAREPOINT_TENANT_CONFIG_DIRECTORY',
+  ]),
 });
 
 export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;
