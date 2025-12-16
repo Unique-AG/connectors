@@ -3,8 +3,7 @@
 FROM node:22-bookworm AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-ARG PNPM_VERSION=10.15.1
-RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+RUN corepack enable
 
 FROM base AS pruner
 WORKDIR /app
@@ -37,7 +36,6 @@ RUN --mount=type=cache,target=/root/.cache/turbo \
 
 FROM node:22-bookworm-slim AS runner
 ARG APP_NAME
-ARG PNPM_VERSION=10.15.1
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -53,13 +51,11 @@ ENV PNPM_HOME="/tmp/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV COREPACK_HOME="/tmp/.cache/corepack"
 RUN corepack enable
-RUN corepack prepare pnpm@${PNPM_VERSION} --activate
 RUN mkdir -p /tmp/.cache/corepack && chown -R nestjs:nodejs /tmp/.cache/corepack
 
 ENV NODE_ENV=production
 
 COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/public ./public
 COPY --from=builder --chown=nestjs:nodejs /app/out/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/out/package.json ./package.json
 

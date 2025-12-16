@@ -33,7 +33,7 @@ server:
     repository: ghcr.io/unique-ag/connectors/services/sandbox
     tag: 0.1.0 # x-release-please-version
   networkPolicy:
-    enabled: false # TODO: Policies must be defined as good practice, living documentation and as enterprise software and standard (ingress- and egress-policies)
+    enabled: false
   ports:
     application: 3000
     metrics: 3001
