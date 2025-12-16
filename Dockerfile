@@ -16,8 +16,9 @@ FROM base AS deps
 WORKDIR /app
 
 COPY --from=pruner /app/out/json/ .
-COPY ./pnpm-lock.yaml ./pnpm-lock.yaml
-COPY ./pnpm-workspace.yaml ./pnpm-workspace.yaml
+RUN --mount=type=bind,source=.,target=/src,ro \
+    cp /src/pnpm-lock.yaml /app/ && \
+    cp /src/pnpm-workspace.yaml /app/
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
@@ -27,10 +28,13 @@ ARG APP_NAME
 WORKDIR /app
 
 COPY --from=deps /app/ .
-COPY ./tsconfig.json ./tsconfig.json
-COPY ./turbo.json ./turbo.json
+RUN --mount=type=bind,source=.,target=/src,ro \
+    cp /src/tsconfig.json /app/ && \
+    cp /src/turbo.json /app/
 COPY --from=pruner /app/out/full/ .
-COPY ./services/${APP_NAME}/prisma ./services/${APP_NAME}/prisma
+RUN --mount=type=bind,source=.,target=/src,ro \
+    test -d /src/services/${APP_NAME}/prisma && \
+    cp -r /src/services/${APP_NAME}/prisma /app/services/${APP_NAME}/prisma || true
 
 RUN pnpm --filter=@unique-ag/${APP_NAME} db:generate && \
     # This triggers Prisma to download the engines, so we can stash them in the image.
