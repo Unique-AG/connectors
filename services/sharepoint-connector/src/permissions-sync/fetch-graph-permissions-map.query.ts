@@ -1,12 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { isNonNullish } from 'remeda';
+import type { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import {
   SimpleIdentitySet,
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { redactAllValues } from '../utils/logging.util';
+import { redactAllValues, shouldConcealLogs } from '../utils/logging.util';
 import { buildIngestionItemKey } from '../utils/sharepoint.util';
 import { Membership } from './types';
 import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
@@ -21,8 +23,14 @@ type PermissionsFetcher = Record<AnySharepointItem['itemType'], () => Promise<Si
 @Injectable()
 export class FetchGraphPermissionsMapQuery {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly shouldConcealLogs: boolean;
 
-  public constructor(private readonly graphApiService: GraphApiService) {}
+  public constructor(
+    private readonly graphApiService: GraphApiService,
+    private readonly configService: ConfigService<Config, true>,
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+  }
 
   public async run(siteId: string, items: AnySharepointItem[]): Promise<PermissionsMap> {
     const siteName = await this.graphApiService.getSiteName(siteId);
@@ -78,7 +86,11 @@ export class FetchGraphPermissionsMapQuery {
       }
 
       this.logger.warn(
-        `No parsable permissions for permission ${permission.id}: ${JSON.stringify(redactAllValues(permission), null, 4)}`,
+        `No parsable permissions for permission ${permission.id}: ${JSON.stringify(
+          this.shouldConcealLogs ? redactAllValues(permission) : permission,
+          null,
+          4,
+        )}`,
       );
       return [];
     });

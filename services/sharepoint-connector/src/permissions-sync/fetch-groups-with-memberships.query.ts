@@ -28,7 +28,7 @@ import {
   SharepointRestClientService,
   SiteGroupMembership,
 } from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
-import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
+import { redact, redactAllValues, shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import type {
   GroupDistinctId,
@@ -260,7 +260,9 @@ export class FetchGroupsWithMembershipsQuery {
         email:
           membership.mail ||
           membership.userPrincipalName ||
-          assert.fail(`User has no email or userPrincipalName: ${JSON.stringify(membership)}`),
+          assert.fail(
+            `User has no email or userPrincipalName: ${JSON.stringify(this.shouldConcealLogs ? redactAllValues(membership) : membership)}`,
+          ),
       };
     }
 
