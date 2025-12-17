@@ -1,0 +1,35 @@
+# SharePoint Connector - Tenant Configuration Example 2
+# This example shows loading site configurations from a SharePoint list
+# Each list item should contain the fields matching the SiteConfig schema
+
+# Tenant Identification
+tenantId: "99330c76-81d2-460e-861e-35af8e2a4266"
+clientId: "c508960f-f921-48ec-bca9-55ca0b89818e"
+
+# SharePoint Configuration
+authStrategy: "certificate"
+sharepointBaseUrl: "https://uniqueapp.sharepoint.com"
+graphApiRateLimitPerMinute: 780000
+
+# Unique Services Configuration
+ingestionServiceBaseUrl: "http://node-ingestion.finance-gpt:8091"
+scopeManagementServiceBaseUrl: "http://node-scope-management.finance-gpt:8094"
+uniqueApiRateLimitPerMinute: 100
+
+# Site Configuration Source Settings
+# Load site configs from a SharePoint list
+# The list URL should point to a SharePoint list containing site configuration items
+# Each list item should have fields corresponding to SiteConfig schema:
+# - siteId (UUID)
+# - syncColumnName (string)
+# - ingestionMode (flat or recursive)
+# - scopeId (string)
+# - maxIngestedFiles (optional number)
+# - storeInternally (optional: enabled or disabled)
+# - syncStatus (active, inactive, or deleted)
+# - inheritMode (optional: inherit_scopes_and_files, inherit_scopes, inherit_files, or none)
+# - syncMode (optional: content_only or content_and_permissions)
+# - processingMaxFilesToScan (optional number)
+# - processingCronInterval (optional cron expression)
+sitesConfigurationSource: "sharePointList"
+sitesConfigSourceListUrl: "https://uniqueapp.sharepoint.com/sites/QA/Lists/Sharepoint%20Sites%20to%20Sync/AllItems.aspx"

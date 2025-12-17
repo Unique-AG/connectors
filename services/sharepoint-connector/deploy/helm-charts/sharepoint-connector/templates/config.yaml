@@ -20,8 +20,21 @@ data:
   SHAREPOINT_GRAPH_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute | quote }}
   {{- end }}
   SHAREPOINT_BASE_URL: {{ .Values.connectorConfig.sharepoint.baseUrl | quote }}
+  {{- if .Values.connectorConfig.sharepoint.siteIds }}
   SHAREPOINT_SITE_IDS: {{ .Values.connectorConfig.sharepoint.siteIds | join "," | quote }}
+  {{- end }}
+  {{- if .Values.connectorConfig.sharepoint.syncColumnName }}
   SHAREPOINT_SYNC_COLUMN_NAME: {{ .Values.connectorConfig.sharepoint.syncColumnName | quote }}
+  {{- end }}
+  # Site configuration source
+  {{- if .Values.connectorConfig.sharepoint.sitesConfigurationSource }}
+  SHAREPOINT_SITES_CONFIGURATION_SOURCE: {{ .Values.connectorConfig.sharepoint.sitesConfigurationSource.source | quote }}
+  {{- if eq .Values.connectorConfig.sharepoint.sitesConfigurationSource.source "configDirectory" }}
+  SHAREPOINT_SITES_CONFIG_PATH: {{ .Values.connectorConfig.sharepoint.sitesConfigurationSource.configPath | quote }}
+  {{- else if eq .Values.connectorConfig.sharepoint.sitesConfigurationSource.source "sharePointList" }}
+  SHAREPOINT_SITES_CONFIG_SOURCE_LIST_URL: {{ .Values.connectorConfig.sharepoint.sitesConfigurationSource.listUrl | quote }}
+  {{- end }}
+  {{- end }}
   # Unique config
   UNIQUE_SCOPE_ID: {{ .Values.connectorConfig.unique.scopeId | quote }}
   UNIQUE_INGESTION_MODE: {{ .Values.connectorConfig.unique.ingestionMode | quote }}

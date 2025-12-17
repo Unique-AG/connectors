@@ -1,0 +1,57 @@
+# SharePoint Connector - Tenant Configuration Example 1
+# This example shows inline site configurations
+# Site configs are defined directly in this tenant configuration file
+
+# Tenant Identification
+tenantId: "99330c76-81d2-460e-861e-35af8e2a4266"
+clientId: "c508960f-f921-48ec-bca9-55ca0b89818e"
+
+# SharePoint Configuration
+authStrategy: "certificate"
+sharepointBaseUrl: "https://uniqueapp.sharepoint.com"
+graphApiRateLimitPerMinute: 780000
+
+# Unique Services Configuration
+ingestionServiceBaseUrl: "http://node-ingestion.finance-gpt:8091"
+scopeManagementServiceBaseUrl: "http://node-scope-management.finance-gpt:8094"
+uniqueApiRateLimitPerMinute: 100
+
+# Site Configuration Source Settings
+# Load site configs from inline (defined below in this file)
+sitesConfigurationSource: "inline"
+
+# Site Configurations
+sites:
+  - siteId: "e1234567-89ab-cdef-0123-456789abcdef"
+    syncColumnName: "FinanceGPTKnowledge"
+    ingestionMode: "recursive"
+    scopeId: "scope_qa_finance_001"
+    maxIngestedFiles: 5000
+    storeInternally: "enabled"
+    syncStatus: "active"
+    inheritMode: "inherit_scopes_and_files"
+    syncMode: "content_and_permissions"
+    processingMaxFilesToScan: 5
+    processingCronInterval: "*/60 * * * *"
+
+  - siteId: "f2345678-89ab-cdef-0123-456789abcdef"
+    syncColumnName: "QAContentSync"
+    ingestionMode: "flat"
+    scopeId: "scope_qa_general_001"
+    maxIngestedFiles: 10000
+    storeInternally: "enabled"
+    syncStatus: "active"
+    inheritMode: "inherit_scopes"
+    syncMode: "content_only"
+    processingMaxFilesToScan: 10
+    processingCronInterval: "*/60 * * * *"
+
+  - siteId: "a3456789-89ab-cdef-0123-456789abcdef"
+    syncColumnName: "SyncRequired"
+    ingestionMode: "recursive"
+    scopeId: "scope_qa_engineering_001"
+    maxIngestedFiles: 8000
+    storeInternally: "enabled"
+    syncStatus: "active"
+    inheritMode: "inherit_scopes_and_files"
+    syncMode: "content_and_permissions"

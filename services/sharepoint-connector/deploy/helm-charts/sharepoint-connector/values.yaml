@@ -69,12 +69,24 @@ connector:
         items:
           - key: key.pem
             path: key.pem
+    # -- SharePoint site configuration volume (for configDirectory source)
+    # This ConfigMap is created separately containing the site configuration files
+    # Example ConfigMap creation:
+    # kubectl create configmap sharepoint-sitemap --from-file=config/site-configs/
+    - name: sharepoint-sitemap
+      configMap:
+        name: sharepoint-sitemap
+        optional: true
   volumeMounts:
     - name: tmp
       mountPath: /tmp
     - name: sharepoint-connector-secret
       mountPath: /app/key.pem
       subPath: key.pem
+      readOnly: true
+    # -- Mount configuration directory when using configDirectory source
+    - name: sharepoint-sitemap
+      mountPath: /var/lib/sharepoint-sites
       readOnly: true
 
 # -- Grafana dashboard configuration
@@ -152,6 +164,18 @@ connectorConfig:
     # -- column name against which the files are synced
     # example: FinanceGPTKnowledge
     syncColumnName: unset_default_value
+    # -- Site configuration source settings
+    # Supports two sources:
+    # - configDirectory: Load site configs from mounted directory (YAML/JSON files)
+    # - sharePointList: Load site configs from a SharePoint list
+    sitesConfigurationSource:
+      # -- Configuration source: configDirectory or sharePointList
+      source: configDirectory
+      # -- Path to configuration directory when using configDirectory source
+      configPath: /var/lib/sharepoint-sites
+      # -- SharePoint list URL when using sharePointList source
+      # example: https://uniqueapp.sharepoint.com/sites/QA/Lists/Sharepoint%20Sites%20to%20Sync/AllItems.aspx
+      listUrl: null
     auth:
       # -- authentication mode
       # possible values: certificate
