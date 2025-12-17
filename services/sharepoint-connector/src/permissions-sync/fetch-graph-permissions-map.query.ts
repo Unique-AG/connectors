@@ -8,7 +8,7 @@ import {
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { redactAllValues, shouldConcealLogs } from '../utils/logging.util';
+import { shouldConcealLogs } from '../utils/logging.util';
 import { buildIngestionItemKey } from '../utils/sharepoint.util';
 import { Membership } from './types';
 import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
@@ -49,6 +49,7 @@ export class FetchGraphPermissionsMapQuery {
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
         sharePointPermissions,
         siteName,
+        item.item.id
       );
     }
     return permissionsMap;
@@ -57,6 +58,7 @@ export class FetchGraphPermissionsMapQuery {
   private mapSharePointPermissionsToOurPermissions(
     simplePermissions: SimplePermission[],
     siteName: string,
+    itemId: string,
   ): Permission[] {
     return simplePermissions.flatMap((permission) => {
       if (isNonNullish(permission.grantedToV2)) {
@@ -84,10 +86,28 @@ export class FetchGraphPermissionsMapQuery {
           return itemPermissions;
         }
       }
+        // we do not want to log the full permissions object because it contains sensitive data
+        const permissionInfo = {
+          itemId,
+          id: permission.id,
+          grantedToIdentitiesV2: permission.grantedToIdentitiesV2?.map((simpleIdentitySet: SimpleIdentitySet) => {
+            const redactedIdentity: Record<string, unknown> = {};
+            Object.keys(simpleIdentitySet).forEach((key) => {
+              // We need to type the key and the identityValue else typescript will complain
+              const typedKey = key as keyof SimpleIdentitySet;
+              const identityValue = simpleIdentitySet[typedKey] as Record<string, unknown> | undefined;
+              redactedIdentity[typedKey] = {
+                id: identityValue?.id,
+                '@odata.type': identityValue?.['@odata.type']
+              }
+            })
+            return redactedIdentity;
+          })
+        }
 
       this.logger.warn(
         `No parsable permissions for permission ${permission.id}: ${JSON.stringify(
-          this.shouldConcealLogs ? redactAllValues(permission) : permission,
+          permissionInfo,
           null,
           4,
         )}`,
