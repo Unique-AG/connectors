@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
-import { BatchResponseContent } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
@@ -8,17 +7,14 @@ import { serializeError } from 'serialize-error-cjs';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { MicrosoftGraphErrorSchema, makeGraphError } from '~/msgraph/graph-error';
 import { UniqueService } from '~/unique/unique.service';
 import { normalizeError } from '~/utils/normalize-error';
 import {
-  BatchRequest,
   CreatedEventDto,
   Meeting,
   RecordingCollection,
   Transcript,
   TranscriptResourceSchema,
-  TranscriptVttMetadataSchema,
 } from './transcript.dtos';
 
 @Injectable()
@@ -123,90 +119,37 @@ export class TranscriptCreatedService {
 
     this.logger.debug(
       { userId, meetingId, transcriptId },
-      'Preparing batch request to retrieve transcript data from Microsoft Graph',
+      'Retrieving transcript data from Microsoft Graph using parallel API calls',
     );
 
-    const payload = await BatchRequest.encodeAsync({
-      requests: [
-        {
-          id: 'meetingData',
-          url: `/users/${userId}/onlineMeetings/${meetingId}`,
-          method: 'GET',
-        },
-        {
-          id: 'transcriptData',
-          url: `/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}`,
-          method: 'GET',
-        },
-        {
-          id: 'transcriptContent',
-          url: `/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`,
-          method: 'GET',
-          headers: { Accept: 'text/vtt' },
-        },
-        {
-          id: 'transcriptMeta',
-          url: `/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/metadataContent`,
-          method: 'GET',
-          headers: { Accept: 'text/vtt' },
-        },
-      ],
+    const [meeting, transcript, vttStream] = await Promise.all([
+      client.api(`/users/${userId}/onlineMeetings/${meetingId}`).get().then(Meeting.parseAsync),
+      client
+        .api(`/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}`)
+        .get()
+        .then(Transcript.parseAsync),
+      client
+        .api(`/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
+        .header('Accept', 'text/vtt')
+        .getStream(),
+    ]);
+
+    span?.addEvent('microsoft graph data retrieved', {
+      meetingId,
+      transcriptId,
+      contentCorrelationId: transcript.contentCorrelationId,
+      hasVtt: !!vttStream,
     });
-    const batch = await client
-      .api('/$batch')
-      .post(payload)
-      .then((res) => new BatchResponseContent(res));
-
-    span?.addEvent('batch request completed');
-
-    const meetingDataResponse = batch.getResponseById('meetingData');
-    if (!meetingDataResponse.ok) {
-      const error = await meetingDataResponse.json().then(MicrosoftGraphErrorSchema.parseAsync);
-      throw makeGraphError(error, meetingDataResponse.status, meetingDataResponse.headers);
-    }
-    const meeting = await meetingDataResponse.json().then(Meeting.parseAsync);
-    span?.addEvent('meeting data retrieved');
-    this.logger.debug({ meetingId }, 'Successfully retrieved meeting data from Microsoft Graph');
-
-    const transcriptDataResponse = batch.getResponseById('transcriptData');
-    if (!transcriptDataResponse.ok) {
-      const error = await transcriptDataResponse.json().then(MicrosoftGraphErrorSchema.parseAsync);
-      throw makeGraphError(error, transcriptDataResponse.status, transcriptDataResponse.headers);
-    }
-    const transcript = await transcriptDataResponse.json().then(Transcript.parseAsync);
-    span?.addEvent('transcript data retrieved');
     this.logger.debug(
-      { transcriptId, contentCorrelationId: transcript.contentCorrelationId },
-      'Successfully retrieved transcript metadata from Microsoft Graph',
+      {
+        meetingId,
+        transcriptId,
+        contentCorrelationId: transcript.contentCorrelationId,
+        hasVtt: !!vttStream,
+      },
+      'Successfully retrieved data from Microsoft Graph',
     );
-
-    const transcriptContentResponse = batch.getResponseById('transcriptContent');
-    if (!transcriptContentResponse.ok) {
-      const error = await transcriptContentResponse
-        .json()
-        .then(MicrosoftGraphErrorSchema.parseAsync);
-      throw makeGraphError(
-        error,
-        transcriptContentResponse.status,
-        transcriptContentResponse.headers,
-      );
-    }
-    const vttStream = transcriptContentResponse.body;
-    span?.addEvent('transcript content retrieved', { hasVtt: !!vttStream });
-    this.logger.debug(
-      { hasVtt: !!vttStream },
-      'Successfully retrieved VTT transcript content from Microsoft Graph',
-    );
-    if (!vttStream) throw new Error('expected a vtt transcript body');
-
-    const transcriptMetaResponse = batch.getResponseById('transcriptMeta');
-    if (!transcriptMetaResponse.ok) {
-      const error = await transcriptMetaResponse.json().then(MicrosoftGraphErrorSchema.parseAsync);
-      throw makeGraphError(error, transcriptMetaResponse.status, transcriptMetaResponse.headers);
-    }
-    const _meta = await transcriptMetaResponse.text().then(TranscriptVttMetadataSchema.parseAsync);
-    span?.addEvent('transcript metadata retrieved');
-    this.logger.debug({}, 'Successfully retrieved VTT metadata for transcript');
+    assert.ok(vttStream, 'expected a vtt transcript body');
 
     let recordingStream: ReadableStream<Uint8Array<ArrayBuffer>> | undefined;
     try {
