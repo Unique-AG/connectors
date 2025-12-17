@@ -22,9 +22,9 @@ export class SubscriptionRemoveService {
   @Span()
   public async enqueueSubscriptionRemoved(subscriptionId: string): Promise<void> {
     const span = this.trace.getSpan();
-    span?.setAttribute('subscriptionId', subscriptionId);
+    span?.setAttribute('subscription_id', subscriptionId);
 
-    this.logger.debug({ subscriptionId }, 'enqueuing subscription removed event');
+    this.logger.debug({ subscriptionId }, 'Enqueuing subscription removal event for processing');
 
     const payload = await SubscriptionRemovedEventDto.encodeAsync({
       subscriptionId,
@@ -40,13 +40,13 @@ export class SubscriptionRemoveService {
       published,
     });
 
-    this.logger.log(
+    this.logger.debug(
       {
         exchangeName: MAIN_EXCHANGE.name,
         payload,
         published,
       },
-      `publishing "${payload.type}" event to AMQP exchange`,
+      'Publishing event to message queue for asynchronous processing',
     );
 
     assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
@@ -55,9 +55,9 @@ export class SubscriptionRemoveService {
   @Span()
   public async remove(subscriptionId: string): Promise<void> {
     const span = this.trace.getSpan();
-    span?.setAttribute('subscriptionId', subscriptionId);
+    span?.setAttribute('subscription_id', subscriptionId);
 
-    this.logger.debug({ subscriptionId }, 'starting subscription removal');
+    this.logger.log({ subscriptionId }, 'Beginning Microsoft Graph subscription removal process');
 
     const deletedSubscriptions = await this.db
       .delete(subscriptions)
@@ -71,20 +71,20 @@ export class SubscriptionRemoveService {
 
     this.logger.log(
       { subscriptionId, count: deletedSubscriptions.length },
-      'deleted managed subscription',
+      'Successfully deleted managed subscription record from database',
     );
 
     const deletedSubscription = deletedSubscriptions.at(0);
     if (!deletedSubscription) {
       span?.addEvent('no subscription found to delete');
-      this.logger.debug({ subscriptionId }, 'no subscription found to delete');
+      this.logger.debug({ subscriptionId }, 'No matching subscription found in database to delete');
       return;
     }
 
-    span?.setAttribute('userProfileId', deletedSubscription.userProfileId);
+    span?.setAttribute('user_profile_id', deletedSubscription.userProfileId);
     this.logger.debug(
       { subscriptionId, userProfileId: deletedSubscription.userProfileId },
-      'deleting subscription from Graph API',
+      'Sending deletion request to Microsoft Graph API for subscription',
     );
 
     const client = this.graphClientFactory.createClientForUser(deletedSubscription.userProfileId);
@@ -93,6 +93,9 @@ export class SubscriptionRemoveService {
       .delete()) as unknown;
 
     span?.addEvent('Graph API subscription deleted');
-    this.logger.log({ subscriptionId }, 'subscription removed from Graph API');
+    this.logger.log(
+      { subscriptionId },
+      'Successfully removed subscription from Microsoft Graph API',
+    );
   }
 }

@@ -21,9 +21,12 @@ export class TranscriptUtilsService {
 
     const isTrusted = state === null || state.value === webhookSecret.value;
 
-    this.logger.debug({ isTrusted, hasState: state !== null }, 'webhook trust validation');
+    this.logger.debug(
+      { isTrusted, hasState: state !== null },
+      'Validating webhook authenticity using client state verification',
+    );
     const span = this.trace.getSpan();
-    span?.setAttribute('isTrusted', isTrusted);
+    span?.setAttribute('is_trusted', isTrusted);
 
     return isTrusted;
   }
@@ -48,7 +51,7 @@ export class TranscriptUtilsService {
         notificationUrl: notificationUrl.toString(),
         lifecycleNotificationUrl: lifecycleNotificationUrl.toString(),
       },
-      'subscription URLs generated',
+      'Generated webhook URLs for Microsoft Graph subscription endpoints',
     );
 
     return {
@@ -87,7 +90,7 @@ export class TranscriptUtilsService {
         now,
         nextThreeAM,
       },
-      'next scheduled expiration',
+      'Calculated next scheduled subscription expiration time',
     );
 
     return nextThreeAM;

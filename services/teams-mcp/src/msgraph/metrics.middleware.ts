@@ -107,12 +107,16 @@ export class MetricsMiddleware implements Middleware {
         this.msgraphThrottleCounter.add(1, { policy });
 
         this.logger.warn(
-          `MS Graph request throttled: ${method} ${endpoint} - Status: ${statusCode}, Policy: ${policy}`,
+          { method, endpoint, statusCode, policy },
+          'Microsoft Graph API request was rate-limited and throttled',
         );
       }
 
       if (duration > 5000) {
-        this.logger.warn(`Slow MS Graph request: ${method} ${endpoint} took ${duration}ms`);
+        this.logger.warn(
+          { method, endpoint, duration },
+          'Microsoft Graph API request exceeded performance threshold and is considered slow',
+        );
       }
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -128,7 +132,10 @@ export class MetricsMiddleware implements Middleware {
         method,
       });
 
-      this.logger.error(`MS Graph request failed: ${method} ${endpoint} - Error: ${error}`);
+      this.logger.error(
+        { method, endpoint, error },
+        'Microsoft Graph API request failed with an error',
+      );
 
       throw error;
     }

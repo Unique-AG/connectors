@@ -96,7 +96,10 @@ export class TokenProvider implements AuthenticationProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        this.logger.error(`Token refresh failed: ${response.status} ${errorText}`);
+        this.logger.error(
+          { status: response.status, errorText },
+          'Microsoft Graph API rejected token refresh request',
+        );
         assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
@@ -117,13 +120,19 @@ export class TokenProvider implements AuthenticationProvider {
         })
         .where(eq(userProfiles.id, userProfileId));
 
-      this.logger.debug(`Successfully refreshed token for user ${this.userProfileId}`);
+      this.logger.debug(
+        { userProfileId: this.userProfileId },
+        'Successfully refreshed Microsoft Graph API access token',
+      );
       return tokenData.access_token;
     } catch (error) {
-      this.logger.error({
-        msg: 'Failed to refresh token for user',
-        error: serializeError(normalizeError(error)),
-      });
+      this.logger.error(
+        {
+          userProfileId: this.userProfileId,
+          error: serializeError(normalizeError(error)),
+        },
+        'Failed to refresh Microsoft Graph API access token for user',
+      );
       throw new Error(
         `Token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );

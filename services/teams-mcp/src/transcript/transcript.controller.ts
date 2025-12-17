@@ -48,7 +48,7 @@ export class TranscriptController {
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(ValidationCallInterceptor)
   public async lifecycle(@Body() event: LifecycleChangeNotificationCollectionDto) {
-    this.logger.log({ event }, 'lifecycle notification!');
+    this.logger.log({ event }, 'Received lifecycle notification webhook from Microsoft Graph');
 
     const span = this.trace.getSpan();
     const reauthorizationRequests = event.value
@@ -58,7 +58,7 @@ export class TranscriptController {
           span?.addEvent('lifecycle notification invalid');
           this.logger.warn(
             { lifecycleNotification: notification },
-            'lifecycle notification was discarded because of an invalid state',
+            'Discarding lifecycle notification due to invalid authentication state',
           );
         }
         return isTrusted;
@@ -79,8 +79,8 @@ export class TranscriptController {
               type: notification.lifecycleEvent,
             });
             this.logger.warn(
-              { lifecycleNotification: notification },
-              `lifecycle notification was discarded because of an unsupported type: ${notification.lifecycleEvent}`,
+              { lifecycleNotification: notification, eventType: notification.lifecycleEvent },
+              'Discarding lifecycle notification with unsupported event type',
             );
             return null;
           }
@@ -99,13 +99,16 @@ export class TranscriptController {
     });
     this.logger.log(
       { successful: successful.length, failed: failed.length },
-      `notifications published: ${successful.length} successful, ${failed.length} failed`,
+      'Successfully processed all lifecycle notifications from Microsoft Graph',
     );
 
     // NOTE: if we fail any, we reject this webhook as microsoft will send this again later
     if (failed.length > 0) {
       failed.forEach((fail) => {
-        this.logger.warn({ error: fail.reason }, 'publishing reauthorization failed');
+        this.logger.warn(
+          { error: fail.reason },
+          'Failed to publish reauthorization event to message queue',
+        );
         // span?.recordException(fail.reason)
       });
       throw new InternalServerErrorException(
@@ -119,7 +122,7 @@ export class TranscriptController {
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(ValidationCallInterceptor)
   public async notification(@Body() event: ChangeNotificationCollectionDto) {
-    this.logger.log({ event }, 'change notification!');
+    this.logger.log({ event }, 'Received change notification webhook from Microsoft Graph');
 
     const span = this.trace.getSpan();
     const processRequests = event.value
@@ -129,7 +132,7 @@ export class TranscriptController {
           span?.addEvent('change notification invalid');
           this.logger.warn(
             { changeNotification: notification },
-            'change notification was discarded because of an invalid state',
+            'Discarding change notification due to invalid authentication state',
           );
         }
         return isTrusted;
@@ -146,8 +149,8 @@ export class TranscriptController {
           default: {
             span?.addEvent('change notification unsupported', { type: notification.changeType });
             this.logger.warn(
-              { changeNotification: notification },
-              `change notification was discarded because of an unsupported type: ${notification.changeType}`,
+              { changeNotification: notification, changeType: notification.changeType },
+              'Discarding change notification with unsupported change type',
             );
             return null;
           }
@@ -166,13 +169,16 @@ export class TranscriptController {
     });
     this.logger.log(
       { successful: successful.length, failed: failed.length },
-      `notifications published: ${successful.length} successful, ${failed.length} failed`,
+      'Successfully processed all change notifications from Microsoft Graph',
     );
 
     // NOTE: if we fail any, we reject this webhook as microsoft will send this again later
     if (failed.length > 0) {
       failed.forEach((fail) => {
-        this.logger.warn({ error: fail.reason }, 'publishing process request failed');
+        this.logger.warn(
+          { error: fail.reason },
+          'Failed to publish processing request to message queue',
+        );
         // span?.recordException(fail.reason)
       });
       throw new InternalServerErrorException(
@@ -197,7 +203,7 @@ export class TranscriptController {
     @RabbitPayload() payload: unknown,
   ) {
     const event = await LifecycleEventDto.parseAsync(payload);
-    this.logger.log({ event }, 'lifecycle event!');
+    this.logger.log({ event }, 'Processing lifecycle event from message queue');
 
     switch (event.type) {
       case 'unique.teams-mcp.transcript.lifecycle-notification.subscription-requested': {
@@ -211,7 +217,10 @@ export class TranscriptController {
       }
 
       default:
-        this.logger.warn(`event ${event.type} is unsupported`);
+        this.logger.warn(
+          { eventType: event.type },
+          'Received unsupported lifecycle event type and will ignore it',
+        );
         break;
     }
   }
@@ -231,7 +240,7 @@ export class TranscriptController {
     @RabbitPayload() payload: unknown,
   ) {
     const event = await ChangeEventDto.parseAsync(payload);
-    this.logger.log({ event }, 'change event!');
+    this.logger.log({ event }, 'Processing change event from message queue');
 
     switch (event.type) {
       case 'unique.teams-mcp.transcript.change-notification.created': {
@@ -239,7 +248,10 @@ export class TranscriptController {
       }
 
       default:
-        this.logger.warn(`event ${event.type} is unsupported`);
+        this.logger.warn(
+          { eventType: event.type },
+          'Received unsupported change event type and will ignore it',
+        );
         break;
     }
   }
@@ -247,7 +259,7 @@ export class TranscriptController {
   @OnEvent('user.upsert')
   public async userUpsert(payload: unknown) {
     const event = UserUpsertEvent.parse(payload);
-    this.logger.debug({ event }, 'user upsert event!');
+    this.logger.debug({ event }, 'Processing user upsert event to trigger subscription creation');
 
     return this.subscriptionCreate.enqueueSubscriptionRequested(event.id);
   }

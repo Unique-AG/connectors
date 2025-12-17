@@ -84,7 +84,7 @@ export class UniqueService {
 
       this.logger.debug(
         { endpoint: endpoint.origin + endpoint.pathname },
-        'Fetching user by email or userName',
+        'Searching for user in Unique system by email or username',
       );
 
       const response = await fetch(endpoint, {
@@ -95,7 +95,7 @@ export class UniqueService {
       if (!response.ok) {
         this.logger.warn(
           { status: response.status, endpoint: endpoint.origin + endpoint.pathname },
-          'Failed to fetch user by email or userName',
+          'Failed to locate user in Unique system by email or username',
         );
         return null;
       }
@@ -121,7 +121,7 @@ export class UniqueService {
         foundByUserName: !!userByUserName,
         email,
       },
-      'User fetch completed',
+      'Completed user search operation in Unique system',
     );
 
     return userFound;
@@ -133,7 +133,7 @@ export class UniqueService {
 
     this.logger.debug(
       { endpoint: endpoint.href, pathCount: payload.paths.length },
-      'Creating scope',
+      'Creating new organizational scope in Unique API',
     );
 
     const response = await fetch(endpoint, {
@@ -148,7 +148,7 @@ export class UniqueService {
     if (!response.ok) {
       this.logger.error(
         { status: response.status, endpoint: endpoint.href },
-        'Unique Public API returned an error for scope creation',
+        'Unique Public API rejected scope creation request with error',
       );
       throw new Error('Unique Public API return an error');
     }
@@ -162,9 +162,12 @@ export class UniqueService {
     const createdScope = result.createdFolders[0]!;
     this.logger.log(
       { scopeId: createdScope.id, foldersCreated: result.createdFolders.length },
-      'Scope created successfully',
+      'Successfully created new organizational scope in Unique system',
     );
-    this.logger.debug({ createdFolders: result.createdFolders }, 'Scope creation details');
+    this.logger.debug(
+      { createdFolders: result.createdFolders },
+      'Detailed information about created scope structure',
+    );
 
     return createdScope;
   }
@@ -185,7 +188,7 @@ export class UniqueService {
 
     this.logger.debug(
       { endpoint: endpoint.href, scopeId: scope, accessCount: accesses.length },
-      'Adding scope accesses',
+      'Configuring user access permissions for organizational scope',
     );
 
     const response = await fetch(endpoint, {
@@ -200,7 +203,7 @@ export class UniqueService {
     if (!response.ok) {
       this.logger.error(
         { status: response.status, endpoint: endpoint.href, scopeId: scope },
-        'Unique Public API returned an error for adding scope accesses',
+        'Unique Public API rejected scope access configuration with error',
       );
       throw new Error('Unique Public API return an error');
     }
@@ -209,7 +212,7 @@ export class UniqueService {
 
     this.logger.log(
       { scopeId: scope, accessesAdded: accesses.length },
-      'Scope accesses added successfully',
+      'Successfully configured user access permissions for scope',
     );
 
     return result;
@@ -233,7 +236,7 @@ export class UniqueService {
         storeInternally: content.storeInternally,
         hasFileUrl: !!content.fileUrl,
       },
-      'Upserting content',
+      'Creating or updating content record in Unique system',
     );
 
     const response = await fetch(endpoint, {
@@ -253,7 +256,7 @@ export class UniqueService {
           scopeId: content.scopeId,
           contentKey: content.input.key,
         },
-        'Unique Public API returned an error for content upsert',
+        'Unique Public API rejected content creation request with error',
       );
       assert.fail(`Unique Public API return an error for content upsert: ${response.status}`);
     }
@@ -268,7 +271,7 @@ export class UniqueService {
         hasWriteUrl: !!result.writeUrl,
         hasReadUrl: !!result.readUrl,
       },
-      'Content upserted successfully',
+      'Successfully created or updated content record in Unique system',
     );
 
     return {
@@ -285,7 +288,7 @@ export class UniqueService {
     const urlObj = new URL(writeUrl);
     const storageEndpoint = `${urlObj.protocol}//${urlObj.hostname}`;
 
-    this.logger.debug({ storageEndpoint }, 'Uploading content to storage');
+    this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
 
     const response = await fetch(writeUrl, {
       method: 'PUT',
@@ -303,12 +306,15 @@ export class UniqueService {
     if (!response.ok) {
       this.logger.error(
         { status: response.status, storageEndpoint },
-        'Unique Public API storage returned an error',
+        'Unique storage system rejected content upload with error',
       );
       assert.fail(`Unique Public API storage return an error: ${response.status}`);
     }
 
-    this.logger.debug({ storageEndpoint }, 'Content uploaded to storage successfully');
+    this.logger.debug(
+      { storageEndpoint },
+      'Successfully completed content upload to storage system',
+    );
   }
 
   public async ingestTranscript(
@@ -329,7 +335,7 @@ export class UniqueService {
         participantCount: meeting.participants.length,
         meetingDate: meeting.startDateTime.toISOString(),
       },
-      'Processing meeting transcript',
+      'Beginning processing of meeting transcript and recording for ingestion',
     );
 
     const participantsPromises = meeting.participants.map((p) =>
@@ -341,14 +347,14 @@ export class UniqueService {
     if (!owner) {
       this.logger.warn(
         { participantCount: meeting.participants.length },
-        "Owner of the meeting couldn't be found in Unique",
+        'Cannot proceed: meeting owner account not found in Unique system',
       );
       return;
     }
 
     this.logger.debug(
       { foundParticipants: participants.length, totalParticipants: meeting.participants.length },
-      'Participants resolved',
+      'Successfully resolved meeting participant accounts in Unique system',
     );
 
     const path = this.mapMeetingToScope(meeting.subject, meeting.startDateTime);
@@ -371,7 +377,10 @@ export class UniqueService {
     });
     await this.addScopeAccesses(scope.id, accesses);
 
-    this.logger.log({ transcriptId: transcript.id, scopeId: scope.id }, 'Uploading transcript');
+    this.logger.log(
+      { transcriptId: transcript.id, scopeId: scope.id },
+      'Beginning transcript upload to Unique system',
+    );
 
     const transcriptUpload = await this.upsertContent({
       storeInternally: true,
@@ -400,7 +409,10 @@ export class UniqueService {
     });
 
     if (recording) {
-      this.logger.log({ recordingId: recording.id, scopeId: scope.id }, 'Uploading recording');
+      this.logger.log(
+        { recordingId: recording.id, scopeId: scope.id },
+        'Beginning meeting recording upload to Unique system',
+      );
 
       const recordingUpload = await this.upsertContent({
         storeInternally: true,
@@ -439,7 +451,7 @@ export class UniqueService {
         recordingId: recording?.id,
         scopeId: scope.id,
       },
-      'Meeting transcript processing completed',
+      'Successfully completed meeting transcript and recording ingestion process',
     );
   }
 

@@ -24,7 +24,10 @@ async function bootstrap() {
 
   const config = app.get<AppConfig>(appConfig.KEY);
   await app.listen(config.port, () =>
-    logger.log(`Server is running on http://localhost:${config.port}`, 'Bootstrap'),
+    logger.log(
+      `Teams MCP server successfully started and listening on http://localhost:${config.port}`,
+      'Bootstrap',
+    ),
   );
 }
 

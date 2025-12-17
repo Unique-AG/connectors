@@ -34,10 +34,13 @@ export class TranscriptCreatedService {
   @Span()
   public async enqueueCreated(subscriptionId: string, resource: string) {
     const span = this.trace.getSpan();
-    span?.setAttribute('subscriptionId', subscriptionId);
+    span?.setAttribute('subscription_id', subscriptionId);
     span?.setAttribute('resource', resource);
 
-    this.logger.debug({ subscriptionId, resource }, 'enqueuing transcript created event');
+    this.logger.debug(
+      { subscriptionId, resource },
+      'Enqueuing transcript creation event for processing',
+    );
 
     const payload = await CreatedEventDto.encodeAsync({
       subscriptionId,
@@ -54,13 +57,13 @@ export class TranscriptCreatedService {
       published,
     });
 
-    this.logger.log(
+    this.logger.debug(
       {
         exchangeName: MAIN_EXCHANGE.name,
         payload,
         published,
       },
-      `publishing "${payload.type}" event to AMQP exchange`,
+      'Publishing event to message queue for asynchronous processing',
     );
 
     assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
@@ -69,20 +72,23 @@ export class TranscriptCreatedService {
   @Span()
   public async created(subscriptionId: string, resource: string): Promise<void> {
     const span = this.trace.getSpan();
-    span?.setAttribute('subscriptionId', subscriptionId);
+    span?.setAttribute('subscription_id', subscriptionId);
     span?.setAttribute('resource', resource);
 
-    this.logger.debug({ subscriptionId, resource }, 'processing transcript created notification');
+    this.logger.log(
+      { subscriptionId, resource },
+      'Processing transcript creation notification from Microsoft Graph',
+    );
 
     const { userId, meetingId, transcriptId } = await TranscriptResourceSchema.parseAsync(resource);
 
-    span?.setAttribute('userId', userId);
-    span?.setAttribute('meetingId', meetingId);
-    span?.setAttribute('transcriptId', transcriptId);
+    span?.setAttribute('user_id', userId);
+    span?.setAttribute('meeting_id', meetingId);
+    span?.setAttribute('transcript_id', transcriptId);
 
     this.logger.debug(
       { userId, meetingId, transcriptId },
-      'parsed transcript resource identifiers',
+      'Successfully parsed transcript resource identifiers from Microsoft Graph',
     );
 
     const subscription = await this.db.query.subscriptions.findFirst({
@@ -98,22 +104,22 @@ export class TranscriptCreatedService {
 
       this.logger.warn(
         { subscriptionId },
-        "the created transcript is for a subscription we don't manage",
+        'Transcript belongs to a subscription not managed by this service',
       );
       return;
     }
 
-    span?.setAttribute('userProfileId', subscription.userProfileId);
+    span?.setAttribute('user_profile_id', subscription.userProfileId);
     this.logger.debug(
       { subscriptionId, userProfileId: subscription.userProfileId },
-      'found managed subscription',
+      'Located managed subscription record in database',
     );
 
     const client = this.graphClientFactory.createClientForUser(subscription.userProfileId);
 
     this.logger.debug(
       { userId, meetingId, transcriptId },
-      'preparing batch request for transcript data',
+      'Preparing batch request to retrieve transcript data from Microsoft Graph',
     );
 
     const payload = await BatchRequest.encodeAsync({
@@ -156,7 +162,7 @@ export class TranscriptCreatedService {
     }
     const meeting = await meetingDataResponse.json().then(Meeting.parseAsync);
     span?.addEvent('meeting data retrieved');
-    this.logger.debug({ meetingId }, 'meeting data retrieved');
+    this.logger.debug({ meetingId }, 'Successfully retrieved meeting data from Microsoft Graph');
 
     const transcriptDataResponse = batch.getResponseById('transcriptData');
     if (!transcriptDataResponse.ok) {
@@ -167,7 +173,7 @@ export class TranscriptCreatedService {
     span?.addEvent('transcript data retrieved');
     this.logger.debug(
       { transcriptId, contentCorrelationId: transcript.contentCorrelationId },
-      'transcript data retrieved',
+      'Successfully retrieved transcript metadata from Microsoft Graph',
     );
 
     const transcriptContentResponse = batch.getResponseById('transcriptContent');
@@ -183,7 +189,10 @@ export class TranscriptCreatedService {
     }
     const vttStream = transcriptContentResponse.body;
     span?.addEvent('transcript content retrieved', { hasVtt: !!vttStream });
-    this.logger.debug({ hasVtt: !!vttStream }, 'transcript VTT content retrieved');
+    this.logger.debug(
+      { hasVtt: !!vttStream },
+      'Successfully retrieved VTT transcript content from Microsoft Graph',
+    );
     if (!vttStream) throw new Error('expected a vtt transcript body');
 
     const transcriptMetaResponse = batch.getResponseById('transcriptMeta');
@@ -193,13 +202,13 @@ export class TranscriptCreatedService {
     }
     const _meta = await transcriptMetaResponse.text().then(TranscriptVttMetadataSchema.parseAsync);
     span?.addEvent('transcript metadata retrieved');
-    this.logger.debug('transcript metadata retrieved');
+    this.logger.debug({}, 'Successfully retrieved VTT metadata for transcript');
 
     let recordingStream: ReadableStream<Uint8Array<ArrayBuffer>> | undefined;
     try {
       this.logger.debug(
         { contentCorrelationId: transcript.contentCorrelationId },
-        'attempting to retrieve recording',
+        'Attempting to retrieve correlated meeting recording from Microsoft Graph',
       );
 
       const recordingResponse = await client
@@ -216,7 +225,10 @@ export class TranscriptCreatedService {
         .parseAsync(recordingResponse);
 
       span?.setAttribute('recording.id', recordingData.id);
-      this.logger.debug({ recordingId: recordingData.id }, 'found correlated recording');
+      this.logger.debug(
+        { recordingId: recordingData.id },
+        'Located correlated meeting recording in Microsoft Graph',
+      );
 
       recordingStream = await client
         .api(
@@ -225,13 +237,19 @@ export class TranscriptCreatedService {
         .getStream();
 
       span?.addEvent('recording content retrieved');
-      this.logger.log({ recordingId: recordingData.id }, 'recording content retrieved');
+      this.logger.debug(
+        { recordingId: recordingData.id },
+        'Successfully downloaded meeting recording content',
+      );
     } catch (error) {
       span?.addEvent('failed to retrieve recording', {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      this.logger.warn({ error }, 'unable to get recording content');
+      this.logger.warn(
+        { error },
+        'Failed to retrieve or locate meeting recording, proceeding without it',
+      );
     }
 
     span?.addEvent('transcript processing completed', {

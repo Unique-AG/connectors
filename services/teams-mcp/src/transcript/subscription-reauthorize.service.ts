@@ -28,9 +28,12 @@ export class SubscriptionReauthorizeService {
   @Span()
   public async enqueueReauthorizationRequired(subscriptionId: string): Promise<void> {
     const span = this.trace.getSpan();
-    span?.setAttribute('subscriptionId', subscriptionId);
+    span?.setAttribute('subscription_id', subscriptionId);
 
-    this.logger.debug({ subscriptionId }, 'enqueuing reauthorization required event');
+    this.logger.debug(
+      { subscriptionId },
+      'Enqueuing subscription reauthorization event for processing',
+    );
 
     const payload = await ReauthorizationRequiredEventDto.encodeAsync({
       subscriptionId,
@@ -46,13 +49,13 @@ export class SubscriptionReauthorizeService {
       published,
     });
 
-    this.logger.log(
+    this.logger.debug(
       {
         exchangeName: MAIN_EXCHANGE.name,
         payload,
         published,
       },
-      `publishing "${payload.type}" event to AMQP exchange`,
+      'Publishing event to message queue for asynchronous processing',
     );
 
     assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
@@ -61,9 +64,12 @@ export class SubscriptionReauthorizeService {
   @Span()
   public async reauthorize(subscriptionId: string): Promise<void> {
     const span = this.trace.getSpan();
-    span?.setAttribute('subscriptionId', subscriptionId);
+    span?.setAttribute('subscription_id', subscriptionId);
 
-    this.logger.debug({ subscriptionId }, 'starting subscription reauthorization');
+    this.logger.log(
+      { subscriptionId },
+      'Beginning Microsoft Graph subscription reauthorization process',
+    );
 
     const subscription = await this.db.query.subscriptions.findFirst({
       where: and(
@@ -77,17 +83,17 @@ export class SubscriptionReauthorizeService {
 
       this.logger.warn(
         { subscriptionId },
-        "the requested reauthorization is for a subscription we don't manage",
+        'Cannot reauthorize: subscription is not managed by this service',
       );
       return;
     }
 
-    span?.setAttribute('userProfileId', subscription.userProfileId);
+    span?.setAttribute('user_profile_id', subscription.userProfileId);
     span?.setAttribute('subscription.id', subscription.id);
 
     this.logger.debug(
       { subscriptionId, managedId: subscription.id, userProfileId: subscription.userProfileId },
-      'found managed subscription for reauthorization',
+      'Located managed subscription record that requires reauthorization',
     );
 
     const nextScheduledExpiration = this.utils.getNextScheduledExpiration();
@@ -100,16 +106,16 @@ export class SubscriptionReauthorizeService {
       expirationDateTime: payload.expirationDateTime,
     });
 
-    this.logger.log(
+    this.logger.debug(
       {
         expirationDateTime: payload.expirationDateTime,
       },
-      'reauthorize subscription payload prepared',
+      'Prepared Microsoft Graph subscription reauthorization request payload',
     );
 
     this.logger.debug(
       { subscriptionId, newExpiration: payload.expirationDateTime },
-      'updating subscription in Graph API',
+      'Sending reauthorization update request to Microsoft Graph API',
     );
 
     const client = this.graphClientFactory.createClientForUser(subscription.userProfileId);
@@ -122,9 +128,9 @@ export class SubscriptionReauthorizeService {
       newExpirationDateTime: graphSubscription.expirationDateTime.toISOString(),
     });
 
-    this.logger.debug(
+    this.logger.log(
       { subscriptionId, newExpiration: graphSubscription.expirationDateTime },
-      'Graph API subscription updated successfully',
+      'Microsoft Graph API subscription was successfully reauthorized',
     );
 
     const updates = await this.db
@@ -148,6 +154,9 @@ export class SubscriptionReauthorizeService {
     }
 
     span?.addEvent('managed subscription updated', { id: updated.id });
-    this.logger.log({ id: updated.id }, 'managed subscription updated');
+    this.logger.log(
+      { id: updated.id },
+      'Successfully updated managed subscription record with new expiration',
+    );
   }
 }

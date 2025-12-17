@@ -29,7 +29,7 @@ export class SubscriptionCreateService {
   @Span()
   public async enqueueSubscriptionRequested(userProfileId: TypeID<'user_profile'>): Promise<void> {
     const span = this.trace.getSpan();
-    span?.setAttribute('userProfileId', userProfileId.toString());
+    span?.setAttribute('user_profile_id', userProfileId.toString());
 
     const payload = await SubscriptionRequestedEventDto.encodeAsync({
       userProfileId,
@@ -38,7 +38,7 @@ export class SubscriptionCreateService {
 
     this.logger.debug(
       { userProfileId: userProfileId.toString(), eventType: payload.type },
-      'enqueuing subscription requested event',
+      'Enqueuing subscription request event for user profile processing',
     );
 
     const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
@@ -50,13 +50,13 @@ export class SubscriptionCreateService {
       published,
     });
 
-    this.logger.log(
+    this.logger.debug(
       {
         exchangeName: MAIN_EXCHANGE.name,
         payload,
         published,
       },
-      `publishing "${payload.type}" event to AMQP exchange`,
+      'Publishing event to message queue for asynchronous processing',
     );
 
     assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
@@ -65,9 +65,12 @@ export class SubscriptionCreateService {
   @Span()
   public async subscribe(userProfileId: TypeID<'user_profile'>): Promise<void> {
     const span = this.trace.getSpan();
-    span?.setAttribute('userProfileId', userProfileId.toString());
+    span?.setAttribute('user_profile_id', userProfileId.toString());
 
-    this.logger.debug({ userProfileId: userProfileId.toString() }, 'starting subscription process');
+    this.logger.log(
+      { userProfileId: userProfileId.toString() },
+      'Starting Microsoft Graph subscription creation process for user',
+    );
 
     const subscription = await this.db.query.subscriptions.findFirst({
       where: and(
@@ -78,7 +81,10 @@ export class SubscriptionCreateService {
 
     if (subscription) {
       span?.addEvent('found managed subscription', { id: subscription.id });
-      this.logger.log({ id: subscription.id }, 'found managed subscription in DB');
+      this.logger.debug(
+        { id: subscription.id },
+        'Located existing managed subscription in database',
+      );
 
       const expiresAt = new Date(subscription.expiresAt);
       const now = new Date();
@@ -89,7 +95,7 @@ export class SubscriptionCreateService {
 
       this.logger.debug(
         { id: subscription.id, expiresAt, now: now, diffFromNow },
-        'managed subscription expiration',
+        'Evaluating managed subscription expiration status',
       );
 
       const minimalTimeForLifecycleNotificationsInMinutes = 15;
@@ -107,7 +113,7 @@ export class SubscriptionCreateService {
 
         this.logger.log(
           { id: subscription.id, count: result.rowCount ?? NaN },
-          'expired managed subscription deleted',
+          'Successfully deleted expired managed subscription from database',
         );
       } else if (diffFromNow <= minimalTimeForLifecycleNotificationsInMinutes * 60 * 1000) {
         span?.addEvent('subscription below renewal threshold', {
@@ -116,20 +122,26 @@ export class SubscriptionCreateService {
         });
 
         this.logger.warn(
-          { id: subscription.id },
-          `subscription is below "${minimalTimeForLifecycleNotificationsInMinutes}" minutes threshold`,
+          { id: subscription.id, thresholdMinutes: minimalTimeForLifecycleNotificationsInMinutes },
+          'Subscription expires too soon to renew safely, skipping creation',
         );
         return;
       } else {
         span?.addEvent('subscription valid, skipping creation');
 
-        this.logger.log({ id: subscription.id }, 'skipping creation of new subscription');
+        this.logger.debug(
+          { id: subscription.id },
+          'Existing subscription is valid, skipping new subscription creation',
+        );
         return;
       }
     }
 
     span?.addEvent('no existing subscription found');
-    this.logger.debug('no existing subscription found, creating new one');
+    this.logger.debug(
+      {},
+      'No existing subscription found, proceeding with new subscription creation',
+    );
 
     const { notificationUrl, lifecycleNotificationUrl } = this.utils.getSubscriptionURLs();
     const nextScheduledExpiration = this.utils.getNextScheduledExpiration();
@@ -146,13 +158,16 @@ export class SubscriptionCreateService {
       span?.addEvent('user profile not found');
       this.logger.error(
         { userProfileId: userProfileId.toString() },
-        'user profile not found in DB',
+        'Cannot proceed: user profile does not exist in database',
       );
       throw new Error(`${userProfileId} could not be found on DB`);
     }
 
-    span?.setAttribute('userProfile.providerUserId', userProfile.providerUserId);
-    this.logger.debug({ providerUserId: userProfile.providerUserId }, 'user profile retrieved');
+    span?.setAttribute('user_profile.provider_user_id', userProfile.providerUserId);
+    this.logger.debug(
+      { providerUserId: userProfile.providerUserId },
+      'Successfully retrieved user profile from database',
+    );
 
     const payload = await CreateSubscriptionRequestSchema.encodeAsync({
       changeType: ['created'],
@@ -169,32 +184,32 @@ export class SubscriptionCreateService {
       expirationDateTime: payload.expirationDateTime,
     });
 
-    this.logger.log(
+    this.logger.debug(
       {
         notificationUrl: payload.notificationUrl,
         lifecycleNotificationUrl: payload.lifecycleNotificationUrl,
         expirationDateTime: payload.expirationDateTime,
       },
-      'new subscription payload prepared',
+      'Prepared Microsoft Graph subscription request payload',
     );
 
     this.logger.debug(
       { resource: payload.resource, changeType: payload.changeType },
-      'creating Graph API subscription',
+      'Sending subscription creation request to Microsoft Graph API',
     );
 
     const client = this.graphClientFactory.createClientForUser(userProfileId.toString());
     const graphResponse = (await client.api('/subscriptions').post(payload)) as unknown;
     const graphSubscription = await Subscription.parseAsync(graphResponse);
 
-    span?.setAttribute('graphSubscription.id', graphSubscription.id);
+    span?.setAttribute('graph_subscription.id', graphSubscription.id);
     span?.addEvent('Graph API subscription created', {
       subscriptionId: graphSubscription.id,
     });
 
-    this.logger.debug(
+    this.logger.log(
       { subscriptionId: graphSubscription.id },
-      'Graph API subscription created successfully',
+      'Microsoft Graph API subscription was created successfully',
     );
 
     const newManagedSubscriptions = await this.db
@@ -214,6 +229,6 @@ export class SubscriptionCreateService {
     }
 
     span?.addEvent('new managed subscription created', { id: created.id });
-    this.logger.log({ id: created.id }, 'new managed subscription created');
+    this.logger.log({ id: created.id }, 'Successfully created new managed subscription record');
   }
 }

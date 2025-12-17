@@ -31,7 +31,7 @@ export class ValidationCallInterceptor implements NestInterceptor {
           validationToken,
           path: request.path,
         },
-        'Validation call received for subscription',
+        'Received Microsoft Graph subscription validation challenge',
       );
       response.status(HttpStatus.OK).contentType('text/plain');
       return of(validationToken);
