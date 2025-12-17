@@ -6,6 +6,7 @@ import {
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { redactAllValues } from '../utils/logging.util';
 import { buildIngestionItemKey } from '../utils/sharepoint.util';
 import { Membership } from './types';
 import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
@@ -77,7 +78,7 @@ export class FetchGraphPermissionsMapQuery {
       }
 
       this.logger.warn(
-        `No parsable permissions for permission ${permission.id}: ${JSON.stringify(permission, null, 4)}`,
+        `No parsable permissions for permission ${permission.id}: ${JSON.stringify(redactAllValues(permission), null, 4)}`,
       );
       return [];
     });

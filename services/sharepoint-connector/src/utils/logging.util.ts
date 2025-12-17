@@ -61,6 +61,42 @@ export function concealIngestionKey(key: string): string {
   return smear(key); // Smear the whole key if format is unexpected
 }
 
+/**
+ * Recursively redacts all values in an object structure while preserving the keys and structure.
+ * This is useful for logging sensitive data where you want to show the structure but hide all values.
+ * Preserves null and undefined values as they are not considered sensitive data.
+ */
+export function redactAllValues(obj: unknown): unknown {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj !== 'object') {
+    return '***';
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(redactAllValues);
+  }
+
+  // For non-plain objects (Date, RegExp, functions) redact the whole thing
+  const proto = Object.getPrototypeOf(obj);
+  if (proto !== Object.prototype && proto !== null) {
+    return '***';
+  }
+
+  const result: Record<string | symbol, unknown> = {};
+
+  // Handle all property keys including symbols
+  const keys = [...Object.getOwnPropertyNames(obj), ...Object.getOwnPropertySymbols(obj)];
+
+  for (const key of keys) {
+    result[key] = redactAllValues((obj as Record<string | symbol, unknown>)[key]);
+  }
+
+  return result;
+}
+
 export function shouldConcealLogs(configService: ConfigService<Config, true>): boolean {
   return configService.get('app.logsDiagnosticsDataPolicy', { infer: true }) === 'conceal';
 }

@@ -4,6 +4,7 @@ import type { Config } from '../config';
 import {
   concealIngestionKey,
   redact,
+  redactAllValues,
   redactSiteNameFromPath,
   shouldConcealLogs,
   smear,
@@ -238,6 +239,270 @@ describe('logging utilities', () => {
       shouldConcealLogs(mockConfigService);
       expect(capturedKey).toBe('app.logsDiagnosticsDataPolicy');
       expect(capturedOptions).toEqual({ infer: true });
+    });
+  });
+
+  describe('redactAllValues', () => {
+    it('redacts primitive string values', () => {
+      expect(redactAllValues('sensitive-data')).toBe('***');
+      expect(redactAllValues('')).toBe('***');
+      expect(redactAllValues('hello world')).toBe('***');
+    });
+
+    it('redacts primitive number values', () => {
+      expect(redactAllValues(42)).toBe('***');
+      expect(redactAllValues(0)).toBe('***');
+      expect(redactAllValues(-123.45)).toBe('***');
+      expect(redactAllValues(NaN)).toBe('***');
+      expect(redactAllValues(Infinity)).toBe('***');
+    });
+
+    it('redacts primitive boolean values', () => {
+      expect(redactAllValues(true)).toBe('***');
+      expect(redactAllValues(false)).toBe('***');
+    });
+
+    it('preserves null and undefined values', () => {
+      expect(redactAllValues(null)).toBe(null);
+      expect(redactAllValues(undefined)).toBe(undefined);
+    });
+
+    it('redacts bigint values', () => {
+      expect(redactAllValues(BigInt(123))).toBe('***');
+    });
+
+    it('redacts symbol values', () => {
+      expect(redactAllValues(Symbol('test'))).toBe('***');
+    });
+
+    it('redacts simple objects with primitive values', () => {
+      const input = {
+        name: 'John Doe',
+        age: 30,
+        email: 'john@example.com',
+        isActive: true,
+      };
+
+      const expected = {
+        name: '***',
+        age: '***',
+        email: '***',
+        isActive: '***',
+      };
+
+      expect(redactAllValues(input)).toEqual(expected);
+    });
+
+    it('redacts nested objects', () => {
+      const input = {
+        user: {
+          personal: {
+            firstName: 'John',
+            lastName: 'Doe',
+            ssn: '123-45-6789',
+          },
+          contact: {
+            email: 'john@example.com',
+            phone: '555-0123',
+          },
+        },
+        metadata: {
+          createdAt: '2023-01-01',
+          version: 1.0,
+        },
+      };
+
+      const expected = {
+        user: {
+          personal: {
+            firstName: '***',
+            lastName: '***',
+            ssn: '***',
+          },
+          contact: {
+            email: '***',
+            phone: '***',
+          },
+        },
+        metadata: {
+          createdAt: '***',
+          version: '***',
+        },
+      };
+
+      expect(redactAllValues(input)).toEqual(expected);
+    });
+
+    it('redacts arrays of primitives', () => {
+      const input = ['secret1', 'secret2', 123, true, null, undefined];
+      const expected = ['***', '***', '***', '***', null, undefined];
+
+      expect(redactAllValues(input)).toEqual(expected);
+    });
+
+    it('redacts arrays of objects', () => {
+      const input = [
+        { name: 'Alice', secret: 'password123' },
+        { name: 'Bob', secret: 'letmein' },
+      ];
+
+      const expected = [
+        { name: '***', secret: '***' },
+        { name: '***', secret: '***' },
+      ];
+
+      expect(redactAllValues(input)).toEqual(expected);
+    });
+
+    it('redacts mixed arrays with nested structures', () => {
+      const input = [
+        'simple string',
+        { key: 'value', nested: { deep: 'secret' } },
+        [1, 2, { inner: 'data' }],
+        null,
+        undefined,
+      ];
+
+      const expected = [
+        '***',
+        { key: '***', nested: { deep: '***' } },
+        ['***', '***', { inner: '***' }],
+        null,
+        undefined,
+      ];
+
+      expect(redactAllValues(input)).toEqual(expected);
+    });
+
+    it('redacts empty objects and arrays', () => {
+      expect(redactAllValues({})).toEqual({});
+      expect(redactAllValues([])).toEqual([]);
+    });
+
+    it('preserves object structure with empty keys', () => {
+      const input = {
+        '': 'empty key',
+        key: '',
+        nested: {
+          '': 'nested empty key',
+        },
+      };
+
+      const expected = {
+        '': '***',
+        key: '***',
+        nested: {
+          '': '***',
+        },
+      };
+
+      expect(redactAllValues(input)).toEqual(expected);
+    });
+
+    it('handles complex permission-like objects', () => {
+      const input = {
+        id: '97411c66-13bd-453a-8785-9927a1356307',
+        grantedToIdentitiesV2: [
+          {
+            siteUser: {
+              displayName: 'Thomas Hediger',
+              email: 'hediger@solira.ch',
+              id: '84',
+              loginName: 'i:0#.f|membership|hediger_solira.ch#ext#@uniqueapp.onmicrosoft.com',
+            },
+          },
+          {
+            user: {
+              '@odata.type': '#microsoft.graph.sharePointIdentity',
+              displayName: 'Thomas Hediger',
+              email: 'hediger@solira.ch',
+            },
+          },
+        ],
+        roles: ['read', 'write'],
+        metadata: {
+          created: '2023-01-01T00:00:00Z',
+          modified: '2023-12-01T00:00:00Z',
+          version: 1,
+        },
+      };
+
+      const expected = {
+        id: '***',
+        grantedToIdentitiesV2: [
+          {
+            siteUser: {
+              displayName: '***',
+              email: '***',
+              id: '***',
+              loginName: '***',
+            },
+          },
+          {
+            user: {
+              '@odata.type': '***',
+              displayName: '***',
+              email: '***',
+            },
+          },
+        ],
+        roles: ['***', '***'],
+        metadata: {
+          created: '***',
+          modified: '***',
+          version: '***',
+        },
+      };
+
+      expect(redactAllValues(input)).toEqual(expected);
+    });
+
+    it('handles objects with symbol keys', () => {
+      const symbolKey = Symbol('test');
+      const input = {
+        [symbolKey]: 'symbol value',
+        normalKey: 'normal value',
+      };
+
+      const result = redactAllValues(input) as Record<string | symbol, unknown>;
+
+      expect(result[symbolKey]).toBe('***');
+      expect(result.normalKey).toBe('***');
+      expect(Object.getOwnPropertySymbols(result)).toContain(symbolKey);
+    });
+
+    it('redacts Date objects', () => {
+      const date = new Date('2023-01-01');
+      expect(redactAllValues(date)).toBe('***');
+    });
+
+    it('redacts RegExp objects', () => {
+      const regex = /test/g;
+      expect(redactAllValues(regex)).toBe('***');
+    });
+
+    it('redacts function objects', () => {
+      const func = () => 'test';
+      expect(redactAllValues(func)).toBe('***');
+    });
+
+    it('works with JSON.stringify for logging', () => {
+      const input = {
+        sensitive: 'secret',
+        nested: { password: '123456', token: 'abc123' },
+      };
+
+      const redacted = redactAllValues(input);
+      const json = JSON.stringify(redacted);
+
+      expect(json).toContain('sensitive');
+      expect(json).toContain('nested');
+      expect(json).toContain('password');
+      expect(json).toContain('token');
+      expect(json).toContain('"***"');
+      expect(json).not.toContain('secret');
+      expect(json).not.toContain('123456');
+      expect(json).not.toContain('abc123');
     });
   });
 });
