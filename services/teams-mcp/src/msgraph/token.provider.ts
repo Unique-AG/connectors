@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
 import {
   AuthenticationProvider,
@@ -54,9 +55,8 @@ export class TokenProvider implements AuthenticationProvider {
       where: eq(userProfiles.id, this.userProfileId),
     });
 
-    if (!userProfile) throw new Error(`User profile not found: ${this.userProfileId}`);
-    if (!userProfile.accessToken)
-      throw new Error(`Access token not found for user: ${this.userProfileId}`);
+    assert.ok(userProfile, `User profile not found: ${this.userProfileId}`);
+    assert.ok(userProfile.accessToken, `Access token not found for user: ${this.userProfileId}`);
 
     const decrypedAccessToken = this.encryptionService.decryptFromString(userProfile.accessToken);
 
@@ -71,8 +71,10 @@ export class TokenProvider implements AuthenticationProvider {
       where: eq(userProfiles.id, userProfileId),
     });
 
-    if (!userProfile?.refreshToken)
-      throw new Error(`No refresh token available for user: ${this.userProfileId}`);
+    assert.ok(
+      userProfile?.refreshToken,
+      `No refresh token available for user: ${this.userProfileId}`,
+    );
 
     const decrypedRefreshToken = this.encryptionService.decryptFromString(userProfile.refreshToken);
 
@@ -95,7 +97,7 @@ export class TokenProvider implements AuthenticationProvider {
       if (!response.ok) {
         const errorText = await response.text();
         this.logger.error(`Token refresh failed: ${response.status} ${errorText}`);
-        throw new Error(`Token refresh failed: ${response.statusText}`);
+        assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
       const tokenData = await response.json();

@@ -19,7 +19,7 @@ const ConfigSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .prefault('info')
       .describe('The log level at which the services outputs (pino).'),
-    selfUrl: stringToURL().describe('The URL of the MCP Server. Used for oAuth callbacks.'),
+    selfUrl: stringToURL().describe('The URL of the MCP Server. Used for OAuth callbacks.'),
   })
   .transform((c) => ({
     ...c,

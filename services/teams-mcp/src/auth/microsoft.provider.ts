@@ -18,8 +18,7 @@ export const MicrosoftOAuthProvider: OAuthProviderConfig = {
   strategyOptions: ({ serverUrl, clientId, clientSecret, callbackPath }) => ({
     clientID: clientId,
     clientSecret,
-    // FIXME: callbackPath undefined makes the url suffixed with "undefined"
-    callbackURL: `${serverUrl}${callbackPath}`,
+    callbackURL: serverUrl + callbackPath,
     scope: SCOPES,
   }),
   profileMapper: (profile) => ({

@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { UniqueConfigNamespaced } from '~/config';
@@ -11,6 +12,7 @@ import {
   PublicContentUpsertResultSchema,
   PublicCreateScopeRequestSchema,
   PublicCreateScopeResultSchema,
+  type PublicGetUsersRequest,
   PublicGetUsersRequestSchema,
   type PublicScopeAccessSchema,
   type PublicUserResult,
@@ -25,9 +27,7 @@ import {
 export class UniqueService {
   private readonly logger = new Logger(UniqueService.name);
 
-  public constructor(
-    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
-  ) {}
+  public constructor(private readonly config: ConfigService<UniqueConfigNamespaced, true>) {}
 
   private getAuthHeaders(): Record<string, string> {
     const uniqueConfig = this.config.get('unique', { infer: true });
@@ -68,8 +68,10 @@ export class UniqueService {
     const baseUrl = this.config.get('unique.apiBaseUrl', { infer: true });
 
     // Create two parallel requests - one with email param, one with userName param (both using email value)
-    const fetchByEmail = async (): Promise<PublicUserResult | null> => {
-      const payload = PublicGetUsersRequestSchema.encode({ email });
+    const fetchByEmailOrUsername = async (
+      payloadInput: PublicGetUsersRequest,
+    ): Promise<PublicUserResult | null> => {
+      const payload = PublicGetUsersRequestSchema.encode(payloadInput);
       const endpoint = new URL('users', baseUrl);
       const params = new URLSearchParams();
       Object.entries(payload).forEach(([key, value]) => {
@@ -80,7 +82,10 @@ export class UniqueService {
         endpoint.search = qs;
       }
 
-      this.logger.debug({ endpoint: endpoint.origin + endpoint.pathname, email }, 'Fetching user by email');
+      this.logger.debug(
+        { endpoint: endpoint.origin + endpoint.pathname },
+        'Fetching user by email or userName',
+      );
 
       const response = await fetch(endpoint, {
         method: 'GET',
@@ -89,40 +94,8 @@ export class UniqueService {
 
       if (!response.ok) {
         this.logger.warn(
-          { status: response.status, endpoint: endpoint.origin + endpoint.pathname, email },
-          'Failed to fetch user by email',
-        );
-        return null;
-      }
-
-      const body = await response.json();
-      const result = PublicUsersResultSchema.parse(body);
-      return result.users.at(0) ?? null;
-    };
-
-    const fetchByUserName = async (): Promise<PublicUserResult | null> => {
-      const payload = PublicGetUsersRequestSchema.encode({ userName: email });
-      const endpoint = new URL('users', baseUrl);
-      const params = new URLSearchParams();
-      Object.entries(payload).forEach(([key, value]) => {
-        params.append(key, String(value));
-      });
-      const qs = params.toString();
-      if (qs) {
-        endpoint.search = qs;
-      }
-
-      this.logger.debug({ endpoint: endpoint.origin + endpoint.pathname, userName: email }, 'Fetching user by userName');
-
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        this.logger.warn(
-          { status: response.status, endpoint: endpoint.origin + endpoint.pathname, userName: email },
-          'Failed to fetch user by userName',
+          { status: response.status, endpoint: endpoint.origin + endpoint.pathname },
+          'Failed to fetch user by email or userName',
         );
         return null;
       }
@@ -133,7 +106,10 @@ export class UniqueService {
     };
 
     // Execute both requests in parallel
-    const [userByEmail, userByUserName] = await Promise.all([fetchByEmail(), fetchByUserName()]);
+    const [userByEmail, userByUserName] = await Promise.all([
+      fetchByEmailOrUsername({ email }),
+      fetchByEmailOrUsername({ userName: email }),
+    ]);
 
     // Return whichever found a user (prefer email match if both succeed)
     const userFound = userByEmail ?? userByUserName;
@@ -143,7 +119,7 @@ export class UniqueService {
         found: !!userFound,
         foundByEmail: !!userByEmail,
         foundByUserName: !!userByUserName,
-        email
+        email,
       },
       'User fetch completed',
     );
@@ -279,7 +255,7 @@ export class UniqueService {
         },
         'Unique Public API returned an error for content upsert',
       );
-      throw new Error('Unique Public API return an error');
+      assert.fail(`Unique Public API return an error for content upsert: ${response.status}`);
     }
     const body = await response.json();
     const result = PublicContentUpsertResultSchema.parse(body);
@@ -318,7 +294,9 @@ export class UniqueService {
         'x-ms-blob-type': 'BlockBlob',
       },
       body: content,
-      // @ts-expect-error: this is nodejs fetch
+      // @ts-expect-error: this is nodejs fetch and requires `half` to be specified as per fetch WHATWG
+      // and nodejs types get merged with browser types which do not have such property
+      // - see https://undici.nodejs.org/#/?id=requestduplex
       duplex: 'half',
     });
 
@@ -327,13 +305,13 @@ export class UniqueService {
         { status: response.status, storageEndpoint },
         'Unique Public API storage returned an error',
       );
-      throw new Error('Unique Public API storage return an error');
+      assert.fail(`Unique Public API storage return an error: ${response.status}`);
     }
 
     this.logger.debug({ storageEndpoint }, 'Content uploaded to storage successfully');
   }
 
-  public async onTranscript(
+  public async ingestTranscript(
     meeting: {
       subject: string;
       startDateTime: Date;
@@ -376,7 +354,6 @@ export class UniqueService {
     const path = this.mapMeetingToScope(meeting.subject, meeting.startDateTime);
     const scope = await this.createScope(path);
 
-    // REVIEW: verify that organizer is also in the participants lists for a READ access
     const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
       entityId: p.id,
       entityType: ScopeAccessEntityType.User,
@@ -386,6 +363,11 @@ export class UniqueService {
       entityId: owner.id,
       entityType: ScopeAccessEntityType.User,
       type: ScopeAccessType.Write,
+    });
+    accesses.push({
+      entityId: owner.id,
+      entityType: ScopeAccessEntityType.User,
+      type: ScopeAccessType.Read,
     });
     await this.addScopeAccesses(scope.id, accesses);
 
@@ -427,12 +409,13 @@ export class UniqueService {
           key: recording.id,
           mimeType: 'video/mp4',
           title: meeting.subject,
-          byteSize: 1,
+          byteSize: 1, // API requires byteSize to be set for properly create ingestion URLs (?), but we don't know it here yet
           metadata: {
             date: meeting.startDateTime.toISOString(),
             participants: meeting.participants,
           },
           ingestionConfig: {
+            // NOTE: we don't want to ingest recordings, we only store them to have a reference to eventually share to users when needed
             uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
           },
         },

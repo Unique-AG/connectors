@@ -32,7 +32,7 @@ export class TranscriptController {
   private readonly logger = new Logger(TranscriptController.name);
 
   public constructor(
-    private readonly svc: TranscriptService,
+    private readonly transcriptService: TranscriptService,
     private readonly trace: TraceService,
   ) {}
 
@@ -45,7 +45,7 @@ export class TranscriptController {
     const span = this.trace.getSpan();
     const reauthorizationRequests = event.value
       .filter((notification) => {
-        const isTrusted = this.svc.isWebhookTrustedViaState(notification.clientState);
+        const isTrusted = this.transcriptService.isWebhookTrustedViaState(notification.clientState);
         if (!isTrusted) {
           span?.addEvent('lifecycle notification invalid');
           this.logger.warn(
@@ -58,10 +58,10 @@ export class TranscriptController {
       .map((notification) => {
         switch (notification.lifecycleEvent) {
           case 'subscriptionRemoved': {
-            return this.svc.enqueueSubscriptionRemoved(notification.subscriptionId);
+            return this.transcriptService.enqueueSubscriptionRemoved(notification.subscriptionId);
           }
           case 'reauthorizationRequired': {
-            return this.svc.enqueueReauthorizationRequired(notification.subscriptionId);
+            return this.transcriptService.enqueueReauthorizationRequired(notification.subscriptionId);
           }
 
           default: {
@@ -114,7 +114,7 @@ export class TranscriptController {
     const span = this.trace.getSpan();
     const processRequests = event.value
       .filter((notification) => {
-        const isTrusted = this.svc.isWebhookTrustedViaState(notification.clientState);
+        const isTrusted = this.transcriptService.isWebhookTrustedViaState(notification.clientState);
         if (!isTrusted) {
           span?.addEvent('change notification invalid');
           this.logger.warn(
@@ -127,7 +127,7 @@ export class TranscriptController {
       .map((notification) => {
         switch (notification.changeType) {
           case 'created': {
-            return this.svc.enqueueCreated(notification.subscriptionId, notification.resource);
+            return this.transcriptService.enqueueCreated(notification.subscriptionId, notification.resource);
           }
 
           default: {
@@ -188,13 +188,13 @@ export class TranscriptController {
 
     switch (event.type) {
       case 'unique.teams-mcp.transcript.lifecycle-notification.subscription-requested': {
-        return this.svc.subscribe(event.userProfileId);
+        return this.transcriptService.subscribe(event.userProfileId);
       }
       case 'unique.teams-mcp.transcript.lifecycle-notification.subscription-removed': {
-        return this.svc.remove(event.subscriptionId);
+        return this.transcriptService.remove(event.subscriptionId);
       }
       case 'unique.teams-mcp.transcript.lifecycle-notification.reauthorization-required': {
-        return this.svc.reauthorize(event.subscriptionId);
+        return this.transcriptService.reauthorize(event.subscriptionId);
       }
 
       default:
@@ -222,7 +222,7 @@ export class TranscriptController {
 
     switch (event.type) {
       case 'unique.teams-mcp.transcript.change-notification.created': {
-        return this.svc.created(event.subscriptionId, event.resource);
+        return this.transcriptService.created(event.subscriptionId, event.resource);
       }
 
       default:
@@ -236,6 +236,6 @@ export class TranscriptController {
     const event = UserUpsertEvent.parse(payload);
     this.logger.debug({ event }, 'user upsert event!');
 
-    return this.svc.enqueueSubscriptionRequested(event.id);
+    return this.transcriptService.enqueueSubscriptionRequested(event.id);
   }
 }

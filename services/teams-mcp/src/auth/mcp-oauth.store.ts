@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import {
   AccessTokenMetadata,
   AuthorizationCode,
@@ -53,8 +54,10 @@ export class McpOAuthStore implements IOAuthStore {
       .insert(oauthClients)
       .values(toDrizzleOAuthClientInsert(client))
       .returning();
-    if (!saved.length || !saved[0]) throw new Error('Failed to store client');
-    return fromDrizzleOAuthClientRow(saved[0]);
+    const savedClient = saved.at(0);
+    assert.ok(savedClient, "Save didn't return a client");
+
+    return fromDrizzleOAuthClientRow(savedClient);
   }
 
   public async getClient(client_id: string): Promise<OAuthClient | undefined> {
@@ -388,7 +391,9 @@ export class McpOAuthStore implements IOAuthStore {
     const cacheKey = this.getRefreshTokenCacheKey(token);
     const ttl = Math.max(0, Math.floor((metadata.expiresAt.getTime() - Date.now()) / 1000));
 
-    if (ttl > 0) await this.cacheManager.set(cacheKey, metadata, ttl);
+    if (ttl > 0) {
+      await this.cacheManager.set(cacheKey, metadata, ttl);
+    }
   }
 
   private async removeCachedAccessToken(token: string): Promise<void> {

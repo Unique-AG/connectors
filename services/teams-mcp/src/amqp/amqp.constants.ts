@@ -14,13 +14,6 @@ export const DEAD_EXCHANGE = {
   createExchangeIfNotExists: true,
 } as const satisfies RabbitMQExchangeConfig;
 
-export const PARKING_QUEUE = {
-  name: 'unique.teams-mcp.parking',
-  // exchange: DEAD_EXCHANGE.name,
-  // routingKey: '#',
-  createQueueIfNotExists: true,
-} as const satisfies RabbitMQQueueConfig;
-
 export const DEAD_QUEUE = {
   name: 'unique.teams-mcp.dead',
   exchange: DEAD_EXCHANGE.name,

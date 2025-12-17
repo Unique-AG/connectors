@@ -22,12 +22,7 @@ export const PublicUsersResultSchema = z.object({
 export type PublicUsersResult = z.infer<typeof PublicUsersResultSchema>;
 
 export const PublicCreateScopeRequestSchema = z.object({
-  paths: z
-    .array(z.string())
-    .min(
-      1,
-      'paths must be an array of strings with slashes, example: ["/path/to/scope", "/another/path"]',
-    ),
+  paths: z.array(z.string()),
 });
 
 export type PublicCreateScopeRequest = z.infer<typeof PublicCreateScopeRequestSchema>;

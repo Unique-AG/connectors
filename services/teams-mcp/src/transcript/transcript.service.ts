@@ -35,7 +35,7 @@ export class TranscriptService {
 
   public constructor(
     private readonly config: ConfigService<AppConfigNamespaced & MicrosoftConfigNamespaced, true>,
-    private readonly amqpconn: AmqpConnection,
+    private readonly amqp: AmqpConnection,
     private readonly trace: TraceService,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
@@ -71,7 +71,7 @@ export class TranscriptService {
       'enqueuing subscription requested event',
     );
 
-    const published = await this.amqpconn.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
+    const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
 
     span?.setAttribute('published', published);
     span?.addEvent('event published to AMQP', {
@@ -328,7 +328,7 @@ export class TranscriptService {
       type: 'unique.teams-mcp.transcript.lifecycle-notification.subscription-removed',
     });
 
-    const published = await this.amqpconn.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
+    const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
 
     span?.setAttribute('published', published);
     span?.addEvent('event published to AMQP', {
@@ -405,7 +405,7 @@ export class TranscriptService {
       type: 'unique.teams-mcp.transcript.lifecycle-notification.reauthorization-required',
     });
 
-    const published = await this.amqpconn.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
+    const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
 
     span?.setAttribute('published', published);
     span?.addEvent('event published to AMQP', {
@@ -533,7 +533,7 @@ export class TranscriptService {
       type: 'unique.teams-mcp.transcript.change-notification.created',
     });
 
-    const published = await this.amqpconn.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
+    const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
 
     span?.setAttribute('published', published);
     span?.addEvent('event published to AMQP', {
@@ -726,7 +726,7 @@ export class TranscriptService {
       hasRecording: recordingStream !== undefined,
     });
 
-    await this.unique.onTranscript(
+    await this.unique.ingestTranscript(
       {
         subject: meeting.subject ?? '',
         startDateTime: meeting.startDateTime,

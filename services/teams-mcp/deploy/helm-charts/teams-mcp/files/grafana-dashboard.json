@@ -93,7 +93,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(outlook_actions_total{job=\"apps-mcp-server-outlook\"}[5m])) * 60",
+          "expr": "sum(rate(teams_actions_total{job=\"apps-mcp-server-teams\"}[5m])) * 60",
           "refId": "A"
         }
       ],
@@ -155,7 +155,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(sum(rate(outlook_action_failures_total{job=\"apps-mcp-server-outlook\"}[5m])) / sum(rate(outlook_actions_total{job=\"apps-mcp-server-outlook\"}[5m]))) * 100",
+          "expr": "(sum(rate(teams_action_failures_total{job=\"apps-mcp-server-teams\"}[5m])) / sum(rate(teams_actions_total{job=\"apps-mcp-server-teams\"}[5m]))) * 100",
           "refId": "A"
         }
       ],
@@ -221,7 +221,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(msgraph_request_duration_seconds_bucket{job=\"apps-mcp-server-outlook\"}[5m])) by (le)) * 1000",
+          "expr": "histogram_quantile(0.95, sum(rate(msgraph_request_duration_seconds_bucket{job=\"apps-mcp-server-teams\"}[5m])) by (le)) * 1000",
           "refId": "A"
         }
       ],
@@ -287,7 +287,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(msgraph_throttle_events_total{job=\"apps-mcp-server-outlook\"}[5m])) * 60",
+          "expr": "sum(rate(msgraph_throttle_events_total{job=\"apps-mcp-server-teams\"}[5m])) * 60",
           "refId": "A"
         }
       ],
@@ -345,7 +345,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(outlook_actions_total{job=\"apps-mcp-server-outlook\"}[$__range]))",
+          "expr": "sum(increase(teams_actions_total{job=\"apps-mcp-server-teams\"}[$__range]))",
           "refId": "A"
         }
       ],
@@ -446,7 +446,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (action) (rate(outlook_actions_total{job=\"apps-mcp-server-outlook\"}[5m]))",
+          "expr": "sum by (action) (rate(teams_actions_total{job=\"apps-mcp-server-teams\"}[5m]))",
           "legendFormat": "{{action}}",
           "refId": "A"
         }
@@ -505,7 +505,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (action) (increase(outlook_actions_total{job=\"apps-mcp-server-outlook\"}[$__range]))",
+          "expr": "sum by (action) (increase(teams_actions_total{job=\"apps-mcp-server-teams\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{action}}",
@@ -613,7 +613,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (action, reason) (rate(outlook_action_failures_total{job=\"apps-mcp-server-outlook\"}[5m]))",
+          "expr": "sum by (action, reason) (rate(teams_action_failures_total{job=\"apps-mcp-server-teams\"}[5m]))",
           "legendFormat": "{{action}} - {{reason}}",
           "refId": "A"
         }
@@ -715,7 +715,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (endpoint) (rate(msgraph_requests_total{job=\"apps-mcp-server-outlook\"}[5m]))",
+          "expr": "sum by (endpoint) (rate(msgraph_requests_total{job=\"apps-mcp-server-teams\"}[5m]))",
           "legendFormat": "{{endpoint}}",
           "refId": "A"
         }
@@ -804,7 +804,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (status_class) (rate(msgraph_requests_total{job=\"apps-mcp-server-outlook\"}[5m]))",
+          "expr": "sum by (status_class) (rate(msgraph_requests_total{job=\"apps-mcp-server-teams\"}[5m]))",
           "legendFormat": "{{status_class}}",
           "refId": "A"
         }
@@ -901,7 +901,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.50, sum(rate(msgraph_request_duration_seconds_bucket{job=\"apps-mcp-server-outlook\"}[5m])) by (endpoint, le)) * 1000",
+          "expr": "histogram_quantile(0.50, sum(rate(msgraph_request_duration_seconds_bucket{job=\"apps-mcp-server-teams\"}[5m])) by (endpoint, le)) * 1000",
           "legendFormat": "p50 - {{endpoint}}",
           "refId": "A"
         },
@@ -910,7 +910,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(msgraph_request_duration_seconds_bucket{job=\"apps-mcp-server-outlook\"}[5m])) by (endpoint, le)) * 1000",
+          "expr": "histogram_quantile(0.95, sum(rate(msgraph_request_duration_seconds_bucket{job=\"apps-mcp-server-teams\"}[5m])) by (endpoint, le)) * 1000",
           "legendFormat": "p95 - {{endpoint}}",
           "refId": "B"
         },
@@ -919,7 +919,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(msgraph_request_duration_seconds_bucket{job=\"apps-mcp-server-outlook\"}[5m])) by (endpoint, le)) * 1000",
+          "expr": "histogram_quantile(0.99, sum(rate(msgraph_request_duration_seconds_bucket{job=\"apps-mcp-server-teams\"}[5m])) by (endpoint, le)) * 1000",
           "legendFormat": "p99 - {{endpoint}}",
           "refId": "C"
         }
@@ -1012,7 +1012,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (policy) (rate(msgraph_throttle_events_total{job=\"apps-mcp-server-outlook\"}[5m]))",
+          "expr": "sum by (policy) (rate(msgraph_throttle_events_total{job=\"apps-mcp-server-teams\"}[5m]))",
           "legendFormat": "{{policy}}",
           "refId": "A"
         }
@@ -1114,7 +1114,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(oauth_flows_started_total{job=\"apps-mcp-server-outlook\"}[5m]))",
+          "expr": "sum(rate(oauth_flows_started_total{job=\"apps-mcp-server-teams\"}[5m]))",
           "legendFormat": "OAuth Flows Started",
           "refId": "A"
         },
@@ -1123,7 +1123,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(oauth_clients_registered_total{job=\"apps-mcp-server-outlook\"}[5m]))",
+          "expr": "sum(rate(oauth_clients_registered_total{job=\"apps-mcp-server-teams\"}[5m]))",
           "legendFormat": "OAuth Clients Registered",
           "refId": "B"
         }
@@ -1182,7 +1182,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(oauth_clients_registered_total{job=\"apps-mcp-server-outlook\"}[24h]))",
+          "expr": "sum(increase(oauth_clients_registered_total{job=\"apps-mcp-server-teams\"}[24h]))",
           "refId": "A"
         }
       ],
@@ -1283,7 +1283,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(mcp_requests_total{job=\"apps-mcp-server-outlook\"}[5m]))",
+          "expr": "sum(rate(mcp_requests_total{job=\"apps-mcp-server-teams\"}[5m]))",
           "legendFormat": "MCP Requests",
           "refId": "A"
         }
@@ -1372,7 +1372,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (http_response_status_code) (rate(http_client_request_duration_count{job=\"apps-mcp-server-outlook\"}[5m]))",
+          "expr": "sum by (http_response_status_code) (rate(http_client_request_duration_count{job=\"apps-mcp-server-teams\"}[5m]))",
           "legendFormat": "HTTP {{http_response_status_code}}",
           "refId": "A"
         }
@@ -1469,7 +1469,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.50, sum(rate(http_client_request_duration_bucket{job=\"apps-mcp-server-outlook\"}[5m])) by (http_route, le)) * 1000",
+          "expr": "histogram_quantile(0.50, sum(rate(http_client_request_duration_bucket{job=\"apps-mcp-server-teams\"}[5m])) by (http_route, le)) * 1000",
           "legendFormat": "p50 - {{http_route}}",
           "refId": "A"
         },
@@ -1478,7 +1478,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(http_client_request_duration_bucket{job=\"apps-mcp-server-outlook\"}[5m])) by (http_route, le)) * 1000",
+          "expr": "histogram_quantile(0.95, sum(rate(http_client_request_duration_bucket{job=\"apps-mcp-server-teams\"}[5m])) by (http_route, le)) * 1000",
           "legendFormat": "p95 - {{http_route}}",
           "refId": "B"
         },
@@ -1487,7 +1487,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(http_client_request_duration_bucket{job=\"apps-mcp-server-outlook\"}[5m])) by (http_route, le)) * 1000",
+          "expr": "histogram_quantile(0.99, sum(rate(http_client_request_duration_bucket{job=\"apps-mcp-server-teams\"}[5m])) by (http_route, le)) * 1000",
           "legendFormat": "p99 - {{http_route}}",
           "refId": "C"
         }
@@ -1597,7 +1597,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_cpu_time_total{job=\"apps-mcp-server-outlook\", process_cpu_state=\"user\"}",
+          "expr": "process_cpu_time_total{job=\"apps-mcp-server-teams\", process_cpu_state=\"user\"}",
           "legendFormat": "CPU User Time",
           "refId": "A"
         },
@@ -1606,7 +1606,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_cpu_time_total{job=\"apps-mcp-server-outlook\", process_cpu_state=\"system\"}",
+          "expr": "process_cpu_time_total{job=\"apps-mcp-server-teams\", process_cpu_state=\"system\"}",
           "legendFormat": "CPU System Time",
           "refId": "B"
         }
@@ -1695,7 +1695,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_memory_usage{job=\"apps-mcp-server-outlook\"}",
+          "expr": "process_memory_usage{job=\"apps-mcp-server-teams\"}",
           "legendFormat": "Process Memory",
           "refId": "A"
         },
@@ -1704,7 +1704,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "v8js_memory_heap_used{job=\"apps-mcp-server-outlook\"}",
+          "expr": "v8js_memory_heap_used{job=\"apps-mcp-server-teams\"}",
           "legendFormat": "V8 Heap Used",
           "refId": "B"
         },
@@ -1713,7 +1713,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "v8js_memory_heap_limit{job=\"apps-mcp-server-outlook\"}",
+          "expr": "v8js_memory_heap_limit{job=\"apps-mcp-server-teams\"}",
           "legendFormat": "V8 Heap Limit",
           "refId": "C"
         },
@@ -1722,7 +1722,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "v8js_memory_heap_space_physical_size{job=\"apps-mcp-server-outlook\"}",
+          "expr": "v8js_memory_heap_space_physical_size{job=\"apps-mcp-server-teams\"}",
           "legendFormat": "V8 Heap Physical Size",
           "refId": "D"
         },
@@ -1731,7 +1731,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "v8js_memory_heap_space_available_size{job=\"apps-mcp-server-outlook\"}",
+          "expr": "v8js_memory_heap_space_available_size{job=\"apps-mcp-server-teams\"}",
           "legendFormat": "V8 Heap Available",
           "refId": "E"
         },
@@ -1740,7 +1740,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "system_memory_usage{job=\"apps-mcp-server-outlook\"}",
+          "expr": "system_memory_usage{job=\"apps-mcp-server-teams\"}",
           "legendFormat": "System Memory Usage",
           "refId": "F"
         }
@@ -1807,7 +1807,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "system_memory_utilization{job=\"apps-mcp-server-outlook\"} * 100",
+          "expr": "system_memory_utilization{job=\"apps-mcp-server-teams\"} * 100",
           "legendFormat": "Memory Utilization",
           "refId": "A"
         }
@@ -1896,7 +1896,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(v8js_gc_duration_sum{job=\"apps-mcp-server-outlook\"}[5m]) / rate(v8js_gc_duration_count{job=\"apps-mcp-server-outlook\"}[5m]) * 1000",
+          "expr": "rate(v8js_gc_duration_sum{job=\"apps-mcp-server-teams\"}[5m]) / rate(v8js_gc_duration_count{job=\"apps-mcp-server-teams\"}[5m]) * 1000",
           "legendFormat": "GC Duration - {{kind}}",
           "refId": "A"
         }
@@ -1985,7 +1985,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "nodejs_eventloop_utilization{job=\"apps-mcp-server-outlook\"}",
+          "expr": "nodejs_eventloop_utilization{job=\"apps-mcp-server-teams\"}",
           "legendFormat": "Event Loop Utilization",
           "refId": "A"
         },
@@ -1994,7 +1994,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "nodejs_eventloop_delay_mean{job=\"apps-mcp-server-outlook\"} * 1000",
+          "expr": "nodejs_eventloop_delay_mean{job=\"apps-mcp-server-teams\"} * 1000",
           "legendFormat": "Mean Delay (ms)",
           "refId": "B"
         },
@@ -2003,7 +2003,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "nodejs_eventloop_delay_p99{job=\"apps-mcp-server-outlook\"} * 1000",
+          "expr": "nodejs_eventloop_delay_p99{job=\"apps-mcp-server-teams\"} * 1000",
           "legendFormat": "P99 Delay (ms)",
           "refId": "C"
         },
@@ -2012,7 +2012,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(nodejs_eventloop_time_total{job=\"apps-mcp-server-outlook\",nodejs_eventloop_state=\"active\"}[5m])",
+          "expr": "rate(nodejs_eventloop_time_total{job=\"apps-mcp-server-teams\",nodejs_eventloop_state=\"active\"}[5m])",
           "legendFormat": "Active Time Rate",
           "refId": "D"
         }
@@ -2024,7 +2024,7 @@
   "refresh": "10s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["outlook", "mcp", "monitoring"],
+  "tags": ["teams", "mcp", "monitoring"],
   "templating": {
     "list": [
       {
@@ -2057,7 +2057,7 @@
   },
   "timezone": "",
   "title": "Teams MCP Server Monitoring",
-  "uid": "apps-mcp-server-outlook-monitoring",
+  "uid": "apps-mcp-server-teams-monitoring",
   "version": 1,
   "weekStart": ""
 }
