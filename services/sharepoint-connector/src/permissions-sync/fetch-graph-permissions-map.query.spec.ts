@@ -1,10 +1,11 @@
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
-import { SimpleIdentitySet, SimplePermission } from '../microsoft-apis/graph/types/sharepoint.types';
+import {
+  SimpleIdentitySet,
+  SimplePermission,
+} from '../microsoft-apis/graph/types/sharepoint.types';
 import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { FetchGraphPermissionsMapQuery } from './fetch-graph-permissions-map.query';
 
@@ -103,15 +104,10 @@ describe('FetchGraphPermissionsMapQuery', () => {
         getDriveItemPermissions: vi.fn(),
         getListItemPermissions: vi.fn(),
       }))
-      .mock<ConfigService<Config, true>>(ConfigService)
-      .impl((stubFn) => ({
-        ...stubFn(),
-        get: vi.fn().mockReturnValue(undefined),
-      }))
       .compile();
 
     query = unit;
-    graphApiService = unitRef.get(GraphApiService);
+    graphApiService = unitRef.get(GraphApiService) as unknown as GraphApiService;
   });
 
   describe('mapSharePointPermissionsToOurPermissions', () => {
@@ -122,7 +118,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
           {
             group: {
               id: 'group-1',
-              displayName: 'Test Group',
+              displayName: 'Sensitive Group Name',
             },
           } as SimpleIdentitySet,
         ],
@@ -141,7 +137,6 @@ describe('FetchGraphPermissionsMapQuery', () => {
         call[0].includes('No parsable permissions for permission perm-unparseable'),
       )?.[0];
       expect(warnCall).toBeDefined();
-      expect(warnCall).toContain('perm-unparseable');
 
       const jsonStart = warnCall.indexOf('{');
       const jsonEnd = warnCall.lastIndexOf('}') + 1;
@@ -154,27 +149,18 @@ describe('FetchGraphPermissionsMapQuery', () => {
       expect(parsedInfo.grantedToIdentitiesV2).toHaveLength(1);
       expect(parsedInfo.grantedToIdentitiesV2[0]).toHaveProperty('group');
       expect(parsedInfo.grantedToIdentitiesV2[0].group).toHaveProperty('id', 'group-1');
-      expect(parsedInfo.grantedToIdentitiesV2[0].group).toEqual(
-        expect.objectContaining({
-          id: 'group-1',
-        }),
-      );
+      expect(parsedInfo.grantedToIdentitiesV2[0].group).not.toHaveProperty('displayName');
+      expect(warnCall).not.toContain('Sensitive Group Name');
     });
 
-    it('logs warning with redacted permissionInfo including multiple identity sets', async () => {
+    it('logs warning with redacted permissionInfo excluding sensitive user data', async () => {
       const mockPermission: SimplePermission = {
-        id: 'perm-multiple-nulls',
+        id: 'perm-user-data',
         grantedToIdentitiesV2: [
-          {
-            group: {
-              id: 'group-1',
-              displayName: 'Group 1',
-            },
-          } as SimpleIdentitySet,
           {
             user: {
               id: 'user-1',
-              email: 'user@example.com',
+              email: 'sensitive.email@example.com',
             },
           } as SimpleIdentitySet,
         ],
@@ -185,9 +171,87 @@ describe('FetchGraphPermissionsMapQuery', () => {
 
       await query.run(mockSiteId, items);
 
-      expect(loggerWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('No parsable permissions for permission perm-multiple-nulls'),
-      );
+      const warnCall = loggerWarnSpy.mock.calls.find((call) =>
+        call[0].includes('No parsable permissions for permission perm-user-data'),
+      )?.[0];
+      expect(warnCall).toBeDefined();
+
+      const jsonStart = warnCall.indexOf('{');
+      const jsonEnd = warnCall.lastIndexOf('}') + 1;
+      const parsedInfo = JSON.parse(warnCall.substring(jsonStart, jsonEnd));
+
+      expect(parsedInfo.grantedToIdentitiesV2[0]).toHaveProperty('user');
+      expect(parsedInfo.grantedToIdentitiesV2[0].user).toHaveProperty('id', 'user-1');
+      expect(parsedInfo.grantedToIdentitiesV2[0].user).not.toHaveProperty('email');
+      expect(warnCall).not.toContain('sensitive.email@example.com');
+    });
+
+    it('logs warning with redacted permissionInfo excluding sensitive siteUser data', async () => {
+      const mockPermission: SimplePermission = {
+        id: 'perm-siteuser-data',
+        grantedToIdentitiesV2: [
+          {
+            siteUser: {
+              id: 'site-user-1',
+              email: 'sensitive.siteuser@example.com',
+              loginName: 'sensitive\\loginname',
+            },
+          } as SimpleIdentitySet,
+        ],
+      };
+
+      const items = [createMockDriveItem('item-1')];
+      vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
+
+      await query.run(mockSiteId, items);
+
+      const warnCall = loggerWarnSpy.mock.calls.find((call) =>
+        call[0].includes('No parsable permissions for permission perm-siteuser-data'),
+      )?.[0];
+      expect(warnCall).toBeDefined();
+
+      const jsonStart = warnCall.indexOf('{');
+      const jsonEnd = warnCall.lastIndexOf('}') + 1;
+      const parsedInfo = JSON.parse(warnCall.substring(jsonStart, jsonEnd));
+
+      expect(parsedInfo.grantedToIdentitiesV2[0]).toHaveProperty('siteUser');
+      expect(parsedInfo.grantedToIdentitiesV2[0].siteUser).toHaveProperty('id', 'site-user-1');
+      expect(parsedInfo.grantedToIdentitiesV2[0].siteUser).not.toHaveProperty('email');
+      expect(parsedInfo.grantedToIdentitiesV2[0].siteUser).not.toHaveProperty('loginName');
+      expect(warnCall).not.toContain('sensitive.siteuser@example.com');
+      expect(warnCall).not.toContain('sensitive\\loginname');
+    });
+
+    it('logs warning with redacted permissionInfo including multiple identity sets with all sensitive data excluded', async () => {
+      const mockPermission: SimplePermission = {
+        id: 'perm-multiple-nulls',
+        grantedToIdentitiesV2: [
+          {
+            group: {
+              id: 'group-1',
+              displayName: 'Sensitive Group 1',
+            },
+          } as SimpleIdentitySet,
+          {
+            user: {
+              id: 'user-1',
+              email: 'sensitive.user@example.com',
+            },
+          } as SimpleIdentitySet,
+          {
+            siteUser: {
+              id: 'site-user-1',
+              email: 'sensitive.siteuser@example.com',
+              loginName: 'sensitive\\login',
+            },
+          } as SimpleIdentitySet,
+        ],
+      };
+
+      const items = [createMockDriveItem('item-1')];
+      vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
+
+      await query.run(mockSiteId, items);
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-multiple-nulls'),
@@ -199,11 +263,59 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const parsedInfo = JSON.parse(warnCall.substring(jsonStart, jsonEnd));
 
       expect(parsedInfo).toHaveProperty('itemId', 'item-1');
-      expect(parsedInfo.grantedToIdentitiesV2).toHaveLength(2);
-      expect(parsedInfo.grantedToIdentitiesV2[0]).toHaveProperty('group');
+      expect(parsedInfo.grantedToIdentitiesV2).toHaveLength(3);
+
       expect(parsedInfo.grantedToIdentitiesV2[0].group).toHaveProperty('id', 'group-1');
-      expect(parsedInfo.grantedToIdentitiesV2[1]).toHaveProperty('user');
+      expect(parsedInfo.grantedToIdentitiesV2[0].group).not.toHaveProperty('displayName');
+
       expect(parsedInfo.grantedToIdentitiesV2[1].user).toHaveProperty('id', 'user-1');
+      expect(parsedInfo.grantedToIdentitiesV2[1].user).not.toHaveProperty('email');
+
+      expect(parsedInfo.grantedToIdentitiesV2[2].siteUser).toHaveProperty('id', 'site-user-1');
+      expect(parsedInfo.grantedToIdentitiesV2[2].siteUser).not.toHaveProperty('email');
+      expect(parsedInfo.grantedToIdentitiesV2[2].siteUser).not.toHaveProperty('loginName');
+
+      expect(warnCall).not.toContain('Sensitive Group 1');
+      expect(warnCall).not.toContain('sensitive.user@example.com');
+      expect(warnCall).not.toContain('sensitive.siteuser@example.com');
+      expect(warnCall).not.toContain('sensitive\\login');
+    });
+
+    it('only includes id and optionally @odata.type in redacted identity values', async () => {
+      const mockPermission: SimplePermission = {
+        id: 'perm-structure-check',
+        grantedToIdentitiesV2: [
+          {
+            group: {
+              id: 'group-1',
+              displayName: 'Test Group',
+            },
+          } as SimpleIdentitySet,
+        ],
+      };
+
+      const items = [createMockDriveItem('item-1')];
+      vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
+
+      await query.run(mockSiteId, items);
+
+      const warnCall = loggerWarnSpy.mock.calls.find((call) =>
+        call[0].includes('No parsable permissions for permission perm-structure-check'),
+      )?.[0];
+      expect(warnCall).toBeDefined();
+
+      const jsonStart = warnCall.indexOf('{');
+      const jsonEnd = warnCall.lastIndexOf('}') + 1;
+      const parsedInfo = JSON.parse(warnCall.substring(jsonStart, jsonEnd));
+
+      const redactedGroup = parsedInfo.grantedToIdentitiesV2[0].group;
+      const groupKeys = Object.keys(redactedGroup);
+      expect(groupKeys.length).toBeGreaterThanOrEqual(1);
+      expect(groupKeys).toContain('id');
+      expect(groupKeys).not.toContain('displayName');
+      if (groupKeys.includes('@odata.type')) {
+        expect(groupKeys).toHaveLength(2);
+      }
     });
   });
 });

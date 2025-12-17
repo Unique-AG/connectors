@@ -1,14 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { isNonNullish } from 'remeda';
-import type { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import {
   SimpleIdentitySet,
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { shouldConcealLogs } from '../utils/logging.util';
 import { buildIngestionItemKey } from '../utils/sharepoint.util';
 import { Membership } from './types';
 import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
@@ -23,14 +20,8 @@ type PermissionsFetcher = Record<AnySharepointItem['itemType'], () => Promise<Si
 @Injectable()
 export class FetchGraphPermissionsMapQuery {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
-  public constructor(
-    private readonly graphApiService: GraphApiService,
-    private readonly configService: ConfigService<Config, true>,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  public constructor(private readonly graphApiService: GraphApiService) {}
 
   public async run(siteId: string, items: AnySharepointItem[]): Promise<PermissionsMap> {
     const siteName = await this.graphApiService.getSiteName(siteId);
@@ -49,7 +40,7 @@ export class FetchGraphPermissionsMapQuery {
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
         sharePointPermissions,
         siteName,
-        item.item.id
+        item.item.id,
       );
     }
     return permissionsMap;
@@ -86,24 +77,28 @@ export class FetchGraphPermissionsMapQuery {
           return itemPermissions;
         }
       }
-        // we do not want to log the full permissions object because it contains sensitive data
-        const permissionInfo = {
-          itemId,
-          id: permission.id,
-          grantedToIdentitiesV2: permission.grantedToIdentitiesV2?.map((simpleIdentitySet: SimpleIdentitySet) => {
+      // we do not want to log the full permissions object because it contains sensitive data
+      const permissionInfo = {
+        itemId,
+        id: permission.id,
+        grantedToIdentitiesV2: permission.grantedToIdentitiesV2?.map(
+          (simpleIdentitySet: SimpleIdentitySet) => {
             const redactedIdentity: Record<string, unknown> = {};
             Object.keys(simpleIdentitySet).forEach((key) => {
               // We need to type the key and the identityValue else typescript will complain
               const typedKey = key as keyof SimpleIdentitySet;
-              const identityValue = simpleIdentitySet[typedKey] as Record<string, unknown> | undefined;
+              const identityValue = simpleIdentitySet[typedKey] as
+                | Record<string, unknown>
+                | undefined;
               redactedIdentity[typedKey] = {
                 id: identityValue?.id,
-                '@odata.type': identityValue?.['@odata.type']
-              }
-            })
+                '@odata.type': identityValue?.['@odata.type'],
+              };
+            });
             return redactedIdentity;
-          })
-        }
+          },
+        ),
+      };
 
       this.logger.warn(
         `No parsable permissions for permission ${permission.id}: ${JSON.stringify(
