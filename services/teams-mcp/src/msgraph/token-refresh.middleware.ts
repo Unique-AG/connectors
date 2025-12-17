@@ -1,5 +1,7 @@
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
+import { serializeError } from 'serialize-error-cjs';
+import { normalizeError } from '../utils/normalize-error';
 import { TokenProvider } from './token.provider';
 
 export class TokenRefreshMiddleware implements Middleware {
@@ -62,14 +64,22 @@ export class TokenRefreshMiddleware implements Middleware {
     if (!isExpired) return;
 
     this.logger.debug(
-      { userProfileId: this.userProfileId },
+      {
+        userProfileId: this.userProfileId,
+        tokenStatus: 'expired',
+        action: 'refresh_attempt',
+      },
       'Microsoft Graph access token has expired for user, attempting refresh',
     );
 
     try {
       const newAccessToken = await this.tokenProvider.refreshAccessToken(this.userProfileId);
       this.logger.debug(
-        { userProfileId: this.userProfileId },
+        {
+          userProfileId: this.userProfileId,
+          tokenStatus: 'refreshed',
+          action: 'refresh_success',
+        },
         'Successfully refreshed expired Microsoft Graph access token for user',
       );
 
@@ -84,7 +94,11 @@ export class TokenRefreshMiddleware implements Middleware {
       };
 
       this.logger.debug(
-        { userProfileId: this.userProfileId },
+        {
+          userProfileId: this.userProfileId,
+          action: 'retry_request',
+          tokenStatus: 'fresh',
+        },
         'Retrying Microsoft Graph request with newly refreshed access token',
       );
       await this.nextMiddleware.execute(retryContext);
@@ -93,18 +107,30 @@ export class TokenRefreshMiddleware implements Middleware {
 
       if (context.response?.ok) {
         this.logger.debug(
-          { userProfileId: this.userProfileId },
+          {
+            userProfileId: this.userProfileId,
+            retryResult: 'success',
+            tokenRefreshWorked: true,
+          },
           'Microsoft Graph request succeeded after token refresh was completed',
         );
       } else {
         this.logger.warn(
-          { userProfileId: this.userProfileId },
+          {
+            userProfileId: this.userProfileId,
+            retryResult: 'failed',
+            tokenRefreshWorked: false,
+          },
           'Microsoft Graph request failed even after successful token refresh',
         );
       }
     } catch (error) {
       this.logger.error(
-        { userProfileId: this.userProfileId, error },
+        {
+          error: serializeError(normalizeError(error)),
+          userProfileId: this.userProfileId,
+          tokenRefreshFailed: true,
+        },
         'Failed to refresh token or retry Microsoft Graph request for user',
       );
       // Keep the original 401 response if refresh fails

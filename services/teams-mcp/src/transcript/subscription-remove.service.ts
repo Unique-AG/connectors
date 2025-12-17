@@ -23,6 +23,7 @@ export class SubscriptionRemoveService {
   public async enqueueSubscriptionRemoved(subscriptionId: string): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('subscription_id', subscriptionId);
+    span?.setAttribute('operation', 'enqueue_removal');
 
     this.logger.debug({ subscriptionId }, 'Enqueuing subscription removal event for processing');
 
@@ -56,6 +57,7 @@ export class SubscriptionRemoveService {
   public async remove(subscriptionId: string): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('subscription_id', subscriptionId);
+    span?.setAttribute('operation', 'remove_subscription');
 
     this.logger.log({ subscriptionId }, 'Beginning Microsoft Graph subscription removal process');
 

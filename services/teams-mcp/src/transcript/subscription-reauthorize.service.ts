@@ -29,6 +29,7 @@ export class SubscriptionReauthorizeService {
   public async enqueueReauthorizationRequired(subscriptionId: string): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('subscription_id', subscriptionId);
+    span?.setAttribute('operation', 'enqueue_reauthorization');
 
     this.logger.debug(
       { subscriptionId },
@@ -65,6 +66,7 @@ export class SubscriptionReauthorizeService {
   public async reauthorize(subscriptionId: string): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('subscription_id', subscriptionId);
+    span?.setAttribute('operation', 'reauthorize_subscription');
 
     this.logger.log(
       { subscriptionId },

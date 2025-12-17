@@ -30,6 +30,7 @@ export class SubscriptionCreateService {
   public async enqueueSubscriptionRequested(userProfileId: TypeID<'user_profile'>): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('user_profile_id', userProfileId.toString());
+    span?.setAttribute('operation', 'enqueue_subscription_request');
 
     const payload = await SubscriptionRequestedEventDto.encodeAsync({
       userProfileId,
@@ -66,6 +67,7 @@ export class SubscriptionCreateService {
   public async subscribe(userProfileId: TypeID<'user_profile'>): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('user_profile_id', userProfileId.toString());
+    span?.setAttribute('operation', 'create_subscription');
 
     this.logger.log(
       { userProfileId: userProfileId.toString() },

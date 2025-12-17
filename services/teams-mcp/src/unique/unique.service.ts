@@ -119,7 +119,7 @@ export class UniqueService {
         found: !!userFound,
         foundByEmail: !!userByEmail,
         foundByUserName: !!userByUserName,
-        email,
+        searchMethod: 'email_and_username',
       },
       'Completed user search operation in Unique system',
     );
@@ -150,7 +150,7 @@ export class UniqueService {
         { status: response.status, endpoint: endpoint.href },
         'Unique Public API rejected scope creation request with error',
       );
-      throw new Error('Unique Public API return an error');
+      assert.fail(`Unique Public API return an error for content upsert: ${response.status}`);
     }
     const body = await response.json();
     const result = PublicCreateScopeResultSchema.refine(
@@ -205,7 +205,7 @@ export class UniqueService {
         { status: response.status, endpoint: endpoint.href, scopeId: scope },
         'Unique Public API rejected scope access configuration with error',
       );
-      throw new Error('Unique Public API return an error');
+      assert.fail(`Unique Public API return an error for content upsert: ${response.status}`);
     }
     const body = await response.json();
     const result = PublicAddScopeAccessResultSchema.parse(body);

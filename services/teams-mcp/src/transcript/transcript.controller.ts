@@ -15,9 +15,11 @@ import {
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { TraceService } from 'nestjs-otel';
+import { serializeError } from 'serialize-error-cjs';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { UserUpsertEvent } from '~/auth/events';
+import { normalizeError } from '~/utils/normalize-error';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
 import { SubscriptionCreateService } from './subscription-create.service';
 import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
@@ -48,7 +50,14 @@ export class TranscriptController {
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(ValidationCallInterceptor)
   public async lifecycle(@Body() event: LifecycleChangeNotificationCollectionDto) {
-    this.logger.log({ event }, 'Received lifecycle notification webhook from Microsoft Graph');
+    this.logger.log(
+      {
+        notificationCount: event.value.length,
+        eventSource: 'microsoft_graph',
+        webhookType: 'lifecycle',
+      },
+      'Received lifecycle notification webhook from Microsoft Graph',
+    );
 
     const span = this.trace.getSpan();
     const reauthorizationRequests = event.value
@@ -106,7 +115,7 @@ export class TranscriptController {
     if (failed.length > 0) {
       failed.forEach((fail) => {
         this.logger.warn(
-          { error: fail.reason },
+          { error: serializeError(normalizeError(fail.reason)) },
           'Failed to publish reauthorization event to message queue',
         );
         // span?.recordException(fail.reason)
@@ -122,7 +131,14 @@ export class TranscriptController {
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(ValidationCallInterceptor)
   public async notification(@Body() event: ChangeNotificationCollectionDto) {
-    this.logger.log({ event }, 'Received change notification webhook from Microsoft Graph');
+    this.logger.log(
+      {
+        notificationCount: event.value.length,
+        eventSource: 'microsoft_graph',
+        webhookType: 'change',
+      },
+      'Received change notification webhook from Microsoft Graph',
+    );
 
     const span = this.trace.getSpan();
     const processRequests = event.value
@@ -176,7 +192,7 @@ export class TranscriptController {
     if (failed.length > 0) {
       failed.forEach((fail) => {
         this.logger.warn(
-          { error: fail.reason },
+          { error: serializeError(normalizeError(fail.reason)) },
           'Failed to publish processing request to message queue',
         );
         // span?.recordException(fail.reason)

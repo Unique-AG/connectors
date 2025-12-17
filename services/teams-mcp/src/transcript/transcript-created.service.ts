@@ -4,11 +4,13 @@ import { BatchResponseContent } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
+import { serializeError } from 'serialize-error-cjs';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { MicrosoftGraphErrorSchema, makeGraphError } from '~/msgraph/graph-error';
 import { UniqueService } from '~/unique/unique.service';
+import { normalizeError } from '~/utils/normalize-error';
 import {
   BatchRequest,
   CreatedEventDto,
@@ -36,6 +38,7 @@ export class TranscriptCreatedService {
     const span = this.trace.getSpan();
     span?.setAttribute('subscription_id', subscriptionId);
     span?.setAttribute('resource', resource);
+    span?.setAttribute('operation', 'enqueue_created');
 
     this.logger.debug(
       { subscriptionId, resource },
@@ -74,6 +77,7 @@ export class TranscriptCreatedService {
     const span = this.trace.getSpan();
     span?.setAttribute('subscription_id', subscriptionId);
     span?.setAttribute('resource', resource);
+    span?.setAttribute('operation', 'process_created');
 
     this.logger.log(
       { subscriptionId, resource },
@@ -247,7 +251,7 @@ export class TranscriptCreatedService {
       });
 
       this.logger.warn(
-        { error },
+        { error: serializeError(normalizeError(error)) },
         'Failed to retrieve or locate meeting recording, proceeding without it',
       );
     }

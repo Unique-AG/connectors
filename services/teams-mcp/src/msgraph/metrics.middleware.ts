@@ -2,6 +2,8 @@ import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
+import { serializeError } from 'serialize-error-cjs';
+import { normalizeError } from '../utils/normalize-error';
 
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
@@ -107,14 +109,27 @@ export class MetricsMiddleware implements Middleware {
         this.msgraphThrottleCounter.add(1, { policy });
 
         this.logger.warn(
-          { method, endpoint, statusCode, policy },
+          {
+            method,
+            endpoint,
+            statusCode,
+            throttlePolicy: policy,
+            duration: duration,
+            rateLimited: true,
+          },
           'Microsoft Graph API request was rate-limited and throttled',
         );
       }
 
       if (duration > 5000) {
         this.logger.warn(
-          { method, endpoint, duration },
+          {
+            method,
+            endpoint,
+            duration,
+            thresholdMs: 5000,
+            performanceIssue: true,
+          },
           'Microsoft Graph API request exceeded performance threshold and is considered slow',
         );
       }
@@ -133,7 +148,13 @@ export class MetricsMiddleware implements Middleware {
       });
 
       this.logger.error(
-        { method, endpoint, error },
+        {
+          method,
+          endpoint,
+          duration,
+          error: serializeError(normalizeError(error)),
+          requestFailed: true,
+        },
         'Microsoft Graph API request failed with an error',
       );
 

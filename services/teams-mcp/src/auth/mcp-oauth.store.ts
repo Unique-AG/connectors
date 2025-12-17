@@ -108,6 +108,7 @@ export class McpOAuthStore implements IOAuthStore {
       this.logger.warn({
         message: 'Failed to delete expired authorization code from database',
         error: serializeError(normalizeError(error)),
+        operation: 'cleanup_auth_code',
       });
     }
   }
@@ -137,6 +138,7 @@ export class McpOAuthStore implements IOAuthStore {
       this.logger.warn({
         message: 'Failed to delete expired OAuth session from database',
         error: serializeError(normalizeError(error)),
+        operation: 'cleanup_oauth_session',
       });
     }
   }
@@ -411,7 +413,11 @@ export class McpOAuthStore implements IOAuthStore {
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
     this.logger.debug(
-      { cutoffDate: cutoffDate.toISOString() },
+      {
+        cutoffDate: cutoffDate.toISOString(),
+        olderThanDays,
+        operation: 'cleanup_expired_tokens',
+      },
       'Beginning cleanup of expired tokens and sessions from database',
     );
 
