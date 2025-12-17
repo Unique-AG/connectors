@@ -1,0 +1,157 @@
+/** biome-ignore-all lint/suspicious/noUnknownAtRules: We use Tailwind CSS at-rules. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Caumasee-inspired Design System
+Beautiful turquoise lake colors from the Swiss Alps
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Caumasee Base Colors */
+    --background: 210 30% 98%;
+    --foreground: 200 20% 15%;
+
+    /* Cards & Surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 200 20% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 20% 15%;
+
+    /* Caumasee Primary - Deep Lake Turquoise */
+    --primary: 188 85% 35%;
+    --primary-foreground: 0 0% 98%;
+    --primary-hover: 188 85% 40%;
+    --primary-muted: 188 40% 88%;
+
+    /* Alpine Secondary - Deep Water Blue */
+    --secondary: 200 60% 25%;
+    --secondary-foreground: 0 0% 98%;
+    --secondary-hover: 200 60% 30%;
+    --secondary-muted: 200 30% 92%;
+
+    /* Muted Tones - Gentle Lake Mist */
+    --muted: 200 20% 95%;
+    --muted-foreground: 200 15% 45%;
+
+    /* Accent - Fresh Alpine Mint */
+    --accent: 175 70% 65%;
+    --accent-foreground: 200 20% 15%;
+    --accent-hover: 175 70% 70%;
+
+    /* Status Colors */
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 90% 55%;
+    --warning-foreground: 0 0% 98%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Interface Elements */
+    --border: 200 20% 88%;
+    --input: 200 20% 95%;
+    --ring: 188 85% 35%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(188, 85%, 35%), hsl(175, 70%, 65%));
+    --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%), hsl(200, 20%, 98%));
+    --gradient-accent: linear-gradient(135deg, hsl(175, 70%, 65%), hsl(188, 85%, 45%));
+
+    /* Shadows */
+    --shadow-soft: 0 2px 8px hsla(200, 20%, 20%, 0.08);
+    --shadow-medium: 0 4px 16px hsla(200, 20%, 20%, 0.12);
+    --shadow-strong: 0 8px 32px hsla(200, 20%, 20%, 0.16);
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark Caumasee - Night Lake */
+    --background: 200 35% 8%;
+    --foreground: 200 15% 90%;
+
+    --card: 200 30% 10%;
+    --card-foreground: 200 15% 90%;
+
+    --popover: 200 30% 10%;
+    --popover-foreground: 200 15% 90%;
+
+    /* Dark Primary - Moonlit Lake */
+    --primary: 188 70% 55%;
+    --primary-foreground: 200 30% 8%;
+    --primary-hover: 188 70% 60%;
+    --primary-muted: 188 30% 20%;
+
+    /* Dark Secondary */
+    --secondary: 200 40% 20%;
+    --secondary-foreground: 200 15% 90%;
+    --secondary-hover: 200 40% 25%;
+    --secondary-muted: 200 20% 15%;
+
+    --muted: 200 25% 15%;
+    --muted-foreground: 200 15% 65%;
+
+    --accent: 175 60% 50%;
+    --accent-foreground: 200 30% 8%;
+    --accent-hover: 175 60% 55%;
+
+    /* Dark Status Colors */
+    --success: 142 60% 50%;
+    --success-foreground: 200 30% 8%;
+    --warning: 38 80% 60%;
+    --warning-foreground: 200 30% 8%;
+    --destructive: 0 70% 60%;
+    --destructive-foreground: 200 30% 8%;
+
+    --border: 200 25% 20%;
+    --input: 200 25% 15%;
+    --ring: 188 70% 55%;
+
+    /* Dark Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(188, 70%, 55%), hsl(175, 60%, 50%));
+    --gradient-card: linear-gradient(180deg, hsl(200, 30%, 10%), hsl(200, 25%, 8%));
+    --gradient-accent: linear-gradient(135deg, hsl(175, 60%, 50%), hsl(188, 70%, 45%));
+
+    /* Dark Shadows */
+    --shadow-soft: 0 2px 8px hsla(200, 30%, 5%, 0.3);
+    --shadow-medium: 0 4px 16px hsla(200, 30%, 5%, 0.4);
+    --shadow-strong: 0 8px 32px hsla(200, 30%, 5%, 0.5);
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

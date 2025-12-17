@@ -1,0 +1,215 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/batch": {
+      "post": {
+        "operationId": "batch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch processed successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Batch process Powersync write operations for the authenticated user",
+        "tags": ["batch"]
+      }
+    },
+    "/sync": {
+      "patch": {
+        "operationId": "syncFolders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Folders synced successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sync folders for the authenticated user",
+        "tags": ["sync"]
+      },
+      "delete": {
+        "operationId": "deleteAllUserData",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User data deleted successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete all user data for the authenticated user",
+        "tags": ["sync"]
+      }
+    },
+    "/sync/folder/{folderId}": {
+      "patch": {
+        "operationId": "syncFolderEmails",
+        "parameters": [
+          {
+            "name": "folderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Folder synced successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resync emails in a specific folder for the authenticated user",
+        "tags": ["sync"]
+      }
+    },
+    "/sync/folder/{folderId}/email/{emailId}": {
+      "patch": {
+        "operationId": "reprocessEmail",
+        "parameters": [
+          {
+            "name": "folderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "emailId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email reprocessing started"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reprocess a specific email",
+        "tags": ["sync"]
+      }
+    }
+  },
+  "info": {
+    "title": "Agentic Outlook MCP API",
+    "description": "API for managing Outlook sync and folders",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "BatchDto": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "op_id": {
+                  "type": "number"
+                },
+                "op": {
+                  "type": "string",
+                  "enum": ["PUT", "PATCH", "DELETE"]
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["user_profiles", "folders", "emails"]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "tx_id": {
+                  "type": "number"
+                },
+                "data": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "old": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "metadata": {
+                  "type": "string"
+                }
+              },
+              "required": ["op_id", "op", "type", "id"]
+            }
+          }
+        },
+        "required": ["clientId", "data"]
+      }
+    }
+  }
+}
