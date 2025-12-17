@@ -19,20 +19,28 @@ import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { UserUpsertEvent } from '~/auth/events';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
+import { SubscriptionCreateService } from './subscription-create.service';
+import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
+import { SubscriptionRemoveService } from './subscription-remove.service';
 import {
   ChangeEventDto,
   ChangeNotificationCollectionDto,
   LifecycleChangeNotificationCollectionDto,
   LifecycleEventDto,
 } from './transcript.dtos';
-import { TranscriptService } from './transcript.service';
+import { TranscriptCreatedService } from './transcript-created.service';
+import { TranscriptUtilsService } from './transcript-utils.service';
 
 @Controller('transcript')
 export class TranscriptController {
   private readonly logger = new Logger(TranscriptController.name);
 
   public constructor(
-    private readonly transcriptService: TranscriptService,
+    private readonly subscriptionCreate: SubscriptionCreateService,
+    private readonly subscriptionReauthorize: SubscriptionReauthorizeService,
+    private readonly subscriptionRemove: SubscriptionRemoveService,
+    private readonly transcriptCreated: TranscriptCreatedService,
+    private readonly utils: TranscriptUtilsService,
     private readonly trace: TraceService,
   ) {}
 
@@ -45,7 +53,7 @@ export class TranscriptController {
     const span = this.trace.getSpan();
     const reauthorizationRequests = event.value
       .filter((notification) => {
-        const isTrusted = this.transcriptService.isWebhookTrustedViaState(notification.clientState);
+        const isTrusted = this.utils.isWebhookTrustedViaState(notification.clientState);
         if (!isTrusted) {
           span?.addEvent('lifecycle notification invalid');
           this.logger.warn(
@@ -58,10 +66,12 @@ export class TranscriptController {
       .map((notification) => {
         switch (notification.lifecycleEvent) {
           case 'subscriptionRemoved': {
-            return this.transcriptService.enqueueSubscriptionRemoved(notification.subscriptionId);
+            return this.subscriptionRemove.enqueueSubscriptionRemoved(notification.subscriptionId);
           }
           case 'reauthorizationRequired': {
-            return this.transcriptService.enqueueReauthorizationRequired(notification.subscriptionId);
+            return this.subscriptionReauthorize.enqueueReauthorizationRequired(
+              notification.subscriptionId,
+            );
           }
 
           default: {
@@ -114,7 +124,7 @@ export class TranscriptController {
     const span = this.trace.getSpan();
     const processRequests = event.value
       .filter((notification) => {
-        const isTrusted = this.transcriptService.isWebhookTrustedViaState(notification.clientState);
+        const isTrusted = this.utils.isWebhookTrustedViaState(notification.clientState);
         if (!isTrusted) {
           span?.addEvent('change notification invalid');
           this.logger.warn(
@@ -127,7 +137,10 @@ export class TranscriptController {
       .map((notification) => {
         switch (notification.changeType) {
           case 'created': {
-            return this.transcriptService.enqueueCreated(notification.subscriptionId, notification.resource);
+            return this.transcriptCreated.enqueueCreated(
+              notification.subscriptionId,
+              notification.resource,
+            );
           }
 
           default: {
@@ -188,13 +201,13 @@ export class TranscriptController {
 
     switch (event.type) {
       case 'unique.teams-mcp.transcript.lifecycle-notification.subscription-requested': {
-        return this.transcriptService.subscribe(event.userProfileId);
+        return this.subscriptionCreate.subscribe(event.userProfileId);
       }
       case 'unique.teams-mcp.transcript.lifecycle-notification.subscription-removed': {
-        return this.transcriptService.remove(event.subscriptionId);
+        return this.subscriptionRemove.remove(event.subscriptionId);
       }
       case 'unique.teams-mcp.transcript.lifecycle-notification.reauthorization-required': {
-        return this.transcriptService.reauthorize(event.subscriptionId);
+        return this.subscriptionReauthorize.reauthorize(event.subscriptionId);
       }
 
       default:
@@ -222,7 +235,7 @@ export class TranscriptController {
 
     switch (event.type) {
       case 'unique.teams-mcp.transcript.change-notification.created': {
-        return this.transcriptService.created(event.subscriptionId, event.resource);
+        return this.transcriptCreated.created(event.subscriptionId, event.resource);
       }
 
       default:
@@ -236,6 +249,6 @@ export class TranscriptController {
     const event = UserUpsertEvent.parse(payload);
     this.logger.debug({ event }, 'user upsert event!');
 
-    return this.transcriptService.enqueueSubscriptionRequested(event.id);
+    return this.subscriptionCreate.enqueueSubscriptionRequested(event.id);
   }
 }
