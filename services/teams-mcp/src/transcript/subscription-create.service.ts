@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
@@ -58,7 +59,7 @@ export class SubscriptionCreateService {
       `publishing "${payload.type}" event to AMQP exchange`,
     );
 
-    if (!published) throw new Error(`Cannot publish AMQP event "${payload.type}"`);
+    assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
   }
 
   @Span()
@@ -99,14 +100,14 @@ export class SubscriptionCreateService {
           .delete(subscriptions)
           .where(eq(subscriptions.id, subscription.id));
 
-        span?.addEvent('expired managed subscription yeeted', {
+        span?.addEvent('expired managed subscription deleted', {
           id: subscription.id,
           count: result.rowCount ?? NaN,
         });
 
         this.logger.log(
           { id: subscription.id, count: result.rowCount ?? NaN },
-          'expired managed subscription yeeted',
+          'expired managed subscription deleted',
         );
       } else if (diffFromNow <= minimalTimeForLifecycleNotificationsInMinutes * 60 * 1000) {
         span?.addEvent('subscription below renewal threshold', {

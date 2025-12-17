@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
@@ -48,7 +49,7 @@ export class SubscriptionRemoveService {
       `publishing "${payload.type}" event to AMQP exchange`,
     );
 
-    if (!published) throw new Error(`Cannot publish AMQP event "${payload.type}"`);
+    assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
   }
 
   @Span()

@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { BatchResponseContent } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -62,7 +63,7 @@ export class TranscriptCreatedService {
       `publishing "${payload.type}" event to AMQP exchange`,
     );
 
-    if (!published) throw new Error(`Cannot publish AMQP event "${payload.type}"`);
+    assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
   }
 
   @Span()
