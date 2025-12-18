@@ -58,7 +58,6 @@ export class UniqueService {
     const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
     // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
     const formattedDate = happenedAt.toISOString().split('T').at(0)!;
-    // TODO: remove any non-alpha numeric characters from subject
     return recurring
       ? `/${rootScopePath}/${subject}/${formattedDate}`
       : `/${rootScopePath}/${subject} - ${formattedDate}`;
@@ -438,7 +437,7 @@ export class UniqueService {
         scopeId: scope.id,
         fileUrl: recordingUpload.readUrl,
         input: {
-          key: transcript.id,
+          key: recording.id,
           mimeType: 'video/mp4',
           title: meeting.subject,
         },
