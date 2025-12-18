@@ -124,8 +124,8 @@ export class SubscriptionCreateService {
         );
       } else if (diffFromNow <= minimalTimeForLifecycleNotificationsInMinutes * 60 * 1000) {
         // NOTE: here we are below the threshold and ideally we should also be discarding the existing subscription
-        // but there might be an edge case where this event gets picked up while a renewal is already in progress or 
-        // is about to happen very soon - this is a very unlikely edge case (never happened in prod), 
+        // but there might be an edge case where this event gets picked up while a renewal is already in progress or
+        // is about to happen very soon - this is a very unlikely edge case (never happened in prod),
         // but to be safe we just skip creating a new subscription here and let it naturally renew later or eventually expire.
         span?.addEvent('subscription expiration below renewal threshold', {
           id: subscription.id,

@@ -73,12 +73,6 @@ server:
   #         secretKeyRef:
   #           name: teams-mcp-secret
   #           key: ENCRYPTION_KEY
-  #     # For external auth mode, also add:
-  #     - name: UNIQUE_APP_KEY
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: teams-mcp-secret
-  #           key: UNIQUE_APP_KEY
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
   extraEnvCM:
@@ -205,8 +199,8 @@ mcpConfig:
   unique:
     # -- Authentication mode for Unique API services
     # possible values: cluster_local, external
-    # cluster_local: communicates using in-cluster URLs and requires serviceExtraHeaders
-    # external: communicates using external URLs and requires app key authentication
+    # cluster_local: communicates using in-cluster URLs with service headers
+    # external: communicates using external URLs with app key authentication
     serviceAuthMode: cluster_local
     # -- The Public API URL
     # example: https://api.unique.app
@@ -217,29 +211,18 @@ mcpConfig:
     # -- The root scope path where to upload recordings and transcripts
     rootScopePath: Teams-MCP
 
-    # -- Configuration for cluster_local mode
-    # Object containing extra HTTP headers for Unique API requests
-    # Required when serviceAuthMode is cluster_local. Must contain x-company-id, x-user-id, and x-service-id headers.
-    # example: {"x-company-id": "1234567890", "x-user-id": "1234567890", "x-service-id": "teams-mcp"}
+    # -- Extra HTTP headers for Unique API requests (required for both modes)
+    # For cluster_local mode: must contain x-company-id and x-user-id headers
+    # example: {"x-company-id": "1234567890", "x-user-id": "1234567890"}
+    # For external mode: must contain authorization, x-app-id, x-user-id, and x-company-id headers
+    # example: {"authorization": "Bearer <app-key>", "x-app-id": "<app-id>", "x-user-id": "<user-id>", "x-company-id": "<company-id>"}
     serviceExtraHeaders:
       x-company-id: unset_default_value
       x-user-id: unset_default_value
-      x-service-id: unset_default_value
-    # -- Base URL for Unique ingestion service (cluster_local mode)
+
+    # -- Base URL for Unique ingestion service (cluster_local mode only)
     # example: http://node-ingestion.finance-gpt:8091
     ingestionServiceBaseUrl: unset_default_value
-
-    # -- Configuration for external mode (requires UNIQUE_APP_KEY secret)
-    # -- App ID of the Chat App (external mode)
-    # example: app_bu4gokr0atzj0kfiuaaaaaaa
-    appId: null
-    # -- User ID of a Zitadel Service User (external mode)
-    # example: 123456789012345678
-    authUserId: null
-    # -- Organisation ID where the Zitadel Service User is created (external mode)
-    # example: 987654321098765432
-    authCompanyId: null
-    # appKey is loaded from a secret when using external mode, see server.envVars
 
   # -- Authentication configuration for the MCP server
   auth:
@@ -255,4 +238,3 @@ mcpConfig:
   # - MICROSOFT_WEBHOOK_SECRET: 128 character random string for webhook validation
   # - AUTH_HMAC_SECRET: Secret key for signing HMAC tokens
   # - ENCRYPTION_KEY: 32-byte (256-bit) secret for AES-256-GCM encryption (hex or base64)
-  # - UNIQUE_APP_KEY: API key for Chat App (only for external auth mode)

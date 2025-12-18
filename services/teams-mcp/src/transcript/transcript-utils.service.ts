@@ -62,7 +62,7 @@ export class TranscriptUtilsService {
 
   public getNextScheduledExpiration(): Date {
     // NOTE: requires to be at least 2 hours in the future or we won't be getting lifecycle notifications
-    // We technically could do with anything more than 1 hour, but to be safe we pick 2 hours to give more 
+    // We technically could do with anything more than 1 hour, but to be safe we pick 2 hours to give more
     // buffer in case of delays. Lifecycle notifications are sent at some intervals before 15/45 minutes before expiration.
     // Those notifications are crucial to renew, remove and recreate subscriptions before they expire and we miss notifications completely.
     const lifecycleHoursRequired = 2;

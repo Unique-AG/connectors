@@ -31,26 +31,9 @@ export class UniqueService {
 
   private getAuthHeaders(): Record<string, string> {
     const uniqueConfig = this.config.get('unique', { infer: true });
-    const baseHeaders: Record<string, string> = {
-      'x-api-version': uniqueConfig.apiVersion,
-    };
-
-    if (uniqueConfig.serviceAuthMode === 'cluster_local') {
-      // For cluster_local mode, use the extra headers from config
-      const extraHeaders = uniqueConfig.serviceExtraHeaders;
-      return {
-        ...baseHeaders,
-        ...extraHeaders,
-      };
-    }
-
-    // For external mode, use app key and other auth details
     return {
-      ...baseHeaders,
-      Authorization: `Bearer ${uniqueConfig.appKey.value}`,
-      'x-app-id': uniqueConfig.appId,
-      'x-company-id': uniqueConfig.authCompanyId,
-      'x-user-id': uniqueConfig.authUserId,
+      'x-api-version': uniqueConfig.apiVersion,
+      ...uniqueConfig.serviceExtraHeaders,
     };
   }
 

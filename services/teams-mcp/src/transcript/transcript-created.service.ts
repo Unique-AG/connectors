@@ -151,7 +151,7 @@ export class TranscriptCreatedService {
     );
     assert.ok(vttStream, 'expected a vtt transcript body');
 
-    let recording: { id:string, content: ReadableStream<Uint8Array<ArrayBuffer>> } | undefined;
+    let recording: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> } | undefined;
     try {
       this.logger.debug(
         { contentCorrelationId: transcript.contentCorrelationId },

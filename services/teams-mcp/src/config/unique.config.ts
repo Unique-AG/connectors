@@ -4,7 +4,7 @@ import {
   registerConfig,
 } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-import { json, redacted, stringToURL } from '~/utils/zod';
+import { json, stringToURL } from '~/utils/zod';
 
 // ==== Config for local in-cluster communication with Unique API services ====
 
@@ -16,17 +16,17 @@ const clusterLocalConfig = z.object({
     .refine(
       (headers) => {
         const providedHeaders = Object.keys(headers);
-        const requiredHeaders = ['x-company-id', 'x-user-id', 'x-service-id'];
+        const requiredHeaders = ['x-company-id', 'x-user-id'];
         return requiredHeaders.every((header) => providedHeaders.includes(header));
       },
       {
-        message: 'Must contain x-company-id, x-user-id, and x-service-id headers',
+        message: 'Must contain x-company-id and x-user-id headers',
         path: ['serviceExtraHeaders'],
       },
     )
     .describe(
       'JSON string of extra HTTP headers for API requests ' +
-        '(e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>", "x-service-id": "<service-id>"})',
+        '(e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
     ),
   ingestionServiceBaseUrl: stringToURL().describe('Base URL for Unique ingestion service'),
 });
@@ -37,13 +37,21 @@ const externalConfig = z.object({
   serviceAuthMode: z
     .literal('external')
     .describe('Authentication mode to use for accessing Unique API services'),
-  appKey: redacted(z.string()).describe('API key of a Chat App (maps to `Authorization`).'),
-  appId: z.string().describe('App ID of the Chat App (maps to `x-app-id`).'),
-  authUserId: z.string().describe('User ID of a Zitadel Service User (maps to `x-user-id`).'),
-  authCompanyId: z
-    .string()
+  serviceExtraHeaders: json(z.record(z.string(), z.string()))
+    .refine(
+      (headers) => {
+        const providedHeaders = Object.keys(headers);
+        const requiredHeaders = ['authorization', 'x-app-id', 'x-user-id', 'x-company-id'];
+        return requiredHeaders.every((header) => providedHeaders.includes(header));
+      },
+      {
+        message: 'Must contain authorization, x-app-id, x-user-id, and x-company-id headers',
+        path: ['serviceExtraHeaders'],
+      },
+    )
     .describe(
-      'Organisation ID of where the Zitadel Service User is created (maps to `x-company-id`).',
+      'JSON string of extra HTTP headers for API requests ' +
+        '(e.g., {"authorization": "Bearer <app-key>", "x-app-id": "<app-id>", "x-user-id": "<user-id>", "x-company-id": "<company-id>"})',
     ),
 });
 
