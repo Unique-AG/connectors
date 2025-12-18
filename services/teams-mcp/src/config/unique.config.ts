@@ -67,6 +67,12 @@ const baseConfig = z.object({
     .string()
     .default('Teams-MCP')
     .describe('The root scope path where to upload recordings and transcripts.'),
+  userFetchConcurrency: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5)
+    .describe('The concurrency limit for fetching users when resolving scope accesses.'),
 });
 
 export const UniqueConfigSchema = z

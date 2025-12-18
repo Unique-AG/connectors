@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import pLimit from 'p-limit';
 import type { UniqueConfigNamespaced } from '~/config';
 import {
   PublicAddScopeAccessRequestSchema,
@@ -320,8 +321,10 @@ export class UniqueService {
       'Beginning processing of meeting transcript and recording for ingestion',
     );
 
+    const concurrency = this.config.get('unique.userFetchConcurrency', { infer: true });
+    const limit = pLimit(concurrency);
     const participantsPromises = meeting.participants.map((p) =>
-      this.fetchUserForScopeAccess(p.email),
+      limit(() => this.fetchUserForScopeAccess(p.email)),
     );
     const participants = (await Promise.all(participantsPromises)).filter((v) => v !== null);
     const owner = await this.fetchUserForScopeAccess(meeting.owner.email);
@@ -403,7 +406,7 @@ export class UniqueService {
           key: recording.id,
           mimeType: 'video/mp4',
           title: meeting.subject,
-          byteSize: 1, // API requires byteSize to be set for properly create ingestion URLs (?), but we don't know it here yet
+          byteSize: 1, // NOTE: byteSize is required to be `> 0` so that the file would show up in the UI while the file is being "ingested"
           metadata: {
             date: meeting.startDateTime.toISOString(),
             participants: meeting.participants,

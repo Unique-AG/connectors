@@ -219,6 +219,8 @@ mcpConfig:
     apiVersion: "2023-12-06"
     # -- The root scope path where to upload recordings and transcripts
     rootScopePath: Teams-MCP
+    # -- Concurrency limit for fetching users when resolving scope accesses
+    userFetchConcurrency: 5
 
     # -- Base URL for Unique ingestion service (cluster_local mode only)
     # example: http://node-ingestion.finance-gpt:8091
