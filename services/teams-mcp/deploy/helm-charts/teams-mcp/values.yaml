@@ -202,15 +202,6 @@ mcpConfig:
     # cluster_local: communicates using in-cluster URLs with service headers
     # external: communicates using external URLs with app key authentication
     serviceAuthMode: cluster_local
-    # -- The Public API URL
-    # example: https://api.unique.app
-    # example: http://api-gateway.unique:8080
-    apiBaseUrl: unset_default_value
-    # -- The Public API version to use
-    apiVersion: "2023-12-06"
-    # -- The root scope path where to upload recordings and transcripts
-    rootScopePath: Teams-MCP
-
     # -- Extra HTTP headers for Unique API requests (required for both modes)
     # For cluster_local mode: must contain x-company-id and x-user-id headers
     # example: {"x-company-id": "1234567890", "x-user-id": "1234567890"}
@@ -219,6 +210,15 @@ mcpConfig:
     serviceExtraHeaders:
       x-company-id: unset_default_value
       x-user-id: unset_default_value
+
+    # -- The Public API URL
+    # example: https://api.unique.app
+    # example: http://api-gateway.unique:8080
+    apiBaseUrl: unset_default_value
+    # -- The Public API version to use
+    apiVersion: "2023-12-06"
+    # -- The root scope path where to upload recordings and transcripts
+    rootScopePath: Teams-MCP
 
     # -- Base URL for Unique ingestion service (cluster_local mode only)
     # example: http://node-ingestion.finance-gpt:8091
