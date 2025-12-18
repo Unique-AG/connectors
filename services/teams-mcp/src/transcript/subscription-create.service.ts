@@ -100,6 +100,11 @@ export class SubscriptionCreateService {
         'Evaluating managed subscription expiration status',
       );
 
+      // NOTE: 15 minutes is the last possible time we can get lifecycle notifications from Microsoft Graph
+      // beyond that, we risk missing the notification and thus missing the chance to renew the subscription
+      // automatically. In practice, we should aim to renew well before that to avoid any risk of missing it.
+      // This threshold gives marks that last point to understand whether we should force a new subscription
+      // or just keep it as is.
       const minimalTimeForLifecycleNotificationsInMinutes = 15;
       if (diffFromNow < 0) {
         span?.addEvent('subscription expired, deleting');
@@ -118,7 +123,11 @@ export class SubscriptionCreateService {
           'Successfully deleted expired managed subscription from database',
         );
       } else if (diffFromNow <= minimalTimeForLifecycleNotificationsInMinutes * 60 * 1000) {
-        span?.addEvent('subscription below renewal threshold', {
+        // NOTE: here we are below the threshold and ideally we should also be discarding the existing subscription
+        // but there might be an edge case where this event gets picked up while a renewal is already in progress or 
+        // is about to happen very soon - this is a very unlikely edge case (never happened in prod), 
+        // but to be safe we just skip creating a new subscription here and let it naturally renew later or eventually expire.
+        span?.addEvent('subscription expiration below renewal threshold', {
           id: subscription.id,
           thresholdMinutes: minimalTimeForLifecycleNotificationsInMinutes,
         });
@@ -129,6 +138,7 @@ export class SubscriptionCreateService {
         );
         return;
       } else {
+        // NOTE: here we have enough time left on the subscription, so we do nothing
         span?.addEvent('subscription valid, skipping creation');
 
         this.logger.debug(
@@ -162,7 +172,7 @@ export class SubscriptionCreateService {
         { userProfileId: userProfileId.toString() },
         'Cannot proceed: user profile does not exist in database',
       );
-      throw new Error(`${userProfileId} could not be found on DB`);
+      assert.fail(`${userProfileId} could not be found on DB`);
     }
 
     span?.setAttribute('user_profile.provider_user_id', userProfile.providerUserId);
@@ -227,7 +237,7 @@ export class SubscriptionCreateService {
     const created = newManagedSubscriptions.at(0);
     if (!created) {
       span?.addEvent('failed to create managed subscription in DB');
-      throw new Error('subscription was not created');
+      assert.fail('subscription was not created');
     }
 
     span?.addEvent('new managed subscription created', { id: created.id });

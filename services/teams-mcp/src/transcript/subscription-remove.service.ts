@@ -90,6 +90,7 @@ export class SubscriptionRemoveService {
     );
 
     const client = this.graphClientFactory.createClientForUser(deletedSubscription.userProfileId);
+    // Be explicit that this returns the response but we don't care about it if successful
     const _graphResponse = (await client
       .api(`/subscriptions/${subscriptionId}`)
       .delete()) as unknown;

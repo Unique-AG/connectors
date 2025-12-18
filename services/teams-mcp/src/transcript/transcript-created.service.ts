@@ -151,7 +151,7 @@ export class TranscriptCreatedService {
     );
     assert.ok(vttStream, 'expected a vtt transcript body');
 
-    let recordingStream: ReadableStream<Uint8Array<ArrayBuffer>> | undefined;
+    let recording: { id:string, content: ReadableStream<Uint8Array<ArrayBuffer>> } | undefined;
     try {
       this.logger.debug(
         { contentCorrelationId: transcript.contentCorrelationId },
@@ -177,11 +177,14 @@ export class TranscriptCreatedService {
         'Located correlated meeting recording in Microsoft Graph',
       );
 
-      recordingStream = await client
-        .api(
-          `/v1.0/users/${userId}/onlineMeetings/${meetingId}/recordings/${recordingData.id}/content`,
-        )
-        .getStream();
+      recording = {
+        id: recordingData.id,
+        content: await client
+          .api(
+            `/v1.0/users/${userId}/onlineMeetings/${meetingId}/recordings/${recordingData.id}/content`,
+          )
+          .getStream(),
+      };
 
       span?.addEvent('recording content retrieved');
       this.logger.debug(
@@ -200,7 +203,7 @@ export class TranscriptCreatedService {
     }
 
     span?.addEvent('transcript processing completed', {
-      hasRecording: recordingStream !== undefined,
+      hasRecording: recording !== undefined,
     });
 
     await this.unique.ingestTranscript(
@@ -218,6 +221,7 @@ export class TranscriptCreatedService {
         })),
       },
       { id: transcript.id, content: vttStream },
+      recording ? { id: recording.id, content: recording.content } : undefined,
     );
   }
 }

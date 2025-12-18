@@ -20,6 +20,14 @@ const ConfigSchema = z.object({
   publicWebhookUrl: stringToURL().describe(
     'The public webhook URL reachable from external network used by Microsoft Graph subscription for pushes.',
   ),
+  subscriptionExpirationTimeHoursUTC: z.coerce
+    .number()
+    .min(0)
+    .max(23)
+    .default(3)
+    .describe(
+      'The hour of the day in UTC when scheduled subscription expirations should occur. This should be done during off-peak hours to avoid disruptions of incoming notifications.',
+    ),
 });
 
 export const microsoftConfig = registerConfig('microsoft', ConfigSchema);

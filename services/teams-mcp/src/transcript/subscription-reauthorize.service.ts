@@ -152,7 +152,7 @@ export class SubscriptionReauthorizeService {
     const updated = updates.at(0);
     if (!updated) {
       span?.addEvent('failed to update managed subscription in DB');
-      throw new Error('subscription was not updated');
+      assert.fail('subscription was not updated');
     }
 
     span?.addEvent('managed subscription updated', { id: updated.id });

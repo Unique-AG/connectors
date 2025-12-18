@@ -62,12 +62,22 @@ export class TranscriptUtilsService {
 
   public getNextScheduledExpiration(): Date {
     // NOTE: requires to be at least 2 hours in the future or we won't be getting lifecycle notifications
+    // We technically could do with anything more than 1 hour, but to be safe we pick 2 hours to give more 
+    // buffer in case of delays. Lifecycle notifications are sent at some intervals before 15/45 minutes before expiration.
+    // Those notifications are crucial to renew, remove and recreate subscriptions before they expire and we miss notifications completely.
     const lifecycleHoursRequired = 2;
-    const targetHour = 3; // TODO: can extract to a module option at somepoint
+    const targetHour = this.config.get('microsoft.subscriptionExpirationTimeHoursUTC', {
+      infer: true,
+    });
 
     const now = new Date();
-    // build today's target (3:00:00.000 UTC)
-    const nextThreeAM = new Date(
+    // NOTE: We synchronize all times to UTC to avoid disrupations during the day for incoming notifications
+    // hooks because Microsoft Graph always sends a notification *only* if the artifact is created
+    // while a subscription is active; otherwise, we miss the notification completely and we will never know.
+    // Thus, we pick a time that is always outside of working hours to reduce the chance of missing notifications.
+    // This is because _renewals_ keep a subscription active but _creations_ actually not, so if it eventually
+    // expires during outside of working hours, the creation happen in a time where we would likely not miss anything.
+    const nextSync = new Date(
       Date.UTC(
         now.getUTCFullYear(),
         now.getUTCMonth(),
@@ -82,18 +92,18 @@ export class TranscriptUtilsService {
     const nowHour = now.getUTCHours();
     const needsNextDay = nowHour >= targetHour || nowHour + lifecycleHoursRequired >= targetHour;
     if (needsNextDay) {
-      nextThreeAM.setUTCDate(nextThreeAM.getUTCDate() + 1);
+      nextSync.setUTCDate(nextSync.getUTCDate() + 1);
     }
 
     this.logger.debug(
       {
         now,
-        nextThreeAM,
+        nextSync,
       },
       'Calculated next scheduled subscription expiration time',
     );
 
-    return nextThreeAM;
+    return nextSync;
   }
 
   public getWebhookSecret(): Redacted<string> {
