@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-beta.9](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.8...sharepoint-connector@2.0.0-beta.9) (2025-12-18)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** removed sensitive data from warning log ([#186](https://github.com/Unique-AG/connectors/issues/186)) ([9d71b95](https://github.com/Unique-AG/connectors/commit/9d71b95885c5ddcae235fc79b4bd8fca9b0658a3))
+
 ## [2.0.0-beta.8](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.7...sharepoint-connector@2.0.0-beta.8) (2025-12-11)
 
 
