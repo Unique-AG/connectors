@@ -40,6 +40,7 @@ export class FetchGraphPermissionsMapQuery {
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
         sharePointPermissions,
         siteName,
+        item.item.id,
       );
     }
     return permissionsMap;
@@ -48,6 +49,7 @@ export class FetchGraphPermissionsMapQuery {
   private mapSharePointPermissionsToOurPermissions(
     simplePermissions: SimplePermission[],
     siteName: string,
+    itemId: string,
   ): Permission[] {
     return simplePermissions.flatMap((permission) => {
       if (isNonNullish(permission.grantedToV2)) {
@@ -75,9 +77,35 @@ export class FetchGraphPermissionsMapQuery {
           return itemPermissions;
         }
       }
+      // we do not want to log the full permissions object because it contains sensitive data
+      const permissionInfo = {
+        itemId,
+        id: permission.id,
+        grantedToIdentitiesV2: permission.grantedToIdentitiesV2?.map(
+          (simpleIdentitySet: SimpleIdentitySet) => {
+            const redactedIdentity: Record<string, unknown> = {};
+            Object.keys(simpleIdentitySet).forEach((key) => {
+              // We need to type the key and the identityValue else typescript will complain
+              const typedKey = key as keyof SimpleIdentitySet;
+              const identityValue = simpleIdentitySet[typedKey] as
+                | Record<string, unknown>
+                | undefined;
+              redactedIdentity[typedKey] = {
+                id: identityValue?.id,
+                '@odata.type': identityValue?.['@odata.type'],
+              };
+            });
+            return redactedIdentity;
+          },
+        ),
+      };
 
       this.logger.warn(
-        `No parsable permissions for permission ${permission.id}: ${JSON.stringify(permission, null, 4)}`,
+        `No parsable permissions for permission ${permission.id}: ${JSON.stringify(
+          permissionInfo,
+          null,
+          4,
+        )}`,
       );
       return [];
     });

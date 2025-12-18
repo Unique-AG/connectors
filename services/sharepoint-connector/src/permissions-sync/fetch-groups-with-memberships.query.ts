@@ -260,7 +260,7 @@ export class FetchGroupsWithMembershipsQuery {
         email:
           membership.mail ||
           membership.userPrincipalName ||
-          assert.fail(`User has no email or userPrincipalName: ${JSON.stringify(membership)}`),
+          assert.fail(`User has no email or userPrincipalName`),
       };
     }
 
