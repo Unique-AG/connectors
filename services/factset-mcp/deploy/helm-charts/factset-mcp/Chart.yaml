@@ -2,8 +2,8 @@ apiVersion: v2
 name: mcp-server-factset
 description: An experimental MCP server for Factset.
 type: application
-version: 0.2.4
-appVersion: 0.2.4
+version: 0.3.0
+appVersion: 0.3.0
 dependencies:
   - alias: server
     name: backend-service
