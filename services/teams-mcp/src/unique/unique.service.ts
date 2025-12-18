@@ -30,22 +30,151 @@ export class UniqueService {
 
   public constructor(private readonly config: ConfigService<UniqueConfigNamespaced, true>) {}
 
-  private getAuthHeaders(): Record<string, string> {
-    const uniqueConfig = this.config.get('unique', { infer: true });
-    return {
-      'x-api-version': uniqueConfig.apiVersion,
-      ...uniqueConfig.serviceExtraHeaders,
-    };
+  // SECTION: Public API
+
+  public async ingestTranscript(
+    meeting: {
+      subject: string;
+      startDateTime: Date;
+      endDateTime: Date;
+      participants: { name: string; email: string }[];
+      owner: { name: string; email: string };
+    },
+    transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
+    recording?: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
+  ): Promise<void> {
+    this.logger.log(
+      {
+        transcriptId: transcript.id,
+        recordingId: recording?.id,
+        participantCount: meeting.participants.length,
+        meetingDate: meeting.startDateTime.toISOString(),
+      },
+      'Beginning processing of meeting transcript and recording for ingestion',
+    );
+
+    const concurrency = this.config.get('unique.userFetchConcurrency', { infer: true });
+    const limit = pLimit(concurrency);
+    const participantsPromises = meeting.participants.map((p) =>
+      limit(() => this.fetchUserForScopeAccess(p.email)),
+    );
+    const participants = (await Promise.all(participantsPromises)).filter((v) => v !== null);
+    const owner = await this.fetchUserForScopeAccess(meeting.owner.email);
+
+    if (!owner) {
+      this.logger.warn(
+        { participantCount: meeting.participants.length },
+        'Cannot proceed: meeting owner account not found in Unique system',
+      );
+      return;
+    }
+
+    this.logger.debug(
+      { foundParticipants: participants.length, totalParticipants: meeting.participants.length },
+      'Successfully resolved meeting participant accounts in Unique system',
+    );
+
+    const path = this.mapMeetingToScope(meeting.subject, meeting.startDateTime);
+    const scope = await this.createScope(path);
+
+    const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
+      entityId: p.id,
+      entityType: ScopeAccessEntityType.User,
+      type: ScopeAccessType.Read,
+    }));
+    accesses.push({
+      entityId: owner.id,
+      entityType: ScopeAccessEntityType.User,
+      type: ScopeAccessType.Write,
+    });
+    accesses.push({
+      entityId: owner.id,
+      entityType: ScopeAccessEntityType.User,
+      type: ScopeAccessType.Read,
+    });
+    await this.addScopeAccesses(scope.id, accesses);
+
+    this.logger.log(
+      { transcriptId: transcript.id, scopeId: scope.id },
+      'Beginning transcript upload to Unique system',
+    );
+
+    const transcriptUpload = await this.upsertContent({
+      storeInternally: true,
+      scopeId: scope.id,
+      input: {
+        key: transcript.id,
+        mimeType: 'text/vtt',
+        title: meeting.subject,
+        byteSize: 1,
+        metadata: {
+          date: meeting.startDateTime.toISOString(),
+          participants: meeting.participants,
+        },
+      },
+    });
+    await this.uploadToStorage(transcriptUpload.writeUrl, transcript.content);
+    await this.upsertContent({
+      storeInternally: true,
+      scopeId: scope.id,
+      fileUrl: transcriptUpload.readUrl,
+      input: {
+        key: transcript.id,
+        mimeType: 'text/vtt',
+        title: meeting.subject,
+      },
+    });
+
+    if (recording) {
+      this.logger.log(
+        { recordingId: recording.id, scopeId: scope.id },
+        'Beginning meeting recording upload to Unique system',
+      );
+
+      const recordingUpload = await this.upsertContent({
+        storeInternally: true,
+        scopeId: scope.id,
+        input: {
+          key: recording.id,
+          mimeType: 'video/mp4',
+          title: meeting.subject,
+          byteSize: 1, // NOTE: byteSize is required to be `> 0` so that the file would show up in the UI while the file is being "ingested"
+          metadata: {
+            date: meeting.startDateTime.toISOString(),
+            participants: meeting.participants,
+          },
+          ingestionConfig: {
+            // NOTE: we don't want to ingest recordings, we only store them to have a reference to eventually share to users when needed
+            uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+          },
+        },
+      });
+      await this.uploadToStorage(recordingUpload.writeUrl, recording.content);
+      await this.upsertContent({
+        storeInternally: true,
+        scopeId: scope.id,
+        fileUrl: recordingUpload.readUrl,
+        input: {
+          key: recording.id,
+          mimeType: 'video/mp4',
+          title: meeting.subject,
+        },
+      });
+    }
+
+    this.logger.log(
+      {
+        transcriptId: transcript.id,
+        recordingId: recording?.id,
+        scopeId: scope.id,
+      },
+      'Successfully completed meeting transcript and recording ingestion process',
+    );
   }
 
-  private mapMeetingToScope(subject: string, happenedAt: Date, recurring = false): string {
-    const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
-    // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
-    const formattedDate = happenedAt.toISOString().split('T').at(0)!;
-    return recurring
-      ? `/${rootScopePath}/${subject}/${formattedDate}`
-      : `/${rootScopePath}/${subject} - ${formattedDate}`;
-  }
+  // !SECTION: Public API
+
+  // SECTION: Unique API Methods
 
   private async fetchUserForScopeAccess(email: string): Promise<PublicUserResult | null> {
     const baseUrl = this.config.get('unique.apiBaseUrl', { infer: true });
@@ -300,144 +429,25 @@ export class UniqueService {
     );
   }
 
-  public async ingestTranscript(
-    meeting: {
-      subject: string;
-      startDateTime: Date;
-      endDateTime: Date;
-      participants: { name: string; email: string }[];
-      owner: { name: string; email: string };
-    },
-    transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
-    recording?: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
-  ): Promise<void> {
-    this.logger.log(
-      {
-        transcriptId: transcript.id,
-        recordingId: recording?.id,
-        participantCount: meeting.participants.length,
-        meetingDate: meeting.startDateTime.toISOString(),
-      },
-      'Beginning processing of meeting transcript and recording for ingestion',
-    );
+  // !SECTION: Unique API Methods
 
-    const concurrency = this.config.get('unique.userFetchConcurrency', { infer: true });
-    const limit = pLimit(concurrency);
-    const participantsPromises = meeting.participants.map((p) =>
-      limit(() => this.fetchUserForScopeAccess(p.email)),
-    );
-    const participants = (await Promise.all(participantsPromises)).filter((v) => v !== null);
-    const owner = await this.fetchUserForScopeAccess(meeting.owner.email);
+  // SECTION: Helpers
 
-    if (!owner) {
-      this.logger.warn(
-        { participantCount: meeting.participants.length },
-        'Cannot proceed: meeting owner account not found in Unique system',
-      );
-      return;
-    }
+  private getAuthHeaders(): Record<string, string> {
+    const uniqueConfig = this.config.get('unique', { infer: true });
+    return {
+      'x-api-version': uniqueConfig.apiVersion,
+      ...uniqueConfig.serviceExtraHeaders,
+    };
+  }
 
-    this.logger.debug(
-      { foundParticipants: participants.length, totalParticipants: meeting.participants.length },
-      'Successfully resolved meeting participant accounts in Unique system',
-    );
-
-    const path = this.mapMeetingToScope(meeting.subject, meeting.startDateTime);
-    const scope = await this.createScope(path);
-
-    const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
-      entityId: p.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Read,
-    }));
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Write,
-    });
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Read,
-    });
-    await this.addScopeAccesses(scope.id, accesses);
-
-    this.logger.log(
-      { transcriptId: transcript.id, scopeId: scope.id },
-      'Beginning transcript upload to Unique system',
-    );
-
-    const transcriptUpload = await this.upsertContent({
-      storeInternally: true,
-      scopeId: scope.id,
-      input: {
-        key: transcript.id,
-        mimeType: 'text/vtt',
-        title: meeting.subject,
-        byteSize: 1,
-        metadata: {
-          date: meeting.startDateTime.toISOString(),
-          participants: meeting.participants,
-        },
-      },
-    });
-    await this.uploadToStorage(transcriptUpload.writeUrl, transcript.content);
-    await this.upsertContent({
-      storeInternally: true,
-      scopeId: scope.id,
-      fileUrl: transcriptUpload.readUrl,
-      input: {
-        key: transcript.id,
-        mimeType: 'text/vtt',
-        title: meeting.subject,
-      },
-    });
-
-    if (recording) {
-      this.logger.log(
-        { recordingId: recording.id, scopeId: scope.id },
-        'Beginning meeting recording upload to Unique system',
-      );
-
-      const recordingUpload = await this.upsertContent({
-        storeInternally: true,
-        scopeId: scope.id,
-        input: {
-          key: recording.id,
-          mimeType: 'video/mp4',
-          title: meeting.subject,
-          byteSize: 1, // NOTE: byteSize is required to be `> 0` so that the file would show up in the UI while the file is being "ingested"
-          metadata: {
-            date: meeting.startDateTime.toISOString(),
-            participants: meeting.participants,
-          },
-          ingestionConfig: {
-            // NOTE: we don't want to ingest recordings, we only store them to have a reference to eventually share to users when needed
-            uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
-          },
-        },
-      });
-      await this.uploadToStorage(recordingUpload.writeUrl, recording.content);
-      await this.upsertContent({
-        storeInternally: true,
-        scopeId: scope.id,
-        fileUrl: recordingUpload.readUrl,
-        input: {
-          key: recording.id,
-          mimeType: 'video/mp4',
-          title: meeting.subject,
-        },
-      });
-    }
-
-    this.logger.log(
-      {
-        transcriptId: transcript.id,
-        recordingId: recording?.id,
-        scopeId: scope.id,
-      },
-      'Successfully completed meeting transcript and recording ingestion process',
-    );
+  private mapMeetingToScope(subject: string, happenedAt: Date, recurring = false): string {
+    const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
+    // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
+    const formattedDate = happenedAt.toISOString().split('T').at(0)!;
+    return recurring
+      ? `/${rootScopePath}/${subject}/${formattedDate}`
+      : `/${rootScopePath}/${subject} - ${formattedDate}`;
   }
 
   // HACK:
@@ -461,4 +471,6 @@ export class UniqueService {
       uniqueConfig.ingestionServiceBaseUrl,
     ).toString();
   }
+
+  // !SECTION: Helpers
 }
