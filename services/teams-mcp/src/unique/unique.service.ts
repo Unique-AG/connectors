@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Span, TraceService } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import type { UniqueConfigNamespaced } from '~/config';
 import {
@@ -28,10 +29,14 @@ import {
 export class UniqueService {
   private readonly logger = new Logger(UniqueService.name);
 
-  public constructor(private readonly config: ConfigService<UniqueConfigNamespaced, true>) {}
+  public constructor(
+    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
+    private readonly trace: TraceService,
+  ) {}
 
   // SECTION: Public API
 
+  @Span()
   public async ingestTranscript(
     meeting: {
       subject: string;
@@ -43,6 +48,13 @@ export class UniqueService {
     transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
     recording?: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
   ): Promise<void> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('transcript_id', transcript.id);
+    span?.setAttribute('recording_id', recording?.id ?? '');
+    span?.setAttribute('participant_count', meeting.participants.length);
+    span?.setAttribute('meeting_date', meeting.startDateTime.toISOString());
+    span?.setAttribute('owner_email', meeting.owner.email);
+
     this.logger.log(
       {
         transcriptId: transcript.id,
@@ -62,12 +74,19 @@ export class UniqueService {
     const owner = await this.fetchUserForScopeAccess(meeting.owner.email);
 
     if (!owner) {
+      span?.addEvent('owner_not_found');
       this.logger.warn(
         { participantCount: meeting.participants.length },
         'Cannot proceed: meeting owner account not found in Unique system',
       );
       return;
     }
+
+    span?.setAttribute('resolved_participants_count', participants.length);
+    span?.addEvent('participants_resolved', {
+      foundParticipants: participants.length,
+      totalParticipants: meeting.participants.length,
+    });
 
     this.logger.debug(
       { foundParticipants: participants.length, totalParticipants: meeting.participants.length },
@@ -76,6 +95,7 @@ export class UniqueService {
 
     const path = this.mapMeetingToScope(meeting.subject, meeting.startDateTime);
     const scope = await this.createScope(path);
+    span?.setAttribute('scope_id', scope.id);
 
     const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
       entityId: p.id,
@@ -124,6 +144,7 @@ export class UniqueService {
         title: meeting.subject,
       },
     });
+    span?.addEvent('transcript_uploaded', { transcriptId: transcript.id });
 
     if (recording) {
       this.logger.log(
@@ -160,7 +181,14 @@ export class UniqueService {
           title: meeting.subject,
         },
       });
+      span?.addEvent('recording_uploaded', { recordingId: recording.id });
     }
+
+    span?.addEvent('ingestion_completed', {
+      transcriptId: transcript.id,
+      recordingId: recording?.id ?? '',
+      scopeId: scope.id,
+    });
 
     this.logger.log(
       {
@@ -176,7 +204,11 @@ export class UniqueService {
 
   // SECTION: Unique API Methods
 
+  @Span()
   private async fetchUserForScopeAccess(email: string): Promise<PublicUserResult | null> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('email', email);
+
     const baseUrl = this.config.get('unique.apiBaseUrl', { infer: true });
 
     // Create two parallel requests - one with email param, one with userName param (both using email value)
@@ -226,6 +258,10 @@ export class UniqueService {
     // Return whichever found a user (prefer email match if both succeed)
     const userFound = userByEmail ?? userByUserName;
 
+    span?.setAttribute('user_found', !!userFound);
+    span?.setAttribute('found_by_email', !!userByEmail);
+    span?.setAttribute('found_by_username', !!userByUserName);
+
     this.logger.debug(
       {
         found: !!userFound,
@@ -239,7 +275,11 @@ export class UniqueService {
     return userFound;
   }
 
+  @Span()
   private async createScope(path: string): Promise<Scope> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('path', path);
+
     const payload = PublicCreateScopeRequestSchema.encode({ paths: [path] });
     const endpoint = new URL('folder', this.config.get('unique.apiBaseUrl', { infer: true }));
 
@@ -272,6 +312,9 @@ export class UniqueService {
 
     // biome-ignore lint/style/noNonNullAssertion: we assert with zod above
     const createdScope = result.createdFolders[0]!;
+    span?.setAttribute('scope_id', createdScope.id);
+    span?.setAttribute('folders_created_count', result.createdFolders.length);
+
     this.logger.log(
       { scopeId: createdScope.id, foldersCreated: result.createdFolders.length },
       'Successfully created new organizational scope in Unique system',
@@ -284,10 +327,15 @@ export class UniqueService {
     return createdScope;
   }
 
+  @Span()
   private async addScopeAccesses(
     scope: string,
     accesses: PublicScopeAccessSchema[],
   ): Promise<PublicAddScopeAccessResult> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('scope_id', scope);
+    span?.setAttribute('access_count', accesses.length);
+
     const payload = PublicAddScopeAccessRequestSchema.encode({
       applyToSubScopes: false,
       scopeId: scope,
@@ -330,9 +378,17 @@ export class UniqueService {
     return result;
   }
 
+  @Span()
   private async upsertContent(
     content: PublicContentUpsertRequest,
   ): Promise<PublicContentUpsertResult> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('scope_id', content.scopeId ?? '');
+    span?.setAttribute('content_key', content.input.key);
+    span?.setAttribute('mime_type', content.input.mimeType);
+    span?.setAttribute('store_internally', content.storeInternally);
+    span?.setAttribute('has_file_url', !!content.fileUrl);
+
     const payload = PublicContentUpsertRequestSchema.encode(content);
     const endpoint = new URL(
       'content/upsert',
@@ -392,13 +448,17 @@ export class UniqueService {
     };
   }
 
+  @Span()
   private async uploadToStorage(
     writeUrl: string,
     content: ReadableStream<Uint8Array<ArrayBuffer>>,
   ): Promise<void> {
+    const span = this.trace.getSpan();
+
     // Extract only the storage account hostname for logging (no query params or paths with sensitive data)
     const urlObj = new URL(writeUrl);
     const storageEndpoint = `${urlObj.protocol}//${urlObj.hostname}`;
+    span?.setAttribute('storage_endpoint', storageEndpoint);
 
     this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
 
@@ -416,6 +476,8 @@ export class UniqueService {
     });
 
     if (!response.ok) {
+      span?.setAttribute('error', true);
+      span?.setAttribute('http_status', response.status);
       this.logger.error(
         { status: response.status, storageEndpoint },
         'Unique storage system rejected content upload with error',
@@ -423,6 +485,7 @@ export class UniqueService {
       assert.fail(`Unique Public API storage return an error: ${response.status}`);
     }
 
+    span?.setAttribute('http_status', response.status);
     this.logger.debug(
       { storageEndpoint },
       'Successfully completed content upload to storage system',
