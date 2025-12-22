@@ -21,10 +21,16 @@ describe('MicrosoftAuthenticationService', () => {
   let mockConfigService: {
     get: ReturnType<typeof vi.fn>;
   };
+  let mockTenantConfigLoaderService: {
+    loadTenantConfig: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     mockConfigService = {
       get: vi.fn(),
+    };
+    mockTenantConfigLoaderService = {
+      loadTenantConfig: vi.fn().mockReturnValue({}),
     };
   });
 
@@ -42,7 +48,10 @@ describe('MicrosoftAuthenticationService', () => {
       return undefined;
     });
 
-    const service = new MicrosoftAuthenticationService(mockConfigService as never);
+    const service = new MicrosoftAuthenticationService(
+      mockConfigService as never,
+      mockTenantConfigLoaderService as never,
+    );
 
     expect(service).toBeDefined();
     // biome-ignore lint/suspicious/noExplicitAny: Access private property for testing
@@ -61,7 +70,10 @@ describe('MicrosoftAuthenticationService', () => {
       return undefined;
     });
 
-    const service = new MicrosoftAuthenticationService(mockConfigService as never);
+    const service = new MicrosoftAuthenticationService(
+      mockConfigService as never,
+      mockTenantConfigLoaderService as never,
+    );
 
     expect(service).toBeDefined();
     // biome-ignore lint/suspicious/noExplicitAny: Access private property for testing
@@ -89,7 +101,10 @@ describe('MicrosoftAuthenticationService', () => {
       return undefined;
     });
 
-    const service = new MicrosoftAuthenticationService(mockConfigService as never);
+    const service = new MicrosoftAuthenticationService(
+      mockConfigService as never,
+      mockTenantConfigLoaderService as never,
+    );
     // biome-ignore lint/suspicious/noExplicitAny: Override private property for testing
     (service as any).strategy = mockStrategy;
 

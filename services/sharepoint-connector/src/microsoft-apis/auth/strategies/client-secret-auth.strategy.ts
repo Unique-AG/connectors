@@ -1,8 +1,7 @@
 import assert from 'node:assert';
 import { ConfidentialClientApplication, type Configuration } from '@azure/msal-node';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../../../config';
+import { TenantConfig } from '../../../config/tenant-config.schema';
 import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenAcquisitionResult } from '../types';
 import { AuthStrategy } from './auth-strategy.interface';
@@ -12,26 +11,25 @@ export class ClientSecretAuthStrategy implements AuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {
-    const sharePointConfig = this.configService.get('sharepoint', { infer: true });
-
+  public constructor(tenantConfig: TenantConfig) {
     assert.strictEqual(
-      sharePointConfig.authMode,
+      tenantConfig.authStrategy,
       'client-secret',
-      'ClientSecretAuthStrategy called but authentication mode is not "client-secret"',
+      `ClientSecretAuthStrategy called but authentication mode is not "client-secret" (was: ${tenantConfig.authStrategy})`,
     );
 
-    const {
-      authTenantId: tenantId,
-      authClientId: clientId,
-      authClientSecret: clientSecret,
-    } = sharePointConfig;
+    const tenantId = tenantConfig.tenantId;
+    const clientId = tenantConfig.clientId;
+    const clientSecretValue = tenantConfig.clientSecret;
+
+    assert.ok(clientId, 'Client ID must be provided for client-secret authentication');
+    assert.ok(clientSecretValue, 'Client secret must be provided for client-secret authentication');
 
     const msalConfig: Configuration = {
       auth: {
         clientId,
         authority: `https://login.microsoftonline.com/${tenantId}`,
-        clientSecret: clientSecret.value,
+        clientSecret: clientSecretValue,
       },
     };
 

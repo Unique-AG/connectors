@@ -4,6 +4,7 @@ import { type Counter, type Histogram } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
 import { Client, Dispatcher, errors, interceptors } from 'undici';
 import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import {
   createApiMethodExtractor,
   getHttpStatusCodeClass,
@@ -31,9 +32,13 @@ export class IngestionHttpClient implements OnModuleDestroy {
     private readonly spcUniqueApiRequestDurationSeconds: Histogram,
     @Inject(SPC_UNIQUE_REST_API_SLOW_REQUESTS_TOTAL)
     private readonly spcUniqueApiSlowRequestsTotal: Counter,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const uniqueConfig = this.configService.get('unique', { infer: true });
+
     const ingestionUrl = new URL(
-      this.configService.get('unique.ingestionServiceBaseUrl', { infer: true }),
+      tenantConfig.ingestionServiceBaseUrl || uniqueConfig.ingestionServiceBaseUrl,
     );
     const interceptorsInCallingOrder = [
       interceptors.redirect({
@@ -63,9 +68,8 @@ export class IngestionHttpClient implements OnModuleDestroy {
     });
     this.httpClient = httpClient.compose(interceptorsInCallingOrder.reverse());
 
-    const apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
-      infer: true,
-    });
+    const apiRateLimitPerMinute =
+      tenantConfig.uniqueApiRateLimitPerMinute || uniqueConfig.apiRateLimitPerMinute;
 
     this.extractApiMethod = createApiMethodExtractor([
       'v2',
@@ -177,10 +181,20 @@ export class IngestionHttpClient implements OnModuleDestroy {
   }
 
   private async getHeaders(): Promise<Record<string, string>> {
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
     const uniqueConfig = this.configService.get('unique', { infer: true });
+
+    const serviceAuthMode = tenantConfig.uniqueServiceAuthMode || uniqueConfig.serviceAuthMode;
+
+    const serviceExtraHeaders =
+      tenantConfig.uniqueServiceExtraHeaders ||
+      (uniqueConfig.serviceAuthMode === 'cluster_local'
+        ? uniqueConfig.serviceExtraHeaders
+        : undefined);
+
     const clientExtraHeaders =
-      uniqueConfig.serviceAuthMode === 'cluster_local'
-        ? { 'x-service-id': 'sharepoint-connector', ...uniqueConfig.serviceExtraHeaders }
+      serviceAuthMode === 'cluster_local'
+        ? { 'x-service-id': 'sharepoint-connector', ...serviceExtraHeaders }
         : { Authorization: `Bearer ${await this.uniqueAuthService.getToken()}` };
 
     return {

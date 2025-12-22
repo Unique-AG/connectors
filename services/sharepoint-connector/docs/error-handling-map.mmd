@@ -1,0 +1,93 @@
+flowchart TD
+  %% Entry & scheduler
+  subgraph Entry
+    Cron[SchedulerService.runScheduledScan] -->|try| Sync[SharepointSynchronizationService.synchronize]
+    Cron -->|isShuttingDown| SkipShutdown[Return; skip this scheduled run]
+  end
+
+  subgraph ConcurrencyGuard
+    Sync --> IsScanning{isScanning?}
+    IsScanning -->|yes| SkipScan[Return; prior scan in progress]
+    IsScanning -->|no| RootInit[ScopeManagementService.initializeRootScope]
+    RootInit -->|fail| RootAbort[Return; run ends before sites]
+    RootInit --> SiteLoop[for each siteId]
+  end
+
+  %% Per-site flow
+  subgraph SiteScan
+    SiteLoop --> FetchName[GraphApiService.getSiteName]
+    FetchName -->|fail| FatalSite[Throw; scan stops this run]
+    FetchName --> FetchItems[GraphApiService.getAllSiteItems]
+    FetchItems -->|unexpected throw| FatalSite
+    FetchItems --> BranchPartial[ASPX/drive branch may fail -> partial results logged; no retry]
+    FetchItems --> HasItems{items length > 0?}
+    HasItems -->|no| SiteSkip[Continue with next site]
+    HasItems --> ScopeMode{ingestionMode is Recursive?}
+    ScopeMode -->|no| Content[ContentSyncService.syncContentForSite]
+    ScopeMode -->|yes| ScopeCreate[ScopeManagementService.batchCreateScopes]
+    ScopeCreate -->|fail| ScopeCont[Continue with next site]
+    ScopeCreate --> Content
+  end
+
+  %% Content diff and moves
+  subgraph ContentFlow
+    Content --> Diff[performFileDiff + validateNoAccidentalFullDeletion]
+    Diff -->|HTTP or guard fail| SiteFail[Continue with next site]
+    Diff --> Delete[deleteRemovedFiles]
+    Delete -->|fetch fail| DelSkip[Skip deletions; continue run]
+    Delete -->|per-file fail| DelWarn[Continue other deletions]
+    Delete --> Moves[FileMoveProcessor.processFileMoves]
+    DelSkip --> Moves
+    DelWarn --> Moves
+    Moves -->|fetch ingested fail| SiteFail
+    Moves -->|per-move fail| MoveWarn[Continue other moves]
+    MoveWarn --> LimitGuard
+    Moves --> LimitGuard[max files gate after moves/deletes]
+    LimitGuard -->|assert fail| SiteFail
+    LimitGuard --> HasChanges{any new/updated files?}
+    HasChanges -->|no| PermGate
+    HasChanges -->|yes| Orchestrator[ItemProcessingOrchestratorService.processItems]
+  end
+
+  %% Per-item pipeline
+  subgraph PipelineFlow
+    Content --> Orchestrator[ItemProcessingOrchestratorService.processItems]
+    Orchestrator --> Pipeline[ProcessingPipelineService.processItem]
+    Pipeline --> StepOK[Step success]
+    Pipeline --> StepFail[Return failure; continue other files]
+  end
+
+  %% Permissions branch
+  subgraph Permissions
+    Content --> PermGate{syncMode is content_and_permissions?}
+    PermGate -->|no| SiteSuccess[Next site]
+    PermGate -->|yes| Perms[PermissionsSyncService.syncPermissionsForSite\n(folder perms only if ingestionMode is Recursive)]
+    Perms -->|error| PermFail[Continue with next site]
+    Perms --> PermOK[Permissions ok]
+    PermOK --> SiteSuccess
+  end
+
+  %% Looping outcomes
+  SiteSkip --> SiteLoop
+  ScopeCont --> SiteLoop
+  MoveWarn --> SiteLoop
+  StepOK --> SiteLoop
+  StepFail --> SiteLoop
+  PermFail --> SiteLoop
+  SiteFail --> SiteLoop
+  SiteSuccess --> SiteLoop
+  RootAbort -->|run ends; next cron| Cron
+
+  %% Failure capture (run ends on fatal path)
+  FatalSite --> ScanStop[Scan stops this run; outer catch rethrows]
+
+  class SkipShutdown,SkipScan,SiteSkip,ScopeCont,DelSkip,DelWarn,MoveWarn,StepFail,PermFail,BranchPartial warn
+  class SiteFail,FatalSite,RootAbort,LimitGuard,ScanStop fail
+  class StepOK,SiteSuccess,PermOK success
+  class Cron,Sync,IsScanning,RootInit,SiteLoop,FetchName,FetchItems,ScopeMode,ScopeCreate,Content,Diff,Delete,Moves,Orchestrator,Pipeline,PermGate,Perms neutral
+
+  %% Legend: success=green, warning/continue=yellow, failure/throw=red, neutral=gray
+  classDef success fill:#c6f6d5,stroke:#2f855a,color:#22543d
+  classDef warn fill:#fefcbf,stroke:#d69e2e,color:#744210
+  classDef fail fill:#fed7d7,stroke:#c53030,color:#742a2a
+  classDef neutral fill:#e2e8f0,stroke:#475569,color:#1f2937

@@ -45,10 +45,21 @@ export class TenantConfigLoaderService {
       assert.fail(`Unknown site configuration source: ${tenantConfig.sitesConfigurationSource}`);
     }
 
+    // Apply tenant-level defaults to site configs if they are missing
+    this.cachedConfigs = this.cachedConfigs.map((siteConfig) => ({
+      ...siteConfig,
+      ingestionMode: siteConfig.ingestionMode ?? tenantConfig.ingestionMode,
+      scopeId: siteConfig.scopeId ?? tenantConfig.scopeId,
+      maxIngestedFiles: siteConfig.maxIngestedFiles ?? tenantConfig.maxIngestedFiles,
+      storeInternally: siteConfig.storeInternally ?? tenantConfig.storeInternally,
+      inheritMode: siteConfig.inheritMode ?? tenantConfig.inheritMode,
+      syncMode: siteConfig.syncMode ?? tenantConfig.syncMode,
+    }));
+
     return this.cachedConfigs;
   }
 
-  private loadTenantConfig(): TenantConfig {
+  public loadTenantConfig(): TenantConfig {
     if (this.cachedTenantConfig !== null) {
       return this.cachedTenantConfig;
     }
@@ -66,7 +77,7 @@ export class TenantConfigLoaderService {
     assert.ok(files.length > 0, `No tenant configuration files found in ${configPath}`);
 
     // TODO to change when implementing multi tenant support
-    const tenantFile = files[0]; 
+    const tenantFile = files[0];
     assert.ok(tenantFile, `Failed to get first tenant config file from ${configPath}`);
 
     if (files.length > 1) {
@@ -97,27 +108,27 @@ export class TenantConfigLoaderService {
 
   private loadSiteConfigsFromInline(tenantConfig: TenantConfig): SiteConfig[] {
     assert.ok(
-      tenantConfig.sitesConfig && tenantConfig.sitesConfig.length > 0,
+      tenantConfig.sites && tenantConfig.sites.length > 0,
       'No site configurations found in tenant config with inline source',
     );
 
-    this.logger.debug(`Loaded ${tenantConfig.sitesConfig.length} site configs from inline tenant config`);
+    this.logger.debug(`Loaded ${tenantConfig.sites.length} site configs from inline tenant config`);
 
     // TODO Check this logic for filtering active configs. We may return all and let caller take action on status.
     // TODO Check how we handle site deletions
     // TODO extract sync status to enum
-    const activeConfigs = tenantConfig.sitesConfig.filter((config) => config.syncStatus === 'active');
+    const activeConfigs = tenantConfig.sites.filter((config) => config.syncStatus === 'active');
     return activeConfigs;
   }
 
   private async loadSiteConfigsFromSharePointList(
     tenantConfig: TenantConfig,
   ): Promise<SiteConfig[]> {
-    const listUrl = tenantConfig.sitesConfigSourceListUrl;
+    const listUrl = tenantConfig.sitesConfigListUrl;
 
     assert.ok(
       listUrl,
-      'sitesConfigSourceListUrl must be specified in tenant config when using sharePointList source',
+      'sitesConfigListUrl must be specified in tenant config when using sharePointList source',
     );
 
     this.logger.log(

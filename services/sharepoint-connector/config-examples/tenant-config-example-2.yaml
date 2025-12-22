@@ -32,4 +32,4 @@ uniqueApiRateLimitPerMinute: 100
 # - processingMaxFilesToScan (optional number)
 # - processingCronInterval (optional cron expression)
 sitesConfigurationSource: "sharePointList"
-sitesConfigSourceListUrl: "https://uniqueapp.sharepoint.com/sites/QA/Lists/Sharepoint%20Sites%20to%20Sync/AllItems.aspx"
+sitesConfigListUrl: "https://uniqueapp.sharepoint.com/sites/QA/Lists/Sharepoint%20Sites%20to%20Sync/AllItems.aspx"

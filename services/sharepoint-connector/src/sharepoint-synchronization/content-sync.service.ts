@@ -87,6 +87,7 @@ export class ContentSyncService {
       await this.deleteRemovedFiles(siteId, diffResult.deletedFiles);
     }
 
+    // TODO: Document this limitation / Find a solution to also move files when knowledge base scopeId changes
     // 2. Handle moved files (update scopes)
     if (diffResult.movedFiles.length > 0) {
       await this.fileMoveProcessor.processFileMoves(diffResult.movedFiles, items, scopes, context);

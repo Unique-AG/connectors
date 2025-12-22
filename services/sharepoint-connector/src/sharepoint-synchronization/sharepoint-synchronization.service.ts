@@ -73,7 +73,15 @@ export class SharepointSynchronizationService {
 
       // Process each site configuration
       for (const { siteId, config } of sitesToProcess) {
-        await this.processSite(siteId, config, syncStartTime);
+        if (!config.scopeId || !config.ingestionMode) {
+          this.logger.error(`Missing scopeId or ingestionMode for site ${siteId}. Skipping.`);
+          continue;
+        }
+        await this.processSite(
+          siteId,
+          config as SiteConfig & { scopeId: string; ingestionMode: IngestionMode },
+          syncStartTime,
+        );
       }
 
       this.logger.log(
@@ -101,7 +109,7 @@ export class SharepointSynchronizationService {
 
   private async processSite(
     siteId: string,
-    siteConfig: SiteConfig,
+    siteConfig: SiteConfig & { scopeId: string; ingestionMode: IngestionMode },
     _fullSyncStartTime: number,
   ): Promise<void> {
     const siteSyncStartTime = Date.now();
@@ -118,6 +126,7 @@ export class SharepointSynchronizationService {
       // Initialize root scope and context (once per site)
       let baseContext: BaseSyncContext;
       try {
+        // todo: externalIds will be duplicated when we add another scopeId as rootScope - we might want to set the kb path also in the external id
         baseContext = await this.scopeManagementService.initializeRootScope(scopeId, ingestionMode);
       } catch (error) {
         this.logger.error({

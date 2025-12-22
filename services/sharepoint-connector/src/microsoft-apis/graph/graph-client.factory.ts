@@ -14,6 +14,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram } from '@opentelemetry/api';
 import type { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import {
   SPC_MS_GRAPH_API_REQUEST_DURATION_SECONDS,
   SPC_MS_GRAPH_API_SLOW_REQUESTS_TOTAL,
@@ -30,6 +31,7 @@ export class GraphClientFactory {
   public constructor(
     private readonly graphAuthenticationService: GraphAuthenticationService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     @Inject(SPC_MS_GRAPH_API_REQUEST_DURATION_SECONDS)
     private readonly spcGraphApiRequestDurationSeconds: Histogram,
     @Inject(SPC_MS_GRAPH_API_THROTTLE_EVENTS_TOTAL)
@@ -49,6 +51,7 @@ export class GraphClientFactory {
       this.spcGraphApiThrottleEventsTotal,
       this.spcGraphApiSlowRequestsTotal,
       this.configService,
+      this.tenantConfigLoaderService,
     );
     const httpMessageHandler = new HTTPMessageHandler();
 

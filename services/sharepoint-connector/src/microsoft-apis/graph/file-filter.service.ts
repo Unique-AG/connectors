@@ -1,15 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { isModerationStatusApproved } from '../../constants/moderation-status.constants';
 import { DriveItem, ListItem } from './types/sharepoint.types';
 
 @Injectable()
 export class FileFilterService {
-  public constructor(private readonly configService: ConfigService<Config, true>) {}
+  public constructor(private readonly tenantConfigLoaderService: TenantConfigLoaderService) {}
 
   public isListItemValidForIngestion(fields: ListItem['fields']) {
-    const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const syncColumnName = tenantConfig.sites?.[0]?.syncColumnName;
+
+    if (!syncColumnName) {
+      return false;
+    }
+
     return Boolean(
       fields.FileLeafRef?.toLowerCase().endsWith('.aspx') &&
         fields[syncColumnName] === true &&
@@ -19,9 +24,10 @@ export class FileFilterService {
 
   public isFileValidForIngestion(item: DriveItem): boolean {
     const fields = item.listItem?.fields as Record<string, unknown>;
-    const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
-    const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
-    const maxFileSizeBytes = this.configService.get('processing.maxFileSizeBytes', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const syncColumnName = tenantConfig.sites?.[0]?.syncColumnName;
+    const allowedMimeTypes = tenantConfig.processingAllowedMimeTypes;
+    const maxFileSizeBytes = tenantConfig.processingMaxFileSizeBytes;
 
     if (
       !item.file ||
@@ -31,7 +37,10 @@ export class FileFilterService {
       !item.webUrl ||
       !item.lastModifiedDateTime ||
       !item.listItem?.fields ||
-      item.size === 0
+      item.size === 0 ||
+      !syncColumnName ||
+      !allowedMimeTypes ||
+      maxFileSizeBytes === undefined
     ) {
       return false;
     }

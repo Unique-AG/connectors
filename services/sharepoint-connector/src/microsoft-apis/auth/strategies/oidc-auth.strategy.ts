@@ -1,9 +1,8 @@
 import assert from 'node:assert';
 import { DefaultAzureCredential } from '@azure/identity';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
-import { Config } from '../../../config';
+import { TenantConfig } from '../../../config/tenant-config.schema';
 import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenAcquisitionResult } from '../types';
 import { AuthStrategy } from './auth-strategy.interface';
@@ -18,16 +17,14 @@ export class OidcAuthStrategy implements AuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly credential: DefaultAzureCredential;
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {
-    const sharePointConfig = this.configService.get('sharepoint', { infer: true });
-
+  public constructor(tenantConfig: TenantConfig) {
     assert.strictEqual(
-      sharePointConfig.authMode,
+      tenantConfig.authStrategy,
       'oidc',
-      'OidcAuthStrategy called but authentication mode is not "oidc"',
+      `OidcAuthStrategy called but authentication mode is not "oidc" (was: ${tenantConfig.authStrategy})`,
     );
 
-    this.credential = new DefaultAzureCredential({ tenantId: sharePointConfig.authTenantId });
+    this.credential = new DefaultAzureCredential({ tenantId: tenantConfig.tenantId });
   }
 
   public async acquireNewToken(scopes: string[]): Promise<TokenAcquisitionResult> {

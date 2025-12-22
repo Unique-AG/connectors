@@ -6,6 +6,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
@@ -39,18 +40,18 @@ export class GraphApiService {
     private readonly configService: ConfigService<Config, true>,
     private readonly fileFilterService: FileFilterService,
     private readonly bottleneckFactory: BottleneckFactory,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
     this.graphClient = this.graphClientFactory.createClient();
 
-    const msGraphRateLimitPerMinute = this.configService.get(
-      'sharepoint.graphApiRateLimitPerMinute',
-      { infer: true },
-    );
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    assert.ok(tenantConfig.graphApiRateLimitPerMinute, 'Graph API rate limit must be provided');
+    const rateLimit: number = tenantConfig.graphApiRateLimitPerMinute;
 
     this.limiter = this.bottleneckFactory.createLimiter(
       {
-        reservoir: msGraphRateLimitPerMinute,
-        reservoirRefreshAmount: msGraphRateLimitPerMinute,
+        reservoir: rateLimit,
+        reservoirRefreshAmount: rateLimit,
         reservoirRefreshInterval: 60000,
       },
       'Graph API',
@@ -102,7 +103,8 @@ export class GraphApiService {
     siteId: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const maxFilesToScan = tenantConfig.processingMaxFilesToScan;
     const sharepointContentFilesToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
     let totalScanned = 0;
@@ -178,7 +180,8 @@ export class GraphApiService {
 
   public async getAspxPagesForSite(siteId: string): Promise<SharepointContentItem[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
-    const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const maxFilesToScan = tenantConfig.processingMaxFilesToScan;
     const lists = await this.getSiteLists(siteId);
 
     if (maxFilesToScan) {
@@ -238,7 +241,8 @@ export class GraphApiService {
     listId: string,
     maxItemsToScan?: number,
   ): Promise<SharepointContentItem[]> {
-    const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const syncColumnName = tenantConfig.sites?.find((s) => s.siteId === siteId)?.syncColumnName;
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const aspxItems: SharepointContentItem[] = [];

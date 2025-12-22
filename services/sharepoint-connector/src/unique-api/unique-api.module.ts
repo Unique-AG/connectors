@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram } from '@opentelemetry/api';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import {
   SPC_UNIQUE_GRAPHQL_API_REQUEST_DURATION_SECONDS,
   SPC_UNIQUE_GRAPHQL_API_SLOW_REQUESTS_TOTAL,
@@ -44,6 +45,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
         bottleneckFactory: BottleneckFactory,
         spcUniqueGraphqlApiRequestDurationSeconds: Histogram,
         spcUniqueGraphqlApiSlowRequestsTotal: Counter,
+        tenantConfigLoaderService: TenantConfigLoaderService,
       ) => {
         return new UniqueGraphqlClient(
           'scopeManagement',
@@ -52,6 +54,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
           bottleneckFactory,
           spcUniqueGraphqlApiRequestDurationSeconds,
           spcUniqueGraphqlApiSlowRequestsTotal,
+          tenantConfigLoaderService,
         );
       },
       inject: [
@@ -60,6 +63,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
         BottleneckFactory,
         SPC_UNIQUE_GRAPHQL_API_REQUEST_DURATION_SECONDS,
         SPC_UNIQUE_GRAPHQL_API_SLOW_REQUESTS_TOTAL,
+        TenantConfigLoaderService,
       ],
     },
     {
@@ -70,6 +74,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
         bottleneckFactory: BottleneckFactory,
         spcUniqueGraphqlApiRequestDurationSeconds: Histogram,
         spcUniqueGraphqlApiSlowRequestsTotal: Counter,
+        tenantConfigLoaderService: TenantConfigLoaderService,
       ) => {
         return new UniqueGraphqlClient(
           'ingestion',
@@ -78,6 +83,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
           bottleneckFactory,
           spcUniqueGraphqlApiRequestDurationSeconds,
           spcUniqueGraphqlApiSlowRequestsTotal,
+          tenantConfigLoaderService,
         );
       },
       inject: [
@@ -86,6 +92,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
         BottleneckFactory,
         SPC_UNIQUE_GRAPHQL_API_REQUEST_DURATION_SECONDS,
         SPC_UNIQUE_GRAPHQL_API_SLOW_REQUESTS_TOTAL,
+        TenantConfigLoaderService,
       ],
     },
   ],

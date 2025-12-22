@@ -25,4 +25,4 @@ sites: []
 
 # Alternative: Load site configs from SharePoint list
 # sitesConfigurationSource: "sharePointList"
-# sitesConfigSourceListUrl: "https://uniqueapp.sharepoint.com/sites/QA/Lists/Sharepoint%20Sites%20to%20Sync/AllItems.aspx"
+# sitesConfigListUrl: "https://uniqueapp.sharepoint.com/sites/QA/Lists/Sharepoint%20Sites%20to%20Sync/AllItems.aspx"

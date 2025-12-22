@@ -41,7 +41,7 @@ export const appConfig = registerConfig('app', AppConfigSchema, {
     'PORT',
     'NODE_ENV',
     'LOGS_DIAGNOSTICS_DATA_POLICY',
-    'SHAREPOINT_TENANT_CONFIG_DIRECTORY',
+    'TENANT_CONFIG_DIRECTORY',
   ]),
 });
 

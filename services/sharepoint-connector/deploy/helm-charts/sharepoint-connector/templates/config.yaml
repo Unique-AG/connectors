@@ -26,14 +26,9 @@ data:
   {{- if .Values.connectorConfig.sharepoint.syncColumnName }}
   SHAREPOINT_SYNC_COLUMN_NAME: {{ .Values.connectorConfig.sharepoint.syncColumnName | quote }}
   {{- end }}
-  # Site configuration source
+  # Tenant configuration
   {{- if .Values.connectorConfig.sharepoint.sitesConfigurationSource }}
-  SHAREPOINT_SITES_CONFIGURATION_SOURCE: {{ .Values.connectorConfig.sharepoint.sitesConfigurationSource.source | quote }}
-  {{- if eq .Values.connectorConfig.sharepoint.sitesConfigurationSource.source "configDirectory" }}
-  SHAREPOINT_SITES_CONFIG_PATH: {{ .Values.connectorConfig.sharepoint.sitesConfigurationSource.configPath | quote }}
-  {{- else if eq .Values.connectorConfig.sharepoint.sitesConfigurationSource.source "sharePointList" }}
-  SHAREPOINT_SITES_CONFIG_SOURCE_LIST_URL: {{ .Values.connectorConfig.sharepoint.sitesConfigurationSource.listUrl | quote }}
-  {{- end }}
+  TENANT_CONFIG_DIRECTORY: {{ .Values.connectorConfig.sharepoint.sitesConfigurationSource.configPath | quote }}
   {{- end }}
   # Unique config
   UNIQUE_SCOPE_ID: {{ .Values.connectorConfig.unique.scopeId | quote }}

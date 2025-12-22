@@ -5,9 +5,10 @@ import {
   Middleware,
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram } from '@opentelemetry/api';
-import type { Config } from '../../../config';
+import { Config } from '../../../config';
+import { TenantConfigLoaderService } from '../../../config/tenant-config-loader.service';
 import {
   createApiMethodExtractor,
   getHttpStatusCodeClass,
@@ -34,9 +35,11 @@ export class MetricsMiddleware implements Middleware {
     private readonly spcGraphApiThrottleEventsTotal: Counter,
     private readonly spcGraphApiSlowRequestsTotal: Counter,
     configService: ConfigService<Config, true>,
+    tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(configService);
-    this.msTenantId = configService.get('sharepoint.authTenantId', { infer: true });
+    const tenantConfig = tenantConfigLoaderService.loadTenantConfig();
+    this.msTenantId = tenantConfig.tenantId;
 
     this.extractApiMethod = createApiMethodExtractor([
       'sites',

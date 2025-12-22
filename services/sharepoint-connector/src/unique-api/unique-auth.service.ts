@@ -2,6 +2,7 @@ import * as assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { HttpClientService } from '../shared/services/http-client.service';
 import { sanitizeError } from '../utils/normalize-error';
 
@@ -15,6 +16,7 @@ export class UniqueAuthService {
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly httpClientService: HttpClientService,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {}
 
   public async getToken(): Promise<string> {
@@ -22,15 +24,33 @@ export class UniqueAuthService {
       return this.cachedToken;
     }
 
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
     const uniqueConfig = this.configService.get('unique', { infer: true });
+
+    const serviceAuthMode = tenantConfig.uniqueServiceAuthMode || uniqueConfig.serviceAuthMode;
+
     assert.strictEqual(
-      uniqueConfig.serviceAuthMode,
+      serviceAuthMode,
       'external',
       'UniqueAuthService called but serviceAuthMode is not "external"',
     );
 
-    const { zitadelOauthTokenUrl, zitadelClientId, zitadelClientSecret, zitadelProjectId } =
-      uniqueConfig;
+    // When serviceAuthMode is 'external', the uniqueConfig union should be the externalConfig branch.
+    // However, TypeScript doesn't automatically narrow it here across the tenantConfig fallback.
+    const externalConfig = uniqueConfig.serviceAuthMode === 'external' ? uniqueConfig : undefined;
+
+    const zitadelOauthTokenUrl =
+      tenantConfig.uniqueZitadelOauthTokenUrl || externalConfig?.zitadelOauthTokenUrl;
+    const zitadelClientId = tenantConfig.uniqueZitadelClientId || externalConfig?.zitadelClientId;
+    const zitadelClientSecretValue =
+      tenantConfig.uniqueZitadelClientSecret || externalConfig?.zitadelClientSecret.value;
+    const zitadelProjectId =
+      tenantConfig.uniqueZitadelProjectId || externalConfig?.zitadelProjectId;
+
+    assert.ok(zitadelOauthTokenUrl, 'Zitadel OAuth token URL must be provided');
+    assert.ok(zitadelClientId, 'Zitadel client ID must be provided');
+    assert.ok(zitadelClientSecretValue, 'Zitadel client secret must be provided');
+    assert.ok(zitadelProjectId, 'Zitadel project ID must be provided');
 
     const params = new URLSearchParams({
       scope:
@@ -40,7 +60,7 @@ export class UniqueAuthService {
     });
 
     try {
-      const basicAuth = Buffer.from(`${zitadelClientId}:${zitadelClientSecret.value}`).toString(
+      const basicAuth = Buffer.from(`${zitadelClientId}:${zitadelClientSecretValue}`).toString(
         'base64',
       );
       const { statusCode, body } = await this.httpClientService.request(zitadelOauthTokenUrl, {

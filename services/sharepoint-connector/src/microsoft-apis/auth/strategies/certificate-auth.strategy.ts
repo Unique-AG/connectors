@@ -3,8 +3,7 @@ import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { ConfidentialClientApplication, type Configuration } from '@azure/msal-node';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../../../config';
+import { TenantConfig } from '../../../config/tenant-config.schema';
 import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenAcquisitionResult } from '../types';
 import { AuthStrategy } from './auth-strategy.interface';
@@ -14,23 +13,22 @@ export class CertificateAuthStrategy implements AuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {
-    const sharePointConfig = this.configService.get('sharepoint', { infer: true });
-
+  public constructor(tenantConfig: TenantConfig) {
     assert.strictEqual(
-      sharePointConfig.authMode,
+      tenantConfig.authStrategy,
       'certificate',
-      'CertificateAuthStrategy called but authentication mode is not "certificate"',
+      `CertificateAuthStrategy called but authentication mode is not "certificate" (was: ${tenantConfig.authStrategy})`,
     );
 
-    const {
-      authTenantId: tenantId,
-      authClientId: clientId,
-      authPrivateKeyPath: privateKeyPath,
-      authThumbprintSha1: thumbprint,
-      authThumbprintSha256: thumbprintSha256,
-      authPrivateKeyPassword: privateKeyPassword,
-    } = sharePointConfig;
+    const tenantId = tenantConfig.tenantId;
+    const clientId = tenantConfig.clientId;
+    const privateKeyPath = tenantConfig.authPrivateKeyPath;
+    const thumbprint = tenantConfig.authThumbprintSha1;
+    const thumbprintSha256 = tenantConfig.authThumbprintSha256;
+    const privateKeyPassword = tenantConfig.authPrivateKeyPassword;
+
+    assert.ok(privateKeyPath, 'Private key path must be provided for certificate authentication');
+    assert.ok(clientId, 'Client ID must be provided for certificate authentication');
 
     const privateKeyRaw = readFileSync(privateKeyPath, 'utf8').trim();
 
