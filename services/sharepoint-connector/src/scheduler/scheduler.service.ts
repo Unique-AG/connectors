@@ -41,7 +41,12 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private setupScheduledScan(): void {
-    const cronExpression = this.configService.get('processing.scanIntervalCron', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const cronExpression = tenantConfig.processingScanIntervalCron;
+    if (!cronExpression) {
+      this.logger.warn('No cron expression configured for scheduled scan, skipping setup');
+      return;
+    }
     this.logger.log(`Scheduled scan configured with cron expression: ${cronExpression}`);
 
     const job = new CronJob(cronExpression, () => {

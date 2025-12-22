@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import { toSnakeCase } from 'remeda';
-import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
+import type { SiteConfig } from '../config/tenant-config.schema';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
@@ -26,7 +26,7 @@ export class ProcessingPipelineService {
   private readonly shouldConcealLogs: boolean;
 
   public constructor(
-    private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     private readonly aspxProcessingStep: AspxProcessingStep,
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly uploadContentStep: UploadContentStep,
@@ -34,15 +34,15 @@ export class ProcessingPipelineService {
     @Inject(SPC_INGESTION_FILE_PROCESSED_TOTAL)
     private readonly spcIngestionFileProcessedTotal: Counter,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
     this.pipelineSteps = [
       this.aspxProcessingStep,
       this.contentRegistrationStep,
       this.uploadContentStep,
       this.ingestionFinalizationStep,
     ];
-    this.stepTimeoutMs =
-      this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    this.stepTimeoutMs = (tenantConfig.processingStepTimeoutSeconds || 300) * 1000;
   }
 
   public async processItem(
@@ -50,6 +50,7 @@ export class ProcessingPipelineService {
     scopeId: string,
     fileStatus: 'new' | 'updated',
     syncContext: SharepointSyncContext,
+    siteConfig: SiteConfig,
   ): Promise<PipelineResult> {
     const startTime = new Date();
     const correlationId = randomUUID();
@@ -63,6 +64,7 @@ export class ProcessingPipelineService {
       scopeId,
       fileStatus,
       syncContext,
+      siteConfig,
     };
 
     const logSiteId = this.shouldConcealLogs ? smear(syncContext.siteId) : syncContext.siteId;

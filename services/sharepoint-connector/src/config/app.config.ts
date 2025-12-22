@@ -30,12 +30,7 @@ export const AppConfigSchema = z
   }));
 
 export const appConfig = registerConfig('app', AppConfigSchema, {
-  whitelistKeys: new Set([
-    'LOG_LEVEL',
-    'PORT',
-    'NODE_ENV',
-    'TENANT_CONFIG_DIRECTORY',
-  ]),
+  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'TENANT_CONFIG_DIRECTORY']),
 });
 
 export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;

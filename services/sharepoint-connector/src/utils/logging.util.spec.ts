@@ -1,6 +1,4 @@
-import { ConfigService } from '@nestjs/config';
 import { describe, expect, it } from 'vitest';
-import type { Config } from '../config';
 import {
   concealIngestionKey,
   redact,
@@ -235,7 +233,6 @@ describe('logging utilities', () => {
 
       shouldConcealLogs(mockTenantConfigLoaderService);
       expect(calledLoadTenantConfig).toBe(true);
-      expect(capturedOptions).toEqual({ infer: true });
     });
   });
 });

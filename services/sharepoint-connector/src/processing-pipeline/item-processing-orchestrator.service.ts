@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
-import { Config } from '../config';
+import type { SiteConfig } from '../config/tenant-config.schema';
 import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
@@ -14,7 +13,6 @@ export class ItemProcessingOrchestratorService {
   private readonly shouldConcealLogs: boolean;
 
   public constructor(
-    private readonly configService: ConfigService<Config, true>,
     private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     private readonly processingPipelineService: ProcessingPipelineService,
   ) {
@@ -26,6 +24,7 @@ export class ItemProcessingOrchestratorService {
     newItems: SharepointContentItem[],
     updatedItems: SharepointContentItem[],
     getScopeIdForItem: (itemId: string) => string,
+    siteConfig: SiteConfig,
   ): Promise<void> {
     const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
     const concurrency = tenantConfig.processingConcurrency || 5; // Default concurrency
@@ -45,14 +44,14 @@ export class ItemProcessingOrchestratorService {
     const newItemsPromises = newItems.map((item) =>
       limit(async () => {
         const scopeId = getScopeIdForItem(item.item.id);
-        await this.processingPipelineService.processItem(item, scopeId, 'new', syncContext);
+        await this.processingPipelineService.processItem(item, scopeId, 'new', syncContext, siteConfig);
       }),
     );
 
     const updatedItemsPromises = updatedItems.map((item) =>
       limit(async () => {
         const scopeId = getScopeIdForItem(item.item.id);
-        await this.processingPipelineService.processItem(item, scopeId, 'updated', syncContext);
+        await this.processingPipelineService.processItem(item, scopeId, 'updated', syncContext, siteConfig);
       }),
     );
 

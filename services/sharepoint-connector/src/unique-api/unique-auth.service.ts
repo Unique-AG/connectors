@@ -25,27 +25,17 @@ export class UniqueAuthService {
     }
 
     const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
-    const uniqueConfig = this.configService.get('unique', { infer: true });
-
-    const serviceAuthMode = tenantConfig.uniqueServiceAuthMode || uniqueConfig.serviceAuthMode;
 
     assert.strictEqual(
-      serviceAuthMode,
+      tenantConfig.serviceAuthMode,
       'external',
       'UniqueAuthService called but serviceAuthMode is not "external"',
     );
 
-    // When serviceAuthMode is 'external', the uniqueConfig union should be the externalConfig branch.
-    // However, TypeScript doesn't automatically narrow it here across the tenantConfig fallback.
-    const externalConfig = uniqueConfig.serviceAuthMode === 'external' ? uniqueConfig : undefined;
-
-    const zitadelOauthTokenUrl =
-      tenantConfig.uniqueZitadelOauthTokenUrl || externalConfig?.zitadelOauthTokenUrl;
-    const zitadelClientId = tenantConfig.uniqueZitadelClientId || externalConfig?.zitadelClientId;
-    const zitadelClientSecretValue =
-      tenantConfig.uniqueZitadelClientSecret || externalConfig?.zitadelClientSecret.value;
-    const zitadelProjectId =
-      tenantConfig.uniqueZitadelProjectId || externalConfig?.zitadelProjectId;
+    const zitadelOauthTokenUrl = tenantConfig.zitadelOauthTokenUrl;
+    const zitadelClientId = tenantConfig.zitadelClientId;
+    const zitadelClientSecretValue = tenantConfig.zitadelClientSecret;
+    const zitadelProjectId = tenantConfig.zitadelProjectId;
 
     assert.ok(zitadelOauthTokenUrl, 'Zitadel OAuth token URL must be provided');
     assert.ok(zitadelClientId, 'Zitadel client ID must be provided');

@@ -45,16 +45,6 @@ export class TenantConfigLoaderService {
       assert.fail(`Unknown site configuration source: ${tenantConfig.sitesConfigurationSource}`);
     }
 
-    // Apply tenant-level defaults to site configs if they are missing
-    this.cachedConfigs = this.cachedConfigs.map((siteConfig) => ({
-      ...siteConfig,
-      ingestionMode: siteConfig.ingestionMode ?? tenantConfig.ingestionMode,
-      scopeId: siteConfig.scopeId ?? tenantConfig.scopeId,
-      maxIngestedFiles: siteConfig.maxIngestedFiles ?? tenantConfig.maxIngestedFiles,
-      storeInternally: siteConfig.storeInternally ?? tenantConfig.storeInternally,
-      inheritMode: siteConfig.inheritMode ?? tenantConfig.inheritMode,
-      syncMode: siteConfig.syncMode ?? tenantConfig.syncMode,
-    }));
 
     return this.cachedConfigs;
   }

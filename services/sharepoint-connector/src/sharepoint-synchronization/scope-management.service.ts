@@ -1,9 +1,9 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
-import { Config } from '../config';
+import type { SiteConfig } from '../config/tenant-config.schema';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
@@ -29,7 +29,7 @@ export class ScopeManagementService {
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
-    private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
@@ -138,6 +138,7 @@ export class ScopeManagementService {
     items: SharepointContentItem[],
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
+    siteConfig: SiteConfig,
   ): Promise<ScopeWithPath[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
 
@@ -154,7 +155,7 @@ export class ScopeManagementService {
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
-    const { inheritScopes } = resolveInheritanceSettings(this.configService);
+    const { inheritScopes } = resolveInheritanceSettings(siteConfig.inheritMode);
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
       inheritAccess: inheritScopes,

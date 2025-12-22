@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { type Histogram } from '@opentelemetry/api';
 import { filter, flat, indexBy, mapKeys, mapValues, pipe, prop, uniqueBy, values } from 'remeda';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { SPC_PERMISSIONS_SYNC_DURATION_SECONDS } from '../metrics';
 import type {
@@ -51,10 +52,11 @@ export class PermissionsSyncService {
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     @Inject(SPC_PERMISSIONS_SYNC_DURATION_SECONDS)
     private readonly spcPermissionsSyncDurationSeconds: Histogram,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async syncPermissionsForSite(input: Input): Promise<void> {
@@ -116,20 +118,18 @@ export class PermissionsSyncService {
         unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
       });
 
-      const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-      if (ingestionMode === IngestionMode.Recursive) {
-        currentStep = 'folder_permissions_sync';
-        assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
-        await this.syncSharepointFolderPermissionsToUniqueCommand.run({
-          context,
-          sharePoint: { directories: sharePoint.directories, permissionsMap },
-          unique: {
-            folders: unique.folders,
-            groupsMap: updatedUniqueGroupsMap,
-            usersMap: uniqueUsersMap,
-          },
-        });
-      }
+      // Always sync folder permissions (removed global ingestion mode check)
+      currentStep = 'folder_permissions_sync';
+      assert.ok(unique.folders, `${logPrefix} Folders are required for folder permissions sync`);
+      await this.syncSharepointFolderPermissionsToUniqueCommand.run({
+        context,
+        sharePoint: { directories: sharePoint.directories, permissionsMap },
+        unique: {
+          folders: unique.folders,
+          groupsMap: updatedUniqueGroupsMap,
+          usersMap: uniqueUsersMap,
+        },
+      });
 
       this.logger.log(`${logPrefix} Synced file permissions to Unique`);
 

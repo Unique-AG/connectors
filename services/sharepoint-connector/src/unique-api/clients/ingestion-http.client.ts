@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram } from '@opentelemetry/api';
@@ -35,11 +36,8 @@ export class IngestionHttpClient implements OnModuleDestroy {
     private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
     const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
-    const uniqueConfig = this.configService.get('unique', { infer: true });
 
-    const ingestionUrl = new URL(
-      tenantConfig.ingestionServiceBaseUrl || uniqueConfig.ingestionServiceBaseUrl,
-    );
+    const ingestionUrl = new URL(tenantConfig.ingestionServiceBaseUrl);
     const interceptorsInCallingOrder = [
       interceptors.redirect({
         maxRedirections: 10,
@@ -68,8 +66,8 @@ export class IngestionHttpClient implements OnModuleDestroy {
     });
     this.httpClient = httpClient.compose(interceptorsInCallingOrder.reverse());
 
-    const apiRateLimitPerMinute =
-      tenantConfig.uniqueApiRateLimitPerMinute || uniqueConfig.apiRateLimitPerMinute;
+    assert.ok(tenantConfig.uniqueApiRateLimitPerMinute, 'Unique API rate limit must be provided');
+    const apiRateLimitPerMinute: number = tenantConfig.uniqueApiRateLimitPerMinute;
 
     this.extractApiMethod = createApiMethodExtractor([
       'v2',
@@ -182,19 +180,14 @@ export class IngestionHttpClient implements OnModuleDestroy {
 
   private async getHeaders(): Promise<Record<string, string>> {
     const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
-    const uniqueConfig = this.configService.get('unique', { infer: true });
 
-    const serviceAuthMode = tenantConfig.uniqueServiceAuthMode || uniqueConfig.serviceAuthMode;
+    const serviceAuthMode = tenantConfig.serviceAuthMode;
 
-    const serviceExtraHeaders =
-      tenantConfig.uniqueServiceExtraHeaders ||
-      (uniqueConfig.serviceAuthMode === 'cluster_local'
-        ? uniqueConfig.serviceExtraHeaders
-        : undefined);
+    const serviceExtraHeaders = tenantConfig.serviceExtraHeaders;
 
-    const clientExtraHeaders =
+    const clientExtraHeaders: Record<string, string> =
       serviceAuthMode === 'cluster_local'
-        ? { 'x-service-id': 'sharepoint-connector', ...serviceExtraHeaders }
+        ? { 'x-service-id': 'sharepoint-connector', ...(serviceExtraHeaders || {}) }
         : { Authorization: `Bearer ${await this.uniqueAuthService.getToken()}` };
 
     return {

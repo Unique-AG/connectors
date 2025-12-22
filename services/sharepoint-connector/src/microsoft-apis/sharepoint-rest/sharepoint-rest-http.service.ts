@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { chunk, identity } from 'remeda';
 import { Client, Dispatcher, interceptors } from 'undici';
 import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { redact, shouldConcealLogs } from '../../utils/logging.util';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { createLoggingInterceptor } from './logging.interceptor';
@@ -21,9 +22,11 @@ export class SharepointRestHttpService {
   public constructor(
     private readonly microsoftAuthenticationService: MicrosoftAuthenticationService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-    const sharePointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const sharePointBaseUrl = tenantConfig.sharepointBaseUrl;
     const httpClient = new Client(sharePointBaseUrl, {
       bodyTimeout: 60_000,
       headersTimeout: 30_000,

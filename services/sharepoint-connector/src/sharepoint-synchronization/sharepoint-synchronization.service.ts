@@ -73,10 +73,6 @@ export class SharepointSynchronizationService {
 
       // Process each site configuration
       for (const { siteId, config } of sitesToProcess) {
-        // if (!config.scopeId || !config.ingestionMode) {
-        //   this.logger.error(`Missing scopeId or ingestionMode for site ${siteId}. Skipping.`);
-        //   continue;
-        // }
         await this.processSite(
           siteId,
           config as SiteConfig & { scopeId: string; ingestionMode: IngestionMode },
@@ -117,11 +113,10 @@ export class SharepointSynchronizationService {
     const logPrefix = `[Site: ${logSiteId}]`;
 
     try {
-      // Use per-site config values, or fall back to global config
+      // Use site config values (no global fallbacks)
       const ingestionMode = siteConfig.ingestionMode;
       const scopeId = siteConfig.scopeId;
-      const syncMode =
-        siteConfig.syncMode || this.configService.get('processing.syncMode', { infer: true });
+      const syncMode = siteConfig.syncMode;
 
       // Initialize root scope and context (once per site)
       let baseContext: BaseSyncContext;
@@ -168,7 +163,7 @@ export class SharepointSynchronizationService {
       if (ingestionMode === IngestionMode.Recursive) {
         try {
           // Create scopes for ALL paths (including moved file destinations)
-          scopes = await this.scopeManagementService.batchCreateScopes(items, directories, context);
+          scopes = await this.scopeManagementService.batchCreateScopes(items, directories, context, siteConfig);
         } catch (error) {
           this.logger.error({
             msg: `${logPrefix} Failed to create scopes. Skipping site.`,
@@ -185,7 +180,7 @@ export class SharepointSynchronizationService {
       }
 
       try {
-        await this.contentSyncService.syncContentForSite(items, scopes, context);
+        await this.contentSyncService.syncContentForSite(items, scopes, context, siteConfig);
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to synchronize content`,

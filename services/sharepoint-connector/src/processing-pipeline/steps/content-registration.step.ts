@@ -1,7 +1,5 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../../config';
 import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
@@ -32,7 +30,6 @@ export class ContentRegistrationStep implements IPipelineStep {
 
   public constructor(
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
-    private readonly configService: ConfigService<Config, true>,
     private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
     const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
@@ -62,7 +59,7 @@ export class ContentRegistrationStep implements IPipelineStep {
 
     context.metadata = contentRegistrationRequest.metadata;
 
-    const { inheritFiles } = resolveInheritanceSettings(this.configService);
+    const { inheritFiles } = resolveInheritanceSettings(context.siteConfig?.inheritMode);
     // We add permissions only for new files, because existing ones should already have correct
     // permissions (including service user permissions) and we don't want to override them; applies
     // when inheritance is disabled or when syncing permissions.
@@ -174,17 +171,14 @@ export class ContentRegistrationStep implements IPipelineStep {
   // writeUrl configurable, but for now this hack lets us avoid hairpinning issues in the internal
   // upload flows.
   private correctWriteUrl(writeUrl: string): string {
-    const uniqueAuthMode = this.configService.get('unique.serviceAuthMode', { infer: true });
-    if (uniqueAuthMode === 'external') {
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    if (tenantConfig.uniqueServiceAuthMode === 'external') {
       return writeUrl;
     }
     const url = new URL(writeUrl);
     const key = url.searchParams.get('key');
     assert.ok(key, 'writeUrl is missing key parameter');
 
-    const ingestionApiUrl = this.configService.get('unique.ingestionServiceBaseUrl', {
-      infer: true,
-    });
-    return `${ingestionApiUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
+    return `${tenantConfig.ingestionServiceBaseUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
   }
 }

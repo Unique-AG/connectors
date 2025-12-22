@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { pick, prop } from 'remeda';
 import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -38,8 +39,9 @@ export class UniqueGroupsService {
   public constructor(
     @Inject(SCOPE_MANAGEMENT_CLIENT) private readonly scopeManagementClient: UniqueGraphqlClient,
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async listAllGroupsForSite(siteId: string): Promise<UniqueGroupWithMembers[]> {

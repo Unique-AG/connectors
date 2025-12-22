@@ -1,7 +1,6 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
@@ -21,10 +20,11 @@ export class IngestionFinalizationStep implements IPipelineStep {
 
   public constructor(
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
-    private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
-    this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    this.sharepointBaseUrl = tenantConfig.sharepointBaseUrl;
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {

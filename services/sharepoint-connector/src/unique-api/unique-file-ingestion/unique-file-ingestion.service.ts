@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
@@ -27,10 +28,11 @@ export class UniqueFileIngestionService {
     @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
     private readonly ingestionHttpClient: IngestionHttpClient,
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {}
 
   public async registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse> {
-    const uniqueConfig = this.configService.get('unique', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
     const variables: ContentUpsertMutationInput = {
       input: {
         key: request.key,
@@ -45,16 +47,12 @@ export class UniqueFileIngestionService {
       sourceOwnerType: request.sourceOwnerType,
       sourceKind: request.sourceKind,
       sourceName: request.sourceName,
-      storeInternally: uniqueConfig.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: false, // Removed global default - use site-level config
       baseUrl: request.baseUrl,
     };
 
     if (request.fileAccess) {
       variables.input.fileAccess = request.fileAccess;
-    }
-
-    if (uniqueConfig.ingestionConfig) {
-      variables.input.ingestionConfig = uniqueConfig.ingestionConfig;
     }
 
     const result = await this.ingestionClient.request<
@@ -67,7 +65,7 @@ export class UniqueFileIngestionService {
   }
 
   public async finalizeIngestion(request: IngestionFinalizationRequest): Promise<{ id: string }> {
-    const uniqueConfig = this.configService.get('unique', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
     const variables: ContentUpsertMutationInput = {
       input: {
         key: request.key,
@@ -83,13 +81,9 @@ export class UniqueFileIngestionService {
       sourceName: request.sourceName,
       sourceKind: request.sourceKind,
       fileUrl: request.fileUrl,
-      storeInternally: uniqueConfig.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: false, // Removed global default - use site-level config
       baseUrl: request.baseUrl,
     };
-
-    if (uniqueConfig.ingestionConfig) {
-      variables.input.ingestionConfig = uniqueConfig.ingestionConfig;
-    }
 
     const result = await this.ingestionClient.request<
       ContentUpsertMutationResult,
@@ -104,9 +98,8 @@ export class UniqueFileIngestionService {
     fileList: FileDiffItem[],
     partialKey: string,
   ): Promise<FileDiffResponse> {
-    const ingestionUrl = new URL(
-      this.configService.get('unique.ingestionServiceBaseUrl', { infer: true }),
-    );
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const ingestionUrl = new URL(tenantConfig.ingestionServiceBaseUrl);
     // The ingestionServiceBaseUrl can have already part of the path when running in external mode
     const pathPrefix = ingestionUrl.pathname === '/' ? '' : ingestionUrl.pathname;
     const fileDiffPath = `${pathPrefix}/v2/content/file-diff`;

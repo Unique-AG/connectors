@@ -22,7 +22,7 @@ export class UploadContentStep implements IPipelineStep {
   public constructor(
     private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     private readonly httpClientService: HttpClientService,
-    private readonly uniqueFilesService: UniqueFilesService,    
+    private readonly uniqueFilesService: UniqueFilesService,
     private readonly apiService: GraphApiService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);

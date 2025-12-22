@@ -1,5 +1,6 @@
 import type { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../../sharepoint-synchronization/types';
+import type { SiteConfig } from '../../config/tenant-config.schema';
 import {
   ContentMetadata,
   IngestionApiResponse,
@@ -20,6 +21,7 @@ export interface ProcessingContext {
   registrationResponse?: IngestionApiResponse;
   fileStatus: 'new' | 'updated';
   syncContext: SharepointSyncContext;
+  siteConfig: SiteConfig;
   metadata?: ContentMetadata;
 }
 

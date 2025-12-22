@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { getTitle } from '../../utils/list-item.util';
@@ -18,9 +19,10 @@ export class AspxProcessingStep implements IPipelineStep {
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     private readonly apiService: GraphApiService,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
@@ -89,6 +91,7 @@ export class AspxProcessingStep implements IPipelineStep {
   }
 
   private getSharepointBaseUrl(): string {
-    return this.configService.get('sharepoint.baseUrl', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    return tenantConfig.sharepointBaseUrl;
   }
 }
