@@ -14,6 +14,7 @@ data:
       {{- if eq .Values.connectorConfig.sharepoint.auth.mode "certificate" }}
       authClientId: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
       authPrivateKeyPath: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPath | quote }}
+      # authPrivateKeyPassword is loaded from environment variable (secret) if key is encrypted
       authThumbprintSha1: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha1 | quote }}
       {{- end }}
       baseUrl: {{ .Values.connectorConfig.sharepoint.baseUrl | quote }}

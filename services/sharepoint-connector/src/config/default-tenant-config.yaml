@@ -1,0 +1,48 @@
+# Test Configuration for SharePoint Connector
+# This file is for local testing purposes only
+
+sharepoint:
+  authMode: certificate
+  authTenantId: f96a6b77-d28b-491a-8bad-607af412b850
+  authClientId: a1c4829b-7918-4c50-95c5-fff671d36a66
+  authPrivateKeyPath: /Users/lorand/key.pem
+  # authPrivateKeyPassword loaded from SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD env var
+  authThumbprintSha1: 3305F6F8E999F499E96E774D41FCCB692A47B004
+  baseUrl: https://dogfoodindustries.sharepoint.com
+  siteIds: ae0242ac-72f7-440c-91cb-847d2a33d029
+  syncColumnName: UniqueAI
+  graphApiRateLimitPerMinute: 180000
+
+unique:
+  serviceAuthMode: external
+  zitadelOauthTokenUrl: http://localhost:10116/oauth/v2/token
+  zitadelProjectId: '341558074118504450'
+  zitadelClientId: sharepoint-connector-v2
+  # zitadelClientSecret loaded from ZITADEL_CLIENT_SECRET env var
+  ingestionMode: recursive
+  scopeId: scope_q0zxr1codwzcrn6nbyjf2mkz
+  ingestionServiceBaseUrl: http://localhost:8091
+  scopeManagementServiceBaseUrl: http://localhost:8094
+  apiRateLimitPerMinute: 60
+  storeInternally: enabled
+  # serviceExtraHeaders:
+    # x-service-id: sharepoint-connector
+    # x-company-id: 337406675633897483
+    # x-user-id: 341560781055197186
+    # x-user-roles: chat.admin.all
+
+processing:
+  syncMode: content_only
+  stepTimeoutSeconds: 900
+  concurrency: 1
+  maxFileSizeBytes: 209715200
+  maxFilesToScan: 5  # For testing: limit to 5 files
+  allowedMimeTypes:
+    - application/pdf
+    - text/plain
+    - text/html
+    - application/x-asp
+    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    - application/vnd.openxmlformats-officedocument.presentationml.presentation
+  scanIntervalCron: "*/60 * * * *"
+

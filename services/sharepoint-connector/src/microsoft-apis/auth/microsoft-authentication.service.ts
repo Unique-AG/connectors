@@ -34,7 +34,8 @@ export class MicrosoftAuthenticationService {
       ],
     };
 
-    switch (this.configService.get('sharepoint.authMode', { infer: true })) {
+    const authMode = this.configService.get('sharepoint.authMode', { infer: true });
+    switch (authMode) {
       case 'oidc':
         this.strategy = new OidcAuthStrategy(configService);
         break;
@@ -44,6 +45,8 @@ export class MicrosoftAuthenticationService {
       case 'certificate':
         this.strategy = new CertificateAuthStrategy(configService);
         break;
+      default:
+        throw new Error(`Unsupported authentication mode: ${authMode}`);
     }
     this.logger.log(`Using ${this.strategy.constructor.name} for Microsoft API authentication`);
   }

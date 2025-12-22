@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { ProcessingConfigSchema } from './processing.config';
-import { SharepointConfigSchema } from './sharepoint.config';
-import { UniqueConfigSchema } from './unique.config';
+import { ProcessingConfigSchema } from './processing.schema';
+import { SharepointConfigSchema } from './sharepoint.schema';
+import { UniqueConfigSchema } from './unique.schema';
 
 export const TenantConfigSchema = z.object({
   sharepoint: SharepointConfigSchema,

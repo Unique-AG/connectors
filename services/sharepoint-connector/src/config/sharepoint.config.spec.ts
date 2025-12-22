@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { SharepointConfigSchema } from './sharepoint.config';
+import { SharepointConfigSchema } from './sharepoint.schema';
 
 describe('SharepointConfigSchema - siteIds validation', () => {
   const validConfigBase = {

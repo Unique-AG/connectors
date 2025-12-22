@@ -1,0 +1,121 @@
+# SharePoint Connector Tenant Configuration Example
+# This file contains all configuration options for the SharePoint connector.
+# Copy this file and customize it for your tenant.
+
+# ============================================================================
+# SharePoint Configuration
+# ============================================================================
+sharepoint:
+  # Authentication mode: 'oidc', 'client-secret', or 'certificate'
+  authMode: certificate
+  
+  # Azure AD tenant ID (required for all auth modes)
+  authTenantId: your-tenant-id-here
+  
+  # Client ID (required for 'client-secret' and 'certificate' modes)
+  authClientId: your-client-id-here
+  
+  # Client secret (required only for 'client-secret' mode)
+  # authClientSecret: your-client-secret-here
+  
+  # Certificate authentication (required only for 'certificate' mode)
+  authPrivateKeyPath: /path/to/private-key.pem
+  authThumbprintSha1: your-sha1-thumbprint-here
+  # authThumbprintSha256: your-sha256-thumbprint-here
+  
+  # Note: If private key is encrypted, provide password via environment variable:
+  # - Local dev: Add SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD to .env file
+  # - Kubernetes: Load from secret via envVars (see values.yaml)
+  # authPrivateKeyPassword: password-if-key-is-encrypted
+  
+  # Your company's SharePoint base URL (without trailing slash)
+  baseUrl: https://yourcompany.sharepoint.com
+  
+  # Comma-separated list of SharePoint site IDs to scan (UUIDv4 format)
+  siteIds: 12345678-1234-1234-1234-123456789abc,87654321-4321-4321-4321-cba987654321
+  
+  # Name of the SharePoint column indicating sync flag
+  syncColumnName: FinanceGPTKnowledge
+  
+  # Number of MS Graph API requests allowed per minute (optional, default: 600)
+  graphApiRateLimitPerMinute: 600
+
+# ============================================================================
+# Unique API Configuration
+# ============================================================================
+unique:
+  # Authentication mode: 'cluster_local' or 'external'
+  serviceAuthMode: cluster_local
+  
+  # For 'cluster_local' mode: Extra headers for in-cluster communication
+  serviceExtraHeaders:
+    x-company-id: your-company-id
+    x-user-id: your-user-id
+  
+  # For 'external' mode: Zitadel authentication settings
+  # serviceAuthMode: external
+  # zitadelOauthTokenUrl: https://your-zitadel-instance.com/oauth/v2/token
+  # zitadelProjectId: your-project-id
+  # zitadelClientId: your-client-id
+  # Note: zitadelClientSecret must be provided via environment variable:
+  # - Local dev: Add ZITADEL_CLIENT_SECRET to .env file
+  # - Kubernetes: Load from secret via envVars (see values.yaml)
+  
+  # Ingestion mode: 'flat' or 'recursive'
+  # - flat: ingests all files to a single root scope
+  # - recursive: maintains the folder hierarchy
+  ingestionMode: recursive
+  
+  # Scope ID to be used as root for ingestion
+  scopeId: your-root-scope-id
+  
+  # Base URL for Unique ingestion service (without trailing slash)
+  ingestionServiceBaseUrl: https://ingestion.your-unique-instance.com
+  
+  # Base URL for Unique scope management service (without trailing slash)
+  scopeManagementServiceBaseUrl: https://scope-management.your-unique-instance.com
+  
+  # Number of Unique API requests allowed per minute (optional, default: 60)
+  apiRateLimitPerMinute: 60
+  
+  # Maximum number of files to ingest per site in a single run (optional)
+  # If exceeded, the sync for that site will fail
+  # maxIngestedFiles: 1000
+  
+  # Whether to store content internally in Unique: 'enabled' or 'disabled'
+  storeInternally: enabled
+  
+  # Optional: Config object to pass when submitting file for ingestion
+  # ingestionConfig:
+  #   uniqueIngestionMode: SKIP_INGESTION
+  #   customProperty: value
+
+# ============================================================================
+# Processing Configuration
+# ============================================================================
+processing:
+  # Sync mode: 'content_only' or 'content_and_permissions'
+  syncMode: content_and_permissions
+  
+  # Time limit for a file processing step in seconds (default: 300)
+  stepTimeoutSeconds: 300
+  
+  # Concurrency: how many files to ingest at once (default: 5)
+  concurrency: 5
+  
+  # Maximum file size in bytes to ingest (default: 52428800 = 50MB)
+  maxFileSizeBytes: 52428800
+  
+  # Allowed MIME types for files to sync (can be array or comma-separated string)
+  allowedMimeTypes:
+    - application/pdf
+    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+    - application/vnd.openxmlformats-officedocument.presentationml.presentation
+  
+  # For testing: maximum number of files to scan (optional, unlimited if not set)
+  maxFilesToScan: 100  # Optional: useful for testing with limited file sets
+  
+  # Cron expression for the scheduled file scan interval (default: every 15 minutes)
+  scanIntervalCron: "*/15 * * * *"
+

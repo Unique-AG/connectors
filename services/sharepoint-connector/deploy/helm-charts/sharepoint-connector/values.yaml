@@ -14,14 +14,21 @@ connector:
     OTEL_METRICS_EXPORTER: "prometheus"
     # Path pattern to tenant configuration YAML file
     TENANT_CONFIG_PATH: /app/config/*-tenant-config.yaml
-  # -- Environment variables from secrets. Required when authMode is 'external'.
-  # When using external authMode, add the following to load the Zitadel client secret:
+  # -- Environment variables from secrets.
+  # Example for loading secrets (uncomment and customize as needed):
   #   envVars:
+  #     # For Zitadel authentication (required when authMode is 'external')
   #     - name: ZITADEL_CLIENT_SECRET
   #       valueFrom:
   #         secretKeyRef:
   #           name: sharepoint-connector-secret
   #           key: ZITADEL_CLIENT_SECRET
+  #     # For encrypted certificate private key (optional, only if key is password-protected)
+  #     - name: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: sharepoint-connector-secret
+  #           key: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
   extraEnvCM:

@@ -1,4 +1,7 @@
 {{- if .Values.connectorConfig.enabled }}
+# DEPRECATED: This ConfigMap will be removed in a future version.
+# The connector now uses YAML-based configuration from tenant-config.yaml
+# To migrate, ensure TENANT_CONFIG_DIRECTORY is set and tenant-config.yaml is mounted
 # We quote everything, small adoption start of KYAML; also less prone to errors later
 apiVersion: v1
 kind: ConfigMap

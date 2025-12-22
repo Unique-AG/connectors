@@ -32,6 +32,8 @@ export class UniqueAuthService {
     const { zitadelOauthTokenUrl, zitadelClientId, zitadelClientSecret, zitadelProjectId } =
       uniqueConfig;
 
+    assert.ok(zitadelClientSecret, 'zitadelClientSecret is required when using external auth mode');
+
     const params = new URLSearchParams({
       scope:
         `openid profile email urn:zitadel:iam:user:resourceowner ` +
