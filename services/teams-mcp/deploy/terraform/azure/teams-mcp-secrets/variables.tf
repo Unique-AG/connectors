@@ -24,31 +24,25 @@ variable "secrets_placeholders" {
       - teams-mcp-amqp-url: AMQP/RabbitMQ connection URL (AMQP_URL)
 
       Unique Configuration (unique.config.ts):
-      - teams-mcp-unique-api-base-url: Unique Public API base URL (UNIQUE_API_BASE_URL)
-      - teams-mcp-unique-service-extra-headers: Extra headers for cluster_local mode (UNIQUE_SERVICE_EXTRA_HEADERS) - optional
-      - teams-mcp-unique-ingestion-service-base-url: Ingestion service URL for cluster_local mode (UNIQUE_INGESTION_SERVICE_BASE_URL) - optional
-      - teams-mcp-unique-app-key: API key for external mode (UNIQUE_APP_KEY) - optional
-      - teams-mcp-unique-app-id: App ID for external mode (UNIQUE_APP_ID) - optional
-      - teams-mcp-unique-auth-user-id: User ID for external mode (UNIQUE_AUTH_USER_ID) - optional
-      - teams-mcp-unique-auth-company-id: Company ID for external mode (UNIQUE_AUTH_COMPANY_ID) - optional
+      The config uses a discriminated union based on serviceAuthMode (cluster_local or external).
+      Both modes use serviceExtraHeaders as a JSON object containing auth-related headers.
+      - teams-mcp-unique-service-extra-headers: JSON object with auth headers (UNIQUE_SERVICE_EXTRA_HEADERS)
+        For cluster_local: {"x-company-id": "...", "x-user-id": "..."}
+        For external: {"authorization": "Bearer ...", "x-app-id": "...", "x-user-id": "...", "x-company-id": "..."}
+
+      NOTE: Non-sensitive URLs should be configured via Helm values instead of Key Vault:
+      - UNIQUE_API_BASE_URL -> mcpConfig.unique.apiBaseUrl
+      - UNIQUE_INGESTION_SERVICE_BASE_URL -> mcpConfig.unique.ingestionServiceBaseUrl
 
       App Configuration (app.config.ts):
-      - teams-mcp-self-url: The URL of the MCP Server for OAuth callbacks (SELF_URL)
+      NOTE: Non-sensitive URLs should be configured via Helm values instead of Key Vault:
+      - SELF_URL -> mcpConfig.app.selfUrl
     */
-    teams-mcp-client-secret           = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
-    teams-mcp-database-url            = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
-    teams-mcp-amqp-url                = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
-    teams-mcp-public-webhook-url      = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
-    teams-mcp-unique-api-base-url     = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
-    teams-mcp-self-url                = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
-    # Optional secrets for Unique configuration (external mode)
-    teams-mcp-unique-app-key          = { create = false, expiration_date = "2099-12-31T23:59:59Z" }
-    teams-mcp-unique-app-id           = { create = false, expiration_date = "2099-12-31T23:59:59Z" }
-    teams-mcp-unique-auth-user-id     = { create = false, expiration_date = "2099-12-31T23:59:59Z" }
-    teams-mcp-unique-auth-company-id  = { create = false, expiration_date = "2099-12-31T23:59:59Z" }
-    # Optional secrets for Unique configuration (cluster_local mode)
-    teams-mcp-unique-service-extra-headers        = { create = false, expiration_date = "2099-12-31T23:59:59Z" }
-    teams-mcp-unique-ingestion-service-base-url   = { create = false, expiration_date = "2099-12-31T23:59:59Z" }
+    teams-mcp-client-secret              = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
+    teams-mcp-database-url               = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
+    teams-mcp-amqp-url                   = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
+    teams-mcp-public-webhook-url         = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
+    teams-mcp-unique-service-extra-headers = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
   }
 }
 

@@ -73,6 +73,11 @@ server:
   #         secretKeyRef:
   #           name: teams-mcp-secret
   #           key: ENCRYPTION_KEY
+  #     - name: UNIQUE_SERVICE_EXTRA_HEADERS
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: teams-mcp-secret
+  #           key: UNIQUE_SERVICE_EXTRA_HEADERS
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
   extraEnvCM:
@@ -202,14 +207,17 @@ mcpConfig:
     # cluster_local: communicates using in-cluster URLs with service headers
     # external: communicates using external URLs with app key authentication
     serviceAuthMode: cluster_local
-    # -- Extra HTTP headers for Unique API requests (required for both modes)
-    # For cluster_local mode: must contain x-company-id and x-user-id headers
-    # example: {"x-company-id": "1234567890", "x-user-id": "1234567890"}
-    # For external mode: must contain authorization, x-app-id, x-user-id, and x-company-id headers
-    # example: {"authorization": "Bearer <app-key>", "x-app-id": "<app-id>", "x-user-id": "<user-id>", "x-company-id": "<company-id>"}
-    serviceExtraHeaders:
-      x-company-id: unset_default_value
-      x-user-id: unset_default_value
+    # NOTE: serviceExtraHeaders contains sensitive auth tokens and must be loaded from a secret.
+    # It is NOT configured here. Instead, add it to server.envVars:
+    #   envVars:
+    #     - name: UNIQUE_SERVICE_EXTRA_HEADERS
+    #       valueFrom:
+    #         secretKeyRef:
+    #           name: teams-mcp-secret
+    #           key: UNIQUE_SERVICE_EXTRA_HEADERS
+    # The value should be a JSON string:
+    # For cluster_local mode: '{"x-company-id": "...", "x-user-id": "..."}'
+    # For external mode: '{"authorization": "Bearer ...", "x-app-id": "...", "x-user-id": "...", "x-company-id": "..."}'
 
     # -- The Public API URL
     # example: https://api.unique.app
@@ -240,3 +248,4 @@ mcpConfig:
   # - MICROSOFT_WEBHOOK_SECRET: 128 character random string for webhook validation
   # - AUTH_HMAC_SECRET: Secret key for signing HMAC tokens
   # - ENCRYPTION_KEY: 32-byte (256-bit) secret for AES-256-GCM encryption (hex or base64)
+  # - UNIQUE_SERVICE_EXTRA_HEADERS: JSON string with auth headers (may contain Authorization token)

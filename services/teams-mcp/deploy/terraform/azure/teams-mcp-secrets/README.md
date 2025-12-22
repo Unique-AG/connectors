@@ -36,24 +36,31 @@ This module provisions secrets needed for Teams MCP operation:
 | `manual-teams-mcp-database-url` | PostgreSQL connection URL | `DATABASE_URL` | Yes |
 | `manual-teams-mcp-amqp-url` | AMQP/RabbitMQ connection URL | `AMQP_URL` | Yes |
 | `manual-teams-mcp-public-webhook-url` | Public webhook URL for Microsoft Graph subscriptions | `MICROSOFT_PUBLIC_WEBHOOK_URL` | Yes |
-| `manual-teams-mcp-unique-api-base-url` | Unique Public API base URL | `UNIQUE_API_BASE_URL` | Yes |
-| `manual-teams-mcp-self-url` | MCP Server URL for OAuth callbacks | `SELF_URL` | Yes |
+| `manual-teams-mcp-unique-service-extra-headers` | JSON object with auth headers | `UNIQUE_SERVICE_EXTRA_HEADERS` | Yes |
 
-### Manual Secret Placeholders (Optional - Unique External Mode)
+### Non-Secret Configuration (Helm Values)
 
-| Secret Name | Description | Config Key | When Needed |
-|-------------|-------------|------------|-------------|
-| `manual-teams-mcp-unique-app-key` | Unique API key (Authorization header) | `UNIQUE_APP_KEY` | External mode |
-| `manual-teams-mcp-unique-app-id` | Unique App ID | `UNIQUE_APP_ID` | External mode |
-| `manual-teams-mcp-unique-auth-user-id` | Zitadel Service User ID | `UNIQUE_AUTH_USER_ID` | External mode |
-| `manual-teams-mcp-unique-auth-company-id` | Zitadel Organisation ID | `UNIQUE_AUTH_COMPANY_ID` | External mode |
+The following should be configured via Helm values instead of Key Vault:
 
-### Manual Secret Placeholders (Optional - Unique Cluster Local Mode)
+| Helm Value | Environment Variable | Description |
+|------------|---------------------|-------------|
+| `mcpConfig.unique.apiBaseUrl` | `UNIQUE_API_BASE_URL` | Unique Public API base URL |
+| `mcpConfig.unique.ingestionServiceBaseUrl` | `UNIQUE_INGESTION_SERVICE_BASE_URL` | Ingestion service URL (cluster_local mode) |
+| `mcpConfig.app.selfUrl` | `SELF_URL` | MCP Server URL for OAuth callbacks |
 
-| Secret Name | Description | Config Key | When Needed |
-|-------------|-------------|------------|-------------|
-| `manual-teams-mcp-unique-service-extra-headers` | JSON string of extra HTTP headers | `UNIQUE_SERVICE_EXTRA_HEADERS` | Cluster local mode |
-| `manual-teams-mcp-unique-ingestion-service-base-url` | Ingestion service base URL | `UNIQUE_INGESTION_SERVICE_BASE_URL` | Cluster local mode |
+### Unique Service Extra Headers (Secret)
+
+The `UNIQUE_SERVICE_EXTRA_HEADERS` contains sensitive auth tokens (e.g., Authorization header) and must be stored as a secret. The value is a JSON string with the required headers depending on `serviceAuthMode`:
+
+**For `cluster_local` mode** (in-cluster communication):
+```json
+{"x-company-id": "<company-id>", "x-user-id": "<user-id>"}
+```
+
+**For `external` mode** (external API access):
+```json
+{"authorization": "Bearer <app-key>", "x-app-id": "<app-id>", "x-user-id": "<user-id>", "x-company-id": "<company-id>"}
+```
 
 ## Usage
 
@@ -185,49 +192,23 @@ az keyvault secret set \
   --name manual-teams-mcp-public-webhook-url \
   --value "https://teams-mcp.example.com/webhooks/microsoft"
 
-# Set the Unique API base URL
-az keyvault secret set \
-  --vault-name <vault-name> \
-  --name manual-teams-mcp-unique-api-base-url \
-  --value "https://api.unique.example.com"
-
-# Set the self URL for OAuth callbacks
-az keyvault secret set \
-  --vault-name <vault-name> \
-  --name manual-teams-mcp-self-url \
-  --value "https://teams-mcp.example.com"
-
-# Optional: For Unique external mode
-az keyvault secret set \
-  --vault-name <vault-name> \
-  --name manual-teams-mcp-unique-app-key \
-  --value "<unique-app-key>"
-
-az keyvault secret set \
-  --vault-name <vault-name> \
-  --name manual-teams-mcp-unique-app-id \
-  --value "<unique-app-id>"
-
-az keyvault secret set \
-  --vault-name <vault-name> \
-  --name manual-teams-mcp-unique-auth-user-id \
-  --value "<zitadel-service-user-id>"
-
-az keyvault secret set \
-  --vault-name <vault-name> \
-  --name manual-teams-mcp-unique-auth-company-id \
-  --value "<zitadel-organisation-id>"
-
-# Optional: For Unique cluster_local mode
+# Set the Unique service extra headers (JSON string with auth headers)
+# For cluster_local mode:
 az keyvault secret set \
   --vault-name <vault-name> \
   --name manual-teams-mcp-unique-service-extra-headers \
-  --value '{"x-company-id":"<company-id>","x-user-id":"<user-id>","x-service-id":"teams-mcp"}'
+  --value '{"x-company-id":"<company-id>","x-user-id":"<user-id>"}'
 
-az keyvault secret set \
-  --vault-name <vault-name> \
-  --name manual-teams-mcp-unique-ingestion-service-base-url \
-  --value "http://ingestion-service:8080"
+# For external mode (with Authorization token):
+# az keyvault secret set \
+#   --vault-name <vault-name> \
+#   --name manual-teams-mcp-unique-service-extra-headers \
+#   --value '{"authorization":"Bearer <app-key>","x-app-id":"<app-id>","x-user-id":"<user-id>","x-company-id":"<company-id>"}'
+
+# NOTE: The following are configured via Helm values, not Key Vault:
+# - UNIQUE_API_BASE_URL -> mcpConfig.unique.apiBaseUrl
+# - UNIQUE_INGESTION_SERVICE_BASE_URL -> mcpConfig.unique.ingestionServiceBaseUrl
+# - SELF_URL -> mcpConfig.app.selfUrl
 ```
 
 ### Using Azure Portal
@@ -292,33 +273,29 @@ Map Key Vault secrets to Teams MCP environment variables:
 |------------------|---------------------|-------------|
 | `manual-teams-mcp-amqp-url` | `AMQP_URL` | `amqp.url` |
 
-### App Configuration
+### App Configuration (Non-Secret via Helm)
 
-| Key Vault Secret | Environment Variable | Config Path |
-|------------------|---------------------|-------------|
-| `manual-teams-mcp-self-url` | `SELF_URL` | `app.selfUrl` |
+| Helm Value | Environment Variable | Config Path |
+|------------|---------------------|-------------|
+| `mcpConfig.app.selfUrl` | `SELF_URL` | `app.selfUrl` |
 
-### Unique Configuration (Required)
+### Unique Configuration
 
-| Key Vault Secret | Environment Variable | Config Path |
-|------------------|---------------------|-------------|
-| `manual-teams-mcp-unique-api-base-url` | `UNIQUE_API_BASE_URL` | `unique.apiBaseUrl` |
+**Non-secrets (via Helm ConfigMap):**
 
-### Unique Configuration (External Mode - Optional)
+| Helm Value | Environment Variable | Config Path |
+|------------|---------------------|-------------|
+| `mcpConfig.unique.serviceAuthMode` | `UNIQUE_SERVICE_AUTH_MODE` | `unique.serviceAuthMode` |
+| `mcpConfig.unique.apiBaseUrl` | `UNIQUE_API_BASE_URL` | `unique.apiBaseUrl` |
+| `mcpConfig.unique.ingestionServiceBaseUrl` | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `unique.ingestionServiceBaseUrl` |
 
-| Key Vault Secret | Environment Variable | Config Path |
-|------------------|---------------------|-------------|
-| `manual-teams-mcp-unique-app-key` | `UNIQUE_APP_KEY` | `unique.appKey` |
-| `manual-teams-mcp-unique-app-id` | `UNIQUE_APP_ID` | `unique.appId` |
-| `manual-teams-mcp-unique-auth-user-id` | `UNIQUE_AUTH_USER_ID` | `unique.authUserId` |
-| `manual-teams-mcp-unique-auth-company-id` | `UNIQUE_AUTH_COMPANY_ID` | `unique.authCompanyId` |
-
-### Unique Configuration (Cluster Local Mode - Optional)
+**Secret (via Key Vault / Kubernetes Secret):**
 
 | Key Vault Secret | Environment Variable | Config Path |
 |------------------|---------------------|-------------|
 | `manual-teams-mcp-unique-service-extra-headers` | `UNIQUE_SERVICE_EXTRA_HEADERS` | `unique.serviceExtraHeaders` |
-| `manual-teams-mcp-unique-ingestion-service-base-url` | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `unique.ingestionServiceBaseUrl` |
+
+The `serviceExtraHeaders` contains auth-related headers as a JSON string. See the "Unique Service Extra Headers (Secret)" section above for required headers based on auth mode.
 
 ### Using CSI Driver (Recommended for Kubernetes)
 
@@ -357,25 +334,13 @@ spec:
         - objectName: "manual-teams-mcp-public-webhook-url"
           objectType: "secret"
           objectAlias: "public-webhook-url"
-        - objectName: "manual-teams-mcp-unique-api-base-url"
+        - objectName: "manual-teams-mcp-unique-service-extra-headers"
           objectType: "secret"
-          objectAlias: "unique-api-base-url"
-        - objectName: "manual-teams-mcp-self-url"
-          objectType: "secret"
-          objectAlias: "self-url"
-        # Optional: Unique external mode secrets (uncomment if needed)
-        # - objectName: "manual-teams-mcp-unique-app-key"
-        #   objectType: "secret"
-        #   objectAlias: "unique-app-key"
-        # - objectName: "manual-teams-mcp-unique-app-id"
-        #   objectType: "secret"
-        #   objectAlias: "unique-app-id"
-        # - objectName: "manual-teams-mcp-unique-auth-user-id"
-        #   objectType: "secret"
-        #   objectAlias: "unique-auth-user-id"
-        # - objectName: "manual-teams-mcp-unique-auth-company-id"
-        #   objectType: "secret"
-        #   objectAlias: "unique-auth-company-id"
+          objectAlias: "unique-service-extra-headers"
+        # NOTE: The following are configured via Helm values (ConfigMap), not Key Vault:
+        # - UNIQUE_API_BASE_URL -> mcpConfig.unique.apiBaseUrl
+        # - UNIQUE_INGESTION_SERVICE_BASE_URL -> mcpConfig.unique.ingestionServiceBaseUrl
+        # - SELF_URL -> mcpConfig.app.selfUrl
 ```
 
 ## Security Considerations
@@ -441,25 +406,32 @@ spec:
 - **Format**: HTTPS URL
 - **Example**: `https://teams-mcp.example.com`
 - **Purpose**: OAuth callback URL for user authentication
-
-### Unique API Base URL
-- **Format**: HTTPS URL
-- **Example**: `https://api.unique.example.com`
-- **Purpose**: Base URL for Unique API calls
+- **Note**: This is now configured via Helm values (`mcpConfig.app.selfUrl`), not as a secret
 
 ## Non-Secret Configuration
 
-Some configuration values don't need to be secrets but are required:
+Configuration values that don't need to be secrets are configured via Helm values:
 
-| Environment Variable | Description | Source |
-|---------------------|-------------|--------|
-| `MICROSOFT_CLIENT_ID` | Microsoft Entra application client ID | Terraform output from entra-application module |
-| `NODE_ENV` | Application environment | Configuration (production/development/test) |
-| `PORT` | HTTP port to bind | Configuration (default: 9542) |
-| `LOG_LEVEL` | Logging level | Configuration (info/debug/trace) |
-| `UNIQUE_API_VERSION` | Unique API version | Configuration (default: 2023-12-06) |
-| `UNIQUE_ROOT_SCOPE_PATH` | Root scope path for uploads | Configuration (default: Teams-MCP) |
-| `UNIQUE_SERVICE_AUTH_MODE` | Auth mode for Unique API | Configuration (cluster_local/external) |
+| Environment Variable | Helm Value | Description |
+|---------------------|------------|-------------|
+| `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | Microsoft Entra application client ID |
+| `PORT` | `mcpConfig.app.port` | HTTP port to bind (default: 51345) |
+| `SELF_URL` | `mcpConfig.app.selfUrl` | MCP Server URL for OAuth callbacks |
+| `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | Auth mode for Unique API (cluster_local/external) |
+| `UNIQUE_API_BASE_URL` | `mcpConfig.unique.apiBaseUrl` | Unique Public API base URL |
+| `UNIQUE_API_VERSION` | `mcpConfig.unique.apiVersion` | Unique API version (default: 2023-12-06) |
+| `UNIQUE_ROOT_SCOPE_PATH` | `mcpConfig.unique.rootScopePath` | Root scope path for uploads (default: Teams-MCP) |
+| `UNIQUE_USER_FETCH_CONCURRENCY` | `mcpConfig.unique.userFetchConcurrency` | Concurrency for user fetching (default: 5) |
+| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | Ingestion service URL (cluster_local mode) |
+
+> **Note**: `UNIQUE_SERVICE_EXTRA_HEADERS` is a **secret** (loaded via `server.envVars`) as it may contain Authorization tokens.
+
+Additional environment variables configured directly in `server.env`:
+
+| Environment Variable | Description |
+|---------------------|-------------|
+| `NODE_ENV` | Application environment (production/development/test) |
+| `LOG_LEVEL` | Logging level (info/debug/trace) |
 
 ## Troubleshooting
 
