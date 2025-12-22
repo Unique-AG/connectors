@@ -178,14 +178,23 @@ export class IngestionHttpClient implements OnModuleDestroy {
 
   private async getHeaders(): Promise<Record<string, string>> {
     const uniqueConfig = this.configService.get('unique', { infer: true });
-    const clientExtraHeaders =
-      uniqueConfig.serviceAuthMode === 'cluster_local'
-        ? { 'x-service-id': 'sharepoint-connector', ...uniqueConfig.serviceExtraHeaders }
-        : { Authorization: `Bearer ${await this.uniqueAuthService.getToken()}` };
 
-    return {
-      ...clientExtraHeaders,
+    const baseHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
+    };
+
+    if (uniqueConfig.serviceAuthMode === 'cluster_local') {
+      return {
+        ...baseHeaders,
+        'x-service-id': 'sharepoint-connector',
+        ...uniqueConfig.serviceExtraHeaders,
+      };
+    }
+
+    const token = await this.uniqueAuthService.getToken();
+    return {
+      ...baseHeaders,
+      Authorization: `Bearer ${token}`,
     };
   }
 }

@@ -1,11 +1,10 @@
-import { ConfigType } from '@nestjs/config';
-import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { type ConfigFactory } from '@nestjs/config';
 import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
-import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { Redacted } from '../utils/redacted';
+import { getTenantConfig } from './tenant-config-loader';
 
 // ==== Config for local in-cluster communication with Unique API services ====
 
@@ -14,8 +13,7 @@ const clusterLocalConfig = z.object({
     .literal('cluster_local')
     .describe('Authentication mode to use for accessing Unique API services'),
   serviceExtraHeaders: z
-    .string()
-    .pipe(parseJsonEnvironmentVariable('UNIQUE_SERVICE_EXTRA_HEADERS'))
+    .record(z.string(), z.string())
     .refine(
       (headers) => {
         const providedHeaders = Object.keys(headers);
@@ -23,7 +21,7 @@ const clusterLocalConfig = z.object({
         return requiredHeaders.every((header) => providedHeaders.includes(header));
       },
       {
-        message: 'UNIQUE_SERVICE_EXTRA_HEADERS must contain x-company-id and x-user-id headers',
+        message: 'serviceExtraHeaders must contain x-company-id and x-user-id headers',
         path: ['serviceExtraHeaders'],
       },
     )
@@ -94,11 +92,10 @@ const baseConfig = z.object({
     .default(StoreInternallyMode.Enabled)
     .describe('Whether to store content internally in Unique or not.'),
   ingestionConfig: z
-    .string()
-    .pipe(parseJsonEnvironmentVariable('UNIQUE_INGESTION_CONFIG'))
+    .record(z.string(), z.unknown())
     .optional()
     .describe(
-      'JSON string of config to pass when submitting file for ingestion (e.g., ' +
+      'Config object to pass when submitting file for ingestion (e.g., ' +
         '{"uniqueIngestionMode": "SKIP_INGESTION", "customProperty": "value"})',
     ),
 });
@@ -107,14 +104,10 @@ export const UniqueConfigSchema = z
   .discriminatedUnion('serviceAuthMode', [clusterLocalConfig, externalConfig])
   .and(baseConfig);
 
-export const uniqueConfig = registerConfig('unique', UniqueConfigSchema, {
-  whitelistKeys: new Set([
-    'ZITADEL_OAUTH_TOKEN_URL',
-    'ZITADEL_PROJECT_ID',
-    'ZITADEL_CLIENT_ID',
-    'ZITADEL_CLIENT_SECRET',
-  ]),
-});
+export const uniqueConfig: ConfigFactory & { KEY: string } = Object.assign(
+  () => UniqueConfigSchema.parse(getTenantConfig().unique),
+  { KEY: 'unique' },
+);
 
-export type UniqueConfigNamespaced = NamespacedConfigType<typeof uniqueConfig>;
-export type UniqueConfig = ConfigType<typeof uniqueConfig>;
+export type UniqueConfigNamespaced = { unique: UniqueConfig };
+export type UniqueConfig = z.infer<typeof UniqueConfigSchema>;

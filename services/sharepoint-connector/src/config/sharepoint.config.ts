@@ -1,8 +1,8 @@
-import { ConfigType } from '@nestjs/config';
-import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { type ConfigFactory } from '@nestjs/config';
 import { z } from 'zod';
 import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import { Redacted } from '../utils/redacted';
+import { getTenantConfig } from './tenant-config-loader';
 
 const oidcAuthModeConfig = z.object({
   authMode: z.literal('oidc').describe('Authentication mode to use for Microsoft APIs'),
@@ -96,7 +96,10 @@ export const SharepointConfigSchema = z
   ])
   .and(baseConfig);
 
-export const sharepointConfig = registerConfig('sharepoint', SharepointConfigSchema);
+export const sharepointConfig: ConfigFactory & { KEY: string } = Object.assign(
+  () => SharepointConfigSchema.parse(getTenantConfig().sharepoint),
+  { KEY: 'sharepoint' },
+);
 
-export type SharepointConfigNamespaced = NamespacedConfigType<typeof sharepointConfig>;
-export type SharepointConfig = ConfigType<typeof sharepointConfig>;
+export type SharepointConfigNamespaced = { sharepoint: SharepointConfig };
+export type SharepointConfig = z.infer<typeof SharepointConfigSchema>;
