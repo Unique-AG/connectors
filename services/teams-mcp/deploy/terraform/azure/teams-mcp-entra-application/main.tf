@@ -34,7 +34,7 @@ resource "azuread_application" "teams_mcp" {
       for_each = local.graph_roles
       content {
         id   = azuread_service_principal.msgraph.app_role_ids[resource_access.value]
-        type = "Role"
+        type = "Scope"
       }
     }
   }
