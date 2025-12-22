@@ -37,7 +37,7 @@ export class MetricsMiddleware implements Middleware {
     configService: ConfigService<Config, true>,
     tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(configService);
+    this.shouldConcealLogs = shouldConcealLogs(tenantConfigLoaderService);
     const tenantConfig = tenantConfigLoaderService.loadTenantConfig();
     this.msTenantId = tenantConfig.tenantId;
 

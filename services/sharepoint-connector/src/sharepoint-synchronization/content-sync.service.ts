@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import { length, mapValues } from 'remeda';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
@@ -30,6 +31,7 @@ export class ContentSyncService {
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     private readonly orchestrator: ItemProcessingOrchestratorService,
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly uniqueFilesService: UniqueFilesService,
@@ -38,7 +40,7 @@ export class ContentSyncService {
     @Inject(SPC_FILE_DIFF_EVENTS_TOTAL) private readonly spcFileDiffEventsTotal: Counter,
     @Inject(SPC_FILE_DELETED_TOTAL) private readonly spcFileDeletedTotal: Counter,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async syncContentForSite(

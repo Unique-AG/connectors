@@ -57,7 +57,7 @@ export class GraphApiService {
       'Graph API',
     );
 
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async getAllSiteItems(

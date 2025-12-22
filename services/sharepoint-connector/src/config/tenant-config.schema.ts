@@ -161,6 +161,13 @@ export const TenantConfigSchema = z
     processingAllowedMimeTypes: z.array(z.string()).optional(),
     processingScanIntervalCron: z.string().optional(),
 
+    // Logging configuration
+    logsDiagnosticsDataPolicy: z
+      .enum(['conceal', 'disclose'])
+      .default('conceal')
+      .optional()
+      .describe('Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted'),
+
     // Configuration source settings
     sitesConfigurationSource: z
       .enum(['inline', 'sharePointList'])

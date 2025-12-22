@@ -31,7 +31,7 @@ export class ScopeManagementService {
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService<Config, true>,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async initializeRootScope(

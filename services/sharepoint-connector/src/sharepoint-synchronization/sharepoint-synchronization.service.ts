@@ -32,7 +32,7 @@ export class SharepointSynchronizationService {
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async synchronize(): Promise<void> {
@@ -73,10 +73,10 @@ export class SharepointSynchronizationService {
 
       // Process each site configuration
       for (const { siteId, config } of sitesToProcess) {
-        if (!config.scopeId || !config.ingestionMode) {
-          this.logger.error(`Missing scopeId or ingestionMode for site ${siteId}. Skipping.`);
-          continue;
-        }
+        // if (!config.scopeId || !config.ingestionMode) {
+        //   this.logger.error(`Missing scopeId or ingestionMode for site ${siteId}. Skipping.`);
+        //   continue;
+        // }
         await this.processSite(
           siteId,
           config as SiteConfig & { scopeId: string; ingestionMode: IngestionMode },

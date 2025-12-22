@@ -27,7 +27,7 @@ export class TenantConfigLoaderService {
     private readonly configService: ConfigService<Config, true>,
     private readonly graphApiService: GraphApiService,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this);
   }
 
   public async loadConfig(): Promise<SiteConfig[]> {

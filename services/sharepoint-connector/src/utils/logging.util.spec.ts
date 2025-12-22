@@ -210,33 +210,31 @@ describe('logging utilities', () => {
 
   describe('concealLogs', () => {
     it('returns true when policy is "conceal"', () => {
-      const mockConfigService = {
-        get: (_key: string, _options: { infer: true }) => 'conceal' as const,
-      } as ConfigService<Config, true>;
-      expect(shouldConcealLogs(mockConfigService)).toBe(true);
+      const mockTenantConfigLoaderService = {
+        loadTenantConfig: () => ({ logsDiagnosticsDataPolicy: 'conceal' }),
+      } as unknown as any;
+      expect(shouldConcealLogs(mockTenantConfigLoaderService)).toBe(true);
     });
 
     it('returns false when policy is "disclose"', () => {
-      const mockConfigService = {
-        get: (_key: string, _options: { infer: true }) => 'disclose' as const,
-      } as ConfigService<Config, true>;
-      expect(shouldConcealLogs(mockConfigService)).toBe(false);
+      const mockTenantConfigLoaderService = {
+        loadTenantConfig: () => ({ logsDiagnosticsDataPolicy: 'disclose' }),
+      } as unknown as any;
+      expect(shouldConcealLogs(mockTenantConfigLoaderService)).toBe(false);
     });
 
-    it('calls config service with correct parameters', () => {
-      let capturedKey: string | undefined;
-      let capturedOptions: { infer: true } | undefined;
+    it('calls tenant config loader service', () => {
+      let calledLoadTenantConfig = false;
 
-      const mockConfigService = {
-        get: (key: string, options: { infer: true }) => {
-          capturedKey = key;
-          capturedOptions = options;
-          return 'conceal' as const;
+      const mockTenantConfigLoaderService = {
+        loadTenantConfig: () => {
+          calledLoadTenantConfig = true;
+          return { logsDiagnosticsDataPolicy: 'conceal' };
         },
-      } as ConfigService<Config, true>;
+      } as unknown as any;
 
-      shouldConcealLogs(mockConfigService);
-      expect(capturedKey).toBe('app.logsDiagnosticsDataPolicy');
+      shouldConcealLogs(mockTenantConfigLoaderService);
+      expect(calledLoadTenantConfig).toBe(true);
       expect(capturedOptions).toEqual({ infer: true });
     });
   });

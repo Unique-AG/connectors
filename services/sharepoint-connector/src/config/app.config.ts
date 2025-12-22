@@ -18,12 +18,6 @@ export const AppConfigSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .prefault('info')
       .describe('The log level at which the services outputs (pino)'),
-    logsDiagnosticsDataPolicy: z
-      .enum(['conceal', 'disclose'])
-      .prefault('conceal')
-      .describe(
-        'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
-      ),
     tenantConfigDirectory: z
       .string()
       .describe(
@@ -40,7 +34,6 @@ export const appConfig = registerConfig('app', AppConfigSchema, {
     'LOG_LEVEL',
     'PORT',
     'NODE_ENV',
-    'LOGS_DIAGNOSTICS_DATA_POLICY',
     'TENANT_CONFIG_DIRECTORY',
   ]),
 });

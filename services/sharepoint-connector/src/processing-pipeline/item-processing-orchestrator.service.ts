@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
@@ -14,9 +15,10 @@ export class ItemProcessingOrchestratorService {
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     private readonly processingPipelineService: ProcessingPipelineService,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async processItems(
@@ -25,7 +27,8 @@ export class ItemProcessingOrchestratorService {
     updatedItems: SharepointContentItem[],
     getScopeIdForItem: (itemId: string) => string,
   ): Promise<void> {
-    const concurrency = this.configService.get('processing.concurrency', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const concurrency = tenantConfig.processingConcurrency || 5; // Default concurrency
     const limit = pLimit(concurrency);
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(syncContext.siteId) : syncContext.siteId}]`;
 
