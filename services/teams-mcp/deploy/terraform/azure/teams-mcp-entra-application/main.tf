@@ -77,18 +77,6 @@ resource "azuread_app_role_assignment" "grant_graph_admin_consent" {
   depends_on = [time_sleep.wait_for_graph_propagation]
 }
 
-# Federated identity credentials for workload identity
-resource "azuread_application_federated_identity_credential" "teams_mcp_fic" {
-  for_each = var.federated_identity_credentials
-
-  application_id = azuread_application.teams_mcp.id
-  display_name   = each.key
-  description    = coalesce(each.value.description, each.key)
-  audiences      = each.value.audiences
-  issuer         = each.value.issuer
-  subject        = each.value.subject
-}
-
 # Application password (client secret) for OAuth
 resource "azuread_application_password" "teams_mcp_secret" {
   count = var.create_client_secret ? 1 : 0

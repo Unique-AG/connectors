@@ -9,16 +9,14 @@ This Terraform module creates and configures an Azure Entra (formerly Azure AD) 
 This module provisions an Azure Entra application that can:
 - Access Microsoft Teams meeting data via Microsoft Graph API
 - Read user information, online meetings, recordings, and transcripts
-- Authenticate users via OAuth 2.0 flow
-- Support multiple authentication methods (client secret, workload identity)
+- Authenticate users via OAuth 2.0 delegated flow
 
 ## Features
 
 - **Automatic Microsoft Graph API Permissions**: Configures all required application roles for Teams MCP
 - **Admin Consent**: Optionally grants admin consent automatically via Terraform
 - **OAuth Redirect URIs**: Configures web redirect URIs for OAuth flow
-- **Multiple Auth Methods**: Supports client secrets and federated credentials (workload identity)
-- **Workload Identity**: Full support for Azure AKS workload identity (OIDC)
+- **Client Secret**: Creates a client secret for OAuth authentication
 - **Multi-tenant Support**: Configurable sign-in audience for single or multi-tenant scenarios
 
 ## Required Permissions
@@ -36,7 +34,7 @@ The module grants the following Microsoft Graph **application permissions** (not
 
 ## Usage
 
-### Basic Usage (Client Secret Auth)
+### Basic Usage
 
 ```hcl
 module "teams_mcp_app" {
@@ -48,7 +46,7 @@ module "teams_mcp_app" {
   ]
 
   service_principal_configuration = {}
-  create_client_secret           = true
+  create_client_secret            = true
 }
 
 output "client_id" {
@@ -61,7 +59,7 @@ output "client_secret" {
 }
 ```
 
-### Advanced Usage (Workload Identity)
+### Production Usage
 
 ```hcl
 module "teams_mcp_app" {
@@ -72,8 +70,7 @@ module "teams_mcp_app" {
   notes            = "Teams MCP production application"
 
   redirect_uris = [
-    "https://teams-mcp.example.com/auth/microsoft/callback",
-    "https://teams-mcp-staging.example.com/auth/microsoft/callback"
+    "https://teams-mcp.example.com/auth/microsoft/callback"
   ]
 
   # Enable service principal and grant admin consent
@@ -81,22 +78,8 @@ module "teams_mcp_app" {
     notes = "Service principal for Teams MCP"
   }
 
-  # Configure federated identity for AKS
-  federated_identity_credentials = {
-    "production-aks" = {
-      description = "Production AKS cluster workload identity"
-      issuer      = "https://switzerlandnorth.oic.prod-aks.azure.com/<tenant_id>/<cluster_guid>/"
-      subject     = "system:serviceaccount:teams-mcp:teams-mcp-sa"
-    }
-    "staging-aks" = {
-      description = "Staging AKS cluster workload identity"
-      issuer      = "https://switzerlandnorth.oic.prod-aks.azure.com/<tenant_id>/<cluster_guid>/"
-      subject     = "system:serviceaccount:teams-mcp-staging:teams-mcp-sa"
-    }
-  }
-
-  # Don't create client secret when using workload identity
-  create_client_secret = false
+  create_client_secret   = true
+  client_secret_end_date = "2026-12-31T23:59:59Z"
 }
 ```
 
@@ -109,8 +92,7 @@ module "teams_mcp_app" {
 | `sign_in_audience` | Microsoft identity platform audiences supported | `string` | `"AzureADMultipleOrgs"` | no |
 | `redirect_uris` | List of OAuth redirect URIs | `list(string)` | `[]` | no |
 | `service_principal_configuration` | Service principal configuration (set to `null` to skip creation) | `object` | `{}` | no |
-| `federated_identity_credentials` | Map of federated identity credentials (OIDC) | `map(object)` | `{}` | no |
-| `create_client_secret` | Whether to create a client secret | `bool` | `false` | no |
+| `create_client_secret` | Whether to create a client secret | `bool` | `true` | no |
 | `client_secret_end_date` | End date for the client secret | `string` | `null` | no |
 
 ## Outputs
@@ -122,20 +104,6 @@ module "teams_mcp_app" {
 | `object_id` | Service principal object ID (null if not created) | no |
 | `client_secret_id` | Client secret key ID (null if not created) | yes |
 | `client_secret_value` | Client secret value (null if not created) | yes |
-
-## Authentication Methods
-
-### 1. Client Secret
-- Set `create_client_secret = true`
-- Use output `client_secret_value` in your application
-- Requires periodic rotation
-- Suitable for development and production environments
-
-### 2. Federated Credentials / Workload Identity (Recommended for Kubernetes)
-- Configure via `federated_identity_credentials`
-- No secrets to manage or rotate
-- Requires AKS with workload identity enabled
-- Most secure option for production deployments
 
 ## Post-Deployment
 
@@ -167,9 +135,9 @@ After applying this module:
 - The module waits 15 seconds after service principal creation for Azure AD propagation
 - All Microsoft Graph permissions are **application-level** (app-only access)
 - OAuth redirect URIs must match exactly what your application uses
+- Client secrets should be rotated periodically (set `client_secret_end_date` appropriately)
 
 ## Related Documentation
 
 - [Microsoft Graph Permissions Reference](https://learn.microsoft.com/en-us/graph/permissions-reference)
-- [Azure Workload Identity](https://azure.github.io/azure-workload-identity/)
 - [Entra Application Registration](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app)

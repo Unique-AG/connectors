@@ -31,27 +31,10 @@ variable "redirect_uris" {
   default     = []
 }
 
-variable "federated_identity_credentials" {
-  description = "A map of federated identity credentials for the Azure AD application. Each key is the display name and the value contains the credential configuration. Currently we only support OIDC from this module. You can reuse the same application for multiple origins without sharing secrets by adding multiple issuers and subjects to the map."
-  type = map(object({
-    description = optional(string)
-    audiences   = optional(list(string), ["api://AzureADTokenExchange"])
-    issuer      = string
-    subject     = string
-  }))
-  default = {}
-  # Example
-  # {
-  #  "my-first-kubernetes-cluster" = {
-  #  issuer      = "https://switzerlandnorth.oic.prod-aks.azure.com/<my_entra_tenant_id>/<my_aks_cluster_guid>/"
-  #  subject     = "system:serviceaccount:<namespace>:<serviceaccount-name>"
-  # }
-}
-
 variable "create_client_secret" {
-  description = "Whether to create a client secret for the application. Set to false if you only want to use federated credentials (workload identity)."
+  description = "Whether to create a client secret for the application."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "client_secret_end_date" {
