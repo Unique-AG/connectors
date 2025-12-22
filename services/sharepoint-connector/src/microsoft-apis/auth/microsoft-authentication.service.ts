@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { AuthStrategy } from './strategies/auth-strategy.interface';
 import { CertificateAuthStrategy } from './strategies/certificate-auth.strategy';
 import { ClientSecretAuthStrategy } from './strategies/client-secret-auth.strategy';
@@ -26,24 +27,31 @@ export class MicrosoftAuthenticationService {
     [AuthenticationScope.SHAREPOINT_REST]: new TokenCache(),
   };
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {
+  public constructor(
+    private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
+  ) {
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+
     this.scopesMap = {
       [AuthenticationScope.GRAPH]: ['https://graph.microsoft.com/.default'],
-      [AuthenticationScope.SHAREPOINT_REST]: [
-        `${this.configService.get('sharepoint.baseUrl', { infer: true })}/.default`,
-      ],
+      [AuthenticationScope.SHAREPOINT_REST]: [`${tenantConfig.sharepointBaseUrl}/.default`],
     };
 
-    switch (this.configService.get('sharepoint.authMode', { infer: true })) {
+    const authMode = tenantConfig.authStrategy;
+
+    switch (authMode) {
       case 'oidc':
-        this.strategy = new OidcAuthStrategy(configService);
+        this.strategy = new OidcAuthStrategy(tenantConfig);
         break;
       case 'client-secret':
-        this.strategy = new ClientSecretAuthStrategy(configService);
+        this.strategy = new ClientSecretAuthStrategy(tenantConfig);
         break;
       case 'certificate':
-        this.strategy = new CertificateAuthStrategy(configService);
+        this.strategy = new CertificateAuthStrategy(tenantConfig);
         break;
+      default:
+        throw new Error(`Unsupported authentication mode: ${authMode}`);
     }
     this.logger.log(`Using ${this.strategy.constructor.name} for Microsoft API authentication`);
   }

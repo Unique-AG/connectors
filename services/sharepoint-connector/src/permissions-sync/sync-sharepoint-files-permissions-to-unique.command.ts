@@ -13,6 +13,7 @@ import {
   pipe,
 } from 'remeda';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointSyncContext } from '../sharepoint-synchronization/types';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
@@ -40,10 +41,11 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
   public constructor(
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     @Inject(SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL)
     private readonly spcPermissionsSyncFileOperationsTotal: Counter,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async run(input: Input): Promise<void> {

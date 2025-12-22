@@ -6,10 +6,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
-import { shouldConcealLogs, smear } from '../../utils/logging.util';
+import { redact, shouldConcealLogs, smear } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
@@ -39,24 +40,24 @@ export class GraphApiService {
     private readonly configService: ConfigService<Config, true>,
     private readonly fileFilterService: FileFilterService,
     private readonly bottleneckFactory: BottleneckFactory,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
     this.graphClient = this.graphClientFactory.createClient();
 
-    const msGraphRateLimitPerMinute = this.configService.get(
-      'sharepoint.graphApiRateLimitPerMinute',
-      { infer: true },
-    );
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    assert.ok(tenantConfig.graphApiRateLimitPerMinute, 'Graph API rate limit must be provided');
+    const rateLimit: number = tenantConfig.graphApiRateLimitPerMinute;
 
     this.limiter = this.bottleneckFactory.createLimiter(
       {
-        reservoir: msGraphRateLimitPerMinute,
-        reservoirRefreshAmount: msGraphRateLimitPerMinute,
+        reservoir: rateLimit,
+        reservoirRefreshAmount: rateLimit,
         reservoirRefreshInterval: 60000,
       },
       'Graph API',
     );
 
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async getAllSiteItems(
@@ -102,7 +103,8 @@ export class GraphApiService {
     siteId: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const maxFilesToScan = tenantConfig.processingMaxFilesToScan;
     const sharepointContentFilesToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
     let totalScanned = 0;
@@ -178,7 +180,13 @@ export class GraphApiService {
 
   public async getAspxPagesForSite(siteId: string): Promise<SharepointContentItem[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const maxFilesToScan = tenantConfig.processingMaxFilesToScan;
     const lists = await this.getSiteLists(siteId);
+
+    if (maxFilesToScan) {
+      this.logger.warn(`Items scan limit set to ${maxFilesToScan} items for testing purpose.`);
+    }
 
     // Scan ASPX files from SitePages list
     const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
@@ -191,6 +199,7 @@ export class GraphApiService {
       const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
         siteId,
         sitePagesList.id,
+        maxFilesToScan,
       );
       this.logger.log(
         `${logPrefix} Found ${aspxSharepointContentItems.length} ASPX files from SitePages`,
@@ -227,8 +236,13 @@ export class GraphApiService {
     }
   }
 
-  public async getAspxListItems(siteId: string, listId: string): Promise<SharepointContentItem[]> {
-    const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
+  public async getAspxListItems(
+    siteId: string,
+    listId: string,
+    maxItemsToScan?: number,
+  ): Promise<SharepointContentItem[]> {
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const syncColumnName = tenantConfig.sites?.find((s) => s.siteId === siteId)?.syncColumnName;
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const aspxItems: SharepointContentItem[] = [];
@@ -260,6 +274,13 @@ export class GraphApiService {
         };
 
         aspxItems.push(aspxSharepointContentItem);
+
+        if (maxItemsToScan && aspxItems.length >= maxItemsToScan) {
+          this.logger.log(
+            `${logPrefix} Reached scan limit of ${maxItemsToScan} items in SitePages list ${listId}, stopping scan`,
+          );
+          break;
+        }
       }
 
       this.logger.log(`${logPrefix} Found ${aspxItems.length} ASPX files in SitePages list`);
@@ -559,5 +580,119 @@ export class GraphApiService {
 
   private isFolder(driveItem: DriveItem): boolean {
     return Boolean(driveItem.folder && driveItem.id);
+  }
+
+  public async extractSiteAndListIdFromUrl(
+    listUrl: string,
+  ): Promise<{ siteId: string; listId: string }> {
+    const logPrefix = `[extractSiteAndListIdFromUrl: ${this.shouldConcealLogs ? smear(listUrl) : listUrl}]`;
+
+    try {
+      // Parse URL: https://uniqueapp.sharepoint.com/sites/QA/Lists/Sharepoint%20Sites%20to%20Sync/AllItems.aspx
+      const url = new URL(listUrl);
+      const pathParts = url.pathname.split('/').filter(Boolean);
+
+      // Expected structure: ['sites', 'QA', 'Lists', 'ListName', ...]
+      const sitesIndex = pathParts.indexOf('sites');
+      assert.ok(sitesIndex !== -1, 'URL does not contain /sites/ path segment');
+
+      const siteName = pathParts[sitesIndex + 1];
+      assert.ok(siteName, 'Could not extract site name from URL');
+
+      // Find the list name (comes after /Lists/ segment)
+      const listsIndex = pathParts.indexOf('Lists');
+      assert.ok(listsIndex !== -1, 'URL does not contain /Lists/ path segment');
+
+      const rawListName = pathParts[listsIndex + 1];
+      assert.ok(rawListName, 'Could not extract list name from URL');
+      const listName = decodeURIComponent(rawListName);
+
+      const siteId = await this.getSiteIdFromName(siteName);
+      const listId = await this.getListIdFromName(siteId, listName);
+
+      this.logger.log(`${logPrefix} Extracted siteId and listId from url`, {
+        siteName: this.shouldConcealLogs ? smear(siteName) : siteName,
+        siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
+        listName: this.shouldConcealLogs ? redact(listName) : listName,
+        listId: listId,
+      });
+
+      return { siteId, listId };
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to extract site and list ID from URL`,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
+  }
+
+  public async getSitesConfigList(siteId: string, listId: string): Promise<ListItem[]> {
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+
+    try {
+      const items = await this.paginateGraphApiRequest<ListItem>(
+        `/sites/${siteId}/lists/${listId}/items`,
+        (url) =>
+          this.graphClient
+            .api(url)
+            .select('id,fields')
+            .expand('fields')
+            .top(GRAPH_API_PAGE_SIZE)
+            .get(),
+      );
+
+      this.logger.log(`${logPrefix} Fetched ${items.length} items from config list`);
+      return items;
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to fetch items from config list`,
+        siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
+        listId,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
+  }
+
+  private async getSiteIdFromName(siteName: string): Promise<string> {
+    try {
+      const response = await this.makeRateLimitedRequest<{ id: string }>(() =>
+        this.graphClient.api(`/sites/${siteName}`).get(),
+      );
+      assert.ok(
+        response?.id,
+        `Could not find site ID for site name: ${this.shouldConcealLogs ? smear(siteName) : siteName}`,
+      );
+
+      return response.id;
+    } catch (error) {
+      this.logger.error({
+        msg: 'Failed to get site ID from name',
+        siteName,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
+  }
+
+  private async getListIdFromName(siteId: string, listName: string): Promise<string> {
+    try {
+      const lists = await this.getSiteLists(siteId);
+      const targetList = lists.find((list) => list.name === listName);
+
+      if (!targetList?.id) {
+        throw new Error(`Could not find list ID for list name: ${listName}`);
+      }
+
+      return targetList.id;
+    } catch (error) {
+      this.logger.error({
+        msg: 'Failed to get list ID from name',
+        listName,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
   }
 }

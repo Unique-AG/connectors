@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import { difference, filter, isNonNullish, map, pickBy, pipe } from 'remeda';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
@@ -44,10 +45,11 @@ export class SyncSharepointGroupsToUniqueCommand {
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly graphApiService: GraphApiService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     @Inject(SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL)
     private readonly spcPermissionsSyncGroupOperationsTotal: Counter,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async run(input: Input): Promise<Output> {

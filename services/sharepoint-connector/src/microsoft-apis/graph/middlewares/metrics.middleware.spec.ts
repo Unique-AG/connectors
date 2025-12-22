@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '../../../config';
+import type { TenantConfigLoaderService } from '../../../config/tenant-config-loader.service';
 import { MetricsMiddleware } from './metrics.middleware';
 
 describe('MetricsMiddleware', () => {
@@ -17,6 +18,7 @@ describe('MetricsMiddleware', () => {
     add: ReturnType<typeof vi.fn>;
   };
   let mockConfigService: ConfigService<Config, true>;
+  let mockTenantConfigLoaderService: TenantConfigLoaderService;
 
   beforeEach(() => {
     mockNextMiddleware = {
@@ -33,14 +35,26 @@ describe('MetricsMiddleware', () => {
 
     mockConfigService = {
       get: vi.fn().mockImplementation((key: string, _options?: { infer?: boolean }) => {
-        if (key === 'sharepoint.authTenantId') {
-          return 'test-tenant-id';
+        if (key === 'app.logsDiagnosticsDataPolicy') {
+          return 'disclose';
         }
         return undefined;
       }),
     } as unknown as ConfigService<Config, true>;
 
-    middleware = new MetricsMiddleware(mockHistogram, mockCounter, mockCounter, mockConfigService);
+    mockTenantConfigLoaderService = {
+      loadTenantConfig: vi.fn().mockReturnValue({
+        tenantId: 'test-tenant-id',
+      }),
+    } as unknown as TenantConfigLoaderService;
+
+    middleware = new MetricsMiddleware(
+      mockHistogram,
+      mockCounter,
+      mockCounter,
+      mockConfigService,
+      mockTenantConfigLoaderService,
+    );
     middleware.setNext(mockNextMiddleware);
   });
 
@@ -274,6 +288,7 @@ describe('MetricsMiddleware', () => {
       mockCounter,
       mockCounter,
       mockConfigService,
+      mockTenantConfigLoaderService,
     );
     const mockContext: Context = {
       request: 'https://graph.microsoft.com/v1.0/me',
@@ -722,6 +737,7 @@ describe('MetricsMiddleware', () => {
         mockCounter,
         mockCounter,
         concealingConfigService,
+        mockTenantConfigLoaderService,
       );
       concealingMiddleware.setNext(mockNextMiddleware);
 
@@ -753,6 +769,7 @@ describe('MetricsMiddleware', () => {
         mockCounter,
         mockCounter,
         concealingConfigService,
+        mockTenantConfigLoaderService,
       );
       concealingMiddleware.setNext(mockNextMiddleware);
 
@@ -785,6 +802,7 @@ describe('MetricsMiddleware', () => {
         mockCounter,
         mockCounter,
         concealingConfigService,
+        mockTenantConfigLoaderService,
       );
       concealingMiddleware.setNext(mockNextMiddleware);
 
@@ -815,6 +833,7 @@ describe('MetricsMiddleware', () => {
         mockCounter,
         mockCounter,
         mockConfigService,
+        mockTenantConfigLoaderService,
       );
       nonConcealingMiddleware.setNext(mockNextMiddleware);
 

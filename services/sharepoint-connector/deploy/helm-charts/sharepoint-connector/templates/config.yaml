@@ -20,13 +20,22 @@ data:
   SHAREPOINT_GRAPH_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute | quote }}
   {{- end }}
   SHAREPOINT_BASE_URL: {{ .Values.connectorConfig.sharepoint.baseUrl | quote }}
+  {{- if .Values.connectorConfig.sharepoint.siteIds }}
   SHAREPOINT_SITE_IDS: {{ .Values.connectorConfig.sharepoint.siteIds | join "," | quote }}
+  {{- end }}
+  {{- if .Values.connectorConfig.sharepoint.syncColumnName }}
   SHAREPOINT_SYNC_COLUMN_NAME: {{ .Values.connectorConfig.sharepoint.syncColumnName | quote }}
+  {{- end }}
+  # Tenant configuration
+  {{- if .Values.connectorConfig.sharepoint.sitesConfigurationSource }}
+  TENANT_CONFIG_DIRECTORY: {{ .Values.connectorConfig.sharepoint.sitesConfigurationSource.configPath | quote }}
+  {{- end }}
   # Unique config
   UNIQUE_SCOPE_ID: {{ .Values.connectorConfig.unique.scopeId | quote }}
   UNIQUE_INGESTION_MODE: {{ .Values.connectorConfig.unique.ingestionMode | quote }}
   UNIQUE_INGESTION_SERVICE_BASE_URL: {{ .Values.connectorConfig.unique.ingestionServiceBaseUrl | quote }}
   UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL: {{ .Values.connectorConfig.unique.scopeManagementServiceBaseUrl | quote }}
+  UNIQUE_PERMISSIONS_INHERITANCE_MODE: {{ .Values.connectorConfig.unique.permissionsInheritanceMode | quote }}
   {{- if .Values.connectorConfig.unique.apiRateLimitPerMinute }}
   UNIQUE_API_RATE_LIMIT_PER_MINUTE: {{ .Values.connectorConfig.unique.apiRateLimitPerMinute | quote }}
   {{- end }}

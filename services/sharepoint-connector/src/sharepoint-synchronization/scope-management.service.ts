@@ -1,9 +1,9 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
-import { Config } from '../config';
+import type { SiteConfig } from '../config/tenant-config.schema';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
@@ -12,6 +12,7 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
+import { resolveInheritanceSettings } from '../utils/inheritance.util';
 import { redact, shouldConcealLogs, smear, smearPath } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
@@ -28,9 +29,9 @@ export class ScopeManagementService {
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
-    private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async initializeRootScope(
@@ -137,6 +138,7 @@ export class ScopeManagementService {
     items: SharepointContentItem[],
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
+    siteConfig: SiteConfig,
   ): Promise<ScopeWithPath[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
 
@@ -153,8 +155,10 @@ export class ScopeManagementService {
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
+    const { inheritScopes } = resolveInheritanceSettings(siteConfig.inheritMode);
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
+      inheritAccess: inheritScopes,
     });
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes`);
 

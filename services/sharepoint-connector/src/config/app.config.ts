@@ -18,11 +18,10 @@ export const AppConfigSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .prefault('info')
       .describe('The log level at which the services outputs (pino)'),
-    logsDiagnosticsDataPolicy: z
-      .enum(['conceal', 'disclose'])
-      .prefault('conceal')
+    tenantConfigDirectory: z
+      .string()
       .describe(
-        'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
+        'Directory containing tenant configuration YAML files. Example: /var/lib/tenant-config',
       ),
   })
   .transform((c) => ({
@@ -31,7 +30,7 @@ export const AppConfigSchema = z
   }));
 
 export const appConfig = registerConfig('app', AppConfigSchema, {
-  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'LOGS_DIAGNOSTICS_DATA_POLICY']),
+  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'TENANT_CONFIG_DIRECTORY']),
 });
 
 export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;

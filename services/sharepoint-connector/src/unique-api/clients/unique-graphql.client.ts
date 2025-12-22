@@ -1,11 +1,11 @@
+import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
 import { isObjectType } from 'remeda';
-import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { getHttpStatusCodeClass, getSlowRequestDurationBucket } from '../../metrics';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { sanitizeError } from '../../utils/normalize-error';
@@ -25,13 +25,17 @@ export class UniqueGraphqlClient {
   public constructor(
     private readonly clientTarget: UniqueGraphqlClientTarget,
     private readonly uniqueAuthService: UniqueAuthService,
-    private readonly configService: ConfigService<Config, true>,
     private readonly bottleneckFactory: BottleneckFactory,
     private readonly spcUniqueApiRequestDurationSeconds: Histogram,
     private readonly spcUniqueApiSlowRequestsTotal: Counter,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
-    const uniqueConfig = this.configService.get('unique', { infer: true });
-    const graphqlUrl = `${uniqueConfig[`${clientTarget}ServiceBaseUrl`]}/graphql`;
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+
+    const baseUrlKey = `${this.clientTarget}ServiceBaseUrl` as const;
+    const baseUrl = tenantConfig[baseUrlKey];
+    assert.ok(baseUrl, `Base URL for ${this.clientTarget} must be provided`);
+    const graphqlUrl = `${baseUrl}/graphql`;
 
     this.graphQlClient = new GraphQLClient(graphqlUrl, {
       requestMiddleware: async (request) => {
@@ -48,13 +52,16 @@ export class UniqueGraphqlClient {
       },
     });
 
-    const apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
-      infer: true,
-    });
+    assert.ok(
+      tenantConfig.uniqueApiRateLimitPerMinute,
+      'Unique API rate limit must be provided',
+    );
+    const rateLimit: number = tenantConfig.uniqueApiRateLimitPerMinute;
+
     this.limiter = this.bottleneckFactory.createLimiter(
       {
-        reservoir: apiRateLimitPerMinute,
-        reservoirRefreshAmount: apiRateLimitPerMinute,
+        reservoir: rateLimit,
+        reservoirRefreshAmount: rateLimit,
         reservoirRefreshInterval: 60_000,
       },
       `Unique ${this.clientTarget}`,
@@ -131,11 +138,12 @@ export class UniqueGraphqlClient {
   }
 
   private async getAdditionalHeaders(): Promise<Record<string, string>> {
-    const uniqueConfig = this.configService.get('unique', { infer: true });
-    return uniqueConfig.serviceAuthMode === 'cluster_local'
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+
+    return tenantConfig.serviceAuthMode === 'cluster_local'
       ? {
           'x-service-id': 'sharepoint-connector',
-          ...uniqueConfig.serviceExtraHeaders,
+          ...tenantConfig.serviceExtraHeaders,
         }
       : { Authorization: `Bearer ${await this.uniqueAuthService.getToken()}` };
   }

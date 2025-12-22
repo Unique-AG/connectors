@@ -14,6 +14,7 @@ import {
   pipe,
 } from 'remeda';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { SharepointSyncContext } from '../sharepoint-synchronization/types';
@@ -49,10 +50,11 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     @Inject(SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL)
     private readonly spcFolderPermissionsSyncTotal: Counter,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async run(input: Input): Promise<void> {

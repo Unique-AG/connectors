@@ -21,6 +21,7 @@ import {
   zip,
 } from 'remeda';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { GroupMember } from '../microsoft-apis/graph/types/sharepoint.types';
 import {
@@ -54,8 +55,9 @@ export class FetchGroupsWithMembershipsQuery {
     private readonly graphApiService: GraphApiService,
     private readonly sharepointRestClientService: SharepointRestClientService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   // For given list of group permissions from files/lists, fetch all the present sharepoint group

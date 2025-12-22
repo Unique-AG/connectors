@@ -3,8 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { SharepointSynchronizationService } from '../sharepoint-synchronization/sharepoint-synchronization.service';
 import { sanitizeError } from '../utils/normalize-error';
+
 @Injectable()
 export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
@@ -14,9 +16,19 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly sharepointScanner: SharepointSynchronizationService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {}
 
-  public onModuleInit() {
+  public async onModuleInit() {
+    try {
+      await this.emitConfigurationsAtStartup();
+    } catch (error) {
+      this.logger.error({
+        msg: 'Failed to emit configurations at startup',
+        error: sanitizeError(error),
+      });
+    }
+
     this.logger.log('Triggering initial scan on service startup...');
     void this.runScheduledScan();
     this.setupScheduledScan();
@@ -29,7 +41,12 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private setupScheduledScan(): void {
-    const cronExpression = this.configService.get('processing.scanIntervalCron', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const cronExpression = tenantConfig.processingScanIntervalCron;
+    if (!cronExpression) {
+      this.logger.warn('No cron expression configured for scheduled scan, skipping setup');
+      return;
+    }
     this.logger.log(`Scheduled scan configured with cron expression: ${cronExpression}`);
 
     const job = new CronJob(cronExpression, () => {
@@ -70,6 +87,44 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error({
         msg: 'Error stopping cron jobs',
+        error: sanitizeError(error),
+      });
+    }
+  }
+
+  private async emitConfigurationsAtStartup(): Promise<void> {
+    try {
+      const siteConfigs = await this.tenantConfigLoaderService.loadConfig();
+
+      if (siteConfigs.length === 0) {
+        this.logger.warn(
+          'No site configurations loaded. Please configure site sources via tenant config files or SharePoint list.',
+        );
+        return;
+      }
+
+      this.logger.log(`Loaded ${siteConfigs.length} site configuration(s) at startup`);
+
+      for (const [index, config] of siteConfigs.entries()) {
+        const redactedConfig = {
+          siteId: config.siteId,
+          syncColumnName: config.syncColumnName,
+          ingestionMode: config.ingestionMode,
+          scopeId: config.scopeId,
+          maxIngestedFiles: config.maxIngestedFiles,
+          storeInternally: config.storeInternally,
+          syncStatus: config.syncStatus,
+          inheritMode: config.inheritMode,
+          syncMode: config.syncMode,
+        };
+        this.logger.log(
+          `[Config ${index + 1}/${siteConfigs.length}]`,
+          JSON.stringify(redactedConfig, null, 2),
+        );
+      }
+    } catch (error) {
+      this.logger.warn({
+        msg: 'Could not emit site configurations at startup',
         error: sanitizeError(error),
       });
     }

@@ -1,7 +1,6 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { ModerationStatusValue } from '../../constants/moderation-status.constants';
@@ -14,6 +13,7 @@ import {
   ContentMetadata,
   ContentRegistrationRequest,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
+import { resolveInheritanceSettings } from '../../utils/inheritance.util';
 import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
@@ -30,10 +30,11 @@ export class ContentRegistrationStep implements IPipelineStep {
 
   public constructor(
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
-    private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {
-    this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    this.sharepointBaseUrl = tenantConfig.sharepointBaseUrl;
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
@@ -58,10 +59,11 @@ export class ContentRegistrationStep implements IPipelineStep {
 
     context.metadata = contentRegistrationRequest.metadata;
 
-    const syncMode = this.configService.get('processing.syncMode', { infer: true });
+    const { inheritFiles } = resolveInheritanceSettings(context.siteConfig?.inheritMode);
     // We add permissions only for new files, because existing ones should already have correct
-    // permissions (including service user permissions) and we don't want to override them.
-    if (syncMode === 'content_and_permissions' && context.fileStatus === 'new') {
+    // permissions (including service user permissions) and we don't want to override them; applies
+    // when inheritance is disabled or when syncing permissions.
+    if (!inheritFiles && context.fileStatus === 'new') {
       contentRegistrationRequest.fileAccess = [
         `u:${context.syncContext.serviceUserId}R`,
         `u:${context.syncContext.serviceUserId}W`,
@@ -169,17 +171,14 @@ export class ContentRegistrationStep implements IPipelineStep {
   // writeUrl configurable, but for now this hack lets us avoid hairpinning issues in the internal
   // upload flows.
   private correctWriteUrl(writeUrl: string): string {
-    const uniqueAuthMode = this.configService.get('unique.serviceAuthMode', { infer: true });
-    if (uniqueAuthMode === 'external') {
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    if (tenantConfig.uniqueServiceAuthMode === 'external') {
       return writeUrl;
     }
     const url = new URL(writeUrl);
     const key = url.searchParams.get('key');
     assert.ok(key, 'writeUrl is missing key parameter');
 
-    const ingestionApiUrl = this.configService.get('unique.ingestionServiceBaseUrl', {
-      infer: true,
-    });
-    return `${ingestionApiUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
+    return `${tenantConfig.ingestionServiceBaseUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
   }
 }

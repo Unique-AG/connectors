@@ -1,0 +1,98 @@
+SharePoint Connector – Error Handling Map
+=======================================
+
+Entry & Scheduler
+-----------------
+- main.ts boots Nest app and runWithInstrumentation; no local error handling around bootstrap (startup failures bubble to process).
+- SchedulerService.onModuleInit triggers initial scan and schedules cron; no error guard here.
+- runScheduledScan(): skips when shutting down; wraps synchronize() in try/catch. On error logs sanitized error and swallows (cron continues).
+- destroyCronJobs(): try/catch; logs sanitized error but continues shutdown.
+
+Full Synchronization Flow
+-------------------------
+- SharepointSynchronizationService.synchronize()
+  - isScanning guard: when true, logs warn, records metric (skipped: scan_in_progress), returns.
+  - try/finally ensures isScanning reset; outer catch logs sanitized error, records failure metric (failure_step: unknown), rethrows.
+  - Root scope init via ScopeManagementService.initializeRootScope(): errors logged + metrics set to failure (root_scope_initialization) then returns (aborts full sync run, no throw).
+  - Per-site loop:
+    - Fetch siteName + getAllSiteItems(): errors propagate to outer catch (abort run & rethrow).
+    - No items: logs, records metric skipped(no_items_to_sync), continue to next site.
+    - Recursive mode scope creation: failure logs + metric failure_step scopes_creation; continue next site.
+    - ContentSyncService.syncContentForSite(): failure logs + metric failure_step content_sync; continue next site.
+    - PermissionsSyncService when syncMode=content_and_permissions: failure logs + metric failure_step permissions_sync; continue next site.
+    - Success: records site success metric.
+
+Scanning & Graph Fetching
+-------------------------
+- GraphApiService.getAllSiteItems(): Promise.allSettled over ASPX + drive files; failed branch logs sanitized error but continues with successful branch.
+- getAllFilesForSite(): scan limit warnings; fetches drives sequentially; errors in recursivelyFetchDriveItems propagate to outer catch? recursivelyFetchDriveItems catches errors, logs, returns partial results (continues scanning other drives).
+- recursivelyFetchDriveItems(): on fetch error logs + warns “continuing” and returns items gathered so far.
+- getAspxPagesForSite(): failure logs warn and returns []; does not throw.
+- downloadFileContent(), getSiteLists(), getAspxListItems(), getAspxPageContent(), getSiteWebUrl(), getDrivesForSite(): try/catch log sanitized error then throw (abort caller path).
+
+Scope Management & Moves
+------------------------
+- ScopeManagementService.initializeRootScope(): assert user id/scope existence; errors propagate (caught in synchronize). createScopeAccesses calls not wrapped.
+- batchCreateScopes(): warns/continues when no folder paths; createScopesBasedOnPaths errors propagate; updateNewlyCreatedScopesWithExternalId logs warn on failure but continues.
+- determineScopeForItem(): warns and returns undefined when scope missing (caller may fall back to root scope).
+- FileMoveProcessor.processFileMoves(): failure fetching ingested files logs sanitized error then throws (bubbles to caller -> site failure). Individual move failures log + metric failure but continue other moves.
+
+Content Sync & Diff
+-------------------
+- ContentSyncService.syncContentForSite():
+  - performFileDiff: HTTP errors throw; validateNoAccidentalFullDeletion uses assert.fail in two cases (submitting 0 items -> all deleted; diff wants to delete all existing) => throws, aborts site and bubbles to SharepointSynchronization catch.
+  - deleteRemovedFiles(): failure to fetch files logs sanitized error and returns (skips deletion). Per-file delete errors log + metric failure but continue other deletions.
+  - processFileMoves(): errors bubble from FileMoveProcessor (see above).
+  - Too many files guard: assert.ok on maxIngestedFiles limit -> throws, aborts site.
+  - ItemProcessingOrchestrator.processItems(): uses Promise.allSettled; per-item failures logged as warn count only; no throw back to ContentSync (pipeline keeps going).
+
+Per-Item Processing Pipeline
+----------------------------
+- ProcessingPipelineService.processItem():
+  - Steps run sequentially with executeWithTimeout (rejects on timeout, sets isTimeout flag).
+  - On step success: metric success; optional step.cleanup.
+  - On step error/timeout: metric result failure/timeout; logs sanitized error; runs step.cleanup + finalCleanup; returns {success:false} (does not throw). Caller currently ignores result.
+- finalCleanup clears contentBuffer.
+- ContentFetchingStep: asserts MIME presence/allowlist (throws). Fetch failures log + rethrow.
+- AspxProcessingStep: build HTML; errors log + rethrow.
+- ContentRegistrationStep: asserts response fields; errors log + rethrow.
+- StorageUploadStep: errors in upload log + rethrow. cleanup() attempts delete registered content on failed upload; delete errors logged but swallowed; also clears buffer.
+- IngestionFinalizationStep: asserts registrationResponse, errors log + rethrow.
+
+Permissions Sync
+----------------
+- PermissionsSyncService.syncPermissionsForSite(): try/catch wraps whole flow; on error records metric failure_step and rethrows (propagates to SharepointSynchronization per-site catch).
+- FetchGraphPermissionsMapQuery: sequential fetch; warnings for unparseable identities; map failures propagate.
+- FetchGroupsWithMembershipsQuery:
+  - Site group memberships via SharePoint REST; errors from requestBatch bubble (asserts on non-200).
+  - Graph group memberships fetched in chunks with Promise.allSettled; 404 treated as empty + warn; other errors logged + thrown.
+  - Unsupported nesting type in SharePoint groups triggers assert.fail.
+- SyncSharepointGroupsToUniqueCommand: no try/catch; Unique API errors bubble. Groups with zero members are skipped/deleted without error. Stats counters only.
+- SyncSharepointFilesPermissionsToUniqueCommand: no try/catch; Unique API errors bubble. Files missing SharePoint permissions log warn and skip. Service user access never removed.
+- SyncSharepointFolderPermissionsToUniqueCommand: missing root group -> warn + return (skip). Missing SharePoint directory/permissions logs warn + skip folder. Service user access not removed. Unique API errors bubble.
+
+Unique API Clients
+------------------
+- UniqueGraphqlClient.request(): limiter wrapper; on error logs sanitized, records metrics, rethrows.
+- IngestionHttpClient.request(): retries via interceptor; if status >=400 throws ResponseError; catch logs sanitized + metrics, rethrows.
+- UniqueFileIngestionService: asserts on required response fields; HTTP diff failure throws; no catches.
+- UniqueFilesService/Scopes/Groups/Users: mostly no catches; GraphQL errors bubble. Some warnings in callers.
+- UniqueAuthService: token fetch failures logged sanitized then rethrown; cache used when valid.
+
+SharePoint REST Client
+----------------------
+- SharepointRestHttpService.requestSingle(): asserts 2xx else throws with path info.
+- requestBatch(): retries via undici retry; non-2xx batch response logs error + assert.fail (throws). Non-200 inside multipart item logs error + assert.fail. No pagination handling (TODO noted).
+
+Shared Utilities
+----------------
+- BatchProcessorService: invalid args assert; per-batch errors logged sanitized then rethrow (halts processing). Uses sequential batches.
+- normalizeError/sanitizeError: convert unknown to Error and serialize for logging.
+
+Behavior Summary (continue vs throw)
+------------------------------------
+- Continue/skip with log: site items empty; scope creation failure; content sync failure; permissions sync failure; deletion fetch failure; per-file delete/move failure; per-item pipeline failure (logged only); missing folder permissions; root group missing.
+- Partial continue with data gathered: Graph drive scan recursion errors; Graph ASPX scan failure; Graph+REST permissions fetch 404 for deleted Entra groups.
+- Throws/aborts current scope: invalid MIME/step asserts; diff guard asserts; upload errors; Unique/Graph/REST client errors; token acquisition errors; sharepoint batch non-200; max files exceeded; missing registration response; unexpected pipeline exceptions; Graph API calls with try/catch that rethrow.
+- Rethrow to scheduler: unknown failure in synchronize(); site fetch errors; unhandled throws from sub-services.
+- Scheduler swallows run errors (logs) so cron keeps running.

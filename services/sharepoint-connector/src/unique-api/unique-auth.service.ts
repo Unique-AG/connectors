@@ -2,6 +2,7 @@ import * as assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { HttpClientService } from '../shared/services/http-client.service';
 import { sanitizeError } from '../utils/normalize-error';
 
@@ -15,6 +16,7 @@ export class UniqueAuthService {
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly httpClientService: HttpClientService,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
   ) {}
 
   public async getToken(): Promise<string> {
@@ -22,15 +24,23 @@ export class UniqueAuthService {
       return this.cachedToken;
     }
 
-    const uniqueConfig = this.configService.get('unique', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+
     assert.strictEqual(
-      uniqueConfig.serviceAuthMode,
+      tenantConfig.serviceAuthMode,
       'external',
       'UniqueAuthService called but serviceAuthMode is not "external"',
     );
 
-    const { zitadelOauthTokenUrl, zitadelClientId, zitadelClientSecret, zitadelProjectId } =
-      uniqueConfig;
+    const zitadelOauthTokenUrl = tenantConfig.zitadelOauthTokenUrl;
+    const zitadelClientId = tenantConfig.zitadelClientId;
+    const zitadelClientSecretValue = tenantConfig.zitadelClientSecret;
+    const zitadelProjectId = tenantConfig.zitadelProjectId;
+
+    assert.ok(zitadelOauthTokenUrl, 'Zitadel OAuth token URL must be provided');
+    assert.ok(zitadelClientId, 'Zitadel client ID must be provided');
+    assert.ok(zitadelClientSecretValue, 'Zitadel client secret must be provided');
+    assert.ok(zitadelProjectId, 'Zitadel project ID must be provided');
 
     const params = new URLSearchParams({
       scope:
@@ -40,7 +50,7 @@ export class UniqueAuthService {
     });
 
     try {
-      const basicAuth = Buffer.from(`${zitadelClientId}:${zitadelClientSecret.value}`).toString(
+      const basicAuth = Buffer.from(`${zitadelClientId}:${zitadelClientSecretValue}`).toString(
         'base64',
       );
       const { statusCode, body } = await this.httpClientService.request(zitadelOauthTokenUrl, {

@@ -1,5 +1,4 @@
-import { ConfigService } from '@nestjs/config';
-import type { Config } from '../config';
+import { TenantConfigLoaderService } from '../config/tenant-config-loader.service';
 import { normalizeSlashes } from './paths.util';
 
 export function smear(text: string | null | undefined, leaveOver = 4) {
@@ -61,6 +60,7 @@ export function concealIngestionKey(key: string): string {
   return smear(key); // Smear the whole key if format is unexpected
 }
 
-export function shouldConcealLogs(configService: ConfigService<Config, true>): boolean {
-  return configService.get('app.logsDiagnosticsDataPolicy', { infer: true }) === 'conceal';
+export function shouldConcealLogs(tenantConfigLoaderService: TenantConfigLoaderService): boolean {
+  const tenantConfig = tenantConfigLoaderService.loadTenantConfig();
+  return tenantConfig.logsDiagnosticsDataPolicy === 'conceal';
 }
