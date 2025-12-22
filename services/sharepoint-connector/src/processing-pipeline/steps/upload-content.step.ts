@@ -1,8 +1,7 @@
 import assert from 'node:assert';
 import { Readable } from 'node:stream';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../../config';
+import { TenantConfigLoaderService } from '../../config/tenant-config-loader.service';
 import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
@@ -21,12 +20,12 @@ export class UploadContentStep implements IPipelineStep {
   private readonly shouldConcealLogs: boolean;
 
   public constructor(
-    private readonly configService: ConfigService<Config, true>,
+    private readonly tenantConfigLoaderService: TenantConfigLoaderService,
     private readonly httpClientService: HttpClientService,
-    private readonly uniqueFilesService: UniqueFilesService,
+    private readonly uniqueFilesService: UniqueFilesService,    
     private readonly apiService: GraphApiService,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.tenantConfigLoaderService);
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
@@ -166,10 +165,11 @@ export class UploadContentStep implements IPipelineStep {
   }
 
   private validateMimeType(item: DriveItem): void {
-    const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
+    const tenantConfig = this.tenantConfigLoaderService.loadTenantConfig();
+    const allowedMimeTypes = tenantConfig.processingAllowedMimeTypes;
     assert.ok(item.file?.mimeType, `MIME type is missing for this item. Skipping download.`);
     assert.ok(
-      allowedMimeTypes.includes(item.file.mimeType),
+      allowedMimeTypes?.includes(item.file.mimeType),
       `MIME type ${item.file.mimeType} is not allowed. Skipping download.`,
     );
   }
