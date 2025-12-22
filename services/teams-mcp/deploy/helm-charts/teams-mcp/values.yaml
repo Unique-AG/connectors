@@ -53,6 +53,11 @@ server:
   #         secretKeyRef:
   #           name: teams-mcp-secret
   #           key: DATABASE_URL
+  #     - name: AMQP_URL
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: teams-mcp-secret
+  #           key: AMQP_URL
   #     - name: MICROSOFT_CLIENT_SECRET
   #       valueFrom:
   #         secretKeyRef:
@@ -183,11 +188,8 @@ mcpConfig:
     # -- The local HTTP port to bind the server to
     port: 51345
 
-  # -- AMQP configuration for message queue
-  amqp:
-    # -- The AMQP connection URL
-    # example: amqp://user:password@rabbitmq-host:5672/vhost
-    url: unset_default_value
+  # NOTE: AMQP_URL is loaded from a secret via server.envVars (contains credentials)
+  # See the envVars section below for configuration
 
   # -- Microsoft Graph API configuration
   microsoft:
@@ -244,6 +246,7 @@ mcpConfig:
 
   # Note: The following secrets must be provided via server.envVars:
   # - DATABASE_URL: PostgreSQL connection string
+  # - AMQP_URL: AMQP/RabbitMQ connection URL (contains credentials)
   # - MICROSOFT_CLIENT_SECRET: Microsoft App Registration client secret
   # - MICROSOFT_WEBHOOK_SECRET: 128 character random string for webhook validation
   # - AUTH_HMAC_SECRET: Secret key for signing HMAC tokens

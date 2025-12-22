@@ -11,9 +11,6 @@ data:
   SELF_URL: {{ .Values.mcpConfig.app.selfUrl | quote }}
   PORT: {{ .Values.mcpConfig.app.port | quote }}
 
-  # AMQP configuration
-  AMQP_URL: {{ .Values.mcpConfig.amqp.url | quote }}
-
   # Microsoft Graph configuration
   MICROSOFT_CLIENT_ID: {{ .Values.mcpConfig.microsoft.clientId | quote }}
   MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
