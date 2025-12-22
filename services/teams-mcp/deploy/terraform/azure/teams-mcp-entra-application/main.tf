@@ -7,8 +7,8 @@ locals {
   # Microsoft Graph API roles required by Teams MCP
   # Based on SCOPES in services/teams-mcp/src/auth/microsoft.provider.ts
   graph_roles = toset([
-    "User.Read.All",                      # (delegated): df021288-bdef-4463-88db-98f22de89214
-    "OnlineMeetings.Read.All",            # (delegated): c1684f21-1984-47fa-9d61-2dc8c296bb70
+    "User.Read",                          # (delegated): e1fe6dd8-ba31-4d61-89e7-88639da4683d
+    "OnlineMeetings.Read",                # (delegated): 9be106e1-f4e3-4df5-bdff-e4bc531cbe43
     "OnlineMeetingRecording.Read.All",    # (delegated): 190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3
     "OnlineMeetingTranscript.Read.All",   # (delegated): 30b87d18-ebb1-45db-97f8-82ccb1f0190c
   ])
