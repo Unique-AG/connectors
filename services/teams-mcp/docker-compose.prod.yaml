@@ -31,15 +31,28 @@ services:
     ports:
       - "3000:3000"
     environment:
+      # App configuration
       - NODE_ENV=production
       - PORT=3000
       - SELF_URL=http://localhost:3000
+      # Database configuration
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teams_mcp?schema=public
+      # AMQP configuration
+      - AMQP_URL=amqp://rabbitmq:rabbitmq@rabbitmq:5672
+      # Microsoft configuration (from .env or environment)
       - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
       - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
+      - MICROSOFT_WEBHOOK_SECRET=${MICROSOFT_WEBHOOK_SECRET}
+      - MICROSOFT_PUBLIC_WEBHOOK_URL=${MICROSOFT_PUBLIC_WEBHOOK_URL:-http://localhost:3000/webhooks/microsoft}
+      # Auth configuration
       - AUTH_HMAC_SECRET=${AUTH_HMAC_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - AMQP_URL=amqp://rabbitmq:rabbitmq@rabbitmq:5672
+      # Unique API configuration
+      - UNIQUE_SERVICE_AUTH_MODE=${UNIQUE_SERVICE_AUTH_MODE:-external}
+      - UNIQUE_API_BASE_URL=${UNIQUE_API_BASE_URL}
+      - UNIQUE_SERVICE_EXTRA_HEADERS=${UNIQUE_SERVICE_EXTRA_HEADERS}
+      # Optional: only needed for cluster_local mode
+      # - UNIQUE_INGESTION_SERVICE_BASE_URL=${UNIQUE_INGESTION_SERVICE_BASE_URL}
     depends_on:
       rabbitmq:
         condition: service_started
