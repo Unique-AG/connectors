@@ -14,7 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { TraceService } from 'nestjs-otel';
+import { Span, TraceService } from 'nestjs-otel';
 import { serializeError } from 'serialize-error-cjs';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
@@ -272,6 +272,7 @@ export class TranscriptController {
     }
   }
 
+  @Span()
   @OnEvent('user.upsert')
   public async userUpsert(payload: unknown) {
     const event = UserUpsertEvent.parse(payload);
