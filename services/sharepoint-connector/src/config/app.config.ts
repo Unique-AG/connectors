@@ -24,10 +24,12 @@ export const AppConfigSchema = z
       .describe(
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
-    tenantConfigDirectory: z
+    tenantConfigPath: z
       .string()
       .nonempty()
-      .describe('Directory containing tenant configuration YAML files'),
+      .describe(
+        'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/config/*-tenant-config.yaml)',
+      ),
   })
   .transform((c) => ({
     ...c,
@@ -40,7 +42,7 @@ export const appConfig = registerConfig('app', AppConfigSchema, {
     'PORT',
     'NODE_ENV',
     'LOGS_DIAGNOSTICS_DATA_POLICY',
-    'TENANT_CONFIG_DIRECTORY',
+    'TENANT_CONFIG_PATH',
   ]),
 });
 

@@ -1,0 +1,73 @@
+{{- if .Values.connectorConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sharepoint-connector-tenant-config
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+data:
+  default-tenant-config.yaml: |
+    # SharePoint Configuration
+    sharepoint:
+      authMode: {{ .Values.connectorConfig.sharepoint.auth.mode | quote }}
+      authTenantId: {{ .Values.connectorConfig.sharepoint.tenantId | quote }}
+      {{- if eq .Values.connectorConfig.sharepoint.auth.mode "certificate" }}
+      authClientId: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
+      authPrivateKeyPath: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPath | quote }}
+      authThumbprintSha1: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha1 | quote }}
+      {{- end }}
+      baseUrl: {{ .Values.connectorConfig.sharepoint.baseUrl | quote }}
+      siteIds: {{ .Values.connectorConfig.sharepoint.siteIds | join "," | quote }}
+      syncColumnName: {{ .Values.connectorConfig.sharepoint.syncColumnName | quote }}
+      {{- if .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute }}
+      graphApiRateLimitPerMinute: {{ .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute }}
+      {{- end }}
+
+    # Unique API Configuration
+    unique:
+      serviceAuthMode: {{ .Values.connectorConfig.unique.authMode | quote }}
+      {{- if eq .Values.connectorConfig.unique.authMode "cluster_local" }}
+      serviceExtraHeaders:
+        {{- range $key, $value := .Values.connectorConfig.unique.serviceExtraHeaders }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if eq .Values.connectorConfig.unique.authMode "external" }}
+      zitadelOauthTokenUrl: {{ .Values.connectorConfig.unique.zitadel.oauthTokenUrl | quote }}
+      zitadelProjectId: {{ .Values.connectorConfig.unique.zitadel.projectId | quote }}
+      zitadelClientId: {{ .Values.connectorConfig.unique.zitadel.clientId | quote }}
+      # zitadelClientSecret is loaded from environment variable (secret)
+      {{- end }}
+      ingestionMode: {{ .Values.connectorConfig.unique.ingestionMode | quote }}
+      scopeId: {{ .Values.connectorConfig.unique.scopeId | quote }}
+      ingestionServiceBaseUrl: {{ .Values.connectorConfig.unique.ingestionServiceBaseUrl | quote }}
+      scopeManagementServiceBaseUrl: {{ .Values.connectorConfig.unique.scopeManagementServiceBaseUrl | quote }}
+      {{- if .Values.connectorConfig.unique.apiRateLimitPerMinute }}
+      apiRateLimitPerMinute: {{ .Values.connectorConfig.unique.apiRateLimitPerMinute }}
+      {{- end }}
+      {{- if .Values.connectorConfig.unique.maxIngestedFiles }}
+      maxIngestedFiles: {{ .Values.connectorConfig.unique.maxIngestedFiles }}
+      {{- end }}
+      storeInternally: {{ .Values.connectorConfig.unique.storeInternally | quote }}
+      {{- if .Values.connectorConfig.unique.ingestionConfig }}
+      ingestionConfig:
+        {{- toYaml .Values.connectorConfig.unique.ingestionConfig | nindent 8 }}
+      {{- end }}
+
+    # Processing Configuration
+    processing:
+      syncMode: {{ .Values.connectorConfig.processing.syncMode | quote }}
+      stepTimeoutSeconds: {{ .Values.connectorConfig.processing.stepTimeoutSeconds }}
+      concurrency: {{ .Values.connectorConfig.processing.concurrency }}
+      {{- if .Values.connectorConfig.processing.maxFileSizeBytes }}
+      maxFileSizeBytes: {{ .Values.connectorConfig.processing.maxFileSizeBytes }}
+      {{- end }}
+      allowedMimeTypes:
+        {{- range .Values.connectorConfig.processing.allowedMimeTypes }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- if .Values.connectorConfig.processing.scanIntervalCron }}
+      scanIntervalCron: {{ .Values.connectorConfig.processing.scanIntervalCron | quote }}
+      {{- end }}
+{{- end }}
+

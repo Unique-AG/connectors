@@ -1,25 +1,26 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { globSync, readFileSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { TenantConfig, TenantConfigSchema } from './tenant-config.schema';
 
 let cachedConfig: TenantConfig | null = null;
 
-function loadTenantConfig(tenantConfigDirectory: string): TenantConfig {
-  const files = readdirSync(tenantConfigDirectory).filter(
-    (file) => file.endsWith('.yaml') || file.endsWith('.yml'),
-  );
+function loadTenantConfig(pathPattern: string): TenantConfig {
+  const files = globSync(pathPattern);
 
   if (files.length === 0) {
-    throw new Error(`No YAML configuration files found in ${tenantConfigDirectory}`);
+    throw new Error(`No tenant configuration files found matching pattern '${pathPattern}'`);
   }
 
-  const configFile = files[0];
-  if (!configFile) {
-    throw new Error(`No YAML configuration files found in ${tenantConfigDirectory}`);
+  if (files.length > 1) {
+    throw new Error(
+      `Multiple tenant configuration files found matching pattern '${pathPattern}': ${files.join(', ')}. Only one tenant config file is supported for now.`,
+    );
   }
 
-  const configPath = join(tenantConfigDirectory, configFile);
+  const configPath = files[0];
+  if (!configPath) {
+    throw new Error(`No tenant configuration files found matching pattern '${pathPattern}'`);
+  }
 
   try {
     const fileContent = readFileSync(configPath, 'utf-8');
@@ -38,11 +39,13 @@ function loadTenantConfig(tenantConfigDirectory: string): TenantConfig {
 
 export function getTenantConfig(): TenantConfig {
   if (!cachedConfig) {
-    const tenantConfigDirectory = process.env.TENANT_CONFIG_DIRECTORY;
-    if (!tenantConfigDirectory) {
-      throw new Error('TENANT_CONFIG_DIRECTORY environment variable is not set');
+    const tenantConfigPath = process.env.TENANT_CONFIG_PATH;
+
+    if (!tenantConfigPath) {
+      throw new Error('TENANT_CONFIG_PATH environment variable is not set');
     }
-    cachedConfig = loadTenantConfig(tenantConfigDirectory);
+
+    cachedConfig = loadTenantConfig(tenantConfigPath);
   }
   return cachedConfig;
 }

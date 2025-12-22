@@ -12,18 +12,22 @@ connector:
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
+    # Path pattern to tenant configuration YAML file
+    TENANT_CONFIG_PATH: /app/config/*-tenant-config.yaml
   # -- Environment variables from secrets. Required when authMode is 'external'.
   # When using external authMode, add the following to load the Zitadel client secret:
   #   envVars:
-  #     - name: UNIQUE_ZITADEL_CLIENT_SECRET
+  #     - name: ZITADEL_CLIENT_SECRET
   #       valueFrom:
   #         secretKeyRef:
   #           name: sharepoint-connector-secret
-  #           key: UNIQUE_ZITADEL_CLIENT_SECRET
+  #           key: ZITADEL_CLIENT_SECRET
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
   extraEnvCM:
-    - sharepoint-connector-config
+    # Deprecated: Legacy environment variable based config (will be removed in future version)
+    # The connector now uses YAML-based configuration from sharepoint-connector-tenant-config
+    # - sharepoint-connector-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
     tag: 2.0.0-beta.8 # x-release-please-version
@@ -69,12 +73,20 @@ connector:
         items:
           - key: key.pem
             path: key.pem
+      # -- Tenant configuration YAML file mounted from ConfigMap
+    - name: tenant-config
+      configMap:
+        name: sharepoint-connector-tenant-config
   volumeMounts:
     - name: tmp
       mountPath: /tmp
     - name: sharepoint-connector-secret
       mountPath: /app/key.pem
       subPath: key.pem
+      readOnly: true
+      # -- Mount tenant configuration directory
+    - name: tenant-config
+      mountPath: /app/config
       readOnly: true
 
 # -- Grafana dashboard configuration
