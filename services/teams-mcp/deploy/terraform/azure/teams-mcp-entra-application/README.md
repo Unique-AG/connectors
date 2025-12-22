@@ -13,7 +13,7 @@ This module provisions an Azure Entra application that can:
 
 ## Features
 
-- **Automatic Microsoft Graph API Permissions**: Configures all required application roles for Teams MCP
+- **Automatic Microsoft Graph API Permissions**: Configures all required delegated permissions for Teams MCP
 - **Admin Consent**: Optionally grants admin consent automatically via Terraform
 - **OAuth Redirect URIs**: Configures web redirect URIs for OAuth flow
 - **Client Secret**: Creates a client secret for OAuth authentication
@@ -21,16 +21,16 @@ This module provisions an Azure Entra application that can:
 
 ## Required Permissions
 
-The module grants the following Microsoft Graph **application permissions** (not delegated):
+The module grants the following Microsoft Graph **delegated permissions**:
 
 | Permission | ID | Description |
 |------------|-----|-------------|
-| `User.Read.All` | df021288-bdef-4463-88db-98f22de89214 | Read all users' full profiles |
-| `OnlineMeetings.Read.All` | c1684f21-1984-47fa-9d61-2dc8c296bb70 | Read all online meetings |
+| `User.Read` | e1fe6dd8-ba31-4d61-89e7-88639da4683d | Read signed-in user's profile |
+| `OnlineMeetings.Read` | 9be106e1-f4e3-4df5-bdff-e4bc531cbe43 | Read user's online meetings |
 | `OnlineMeetingRecording.Read.All` | 190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3 | Read all online meeting recordings |
 | `OnlineMeetingTranscript.Read.All` | 30b87d18-ebb1-45db-97f8-82ccb1f0190c | Read all online meeting transcripts |
 
-> **Note**: These are **application permissions** which require admin consent and allow the app to act without a signed-in user.
+> **Note**: These are **delegated permissions** which act on behalf of the signed-in user. Admin consent may still be required for some permissions.
 
 ## Usage
 
@@ -116,7 +116,6 @@ After applying this module:
 
 ## Limitations
 
-- Module creates application permissions only (not delegated permissions)
 - Service principal creation is optional but required for admin consent
 - Automatic admin consent only works when `service_principal_configuration` is set
 - Cross-tenant scenarios require manual consent (set `service_principal_configuration = null`)
@@ -133,7 +132,7 @@ After applying this module:
 
 - Admin consent is automatically granted when `service_principal_configuration` is set
 - The module waits 15 seconds after service principal creation for Azure AD propagation
-- All Microsoft Graph permissions are **application-level** (app-only access)
+- All Microsoft Graph permissions are **delegated** (act on behalf of signed-in user)
 - OAuth redirect URIs must match exactly what your application uses
 - Client secrets should be rotated periodically (set `client_secret_end_date` appropriately)
 

@@ -59,24 +59,6 @@ resource "azuread_service_principal" "teams_mcp" {
   notes        = var.service_principal_configuration.notes != null ? var.service_principal_configuration.notes : var.notes
 }
 
-# Wait for Azure AD propagation
-resource "time_sleep" "wait_for_graph_propagation" {
-  count = var.service_principal_configuration != null ? 1 : 0
-
-  depends_on      = [azuread_application.teams_mcp, azuread_service_principal.teams_mcp]
-  create_duration = "15s"
-}
-
-# Grant admin consent for Microsoft Graph permissions
-resource "azuread_app_role_assignment" "grant_graph_admin_consent" {
-  for_each            = var.service_principal_configuration != null ? local.graph_roles : []
-  app_role_id         = azuread_service_principal.msgraph.app_role_ids[each.value]
-  principal_object_id = azuread_service_principal.teams_mcp[0].object_id
-  resource_object_id  = azuread_service_principal.msgraph.object_id
-
-  depends_on = [time_sleep.wait_for_graph_propagation]
-}
-
 # Application password (client secret) for OAuth
 resource "azuread_application_password" "teams_mcp_secret" {
   count = var.create_client_secret ? 1 : 0

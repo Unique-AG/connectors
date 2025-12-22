@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-bookworm AS base
+FROM node:24-bookworm AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-ARG PNPM_VERSION=10.15.1
+ARG PNPM_VERSION=10.22.0
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 
 FROM base AS pruner
@@ -36,9 +36,9 @@ RUN --mount=type=cache,target=/root/.cache/turbo \
     pnpm turbo build --filter=@unique-ag/${APP_NAME}... && \
     pnpm --filter=@unique-ag/${APP_NAME} deploy out
 
-FROM node:22-bookworm-slim AS runner
+FROM node:24-bookworm-slim AS runner
 ARG APP_NAME
-ARG PNPM_VERSION=10.15.1
+ARG PNPM_VERSION=10.22.0
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

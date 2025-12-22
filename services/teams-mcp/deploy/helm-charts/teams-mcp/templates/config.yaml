@@ -9,7 +9,6 @@ metadata:
 data:
   # App configuration
   SELF_URL: {{ .Values.mcpConfig.app.selfUrl | quote }}
-  PORT: {{ .Values.mcpConfig.app.port | quote }}
 
   # Microsoft Graph configuration
   MICROSOFT_CLIENT_ID: {{ .Values.mcpConfig.microsoft.clientId | quote }}
@@ -21,7 +20,9 @@ data:
   UNIQUE_API_VERSION: {{ .Values.mcpConfig.unique.apiVersion | quote }}
   UNIQUE_ROOT_SCOPE_PATH: {{ .Values.mcpConfig.unique.rootScopePath | quote }}
   UNIQUE_USER_FETCH_CONCURRENCY: {{ .Values.mcpConfig.unique.userFetchConcurrency | quote }}
-  # NOTE: UNIQUE_SERVICE_EXTRA_HEADERS is loaded from a secret via server.envVars (contains auth tokens)
+  {{- if .Values.mcpConfig.unique.serviceExtraHeaders }}
+  UNIQUE_SERVICE_EXTRA_HEADERS: {{ .Values.mcpConfig.unique.serviceExtraHeaders | quote }}
+  {{- end }}
   {{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
   UNIQUE_INGESTION_SERVICE_BASE_URL: {{ .Values.mcpConfig.unique.ingestionServiceBaseUrl | quote }}
   {{- end }}

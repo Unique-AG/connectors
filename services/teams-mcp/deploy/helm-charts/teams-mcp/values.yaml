@@ -78,11 +78,6 @@ server:
   #         secretKeyRef:
   #           name: teams-mcp-secret
   #           key: ENCRYPTION_KEY
-  #     - name: UNIQUE_SERVICE_EXTRA_HEADERS
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: teams-mcp-secret
-  #           key: UNIQUE_SERVICE_EXTRA_HEADERS
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
   extraEnvCM:
@@ -115,18 +110,15 @@ server:
         enabled: false
   service:
     enabled: false
-  serviceAccount:
-    enabled: true
-    workloadIdentity:
-      enabled: true
-      clientId: unset_default_value
+
   # Prometheus metrics enabled (from outlook-mcp)
   prometheus:
     enabled: true
   # The volume is needed for CorePack
   volumes:
     - name: tmp
-      emptyDir: {}
+      emptyDir:
+        sizeLimit: 5Gi
   volumeMounts:
     - name: tmp
       mountPath: /tmp
@@ -142,7 +134,7 @@ grafana:
 # -- Prometheus alerting rules configuration
 alerts:
   # -- Enable PrometheusRule resource creation
-  enabled: false
+  enabled: true
   # -- Default alert definitions
   defaultAlerts:
     # -- Enable GraphQL API error rate alerts
@@ -185,8 +177,7 @@ mcpConfig:
     # -- The URL of the MCP Server. Used for OAuth callbacks.
     # example: https://teams.mcp.unique.app
     selfUrl: unset_default_value
-    # -- The local HTTP port to bind the server to
-    port: 51345
+
 
   # NOTE: AMQP_URL is loaded from a secret via server.envVars (contains credentials)
   # See the envVars section below for configuration
@@ -209,17 +200,10 @@ mcpConfig:
     # cluster_local: communicates using in-cluster URLs with service headers
     # external: communicates using external URLs with app key authentication
     serviceAuthMode: cluster_local
-    # NOTE: serviceExtraHeaders contains sensitive auth tokens and must be loaded from a secret.
-    # It is NOT configured here. Instead, add it to server.envVars:
-    #   envVars:
-    #     - name: UNIQUE_SERVICE_EXTRA_HEADERS
-    #       valueFrom:
-    #         secretKeyRef:
-    #           name: teams-mcp-secret
-    #           key: UNIQUE_SERVICE_EXTRA_HEADERS
-    # The value should be a JSON string:
+    # -- Extra headers to send with requests to Unique API services (JSON string)
     # For cluster_local mode: '{"x-company-id": "...", "x-user-id": "..."}'
     # For external mode: '{"authorization": "Bearer ...", "x-app-id": "...", "x-user-id": "...", "x-company-id": "..."}'
+    serviceExtraHeaders: ""
 
     # -- The Public API URL
     # example: https://api.unique.app
@@ -251,4 +235,3 @@ mcpConfig:
   # - MICROSOFT_WEBHOOK_SECRET: 128 character random string for webhook validation
   # - AUTH_HMAC_SECRET: Secret key for signing HMAC tokens
   # - ENCRYPTION_KEY: 32-byte (256-bit) secret for AES-256-GCM encryption (hex or base64)
-  # - UNIQUE_SERVICE_EXTRA_HEADERS: JSON string with auth headers (may contain Authorization token)
