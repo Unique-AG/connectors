@@ -133,7 +133,7 @@ export class UniqueService {
         },
       },
     });
-    await this.uploadToStorage(transcriptUpload.writeUrl, transcript.content);
+    await this.uploadToStorage(transcriptUpload.writeUrl, transcript.content, 'text/vtt');
     await this.upsertContent({
       storeInternally: true,
       scopeId: scope.id,
@@ -170,7 +170,7 @@ export class UniqueService {
           },
         },
       });
-      await this.uploadToStorage(recordingUpload.writeUrl, recording.content);
+      await this.uploadToStorage(recordingUpload.writeUrl, recording.content, 'video/mp4');
       await this.upsertContent({
         storeInternally: true,
         scopeId: scope.id,
@@ -452,6 +452,7 @@ export class UniqueService {
   private async uploadToStorage(
     writeUrl: string,
     content: ReadableStream<Uint8Array<ArrayBuffer>>,
+    mime: string
   ): Promise<void> {
     const span = this.trace.getSpan();
 
@@ -465,7 +466,7 @@ export class UniqueService {
     const response = await fetch(writeUrl, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'text/vtt',
+        'Content-Type': mime,
         'x-ms-blob-type': 'BlockBlob',
       },
       body: content,

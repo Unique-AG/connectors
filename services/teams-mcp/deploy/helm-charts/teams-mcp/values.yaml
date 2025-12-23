@@ -24,11 +24,39 @@ server:
   #         secretKeyRef:
   #           name: teams-mcp-secret
   #           key: DATABASE_URL
+  #     # AMQP: Choose one of the following options:
+  #     # Option 1: Full URL
   #     - name: AMQP_URL
   #       valueFrom:
   #         secretKeyRef:
   #           name: teams-mcp-secret
   #           key: AMQP_URL
+  #     # Option 2: Individual fields
+  #     # - name: AMQP_HOST
+  #     #   valueFrom:
+  #     #     secretKeyRef:
+  #     #       name: teams-mcp-secret
+  #     #       key: AMQP_HOST
+  #     # - name: AMQP_PORT
+  #     #   valueFrom:
+  #     #     secretKeyRef:
+  #     #       name: teams-mcp-secret
+  #     #       key: AMQP_PORT
+  #     # - name: AMQP_USERNAME
+  #     #   valueFrom:
+  #     #     secretKeyRef:
+  #     #       name: teams-mcp-secret
+  #     #       key: AMQP_USERNAME
+  #     # - name: AMQP_PASSWORD
+  #     #   valueFrom:
+  #     #     secretKeyRef:
+  #     #       name: teams-mcp-secret
+  #     #       key: AMQP_PASSWORD
+  #     # - name: AMQP_VHOST  # optional
+  #     #   valueFrom:
+  #     #     secretKeyRef:
+  #     #       name: teams-mcp-secret
+  #     #       key: AMQP_VHOST
   #     - name: MICROSOFT_CLIENT_SECRET
   #       valueFrom:
   #         secretKeyRef:
@@ -149,10 +177,6 @@ mcpConfig:
     # example: https://teams.mcp.unique.app
     selfUrl: unset_default_value
 
-
-  # NOTE: AMQP_URL is loaded from a secret via server.envVars (contains credentials)
-  # See the envVars section below for configuration
-
   # -- Microsoft Graph API configuration
   microsoft:
     # -- The client ID of the Microsoft App Registration
@@ -202,7 +226,9 @@ mcpConfig:
 
   # Note: The following secrets must be provided via server.envVars:
   # - DATABASE_URL: PostgreSQL connection string
-  # - AMQP_URL: AMQP/RabbitMQ connection URL (contains credentials)
+  # - AMQP (choose one):
+  #   - AMQP_URL: Full AMQP/RabbitMQ connection URL (contains credentials)
+  #   - AMQP_*: AMQP individual fields (username, password, host, port, vhost)
   # - MICROSOFT_CLIENT_SECRET: Microsoft App Registration client secret
   # - MICROSOFT_WEBHOOK_SECRET: 128 character random string for webhook validation
   # - AUTH_HMAC_SECRET: Secret key for signing HMAC tokens

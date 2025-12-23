@@ -100,17 +100,6 @@
           },
           "required": ["selfUrl"]
         },
-        "amqp": {
-          "type": "object",
-          "description": "AMQP configuration for message queue",
-          "properties": {
-            "url": {
-              "type": "string",
-              "description": "The AMQP connection URL. Example: amqp://user:pass@host:5672/vhost"
-            }
-          },
-          "required": ["url"]
-        },
         "microsoft": {
           "type": "object",
           "description": "Microsoft Graph API configuration",
@@ -196,7 +185,7 @@
           }
         }
       },
-      "required": ["app", "amqp", "microsoft", "unique"]
+      "required": ["app", "microsoft", "unique"]
     }
   },
   "additionalProperties": false
