@@ -212,10 +212,12 @@ export class TranscriptCreatedService {
         startDateTime: meeting.startDateTime,
         endDateTime: meeting.endDateTime,
         owner: {
+          id: meeting.participants.organizer.identity.user.id,
           name: meeting.participants.organizer.identity.user.displayName ?? '',
           email: meeting.participants.organizer.upn,
         },
         participants: meeting.participants.attendees.map((p) => ({
+          id: p.identity.user.id ?? undefined,
           name: p.identity.user.displayName ?? '',
           email: p.upn,
         })),

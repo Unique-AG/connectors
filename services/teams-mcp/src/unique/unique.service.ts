@@ -42,8 +42,8 @@ export class UniqueService {
       subject: string;
       startDateTime: Date;
       endDateTime: Date;
-      participants: { name: string; email: string }[];
-      owner: { name: string; email: string };
+      participants: { id?: string; name: string; email: string }[];
+      owner: { id: string; name: string; email: string };
     },
     transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
     recording?: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
@@ -53,7 +53,7 @@ export class UniqueService {
     span?.setAttribute('recording_id', recording?.id ?? '');
     span?.setAttribute('participant_count', meeting.participants.length);
     span?.setAttribute('meeting_date', meeting.startDateTime.toISOString());
-    span?.setAttribute('owner_email', meeting.owner.email);
+    span?.setAttribute('owner_id', meeting.owner.id);
 
     this.logger.log(
       {
@@ -452,7 +452,7 @@ export class UniqueService {
   private async uploadToStorage(
     writeUrl: string,
     content: ReadableStream<Uint8Array<ArrayBuffer>>,
-    mime: string
+    mime: string,
   ): Promise<void> {
     const span = this.trace.getSpan();
 
