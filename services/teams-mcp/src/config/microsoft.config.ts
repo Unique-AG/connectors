@@ -17,9 +17,11 @@ const ConfigSchema = z.object({
   webhookSecret: redacted(z.string().length(128)).describe(
     'The webhook secret for validating subscriptions hooks (spoof protection). Must be a 128 random characters.',
   ),
-  publicWebhookUrl: stringToURL().describe(
-    'The public webhook URL reachable from external network used by Microsoft Graph subscription for pushes.',
-  ),
+  publicWebhookUrl: stringToURL()
+    .prefault(process.env.SELF_URL ?? '')
+    .describe(
+      'The public webhook URL reachable from external network used by Microsoft Graph subscription for pushes.',
+    ),
   subscriptionExpirationTimeHoursUTC: z.coerce
     .number()
     .min(0)
