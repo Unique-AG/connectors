@@ -9,33 +9,6 @@ server:
       enabled: true
       command: |
         pnpm run db:migrate
-  # External Ingress endpoint (from outlook-mcp)
-  extraObjects:
-    - apiVersion: networking.k8s.io/v1
-      kind: Ingress
-      metadata:
-        name: apps-mcp-server-teams-mcp
-        annotations:
-          cert-manager.io/cluster-issuer: letsencrypt
-          external-dns.alpha.kubernetes.io/hostname: teams.mcp.unique.app
-          konghq.com/plugins: unique-route-metrics
-      spec:
-        ingressClassName: kong
-        tls:
-          - hosts:
-              - teams.mcp.unique.app
-            secretName: apps-mcp-server-teams-mcp-tls
-        rules:
-          - host: teams.mcp.unique.app
-            http:
-              paths:
-                - path: /
-                  pathType: Prefix
-                  backend:
-                    service:
-                      name: apps-mcp-server-teams
-                      port:
-                        number: 80
   env:
     LOG_LEVEL: info
     MAX_HEAP_MB: 1920
