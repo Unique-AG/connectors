@@ -14,12 +14,6 @@ locals {
   ])
 }
 
-# Service principal for Microsoft Graph
-resource "azuread_service_principal" "msgraph" {
-  client_id    = local.graph_app_id
-  use_existing = true
-}
-
 # Azure AD application for Teams MCP
 resource "azuread_application" "teams_mcp" {
   display_name     = var.display_name
@@ -33,7 +27,7 @@ resource "azuread_application" "teams_mcp" {
     dynamic "resource_access" {
       for_each = local.graph_roles
       content {
-        id   = azuread_service_principal.msgraph.app_role_ids[resource_access.value]
+        id   = resource_access.value
         type = "Scope"
       }
     }
@@ -48,15 +42,6 @@ resource "azuread_application" "teams_mcp" {
       id_token_issuance_enabled     = false
     }
   }
-}
-
-# Service principal for the Teams MCP application
-resource "azuread_service_principal" "teams_mcp" {
-  count = var.service_principal_configuration != null ? 1 : 0
-
-  client_id    = azuread_application.teams_mcp.client_id
-  use_existing = true
-  notes        = var.service_principal_configuration.notes != null ? var.service_principal_configuration.notes : var.notes
 }
 
 # Application password (client secret) for OAuth
