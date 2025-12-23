@@ -8,11 +8,6 @@ output "application_id" {
   value       = azuread_application.teams_mcp.id
 }
 
-output "object_id" {
-  description = "The object ID of the Azure AD service principal. Null if service principal was not created."
-  value       = var.service_principal_configuration != null ? azuread_service_principal.teams_mcp[0].object_id : null
-}
-
 output "client_secret_id" {
   description = "The key ID of the client secret. Null if client secret was not created."
   value       = var.create_client_secret ? azuread_application_password.teams_mcp_secret[0].key_id : null
