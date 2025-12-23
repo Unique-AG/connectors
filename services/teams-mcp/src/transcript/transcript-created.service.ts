@@ -181,7 +181,7 @@ export class TranscriptCreatedService {
         id: recordingData.id,
         content: await client
           .api(
-            `/v1.0/users/${userId}/onlineMeetings/${meetingId}/recordings/${recordingData.id}/content`,
+            `/users/${userId}/onlineMeetings/${meetingId}/recordings/${recordingData.id}/content`,
           )
           .getStream(),
       };
