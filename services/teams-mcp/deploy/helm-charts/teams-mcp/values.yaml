@@ -98,7 +98,7 @@ server:
 grafana:
   dashboard:
     # -- Enable Grafana dashboard ConfigMap creation
-    enabled: false
+    enabled: true
     # -- Grafana folder where the dashboard will be placed
     folder: mcp-servers
 
