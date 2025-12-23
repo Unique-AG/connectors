@@ -12,7 +12,9 @@ data:
 
   # Microsoft Graph configuration
   MICROSOFT_CLIENT_ID: {{ .Values.mcpConfig.microsoft.clientId | quote }}
+  {{- if .Values.mcpConfig.microsoft.publicWebhookUrl }}
   MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
+  {{- end }}
 
   # Unique API configuration
   UNIQUE_SERVICE_AUTH_MODE: {{ .Values.mcpConfig.unique.serviceAuthMode | quote }}

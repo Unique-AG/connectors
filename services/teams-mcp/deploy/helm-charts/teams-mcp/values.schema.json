@@ -121,10 +121,10 @@
             },
             "publicWebhookUrl": {
               "type": "string",
-              "description": "The public webhook URL reachable from external network for Microsoft Graph subscriptions. Example: https://teams.mcp.unique.app/webhooks"
+              "description": "The public webhook URL reachable from external network for Microsoft Graph subscriptions. Optional - defaults to SELF_URL if not provided. Example: https://teams.mcp.unique.app/webhooks"
             }
           },
-          "required": ["clientId", "publicWebhookUrl"]
+          "required": ["clientId"]
         },
         "unique": {
           "type": "object",

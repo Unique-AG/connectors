@@ -158,9 +158,10 @@ mcpConfig:
     # -- The client ID of the Microsoft App Registration
     # example: 12345678-1234-1234-1234-123456789012
     clientId: unset_default_value
-    # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions
-    # example: https://teams.mcp.unique.app/webhooks
-    publicWebhookUrl: unset_default_value
+    # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions.
+    # Optional - defaults to SELF_URL if not provided.
+    # example: https://teams.mcp.unique.app
+    # publicWebhookUrl: ""
     # clientSecret is loaded from a secret, see server.envVars
     # webhookSecret is loaded from a secret, see server.envVars
 
