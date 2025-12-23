@@ -19,7 +19,7 @@ export class TranscriptUtilsService {
       infer: true,
     });
 
-    const isTrusted = state === null || state.value === webhookSecret.value;
+    const isTrusted = state !== null && state.value === webhookSecret.value;
 
     this.logger.debug(
       { isTrusted, hasState: state !== null },
