@@ -80,7 +80,7 @@ server:
       default:
         enabled: false
   service:
-    enabled: false
+    enabled: true
 
   # Prometheus metrics enabled (from outlook-mcp)
   prometheus:
