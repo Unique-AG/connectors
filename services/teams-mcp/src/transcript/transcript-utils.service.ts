@@ -89,6 +89,11 @@ export class TranscriptUtilsService {
       ),
     );
 
+    // NOTE: we synchronise all of them to 1 day in advance at most because if we would do a longer window
+    // each time a notification comes in, and a token is expired, we would try to keep getting data from the API
+    // but it keeps failing (because token expired) and we would just spam with errors
+    // - instead we renew daily, so that if anyone is expired, we get less "notification with expired token"
+    // noise and we would see who has token expired on a daily basis at renewal.
     const nowHour = now.getUTCHours();
     const needsNextDay = nowHour >= targetHour || nowHour + lifecycleHoursRequired >= targetHour;
     if (needsNextDay) {

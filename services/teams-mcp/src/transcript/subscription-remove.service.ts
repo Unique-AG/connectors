@@ -89,6 +89,9 @@ export class SubscriptionRemoveService {
       'Sending deletion request to Microsoft Graph API for subscription',
     );
 
+    // NOTE: even if this deletion fails, whenever we get notification from microsoft we verify
+    // the subscription exists on our DB as the source of truth, ignoring anything coming if not there
+    // - so this is safe to do
     const client = this.graphClientFactory.createClientForUser(deletedSubscription.userProfileId);
     // Be explicit that this returns the response but we don't care about it if successful
     const _graphResponse = (await client
