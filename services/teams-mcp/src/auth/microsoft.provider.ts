@@ -24,7 +24,7 @@ export const MicrosoftOAuthProvider: OAuthProviderConfig = {
   profileMapper: (profile) => ({
     id: profile.id,
     username: profile.userPrincipalName,
-    email: profile.emails[0]?.value,
+    email: profile.emails?.[0]?.value,
     displayName: profile.displayName,
     raw: profile,
   }),
