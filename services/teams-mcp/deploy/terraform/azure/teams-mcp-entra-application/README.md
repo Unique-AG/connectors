@@ -14,7 +14,6 @@ This module provisions an Azure Entra application that can:
 ## Features
 
 - **Automatic Microsoft Graph API Permissions**: Configures all required delegated permissions for Teams MCP
-- **Admin Consent**: Optionally grants admin consent automatically via Terraform
 - **OAuth Redirect URIs**: Configures web redirect URIs for OAuth flow
 - **Client Secret**: Creates a client secret for OAuth authentication
 - **Multi-tenant Support**: Configurable sign-in audience for single or multi-tenant scenarios
@@ -45,8 +44,7 @@ module "teams_mcp_app" {
     "https://teams-mcp.example.com/auth/microsoft/callback"
   ]
 
-  service_principal_configuration = {}
-  create_client_secret            = true
+  create_client_secret = true
 }
 
 output "client_id" {
@@ -73,11 +71,6 @@ module "teams_mcp_app" {
     "https://teams-mcp.example.com/auth/microsoft/callback"
   ]
 
-  # Enable service principal and grant admin consent
-  service_principal_configuration = {
-    notes = "Service principal for Teams MCP"
-  }
-
   create_client_secret   = true
   client_secret_end_date = "2026-12-31T23:59:59Z"
 }
@@ -91,7 +84,6 @@ module "teams_mcp_app" {
 | `notes` | Notes for the Azure AD application | `string` | `null` | no |
 | `sign_in_audience` | Microsoft identity platform audiences supported | `string` | `"AzureADMultipleOrgs"` | no |
 | `redirect_uris` | List of OAuth redirect URIs | `list(string)` | `[]` | no |
-| `service_principal_configuration` | Service principal configuration (set to `null` to skip creation) | `object` | `{}` | no |
 | `create_client_secret` | Whether to create a client secret | `bool` | `true` | no |
 | `client_secret_end_date` | End date for the client secret | `string` | `null` | no |
 
@@ -101,7 +93,6 @@ module "teams_mcp_app" {
 |------|-------------|-----------|
 | `client_id` | The application (client) ID | no |
 | `application_id` | The application object ID | no |
-| `object_id` | Service principal object ID (null if not created) | no |
 | `client_secret_id` | Client secret key ID (null if not created) | yes |
 | `client_secret_value` | Client secret value (null if not created) | yes |
 
@@ -109,16 +100,9 @@ module "teams_mcp_app" {
 
 After applying this module:
 
-1. **Verify Admin Consent**: Check in Azure Portal that all permissions show "Granted for \<tenant\>"
-2. **Configure Application**: Use the `client_id` output in your Teams MCP configuration
-3. **Store Secrets Securely**: If using client secret, store the output in Azure Key Vault
-4. **Test Authentication**: Verify OAuth flow works with configured redirect URIs
-
-## Limitations
-
-- Service principal creation is optional but required for admin consent
-- Automatic admin consent only works when `service_principal_configuration` is set
-- Cross-tenant scenarios require manual consent (set `service_principal_configuration = null`)
+1. **Configure Application**: Use the `client_id` output in your Teams MCP configuration
+2. **Store Secrets Securely**: If using client secret, store the output in Azure Key Vault
+3. **Test Authentication**: Verify OAuth flow works with configured redirect URIs
 
 ## Requirements
 
@@ -130,9 +114,7 @@ After applying this module:
 
 ## Notes
 
-- Admin consent is automatically granted when `service_principal_configuration` is set
-- The module waits 15 seconds after service principal creation for Azure AD propagation
-- All Microsoft Graph permissions are **delegated** (act on behalf of signed-in user)
+- All Microsoft Graph permissions are **delegated** (act on behalf of signed-in user, consent is granted during sign-in)
 - OAuth redirect URIs must match exactly what your application uses
 - Client secrets should be rotated periodically (set `client_secret_end_date` appropriately)
 

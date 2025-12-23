@@ -16,15 +16,6 @@ variable "sign_in_audience" {
   default     = "AzureADMultipleOrgs"
 }
 
-variable "service_principal_configuration" {
-  description = "Configuration for the service principal. Set to null to skip service principal creation (useful in cross-tenant scenarios). When set, you can provide optional tags and notes that override the application-level values."
-  type = object({
-    tags  = optional(list(string))
-    notes = optional(string)
-  })
-  default = {}
-}
-
 variable "redirect_uris" {
   description = "List of OAuth redirect URIs for the application. Should include the callback URL for your Teams MCP server."
   type        = list(string)
