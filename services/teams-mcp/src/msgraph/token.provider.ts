@@ -113,9 +113,9 @@ export class TokenProvider implements AuthenticationProvider {
 
       const encryptedAccessToken = this.encryptionService.encryptToString(tokenData.access_token);
       // Keep old refresh token if new one not provided
-      const encryptedRefreshToken = this.encryptionService.encryptToString(
-        tokenData.refresh_token || userProfile.refreshToken,
-      );
+      const encryptedRefreshToken = tokenData.refresh_token
+        ? this.encryptionService.encryptToString(tokenData.refresh_token)
+        : userProfile.refreshToken;
 
       // Update the stored tokens
       await this.drizzle
