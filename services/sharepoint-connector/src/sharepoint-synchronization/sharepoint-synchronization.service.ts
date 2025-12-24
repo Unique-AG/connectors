@@ -49,43 +49,65 @@ export class SharepointSynchronizationService {
     // We wrap the whole action in a try-finally block to ensure that the isScanning flag is reset
     // in case of some unexpected one-off error occurring.
     try {
-      const siteIdsToScan = this.configService.get('sharepoint.siteIds', { infer: true });
-      const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-      const scopeId = this.configService.get('unique.scopeId', { infer: true });
+      const sites = this.configService.get('sharepoint.sites', { infer: true });
 
-      // Initialize root scope and context (once)
-      let baseContext: BaseSyncContext;
-      try {
-        baseContext = await this.scopeManagementService.initializeRootScope(scopeId, ingestionMode);
-      } catch (error) {
-        this.logger.error({
-          msg: 'Failed to initialize root scope',
-          error: sanitizeError(error),
-        });
+      // Filter to only active sites
+      const activeSites = sites.filter((site) => site.syncStatus === 'active');
+
+      if (activeSites.length === 0) {
+        this.logger.warn('No active sites configured for synchronization');
         this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
           sync_type: 'full',
-          result: 'failure',
-          failure_step: 'root_scope_initialization',
+          result: 'skipped',
+          skip_reason: 'no_active_sites',
         });
         return;
       }
 
-      this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
+      this.logger.log(
+        `Starting scan of ${activeSites.length} active SharePoint sites (${sites.length - activeSites.length} sites skipped)...`,
+      );
 
-      for (const siteId of siteIdsToScan) {
+      for (const siteConfig of activeSites) {
         const siteSyncStartTime = Date.now();
-        const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+        const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
         const logPrefix = `[Site: ${logSiteId}]`;
         let scopes: ScopeWithPath[] | null = null;
         const siteStartTime = Date.now();
 
+        // Initialize root scope for this site
+        let baseContext: BaseSyncContext;
+        try {
+          baseContext = await this.scopeManagementService.initializeRootScope(
+            siteConfig.scopeId,
+            siteConfig.ingestionMode,
+          );
+        } catch (error) {
+          this.logger.error({
+            msg: `${logPrefix} Failed to initialize root scope`,
+            error: sanitizeError(error),
+          });
+          this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+            sync_type: 'site',
+            sp_site_id: logSiteId,
+            result: 'failure',
+            failure_step: 'root_scope_initialization',
+          });
+          continue;
+        }
+
+        const siteName = await this.graphApiService.getSiteName(siteConfig.siteId);
         const context: SharepointSyncContext = {
           ...baseContext,
-          siteId,
-          siteName: await this.graphApiService.getSiteName(siteId),
+          siteId: siteConfig.siteId,
+          siteName,
+          siteConfig,
         };
 
-        const { items, directories } = await this.graphApiService.getAllSiteItems(siteId);
+        const { items, directories } = await this.graphApiService.getAllSiteItems(
+          siteConfig.siteId,
+          siteConfig.syncColumnName,
+        );
         this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
 
         if (items.length === 0) {
@@ -99,7 +121,7 @@ export class SharepointSynchronizationService {
           continue;
         }
 
-        if (ingestionMode === IngestionMode.Recursive) {
+        if (siteConfig.ingestionMode === IngestionMode.Recursive) {
           try {
             // Create scopes for ALL paths (including moved file destinations)
             scopes = await this.scopeManagementService.batchCreateScopes(
@@ -138,8 +160,7 @@ export class SharepointSynchronizationService {
           continue;
         }
 
-        const syncMode = this.configService.get('processing.syncMode', { infer: true });
-        if (syncMode === 'content_and_permissions') {
+        if (siteConfig.syncMode === 'content_and_permissions') {
           try {
             await this.permissionsSyncService.syncPermissionsForSite({
               context,

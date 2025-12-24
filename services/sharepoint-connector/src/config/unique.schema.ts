@@ -1,7 +1,5 @@
 import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
-import { IngestionMode } from '../constants/ingestion.constants';
-import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { Redacted } from '../utils/redacted';
 
 const clusterLocalConfig = z.object({
@@ -38,16 +36,6 @@ const externalConfig = z.object({
 });
 
 const baseConfig = z.object({
-  ingestionMode: z
-    .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
-    .describe(
-      'Ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy.',
-    ),
-  scopeId: z
-    .string()
-    .describe(
-      'Scope ID to be used as root for ingestion. For flat mode, all files are ingested in this scope. For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
-    ),
   ingestionServiceBaseUrl: z
     .url()
     .describe('Base URL for Unique ingestion service')
@@ -66,18 +54,6 @@ const baseConfig = z.object({
     .positive()
     .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
     .describe('Number of Unique API requests allowed per minute'),
-  maxIngestedFiles: z.coerce
-    .number()
-    .int()
-    .positive()
-    .optional()
-    .describe(
-      'Maximum number of files to ingest per site in a single run. If the number of new + updated files for a site exceeds this limit, the sync for that site will fail.',
-    ),
-  storeInternally: z
-    .enum([StoreInternallyMode.Enabled, StoreInternallyMode.Disabled])
-    .default(StoreInternallyMode.Enabled)
-    .describe('Whether to store content internally in Unique or not.'),
   ingestionConfig: z
     .record(z.string(), z.unknown())
     .optional()

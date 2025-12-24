@@ -176,7 +176,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
@@ -191,7 +191,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
@@ -213,7 +213,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(2);
       expect(result.directories).toHaveLength(0);
@@ -232,7 +232,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(0);
       expect(result.directories).toHaveLength(0);
@@ -245,7 +245,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
@@ -266,7 +266,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);

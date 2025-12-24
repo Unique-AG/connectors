@@ -5,6 +5,7 @@ import { INGESTION_SOURCE_KIND } from '../../constants/ingestion.constants';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
+import { createMockSiteConfig } from '../../test-utils/mock-site-config';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { ContentRegistrationStep } from './content-registration.step';
@@ -50,6 +51,7 @@ describe('ContentRegistrationStep', () => {
       rootPath: '/Root',
       siteId: 'site',
       siteName: 'test-site',
+      siteConfig: createMockSiteConfig(),
     },
     pipelineItem: {
       itemType: 'listItem',

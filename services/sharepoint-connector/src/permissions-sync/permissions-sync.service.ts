@@ -116,7 +116,7 @@ export class PermissionsSyncService {
         unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
       });
 
-      const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
+      const ingestionMode = context.siteConfig.ingestionMode;
       if (ingestionMode === IngestionMode.Recursive) {
         currentStep = 'folder_permissions_sync';
         assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);

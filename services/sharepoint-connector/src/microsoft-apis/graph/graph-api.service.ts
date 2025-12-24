@@ -61,11 +61,12 @@ export class GraphApiService {
 
   public async getAllSiteItems(
     siteId: string,
+    syncColumnName: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
-      this.getAspxPagesForSite(siteId),
-      this.getAllFilesForSite(siteId),
+      this.getAspxPagesForSite(siteId, syncColumnName),
+      this.getAllFilesForSite(siteId, syncColumnName),
     ]);
 
     const sharepointContentItemsToSync: SharepointContentItem[] = [];
@@ -100,6 +101,7 @@ export class GraphApiService {
 
   public async getAllFilesForSite(
     siteId: string,
+    syncColumnName: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
@@ -128,6 +130,7 @@ export class GraphApiService {
         'root',
         siteId,
         drive.name,
+        syncColumnName,
         remainingLimit,
       );
 
@@ -176,7 +179,10 @@ export class GraphApiService {
     }
   }
 
-  public async getAspxPagesForSite(siteId: string): Promise<SharepointContentItem[]> {
+  public async getAspxPagesForSite(
+    siteId: string,
+    syncColumnName: string,
+  ): Promise<SharepointContentItem[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const lists = await this.getSiteLists(siteId);
 
@@ -191,6 +197,7 @@ export class GraphApiService {
       const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
         siteId,
         sitePagesList.id,
+        syncColumnName,
       );
       this.logger.log(
         `${logPrefix} Found ${aspxSharepointContentItems.length} ASPX files from SitePages`,
@@ -227,8 +234,11 @@ export class GraphApiService {
     }
   }
 
-  public async getAspxListItems(siteId: string, listId: string): Promise<SharepointContentItem[]> {
-    const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
+  public async getAspxListItems(
+    siteId: string,
+    listId: string,
+    syncColumnName: string,
+  ): Promise<SharepointContentItem[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const aspxItems: SharepointContentItem[] = [];
@@ -247,7 +257,8 @@ export class GraphApiService {
       );
 
       for (const item of items) {
-        if (!this.fileFilterService.isListItemValidForIngestion(item.fields)) continue;
+        if (!this.fileFilterService.isListItemValidForIngestion(item.fields, syncColumnName))
+          continue;
 
         const aspxSharepointContentItem: SharepointContentItem = {
           itemType: 'listItem',
@@ -415,6 +426,7 @@ export class GraphApiService {
     itemId: string,
     siteId: string,
     driveName: string,
+    syncColumnName: string,
     maxFiles?: number,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
@@ -441,6 +453,7 @@ export class GraphApiService {
             driveItem.id,
             siteId,
             driveName,
+            syncColumnName,
             remainingLimit,
           );
 
@@ -460,7 +473,7 @@ export class GraphApiService {
             fileName: driveItem.name,
           });
           sharepointDirectoryItemsToSync.push(...directories);
-        } else if (this.fileFilterService.isFileValidForIngestion(driveItem)) {
+        } else if (this.fileFilterService.isFileValidForIngestion(driveItem, syncColumnName)) {
           const folderPath = this.extractFolderPath(driveItem);
           sharepointContentItemsToSync.push({
             itemType: 'driveItem',

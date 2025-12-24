@@ -5,6 +5,7 @@ import { Config } from '../../config';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { ModerationStatusValue } from '../../constants/moderation-status.constants';
+import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { SharePointUser } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
@@ -54,11 +55,13 @@ export class ContentRegistrationStep implements IPipelineStep {
       baseUrl: this.sharepointBaseUrl,
       byteSize: context.fileSize ?? 0,
       metadata: this.extractMetadata(context.pipelineItem),
+      storeInternally:
+        context.syncContext.siteConfig.storeInternally === StoreInternallyMode.Enabled,
     };
 
     context.metadata = contentRegistrationRequest.metadata;
 
-    const syncMode = this.configService.get('processing.syncMode', { infer: true });
+    const syncMode = context.syncContext.siteConfig.syncMode;
     // We add permissions only for new files, because existing ones should already have correct
     // permissions (including service user permissions) and we don't want to override them.
     if (syncMode === 'content_and_permissions' && context.fileStatus === 'new') {

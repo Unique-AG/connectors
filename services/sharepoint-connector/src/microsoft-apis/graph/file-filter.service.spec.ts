@@ -102,22 +102,22 @@ describe('FileFilterService', () => {
 
   it('returns true for valid syncable file', () => {
     const item = mockDriveItem();
-    expect(service.isFileValidForIngestion(item)).toBe(true);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
   });
 
   it('returns false for file without listItem fields', () => {
     const item = mockDriveItem({ listItem: undefined });
-    expect(service.isFileValidForIngestion(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
   });
 
   it('returns false for empty file (0 bytes)', () => {
     const item = mockDriveItem({ size: 0 });
-    expect(service.isFileValidForIngestion(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
   });
 
   it('returns false for file with undefined size', () => {
     const item = mockDriveItem({ size: undefined });
-    expect(service.isFileValidForIngestion(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
   });
 
   it('returns false for file without sync flag', () => {
@@ -131,21 +131,21 @@ describe('FileFilterService', () => {
         },
       },
     });
-    expect(service.isFileValidForIngestion(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
   });
 
   it('returns false for file with disallowed mime type', () => {
     const item = mockDriveItem({
       file: { mimeType: 'image/png', hashes: { quickXorHash: 'hash1' } },
     });
-    expect(service.isFileValidForIngestion(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
   });
 
   it('returns true for file with allowed text/plain mime type', () => {
     const item = mockDriveItem({
       file: { mimeType: 'text/plain', hashes: { quickXorHash: 'hash1' } },
     });
-    expect(service.isFileValidForIngestion(item)).toBe(true);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
   });
 
   it('returns true for ASPX file with allowed MIME type', () => {
@@ -153,7 +153,7 @@ describe('FileFilterService', () => {
       name: 'test.aspx',
       file: { mimeType: 'text/html', hashes: { quickXorHash: 'hash1' } },
     });
-    expect(service.isFileValidForIngestion(item)).toBe(true);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
   });
 
   it('returns true for ASPX file with disallowed MIME type', () => {
@@ -161,7 +161,7 @@ describe('FileFilterService', () => {
       name: 'test.aspx',
       file: { mimeType: 'image/png', hashes: { quickXorHash: 'hash1' } },
     });
-    expect(service.isFileValidForIngestion(item)).toBe(true);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
   });
 
   it('returns true for ASPX file without MIME type', () => {
@@ -169,7 +169,7 @@ describe('FileFilterService', () => {
       name: 'test.aspx',
       file: { mimeType: 'text/html', hashes: { quickXorHash: 'hash1' } },
     });
-    expect(service.isFileValidForIngestion(item)).toBe(true);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
   });
 
   it('returns false for file with .aspx in middle of name but not extension', () => {
@@ -177,7 +177,7 @@ describe('FileFilterService', () => {
       name: 'test.aspx.doc',
       file: { mimeType: 'application/msword', hashes: { quickXorHash: 'hash1' } },
     });
-    expect(service.isFileValidForIngestion(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
   });
 
   it('returns false for file ending with .aspx but without file property', () => {
@@ -185,7 +185,7 @@ describe('FileFilterService', () => {
       name: 'test.aspx',
       file: undefined,
     });
-    expect(service.isFileValidForIngestion(item)).toBe(false);
+    expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
   });
 
   describe('isAspxFileValidForIngestion', () => {
@@ -201,57 +201,57 @@ describe('FileFilterService', () => {
 
     it('returns true for valid ASPX file with all required fields', () => {
       const fields = createFieldsObject();
-      expect(service.isListItemValidForIngestion(fields)).toBe(true);
+      expect(service.isListItemValidForIngestion(fields, 'FinanceGPTKnowledge')).toBe(true);
     });
 
     it('returns false for non-ASPX file', () => {
       const fields = createFieldsObject({ FileLeafRef: 'test.pdf' });
-      expect(service.isListItemValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields, 'FinanceGPTKnowledge')).toBe(false);
     });
 
     it('returns false for ASPX file without sync flag', () => {
       const fields = createFieldsObject({ FinanceGPTKnowledge: false });
-      expect(service.isListItemValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields, 'FinanceGPTKnowledge')).toBe(false);
     });
 
     it('returns false for ASPX file with undefined sync flag', () => {
       const fields = createFieldsObject({ FinanceGPTKnowledge: undefined });
-      expect(service.isListItemValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields, 'FinanceGPTKnowledge')).toBe(false);
     });
 
     it('returns false for ASPX file that is not approved', () => {
       const fields = createFieldsObject({ _ModerationStatus: ModerationStatus.Rejected });
-      expect(service.isListItemValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields, 'FinanceGPTKnowledge')).toBe(false);
     });
 
     it('returns false for ASPX file with pending moderation status', () => {
       const fields = createFieldsObject({ _ModerationStatus: ModerationStatus.Pending });
-      expect(service.isListItemValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields, 'FinanceGPTKnowledge')).toBe(false);
     });
 
     it('returns false for ASPX file with undefined moderation status', () => {
       const fields = createFieldsObject({ _ModerationStatus: undefined });
-      expect(service.isListItemValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields, 'FinanceGPTKnowledge')).toBe(false);
     });
 
     it('returns false for file without FileLeafRef', () => {
       const fields = createFieldsObject({ FileLeafRef: undefined });
-      expect(service.isListItemValidForIngestion(fields)).toBe(false);
+      expect(service.isListItemValidForIngestion(fields, 'FinanceGPTKnowledge')).toBe(false);
     });
 
     it('returns false for file exceeding maxFileSizeBytes', () => {
       const item = mockDriveItem({ size: DEFAULT_MAX_FILE_SIZE_BYTES + 1 });
-      expect(service.isFileValidForIngestion(item)).toBe(false);
+      expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
     });
 
     it('returns true for file at maxFileSizeBytes limit', () => {
       const item = mockDriveItem({ size: DEFAULT_MAX_FILE_SIZE_BYTES });
-      expect(service.isFileValidForIngestion(item)).toBe(true);
+      expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
     });
 
     it('returns true for file below maxFileSizeBytes limit', () => {
       const item = mockDriveItem({ size: 1048576 });
-      expect(service.isFileValidForIngestion(item)).toBe(true);
+      expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
     });
   });
 });

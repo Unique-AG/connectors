@@ -4,6 +4,7 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { ScopeManagementService } from './scope-management.service';
@@ -112,6 +113,7 @@ describe('ScopeManagementService', () => {
     rootPath: '/test1',
     siteId: 'site-123',
     siteName: 'test-site',
+    siteConfig: createMockSiteConfig(),
   };
 
   let service: ScopeManagementService;

@@ -5,6 +5,7 @@ import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
@@ -145,6 +146,7 @@ describe('ProcessingPipelineService', () => {
     rootPath: '/Root',
     siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
     siteName: 'test-site',
+    siteConfig: createMockSiteConfig(),
   };
 
   it('processes file through all pipeline steps successfully', async () => {

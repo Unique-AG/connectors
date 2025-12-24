@@ -163,14 +163,6 @@ connectorConfig:
     # -- base url of the sharepoint instance
     # example: https://acme.sharepoint.com
     baseUrl: unset_default_value
-    # -- Array of site IDs to scan
-    siteIds:
-      # Example values
-      - 00000000-0000-0000-0000-000000000000
-      - 00000000-0000-0000-0000-000000000001
-    # -- column name against which the files are synced
-    # example: FinanceGPTKnowledge
-    syncColumnName: unset_default_value
     auth:
       # -- authentication mode
       # possible values: certificate
@@ -191,6 +183,25 @@ connectorConfig:
       thumbprintSha1: unset_default_value
     graph:
       apiRateLimitPerMinute: 780000
+    # -- Array of sites to sync. Each site has its own configuration.
+    sites:
+      - siteId: 00000000-0000-0000-0000-000000000000
+        syncColumnName: FinanceGPTKnowledge
+        ingestionMode: recursive
+        scopeId: scope_bu4gokr0atzj0kfiuaaaaaaa
+        maxIngestedFiles: 1000
+        storeInternally: enabled
+        syncStatus: active
+        syncMode: content_and_permissions
+      # Example: Additional site with different settings
+      # - siteId: 00000000-0000-0000-0000-000000000001
+      #   syncColumnName: HRKnowledge
+      #   ingestionMode: flat
+      #   scopeId: scope_bu4gokr0atzj0kfiubbbbbb
+      #   maxIngestedFiles: 500
+      #   storeInternally: enabled
+      #   syncStatus: active
+      #   syncMode: content_only
 
   unique:
     # -- communication mode for the Unique Services
@@ -206,18 +217,8 @@ connectorConfig:
     # example: https://api.unique.app/scope-management
     # example: http://node-scope-management.finance-gpt:8094
     scopeManagementServiceBaseUrl: unset_default_value
-    # -- ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy (path-based ingestion)
-    # possible values: flat, recursive
-    ingestionMode: recursive
-    # -- Scope ID to be used as root for ingestion. Required for both flat and recursive modes.
-    # example: scope_bu4gokr0atzj0kfiuaaaaaaa
-    scopeId: unset_default_value
-    # -- Maximum number of files to ingest per site in a single run.
-    # If the number of new + updated files for a site exceeds this limit, the sync for that site will fail.
-    maxIngestedFiles: 1000
-    # -- Whether to store content internally in Unique or not.
-    # possible values: enabled, disabled
-    storeInternally: enabled
+    # NOTE: ingestionMode, scopeId, maxIngestedFiles, and storeInternally have been moved to per-site configuration
+    # See sharepoint.sites array above
     # -- Number of Unique API requests allowed per minute
     apiRateLimitPerMinute: 100
     # -- Object containing extra HTTP headers for Unique API requests (GraphQL and REST)
@@ -243,11 +244,6 @@ connectorConfig:
       # clientSecret is loaded from a secret, see connector.envVars
 
   processing:
-    # -- mode of synchronization from SharePoint to Unique.
-    # Possible values:
-    # - content_only: sync only the content,
-    # - content_and_permissions: sync both content and permissions,
-    syncMode: content_only
     # -- timeout in seconds for a file processing step before it will stop and skip processing the file
     stepTimeoutSeconds: 300
     # -- how many files you want to submit for ingestion into Unique at once

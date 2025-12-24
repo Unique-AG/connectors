@@ -15,6 +15,7 @@ export interface ContentRegistrationRequest {
   byteSize: number;
   fileAccess?: FileAccessKey[];
   metadata: ContentMetadata;
+  storeInternally: boolean;
 }
 
 export interface IngestionFinalizationRequest {
@@ -31,6 +32,7 @@ export interface IngestionFinalizationRequest {
   url?: string;
   baseUrl?: string;
   metadata?: ContentMetadata;
+  storeInternally: boolean;
 }
 
 export interface IngestionApiResponse {

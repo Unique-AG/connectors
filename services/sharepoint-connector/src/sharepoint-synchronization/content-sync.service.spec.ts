@@ -1,6 +1,8 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { IngestionMode } from '../constants/ingestion.constants';
+import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
@@ -11,6 +13,17 @@ import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './types';
+
+const mockSiteConfig = {
+  siteId: 'site-id',
+  syncColumnName: 'TestColumn',
+  ingestionMode: IngestionMode.Flat,
+  scopeId: 'scope-id',
+  maxIngestedFiles: 1000,
+  storeInternally: StoreInternallyMode.Enabled,
+  syncStatus: 'active' as const,
+  syncMode: 'content_only' as const,
+};
 
 describe('ContentSyncService', () => {
   let service: ContentSyncService;
@@ -113,6 +126,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -153,6 +167,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -194,6 +209,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -235,6 +251,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -285,6 +302,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -342,6 +360,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -390,6 +409,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -439,6 +459,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -488,6 +509,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -516,6 +538,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -551,6 +574,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -587,6 +611,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({

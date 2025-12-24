@@ -98,7 +98,7 @@ export class ContentSyncService {
 
     // Check limit only for new/updated files after deletions and moves are processed
     const totalFilesToIngest = newFileKeys.size + updatedFileKeys.size;
-    const maxIngestedFiles = this.configService.get('unique.maxIngestedFiles', { infer: true });
+    const maxIngestedFiles = context.siteConfig.maxIngestedFiles;
 
     assert.ok(
       !maxIngestedFiles || totalFilesToIngest <= maxIngestedFiles,

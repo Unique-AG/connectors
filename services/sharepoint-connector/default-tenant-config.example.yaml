@@ -26,19 +26,46 @@ sharepoint:
   # Note: If private key is encrypted, provide password via environment variable:
   # - Local dev: Add SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD to .env file
   # - Kubernetes: Load from secret via envVars (see values.yaml)
-  # authPrivateKeyPassword: password-if-key-is-encrypted
   
   # Your company's SharePoint base URL (without trailing slash)
   baseUrl: https://yourcompany.sharepoint.com
   
-  # Comma-separated list of SharePoint site IDs to scan (UUIDv4 format)
-  siteIds: 12345678-1234-1234-1234-123456789abc,87654321-4321-4321-4321-cba987654321
-  
-  # Name of the SharePoint column indicating sync flag
-  syncColumnName: FinanceGPTKnowledge
-  
   # Number of MS Graph API requests allowed per minute (optional, default: 600)
   graphApiRateLimitPerMinute: 600
+  
+  # ============================================================================
+  # Sites Configuration
+  # Each site can have its own sync settings
+  # ============================================================================
+  sites:
+    # Example Site 1: Finance site with recursive ingestion
+    - siteId: 12345678-1234-1234-1234-123456789abc
+      syncColumnName: FinanceGPTKnowledge
+      ingestionMode: recursive
+      scopeId: scope_bu4gokr0atzj0kfiuaaaaaaa
+      maxIngestedFiles: 1000
+      storeInternally: enabled
+      syncStatus: active
+      syncMode: content_and_permissions
+    
+    # Example Site 2: HR site with flat ingestion
+    - siteId: 87654321-4321-4321-4321-cba987654321
+      syncColumnName: HRKnowledge
+      ingestionMode: flat
+      scopeId: scope_bu4gokr0atzj0kfiubbbbbb
+      maxIngestedFiles: 500
+      storeInternally: enabled
+      syncStatus: active
+      syncMode: content_only
+    
+    # Example Site 3: Inactive site (will be skipped)
+    - siteId: aabbccdd-1111-2222-3333-444444444444
+      syncColumnName: OldSiteColumn
+      ingestionMode: recursive
+      scopeId: scope_bu4gokr0atzj0kfiuccccccc
+      storeInternally: enabled
+      syncStatus: inactive
+      syncMode: content_only
 
 # ============================================================================
 # Unique API Configuration
@@ -61,14 +88,6 @@ unique:
   # - Local dev: Add ZITADEL_CLIENT_SECRET to .env file
   # - Kubernetes: Load from secret via envVars (see values.yaml)
   
-  # Ingestion mode: 'flat' or 'recursive'
-  # - flat: ingests all files to a single root scope
-  # - recursive: maintains the folder hierarchy
-  ingestionMode: recursive
-  
-  # Scope ID to be used as root for ingestion
-  scopeId: your-root-scope-id
-  
   # Base URL for Unique ingestion service (without trailing slash)
   ingestionServiceBaseUrl: https://ingestion.your-unique-instance.com
   
@@ -77,13 +96,6 @@ unique:
   
   # Number of Unique API requests allowed per minute (optional, default: 60)
   apiRateLimitPerMinute: 60
-  
-  # Maximum number of files to ingest per site in a single run (optional)
-  # If exceeded, the sync for that site will fail
-  # maxIngestedFiles: 1000
-  
-  # Whether to store content internally in Unique: 'enabled' or 'disabled'
-  storeInternally: enabled
   
   # Optional: Config object to pass when submitting file for ingestion
   # ingestionConfig:
@@ -94,9 +106,6 @@ unique:
 # Processing Configuration
 # ============================================================================
 processing:
-  # Sync mode: 'content_only' or 'content_and_permissions'
-  syncMode: content_and_permissions
-  
   # Time limit for a file processing step in seconds (default: 300)
   stepTimeoutSeconds: 300
   
@@ -114,8 +123,7 @@ processing:
     - application/vnd.openxmlformats-officedocument.presentationml.presentation
   
   # For testing: maximum number of files to scan (optional, unlimited if not set)
-  maxFilesToScan: 100  # Optional: useful for testing with limited file sets
+  # maxFilesToScan: 100
   
   # Cron expression for the scheduled file scan interval (default: every 15 minutes)
   scanIntervalCron: "*/15 * * * *"
-
