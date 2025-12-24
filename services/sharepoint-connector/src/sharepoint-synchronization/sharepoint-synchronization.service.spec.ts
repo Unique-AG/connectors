@@ -7,6 +7,7 @@ import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
+import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
@@ -122,7 +123,8 @@ describe('SharepointSynchronizationService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
+          if (key === 'sharepoint.sites')
+            return [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })];
           if (key === 'processing.syncMode') return 'content_only';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
           if (key === 'unique.scopeId') return 'test-scope-id';
@@ -150,6 +152,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      'TestColumn',
     );
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       [mockFile],
@@ -245,7 +248,13 @@ describe('SharepointSynchronizationService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
+          if (key === 'sharepoint.sites')
+            return [
+              createMockSiteConfig({
+                siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+                syncMode: 'content_and_permissions',
+              }),
+            ];
           if (key === 'processing.syncMode') return 'content_and_permissions';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
           if (key === 'unique.scopeId') return 'test-scope-id';
@@ -293,7 +302,8 @@ describe('SharepointSynchronizationService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
+          if (key === 'sharepoint.sites')
+            return [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })];
           if (key === 'processing.syncMode') return 'content_and_permissions';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
           if (key === 'unique.scopeId') return 'test-scope-id';

@@ -180,8 +180,8 @@ describe('GraphApiService', () => {
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
     });
 
     it('skips drives without IDs', async () => {
@@ -195,8 +195,8 @@ describe('GraphApiService', () => {
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
     });
 
     it('handles pagination correctly', async () => {
@@ -217,8 +217,8 @@ describe('GraphApiService', () => {
 
       expect(result.items).toHaveLength(2);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
     });
 
     it('filters out non-syncable files', async () => {
@@ -249,8 +249,8 @@ describe('GraphApiService', () => {
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
     });
 
     it('counts total files vs syncable files', async () => {

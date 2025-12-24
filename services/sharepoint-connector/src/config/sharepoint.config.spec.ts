@@ -1,13 +1,384 @@
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { IngestionMode } from '../constants/ingestion.constants';
+import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
+import { SharepointConfigSchema } from './sharepoint.schema';
 
-// These tests need to be rewritten for the new sites array structure
-describe.skip('SharepointConfigSchema', () => {
-  it.skip('TODO: update tests for sites array', () => {
-    // Old tests validated siteIds field
-    // New structure has a sites array with per-site configuration
-    // Tests should be rewritten to validate:
-    // - sites array structure
-    // - siteId field within each site object
-    // - other site-specific fields (syncColumnName, ingestionMode, etc.)
+describe('SharepointConfigSchema', () => {
+  const validBaseConfig = {
+    authTenantId: '12345678-1234-1234-1234-123456789abc',
+    baseUrl: 'https://company.sharepoint.com',
+    graphApiRateLimitPerMinute: 600,
+    sites: [
+      {
+        siteId: '87654321-4321-4321-8321-cba987654321',
+        syncColumnName: 'FinanceGPTKnowledge',
+        ingestionMode: IngestionMode.Recursive,
+        scopeId: 'scope_test123',
+        maxIngestedFiles: 1000,
+        storeInternally: StoreInternallyMode.Enabled,
+        syncStatus: 'active' as const,
+        syncMode: 'content_and_permissions' as const,
+      },
+    ],
+  };
+
+  describe('valid configurations', () => {
+    it('validates oidc auth mode configuration', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
+      const result = SharepointConfigSchema.parse(config);
+      expect(result.authMode).toBe('oidc');
+    });
+
+    it('validates client-secret auth mode configuration', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'client-secret' as const,
+        authClientId: 'client-id-123',
+        authClientSecret: 'secret-123',
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
+      const result = SharepointConfigSchema.parse(config);
+      expect(result.authMode).toBe('client-secret');
+      if (result.authMode === 'client-secret') {
+        expect(result.authClientId).toBe('client-id-123');
+        expect(result.authClientSecret).toBeInstanceOf(Object); // Redacted
+      }
+    });
+
+    it('validates certificate auth mode with SHA1 thumbprint', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'certificate' as const,
+        authClientId: 'client-id-123',
+        authThumbprintSha1: 'abcdef1234567890abcdef1234567890abcdef12',
+        authPrivateKeyPath: '/path/to/key.pem',
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
+      const result = SharepointConfigSchema.parse(config);
+      expect(result.authMode).toBe('certificate');
+      if (result.authMode === 'certificate') {
+        expect(result.authThumbprintSha1).toBe('abcdef1234567890abcdef1234567890abcdef12');
+      }
+    });
+
+    it('validates certificate auth mode with SHA256 thumbprint', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'certificate' as const,
+        authClientId: 'client-id-123',
+        authThumbprintSha256:
+          'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        authPrivateKeyPath: '/path/to/key.pem',
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
+    });
+
+    it('validates configuration with multiple sites', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [
+          {
+            siteId: '87654321-4321-4321-8321-cba987654321',
+            syncColumnName: 'FinanceGPTKnowledge',
+            ingestionMode: IngestionMode.Recursive,
+            scopeId: 'scope_finance',
+            syncMode: 'content_and_permissions' as const,
+          },
+          {
+            siteId: 'abcd1234-5678-4012-8346-789012345678',
+            syncColumnName: 'HRKnowledge',
+            ingestionMode: IngestionMode.Flat,
+            scopeId: 'scope_hr',
+            maxIngestedFiles: 500,
+            storeInternally: StoreInternallyMode.Disabled,
+            syncStatus: 'inactive' as const,
+            syncMode: 'content_only' as const,
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
+      const result = SharepointConfigSchema.parse(config);
+      expect(result.sites).toHaveLength(2);
+    });
+  });
+
+  describe('sites array validation', () => {
+    it('requires at least one site', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow(
+        'At least one site must be configured',
+      );
+    });
+
+    it('validates siteId as UUID', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            siteId: 'not-a-uuid',
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('validates syncColumnName is string', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            syncColumnName: 123,
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('validates ingestionMode enum values', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            ingestionMode: 'invalid-mode',
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('validates scopeId is required', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [
+          {
+            siteId: '87654321-4321-4321-4321-cba987654321',
+            syncColumnName: 'FinanceGPTKnowledge',
+            ingestionMode: IngestionMode.Recursive,
+            syncMode: 'content_and_permissions' as const,
+            // missing scopeId
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('validates maxIngestedFiles is positive integer when provided', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            maxIngestedFiles: -1,
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('validates storeInternally enum values', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            storeInternally: 'invalid-value',
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('validates syncStatus enum values', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            syncStatus: 'invalid-status',
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('validates syncMode enum values', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            syncMode: 'invalid-mode',
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+  });
+
+  describe('site configuration defaults', () => {
+    it('applies default values for optional fields', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        sites: [
+          {
+            siteId: '87654321-4321-4321-8321-cba987654321',
+            ingestionMode: IngestionMode.Recursive,
+            scopeId: 'scope_test',
+            syncMode: 'content_only' as const,
+          },
+        ],
+      };
+
+      const result = SharepointConfigSchema.parse(config);
+      expect(result.sites).toHaveLength(1);
+
+      // TypeScript doesn't understand that the schema guarantees at least one site
+      // biome-ignore lint/style/noNonNullAssertion: Schema validation ensures array has at least one element
+      const site = result.sites[0]!;
+
+      expect(site.syncColumnName).toBe('FinanceGPTKnowledge'); // default value
+      expect(site.storeInternally).toBe(StoreInternallyMode.Enabled); // default value
+      expect(site.syncStatus).toBe('active'); // default value
+      expect(site.maxIngestedFiles).toBeUndefined(); // optional field
+    });
+  });
+
+  describe('invalid configurations', () => {
+    it('rejects missing authTenantId', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        authTenantId: '',
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('rejects invalid baseUrl format', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        baseUrl: 'not-a-url',
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('rejects baseUrl with trailing slash', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        baseUrl: 'https://company.sharepoint.com/',
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow(
+        'Base URL must not end with a trailing slash',
+      );
+    });
+
+    it('rejects negative graphApiRateLimitPerMinute', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'oidc' as const,
+        graphApiRateLimitPerMinute: -1,
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('rejects certificate auth without thumbprint', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'certificate' as const,
+        authClientId: 'client-id-123',
+        authPrivateKeyPath: '/path/to/key.pem',
+        // missing both thumbprints
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow(
+        'Either SHAREPOUNT_AUTH_THUMBPRINT_SHA1 or SHAREPOUNT_AUTH_THUMBPRINT_SHA256 has to be provided',
+      );
+    });
+
+    it('rejects client-secret auth without clientId', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'client-secret' as const,
+        authClientSecret: 'secret-123',
+        // missing authClientId
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('rejects client-secret auth without clientSecret', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'client-secret' as const,
+        authClientId: 'client-id-123',
+        // missing authClientSecret
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('rejects certificate auth without privateKeyPath', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'certificate' as const,
+        authClientId: 'client-id-123',
+        authThumbprintSha1: 'abcdef1234567890abcdef1234567890abcdef12',
+        // missing authPrivateKeyPath
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('rejects invalid hex thumbprint', () => {
+      const config = {
+        ...validBaseConfig,
+        authMode: 'certificate' as const,
+        authClientId: 'client-id-123',
+        authThumbprintSha1: 'gggggggggggggggggggggggggggggggggggggggg', // invalid hex
+        authPrivateKeyPath: '/path/to/key.pem',
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
   });
 });
