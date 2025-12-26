@@ -1,5 +1,5 @@
 apiVersion: v2
-name: mcp-server-teams
+name: teams-mcp
 description: An experimental MCP server for Teams leveraging the Microsoft Graph API.
 type: application
 version: 0.1.0
