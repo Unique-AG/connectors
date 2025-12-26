@@ -3,33 +3,26 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: teams-mcp-config
+  name: {{ include "chart.fullname" . }}-config
   labels:
     {{- include "chart.labels" . | nindent 4 }}
 data:
-  # App configuration
   SELF_URL: {{ .Values.mcpConfig.app.selfUrl | quote }}
-
-  # Microsoft Graph configuration
   MICROSOFT_CLIENT_ID: {{ .Values.mcpConfig.microsoft.clientId | quote }}
   {{- if .Values.mcpConfig.microsoft.publicWebhookUrl }}
   MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
   {{- end }}
-
-  # Unique API configuration
   UNIQUE_SERVICE_AUTH_MODE: {{ .Values.mcpConfig.unique.serviceAuthMode | quote }}
   UNIQUE_API_BASE_URL: {{ .Values.mcpConfig.unique.apiBaseUrl | quote }}
   UNIQUE_API_VERSION: {{ .Values.mcpConfig.unique.apiVersion | quote }}
   UNIQUE_ROOT_SCOPE_PATH: {{ .Values.mcpConfig.unique.rootScopePath | quote }}
   UNIQUE_USER_FETCH_CONCURRENCY: {{ .Values.mcpConfig.unique.userFetchConcurrency | quote }}
   {{- if .Values.mcpConfig.unique.serviceExtraHeaders }}
-  UNIQUE_SERVICE_EXTRA_HEADERS: {{ .Values.mcpConfig.unique.serviceExtraHeaders | quote }}
+  UNIQUE_SERVICE_EXTRA_HEADERS: '{{ .Values.mcpConfig.unique.serviceExtraHeaders | toJson }}'
   {{- end }}
   {{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
   UNIQUE_INGESTION_SERVICE_BASE_URL: {{ .Values.mcpConfig.unique.ingestionServiceBaseUrl | quote }}
   {{- end }}
-
-  # Auth configuration
   AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.accessTokenExpiresInSeconds | quote }}
   AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.refreshTokenExpiresInSeconds | quote }}
 {{- end }}

@@ -90,9 +90,21 @@ server:
       # - Egress # We can not yet leverage egress policies as Kubernetes flavor policies do not support FQDN and MS Graph IP-Addresses are not easily deterministic
       - Ingress
     egress: null
-  # Probes enabled for health checks (from outlook-mcp)
-  probes:
-    enabled: true
+    ingress:
+      - from:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/managed-by: prometheus-operator
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: system
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/name: gateway
+                app.kubernetes.io/instance: kong
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: system
   resources:
     # Resources are granted generously as the service for now is a singleton
     limits:
@@ -104,20 +116,42 @@ server:
     paths:
       default:
         enabled: false
-  service:
-    enabled: true
-
-  # Prometheus metrics enabled (from outlook-mcp)
-  prometheus:
-    enabled: true
-  # The volume is needed for CorePack
+  # The volume is eventually needed for CorePack
   volumes:
     - name: tmp
       emptyDir:
-        sizeLimit: 5Gi
+        sizeLimit: 20Gi
   volumeMounts:
     - name: tmp
       mountPath: /tmp
+
+# -- Ingress configuration
+# MCP servers need to be hosted on their own domain. With Kong as current controller, it is easier to use
+# ingress than http routes to obtain 'wildcard' domains.
+ingress:
+  # -- Enable ingress resource creation
+  enabled: false
+  # -- Ingress class name (e.g., nginx, traefik)
+  ingressClassName: kong
+  # -- Additional labels for the ingress resource
+  additionalLabels: {}
+  # -- Annotations for the ingress resource
+  annotations:
+    konghq.com/plugins: unique-route-metrics
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  # -- Ingress hosts configuration
+  hosts: []
+    # - host: teams.mcp.example.com
+    #   paths:
+    #     - path: /
+    #       pathType: Prefix
+    #       # serviceName: custom-service  # optional, defaults to chart fullname
+    #       # servicePort: http            # optional, defaults to "http"
+  # -- TLS configuration for the ingress
+  tls: []
+    # - secretName: teams-mcp-tls
+    #   hosts:
+    #     - teams.mcp.example.com
 
 # -- Grafana dashboard configuration
 grafana:
@@ -171,6 +205,7 @@ mcpConfig:
   # -- Application configuration
   app:
     # -- The URL of the MCP Server. Used for OAuth callbacks.
+    # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
     # example: https://teams.mcp.unique.app
     selfUrl: unset_default_value
 
@@ -195,8 +230,13 @@ mcpConfig:
     serviceAuthMode: cluster_local
     # -- Extra headers to send with requests to Unique API services (JSON string)
     # For cluster_local mode: '{"x-company-id": "...", "x-user-id": "..."}'
-    # For external mode: '{"authorization": "Bearer ...", "x-app-id": "...", "x-user-id": "...", "x-company-id": "..."}'
-    serviceExtraHeaders: ""
+    serviceExtraHeaders: {}
+    # For external mode:
+    # serviceExtraHeaders:
+    #   authorization: "Bearer ..."
+    #   x-app-id: "..."
+    #   x-user-id: "..."
+    #   x-company-id: "..."
 
     # -- The Public API URL
     # example: https://api.unique.app

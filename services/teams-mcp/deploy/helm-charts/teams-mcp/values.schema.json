@@ -7,6 +7,99 @@
       "description": "Configuration for the backend-service dependency",
       "additionalProperties": true
     },
+    "ingress": {
+      "type": "object",
+      "description": "Ingress configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable ingress resource creation",
+          "default": false
+        },
+        "ingressClassName": {
+          "type": "string",
+          "description": "Ingress class name (e.g., nginx, traefik)"
+        },
+        "additionalLabels": {
+          "type": "object",
+          "description": "Additional labels for the ingress resource",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Annotations for the ingress resource",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "hosts": {
+          "type": "array",
+          "description": "Ingress hosts configuration",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "Hostname for this ingress rule"
+              },
+              "paths": {
+                "type": "array",
+                "description": "Paths for this host",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "description": "Path to match"
+                    },
+                    "pathType": {
+                      "type": "string",
+                      "enum": ["Exact", "Prefix", "ImplementationSpecific"],
+                      "description": "Path type for matching",
+                      "default": "ImplementationSpecific"
+                    },
+                    "serviceName": {
+                      "type": "string",
+                      "description": "Backend service name (defaults to chart fullname)"
+                    },
+                    "servicePort": {
+                      "type": "string",
+                      "description": "Backend service port name (defaults to 'http')"
+                    }
+                  },
+                  "required": ["path"]
+                }
+              }
+            },
+            "required": ["host", "paths"]
+          }
+        },
+        "tls": {
+          "type": "array",
+          "description": "TLS configuration for the ingress",
+          "items": {
+            "type": "object",
+            "properties": {
+              "secretName": {
+                "type": "string",
+                "description": "Name of the TLS secret"
+              },
+              "hosts": {
+                "type": "array",
+                "description": "Hosts covered by this TLS configuration",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["secretName", "hosts"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "grafana": {
       "type": "object",
       "description": "Grafana dashboard configuration",
