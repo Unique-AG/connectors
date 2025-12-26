@@ -3,7 +3,12 @@ output "client_id" {
   value       = azuread_application.teams_mcp.client_id
 }
 
-output "application_id" {
-  description = "The application ID (object ID in Azure AD). Useful for further configuration."
-  value       = azuread_application.teams_mcp.id
+output "client_secrets" {
+  description = "Map of client secret IDs and their corresponding Key Vault secret IDs."
+  value = {
+    for k, v in var.confidential_clients : k => {
+      application_password_id = azuread_application_password.client_secret[k].id
+      key_vault_secret_id     = azurerm_key_vault_secret.kv_client_secret[k].id
+    }
+  }
 }

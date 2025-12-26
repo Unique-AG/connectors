@@ -45,3 +45,25 @@ resource "azuread_application" "teams_mcp" {
     }
   }
 }
+
+resource "azuread_application_password" "client_secret" {
+  for_each = var.confidential_clients
+
+  application_id = azuread_application.teams_mcp.id
+  display_name   = coalesce(each.value.client_secret.explicit_name, each.key)
+  end_date       = each.value.client_secret.end_date
+
+  rotate_when_changed = {
+    rotation = each.value.client_secret.rotation_counter
+  }
+}
+
+resource "azurerm_key_vault_secret" "kv_client_secret" {
+  for_each = var.confidential_clients
+
+  name            = coalesce(each.value.client_secret.explicit_name, each.key)
+  value           = azuread_application_password.client_secret[each.key].value
+  content_type    = "application/x-ms-client-secret"
+  key_vault_id    = each.value.client_secret.key_vault_id
+  expiration_date = each.value.client_secret.end_date
+}
