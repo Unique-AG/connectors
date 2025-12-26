@@ -184,11 +184,6 @@
             "selfUrl": {
               "type": "string",
               "description": "The URL of the MCP Server. Used for OAuth callbacks. Example: https://teams.mcp.unique.app"
-            },
-            "port": {
-              "type": "integer",
-              "description": "The local HTTP port to bind the server to",
-              "default": 51345
             }
           },
           "required": ["selfUrl"]
@@ -241,6 +236,11 @@
             "ingestionServiceBaseUrl": {
               "type": "string",
               "description": "Base URL for Unique ingestion service (cluster_local mode). Example: http://node-ingestion.namespace:8091"
+            },
+            "userFetchConcurrency": {
+              "type": "integer",
+              "description": "Concurrency limit for fetching users when resolving scope accesses",
+              "default": 5
             },
             "appKey": {
               "type": "string",

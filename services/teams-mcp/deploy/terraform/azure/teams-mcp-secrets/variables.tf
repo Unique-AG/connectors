@@ -3,6 +3,11 @@ variable "key_vault_id" {
   type        = string
 }
 
+variable "key_vault_sensitive_id" {
+  description = "The ID of the sensitive key vault for auto-generated secrets. If set, takes precedence over key_vault_id for secrets_to_create. Pass null to use key_vault_id."
+  type        = string
+}
+
 variable "secrets_placeholders" {
   description = "Map of secrets that are manually created and need to be placed in the core key vault. The manual- prefix is prepended automatically."
   type = map(object({
@@ -21,21 +26,34 @@ variable "secrets_placeholders" {
 
       AMQP Configuration (amqp.config.ts):
       - teams-mcp-amqp-url: AMQP/RabbitMQ connection URL (AMQP_URL)
-
-      Auto-generated secrets (see main.tf):
-      - teams-mcp-hmac-secret: 64-char hex (AUTH_HMAC_SECRET)
-      - teams-mcp-webhook-secret: 128-char hex (MICROSOFT_WEBHOOK_SECRET)
-      - teams-mcp-encryption-key: 64-char hex (ENCRYPTION_KEY)
-
-      NOTE: Non-sensitive values should be configured via Helm values instead of Key Vault:
-      - SELF_URL -> mcpConfig.app.selfUrl
-      - MICROSOFT_PUBLIC_WEBHOOK_URL -> mcpConfig.microsoft.publicWebhookUrl
-      - UNIQUE_API_BASE_URL -> mcpConfig.unique.apiBaseUrl
-      - UNIQUE_INGESTION_SERVICE_BASE_URL -> mcpConfig.unique.ingestionServiceBaseUrl
-      - UNIQUE_SERVICE_EXTRA_HEADERS -> mcpConfig.unique.serviceExtraHeaders
     */
     teams-mcp-client-secret = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
     teams-mcp-database-url  = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
     teams-mcp-amqp-url      = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
+  }
+}
+
+variable "secrets_to_create" {
+  description = "List of secrets that are automatically generated and should be placed in the sensitive key vault. Increment a counter to rotate the secret."
+  type = map(object({
+    content_type     = optional(string, "text/plain")
+    create           = optional(bool, true)
+    expiration_date  = optional(string, "2099-12-31T23:59:59Z")
+    length           = optional(number)
+    name             = optional(string)
+    rotation_counter = optional(number, 0)
+  }))
+  default = {
+    /**
+      Auto-generated secrets (hex output from random_id):
+
+      Secret format requirements (from src/config/*.config.ts and .env.example):
+      - HMAC Secret: 64-char hex (openssl rand -hex 32) -> length=32
+      - Webhook Secret: 128-char hex (openssl rand -hex 64) -> length=64
+      - Encryption Key: 64-char hex / 32 bytes (openssl rand -hex 32) -> length=32
+    */
+    hex_hmac_secret    = { create = true, name = "teams-mcp-hmac-secret", content_type = "text/hex", rotation_counter = 0, expiration_date = "2099-12-31T23:59:59Z" }
+    hex_webhook_secret = { create = true, name = "teams-mcp-webhook-secret", content_type = "text/hex", rotation_counter = 0, expiration_date = "2099-12-31T23:59:59Z" }
+    hex_encryption_key = { create = true, name = "teams-mcp-encryption-key", content_type = "text/hex", rotation_counter = 0, expiration_date = "2099-12-31T23:59:59Z" }
   }
 }

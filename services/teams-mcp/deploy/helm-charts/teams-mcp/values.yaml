@@ -3,7 +3,6 @@ server:
     metadata:
       annotations:
         reloader.stakater.com/auto: "true"
-  # Database migration hook for PostgreSQL (from outlook-mcp)
   hooks:
     migration:
       enabled: true
@@ -16,74 +15,18 @@ server:
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
-  # -- Environment variables from secrets.
-  # Required secrets that must be loaded from Kubernetes secrets:
-  #   envVars:
-  #     - name: DATABASE_URL
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: teams-mcp-secret
-  #           key: DATABASE_URL
-  #     # AMQP: Choose one of the following options:
-  #     # Option 1: Full URL
-  #     - name: AMQP_URL
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: teams-mcp-secret
-  #           key: AMQP_URL
-  #     # Option 2: Individual fields
-  #     # - name: AMQP_HOST
-  #     #   valueFrom:
-  #     #     secretKeyRef:
-  #     #       name: teams-mcp-secret
-  #     #       key: AMQP_HOST
-  #     # - name: AMQP_PORT
-  #     #   valueFrom:
-  #     #     secretKeyRef:
-  #     #       name: teams-mcp-secret
-  #     #       key: AMQP_PORT
-  #     # - name: AMQP_USERNAME
-  #     #   valueFrom:
-  #     #     secretKeyRef:
-  #     #       name: teams-mcp-secret
-  #     #       key: AMQP_USERNAME
-  #     # - name: AMQP_PASSWORD
-  #     #   valueFrom:
-  #     #     secretKeyRef:
-  #     #       name: teams-mcp-secret
-  #     #       key: AMQP_PASSWORD
-  #     # - name: AMQP_VHOST  # optional
-  #     #   valueFrom:
-  #     #     secretKeyRef:
-  #     #       name: teams-mcp-secret
-  #     #       key: AMQP_VHOST
-  #     - name: MICROSOFT_CLIENT_SECRET
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: teams-mcp-secret
-  #           key: MICROSOFT_CLIENT_SECRET
-  #     - name: MICROSOFT_WEBHOOK_SECRET
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: teams-mcp-secret
-  #           key: MICROSOFT_WEBHOOK_SECRET
-  #     - name: AUTH_HMAC_SECRET
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: teams-mcp-secret
-  #           key: AUTH_HMAC_SECRET
-  #     - name: ENCRYPTION_KEY
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: teams-mcp-secret
-  #           key: ENCRYPTION_KEY
-  # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
+  # -- Environment variables from secrets (required secrets listed at bottom of file)
+  # @see https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars
   envVars: []
+  # -- ConfigMap(s) to load environment variables from (must match release name + '-config')
   extraEnvCM:
     - teams-mcp-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/teams-mcp
     tag: 0.1.0 # x-release-please-version
+  ports:
+    application: 51345
+    metrics: 51346
   networkPolicy:
     enabled: true
     policyTypes:
@@ -116,7 +59,6 @@ server:
     paths:
       default:
         enabled: false
-  # The volume is eventually needed for CorePack
   volumes:
     - name: tmp
       emptyDir:

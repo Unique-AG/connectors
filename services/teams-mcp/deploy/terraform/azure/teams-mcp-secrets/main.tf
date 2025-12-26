@@ -1,5 +1,5 @@
 resource "azurerm_key_vault_secret" "manual_secret" {
-  for_each        = var.secrets_placeholders
+  for_each        = { for k, v in var.secrets_placeholders : k => v if v.create }
   content_type    = lookup(each.value, "content_type", "text/plain")
   expiration_date = lookup(each.value, "expiration_date", "2099-12-31T23:59:59Z")
   key_vault_id    = var.key_vault_id
@@ -10,53 +10,59 @@ resource "azurerm_key_vault_secret" "manual_secret" {
   }
 }
 
-# Auto-generated secrets using random_bytes (hex output)
-#
-# All secrets use random_bytes with .hex output to match the documented format:
-# - openssl rand -hex N produces 2*N hex characters
-# - random_bytes with length=N and .hex produces 2*N hex characters
-#
-# Secret format requirements (from src/config/*.config.ts and .env.example):
-# - HMAC Secret: 64-char hex (openssl rand -hex 32) -> random_bytes length=32
-# - Webhook Secret: 128-char hex (openssl rand -hex 64) -> random_bytes length=64
-# - Encryption Key: 64-char hex / 32 bytes (openssl rand -hex 32) -> random_bytes length=32
-
-resource "random_bytes" "hmac_secret" {
-  length = 32 # Outputs 64 hex chars via .hex
-  # Maps to AUTH_HMAC_SECRET - used for HMAC token signing
+# ---
+# @description HMAC secret for token signing
+# @length 32 byte hex (64 hex chars)
+# @type random_bytes#hex
+# @env AUTH_HMAC_SECRET
+# ---
+resource "random_bytes" "hex_hmac_secret" {
+  keepers = { version = var.secrets_to_create.hex_hmac_secret.rotation_counter }
+  length  = coalesce(var.secrets_to_create.hex_hmac_secret.length, 32)
+}
+resource "azurerm_key_vault_secret" "hex_hmac_secret" {
+  count           = var.secrets_to_create.hex_hmac_secret.create ? 1 : 0
+  name            = var.secrets_to_create.hex_hmac_secret.name
+  value           = random_bytes.hex_hmac_secret.hex
+  content_type    = var.secrets_to_create.hex_hmac_secret.content_type
+  key_vault_id    = coalesce(var.key_vault_sensitive_id, var.key_vault_id)
+  expiration_date = var.secrets_to_create.hex_hmac_secret.expiration_date
 }
 
-resource "random_bytes" "webhook_secret" {
-  length = 64 # Outputs 128 hex chars via .hex
-  # Maps to MICROSOFT_WEBHOOK_SECRET - used for webhook validation (spoof protection)
+# ---
+# @description Webhook secret for Microsoft webhook validation (spoof protection)
+# @length 64 byte hex (128 hex chars)
+# @type random_bytes#hex
+# @env MICROSOFT_WEBHOOK_SECRET
+# ---
+resource "random_bytes" "hex_webhook_secret" {
+  keepers = { version = var.secrets_to_create.hex_webhook_secret.rotation_counter }
+  length  = coalesce(var.secrets_to_create.hex_webhook_secret.length, 64)
+}
+resource "azurerm_key_vault_secret" "hex_webhook_secret" {
+  count           = var.secrets_to_create.hex_webhook_secret.create ? 1 : 0
+  name            = var.secrets_to_create.hex_webhook_secret.name
+  value           = random_bytes.hex_webhook_secret.hex
+  content_type    = var.secrets_to_create.hex_webhook_secret.content_type
+  key_vault_id    = coalesce(var.key_vault_sensitive_id, var.key_vault_id)
+  expiration_date = var.secrets_to_create.hex_webhook_secret.expiration_date
 }
 
-resource "random_bytes" "encryption_key" {
-  length = 32 # 256 bits for AES-256, outputs 64 hex chars via .hex
-  # Maps to ENCRYPTION_KEY - used for encrypting stored data
+# ---
+# @description Encryption key for encrypting stored data (AES-256)
+# @length 32 byte hex (64 hex chars / 256 bits)
+# @type random_bytes#hex
+# @env ENCRYPTION_KEY
+# ---
+resource "random_bytes" "hex_encryption_key" {
+  keepers = { version = var.secrets_to_create.hex_encryption_key.rotation_counter }
+  length  = coalesce(var.secrets_to_create.hex_encryption_key.length, 32)
 }
-
-# Store auto-generated secrets in Key Vault
-resource "azurerm_key_vault_secret" "hmac_secret" {
-  key_vault_id    = var.key_vault_id
-  name            = "teams-mcp-hmac-secret"
-  value           = random_bytes.hmac_secret.hex
-  expiration_date = "2099-12-31T23:59:59Z"
-  content_type    = "text/hex"
-}
-
-resource "azurerm_key_vault_secret" "webhook_secret" {
-  key_vault_id    = var.key_vault_id
-  name            = "teams-mcp-webhook-secret"
-  value           = random_bytes.webhook_secret.hex
-  expiration_date = "2099-12-31T23:59:59Z"
-  content_type    = "text/hex"
-}
-
-resource "azurerm_key_vault_secret" "encryption_key" {
-  key_vault_id    = var.key_vault_id
-  name            = "teams-mcp-encryption-key"
-  value           = random_bytes.encryption_key.hex
-  expiration_date = "2099-12-31T23:59:59Z"
-  content_type    = "text/hex"
+resource "azurerm_key_vault_secret" "hex_encryption_key" {
+  count           = var.secrets_to_create.hex_encryption_key.create ? 1 : 0
+  name            = var.secrets_to_create.hex_encryption_key.name
+  value           = random_bytes.hex_encryption_key.hex
+  content_type    = var.secrets_to_create.hex_encryption_key.content_type
+  key_vault_id    = coalesce(var.key_vault_sensitive_id, var.key_vault_id)
+  expiration_date = var.secrets_to_create.hex_encryption_key.expiration_date
 }

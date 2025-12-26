@@ -1,16 +1,18 @@
 data "azuread_application_published_app_ids" "well_known" {}
 
-locals {
-  # Application ID for Microsoft Graph
-  graph_app_id = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
+resource "azuread_service_principal" "msgraph" {
+  client_id    = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
+  use_existing = true
+}
 
-  # Microsoft Graph API roles required by Teams MCP
+locals {
+  # Microsoft Graph delegated scopes required by Teams MCP
   # Based on SCOPES in services/teams-mcp/src/auth/microsoft.provider.ts
-  graph_roles = toset([
-    "e1fe6dd8-ba31-4d61-89e7-88639da4683d", # (delegated): User.Read
-    "9be106e1-f4e3-4df5-bdff-e4bc531cbe43", # (delegated): OnlineMeetings.Read
-    "190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3", # (delegated): OnlineMeetingRecording.Read.All
-    "30b87d18-ebb1-45db-97f8-82ccb1f0190c", # (delegated): OnlineMeetingTranscript.Read.All
+  graph_scopes = toset([
+    "User.Read",
+    "OnlineMeetings.Read",
+    "OnlineMeetingRecording.Read.All",
+    "OnlineMeetingTranscript.Read.All",
   ])
 }
 
@@ -20,14 +22,14 @@ resource "azuread_application" "teams_mcp" {
   sign_in_audience = var.sign_in_audience
   notes            = var.notes
 
-  # Microsoft Graph API permissions
+  # Microsoft Graph API permissions (delegated)
   required_resource_access {
-    resource_app_id = local.graph_app_id
+    resource_app_id = azuread_service_principal.msgraph.client_id
 
     dynamic "resource_access" {
-      for_each = local.graph_roles
+      for_each = local.graph_scopes
       content {
-        id   = resource_access.value
+        id   = azuread_service_principal.msgraph.oauth2_permission_scope_ids[resource_access.value]
         type = "Scope"
       }
     }
@@ -42,13 +44,4 @@ resource "azuread_application" "teams_mcp" {
       id_token_issuance_enabled     = false
     }
   }
-}
-
-# Application password (client secret) for OAuth
-resource "azuread_application_password" "teams_mcp_secret" {
-  count = var.create_client_secret ? 1 : 0
-
-  application_id = azuread_application.teams_mcp.id
-  display_name   = "teams-mcp-client-secret"
-  end_date       = var.client_secret_end_date
 }

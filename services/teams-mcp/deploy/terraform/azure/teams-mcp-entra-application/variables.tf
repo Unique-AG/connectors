@@ -21,15 +21,3 @@ variable "redirect_uris" {
   type        = list(string)
   default     = []
 }
-
-variable "create_client_secret" {
-  description = "Whether to create a client secret for the application."
-  type        = bool
-  default     = true
-}
-
-variable "client_secret_end_date" {
-  description = "The end date for the client secret. Defaults to approximately 2 years from creation."
-  type        = string
-  default     = null
-}
