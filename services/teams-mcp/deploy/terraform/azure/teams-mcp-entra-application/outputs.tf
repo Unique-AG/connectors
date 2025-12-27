@@ -9,6 +9,7 @@ output "client_secrets" {
     for k, v in var.confidential_clients : k => {
       application_password_id = azuread_application_password.client_secret[k].id
       key_vault_secret_id     = azurerm_key_vault_secret.kv_client_secret[k].id
+      key_vault_secret_name   = azurerm_key_vault_secret.kv_client_secret[k].name
     }
   }
 }
