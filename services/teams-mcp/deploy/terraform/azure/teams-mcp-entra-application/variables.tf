@@ -32,6 +32,12 @@ variable "redirect_uris" {
   default     = []
 }
 
+variable "client_secrets_prefix" {
+  description = "The prefix for the client secrets. This will be prepended to the client secret name but omitted if a secrets.explicit_name is provided."
+  type        = string
+  default     = "teams-mcp"
+}
+
 variable "confidential_clients" {
   description = <<-EOT
     Map of confidential clients and their client secrets.
@@ -42,13 +48,14 @@ variable "confidential_clients" {
     It is strongly recommended to tie one secret to exactly one workload identity.
     Zero-downtime rotation is currently not supported, rotating the counter will result in a downtime as long as the
     affected workload does not pickup the new secret and gets eventually restarted.
+    The end date is mandatory on purpose to foster teams awareness of secret rotation and expiration.
   EOT
   type = map(object({
     client_secret = object({
       explicit_name    = optional(string)
       key_vault_id     = string
       rotation_counter = optional(number, 0)
-      end_date         = optional(string)
+      end_date         = string
     })
   }))
   default = {}
@@ -56,7 +63,7 @@ variable "confidential_clients" {
   validation {
     condition = alltrue([
       for k, v in var.confidential_clients :
-      v.client_secret.end_date == null || can(regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$", v.client_secret.end_date))
+      can(regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$", v.client_secret.end_date))
     ])
     error_message = "The end_date must be in RFC3339 format (e.g. 2018-01-01T01:02:03Z)."
   }

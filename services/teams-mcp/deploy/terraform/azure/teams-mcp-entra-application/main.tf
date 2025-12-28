@@ -16,13 +16,10 @@ locals {
   ])
 }
 
-# Azure AD application for Teams MCP
 resource "azuread_application" "teams_mcp" {
   display_name     = var.display_name
   sign_in_audience = var.sign_in_audience
   notes            = var.notes
-
-  # Microsoft Graph API permissions (delegated)
   required_resource_access {
     resource_app_id = azuread_service_principal.msgraph.client_id
 
@@ -34,8 +31,6 @@ resource "azuread_application" "teams_mcp" {
       }
     }
   }
-
-  # Web configuration for OAuth redirect URIs
   web {
     redirect_uris = var.redirect_uris
 
@@ -61,7 +56,7 @@ resource "azuread_application_password" "client_secret" {
 resource "azurerm_key_vault_secret" "kv_client_secret" {
   for_each = var.confidential_clients
 
-  name            = coalesce(each.value.client_secret.explicit_name, each.key)
+  name            = coalesce(each.value.client_secret.explicit_name, "${var.client_secrets_prefix}-${each.key}-client-secret")
   value           = azuread_application_password.client_secret[each.key].value
   content_type    = "application/x-ms-client-secret"
   key_vault_id    = each.value.client_secret.key_vault_id
