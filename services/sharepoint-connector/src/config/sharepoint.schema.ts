@@ -45,7 +45,7 @@ const certificateAuthModeConfig = z
       'Either SHAREPOUNT_AUTH_THUMBPRINT_SHA1 or SHAREPOUNT_AUTH_THUMBPRINT_SHA256 has to be provided for certificate authentication mode',
   });
 
-const SiteConfigSchema = z.object({
+export const SiteConfigSchema = z.object({
   siteId: z.uuidv4().describe('SharePoint site ID'),
   syncColumnName: z
     .string()
@@ -61,13 +61,13 @@ const SiteConfigSchema = z.object({
     .describe(
       'Scope ID to be used as root for ingestion. For flat mode, all files are ingested in this scope. For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
     ),
-  maxIngestedFiles: z.coerce
+  maxFilesToIngest: z.coerce
     .number()
     .int()
     .positive()
     .optional()
     .describe(
-      'Maximum number of files to ingest for this site in a single run. If the number of new + updated files exceeds this limit, the sync for this site will fail.',
+      'Maximum number of files to ingest per site in a single sync run. If the number of new + updated files exceeds this limit, the sync for that site will fail.',
     ),
   storeInternally: z
     .enum([StoreInternallyMode.Enabled, StoreInternallyMode.Disabled])
@@ -90,6 +90,25 @@ const SiteConfigSchema = z.object({
 
 export type SiteConfig = z.infer<typeof SiteConfigSchema>;
 
+// Configuration source options
+const staticSitesConfig = z.object({
+  sitesSource: z.literal('configFile').describe('Load sites configuration from static YAML array'),
+  sites: z
+    .array(SiteConfigSchema)
+    .min(1, 'At least one site must be configured')
+    .describe('Array of SharePoint sites to sync'),
+});
+
+const dynamicSitesConfig = z.object({
+  sitesSource: z
+    .literal('sharePointList')
+    .describe('Load sites configuration dynamically from SharePoint list'),
+  sharepointListUrl: z
+    .string()
+    .url()
+    .describe('SharePoint list URL containing site configurations'),
+});
+
 const baseConfig = z.object({
   authTenantId: z.string().min(1).describe('Azure AD tenant ID'),
   graphApiRateLimitPerMinute: z.coerce
@@ -104,10 +123,6 @@ const baseConfig = z.object({
       message: 'Base URL must not end with a trailing slash',
     })
     .describe("Your company's sharepoint URL"),
-  sites: z
-    .array(SiteConfigSchema)
-    .min(1, 'At least one site must be configured')
-    .describe('Array of SharePoint sites to sync'),
 });
 
 export const SharepointConfigSchema = z
@@ -116,7 +131,8 @@ export const SharepointConfigSchema = z
     clientSecretAuthModeConfig,
     certificateAuthModeConfig,
   ])
-  .and(baseConfig);
+  .and(baseConfig)
+  .and(z.discriminatedUnion('sitesSource', [staticSitesConfig, dynamicSitesConfig]));
 
 export type SharepointConfigYaml = z.infer<typeof SharepointConfigSchema>;
 

@@ -11,12 +11,14 @@ sharepoint:
   baseUrl: https://test.sharepoint.com
   graphApiRateLimitPerMinute: 600
   
+  # Use static configuration for tests
+  sitesSource: configFile
   sites:
     - siteId: 12345678-1234-1234-1234-123456789abc
       syncColumnName: TestColumn
       ingestionMode: flat
       scopeId: test-scope-id
-      maxIngestedFiles: 10
+      maxFilesToIngest: 10
       storeInternally: enabled
       syncStatus: active
       syncMode: content_only
@@ -33,7 +35,7 @@ unique:
 processing:
   stepTimeoutSeconds: 300
   concurrency: 5
-  maxFileSizeBytes: 52428800
+  maxFileSizeToIngestBytes: 52428800
   allowedMimeTypes:
     - application/pdf
     - application/vnd.openxmlformats-officedocument.wordprocessingml.document

@@ -8,6 +8,7 @@ describe('SharepointConfigSchema', () => {
     authTenantId: '12345678-1234-1234-1234-123456789abc',
     baseUrl: 'https://company.sharepoint.com',
     graphApiRateLimitPerMinute: 600,
+    sitesSource: 'configFile' as const,
     sites: [
       {
         siteId: '87654321-4321-4321-8321-cba987654321',
@@ -85,6 +86,7 @@ describe('SharepointConfigSchema', () => {
       const config = {
         ...validBaseConfig,
         authMode: 'oidc' as const,
+        sitesSource: 'configFile' as const,
         sites: [
           {
             siteId: '87654321-4321-4321-8321-cba987654321',
@@ -108,7 +110,9 @@ describe('SharepointConfigSchema', () => {
 
       expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
       const result = SharepointConfigSchema.parse(config);
-      expect(result.sites).toHaveLength(2);
+      if (result.sitesSource === 'configFile') {
+        expect(result.sites).toHaveLength(2);
+      }
     });
   });
 
@@ -117,6 +121,7 @@ describe('SharepointConfigSchema', () => {
       const config = {
         ...validBaseConfig,
         authMode: 'oidc' as const,
+        sitesSource: 'configFile' as const,
         sites: [],
       };
 
@@ -265,16 +270,20 @@ describe('SharepointConfigSchema', () => {
       };
 
       const result = SharepointConfigSchema.parse(config);
-      expect(result.sites).toHaveLength(1);
 
-      // TypeScript doesn't understand that the schema guarantees at least one site
-      // biome-ignore lint/style/noNonNullAssertion: Schema validation ensures array has at least one element
-      const site = result.sites[0]!;
+      // Handle discriminated union
+      if (result.sitesSource === 'configFile') {
+        expect(result.sites).toHaveLength(1);
 
-      expect(site.syncColumnName).toBe('FinanceGPTKnowledge'); // default value
-      expect(site.storeInternally).toBe(StoreInternallyMode.Enabled); // default value
-      expect(site.syncStatus).toBe('active'); // default value
-      expect(site.maxIngestedFiles).toBeUndefined(); // optional field
+        // TypeScript doesn't understand that the schema guarantees at least one site
+        // biome-ignore lint/style/noNonNullAssertion: Schema validation ensures array has at least one element
+        const site = result.sites[0]!;
+
+        expect(site.syncColumnName).toBe('FinanceGPTKnowledge'); // default value
+        expect(site.storeInternally).toBe(StoreInternallyMode.Enabled); // default value
+        expect(site.syncStatus).toBe('active'); // default value
+        expect(site.maxIngestedFiles).toBeUndefined(); // optional field
+      }
     });
   });
 

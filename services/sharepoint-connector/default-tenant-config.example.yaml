@@ -34,16 +34,22 @@ sharepoint:
   graphApiRateLimitPerMinute: 600
   
   # ============================================================================
-  # Sites Configuration
-  # Each site can have its own sync settings
+  # Sites Configuration Source
+  # Choose one of the following options:
+  #
+  # Option 1: Static configuration from this YAML file (sitesSource: configFile)
+  # Option 2: Dynamic configuration from SharePoint list (sitesSource: sharePointList)
   # ============================================================================
+  
+  # OPTION 1: Static configuration (sites array in this file)
+  sitesSource: configFile
   sites:
     # Example Site 1: Finance site with recursive ingestion
     - siteId: 12345678-1234-1234-1234-123456789abc
       syncColumnName: FinanceGPTKnowledge
       ingestionMode: recursive
       scopeId: scope_bu4gokr0atzj0kfiuaaaaaaa
-      maxIngestedFiles: 1000
+      maxFilesToIngest: 1000
       storeInternally: enabled
       syncStatus: active
       syncMode: content_and_permissions
@@ -53,7 +59,7 @@ sharepoint:
       syncColumnName: HRKnowledge
       ingestionMode: flat
       scopeId: scope_bu4gokr0atzj0kfiubbbbbb
-      maxIngestedFiles: 500
+      maxFilesToIngest: 500
       storeInternally: enabled
       syncStatus: active
       syncMode: content_only
@@ -66,6 +72,20 @@ sharepoint:
       storeInternally: enabled
       syncStatus: inactive
       syncMode: content_only
+  
+  # OPTION 2: Dynamic configuration from SharePoint list (uncomment to use)
+  # sitesSource: sharePointList
+  # sharepointListUrl: https://yourcompany.sharepoint.com/sites/ConfigSite/Lists/SharePoint%20Sites%20to%20Sync/AllItems.aspx
+  # 
+  # The SharePoint list must have the following columns (exact names):
+  #   - siteId (Single line text, UUID format)
+  #   - syncColumnName (Single line text)
+  #   - ingestionMode (Choice: flat, recursive)
+  #   - scopeId (Single line text)
+  #   - maxFilesToIngest (Number, optional)
+  #   - storeInternally (Choice: enabled, disabled)
+  #   - syncStatus (Choice: active, inactive, deleted)
+  #   - syncMode (Choice: content_only, content_and_permissions)
 
 # ============================================================================
 # Unique API Configuration
@@ -113,7 +133,7 @@ processing:
   concurrency: 5
   
   # Maximum file size in bytes to ingest (default: 52428800 = 50MB)
-  maxFileSizeBytes: 52428800
+  maxFileSizeToIngestBytes: 52428800
   
   # Allowed MIME types for files to sync (can be array or comma-separated string)
   allowedMimeTypes:

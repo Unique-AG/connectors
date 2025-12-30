@@ -189,7 +189,7 @@ connectorConfig:
         syncColumnName: FinanceGPTKnowledge
         ingestionMode: recursive
         scopeId: scope_bu4gokr0atzj0kfiuaaaaaaa
-        maxIngestedFiles: 1000
+        maxFilesToIngest: 1000
         storeInternally: enabled
         syncStatus: active
         syncMode: content_and_permissions
@@ -198,7 +198,7 @@ connectorConfig:
       #   syncColumnName: HRKnowledge
       #   ingestionMode: flat
       #   scopeId: scope_bu4gokr0atzj0kfiubbbbbb
-      #   maxIngestedFiles: 500
+      #   maxFilesToIngest: 500
       #   storeInternally: enabled
       #   syncStatus: active
       #   syncMode: content_only
@@ -217,7 +217,7 @@ connectorConfig:
     # example: https://api.unique.app/scope-management
     # example: http://node-scope-management.finance-gpt:8094
     scopeManagementServiceBaseUrl: unset_default_value
-    # NOTE: ingestionMode, scopeId, maxIngestedFiles, and storeInternally have been moved to per-site configuration
+    # NOTE: ingestionMode, scopeId, maxFilesToIngest, and storeInternally have been moved to per-site configuration
     # See sharepoint.sites array above
     # -- Number of Unique API requests allowed per minute
     apiRateLimitPerMinute: 100
@@ -258,6 +258,6 @@ connectorConfig:
       - application/vnd.ms-excel
       - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
       - application/vnd.openxmlformats-officedocument.presentationml.presentation
-    maxFileSizeBytes: null
+    maxFileSizeToIngestBytes: null
     # -- cron expression for the scheduled SharePoint scan interval default: every 15 minutes
     scanIntervalCron: "*/15 * * * *"

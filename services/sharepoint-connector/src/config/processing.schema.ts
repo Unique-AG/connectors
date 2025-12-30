@@ -21,14 +21,12 @@ export const ProcessingConfigSchema = z.object({
     .positive()
     .prefault(DEFAULT_PROCESSING_CONCURRENCY)
     .describe('Sets the concurrency of how many files you want to ingest into unique at once'),
-  maxFileSizeBytes: z.coerce
+  maxFileSizeToIngestBytes: z.coerce
     .number()
     .int()
     .positive()
     .prefault(DEFAULT_MAX_FILE_SIZE_BYTES)
-    .describe(
-      'Sets the maximum file size in bytes that we are ingesting. Anything above this value will be skipped',
-    ),
+    .describe('Maximum file size in bytes to ingest. Files larger than this will be skipped'),
   allowedMimeTypes: z
     .union([
       z.string().transform((val) =>

@@ -19,7 +19,9 @@ export class FileFilterService {
   public isFileValidForIngestion(item: DriveItem, syncColumnName: string): boolean {
     const fields = item.listItem?.fields as Record<string, unknown>;
     const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
-    const maxFileSizeBytes = this.configService.get('processing.maxFileSizeBytes', { infer: true });
+    const maxFileSizeToIngestBytes = this.configService.get('processing.maxFileSizeToIngestBytes', {
+      infer: true,
+    });
 
     if (
       !item.file ||
@@ -34,7 +36,7 @@ export class FileFilterService {
       return false;
     }
 
-    if (item.size > maxFileSizeBytes) {
+    if (item.size > maxFileSizeToIngestBytes) {
       return false;
     }
 

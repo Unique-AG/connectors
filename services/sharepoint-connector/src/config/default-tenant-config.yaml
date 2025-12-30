@@ -13,12 +13,14 @@ sharepoint:
   baseUrl: https://dogfoodindustries.sharepoint.com
   graphApiRateLimitPerMinute: 180000
   
+  # Using configFile for local testing
+  sitesSource: configFile
   sites:
     - siteId: ae0242ac-72f7-440c-91cb-847d2a33d029
       syncColumnName: UniqueAI
       ingestionMode: recursive
       scopeId: scope_q0zxr1codwzcrn6nbyjf2mkz
-      maxIngestedFiles: 100
+      maxFilesToIngest: 100
       storeInternally: enabled
       syncStatus: active
       syncMode: content_only
@@ -40,7 +42,7 @@ unique:
 processing:
   stepTimeoutSeconds: 900
   concurrency: 1
-  maxFileSizeBytes: 209715200
+  maxFileSizeToIngestBytes: 209715200
   maxFilesToScan: 5  # For testing: limit to 5 files
   allowedMimeTypes:
     - application/pdf

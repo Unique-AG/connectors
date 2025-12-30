@@ -29,8 +29,8 @@ data:
           syncColumnName: {{ .syncColumnName | quote }}
           ingestionMode: {{ .ingestionMode | quote }}
           scopeId: {{ .scopeId | quote }}
-          {{- if .maxIngestedFiles }}
-          maxIngestedFiles: {{ .maxIngestedFiles }}
+          {{- if .maxFilesToIngest }}
+          maxFilesToIngest: {{ .maxFilesToIngest }}
           {{- end }}
           storeInternally: {{ .storeInternally | quote }}
           syncStatus: {{ .syncStatus | quote }}
@@ -66,8 +66,8 @@ data:
     processing:
       stepTimeoutSeconds: {{ .Values.connectorConfig.processing.stepTimeoutSeconds }}
       concurrency: {{ .Values.connectorConfig.processing.concurrency }}
-      {{- if .Values.connectorConfig.processing.maxFileSizeBytes }}
-      maxFileSizeBytes: {{ .Values.connectorConfig.processing.maxFileSizeBytes }}
+      {{- if .Values.connectorConfig.processing.maxFileSizeToIngestBytes }}
+      maxFileSizeToIngestBytes: {{ .Values.connectorConfig.processing.maxFileSizeToIngestBytes }}
       {{- end }}
       allowedMimeTypes:
         {{- range .Values.connectorConfig.processing.allowedMimeTypes }}

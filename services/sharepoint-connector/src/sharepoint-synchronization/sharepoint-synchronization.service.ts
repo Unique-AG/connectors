@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Histogram } from '@opentelemetry/api';
 import { Config } from '../config';
+import type { SiteConfig } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
@@ -12,6 +13,7 @@ import { sanitizeError } from '../utils/normalize-error';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
+import { SitesConfigLoaderService } from './sites-config-loader.service';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
 
 @Injectable()
@@ -26,6 +28,7 @@ export class SharepointSynchronizationService {
     private readonly contentSyncService: ContentSyncService,
     private readonly permissionsSyncService: PermissionsSyncService,
     private readonly scopeManagementService: ScopeManagementService,
+    private readonly sitesConfigLoader: SitesConfigLoaderService,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
   ) {
@@ -49,7 +52,22 @@ export class SharepointSynchronizationService {
     // We wrap the whole action in a try-finally block to ensure that the isScanning flag is reset
     // in case of some unexpected one-off error occurring.
     try {
-      const sites = this.configService.get('sharepoint.sites', { infer: true });
+      const sharepointConfig = this.configService.get('sharepoint', { infer: true });
+      let sites: SiteConfig[];
+      try {
+        sites = await this.sitesConfigLoader.loadSites(sharepointConfig);
+      } catch (error) {
+        this.logger.error({
+          msg: 'Failed to load sites configuration',
+          error: sanitizeError(error),
+        });
+        this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
+          sync_type: 'full',
+          result: 'failure',
+          failure_step: 'sites_config_loading',
+        });
+        return;
+      }
 
       // Filter to only active sites
       const activeSites = sites.filter((site) => site.syncStatus === 'active');
