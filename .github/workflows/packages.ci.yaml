@@ -24,36 +24,36 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
-          node-version: '22'
-          
+          node-version: "22"
+
       - name: Extract PNPM version from package.json
         id: pnpm-version
         run: |
           PNPM_VERSION=$(jq -r '.packageManager | split("@")[1]' package.json)
           echo "version=$PNPM_VERSION" >> $GITHUB_OUTPUT
-          
+
       - uses: pnpm/action-setup@v4
         with:
           version: ${{ steps.pnpm-version.outputs.version }}
           run_install: false
-          
+
       - name: Get pnpm store directory
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-          
-      - uses: actions/cache@v4
+
+      - uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         name: Setup pnpm cache
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
-            
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -62,10 +62,10 @@ jobs:
 
       - name: Run style (all packages)
         run: pnpm style
-        
+
       - name: Type check (all packages)
         run: pnpm check-types --filter='./packages/*'
-        
+
       - name: Build packages
         run: pnpm build --filter='./packages/*'
 
