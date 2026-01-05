@@ -126,11 +126,11 @@ describe('SitesConfigLoaderService', () => {
       const listItem = {
         id: '1',
         fields: {
-          siteId: '12345678-1234-4234-8234-123456789abc',
+          syncSiteId: '12345678-1234-4234-8234-123456789abc',
           syncColumnName: 'TestColumn',
           ingestionMode: 'recursive',
-          scopeId: 'scope_test',
-          maxIngestedFiles: 100,
+          uniqueScopeId: 'scope_test',
+          maxFilesToIngest: 100,
           storeInternally: 'enabled',
           syncStatus: 'active',
           syncMode: 'content_and_permissions',
@@ -145,7 +145,7 @@ describe('SitesConfigLoaderService', () => {
         syncColumnName: 'TestColumn',
         ingestionMode: 'recursive',
         scopeId: 'scope_test',
-        maxIngestedFiles: 100,
+        maxFilesToIngest: 100,
         storeInternally: 'enabled',
         syncStatus: 'active',
         syncMode: 'content_and_permissions',
@@ -224,10 +224,10 @@ describe('SitesConfigLoaderService', () => {
       const listItem = {
         id: '1',
         fields: {
-          siteId: '12345678-1234-4234-8234-123456789abc',
+          syncSiteId: '12345678-1234-4234-8234-123456789abc',
           syncColumnName: 'TestColumn',
           ingestionMode: 'flat',
-          scopeId: 'scope_test',
+          uniqueScopeId: 'scope_test',
           storeInternally: 'enabled',
           syncStatus: 'active',
           syncMode: 'content_only',
@@ -237,7 +237,7 @@ describe('SitesConfigLoaderService', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Test private method
       const result = (unit as any).transformListItemToSiteConfig(listItem, 0);
 
-      expect(result.maxIngestedFiles).toBeUndefined();
+      expect(result.maxFilesToIngest).toBeUndefined();
     });
   });
 
@@ -261,7 +261,7 @@ describe('SitesConfigLoaderService', () => {
 
       // Mock getListIdByName response
       mockGraphClient.get.mockResolvedValueOnce({
-        value: [{ id: 'list-id-456', displayName: 'Test List' }],
+        value: [{ id: 'list-id-456', name: 'Test List', displayName: 'Test List' }],
       });
 
       // Mock getListItems response
@@ -270,11 +270,11 @@ describe('SitesConfigLoaderService', () => {
           {
             id: '1',
             fields: {
-              siteId: '12345678-1234-4234-8123-123456789abc',
+              syncSiteId: '12345678-1234-4234-8123-123456789abc',
               syncColumnName: 'TestColumn',
               ingestionMode: 'recursive',
-              scopeId: 'scope_test',
-              maxIngestedFiles: 100,
+              uniqueScopeId: 'scope_test',
+              maxFilesToIngest: 100,
               storeInternally: 'enabled',
               syncStatus: 'active',
               syncMode: 'content_and_permissions',
@@ -298,7 +298,7 @@ describe('SitesConfigLoaderService', () => {
         syncColumnName: 'TestColumn',
         ingestionMode: 'recursive',
         scopeId: 'scope_test',
-        maxIngestedFiles: 100,
+        maxFilesToIngest: 100,
         storeInternally: 'enabled',
         syncStatus: 'active',
         syncMode: 'content_and_permissions',

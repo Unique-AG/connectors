@@ -126,7 +126,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
-        siteConfig: { ...mockSiteConfig, maxIngestedFiles: 1 },
+        siteConfig: { ...mockSiteConfig, maxFilesToIngest: 1 },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -360,7 +360,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
-        siteConfig: { ...mockSiteConfig, maxIngestedFiles: 2 },
+        siteConfig: { ...mockSiteConfig, maxFilesToIngest: 2 },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({

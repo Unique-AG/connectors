@@ -15,7 +15,7 @@ describe('SharepointConfigSchema', () => {
         syncColumnName: 'FinanceGPTKnowledge',
         ingestionMode: IngestionMode.Recursive,
         scopeId: 'scope_test123',
-        maxIngestedFiles: 1000,
+        maxFilesToIngest: 1000,
         storeInternally: StoreInternallyMode.Enabled,
         syncStatus: 'active' as const,
         syncMode: 'content_and_permissions' as const,
@@ -100,7 +100,7 @@ describe('SharepointConfigSchema', () => {
             syncColumnName: 'HRKnowledge',
             ingestionMode: IngestionMode.Flat,
             scopeId: 'scope_hr',
-            maxIngestedFiles: 500,
+            maxFilesToIngest: 500,
             storeInternally: StoreInternallyMode.Disabled,
             syncStatus: 'inactive' as const,
             syncMode: 'content_only' as const,
@@ -193,14 +193,14 @@ describe('SharepointConfigSchema', () => {
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
     });
 
-    it('validates maxIngestedFiles is positive integer when provided', () => {
+    it('validates maxFilesToIngest is positive integer when provided', () => {
       const config = {
         ...validBaseConfig,
         authMode: 'oidc' as const,
         sites: [
           {
             ...validBaseConfig.sites[0],
-            maxIngestedFiles: -1,
+            maxFilesToIngest: -1,
           },
         ],
       };

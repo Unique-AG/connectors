@@ -69,7 +69,6 @@ export class SharepointSynchronizationService {
         return;
       }
 
-      // Separate sites by syncStatus
       const activeSites = sites.filter((site) => site.syncStatus === 'active');
       const deletedSites = sites.filter((site) => site.syncStatus === 'deleted');
       const inactiveSites = sites.filter((site) => site.syncStatus === 'inactive');
@@ -78,7 +77,6 @@ export class SharepointSynchronizationService {
         `Sites configuration: ${activeSites.length} active, ${inactiveSites.length} inactive, ${deletedSites.length} marked for deletion`,
       );
 
-      // Handle deleted sites first
       for (const siteConfig of deletedSites) {
         const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
         const logPrefix = `[Site: ${logSiteId}]`;
