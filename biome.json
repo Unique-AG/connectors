@@ -9,13 +9,14 @@
   "files": {
     "ignoreUnknown": false,
     "includes": [
-      "**",
-      "!**/dist",
       "!**/.turbo",
+      "!**/.github",
       "!**/@generated",
       "!**/coverage",
+      "!**/dist",
       "!**/drizzle",
-      "!**/helm-charts/**/values.schema.json"
+      "!**/helm-charts/**/values.schema.json",
+      "**"
     ]
   },
   "formatter": {
