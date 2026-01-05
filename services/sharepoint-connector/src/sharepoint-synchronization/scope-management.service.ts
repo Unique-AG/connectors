@@ -79,6 +79,39 @@ export class ScopeManagementService {
     return { serviceUserId: userId, rootScopeId: rootScopeId, rootPath };
   }
 
+  public async deleteRootScopeRecursively(scopeId: string): Promise<void> {
+    const logPrefix = `[RootScopeId: ${scopeId}]`;
+    this.logger.log(`${logPrefix} Deleting root scope recursively`);
+
+    try {
+      const result = await this.uniqueScopesService.deleteScopeRecursively(scopeId);
+
+      if (result.successFolders.length > 0) {
+        this.logger.log(
+          `${logPrefix} Successfully deleted ${result.successFolders.length} folders`,
+        );
+      }
+
+      if (result.failedFolders.length > 0) {
+        this.logger.warn({
+          msg: `${logPrefix} Failed to delete ${result.failedFolders.length} folders`,
+          failedFolders: result.failedFolders.map((f) => ({
+            id: f.id,
+            name: f.name,
+            path: this.shouldConcealLogs ? redact(f.path) : f.path,
+            reason: f.failReason,
+          })),
+        });
+      }
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to delete root scope recursively`,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
+  }
+
   private buildItemIdToScopePathMap(
     items: SharepointContentItem[],
     rootPath: string,

@@ -1,15 +1,15 @@
 import assert from 'node:assert';
-import type {Client} from '@microsoft/microsoft-graph-client';
-import {Injectable, Logger} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {Config} from '../config';
-import type {SharepointConfig, SiteConfig} from '../config/sharepoint.schema';
-import {SiteConfigSchema} from '../config/sharepoint.schema';
-import {GRAPH_API_PAGE_SIZE} from '../constants/defaults.constants';
-import {GraphClientFactory} from '../microsoft-apis/graph/graph-client.factory';
-import type {GraphApiResponse, ListItem} from '../microsoft-apis/graph/types/sharepoint.types';
-import {redact, shouldConcealLogs, smear } from '../utils/logging.util';
-import {sanitizeError} from '../utils/normalize-error';
+import type { Client } from '@microsoft/microsoft-graph-client';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Config } from '../config';
+import type { SharepointConfig, SiteConfig } from '../config/sharepoint.schema';
+import { SiteConfigSchema } from '../config/sharepoint.schema';
+import { GRAPH_API_PAGE_SIZE } from '../constants/defaults.constants';
+import { GraphClientFactory } from '../microsoft-apis/graph/graph-client.factory';
+import type { GraphApiResponse, ListItem } from '../microsoft-apis/graph/types/sharepoint.types';
+import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
+import { sanitizeError } from '../utils/normalize-error';
 
 interface ParsedListUrl {
   hostname: string;
@@ -141,7 +141,9 @@ export class SitesConfigLoaderService {
       }
 
       // if format is unexpected, return value from response
-      this.logger.warn(`Unexpected site ID format: ${this.shouldConcealLogs ? smear(response.id) : response.id}`);
+      this.logger.warn(
+        `Unexpected site ID format: ${this.shouldConcealLogs ? smear(response.id) : response.id}`,
+      );
       return response.id;
     } catch (error) {
       this.logger.error({
@@ -157,9 +159,12 @@ export class SitesConfigLoaderService {
   // fetch all lists with pagination since $filter is not supported on name/displayName and we need to filter client-side
   private async getListIdByName(siteId: string, listName: string): Promise<string> {
     try {
-      const allLists = await this.paginateGraphApiRequest<{ id: string; name: string; displayName: string }>(
-        `/sites/${siteId}/lists`,
-        (url) => this.graphClient.api(url).select('id,name').top(GRAPH_API_PAGE_SIZE).get(),
+      const allLists = await this.paginateGraphApiRequest<{
+        id: string;
+        name: string;
+        displayName: string;
+      }>(`/sites/${siteId}/lists`, (url) =>
+        this.graphClient.api(url).select('id,name').top(GRAPH_API_PAGE_SIZE).get(),
       );
 
       const matchingList = allLists.find((list) => list.name === listName);

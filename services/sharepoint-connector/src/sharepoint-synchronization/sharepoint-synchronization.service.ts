@@ -69,8 +69,35 @@ export class SharepointSynchronizationService {
         return;
       }
 
-      // Filter to only active sites
+      // Separate sites by syncStatus
       const activeSites = sites.filter((site) => site.syncStatus === 'active');
+      const deletedSites = sites.filter((site) => site.syncStatus === 'deleted');
+      const inactiveSites = sites.filter((site) => site.syncStatus === 'inactive');
+
+      this.logger.log(
+        `Sites configuration: ${activeSites.length} active, ${inactiveSites.length} inactive, ${deletedSites.length} marked for deletion`,
+      );
+
+      // Handle deleted sites first
+      for (const siteConfig of deletedSites) {
+        const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
+        const logPrefix = `[Site: ${logSiteId}]`;
+
+        this.logger.log(
+          `${logPrefix} Processing site marked for deletion (ScopeId: ${siteConfig.scopeId})`,
+        );
+
+        try {
+          await this.scopeManagementService.deleteRootScopeRecursively(siteConfig.scopeId);
+          this.logger.log(`${logPrefix} Successfully processed deletion`);
+        } catch (error) {
+          this.logger.error({
+            msg: `${logPrefix} Failed to delete scope recursively - continuing with other sites`,
+            scopeId: siteConfig.scopeId,
+            error: sanitizeError(error),
+          });
+        }
+      }
 
       if (activeSites.length === 0) {
         this.logger.warn('No active sites configured for synchronization');
@@ -82,9 +109,7 @@ export class SharepointSynchronizationService {
         return;
       }
 
-      this.logger.log(
-        `Starting scan of ${activeSites.length} active SharePoint sites (${sites.length - activeSites.length} sites skipped)...`,
-      );
+      this.logger.log(`Starting scan of ${activeSites.length} active SharePoint sites...`);
 
       for (const siteConfig of activeSites) {
         const siteSyncStartTime = Date.now();
