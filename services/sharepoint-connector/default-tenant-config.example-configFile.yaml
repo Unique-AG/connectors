@@ -1,0 +1,52 @@
+# SharePoint Connector - Static Configuration Example
+# Sites are defined directly in this YAML file
+
+sharepoint:
+  authMode: certificate
+  authTenantId: your-tenant-id-here
+  authClientId: your-client-id-here
+  authPrivateKeyPath: /path/to/private-key.pem
+  authThumbprintSha1: your-sha1-thumbprint-here
+  baseUrl: https://yourcompany.sharepoint.com
+  graphApiRateLimitPerMinute: 600
+  
+  # Sites configuration
+  sitesSource: configFile
+  sites:
+    - siteId: 12345678-1234-1234-1234-123456789abc
+      syncColumnName: FinanceGPTKnowledge
+      ingestionMode: recursive
+      scopeId: scope_bu4gokr0atzj0kfiuaaaaaaa
+      maxFilesToIngest: 1000
+      storeInternally: enabled
+      syncStatus: active
+      syncMode: content_and_permissions
+    
+    - siteId: 87654321-4321-4321-4321-cba987654321
+      syncColumnName: HRKnowledge
+      ingestionMode: flat
+      scopeId: scope_bu4gokr0atzj0kfiubbbbbb
+      storeInternally: enabled
+      syncStatus: active
+      syncMode: content_only
+
+unique:
+  serviceAuthMode: cluster_local
+  serviceExtraHeaders:
+    x-company-id: your-company-id
+    x-user-id: your-user-id
+  ingestionServiceBaseUrl: https://ingestion.your-unique-instance.com
+  scopeManagementServiceBaseUrl: https://scope-management.your-unique-instance.com
+  apiRateLimitPerMinute: 60
+
+processing:
+  stepTimeoutSeconds: 300
+  concurrency: 5
+  maxFileSizeToIngestBytes: 52428800
+  allowedMimeTypes:
+    - application/pdf
+    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+    - application/vnd.openxmlformats-officedocument.presentationml.presentation
+  scanIntervalCron: "*/15 * * * *"
+
