@@ -207,7 +207,6 @@ export class UniqueService {
   @Span()
   private async fetchUserForScopeAccess(email: string): Promise<PublicUserResult | null> {
     const span = this.trace.getSpan();
-    span?.setAttribute('email', email);
 
     const baseUrl = this.config.get('unique.apiBaseUrl', { infer: true });
 

@@ -73,7 +73,7 @@ export class TokenProvider implements AuthenticationProvider {
 
     assert.ok(
       userProfile?.refreshToken,
-      `No refresh token available for user: ${this.userProfileId}`,
+      `No refresh token available for user: ${userProfileId}`,
     );
 
     const decrypedRefreshToken = this.encryptionService.decryptFromString(userProfile.refreshToken);
