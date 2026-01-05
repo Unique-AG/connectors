@@ -16,7 +16,8 @@
       "!**/@generated",
       "!**/coverage",
       "!**/drizzle",
-      "!**/helm-charts/**/values.schema.json"
+      "!**/helm-charts/**/values.schema.json",
+      "!**/scripts"
     ]
   },
   "formatter": {
