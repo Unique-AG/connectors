@@ -31,10 +31,6 @@ connector:
   #           key: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
-  extraEnvCM:
-    # Deprecated: Legacy environment variable based config (will be removed in future version)
-    # The connector now uses YAML-based configuration from sharepoint-connector-tenant-config
-    # - sharepoint-connector-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
     tag: 2.0.0-beta.8 # x-release-please-version
@@ -217,8 +213,6 @@ connectorConfig:
     # example: https://api.unique.app/scope-management
     # example: http://node-scope-management.finance-gpt:8094
     scopeManagementServiceBaseUrl: unset_default_value
-    # NOTE: ingestionMode, scopeId, maxFilesToIngest, and storeInternally have been moved to per-site configuration
-    # See sharepoint.sites array above
     # -- Number of Unique API requests allowed per minute
     apiRateLimitPerMinute: 100
     # -- Object containing extra HTTP headers for Unique API requests (GraphQL and REST)
@@ -227,7 +221,7 @@ connectorConfig:
     serviceExtraHeaders:
       x-company-id: unset_default_value
       x-user-id: unset_default_value
-    # -- Object containing config to pass when submitting file for ingestion
+    # -- Optional Object containing config to pass when submitting file for ingestion
     # ingestionConfig:
     #   uniqueIngestionMode: SKIP_INGESTION
     #   customProperty: value

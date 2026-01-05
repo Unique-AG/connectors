@@ -282,7 +282,7 @@ describe('SharepointConfigSchema', () => {
         expect(site.syncColumnName).toBe('FinanceGPTKnowledge'); // default value
         expect(site.storeInternally).toBe(StoreInternallyMode.Enabled); // default value
         expect(site.syncStatus).toBe('active'); // default value
-        expect(site.maxIngestedFiles).toBeUndefined(); // optional field
+        expect(site.maxFilesToIngest).toBeUndefined(); // optional field
       }
     });
   });

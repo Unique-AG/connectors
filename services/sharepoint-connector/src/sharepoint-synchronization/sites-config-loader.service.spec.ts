@@ -41,7 +41,7 @@ describe('SitesConfigLoaderService', () => {
         syncColumnName: 'TestColumn',
         ingestionMode: IngestionMode.Recursive,
         scopeId: 'scope_test',
-        maxIngestedFiles: 100,
+        maxFilesToIngest: 100,
         storeInternally: StoreInternallyMode.Enabled,
         syncStatus: 'active',
         syncMode: 'content_and_permissions',
@@ -218,7 +218,7 @@ describe('SitesConfigLoaderService', () => {
       );
     });
 
-    it('correctly handles optional maxIngestedFiles', async () => {
+    it('correctly handles optional maxFilesToIngest', async () => {
       const { unit } = await TestBed.solitary(SitesConfigLoaderService).compile();
 
       const listItem = {

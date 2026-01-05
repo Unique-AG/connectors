@@ -19,7 +19,7 @@ const mockSiteConfig = {
   syncColumnName: 'TestColumn',
   ingestionMode: IngestionMode.Flat,
   scopeId: 'scope-id',
-  maxIngestedFiles: 1000,
+  maxFilesToIngest: 1000,
   storeInternally: StoreInternallyMode.Enabled,
   syncStatus: 'active' as const,
   syncMode: 'content_only' as const,
@@ -136,14 +136,15 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 1;
-        }
-        return null;
-      });
+      const contextWithLimit = {
+        ...context,
+        siteConfig: {
+          ...context.siteConfig,
+          maxFilesToIngest: 1,
+        },
+      };
 
-      await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
+      await expect(service.syncContentForSite(items, scopes, contextWithLimit)).rejects.toThrow(
         /Too many files to ingest: 2. Limit is 1. Aborting sync./,
       );
     });
@@ -177,17 +178,17 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
-        if (key === 'unique.scopeId') {
-          return 'scope-id';
-        }
-        return null;
-      });
+      const contextWithLimit = {
+        ...context,
+        siteConfig: {
+          ...context.siteConfig,
+          maxFilesToIngest: 2,
+        },
+      };
 
-      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
+      await expect(
+        service.syncContentForSite(items, scopes, contextWithLimit),
+      ).resolves.not.toThrow();
     });
 
     it('does not throw an error if the limit is not set', async () => {
@@ -217,16 +218,6 @@ describe('ContentSyncService', () => {
         updatedFiles: [],
         movedFiles: [],
         deletedFiles: [],
-      });
-
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return undefined;
-        }
-        if (key === 'unique.scopeId') {
-          return 'scope-id';
-        }
-        return null;
       });
 
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
@@ -273,10 +264,7 @@ describe('ContentSyncService', () => {
 
       vi.spyOn(uniqueFilesService, 'getFilesCountForSite').mockResolvedValue(5);
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 1;
-        }
+      vi.spyOn(configService, 'get').mockImplementation((_key: string) => {
         return null;
       });
 
@@ -313,9 +301,6 @@ describe('ContentSyncService', () => {
       });
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 1;
-        }
         if (key === 'unique.scopeId') {
           return 'scope-id';
         }
@@ -370,10 +355,7 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
+      vi.spyOn(configService, 'get').mockImplementation((_key: string) => {
         return null;
       });
 
@@ -420,9 +402,6 @@ describe('ContentSyncService', () => {
       });
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
         if (key === 'unique.scopeId') {
           return 'scope-id';
         }
@@ -470,9 +449,6 @@ describe('ContentSyncService', () => {
       });
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
         if (key === 'unique.scopeId') {
           return 'scope-id';
         }

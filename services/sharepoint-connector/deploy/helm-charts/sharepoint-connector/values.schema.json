@@ -260,8 +260,7 @@
           "required": [
             "tenantId",
             "baseUrl",
-            "siteIds",
-            "syncColumnName",
+            "sites",
             "auth",
             "graph"
           ],
@@ -281,28 +280,85 @@
                 "https://my-company.sharepoint.com"
               ]
             },
-            "siteIds": {
+            "sites": {
               "type": "array",
+              "description": "Array of SharePoint sites to sync with their individual configurations",
+              "minItems": 1,
               "items": {
-                "type": "string",
-                "examples": [
-                  "00000000-0000-0000-0000-000000000000"
-                ]
-              },
-              "description": "SharePoint sites list (UUIDs)",
-              "examples": [
-                [
-                  "00000000-0000-0000-0000-000000000000"
-                ]
-              ]
-            },
-            "syncColumnName": {
-              "type": "string",
-              "description": "Column name for synchronization",
-              "examples": [
-                "FinanceGPTKnowledge",
-                "MyCustomColumn"
-              ]
+                "type": "object",
+                "required": [
+                  "siteId",
+                  "syncColumnName",
+                  "ingestionMode",
+                  "scopeId",
+                  "storeInternally",
+                  "syncStatus",
+                  "syncMode"
+                ],
+                "properties": {
+                  "siteId": {
+                    "type": "string",
+                    "description": "SharePoint site ID (UUID)",
+                    "examples": [
+                      "00000000-0000-0000-0000-000000000000"
+                    ]
+                  },
+                  "syncColumnName": {
+                    "type": "string",
+                    "description": "Column name for synchronization in this site",
+                    "examples": [
+                      "FinanceGPTKnowledge",
+                      "HRKnowledge"
+                    ]
+                  },
+                  "ingestionMode": {
+                    "type": "string",
+                    "enum": [
+                      "flat",
+                      "recursive"
+                    ],
+                    "description": "Ingestion mode for this site: flat ingests all files to a single root scope, recursive maintains the folder hierarchy"
+                  },
+                  "scopeId": {
+                    "type": "string",
+                    "description": "Scope ID to be used as root for ingestion for this site",
+                    "examples": [
+                      "scope_bu4gokr0atzj0kfiuaaaaaaa"
+                    ]
+                  },
+                  "maxFilesToIngest": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum number of files to ingest for this site in a single run"
+                  },
+                  "storeInternally": {
+                    "type": "string",
+                    "enum": [
+                      "enabled",
+                      "disabled"
+                    ],
+                    "description": "Whether to store content internally in Unique for this site"
+                  },
+                  "syncStatus": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "inactive",
+                      "deleted"
+                    ],
+                    "description": "Sync status: active = sync normally, inactive = skip, deleted = delete scope recursively"
+                  },
+                  "syncMode": {
+                    "type": "string",
+                    "enum": [
+                      "content_only",
+                      "content_and_permissions"
+                    ],
+                    "description": "Mode of synchronization for this site"
+                  }
+                },
+                "additionalProperties": false
+              }
             },
             "auth": {
               "type": "object",
@@ -374,9 +430,7 @@
           "required": [
             "ingestionServiceBaseUrl",
             "scopeManagementServiceBaseUrl",
-            "ingestionMode",
-            "authMode",
-            "scopeId"
+            "authMode"
           ],
           "properties": {
             "ingestionServiceBaseUrl": {
@@ -395,37 +449,9 @@
                 "https://api.unique.app/scope-management"
               ]
             },
-            "ingestionMode": {
-              "type": "string",
-              "enum": [
-                "flat",
-                "recursive"
-              ],
-              "description": "Ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy (path-based ingestion)"
-            },
-            "scopeId": {
-              "type": "string",
-              "description": "Scope ID to be used as root for ingestion. Required for both flat and recursive modes.",
-              "examples": [
-                "scope_bu4gokr0atzj0kfiuaaaaaaa"
-              ]
-            },
             "apiRateLimitPerMinute": {
               "type": "integer",
               "description": "Number of Unique API requests allowed per minute"
-            },
-            "maxIngestedFiles": {
-              "type": "integer",
-              "minimum": 1,
-              "description": "Maximum number of files to ingest per site in a single run. If the number of new + updated files for a site exceeds this limit, the sync for that site will fail."
-            },
-            "storeInternally": {
-              "type": "string",
-              "enum": [
-                "enabled",
-                "disabled"
-              ],
-              "description": "Whether to store content internally in Unique or not."
             },
             "authMode": {
               "type": "string",
@@ -496,22 +522,9 @@
           "description": "Files processing configuration",
           "required": [
             "allowedMimeTypes",
-            "concurrency",
-            "syncMode"
+            "concurrency"
           ],
           "properties": {
-            "syncMode": {
-              "type": "string",
-              "enum": [
-                "content_only",
-                "content_and_permissions"
-              ],
-              "description": "Mode of synchronization from SharePoint to Unique",
-              "examples": [
-                "content_only",
-                "content_and_permissions"
-              ]
-            },
             "allowedMimeTypes": {
               "type": "array",
               "items": {
@@ -537,12 +550,12 @@
               "type": "integer",
               "description": "Timeout in seconds for processing steps"
             },
-            "maxFileSizeBytes": {
+            "maxFileSizeToIngestBytes": {
               "type": [
                 "integer",
                 "null"
               ],
-              "description": "Maximum file size in bytes"
+              "description": "Maximum file size in bytes to ingest"
             },
             "scanIntervalCron": {
               "type": "string",
