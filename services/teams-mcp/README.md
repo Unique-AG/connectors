@@ -4,396 +4,28 @@ A NestJS-based microservice that integrates Microsoft Teams meetings with the Un
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Components](#components)
-- [Flows](#flows)
-  - [User Connection Flow](#user-connection-flow)
-  - [Subscription Lifecycle](#subscription-lifecycle)
-  - [Transcript Processing Flow](#transcript-processing-flow)
+- [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Development](#development)
 - [Deployment](#deployment)
+- [Observability](#observability)
+- [Technical Documentation](#technical-documentation)
 
-## Overview
+## Quick Start
 
-The Teams MCP Server:
+```bash
+# Install dependencies
+pnpm install
 
-- Captures Microsoft Teams meeting transcripts and recordings in real-time
-- Manages webhook subscriptions to Microsoft Graph API for notifications
-- Handles OAuth2 authentication with Microsoft Entra ID
-- Ingests content into the Unique platform with participant-based access controls
-- Manages subscription lifecycle (create, renew, remove) with scheduled synchronization
+# Copy environment template
+cp .env.example .env
 
-## Architecture
+# Run database migrations
+pnpm db:migrate
 
-```mermaid
-flowchart TB
-    subgraph External["External Services"]
-        MSGraph["Microsoft Graph API"]
-        EntraID["Microsoft Entra ID"]
-    end
-
-    subgraph TeamsMCP["Teams MCP Server"]
-        API["REST API<br/>(NestJS)"]
-        OAuth["OAuth Module"]
-        TranscriptSvc["Transcript Services"]
-        GraphClient["Graph Client Factory"]
-        TokenProvider["Token Provider"]
-        UniqueClient["Unique Service Client"]
-    end
-
-    subgraph Infrastructure["Infrastructure"]
-        RabbitMQ["RabbitMQ"]
-        PostgreSQL["PostgreSQL"]
-    end
-
-    subgraph Unique["Unique Platform"]
-        UniqueAPI["Unique Public API"]
-        Storage["Content Storage"]
-    end
-
-    User["Teams User"] --> EntraID
-    EntraID --> OAuth
-    OAuth --> PostgreSQL
-
-    MSGraph -->|"Webhook Notifications"| API
-    API --> RabbitMQ
-    RabbitMQ --> TranscriptSvc
-
-    TranscriptSvc --> GraphClient
-    GraphClient --> TokenProvider
-    TokenProvider --> PostgreSQL
-    GraphClient --> MSGraph
-
-    TranscriptSvc --> UniqueClient
-    UniqueClient --> UniqueAPI
-    UniqueAPI --> Storage
+# Start development server
+pnpm dev
 ```
-
-## Components
-
-```mermaid
-flowchart LR
-    subgraph Auth["Authentication"]
-        MicrosoftProvider["Microsoft OAuth Provider"]
-        McpOAuthStore["MCP OAuth Store"]
-        TokenMgmt["Token Management"]
-    end
-
-    subgraph Transcript["Transcript Module"]
-        WebhookController["Webhook Controller"]
-        SubscriptionCreate["Subscription Create"]
-        SubscriptionRemove["Subscription Remove"]
-        SubscriptionReauth["Subscription Reauthorize"]
-        TranscriptCreated["Transcript Created"]
-    end
-
-    subgraph MSGraph["Microsoft Graph"]
-        GraphFactory["Graph Client Factory"]
-        TokenProvider["Token Provider"]
-        MetricsMiddleware["Metrics Middleware"]
-        RefreshMiddleware["Token Refresh Middleware"]
-    end
-
-    subgraph UniqueIntegration["Unique Integration"]
-        UniqueService["Unique Service"]
-    end
-
-    subgraph Data["Data Layer"]
-        DrizzleORM["Drizzle ORM"]
-        Subscriptions[("subscriptions")]
-        UserProfiles[("user_profiles")]
-        OAuthState[("oauth_*")]
-    end
-
-    subgraph Queue["Message Queue"]
-        AMQPModule["AMQP Module"]
-        MainExchange{{"Main Exchange"}}
-        DLX{{"Dead Letter Exchange"}}
-    end
-
-    Auth --> Data
-    Transcript --> Queue
-    Transcript --> MSGraph
-    Transcript --> UniqueIntegration
-    MSGraph --> Data
-    Queue --> Transcript
-```
-
-### Component Descriptions
-
-| Component | Purpose |
-|-----------|---------|
-| **Microsoft OAuth Provider** | Handles OAuth2 flow with Microsoft Entra ID |
-| **MCP OAuth Store** | Stores encrypted JWT tokens in PostgreSQL |
-| **Token Provider** | Manages access/refresh tokens with automatic refresh |
-| **Graph Client Factory** | Creates authenticated Microsoft Graph API clients |
-| **Webhook Controller** | Receives notifications from Microsoft Graph |
-| **Subscription Services** | Manages Graph API subscription lifecycle |
-| **Transcript Created Service** | Processes new transcripts and recordings |
-| **Unique Service** | Interfaces with Unique Public API for content ingestion |
-| **AMQP Module** | RabbitMQ integration for async message processing |
-
-## Flows
-
-### User Connection Flow
-
-Everything starts when a user connects to the MCP server. This triggers OAuth authentication and sets up the subscription for receiving meeting notifications.
-
-```mermaid
-flowchart LR
-    subgraph Connection["User Connects to MCP Server"]
-        Connect["User opens MCP client"]
-        MCPEndpoint["GET /mcp"]
-    end
-
-    subgraph Auth["OAuth Authentication"]
-        Redirect["Redirect to Microsoft"]
-        Consent["User grants permissions"]
-        Callback["Callback with auth code"]
-        Exchange["Exchange for tokens"]
-        Store["Store encrypted tokens"]
-    end
-
-    subgraph Setup["Subscription Setup"]
-        UserUpsert["Emit UserUpsertEvent"]
-        CreateSub["Create Graph subscription"]
-        StoreSub["Store subscription record"]
-    end
-
-    subgraph Ready["Ready for Notifications"]
-        Active["Subscription Active"]
-        Listen["Listening for transcripts"]
-    end
-
-    Connect --> MCPEndpoint
-    MCPEndpoint --> Redirect
-    Redirect --> Consent
-    Consent --> Callback
-    Callback --> Exchange
-    Exchange --> Store
-    Store --> UserUpsert
-    UserUpsert --> CreateSub
-    CreateSub --> StoreSub
-    StoreSub --> Active
-    Active --> Listen
-```
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant MCPClient as MCP Client
-    participant TeamsMCP as Teams MCP Server
-    participant EntraID as Microsoft Entra ID
-    participant MSGraph as Microsoft Graph API
-    participant DB as PostgreSQL
-
-    User->>MCPClient: Connect to MCP server
-    MCPClient->>TeamsMCP: GET /mcp
-    TeamsMCP->>MCPClient: Redirect to Microsoft login
-    MCPClient->>EntraID: OAuth authorization request
-    EntraID->>User: Show consent screen
-    User->>EntraID: Grant permissions
-    EntraID->>MCPClient: Redirect with auth code
-    MCPClient->>TeamsMCP: GET /auth/callback?code=...
-    TeamsMCP->>EntraID: Exchange code for tokens
-    EntraID->>TeamsMCP: Access + Refresh tokens
-    TeamsMCP->>DB: Store encrypted tokens
-
-    Note over TeamsMCP: Emit UserUpsertEvent
-    TeamsMCP->>MSGraph: POST /subscriptions
-    MSGraph->>TeamsMCP: Subscription created (ID, expiry)
-    TeamsMCP->>DB: Store subscription record
-    TeamsMCP->>MCPClient: Connection complete
-
-    Note over TeamsMCP: Now listening for meeting transcripts
-```
-
-**OAuth Scopes Required:**
-- `User.Read` - Read user profile
-- `OnlineMeetings.Read` - Read meeting details
-- `OnlineMeetingRecording.Read.All` - Read meeting recordings (optional)
-- `OnlineMeetingTranscript.Read.All` - Read meeting transcripts
-- `offline_access` - Obtain refresh tokens
-
-### Subscription Lifecycle
-
-Subscriptions are **renewed** (not recreated) before they expire. If renewal fails for any reason, the subscription is deleted and the user must reconnect to the MCP server to re-authenticate.
-
-```mermaid
-stateDiagram-v2
-    [*] --> Creating: User connects to MCP
-
-    Creating --> Active: Subscription created
-    Active --> Renewing: Lifecycle notification<br/>(before expiry)
-    Renewing --> Active: Renewal successful
-    Renewing --> Deleted: Renewal failed
-    Active --> Deleted: User disconnects
-    Deleted --> [*]: User must reconnect
-
-    note right of Creating
-        Creates subscription for:
-        users/{id}/onlineMeetings/getAllTranscripts
-    end note
-
-    note right of Deleted
-        User must reconnect to
-        MCP server and re-authenticate
-    end note
-```
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant TeamsMCP as Teams MCP Server
-    participant RabbitMQ
-    participant MSGraph as Microsoft Graph API
-    participant DB as PostgreSQL
-
-    Note over TeamsMCP: User connected, subscription active
-
-    rect rgb(200, 230, 200)
-        Note over MSGraph: Before expiry - Lifecycle notification
-        MSGraph->>TeamsMCP: POST /transcript/lifecycle
-        TeamsMCP->>RabbitMQ: Enqueue reauthorization event
-        RabbitMQ->>TeamsMCP: Process reauthorization
-        TeamsMCP->>MSGraph: PATCH /subscriptions/{id} (renew)
-        MSGraph->>TeamsMCP: Subscription renewed
-        TeamsMCP->>DB: Update expiration time
-    end
-
-    rect rgb(255, 200, 200)
-        Note over TeamsMCP: If renewal fails
-        TeamsMCP->>MSGraph: DELETE /subscriptions/{id}
-        TeamsMCP->>DB: Delete subscription record
-        Note over TeamsMCP: User must reconnect to MCP server
-    end
-```
-
-**Subscription Scheduling:**
-- Subscriptions are set to expire at a configured UTC hour (default: 3 AM)
-- This batches all renewals to a single time window
-- Daily renewal ensures token validity is checked consistently
-- Minimum 2-hour subscription lifetime required for lifecycle notifications
-- **If renewal fails**: Subscription is deleted and user must reconnect to MCP server
-
-### Transcript Processing Flow
-
-When a meeting transcript becomes available, Microsoft Graph sends a webhook notification. The recording is fetched **only if the user has recording permissions**.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant MSGraph as Microsoft Graph API
-    participant Controller as Webhook Controller
-    participant RabbitMQ
-    participant Service as Transcript Created Service
-    participant Unique as Unique Platform
-
-    Note over MSGraph: Meeting transcript available
-    MSGraph->>Controller: POST /transcript/notification
-    Controller->>Controller: Validate clientState
-    Controller->>RabbitMQ: Enqueue change notification
-
-    RabbitMQ->>Service: Process transcript.created event
-
-    par Fetch meeting data
-        Service->>MSGraph: GET /onlineMeetings/{id}
-        MSGraph->>Service: Meeting details + participants
-    and Fetch transcript
-        Service->>MSGraph: GET /transcripts/{id}
-        MSGraph->>Service: Transcript metadata
-        Service->>MSGraph: GET /transcripts/{id}/content
-        MSGraph->>Service: VTT content stream
-    end
-
-    opt Recording permissions available
-        Service->>MSGraph: GET /recordings?filter=correlationId
-        MSGraph->>Service: Recording metadata + stream
-    end
-
-    Service->>Unique: Resolve participants to user IDs
-    Service->>Unique: Create scope (folder)
-    Service->>Unique: Set access permissions
-    Service->>Unique: Upload transcript (VTT)
-
-    opt Recording was fetched
-        Service->>Unique: Upload recording (MP4)
-    end
-```
-
-```mermaid
-flowchart TB
-    subgraph Input["Microsoft Graph Webhook"]
-        Notification["Change Notification"]
-    end
-
-    subgraph Validation["Validation"]
-        ClientState["clientState Validation"]
-    end
-
-    subgraph Queue["Message Queue"]
-        Exchange{{"teams-mcp.exchange"}}
-        DLX{{"Dead Letter Exchange"}}
-    end
-
-    subgraph Processing["Transcript Processing"]
-        FetchMeeting["Fetch Meeting Details"]
-        FetchTranscript["Fetch Transcript Content"]
-        CheckPerms{"Recording<br/>permissions?"}
-        FetchRecording["Fetch Recording"]
-        SkipRecording["Skip Recording"]
-        ResolveUsers["Resolve Participants"]
-    end
-
-    subgraph Ingestion["Unique Ingestion"]
-        CreateScope["Create Scope"]
-        SetAccess["Set Permissions"]
-        UploadVTT["Upload Transcript"]
-        CheckRecording{"Recording<br/>available?"}
-        UploadMP4["Upload Recording"]
-        Done["Done"]
-    end
-
-    Notification --> ClientState
-    ClientState -->|Valid| Exchange
-    ClientState -->|Invalid| Reject["Reject Request"]
-
-    Exchange --> FetchMeeting
-    Exchange -.->|Failed| DLX
-
-    FetchMeeting --> FetchTranscript
-    FetchTranscript --> CheckPerms
-    CheckPerms -->|Yes| FetchRecording
-    CheckPerms -->|No| SkipRecording
-    FetchRecording --> ResolveUsers
-    SkipRecording --> ResolveUsers
-
-    ResolveUsers --> CreateScope
-    CreateScope --> SetAccess
-    SetAccess --> UploadVTT
-    UploadVTT --> CheckRecording
-    CheckRecording -->|Yes| UploadMP4
-    CheckRecording -->|No| Done
-    UploadMP4 --> Done
-```
-
-**Webhook Validation:**
-- Microsoft Graph sends a `clientState` value with each notification
-- The server validates this matches the secret configured during subscription creation
-- Invalid `clientState` results in request rejection
-
-**Recording Permissions:**
-- Recording fetch requires `OnlineMeetingRecording.Read.All` scope
-- If the user hasn't granted this permission, only the transcript is captured
-- Recording availability is checked before attempting upload
-
-**Access Control:**
-- Meeting organizer receives **write + read** access
-- Meeting participants receive **read** access
-- Users are resolved by email or username in Unique platform
 
 ## Configuration
 
@@ -460,19 +92,6 @@ openssl rand -hex 32
 - PostgreSQL 17
 - RabbitMQ 4
 - Microsoft Azure AD application with required permissions
-
-### Setup
-
-```bash
-# Install dependencies
-pnpm install
-
-# Run database migrations
-pnpm db:migrate
-
-# Start development server
-pnpm dev
-```
 
 ### Available Scripts
 
@@ -543,3 +162,15 @@ OTEL_SERVICE_NAME=teams-mcp
 OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
 OTEL_EXPORTER_PROMETHEUS_PORT=8081
 ```
+
+## Technical Documentation
+
+Detailed technical documentation is available in the `docs/` directory:
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](./docs/architecture.md) | System components, high-level diagrams, infrastructure |
+| [Flows](./docs/flows.md) | User connection, subscription lifecycle, transcript processing |
+| [Permissions](./docs/permissions.md) | Microsoft Graph permissions and least-privilege justification |
+| [Token & Auth](./docs/token-auth-flows.md) | Token types, validation, expiration, refresh flows |
+| [Why RabbitMQ](./docs/why-rabbitmq.md) | Message queue rationale and design decisions |
