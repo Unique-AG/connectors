@@ -14,7 +14,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 
 ## Least-Privilege Justification
 
-Each permission is the minimum required for its function. No broader alternatives exist.
+Each permission is the minimum required for its function. No narrower alternatives exist.
 
 ### `User.Read`
 

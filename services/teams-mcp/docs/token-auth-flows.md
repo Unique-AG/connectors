@@ -208,49 +208,6 @@ flowchart LR
 
 For the full user connection and authentication sequence diagram, see [Flows - User Connection Flow](./flows.md#user-connection-flow).
 
-## Token Lifecycle Summary
-
-```mermaid
-stateDiagram-v2
-    [*] --> Issued
-
-    state "MCP Access Token (TTL 60s)" as MCP_Access {
-        state "Issued" as A_Issued
-        state "Valid" as A_Valid
-        state "Expired" as A_Expired
-
-        A_Issued --> A_Valid
-        A_Valid --> A_Expired : Time elapsed
-        A_Expired --> [*] : Deleted on access
-    }
-
-    state "MCP Refresh Token (TTL 30 days)" as MCP_Refresh {
-        state "Issued" as R_Issued
-        state "Valid" as R_Valid
-        state "Used" as R_Used
-        state "Expired" as R_Expired
-
-        R_Issued --> R_Valid
-        R_Valid --> R_Used : Token exchanged
-        R_Used --> [*] : Rotated, old invalidated
-        R_Valid --> R_Expired : Time elapsed
-        R_Expired --> [*] : Deleted
-    }
-
-    state "Microsoft Token (TTL ~1 hour)" as MS {
-        state "Issued" as M_Issued
-        state "Valid" as M_Valid
-        state "Expired" as M_Expired
-        state "Failed" as M_Failed
-
-        M_Issued --> M_Valid
-        M_Valid --> M_Expired : Time elapsed
-        M_Expired --> M_Valid : On-demand refresh
-        M_Expired --> M_Failed : Refresh failed
-        M_Failed --> [*] : User must reconnect
-    }
-```
-
 ## Configuration Reference
 
 | Variable | Default | Description |
