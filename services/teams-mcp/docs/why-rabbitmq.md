@@ -11,7 +11,7 @@ Microsoft Graph sends webhook notifications when:
 - A subscription needs reauthorization (lifecycle event)
 - A subscription has been removed
 
-Microsoft **requires** webhook endpoints to respond within **3 seconds**, or it considers the delivery failed and retries. However, processing these notifications involves:
+Microsoft **requires** webhook endpoints to respond within **10 seconds**, or it considers the delivery failed and retries. However, processing these notifications involves:
 
 1. Database lookups to find the subscription
 2. Multiple Microsoft Graph API calls (fetch meeting, transcript, recording)
@@ -24,7 +24,7 @@ This processing can take **30+ seconds**, far exceeding Microsoft's timeout requ
 
 ```
 Microsoft Graph → Webhook Controller → RabbitMQ → Transcript Service → Unique
-     (3s max)         (immediate)      (queue)      (async processing)
+     (10s max)         (immediate)      (queue)      (async processing)
 ```
 
 RabbitMQ decouples **webhook reception** from **processing**:
