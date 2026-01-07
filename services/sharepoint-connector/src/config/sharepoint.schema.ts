@@ -140,7 +140,6 @@ export const SharepointConfigSchema = baseConfig.and(
 
 export type SharepointConfigYaml = z.infer<typeof SharepointConfigSchema>;
 
-
 export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 
 // Helper types for discriminated union
@@ -148,13 +147,13 @@ export type StaticSitesConfig = z.infer<typeof staticSitesConfig>;
 export type DynamicSitesConfig = z.infer<typeof dynamicSitesConfig>;
 
 /*
-* 
-* Type for the final config with secrets injected from environment
-* We need to manually reconstruct the discriminated union after adding the privateKeyPassword
-* If we didn't need to add privateKeyPassword, we could just use:
-* export type SharepointConfig = SharepointConfigYaml;
-* But since we inject the password at runtime (not in YAML), we need this type transformation while preserving the discriminated union structure.
-*/
+ *
+ * Type for the final config with secrets injected from environment
+ * We need to manually reconstruct the discriminated union after adding the privateKeyPassword
+ * If we didn't need to add privateKeyPassword, we could just use:
+ * export type SharepointConfig = SharepointConfigYaml;
+ * But since we inject the password at runtime (not in YAML), we need this type transformation while preserving the discriminated union structure.
+ */
 export type SharepointConfig = (
   | {
       sitesSource: 'config_file';

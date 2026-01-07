@@ -24,7 +24,7 @@ export const AppConfigSchema = z
       .describe(
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
-    tenantConfigPath: z
+    tenantConfigPathPattern: z
       .string()
       .nonempty()
       .describe(
