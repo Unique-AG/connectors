@@ -8,7 +8,7 @@ import { SitesConfigLoaderService } from './sites-config-loader.service';
 
 describe('SitesConfigLoaderService', () => {
   describe('loadSites', () => {
-    it('returns sites array for configFile source', async () => {
+    it('returns sites array for config_file source', async () => {
       const { unit } = await TestBed.solitary(SitesConfigLoaderService).compile();
 
       const mockSites: SiteConfig[] = [
@@ -24,7 +24,7 @@ describe('SitesConfigLoaderService', () => {
       ];
 
       const config: Partial<SharepointConfig> = {
-        sitesSource: 'configFile',
+        sitesSource: 'config_file',
         sites: mockSites,
       } as SharepointConfig;
 
@@ -51,14 +51,14 @@ describe('SitesConfigLoaderService', () => {
       vi.spyOn(unit as any, 'fetchFromSharePointList').mockResolvedValue([mockSiteConfig]);
 
       const config = {
-        sitesSource: 'sharePointList' as const,
+        sitesSource: 'sharepoint_list' as const,
         sharepointListUrl: 'https://test.sharepoint.com/sites/Test/Lists/TestList/AllItems.aspx',
       } as SharepointConfig;
 
       const result = await unit.loadSites(config);
 
       expect(result).toEqual([mockSiteConfig]);
-      if (config.sitesSource === 'sharePointList') {
+      if (config.sitesSource === 'sharepoint_list') {
         // biome-ignore lint/suspicious/noExplicitAny: Check private method was called
         expect((unit as any).fetchFromSharePointList).toHaveBeenCalledWith(
           config.sharepointListUrl,
@@ -116,6 +116,21 @@ describe('SitesConfigLoaderService', () => {
 
       // biome-ignore lint/suspicious/noExplicitAny: Test private method
       expect(() => (unit as any).parseListUrl(url)).toThrow('Invalid SharePoint list URL');
+    });
+
+    it('correctly parses URL with apostrophes in list name', async () => {
+      const { unit } = await TestBed.solitary(SitesConfigLoaderService).compile();
+
+      const url = 'https://test.sharepoint.com/sites/Test/Lists/HR%27s%20List/AllItems.aspx';
+
+      // biome-ignore lint/suspicious/noExplicitAny: Test private method
+      const result = (unit as any).parseListUrl(url);
+
+      expect(result).toEqual({
+        hostname: 'test.sharepoint.com',
+        relativePath: '/sites/Test',
+        listName: "HR's List",
+      });
     });
   });
 

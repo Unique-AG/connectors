@@ -8,7 +8,7 @@ describe('SharepointConfigSchema', () => {
     authTenantId: '12345678-1234-1234-1234-123456789abc',
     baseUrl: 'https://company.sharepoint.com',
     graphApiRateLimitPerMinute: 600,
-    sitesSource: 'configFile' as const,
+    sitesSource: 'config_file' as const,
     sites: [
       {
         siteId: '87654321-4321-4321-8321-cba987654321',
@@ -86,7 +86,7 @@ describe('SharepointConfigSchema', () => {
       const config = {
         ...validBaseConfig,
         authMode: 'oidc' as const,
-        sitesSource: 'configFile' as const,
+        sitesSource: 'config_file' as const,
         sites: [
           {
             siteId: '87654321-4321-4321-8321-cba987654321',
@@ -110,7 +110,7 @@ describe('SharepointConfigSchema', () => {
 
       expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
       const result = SharepointConfigSchema.parse(config);
-      if (result.sitesSource === 'configFile') {
+      if (result.sitesSource === 'config_file') {
         expect(result.sites).toHaveLength(2);
       }
     });
@@ -121,7 +121,7 @@ describe('SharepointConfigSchema', () => {
       const config = {
         ...validBaseConfig,
         authMode: 'oidc' as const,
-        sitesSource: 'configFile' as const,
+        sitesSource: 'config_file' as const,
         sites: [],
       };
 
@@ -272,7 +272,7 @@ describe('SharepointConfigSchema', () => {
       const result = SharepointConfigSchema.parse(config);
 
       // Handle discriminated union
-      if (result.sitesSource === 'configFile') {
+      if (result.sitesSource === 'config_file') {
         expect(result.sites).toHaveLength(1);
 
         // TypeScript doesn't understand that the schema guarantees at least one site

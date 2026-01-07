@@ -92,7 +92,7 @@ export type SiteConfig = z.infer<typeof SiteConfigSchema>;
 
 // Configuration source options
 const staticSitesConfig = z.object({
-  sitesSource: z.literal('configFile').describe('Load sites configuration from static YAML array'),
+  sitesSource: z.literal('config_file').describe('Load sites configuration from static YAML array'),
   sites: z
     .array(SiteConfigSchema)
     .min(1, 'At least one site must be configured')
@@ -101,7 +101,7 @@ const staticSitesConfig = z.object({
 
 const dynamicSitesConfig = z.object({
   sitesSource: z
-    .literal('sharePointList')
+    .literal('sharepoint_list')
     .describe('Load sites configuration dynamically from SharePoint list'),
   sharepointListUrl: z
     .string()

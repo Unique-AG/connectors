@@ -1,5 +1,5 @@
-# SharePoint Connector - Static Configuration Example
-# Sites are defined directly in this YAML file
+# SharePoint Connector - Dynamic Configuration Example
+# Sites are loaded from a SharePoint list
 
 sharepoint:
   authMode: certificate
@@ -10,25 +10,19 @@ sharepoint:
   baseUrl: https://yourcompany.sharepoint.com
   graphApiRateLimitPerMinute: 600
   
-  # Sites configuration
-  sitesSource: configFile
-  sites:
-    - siteId: 12345678-1234-1234-1234-123456789abc
-      syncColumnName: FinanceGPTKnowledge
-      ingestionMode: recursive
-      scopeId: scope_bu4gokr0atzj0kfiuaaaaaaa
-      maxFilesToIngest: 1000
-      storeInternally: enabled
-      syncStatus: active
-      syncMode: content_and_permissions
-    
-    - siteId: 87654321-4321-4321-4321-cba987654321
-      syncColumnName: HRKnowledge
-      ingestionMode: flat
-      scopeId: scope_bu4gokr0atzj0kfiubbbbbb
-      storeInternally: enabled
-      syncStatus: active
-      syncMode: content_only
+  # Sites configuration from SharePoint list
+  sitesSource: sharepoint_list
+  sharepointListUrl: https://yourcompany.sharepoint.com/sites/ConfigSite/Lists/SharePoint%20Sites%20to%20Sync/AllItems.aspx
+  
+  # Required SharePoint list columns:
+  # - syncSiteId (Single line text) - SharePoint site ID
+  # - syncColumnName (Single line text) - Column that marks files for sync
+  # - ingestionMode (Choice: flat, recursive)
+  # - uniqueScopeId (Single line text) - Unique scope ID
+  # - maxFilesToIngest (Number, optional)
+  # - storeInternally (Choice: enabled, disabled)
+  # - syncStatus (Choice: active, inactive, deleted)
+  # - syncMode (Choice: content_only, content_and_permissions)
 
 unique:
   serviceAuthMode: cluster_local

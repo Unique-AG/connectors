@@ -137,7 +137,23 @@ export class SharepointSynchronizationService {
           continue;
         }
 
-        const siteName = await this.graphApiService.getSiteName(siteConfig.siteId);
+        let siteName: string;
+        try {
+          siteName = await this.graphApiService.getSiteName(siteConfig.siteId);
+        } catch (error) {
+          this.logger.error({
+            msg: `${logPrefix} Failed to get site name`,
+            error: sanitizeError(error),
+          });
+          this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+            sync_type: 'site',
+            sp_site_id: logSiteId,
+            result: 'failure',
+            failure_step: 'site_name_fetch',
+          });
+          continue;
+        }
+
         const context: SharepointSyncContext = {
           ...baseContext,
           siteId: siteConfig.siteId,
@@ -145,10 +161,30 @@ export class SharepointSynchronizationService {
           siteConfig,
         };
 
-        const { items, directories } = await this.graphApiService.getAllSiteItems(
-          siteConfig.siteId,
-          siteConfig.syncColumnName,
-        );
+        let items: Awaited<ReturnType<typeof this.graphApiService.getAllSiteItems>>['items'];
+        let directories: Awaited<
+          ReturnType<typeof this.graphApiService.getAllSiteItems>
+        >['directories'];
+        try {
+          const result = await this.graphApiService.getAllSiteItems(
+            siteConfig.siteId,
+            siteConfig.syncColumnName,
+          );
+          items = result.items;
+          directories = result.directories;
+        } catch (error) {
+          this.logger.error({
+            msg: `${logPrefix} Failed to get site items`,
+            error: sanitizeError(error),
+          });
+          this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
+            sync_type: 'site',
+            sp_site_id: logSiteId,
+            result: 'failure',
+            failure_step: 'site_items_fetch',
+          });
+          continue;
+        }
         this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
 
         if (items.length === 0) {

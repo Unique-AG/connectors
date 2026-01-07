@@ -23,6 +23,7 @@ data:
       {{- end }}
       
       # Sites Configuration
+      sitesSource: "config_file"
       sites:
         {{- range .Values.connectorConfig.sharepoint.sites }}
         - siteId: {{ .siteId | quote }}

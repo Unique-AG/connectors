@@ -135,7 +135,7 @@ describe('SharepointSynchronizationService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint') return { sitesSource: 'configFile' };
+          if (key === 'sharepoint') return { sitesSource: 'config_file' };
           if (key === 'sharepoint.sites')
             return [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })];
           if (key === 'processing.syncMode') return 'content_only';
@@ -272,7 +272,7 @@ describe('SharepointSynchronizationService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint') return { sitesSource: 'configFile' };
+          if (key === 'sharepoint') return { sitesSource: 'config_file' };
           if (key === 'sharepoint.sites')
             return [
               createMockSiteConfig({
@@ -337,7 +337,7 @@ describe('SharepointSynchronizationService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint') return { sitesSource: 'configFile' };
+          if (key === 'sharepoint') return { sitesSource: 'config_file' };
           if (key === 'sharepoint.sites')
             return [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })];
           if (key === 'processing.syncMode') return 'content_and_permissions';

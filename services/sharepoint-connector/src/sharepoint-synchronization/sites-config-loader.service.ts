@@ -33,11 +33,11 @@ export class SitesConfigLoaderService {
 
   /**
    * Load sites configuration based on the configured source.
-   * For 'configFile' source, returns the sites array from config.
-   * For 'sharePointList' source, fetches sites from SharePoint list URL.
+   * For 'config_file' source, returns the sites array from config.
+   * For 'sharepoint_list' source, fetches sites from SharePoint list URL.
    */
   public async loadSites(config: SharepointConfig): Promise<SiteConfig[]> {
-    if (config.sitesSource === 'configFile') {
+    if (config.sitesSource === 'config_file') {
       this.logger.log('Loading sites configuration from static YAML');
       return config.sites;
     }
@@ -104,7 +104,7 @@ export class SitesConfigLoaderService {
 
       const listNameSegment = pathParts[listsIndex + 1];
       assert.ok(listNameSegment, 'List name not found in URL');
-      const listName = decodeURIComponent(listNameSegment).replace(/'/g, "''");
+      const listName = decodeURIComponent(listNameSegment);
 
       // Build relative path: everything before /Lists/
       const relativePath = `/${pathParts.slice(0, listsIndex).join('/')}`;
