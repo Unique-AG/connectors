@@ -12,8 +12,8 @@ connector:
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
-    # Path pattern to tenant configuration YAML file
-    TENANT_CONFIG_PATH: /app/config/*-tenant-config.yaml
+    # Glob pattern to match tenant configuration YAML files
+    TENANT_CONFIG_PATH_PATTERN: /app/config/*-tenant-config.yaml
   # -- Environment variables from secrets.
   # Example for loading secrets (uncomment and customize as needed):
   #   envVars:
@@ -179,7 +179,16 @@ connectorConfig:
       thumbprintSha1: unset_default_value
     graph:
       apiRateLimitPerMinute: 780000
+    # -- Sites source configuration
+    # Determines how sites are configured: from static YAML (config_file) or dynamically from SharePoint list (sharepoint_list)
+    # possible values: config_file, sharepoint_list
+    sitesSource: config_file
+    # -- SharePoint list URL (only used when sitesSource is "sharepoint_list")
+    # URL to the SharePoint list containing site configurations
+    # example: https://acme.sharepoint.com/sites/ConfigSite/Lists/SharePoint%20Sites%20to%20Sync/AllItems.aspx
+    sharepointListUrl: ""
     # -- Array of sites to sync. Each site has its own configuration.
+    # Only used when sitesSource is "config_file"
     sites:
       - siteId: 00000000-0000-0000-0000-000000000000
         syncColumnName: FinanceGPTKnowledge

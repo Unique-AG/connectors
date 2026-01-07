@@ -42,7 +42,7 @@ export const appConfig = registerConfig('app', AppConfigSchema, {
     'PORT',
     'NODE_ENV',
     'LOGS_DIAGNOSTICS_DATA_POLICY',
-    'TENANT_CONFIG_PATH',
+    'TENANT_CONFIG_PATH_PATTERN',
   ]),
 });
 

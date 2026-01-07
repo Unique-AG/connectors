@@ -23,12 +23,18 @@ describe('SitesConfigLoaderService', () => {
         },
       ];
 
-      const config: Partial<SharepointConfig> = {
+      const config: SharepointConfig = {
+        auth: {
+          mode: 'oidc',
+          tenantId: 'test-tenant-id',
+        },
+        baseUrl: 'https://test.sharepoint.com',
+        graphApiRateLimitPerMinute: 600,
         sitesSource: 'config_file',
         sites: mockSites,
-      } as SharepointConfig;
+      };
 
-      const result = await unit.loadSites(config as SharepointConfig);
+      const result = await unit.loadSites(config);
 
       expect(result).toEqual(mockSites);
     });
@@ -50,20 +56,24 @@ describe('SitesConfigLoaderService', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
       vi.spyOn(unit as any, 'fetchFromSharePointList').mockResolvedValue([mockSiteConfig]);
 
-      const config = {
-        sitesSource: 'sharepoint_list' as const,
+      const config: SharepointConfig = {
+        auth: {
+          mode: 'oidc',
+          tenantId: 'test-tenant-id',
+        },
+        baseUrl: 'https://test.sharepoint.com',
+        graphApiRateLimitPerMinute: 600,
+        sitesSource: 'sharepoint_list',
         sharepointListUrl: 'https://test.sharepoint.com/sites/Test/Lists/TestList/AllItems.aspx',
-      } as SharepointConfig;
+      };
 
       const result = await unit.loadSites(config);
 
       expect(result).toEqual([mockSiteConfig]);
-      if (config.sitesSource === 'sharepoint_list') {
-        // biome-ignore lint/suspicious/noExplicitAny: Check private method was called
-        expect((unit as any).fetchFromSharePointList).toHaveBeenCalledWith(
-          config.sharepointListUrl,
-        );
-      }
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method was called
+      expect((unit as any).fetchFromSharePointList).toHaveBeenCalledWith(
+        'https://test.sharepoint.com/sites/Test/Lists/TestList/AllItems.aspx',
+      );
     });
   });
 

@@ -2,11 +2,12 @@
 # Sites are defined directly in this YAML file
 
 sharepoint:
-  authMode: certificate
-  authTenantId: your-tenant-id-here
-  authClientId: your-client-id-here
-  authPrivateKeyPath: /path/to/private-key.pem
-  authThumbprintSha1: your-sha1-thumbprint-here
+  auth:
+    mode: certificate
+    tenantId: your-tenant-id-here
+    clientId: your-client-id-here
+    privateKeyPath: /path/to/private-key.pem
+    thumbprintSha1: your-sha1-thumbprint-here
   baseUrl: https://yourcompany.sharepoint.com
   graphApiRateLimitPerMinute: 600
   

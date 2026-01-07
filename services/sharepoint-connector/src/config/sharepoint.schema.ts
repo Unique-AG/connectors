@@ -4,46 +4,55 @@ import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { Redacted } from '../utils/redacted';
 
-const oidcAuthModeConfig = z.object({
-  authMode: z.literal('oidc').describe('Authentication mode to use for Microsoft APIs'),
+const oidcAuthConfig = z.object({
+  mode: z.literal('oidc').describe('Authentication mode to use for Microsoft APIs'),
+  tenantId: z.string().min(1).describe('Azure AD tenant ID'),
 });
 
-const clientSecretAuthModeConfig = z.object({
-  authMode: z.literal('client-secret').describe('Authentication mode to use for Microsoft APIs'),
-  authClientId: z.string().nonempty().describe('Azure AD application client ID'),
-  authClientSecret: z
+const clientSecretAuthConfig = z.object({
+  mode: z.literal('client-secret').describe('Authentication mode to use for Microsoft APIs'),
+  tenantId: z.string().min(1).describe('Azure AD tenant ID'),
+  clientId: z.string().nonempty().describe('Azure AD application client ID'),
+  clientSecret: z
     .string()
     .nonempty()
     .transform((val) => new Redacted(val))
     .describe('Azure AD application client secret for Microsoft APIs'),
 });
 
-const certificateAuthModeConfig = z
+const certificateAuthConfig = z
   .object({
-    authMode: z.literal('certificate').describe('Authentication mode to use for Microsoft APIs'),
-    authClientId: z.string().nonempty().describe('Azure AD application client ID'),
-    authThumbprintSha1: z
+    mode: z.literal('certificate').describe('Authentication mode to use for Microsoft APIs'),
+    tenantId: z.string().min(1).describe('Azure AD tenant ID'),
+    clientId: z.string().nonempty().describe('Azure AD application client ID'),
+    thumbprintSha1: z
       .hex()
       .nonempty()
       .optional()
       .describe('SHA1 thumbprint of the Azure AD application certificate'),
-    authThumbprintSha256: z
+    thumbprintSha256: z
       .hex()
       .nonempty()
       .optional()
       .describe('SHA256 thumbprint of the Azure AD application certificate'),
-    authPrivateKeyPath: z
+    privateKeyPath: z
       .string()
       .nonempty()
       .describe(
         'Path to the private key file of the Azure AD application certificate in PEM format',
       ),
-    // authPrivateKeyPassword is NOT in YAML - loaded from SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD environment variable (if needed)
+    // privateKeyPassword is NOT in YAML - loaded from SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD environment variable (if needed)
   })
-  .refine((config) => config.authThumbprintSha1 || config.authThumbprintSha256, {
+  .refine((config) => config.thumbprintSha1 || config.thumbprintSha256, {
     message:
-      'Either SHAREPOUNT_AUTH_THUMBPRINT_SHA1 or SHAREPOUNT_AUTH_THUMBPRINT_SHA256 has to be provided for certificate authentication mode',
+      'Either thumbprintSha1 or thumbprintSha256 has to be provided for certificate authentication mode',
   });
+
+const AuthConfigSchema = z.discriminatedUnion('mode', [
+  oidcAuthConfig,
+  clientSecretAuthConfig,
+  certificateAuthConfig,
+]);
 
 export const SiteConfigSchema = z.object({
   siteId: z.uuidv4().describe('SharePoint site ID'),
@@ -110,7 +119,7 @@ const dynamicSitesConfig = z.object({
 });
 
 const baseConfig = z.object({
-  authTenantId: z.string().min(1).describe('Azure AD tenant ID'),
+  auth: AuthConfigSchema.describe('Authentication configuration for Microsoft APIs'),
   graphApiRateLimitPerMinute: z.coerce
     .number()
     .int()
@@ -125,18 +134,40 @@ const baseConfig = z.object({
     .describe("Your company's sharepoint URL"),
 });
 
-export const SharepointConfigSchema = z
-  .discriminatedUnion('authMode', [
-    oidcAuthModeConfig,
-    clientSecretAuthModeConfig,
-    certificateAuthModeConfig,
-  ])
-  .and(baseConfig)
-  .and(z.discriminatedUnion('sitesSource', [staticSitesConfig, dynamicSitesConfig]));
+export const SharepointConfigSchema = baseConfig.and(
+  z.discriminatedUnion('sitesSource', [staticSitesConfig, dynamicSitesConfig]),
+);
 
 export type SharepointConfigYaml = z.infer<typeof SharepointConfigSchema>;
 
-// Type for the final config with secrets injected from environment
-export type SharepointConfig = SharepointConfigYaml & {
-  authPrivateKeyPassword?: string;
+
+export type AuthConfig = z.infer<typeof AuthConfigSchema>;
+
+// Helper types for discriminated union
+export type StaticSitesConfig = z.infer<typeof staticSitesConfig>;
+export type DynamicSitesConfig = z.infer<typeof dynamicSitesConfig>;
+
+/*
+* 
+* Type for the final config with secrets injected from environment
+* We need to manually reconstruct the discriminated union after adding the privateKeyPassword
+* If we didn't need to add privateKeyPassword, we could just use:
+* export type SharepointConfig = SharepointConfigYaml;
+* But since we inject the password at runtime (not in YAML), we need this type transformation while preserving the discriminated union structure.
+*/
+export type SharepointConfig = (
+  | {
+      sitesSource: 'config_file';
+      sites: StaticSitesConfig['sites'];
+    }
+  | {
+      sitesSource: 'sharepoint_list';
+      sharepointListUrl: DynamicSitesConfig['sharepointListUrl'];
+    }
+) & {
+  auth: AuthConfig & {
+    privateKeyPassword?: string;
+  };
+  graphApiRateLimitPerMinute: number;
+  baseUrl: string;
 };

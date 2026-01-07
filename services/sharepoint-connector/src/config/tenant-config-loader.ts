@@ -39,13 +39,13 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
 
 export function getTenantConfig(): TenantConfig {
   if (!cachedConfig) {
-    const tenantConfigPath = process.env.TENANT_CONFIG_PATH;
+    const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
 
-    if (!tenantConfigPath) {
-      throw new Error('TENANT_CONFIG_PATH environment variable is not set');
+    if (!tenantConfigPathPattern) {
+      throw new Error('TENANT_CONFIG_PATH_PATTERN environment variable is not set');
     }
 
-    cachedConfig = loadTenantConfig(tenantConfigPath);
+    cachedConfig = loadTenantConfig(tenantConfigPathPattern);
   }
   return cachedConfig;
 }

@@ -34,7 +34,7 @@ export class MicrosoftAuthenticationService {
       ],
     };
 
-    const authMode = this.configService.get('sharepoint.authMode', { infer: true });
+    const authMode = this.configService.get('sharepoint.auth.mode', { infer: true });
     switch (authMode) {
       case 'oidc':
         this.strategy = new OidcAuthStrategy(configService);

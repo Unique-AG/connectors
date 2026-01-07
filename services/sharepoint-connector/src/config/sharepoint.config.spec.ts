@@ -5,7 +5,6 @@ import { SharepointConfigSchema } from './sharepoint.schema';
 
 describe('SharepointConfigSchema', () => {
   const validBaseConfig = {
-    authTenantId: '12345678-1234-1234-1234-123456789abc',
     baseUrl: 'https://company.sharepoint.com',
     graphApiRateLimitPerMinute: 600,
     sitesSource: 'config_file' as const,
@@ -27,56 +26,68 @@ describe('SharepointConfigSchema', () => {
     it('validates oidc auth mode configuration', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
       };
 
       expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
       const result = SharepointConfigSchema.parse(config);
-      expect(result.authMode).toBe('oidc');
+      expect(result.auth.mode).toBe('oidc');
     });
 
     it('validates client-secret auth mode configuration', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'client-secret' as const,
-        authClientId: 'client-id-123',
-        authClientSecret: 'secret-123',
+        auth: {
+          mode: 'client-secret' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+          clientId: 'client-id-123',
+          clientSecret: 'secret-123',
+        },
       };
 
       expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
       const result = SharepointConfigSchema.parse(config);
-      expect(result.authMode).toBe('client-secret');
-      if (result.authMode === 'client-secret') {
-        expect(result.authClientId).toBe('client-id-123');
-        expect(result.authClientSecret).toBeInstanceOf(Object); // Redacted
+      expect(result.auth.mode).toBe('client-secret');
+      if (result.auth.mode === 'client-secret') {
+        expect(result.auth.clientId).toBe('client-id-123');
+        expect(result.auth.clientSecret).toBeInstanceOf(Object); // Redacted
       }
     });
 
     it('validates certificate auth mode with SHA1 thumbprint', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'certificate' as const,
-        authClientId: 'client-id-123',
-        authThumbprintSha1: 'abcdef1234567890abcdef1234567890abcdef12',
-        authPrivateKeyPath: '/path/to/key.pem',
+        auth: {
+          mode: 'certificate' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+          clientId: 'client-id-123',
+          thumbprintSha1: 'abcdef1234567890abcdef1234567890abcdef12',
+          privateKeyPath: '/path/to/key.pem',
+        },
       };
 
       expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
       const result = SharepointConfigSchema.parse(config);
-      expect(result.authMode).toBe('certificate');
-      if (result.authMode === 'certificate') {
-        expect(result.authThumbprintSha1).toBe('abcdef1234567890abcdef1234567890abcdef12');
+      expect(result.auth.mode).toBe('certificate');
+      if (result.auth.mode === 'certificate') {
+        expect(result.auth.thumbprintSha1).toBe('abcdef1234567890abcdef1234567890abcdef12');
       }
     });
 
     it('validates certificate auth mode with SHA256 thumbprint', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'certificate' as const,
-        authClientId: 'client-id-123',
-        authThumbprintSha256:
-          'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-        authPrivateKeyPath: '/path/to/key.pem',
+        auth: {
+          mode: 'certificate' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+          clientId: 'client-id-123',
+          thumbprintSha256:
+            'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+          privateKeyPath: '/path/to/key.pem',
+        },
       };
 
       expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
@@ -85,7 +96,10 @@ describe('SharepointConfigSchema', () => {
     it('validates configuration with multiple sites', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sitesSource: 'config_file' as const,
         sites: [
           {
@@ -120,7 +134,10 @@ describe('SharepointConfigSchema', () => {
     it('requires at least one site', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sitesSource: 'config_file' as const,
         sites: [],
       };
@@ -133,7 +150,10 @@ describe('SharepointConfigSchema', () => {
     it('validates siteId as UUID', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -148,7 +168,10 @@ describe('SharepointConfigSchema', () => {
     it('validates syncColumnName is string', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -163,7 +186,10 @@ describe('SharepointConfigSchema', () => {
     it('validates ingestionMode enum values', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -178,7 +204,10 @@ describe('SharepointConfigSchema', () => {
     it('validates scopeId is required', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sites: [
           {
             siteId: '87654321-4321-4321-4321-cba987654321',
@@ -196,7 +225,10 @@ describe('SharepointConfigSchema', () => {
     it('validates maxFilesToIngest is positive integer when provided', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -211,7 +243,10 @@ describe('SharepointConfigSchema', () => {
     it('validates storeInternally enum values', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -226,7 +261,10 @@ describe('SharepointConfigSchema', () => {
     it('validates syncStatus enum values', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -241,7 +279,10 @@ describe('SharepointConfigSchema', () => {
     it('validates syncMode enum values', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -258,7 +299,10 @@ describe('SharepointConfigSchema', () => {
     it('applies default values for optional fields', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         sites: [
           {
             siteId: '87654321-4321-4321-8321-cba987654321',
@@ -288,11 +332,13 @@ describe('SharepointConfigSchema', () => {
   });
 
   describe('invalid configurations', () => {
-    it('rejects missing authTenantId', () => {
+    it('rejects missing tenantId', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
-        authTenantId: '',
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '',
+        },
       };
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
@@ -301,7 +347,10 @@ describe('SharepointConfigSchema', () => {
     it('rejects invalid baseUrl format', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         baseUrl: 'not-a-url',
       };
 
@@ -311,7 +360,10 @@ describe('SharepointConfigSchema', () => {
     it('rejects baseUrl with trailing slash', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         baseUrl: 'https://company.sharepoint.com/',
       };
 
@@ -323,7 +375,10 @@ describe('SharepointConfigSchema', () => {
     it('rejects negative graphApiRateLimitPerMinute', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'oidc' as const,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
         graphApiRateLimitPerMinute: -1,
       };
 
@@ -333,23 +388,29 @@ describe('SharepointConfigSchema', () => {
     it('rejects certificate auth without thumbprint', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'certificate' as const,
-        authClientId: 'client-id-123',
-        authPrivateKeyPath: '/path/to/key.pem',
-        // missing both thumbprints
+        auth: {
+          mode: 'certificate' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+          clientId: 'client-id-123',
+          privateKeyPath: '/path/to/key.pem',
+          // missing both thumbprints
+        },
       };
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow(
-        'Either SHAREPOUNT_AUTH_THUMBPRINT_SHA1 or SHAREPOUNT_AUTH_THUMBPRINT_SHA256 has to be provided',
+        'Either thumbprintSha1 or thumbprintSha256 has to be provided',
       );
     });
 
     it('rejects client-secret auth without clientId', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'client-secret' as const,
-        authClientSecret: 'secret-123',
-        // missing authClientId
+        auth: {
+          mode: 'client-secret' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+          clientSecret: 'secret-123',
+          // missing clientId
+        },
       };
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
@@ -358,9 +419,12 @@ describe('SharepointConfigSchema', () => {
     it('rejects client-secret auth without clientSecret', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'client-secret' as const,
-        authClientId: 'client-id-123',
-        // missing authClientSecret
+        auth: {
+          mode: 'client-secret' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+          clientId: 'client-id-123',
+          // missing clientSecret
+        },
       };
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
@@ -369,10 +433,13 @@ describe('SharepointConfigSchema', () => {
     it('rejects certificate auth without privateKeyPath', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'certificate' as const,
-        authClientId: 'client-id-123',
-        authThumbprintSha1: 'abcdef1234567890abcdef1234567890abcdef12',
-        // missing authPrivateKeyPath
+        auth: {
+          mode: 'certificate' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+          clientId: 'client-id-123',
+          thumbprintSha1: 'abcdef1234567890abcdef1234567890abcdef12',
+          // missing privateKeyPath
+        },
       };
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
@@ -381,10 +448,13 @@ describe('SharepointConfigSchema', () => {
     it('rejects invalid hex thumbprint', () => {
       const config = {
         ...validBaseConfig,
-        authMode: 'certificate' as const,
-        authClientId: 'client-id-123',
-        authThumbprintSha1: 'gggggggggggggggggggggggggggggggggggggggg', // invalid hex
-        authPrivateKeyPath: '/path/to/key.pem',
+        auth: {
+          mode: 'certificate' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+          clientId: 'client-id-123',
+          thumbprintSha1: 'gggggggggggggggggggggggggggggggggggggggg', // invalid hex
+          privateKeyPath: '/path/to/key.pem',
+        },
       };
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();

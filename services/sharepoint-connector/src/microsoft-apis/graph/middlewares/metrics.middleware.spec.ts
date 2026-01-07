@@ -33,7 +33,7 @@ describe('MetricsMiddleware', () => {
 
     mockConfigService = {
       get: vi.fn().mockImplementation((key: string, _options?: { infer?: boolean }) => {
-        if (key === 'sharepoint.authTenantId') {
+        if (key === 'sharepoint.auth.tenantId') {
           return 'test-tenant-id';
         }
         return undefined;
@@ -685,7 +685,7 @@ describe('MetricsMiddleware', () => {
     const createConcealingConfigService = (): ConfigService<Config, true> => {
       return {
         get: vi.fn().mockImplementation((key: string, _options?: { infer?: boolean }) => {
-          if (key === 'sharepoint.authTenantId') {
+          if (key === 'sharepoint.auth.tenantId') {
             return 'test-tenant-id';
           }
           if (key === 'app.logsDiagnosticsDataPolicy') {

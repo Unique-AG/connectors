@@ -19,8 +19,10 @@ describe('OidcAuthStrategy', () => {
   const testScopes = ['https://graph.microsoft.com/.default'];
 
   const mockSharepointConfig = {
-    authMode: 'oidc' as const,
-    authTenantId: 'tenant-123',
+    auth: {
+      mode: 'oidc' as const,
+      tenantId: 'tenant-123',
+    },
   };
 
   beforeEach(async () => {

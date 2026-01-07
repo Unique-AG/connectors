@@ -260,7 +260,7 @@
           "required": [
             "tenantId",
             "baseUrl",
-            "sites",
+            "sitesSource",
             "auth",
             "graph"
           ],
@@ -280,9 +280,24 @@
                 "https://my-company.sharepoint.com"
               ]
             },
+            "sitesSource": {
+              "type": "string",
+              "enum": [
+                "config_file",
+                "sharepoint_list"
+              ],
+              "description": "Sites source configuration. Determines how sites are configured: from static YAML (config_file) or dynamically from SharePoint list (sharepoint_list)"
+            },
+            "sharepointListUrl": {
+              "type": "string",
+              "description": "SharePoint list URL containing site configurations. Only used when sitesSource is 'sharepoint_list'",
+              "examples": [
+                "https://acme.sharepoint.com/sites/ConfigSite/Lists/SharePoint%20Sites%20to%20Sync/AllItems.aspx"
+              ]
+            },
             "sites": {
               "type": "array",
-              "description": "Array of SharePoint sites to sync with their individual configurations",
+              "description": "Array of SharePoint sites to sync with their individual configurations. Only used when sitesSource is 'config_file'",
               "minItems": 1,
               "items": {
                 "type": "object",

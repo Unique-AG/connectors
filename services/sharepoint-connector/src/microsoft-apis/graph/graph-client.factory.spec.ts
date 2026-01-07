@@ -39,7 +39,7 @@ describe('GraphClientFactory', () => {
             },
           };
         }
-        if (key === 'sharepoint.authTenantId') {
+        if (key === 'sharepoint.auth.tenantId') {
           return 'test-tenant-id';
         }
         return undefined;

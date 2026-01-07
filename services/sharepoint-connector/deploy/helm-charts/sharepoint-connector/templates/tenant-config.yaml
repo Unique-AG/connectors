@@ -9,21 +9,25 @@ data:
   default-tenant-config.yaml: |
     # SharePoint Configuration
     sharepoint:
-      authMode: {{ .Values.connectorConfig.sharepoint.auth.mode | quote }}
-      authTenantId: {{ .Values.connectorConfig.sharepoint.tenantId | quote }}
-      {{- if eq .Values.connectorConfig.sharepoint.auth.mode "certificate" }}
-      authClientId: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
-      authPrivateKeyPath: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPath | quote }}
-      # authPrivateKeyPassword is loaded from environment variable (secret) if key is encrypted
-      authThumbprintSha1: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha1 | quote }}
-      {{- end }}
+      auth:
+        mode: {{ .Values.connectorConfig.sharepoint.auth.mode | quote }}
+        tenantId: {{ .Values.connectorConfig.sharepoint.tenantId | quote }}
+        {{- if eq .Values.connectorConfig.sharepoint.auth.mode "certificate" }}
+        clientId: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
+        privateKeyPath: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPath | quote }}
+        # privateKeyPassword is loaded from environment variable (secret) if key is encrypted
+        thumbprintSha1: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha1 | quote }}
+        {{- end }}
       baseUrl: {{ .Values.connectorConfig.sharepoint.baseUrl | quote }}
       {{- if .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute }}
       graphApiRateLimitPerMinute: {{ .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinute }}
       {{- end }}
       
       # Sites Configuration
-      sitesSource: "config_file"
+      sitesSource: {{ .Values.connectorConfig.sharepoint.sitesSource | quote }}
+      {{- if eq .Values.connectorConfig.sharepoint.sitesSource "sharepoint_list" }}
+      sharepointListUrl: {{ .Values.connectorConfig.sharepoint.sharepointListUrl | quote }}
+      {{- else if eq .Values.connectorConfig.sharepoint.sitesSource "config_file" }}
       sites:
         {{- range .Values.connectorConfig.sharepoint.sites }}
         - siteId: {{ .siteId | quote }}
@@ -37,6 +41,7 @@ data:
           syncStatus: {{ .syncStatus | quote }}
           syncMode: {{ .syncMode | quote }}
         {{- end }}
+      {{- end }}
 
     # Unique API Configuration
     unique:

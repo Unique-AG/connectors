@@ -22,12 +22,12 @@ export class OidcAuthStrategy implements AuthStrategy {
     const sharePointConfig = this.configService.get('sharepoint', { infer: true });
 
     assert.strictEqual(
-      sharePointConfig.authMode,
+      sharePointConfig.auth.mode,
       'oidc',
       'OidcAuthStrategy called but authentication mode is not "oidc"',
     );
 
-    this.credential = new DefaultAzureCredential({ tenantId: sharePointConfig.authTenantId });
+    this.credential = new DefaultAzureCredential({ tenantId: sharePointConfig.auth.tenantId });
   }
 
   public async acquireNewToken(scopes: string[]): Promise<TokenAcquisitionResult> {
