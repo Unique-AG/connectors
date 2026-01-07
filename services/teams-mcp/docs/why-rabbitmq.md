@@ -119,7 +119,7 @@ For exchange and queue details, see [Architecture - RabbitMQ](./architecture.md#
 - Polling overhead
 
 ### Direct Processing
-- Cannot meet 3-second webhook deadline
+- Cannot meet 10-second webhook deadline
 - No retry capability
 - No backpressure handling
 
