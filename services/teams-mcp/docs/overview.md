@@ -4,7 +4,7 @@
 
 The Teams MCP Connector is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
-For more technical details on how to operate the Teams MCP Connector please refer to the documentation for IT Operators.
+For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/overview.md).
 
 ## Quick Summary
 
@@ -257,8 +257,19 @@ Planned enhancements will be documented here.
 
 ## Related Documentation
 
-- [Architecture](./architecture.md) - Detailed system components and infrastructure
-- [Flows](./flows.md) - Detailed user connection, subscription lifecycle, transcript processing flows
-- [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
-- [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
-- [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale
+### For IT Operators
+
+- [Operator Guide](./operator/overview.md) - Deployment, configuration, and operations
+  - [Deployment](./operator/deployment.md) - Kubernetes and Helm setup
+  - [Configuration](./operator/configuration.md) - Environment variables and settings
+  - [Authentication](./operator/authentication.md) - Microsoft Entra ID setup
+  - [Troubleshooting](./operator/troubleshooting.md) - Common issues and solutions
+
+### Technical Reference
+
+- [Technical Overview](./technical/overview.md) - Architecture, flows, and design decisions
+  - [Architecture](./technical/architecture.md) - System components and infrastructure
+  - [Flows](./technical/flows.md) - User connection, subscription lifecycle, transcript processing
+  - [Permissions](./technical/permissions.md) - Microsoft Graph permissions with justification
+  - [Token and Authentication](./technical/token-auth-flows.md) - OAuth token lifecycle
+  - [Why RabbitMQ](./technical/why-rabbitmq.md) - Message queue rationale
