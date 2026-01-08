@@ -33,6 +33,11 @@ export class UniqueUsersService {
       >(LIST_USERS_QUERY, {
         skip,
         take: BATCH_SIZE,
+        where: {
+          active: {
+            equals: true,
+          },
+        },
       });
       users.push(...batchResult.listUsers.nodes.map(pick(['id', 'email'])));
       batchCount = batchResult.listUsers.nodes.length;
