@@ -79,7 +79,6 @@ variable "service_principal_configuration" {
     (via the admin consent URL or interactive flow).
   EOT
   type = object({
-    tags  = optional(list(string))
     notes = optional(string)
   })
   default = {}
