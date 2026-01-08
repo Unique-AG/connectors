@@ -54,7 +54,7 @@ export class SitesConfigLoaderService {
    * 3. Get the list ID by name
    * 4. Fetch the list items
    * 5. Transform the list items to SiteConfig and validate with Zod
-   * Rreturns the SiteConfig array
+   * Returns the SiteConfig array
    */
   private async fetchFromSharePointList(listUrl: string): Promise<SiteConfig[]> {
     this.logger.log(`Fetching sites configuration from: ${listUrl}`);

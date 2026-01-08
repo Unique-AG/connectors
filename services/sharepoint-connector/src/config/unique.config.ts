@@ -23,5 +23,4 @@ export const uniqueConfig = registerAs('unique', (): UniqueConfig => {
   return config;
 });
 
-export type { UniqueConfig };
 export type UniqueConfigNamespaced = { unique: UniqueConfig };

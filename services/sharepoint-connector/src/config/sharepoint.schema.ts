@@ -138,8 +138,6 @@ export const SharepointConfigSchema = baseConfig.and(
   z.discriminatedUnion('sitesSource', [staticSitesConfig, dynamicSitesConfig]),
 );
 
-export type SharepointConfigYaml = z.infer<typeof SharepointConfigSchema>;
-
 export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 
 // Helper types for discriminated union

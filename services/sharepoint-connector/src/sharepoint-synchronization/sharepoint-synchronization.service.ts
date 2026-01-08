@@ -154,6 +154,7 @@ export class SharepointSynchronizationService {
           continue;
         }
 
+        // todo flatten siteConfig maybe as we don't have conflicts on baseContext
         const context: SharepointSyncContext = {
           ...baseContext,
           siteId: siteConfig.siteId,

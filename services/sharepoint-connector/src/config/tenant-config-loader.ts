@@ -11,6 +11,7 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
     throw new Error(`No tenant configuration files found matching pattern '${pathPattern}'`);
   }
 
+  // We do not support multiple tenants for now: UN-13091
   if (files.length > 1) {
     throw new Error(
       `Multiple tenant configuration files found matching pattern '${pathPattern}': ${files.join(', ')}. Only one tenant config file is supported for now.`,
@@ -25,6 +26,8 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
   try {
     const fileContent = readFileSync(configPath, 'utf-8');
     const parsedConfig = load(fileContent);
+
+    // load secrets from env here and add them to parsedConfig object
 
     return TenantConfigSchema.parse(parsedConfig);
   } catch (error) {
