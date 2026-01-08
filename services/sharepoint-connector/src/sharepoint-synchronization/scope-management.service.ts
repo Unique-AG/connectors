@@ -12,7 +12,6 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { resolveInheritanceSettings } from '../utils/inheritance.util';
 import { redact, shouldConcealLogs, smear, smearPath } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
@@ -154,7 +153,7 @@ export class ScopeManagementService {
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
-    const { inheritScopes } = resolveInheritanceSettings(this.configService);
+    const inheritScopes = this.configService.get('unique.inheritScopePermissions', { infer: true });
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
       inheritAccess: inheritScopes,

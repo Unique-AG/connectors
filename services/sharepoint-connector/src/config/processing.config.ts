@@ -9,14 +9,16 @@ import {
 } from '../constants/defaults.constants';
 import { parseCommaSeparatedArray } from '../utils/config.util';
 
+export const SyncModeSchema = z
+  .enum(['content_only', 'content_and_permissions'])
+  .describe(
+    'Mode of synchronization from SharePoint to Unique. ' +
+      'content_only: sync only the content, ' +
+      'content_and_permissions: sync both content and permissions',
+  );
+
 export const ProcessingConfigSchema = z.object({
-  syncMode: z
-    .enum(['content_only', 'content_and_permissions'])
-    .describe(
-      'Mode of synchronization from SharePoint to Unique. ' +
-        'content_only: sync only the content, ' +
-        'content_and_permissions: sync both content and permissions',
-    ),
+  syncMode: SyncModeSchema,
   stepTimeoutSeconds: z.coerce
     .number()
     .int()

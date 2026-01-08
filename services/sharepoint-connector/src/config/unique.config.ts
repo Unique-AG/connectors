@@ -5,8 +5,8 @@ import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { parseJsonEnvironmentVariable } from '../utils/config.util';
-import { INHERITANCE_PRESETS } from '../utils/inheritance.constants';
 import { Redacted } from '../utils/redacted';
+import { SyncModeSchema } from './processing.config';
 
 // ==== Config for local in-cluster communication with Unique API services ====
 
@@ -55,7 +55,6 @@ const baseConfig = z.object({
   permissionsInheritanceMode: z
     .enum(['inherit_scopes_and_files', 'inherit_scopes', 'inherit_files', 'none'] as const)
     .default('inherit_scopes_and_files')
-    .transform((mode) => INHERITANCE_PRESETS[mode])
     .describe(
       'Inheritance mode for generated scopes and ingested files in content_only mode; ignored in content_and_permissions mode. Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.',
     ),
@@ -113,7 +112,24 @@ const baseConfig = z.object({
 
 export const UniqueConfigSchema = z
   .discriminatedUnion('serviceAuthMode', [clusterLocalConfig, externalConfig])
-  .and(baseConfig);
+  .and(baseConfig)
+  .transform((config) => {
+    // We're peeking at the environment variable for sync mode to determine if inheritance should
+    // be forced to 'none'. We're doing it here because sync mode lives in another namespace,
+    // and we want to avoid cross-namespace dependency in the schema itself.
+    const syncMode = SyncModeSchema.optional().parse(process.env.PROCESSING_SYNC_MODE);
+
+    const settings =
+      syncMode === 'content_and_permissions'
+        ? INHERITANCE_MODES_MAP.none
+        : INHERITANCE_MODES_MAP[config.permissionsInheritanceMode];
+
+    return {
+      ...config,
+      inheritFilePermissions: settings.inheritFiles,
+      inheritScopePermissions: settings.inheritScopes,
+    };
+  });
 
 export const uniqueConfig = registerConfig('unique', UniqueConfigSchema, {
   whitelistKeys: new Set([
@@ -121,8 +137,24 @@ export const uniqueConfig = registerConfig('unique', UniqueConfigSchema, {
     'ZITADEL_PROJECT_ID',
     'ZITADEL_CLIENT_ID',
     'ZITADEL_CLIENT_SECRET',
+    'PROCESSING_SYNC_MODE',
   ]),
 });
 
 export type UniqueConfigNamespaced = NamespacedConfigType<typeof uniqueConfig>;
 export type UniqueConfig = ConfigType<typeof uniqueConfig>;
+
+type InheritanceSettings = {
+  inheritScopes: boolean;
+  inheritFiles: boolean;
+};
+
+const INHERITANCE_MODES_MAP: Record<
+  'inherit_scopes_and_files' | 'inherit_scopes' | 'inherit_files' | 'none',
+  InheritanceSettings
+> = {
+  inherit_scopes_and_files: { inheritScopes: true, inheritFiles: true },
+  inherit_scopes: { inheritScopes: true, inheritFiles: false },
+  inherit_files: { inheritScopes: false, inheritFiles: true },
+  none: { inheritScopes: false, inheritFiles: false },
+};

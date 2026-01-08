@@ -188,8 +188,7 @@ describe('ContentRegistrationStep', () => {
           if (k === 'unique.scopeId') return 'scope-1';
           if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
           if (k === 'unique.serviceAuthMode') return 'external';
-          if (k === 'unique.permissionsInheritanceMode')
-            return { inheritScopes: true, inheritFiles: false };
+          if (k === 'unique.inheritFilePermissions') return false;
           if (k === 'processing.syncMode') return 'content_only';
           return undefined;
         }),
