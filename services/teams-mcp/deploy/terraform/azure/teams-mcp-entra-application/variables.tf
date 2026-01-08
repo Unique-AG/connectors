@@ -68,3 +68,19 @@ variable "confidential_clients" {
     error_message = "The end_date must be in RFC3339 format (e.g. 2018-01-01T01:02:03Z)."
   }
 }
+
+variable "service_principal_configuration" {
+  description = <<-EOT
+    Configuration for the service principal. Set to null to skip service principal creation
+    (useful in cross-tenant scenarios where the customer tenant manages the service principal).
+    When set (even to {}), creates a service principal and grants admin consent for all
+    Microsoft Graph delegated scopes on behalf of all users in the tenant.
+    For multi-tenant apps, each customer tenant admin must grant consent separately
+    (via the admin consent URL or interactive flow).
+  EOT
+  type = object({
+    tags  = optional(list(string))
+    notes = optional(string)
+  })
+  default = {}
+}
