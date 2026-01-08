@@ -52,10 +52,19 @@ async function chartExists(
   return result.success;
 }
 
+async function updateDependencies(chartPath: string): Promise<void> {
+  const result = await exec(["helm", "dependency", "update", chartPath]);
+  if (!result.success) {
+    throw new Error(`Failed to update dependencies: ${result.stderr}`);
+  }
+}
+
 async function packageChart(
   chartPath: string,
   destination: string
 ): Promise<string> {
+  await updateDependencies(chartPath);
+
   const result = await exec([
     "helm",
     "package",
