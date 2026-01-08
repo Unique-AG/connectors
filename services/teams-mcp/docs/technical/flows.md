@@ -59,17 +59,17 @@ sequenceDiagram
     MCPClient->>EntraID: OAuth authorization request
     EntraID->>User: Show consent screen
     User->>EntraID: Grant permissions
-    EntraID->>MCPClient: Redirect with auth code
-    MCPClient->>TeamsMCP: GET /auth/callback?code=...
-    TeamsMCP->>EntraID: Exchange code for tokens
-    EntraID->>TeamsMCP: Access + Refresh tokens
-    TeamsMCP->>DB: Store encrypted tokens
+    EntraID->>TeamsMCP: Redirect with auth code
+    TeamsMCP->>EntraID: Exchange code for tokens<br/>(using CLIENT_SECRET)
+    EntraID->>TeamsMCP: Microsoft access + refresh tokens
+    Note over TeamsMCP: Microsoft tokens NEVER sent to client<br/>Encrypted and stored on server only
+    TeamsMCP->>DB: Store encrypted Microsoft tokens
 
     Note over TeamsMCP: Emit UserUpsertEvent
-    TeamsMCP->>MSGraph: POST /subscriptions
+    TeamsMCP->>MSGraph: POST /subscriptions<br/>(using Microsoft access token)
     MSGraph->>TeamsMCP: Subscription created (ID, expiry)
     TeamsMCP->>DB: Store subscription record
-    TeamsMCP->>MCPClient: Connection complete
+    TeamsMCP->>MCPClient: Issue opaque JWT tokens<br/>(MCP access + refresh tokens)
 
     Note over TeamsMCP: Now listening for meeting transcripts
 ```
@@ -256,6 +256,7 @@ flowchart TB
 ## Related Documentation
 
 - [Architecture](./architecture.md) - System components and infrastructure
+- [Security](./security.md) - Encryption, PKCE, and threat model
 - [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
 - [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale

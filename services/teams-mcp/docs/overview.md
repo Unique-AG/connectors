@@ -4,7 +4,7 @@
 
 The Teams MCP Connector is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
-For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/overview.md).
+For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
 ## Quick Summary
 
@@ -83,7 +83,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./perm
 
 **Security**
 
-- Application-level authentication via OAuth2 with Microsoft Entra ID
+- Authentication via OAuth2 with Microsoft Entra ID
 - All Microsoft tokens encrypted at rest using AES-GCM
 - Refresh token rotation with family-based revocation for theft detection
 - Short-lived access tokens (60 seconds) limit exposure window
@@ -150,29 +150,30 @@ flowchart TB
 sequenceDiagram
     autonumber
     actor User
-    participant MCP as MCP Client
-    participant Teams as Teams MCP Connector
-    participant Entra as Microsoft Entra ID
-    participant Graph as Microsoft Graph
+    participant MCPClient as MCP Client
+    participant TeamsMCP as Teams MCP Server
+    participant EntraID as Microsoft Entra ID
+    participant MSGraph as Microsoft Graph API
+    participant DB as PostgreSQL
 
-    User->>MCP: Connect to MCP server
-    MCP->>Teams: GET /mcp
-    Teams->>MCP: Redirect to Microsoft login
-    MCP->>Entra: OAuth authorization request
-    Entra->>User: Show consent screen
-    User->>Entra: Grant permissions
-    Entra->>MCP: Redirect with auth code
-    MCP->>Teams: Callback with auth code
-    Teams->>Entra: Exchange code for tokens
-    Entra->>Teams: Access + Refresh tokens
-    Teams->>Teams: Store encrypted tokens
+    User->>MCPClient: Connect to MCP server
+    MCPClient->>TeamsMCP: GET /mcp
+    TeamsMCP->>MCPClient: Redirect to Microsoft login
+    MCPClient->>EntraID: OAuth authorization request
+    EntraID->>User: Show consent screen
+    User->>EntraID: Grant permissions
+    EntraID->>TeamsMCP: Redirect with auth code
+    TeamsMCP->>EntraID: Exchange code for tokens
+    EntraID->>TeamsMCP: Access + Refresh tokens
+    TeamsMCP->>DB: Store encrypted tokens
 
-    Note over Teams: Create Graph subscription
-    Teams->>Graph: POST /subscriptions
-    Graph->>Teams: Subscription created
-    Teams->>MCP: Connection complete
+    Note over TeamsMCP: Emit UserUpsertEvent
+    TeamsMCP->>MSGraph: POST /subscriptions
+    MSGraph->>TeamsMCP: Subscription created (ID, expiry)
+    TeamsMCP->>DB: Store subscription record
+    TeamsMCP->>MCPClient: Opaque JWT for auth
 
-    Note over Teams: Now listening for meeting transcripts
+    Note over TeamsMCP: Now listening for meeting transcripts
 ```
 
 ### Transcript Processing Flow
@@ -235,21 +236,72 @@ sequenceDiagram
    - Participants have read access
    - Content searchable and queryable via Unique AI
 
-## Limitations
+## Limitations and Constraints
+
+### Authentication Constraints
+
+| Constraint | Reason |
+|------------|--------|
+| **Delegated permissions only** | Requires user sign-in; application-only access would need admin-configured policies per user |
+| **No certificate auth** | Certificate auth only works with Client Credentials flow, incompatible with delegated permissions |
+| **Single app registration** | Each MCP server deployment uses one Entra ID app registration (multi-tenant capable) |
+| **Admin consent required** | `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` need admin approval |
+
+### Operational Constraints
+
+| Constraint | Impact | Mitigation |
+|------------|--------|------------|
+| **90-day token expiry** | User must reconnect after ~90 days of inactivity | Monitor for disconnected users |
+| **Webhook timeout** | Microsoft requires response in <10 seconds | RabbitMQ decouples reception from processing |
+| **Subscription expiry** | Graph subscriptions expire after 3 days max | Automatic renewal via lifecycle notifications |
+| **Encryption key change** | All stored tokens become unreadable | Users must reconnect; plan for maintenance window |
+
+### Scaling Considerations
+
+| Factor | Limit | Notes |
+|--------|-------|-------|
+| **Microsoft Graph rate limits** | ~10,000 requests/10 min per app | Shared across all users of the app registration |
+| **Concurrent user lookups** | Configurable (default: 5) | Set via `UNIQUE_USER_FETCH_CONCURRENCY` |
+| **Recording file size** | Limited by `/tmp` volume | Default 20Gi emptyDir; increase for long meetings |
+| **Database connections** | PostgreSQL pool size | Monitor connection usage under load |
 
 ### Not Supported
 
-- **Application-only authentication**: Requires user sign-in; cannot run unattended with app-only permissions
-- **Certificate authentication**: Only supported with Client Credentials flow, which is incompatible with delegated permissions
-- **Immediate token revocation**: Tokens validated locally with short TTLs instead of remote introspection
-- **Multiple tenants per deployment**: Requires separate deployments for each Microsoft tenant
+- **Real-time transcription**: Only processes completed transcripts, not live captions
+- **Meeting creation**: Read-only access; cannot create or modify meetings
+- **Selective meeting capture**: All meetings with transcription enabled are captured
+- **Token introspection**: Tokens validated locally with short TTLs for performance
 
-### Considerations
+### Single App Registration Architecture
 
-- **Admin consent required**: The `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` permissions require administrator consent
-- **User reconnection**: If Microsoft refresh token expires (~90 days of inactivity), user must reconnect to MCP server
-- **Meeting transcription policy**: Teams meetings must have transcription enabled by organizational policy
-- **Subscription renewal**: Handled automatically, but if renewal fails, user must reconnect
+Each Teams MCP server deployment uses **one Microsoft Entra ID app registration**:
+
+```mermaid
+flowchart LR
+    subgraph Tenants["Microsoft Tenants"]
+        EA1["Enterprise App<br/>(Contoso)"]
+        EA2["Enterprise App<br/>(Fabrikam)"]
+        EA3["Enterprise App<br/>(Acme)"]
+    end
+
+    subgraph Your["Your Tenant"]
+        AppReg["App Registration<br/>(single CLIENT_ID)"]
+    end
+
+    subgraph Infra["Your Infrastructure"]
+        MCP["Teams MCP Server"]
+    end
+
+    EA1 --> AppReg
+    EA2 --> AppReg
+    EA3 --> AppReg
+    AppReg --> MCP
+```
+
+- **Multi-tenant support**: Configure app as "Accounts in any organizational directory"
+- **Enterprise Application**: Created in each tenant when admin grants consent
+- **Shared infrastructure**: One deployment serves all tenants
+- **Data isolation**: Each user's data scoped by their Microsoft user ID
 
 ## Future Versions
 
@@ -259,7 +311,7 @@ Planned enhancements will be documented here.
 
 ### For IT Operators
 
-- [Operator Guide](./operator/overview.md) - Deployment, configuration, and operations
+- [Operator Guide](./operator/README.md) - Deployment, configuration, and operations
   - [Deployment](./operator/deployment.md) - Kubernetes and Helm setup
   - [Configuration](./operator/configuration.md) - Environment variables and settings
   - [Authentication](./operator/authentication.md) - Microsoft Entra ID setup
@@ -267,9 +319,10 @@ Planned enhancements will be documented here.
 
 ### Technical Reference
 
-- [Technical Overview](./technical/overview.md) - Architecture, flows, and design decisions
+- [Technical Reference](./technical/README.md) - Architecture, flows, and design decisions
   - [Architecture](./technical/architecture.md) - System components and infrastructure
   - [Flows](./technical/flows.md) - User connection, subscription lifecycle, transcript processing
   - [Permissions](./technical/permissions.md) - Microsoft Graph permissions with justification
+  - [Security](./technical/security.md) - Encryption, authentication, and threat model
   - [Token and Authentication](./technical/token-auth-flows.md) - OAuth token lifecycle
   - [Why RabbitMQ](./technical/why-rabbitmq.md) - Message queue rationale

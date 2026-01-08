@@ -125,16 +125,88 @@ flowchart LR
 
 ### PostgreSQL
 
-Stores persistent data:
+Stores persistent data with the following schema:
+
+```mermaid
+erDiagram
+    user_profiles ||--o{ subscriptions : "has"
+    user_profiles ||--o{ oauth_sessions : "has"
+    oauth_clients ||--o{ oauth_sessions : "owns"
+    oauth_sessions ||--o{ tokens : "issues"
+    oauth_sessions ||--o{ authorization_codes : "generates"
+
+    user_profiles {
+        uuid id PK
+        string microsoft_user_id UK
+        string email
+        string display_name
+        text access_token_encrypted
+        text refresh_token_encrypted
+        timestamp tokens_updated_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    subscriptions {
+        uuid id PK
+        uuid user_profile_id FK
+        string microsoft_subscription_id UK
+        string resource
+        timestamp expiration_date_time
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    oauth_clients {
+        uuid id PK
+        string client_id UK
+        string redirect_uri
+        timestamp created_at
+    }
+
+    oauth_sessions {
+        uuid id PK
+        uuid client_id FK
+        uuid user_profile_id FK
+        string token_family
+        boolean revoked
+        timestamp created_at
+    }
+
+    tokens {
+        uuid id PK
+        uuid session_id FK
+        string token_hash UK
+        enum type "access | refresh"
+        timestamp expires_at
+        timestamp created_at
+    }
+
+    authorization_codes {
+        uuid id PK
+        uuid session_id FK
+        string code_hash UK
+        string code_challenge
+        string code_challenge_method
+        timestamp expires_at
+        timestamp created_at
+    }
+```
 
 | Table | Purpose |
 |-------|---------|
 | `user_profiles` | User identity and encrypted Microsoft tokens |
 | `subscriptions` | Active Graph API webhook subscriptions |
 | `oauth_clients` | Registered MCP OAuth clients |
-| `oauth_sessions` | Active OAuth sessions |
-| `tokens` | MCP access and refresh tokens |
-| `authorization_codes` | Temporary OAuth authorization codes |
+| `oauth_sessions` | Active OAuth sessions with token family tracking |
+| `tokens` | MCP access and refresh tokens (hashed) |
+| `authorization_codes` | Temporary OAuth authorization codes with PKCE |
+
+**Key Design Decisions:**
+
+- **Token Family Tracking**: Each session has a `token_family` ID. If a refresh token is reused (indicating possible theft), the entire family is revoked.
+- **Encrypted Microsoft Tokens**: Access and refresh tokens from Microsoft are encrypted at rest using AES-GCM.
+- **Hashed MCP Tokens**: MCP tokens are stored as hashes, not plaintext, for cache-based validation.
 
 ### RabbitMQ
 
@@ -154,6 +226,7 @@ Enables asynchronous processing of webhook notifications. See [Why RabbitMQ](./w
 ## Related Documentation
 
 - [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing
+- [Security](./security.md) - Encryption, authentication, and threat model
 - [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
 - [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale

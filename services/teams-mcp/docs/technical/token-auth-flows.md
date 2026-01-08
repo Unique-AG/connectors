@@ -24,6 +24,66 @@ flowchart LR
     API <--> TokenStore
 ```
 
+## Microsoft OAuth Setup Flow
+
+### Why Client ID is Required
+
+Microsoft Graph API uses OAuth 2.0 for authentication, which requires a `client_id` to identify and authorize applications. The following sequence shows the complete authentication flow:
+
+**Important:** Microsoft access and refresh tokens are **never sent to the client**. They are received by the server, encrypted, and stored securely. After the Microsoft OAuth flow completes, the server issues **opaque JWT tokens** to the client for MCP authentication.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Client as MCP Client
+    participant TeamsMCP as Teams MCP Server
+    participant EntraID as Microsoft Entra ID
+    participant GraphAPI as Microsoft Graph API
+
+    Note over TeamsMCP, EntraID: App Registration Required
+    Note over TeamsMCP: CLIENT_ID + CLIENT_SECRET<br/>configured from app registration
+
+    User->>Client: 1. Connect to MCP Server
+    Client->>TeamsMCP: 2. GET /mcp (OAuth request)
+    TeamsMCP->>EntraID: 3. OAuth redirect with CLIENT_ID<br/>+ required scopes + PKCE
+    EntraID->>User: 4. Login & consent prompt
+    User->>EntraID: 5. Sign in + grant permissions
+    EntraID->>TeamsMCP: 6. Authorization code (callback)
+    TeamsMCP->>EntraID: 7. Exchange code for tokens<br/>(using CLIENT_ID + CLIENT_SECRET)
+    EntraID->>TeamsMCP: 8. Microsoft access & refresh tokens
+    
+    Note over TeamsMCP: Microsoft tokens NEVER sent to client<br/>Encrypted and stored on server only
+    
+    TeamsMCP->>Client: 9. Issue opaque JWT tokens<br/>(MCP access + refresh tokens)
+    
+    Note over TeamsMCP: Server uses Microsoft tokens internally
+    
+    TeamsMCP->>GraphAPI: 10. API calls with Microsoft access token
+    GraphAPI->>TeamsMCP: 11. Teams transcript data
+```
+
+### Security Model
+
+The `client_id` enables Microsoft to:
+
+- **Verify Application Identity**: Only registered applications can request access to Microsoft Graph
+- **Enforce Permissions**: Validate that your app registration has been granted the necessary Graph scopes
+- **Enable Consent Flow**: Present users with permission details specific to your application name and publisher
+- **Track & Audit**: Monitor API usage patterns and detect suspicious activity across applications
+- **Delegated Authorization**: Ensure access is scoped to data the signed-in user can access, not tenant-wide
+
+### Required App Registration Components
+
+| Component | Purpose | Security Function |
+|-----------|---------|-------------------|
+| `CLIENT_ID` | Application identifier | Identifies which app is requesting access |
+| `CLIENT_SECRET` | Application credential | Proves the server is the legitimate app (not an imposter) |
+| **Redirect URI** | OAuth callback endpoint | Prevents authorization code interception |
+| **API Permissions** | Graph scopes | Limits what data the app can access |
+| **Admin Consent** | Privileged scopes | Required for transcript/recording access |
+
+Without proper app registration, Microsoft Graph API will reject all authentication attempts with `invalid_client` errors.
+
 ## MCP OAuth (Internal)
 
 The MCP OAuth layer implements the [MCP Authorization specification](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization):
@@ -45,12 +105,27 @@ The MCP OAuth layer implements the [MCP Authorization specification](https://mod
 
 ## Microsoft OAuth (External)
 
+### Token Isolation
+
+**Critical Security Design:** Microsoft OAuth tokens (access and refresh) are **never exposed to clients**. The OAuth flow happens entirely on the server:
+
+1. **Microsoft OAuth Flow**: User authenticates with Microsoft Entra ID
+2. **Token Exchange**: Server exchanges authorization code for Microsoft tokens (using `CLIENT_SECRET`)
+3. **Token Storage**: Microsoft tokens are encrypted and stored on the server only
+4. **Client Authentication**: Server issues separate opaque JWT tokens to the client for MCP API access
+
+This design ensures that:
+- Microsoft tokens never leave the server
+- Clients cannot access Microsoft Graph API directly
+- All Microsoft API calls are made by the server on behalf of authenticated users
+- Client tokens are opaque JWTs that only authenticate with the MCP server
+
 ### Token Storage
 
-| Token Type | Source | Storage Location |
-|------------|--------|------------------|
-| Access Token | Microsoft Entra ID | Encrypted in `user_profiles` table |
-| Refresh Token | Microsoft Entra ID | Encrypted in `user_profiles` table |
+| Token Type | Source | Storage Location | Client Access |
+|------------|--------|------------------|---------------|
+| Access Token | Microsoft Entra ID | Encrypted in `user_profiles` table | **Never** |
+| Refresh Token | Microsoft Entra ID | Encrypted in `user_profiles` table | **Never** |
 
 **Required Scopes:** See [Microsoft Graph Permissions](./permissions.md) for the complete list with least-privilege justification.
 
@@ -108,8 +183,20 @@ All Microsoft tokens are encrypted at rest using **AES-GCM** (authenticated encr
 | Client Credentials (OIDC) | **No** | No user context; requires admin policy setup |
 | Certificate Authentication | **No** | Only works with Client Credentials flow |
 | Federated Identity | **No** | Only works with Client Credentials flow |
+| Multiple App Registrations | **No** | Each MCP server deployment uses one Entra ID app registration |
 
 The Teams MCP service requires **delegated permissions** to access user-specific resources. Client Credentials flow only supports application permissions, which would require tenant admins to create Application Access Policies via PowerShell—impractical for self-service MCP connections.
+
+### Single App Registration Architecture
+
+Each MCP server deployment uses **one Microsoft Entra ID app registration**:
+
+- **Single App Registration**: One `CLIENT_ID`/`CLIENT_SECRET` pair per deployment
+- **Multi-Tenant Capable**: The app registration can be configured to accept users from multiple Microsoft tenants
+- **Cross-Tenant Authentication**: Users from different organizations authenticate via Enterprise Applications in their tenant that reference the original app registration
+- **Enterprise Application Creation**: When tenant admin grants consent, Microsoft creates an Enterprise Application in their tenant as a proxy to the original app registration
+
+This design uses a single OAuth application that can serve users across multiple tenants, rather than requiring separate app registrations per organization.
 
 For detailed explanation, see [Permissions - Why Delegated (Not Application)](./permissions.md#why-delegated-not-application-permissions).
 
@@ -156,5 +243,6 @@ For detailed explanation, see [Permissions - Why Delegated (Not Application)](./
 ## Related Documentation
 
 - [Architecture](./architecture.md) - System components and infrastructure
+- [Security](./security.md) - Encryption, PKCE, and threat model
 - [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification

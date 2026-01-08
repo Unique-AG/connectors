@@ -4,6 +4,8 @@
 
 The Teams MCP Connector requires a Microsoft Entra ID (formerly Azure AD) app registration with delegated permissions to access Microsoft Graph API on behalf of users.
 
+For technical details about the OAuth flow and why client credentials are required, see [Token and Authentication Flows](../technical/token-auth-flows.md).
+
 ## App Registration
 
 ### Option 1: Terraform (Recommended)
@@ -106,19 +108,42 @@ Examples:
 
 ### Single Tenant (Recommended)
 
-For enterprise deployments, use single-tenant configuration:
+For enterprise deployments within one organization, use single-tenant configuration:
 
 - **Sign-in audience**: "Accounts in this organizational directory only"
 - **Terraform**: `sign_in_audience = "AzureADMyOrg"`
 
-### Multi-Tenant
+### Multi-Tenant App Registration
 
-For SaaS deployments serving multiple organizations:
+You can configure the Entra ID app registration to serve **multiple Microsoft tenants** with a single MCP server deployment:
 
 - **Sign-in audience**: "Accounts in any organizational directory"
 - **Terraform**: `sign_in_audience = "AzureADMultipleOrgs"`
 
-**Note**: Each tenant admin must grant consent for their organization.
+#### Multi-Tenant Configuration
+
+For SaaS deployments serving multiple organizations:
+
+1. **Single App Registration**: Created in your tenant with one `CLIENT_ID` and `CLIENT_SECRET`
+2. **Enterprise Application Creation**: When each organization's admin grants consent, Microsoft creates an "Enterprise Application" in their tenant that references your app registration
+3. **User Authentication Flow**: Users authenticate via the Enterprise Application in their tenant, which redirects to your app registration for token issuance
+4. **Shared Infrastructure**: One MCP deployment serves all tenants through their respective Enterprise Applications
+
+#### Considerations for Multi-Tenant
+
+**How Admin Consent Works:**
+
+1. **Initial Setup**: You create a multi-tenant app registration in your Entra ID tenant
+2. **Consent Request**: Share the admin consent URL with each organization's admin
+3. **Enterprise App Creation**: When admin grants consent, Microsoft automatically creates an Enterprise Application in their tenant
+4. **User Access**: Users in that tenant can now authenticate via their Enterprise Application to your MCP server
+
+**Considerations:**  
+- **Data isolation**: All tenant data stored in the same database (with tenant-scoped access controls)
+- **Enterprise Application management**: Each tenant admin controls user assignment and access via their Enterprise Application
+- **Compliance**: Some organizations may require dedicated infrastructure for data residency
+
+**Recommendation**: Multi-tenant configuration works well for SaaS scenarios where organizations are comfortable with shared infrastructure and proper data isolation controls.
 
 ## Client Secret Management
 

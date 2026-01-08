@@ -108,6 +108,7 @@ Application permissions would require tenant administrators to pre-configure acc
 ## Related Documentation
 
 - [Architecture](./architecture.md) - System components and infrastructure
+- [Security](./security.md) - Encryption, PKCE, and threat model
 - [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing
 - [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale

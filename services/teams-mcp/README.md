@@ -163,14 +163,22 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
 OTEL_EXPORTER_PROMETHEUS_PORT=8081
 ```
 
-## Technical Documentation
+## Documentation
 
-Detailed technical documentation is available in the `docs/` directory:
+Full documentation is available in the `docs/` directory:
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](./docs/architecture.md) | System components, high-level diagrams, infrastructure |
-| [Flows](./docs/flows.md) | User connection, subscription lifecycle, transcript processing |
-| [Permissions](./docs/permissions.md) | Microsoft Graph permissions and least-privilege justification |
-| [Token & Auth](./docs/token-auth-flows.md) | Token types, validation, expiration, refresh flows |
-| [Why RabbitMQ](./docs/why-rabbitmq.md) | Message queue rationale and design decisions |
+| [Overview](./docs/overview.md) | Features, requirements, limitations, and how it works |
+| [Operator Guide](./docs/operator/README.md) | Deployment, configuration, authentication, troubleshooting |
+| [Technical Reference](./docs/technical/README.md) | Architecture, flows, permissions, security |
+
+### Technical Deep Dives
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](./docs/technical/architecture.md) | System components, data model, infrastructure |
+| [Flows](./docs/technical/flows.md) | User connection, subscription lifecycle, transcript processing |
+| [Security](./docs/technical/security.md) | Encryption, PKCE, threat model |
+| [Permissions](./docs/technical/permissions.md) | Microsoft Graph permissions and least-privilege justification |
+| [Why RabbitMQ](./docs/technical/why-rabbitmq.md) | Message queue rationale and design decisions |
