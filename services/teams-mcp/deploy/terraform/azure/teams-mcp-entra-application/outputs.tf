@@ -21,6 +21,6 @@ output "service_principal_object_id" {
 }
 
 output "admin_consent_url" {
-  description = "URL for tenant admins to grant admin consent. Share this with customer tenant admins for multi-tenant scenarios."
-  value       = "https://login.microsoftonline.com/organizations/adminconsent?client_id=${azuread_application.teams_mcp.client_id}"
+  description = "URL for tenant admins to grant admin consent. Share this with customer tenant admins for multi-tenant scenarios (only outputted when sign_in_audience is AzureADMultipleOrgs)."
+  value       = var.sign_in_audience == "AzureADMultipleOrgs" ? "https://login.microsoftonline.com/organizations/adminconsent?client_id=${azuread_application.teams_mcp.client_id}" : null
 }
