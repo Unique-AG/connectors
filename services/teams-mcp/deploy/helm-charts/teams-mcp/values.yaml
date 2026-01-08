@@ -181,8 +181,8 @@ mcpConfig:
     #   x-company-id: "..."
 
     # -- The Public API URL
-    # example: https://api.unique.app
-    # example: http://api-gateway.unique:8080
+    # example: https://gateway.unique.app/public/chat/
+    # example: http://node-chat.finance-gpt:8092/public/
     apiBaseUrl: unset_default_value
     # -- The Public API version to use
     apiVersion: "2023-12-06"

@@ -49,3 +49,16 @@ Selector labels
 app.kubernetes.io/name: {{ include "chart.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+Ensure URL has trailing slash
+Accepts a context with .url containing the URL to process
+*/}}
+{{- define "chart.ensureTrailingSlash" -}}
+{{- $url := .url }}
+{{- if hasSuffix "/" $url }}
+{{- $url }}
+{{- else }}
+{{- printf "%s/" $url }}
+{{- end }}
+{{- end }}
