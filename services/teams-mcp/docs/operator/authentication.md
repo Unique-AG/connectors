@@ -64,6 +64,8 @@ module "teams_mcp_app" {
 4. **Grant Admin Consent**
    - Click "Grant admin consent for [Tenant]"
    - Confirm the action
+   
+   **Important**: Admin consent is required for `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` permissions. Without admin consent, users will see an error when trying to connect. See [Understanding Admin Consent](#understanding-admin-consent-and-user-consent) below for details.
 
 5. **Create Client Secret**
    - Go to "Certificates & secrets"
@@ -89,6 +91,66 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 | `offline_access` | Obtain refresh tokens for long-lived access | No |
 
 For detailed permission justifications, see [Permissions Documentation](../technical/permissions.md).
+
+## Understanding Microsoft Consent Flows
+
+**This is standard Microsoft behavior, not Teams MCP specific.** All Microsoft 365 apps use the same consent model.
+
+### Standard Microsoft Consent Process
+
+**Step 1: Admin adds the app and grants admin-required permissions**
+- Admin registers the app in Microsoft Entra ID
+- Admin grants consent for permissions requiring admin approval:
+  - **Organization-wide**: All users can use the app
+  - **Per-user**: Only specific users can use the app
+- For Teams MCP: `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` require admin consent
+
+**Step 2: Admin approval workflow (if enabled in tenant)**
+- If tenant has "requires approval flow" enabled, users must request admin approval
+- Admin reviews and approves the app for that user
+- This is in addition to Step 1
+
+**Step 3: User consent (always required for delegated permissions)**
+- Each user must sign in and consent individually
+- This is required even after admin consent (Microsoft's requirement for delegated permissions)
+- User sees consent screen on first connection
+
+**How to grant admin consent:**
+1. Azure Portal → App Registration → API permissions
+2. Click "Grant admin consent for [Your Organization]" (organization-wide)
+3. Or use [admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) for per-user approval
+
+**Microsoft Documentation:**
+- [User and admin consent overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview) - Standard Microsoft consent flows
+- [Grant admin consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) - Step-by-step guide
+- [Admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) - Per-user approval process
+
+### User Reconnection Experience (The "Login Flicker")
+
+**First-time connection:** User sees full Microsoft consent screen and approves permissions.
+
+**Subsequent reconnections:** User sees a quick "flicker" (brief redirect sequence). This is **normal** - Microsoft validates the existing session through rapid OAuth redirects. Standard Microsoft OAuth behavior.
+
+### Consent Flow Summary
+
+**Required for Teams MCP:**
+1. Admin grants consent for admin-required permissions (`OnlineMeetingTranscript.Read.All`, `OnlineMeetingRecording.Read.All`)
+   - Organization-wide OR per-user
+2. If tenant has approval workflow enabled: Admin approves app for each requesting user
+3. User consents individually (always required for delegated permissions, even after admin consent)
+
+**Tenant settings control:**
+- Whether users can consent to certain permissions
+- Whether admin approval workflow is required
+- Configured in Microsoft Entra ID → Enterprise applications → User settings
+
+### Troubleshooting Consent Issues
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `AADSTS65001` | Consent not granted | Grant admin consent in Azure Portal, then have user sign in again |
+| `AADSTS65005` | User consent required | User must sign in and approve the consent screen |
+| `AADSTS90094` | Admin consent required | Administrator must grant consent for permissions marked "Admin Consent: Yes" |
 
 ## Redirect URI Configuration
 
@@ -198,7 +260,15 @@ az ad app permission list-grants --id <client-id>
 
 ## Microsoft Documentation
 
+### App Registration
 - [Register an application](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app)
 - [Configure permissions](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-configure-app-access-web-apis)
-- [Admin consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent)
+
+### Consent and Permissions
+- [Grant admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) - **Required reading**: How to grant admin consent
+- [Understanding user and admin consent](https://learn.microsoft.com/en-us/entra/identity-platform/howto-convert-app-to-be-multi-tenant#understand-user-and-admin-consent) - **Required reading**: Explains the difference between user and admin consent
+- [Configure user consent settings](https://learn.microsoft.com/en-us/entra/identity/manage-apps/configure-user-consent) - How to configure what users can consent to
+- [Admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) - How to set up consent request workflows
+
+### Reference
 - [Microsoft Graph permissions reference](https://learn.microsoft.com/en-us/graph/permissions-reference)

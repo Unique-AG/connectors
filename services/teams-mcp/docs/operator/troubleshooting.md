@@ -61,6 +61,14 @@ kubectl run -it --rm debug --image=curlimages/curl -- curl http://teams-mcp:5134
 
 ## Authentication Issues
 
+### Login "Flicker" on Reconnection
+
+**Symptom**: User sees a quick flicker or brief redirect sequence when reconnecting after the first connection
+
+**This is normal behavior** - not a bug or issue. After a user has connected once and granted permission, Microsoft Entra ID uses silent authentication. The browser quickly redirects through the OAuth flow to validate the existing session, creating a brief "flicker" effect. This is standard Microsoft OAuth behavior.
+
+**See**: [User Reconnection Experience](../operator/authentication.md#user-reconnection-experience-the-login-flicker) for detailed explanation.
+
 ### OAuth Flow Fails
 
 **Symptom**: Users cannot complete Microsoft sign-in
