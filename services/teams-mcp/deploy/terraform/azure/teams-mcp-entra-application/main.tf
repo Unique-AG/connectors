@@ -62,3 +62,28 @@ resource "azurerm_key_vault_secret" "kv_client_secret" {
   key_vault_id    = each.value.client_secret.key_vault_id
   expiration_date = each.value.client_secret.end_date
 }
+
+resource "azuread_service_principal" "teams_mcp" {
+  count = var.service_principal_configuration != null ? 1 : 0
+
+  client_id    = azuread_application.teams_mcp.client_id
+  use_existing = true
+  notes        = var.service_principal_configuration.notes != null ? var.service_principal_configuration.notes : var.notes
+}
+
+resource "time_sleep" "wait_for_graph_propagation" {
+  count = var.service_principal_configuration != null ? 1 : 0
+
+  depends_on      = [azuread_application.teams_mcp, azuread_service_principal.teams_mcp]
+  create_duration = "15s"
+}
+
+resource "azuread_service_principal_delegated_permission_grant" "teams_mcp_graph" {
+  count = var.service_principal_configuration != null ? 1 : 0
+
+  service_principal_object_id          = azuread_service_principal.teams_mcp[0].object_id
+  resource_service_principal_object_id = azuread_service_principal.msgraph.object_id
+  claim_values                         = local.graph_scopes
+
+  depends_on = [time_sleep.wait_for_graph_propagation]
+}
