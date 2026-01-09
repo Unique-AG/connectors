@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileFilterService } from './file-filter.service';
 import { GraphApiService } from './graph-api.service';
 import { GraphClientFactory } from './graph-client.factory';
-import type { DriveItem } from './types/sharepoint.types';
+import type { DriveItem, ListColumn, ListItem } from './types/sharepoint.types';
 import type { SharepointContentItem } from './types/sharepoint-content-item.interface';
 
 describe('GraphApiService', () => {
@@ -27,11 +27,13 @@ describe('GraphApiService', () => {
       get: vi.fn(),
       select: vi.fn(),
       expand: vi.fn(),
+      top: vi.fn(),
       getStream: vi.fn(),
     };
 
     mockChain.select.mockReturnValue(mockChain);
     mockChain.expand.mockReturnValue(mockChain);
+    mockChain.top.mockReturnValue(mockChain);
     mockGraphClient.api.mockReturnValue(mockChain);
 
     // Mock get() calls based on the API endpoint
@@ -90,6 +92,185 @@ describe('GraphApiService', () => {
         return requestFn();
       },
     );
+  });
+
+  describe('fetchSitesFromSharePointList', () => {
+    it('successfully fetches and transforms sites from SharePoint list', async () => {
+      // Mock getSiteLists response
+      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
+        { id: 'list-id-456', name: 'Test List', displayName: 'Test List' },
+      ]);
+
+      const mockColumns: ListColumn[] = [
+        { id: 'c1', name: 'internal_siteId', displayName: 'siteId' },
+        { id: 'c2', name: 'internal_syncColumnName', displayName: 'syncColumnName' },
+        { id: 'c3', name: 'internal_ingestionMode', displayName: 'ingestionMode' },
+        { id: 'c4', name: 'internal_uniqueScopeId', displayName: 'uniqueScopeId' },
+        { id: 'c5', name: 'internal_maxFilesToIngest', displayName: 'maxFilesToIngest' },
+        { id: 'c6', name: 'internal_storeInternally', displayName: 'storeInternally' },
+        { id: 'c7', name: 'internal_syncStatus', displayName: 'syncStatus' },
+        { id: 'c8', name: 'internal_syncMode', displayName: 'syncMode' },
+        {
+          id: 'c9',
+          name: 'internal_permissionsInheritanceMode',
+          displayName: 'permissionsInheritanceMode',
+        },
+      ];
+
+      vi.spyOn(service, 'getListColumns').mockResolvedValue(mockColumns);
+
+      const mockListItem = {
+        id: '1',
+        fields: {
+          internal_siteId: '12345678-1234-4234-8123-123456789abc',
+          internal_syncColumnName: 'TestColumn',
+          internal_ingestionMode: 'recursive',
+          internal_uniqueScopeId: 'scope_test',
+          internal_maxFilesToIngest: 100,
+          internal_storeInternally: 'enabled',
+          internal_syncStatus: 'active',
+          internal_syncMode: 'content_and_permissions',
+          internal_permissionsInheritanceMode: 'inherit_scopes_and_files',
+        },
+      };
+
+      vi.spyOn(service, 'getListItems').mockResolvedValue([mockListItem as unknown as ListItem]);
+
+      const sharepointList = {
+        siteId: 'test-site-id',
+        listDisplayName: 'Test List',
+      };
+
+      const result = await service.fetchSitesFromSharePointList(sharepointList);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        siteId: '12345678-1234-4234-8123-123456789abc',
+        syncColumnName: 'TestColumn',
+        ingestionMode: 'recursive',
+        scopeId: 'scope_test',
+        maxFilesToIngest: 100,
+        storeInternally: 'enabled',
+        syncStatus: 'active',
+        syncMode: 'content_and_permissions',
+        permissionsInheritanceMode: 'inherit_scopes_and_files',
+      });
+
+      expect(service.getSiteLists).toHaveBeenCalledWith('test-site-id');
+      expect(service.getListItems).toHaveBeenCalledWith('test-site-id', 'list-id-456', {
+        expand: 'fields',
+      });
+      expect(service.getListColumns).toHaveBeenCalledWith('test-site-id', 'list-id-456');
+    });
+
+    it('throws error when list is not found', async () => {
+      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
+        { id: 'other-list', name: 'Other', displayName: 'Other' },
+      ]);
+
+      const sharepointList = {
+        siteId: 'test-site-id',
+        listDisplayName: 'Missing List',
+      };
+
+      await expect(service.fetchSitesFromSharePointList(sharepointList)).rejects.toThrow(
+        'List "Missing List" not found',
+      );
+    });
+  });
+
+  describe('getListColumns', () => {
+    it('successfully fetches list columns', async () => {
+      const mockColumns: ListColumn[] = [
+        { id: '1', name: 'Title', displayName: 'Title' },
+        { id: '2', name: 'Created', displayName: 'Created' },
+      ];
+
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).paginateGraphApiRequest = vi.fn().mockResolvedValue(mockColumns);
+
+      const result = await service.getListColumns('site-1', 'list-1');
+
+      expect(result).toEqual(mockColumns);
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method call
+      expect((service as any).paginateGraphApiRequest).toHaveBeenCalledWith(
+        '/sites/site-1/lists/list-1/columns',
+        expect.any(Function),
+      );
+    });
+
+    it('throws error when fetching columns fails', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).paginateGraphApiRequest = vi.fn().mockRejectedValue(new Error('API Error'));
+
+      await expect(service.getListColumns('site-1', 'list-1')).rejects.toThrow('API Error');
+    });
+  });
+
+  describe('transformListItemToSiteConfig', () => {
+    const mockNameMap = {
+      siteId: 'internal_siteId',
+      syncColumnName: 'internal_syncColumnName',
+      ingestionMode: 'internal_ingestionMode',
+      uniqueScopeId: 'internal_uniqueScopeId',
+      maxFilesToIngest: 'internal_maxFilesToIngest',
+      storeInternally: 'internal_storeInternally',
+      syncStatus: 'internal_syncStatus',
+      syncMode: 'internal_syncMode',
+      permissionsInheritanceMode: 'internal_permissionsInheritanceMode',
+    };
+
+    it('correctly transforms valid list item to SiteConfig', () => {
+      const listItem = {
+        id: '1',
+        fields: {
+          internal_siteId: '12345678-1234-4234-8234-123456789abc',
+          internal_syncColumnName: 'TestColumn',
+          internal_ingestionMode: 'recursive',
+          internal_uniqueScopeId: 'scope_test',
+          internal_maxFilesToIngest: 100,
+          internal_storeInternally: 'enabled',
+          internal_syncStatus: 'active',
+          internal_syncMode: 'content_and_permissions',
+          internal_permissionsInheritanceMode: 'inherit_scopes_and_files',
+        },
+      } as unknown as ListItem;
+
+      // biome-ignore lint/suspicious/noExplicitAny: Test private method
+      const result = (service as any).transformListItemToSiteConfig(listItem, 0, mockNameMap);
+
+      expect(result).toEqual({
+        siteId: '12345678-1234-4234-8234-123456789abc',
+        syncColumnName: 'TestColumn',
+        ingestionMode: 'recursive',
+        scopeId: 'scope_test',
+        maxFilesToIngest: 100,
+        storeInternally: 'enabled',
+        syncStatus: 'active',
+        syncMode: 'content_and_permissions',
+        permissionsInheritanceMode: 'inherit_scopes_and_files',
+      });
+    });
+
+    it('validates and rejects invalid siteId format', () => {
+      const listItem = {
+        id: '1',
+        fields: {
+          internal_siteId: 'invalid-uuid',
+          internal_syncColumnName: 'TestColumn',
+          internal_ingestionMode: 'recursive',
+          internal_uniqueScopeId: 'scope_test',
+          internal_storeInternally: 'enabled',
+          internal_syncStatus: 'active',
+          internal_syncMode: 'content_only',
+        },
+      } as unknown as ListItem;
+
+      // biome-ignore lint/suspicious/noExplicitAny: Test private method
+      expect(() =>
+        (service as any).transformListItemToSiteConfig(listItem, 0, mockNameMap),
+      ).toThrow('Invalid site configuration at row 1');
+    });
   });
 
   describe('getAllFilesAndPagesForSite', () => {
@@ -306,7 +487,10 @@ describe('GraphApiService', () => {
       };
 
       // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing limit
-      (service as any).paginateGraphApiRequest = vi.fn().mockResolvedValue([firstItem, secondItem]);
+      vi.spyOn(service, 'getListItems').mockResolvedValue([
+        firstItem,
+        secondItem,
+      ] as unknown as ListItem[]);
       maxFilesToScanConfig = 1;
 
       const result = await service.getAspxListItems(
@@ -318,6 +502,7 @@ describe('GraphApiService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]?.fileName).toBe('Page 1');
+      expect(service.getListItems).toHaveBeenCalled();
     });
   });
 

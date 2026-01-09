@@ -263,12 +263,23 @@
               ],
               "description": "Sites source configuration. Determines how sites are configured: from static YAML (config_file) or dynamically from SharePoint list (sharepoint_list)"
             },
-            "sharepointListUrl": {
-              "type": "string",
-              "description": "SharePoint list URL containing site configurations. Only used when sitesSource is 'sharepoint_list'",
-              "examples": [
-                "https://acme.sharepoint.com/sites/ConfigSite/Lists/SharePoint%20Sites%20to%20Sync/AllItems.aspx"
-              ]
+            "sharepointList": {
+              "type": "object",
+              "description": "SharePoint list details containing site configurations. Only used when sitesSource is 'sharepoint_list'",
+              "required": ["siteId", "listDisplayName"],
+              "properties": {
+                "siteId": {
+                  "type": "string",
+                  "description": "SharePoint site ID containing the configuration list",
+                  "examples": ["00000000-0000-0000-0000-000000000000"]
+                },
+                "listDisplayName": {
+                  "type": "string",
+                  "description": "Display name of the SharePoint configuration list",
+                  "examples": ["SharePoint Sites to Sync"]
+                }
+              },
+              "additionalProperties": false
             },
             "sites": {
               "type": "array",

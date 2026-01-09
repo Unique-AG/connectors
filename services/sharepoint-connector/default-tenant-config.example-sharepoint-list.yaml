@@ -13,10 +13,12 @@ sharepoint:
   
   # Sites configuration from SharePoint list
   sitesSource: sharepoint_list
-  sharepointListUrl: https://yourcompany.sharepoint.com/sites/ConfigSite/Lists/SharePoint%20Sites%20to%20Sync/AllItems.aspx
+  sharepointList:
+    siteId: your-config-site-id-here
+    listDisplayName: SharePoint Sites to Sync
   
   # Required SharePoint list columns:
-  # - syncSiteId (Single line text) - SharePoint site ID
+  # - siteId (Single line text) - SharePoint site ID
   # - syncColumnName (Single line text) - Column that marks files for sync
   # - ingestionMode (Choice: flat, recursive)
   # - uniqueScopeId (Single line text) - Unique scope ID

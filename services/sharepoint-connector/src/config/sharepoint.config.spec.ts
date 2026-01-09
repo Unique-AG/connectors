@@ -131,6 +131,29 @@ describe('SharepointConfigSchema', () => {
         expect(result.sites).toHaveLength(2);
       }
     });
+
+    it('validates sharepoint_list source configuration', () => {
+      const config = {
+        ...validBaseConfig,
+        auth: {
+          mode: 'oidc' as const,
+          tenantId: '12345678-1234-1234-1234-123456789abc',
+        },
+        sitesSource: 'sharepoint_list' as const,
+        sharepointList: {
+          siteId: '87654321-4321-4321-8321-cba987654321',
+          listDisplayName: 'Sharepoint Sites to Sync',
+        },
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
+      const result = SharepointConfigSchema.parse(config);
+      expect(result.sitesSource).toBe('sharepoint_list');
+      if (result.sitesSource === 'sharepoint_list') {
+        expect(result.sharepointList.siteId).toBe('87654321-4321-4321-8321-cba987654321');
+        expect(result.sharepointList.listDisplayName).toBe('Sharepoint Sites to Sync');
+      }
+    });
   });
 
   describe('sites array validation', () => {

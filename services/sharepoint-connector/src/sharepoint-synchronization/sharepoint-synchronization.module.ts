@@ -9,7 +9,6 @@ import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
-import { SitesConfigLoaderService } from './sites-config-loader.service';
 
 @Module({
   imports: [
@@ -25,7 +24,6 @@ import { SitesConfigLoaderService } from './sites-config-loader.service';
     ContentSyncService,
     FileMoveProcessor,
     ScopeManagementService,
-    SitesConfigLoaderService,
   ],
   exports: [SharepointSynchronizationService],
 })

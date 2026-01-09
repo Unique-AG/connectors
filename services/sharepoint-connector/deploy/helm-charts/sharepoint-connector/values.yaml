@@ -183,10 +183,12 @@ connectorConfig:
     # Determines how sites are configured: from static YAML (config_file) or dynamically from SharePoint list (sharepoint_list)
     # possible values: config_file, sharepoint_list
     sitesSource: config_file
-    # -- SharePoint list URL (only used when sitesSource is "sharepoint_list")
-    # URL to the SharePoint list containing site configurations
-    # example: https://acme.sharepoint.com/sites/ConfigSite/Lists/SharePoint%20Sites%20to%20Sync/AllItems.aspx
-    sharepointListUrl: ""
+    # -- SharePoint list configuration (only used when sitesSource is "sharepoint_list")
+    # siteId: SharePoint site ID containing the configuration list
+    # listDisplayName: Display name of the SharePoint configuration list
+    sharepointList:
+      siteId: unset_default_value
+      listDisplayName: unset_default_value
     # -- Array of sites to sync. Each site has its own configuration.
     # Only used when sitesSource is "config_file"
     sites:

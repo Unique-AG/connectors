@@ -31,7 +31,9 @@ data:
       # Sites Configuration
       sitesSource: {{ .Values.connectorConfig.sharepoint.sitesSource | quote }}
       {{- if eq .Values.connectorConfig.sharepoint.sitesSource "sharepoint_list" }}
-      sharepointListUrl: {{ .Values.connectorConfig.sharepoint.sharepointListUrl | quote }}
+      sharepointList:
+        siteId: {{ .Values.connectorConfig.sharepoint.sharepointList.siteId | quote }}
+        listDisplayName: {{ .Values.connectorConfig.sharepoint.sharepointList.listDisplayName | quote }}
       {{- else if eq .Values.connectorConfig.sharepoint.sitesSource "config_file" }}
       sites:
         {{- range .Values.connectorConfig.sharepoint.sites }}

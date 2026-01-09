@@ -3,11 +3,7 @@ import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.const
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { Redacted } from '../utils/redacted';
-import {
-  INHERITANCE_MODES_MAP,
-  type InheritanceSettings,
-  type PermissionsInheritanceMode,
-} from './unique.config';
+import { INHERITANCE_MODES_MAP, type InheritanceSettings } from './unique.config';
 
 export const PermissionsInheritanceModeSchema = z
   .enum(['inherit_scopes_and_files', 'inherit_scopes', 'inherit_files', 'none'] as const)
@@ -114,11 +110,12 @@ export const SiteConfigSchema = z.object({
 
 export type SiteConfig = z.infer<typeof SiteConfigSchema>;
 
-export function getInheritanceSettings(siteConfig: SiteConfig): InheritanceSettings {
-  if (siteConfig.syncMode === 'content_and_permissions') {
-    return { inheritFiles: false, inheritScopes: false };
-  }
-  return INHERITANCE_MODES_MAP[siteConfig.permissionsInheritanceMode as PermissionsInheritanceMode];
+export function getInheritanceSettings({
+  syncMode,
+  permissionsInheritanceMode,
+}: SiteConfig): InheritanceSettings {
+  const mode = syncMode === 'content_and_permissions' ? 'none' : permissionsInheritanceMode;
+  return INHERITANCE_MODES_MAP[mode];
 }
 
 // Configuration source options
@@ -134,10 +131,18 @@ const dynamicSitesConfig = z.object({
   sitesSource: z
     .literal('sharepoint_list')
     .describe('Load sites configuration dynamically from SharePoint list'),
-  sharepointListUrl: z
-    .string()
-    .url()
-    .describe('SharePoint list URL containing site configurations'),
+  sharepointList: z
+    .object({
+      siteId: z
+        .string()
+        .nonempty()
+        .describe('SharePoint site ID containing the configuration list'),
+      listDisplayName: z
+        .string()
+        .nonempty()
+        .describe('Display name of the SharePoint configuration list'),
+    })
+    .describe('SharePoint list details containing site configurations'),
 });
 
 const baseConfig = z.object({
@@ -181,7 +186,7 @@ export type SharepointConfig = (
     }
   | {
       sitesSource: 'sharepoint_list';
-      sharepointListUrl: DynamicSitesConfig['sharepointListUrl'];
+      sharepointList: DynamicSitesConfig['sharepointList'];
     }
 ) & {
   auth: AuthConfig & {

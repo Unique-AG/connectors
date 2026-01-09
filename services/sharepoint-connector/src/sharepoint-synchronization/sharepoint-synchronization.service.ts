@@ -13,7 +13,6 @@ import { sanitizeError } from '../utils/normalize-error';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
-import { SitesConfigLoaderService } from './sites-config-loader.service';
 import type { BaseSyncContext, SharepointSyncContext } from './types';
 
 @Injectable()
@@ -28,7 +27,6 @@ export class SharepointSynchronizationService {
     private readonly contentSyncService: ContentSyncService,
     private readonly permissionsSyncService: PermissionsSyncService,
     private readonly scopeManagementService: ScopeManagementService,
-    private readonly sitesConfigLoader: SitesConfigLoaderService,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
   ) {
@@ -55,7 +53,15 @@ export class SharepointSynchronizationService {
       const sharepointConfig = this.configService.get('sharepoint', { infer: true });
       let sites: SiteConfig[];
       try {
-        sites = await this.sitesConfigLoader.loadSites(sharepointConfig);
+        if (sharepointConfig.sitesSource === 'config_file') {
+          this.logger.log('Loading sites configuration from static YAML');
+          sites = sharepointConfig.sites;
+        } else {
+          this.logger.debug('Loading sites configuration from SharePoint list');
+          sites = await this.graphApiService.fetchSitesFromSharePointList(
+            sharepointConfig.sharepointList,
+          );
+        }
       } catch (error) {
         this.logger.error({
           msg: 'Failed to load sites configuration',

@@ -11,7 +11,6 @@ import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
-import { SitesConfigLoaderService } from './sites-config-loader.service';
 
 describe('SharepointSynchronizationService', () => {
   let service: SharepointSynchronizationService;
@@ -25,9 +24,7 @@ describe('SharepointSynchronizationService', () => {
   let mockScopeManagementService: {
     initializeRootScope: ReturnType<typeof vi.fn>;
     batchCreateScopes: ReturnType<typeof vi.fn>;
-  };
-  let mockSitesConfigLoader: {
-    loadSites: ReturnType<typeof vi.fn>;
+    deleteRootScopeRecursively: ReturnType<typeof vi.fn>;
   };
 
   const mockFile: SharepointContentItem = {
@@ -99,6 +96,11 @@ describe('SharepointSynchronizationService', () => {
     mockGraphApiService = {
       getAllSiteItems: vi.fn().mockResolvedValue({ items: [mockFile], directories: [] }),
       getSiteName: vi.fn().mockResolvedValue('test-site-name'),
+      fetchSitesFromSharePointList: vi
+        .fn()
+        .mockResolvedValue([
+          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
+        ]),
     };
 
     mockContentSyncService = {
@@ -116,14 +118,7 @@ describe('SharepointSynchronizationService', () => {
         rootPath: '/test-root',
       }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
-    };
-
-    mockSitesConfigLoader = {
-      loadSites: vi
-        .fn()
-        .mockResolvedValue([
-          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
-        ]),
+      deleteRootScopeRecursively: vi.fn().mockResolvedValue(undefined),
     };
 
     const mockHistogram = {
@@ -135,9 +130,11 @@ describe('SharepointSynchronizationService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint') return { sitesSource: 'config_file' };
-          if (key === 'sharepoint.sites')
-            return [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })];
+          if (key === 'sharepoint')
+            return {
+              sitesSource: 'config_file',
+              sites: [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })],
+            };
           if (key === 'processing.syncMode') return 'content_only';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
           if (key === 'unique.scopeId') return 'test-scope-id';
@@ -152,8 +149,6 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockPermissionsSyncService)
       .mock(ScopeManagementService)
       .impl(() => mockScopeManagementService)
-      .mock(SitesConfigLoaderService)
-      .impl(() => mockSitesConfigLoader)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -258,28 +253,21 @@ describe('SharepointSynchronizationService', () => {
       record: vi.fn(),
     };
 
-    const mockSitesConfigLoaderForPermissions = {
-      loadSites: vi.fn().mockResolvedValue([
-        createMockSiteConfig({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-          syncMode: 'content_and_permissions',
-        }),
-      ]),
-    };
-
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint') return { sitesSource: 'config_file' };
-          if (key === 'sharepoint.sites')
-            return [
-              createMockSiteConfig({
-                siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-                syncMode: 'content_and_permissions',
-              }),
-            ];
+          if (key === 'sharepoint')
+            return {
+              sitesSource: 'config_file',
+              sites: [
+                createMockSiteConfig({
+                  siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+                  syncMode: 'content_and_permissions',
+                }),
+              ],
+            };
           if (key === 'processing.syncMode') return 'content_and_permissions';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
           if (key === 'unique.scopeId') return 'test-scope-id';
@@ -294,8 +282,6 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockPermissionsSyncService)
       .mock(ScopeManagementService)
       .impl(() => mockScopeManagementService)
-      .mock(SitesConfigLoaderService)
-      .impl(() => mockSitesConfigLoaderForPermissions)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -324,22 +310,16 @@ describe('SharepointSynchronizationService', () => {
       record: vi.fn(),
     };
 
-    const mockSitesConfigLoaderForErrors = {
-      loadSites: vi
-        .fn()
-        .mockResolvedValue([
-          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
-        ]),
-    };
-
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint') return { sitesSource: 'config_file' };
-          if (key === 'sharepoint.sites')
-            return [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })];
+          if (key === 'sharepoint')
+            return {
+              sitesSource: 'config_file',
+              sites: [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })],
+            };
           if (key === 'processing.syncMode') return 'content_and_permissions';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
           if (key === 'unique.scopeId') return 'test-scope-id';
@@ -356,8 +336,6 @@ describe('SharepointSynchronizationService', () => {
       }))
       .mock(ScopeManagementService)
       .impl(() => mockScopeManagementService)
-      .mock(SitesConfigLoaderService)
-      .impl(() => mockSitesConfigLoaderForErrors)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
