@@ -18,7 +18,7 @@ export type McpRequest = CallToolRequest | ReadResourceRequest | GetPromptReques
 /**
  * Enhanced execution context that includes user information
  */
-export type Context = {
+export interface Context {
   reportProgress: (progress: Progress) => Promise<void>;
   log: {
     debug: (message: string, data?: SerializableValue) => void;
@@ -28,4 +28,4 @@ export type Context = {
   };
   mcpServer: McpServer;
   mcpRequest: McpRequest;
-};
+}

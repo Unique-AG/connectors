@@ -137,17 +137,16 @@ export const uniqueConfig = registerConfig('unique', UniqueConfigSchema, {
     'ZITADEL_PROJECT_ID',
     'ZITADEL_CLIENT_ID',
     'ZITADEL_CLIENT_SECRET',
-    'PROCESSING_SYNC_MODE',
   ]),
 });
 
 export type UniqueConfigNamespaced = NamespacedConfigType<typeof uniqueConfig>;
 export type UniqueConfig = ConfigType<typeof uniqueConfig>;
 
-type InheritanceSettings = {
+interface InheritanceSettings {
   inheritScopes: boolean;
   inheritFiles: boolean;
-};
+}
 
 const INHERITANCE_MODES_MAP: Record<
   'inherit_scopes_and_files' | 'inherit_scopes' | 'inherit_files' | 'none',

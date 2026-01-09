@@ -7,9 +7,9 @@ export interface GenerateScopesBasedOnPathsMutationInput {
   inheritAccess?: boolean;
 }
 
-export type GenerateScopesBasedOnPathsMutationResult = {
+export interface GenerateScopesBasedOnPathsMutationResult {
   generateScopesBasedOnPaths: Scope[];
-};
+}
 
 export function getGenerateScopesBasedOnPathsMutation(includePermissions: boolean): string {
   const scopeAccessFields = includePermissions
