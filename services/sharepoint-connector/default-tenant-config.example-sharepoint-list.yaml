@@ -2,9 +2,9 @@
 # Sites are loaded from a SharePoint list
 
 sharepoint:
+  tenantId: your-tenant-id-here
   auth:
     mode: certificate
-    tenantId: your-tenant-id-here
     clientId: your-client-id-here
     privateKeyPath: /path/to/private-key.pem
     thumbprintSha1: your-sha1-thumbprint-here

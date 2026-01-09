@@ -33,9 +33,9 @@ describe('MicrosoftAuthenticationService', () => {
       if (key === 'sharepoint.auth.mode') return 'client-secret';
       if (key === 'sharepoint') {
         return {
+          tenantId: 'tenant-123',
           auth: {
             mode: 'client-secret',
-            tenantId: 'tenant-123',
             clientId: 'client-456',
             clientSecret: new Redacted('secret-789'),
           },
@@ -56,9 +56,9 @@ describe('MicrosoftAuthenticationService', () => {
       if (key === 'sharepoint.auth.mode') return 'oidc';
       if (key === 'sharepoint') {
         return {
+          tenantId: 'tenant-123',
           auth: {
             mode: 'oidc',
-            tenantId: 'tenant-123',
           },
         };
       }
@@ -84,9 +84,9 @@ describe('MicrosoftAuthenticationService', () => {
       if (key === 'sharepoint.auth.mode') return 'client-secret';
       if (key === 'sharepoint') {
         return {
+          tenantId: 'tenant-123',
           auth: {
             mode: 'client-secret',
-            tenantId: 'tenant-123',
             clientId: 'client-456',
             clientSecret: new Redacted('secret-789'),
           },

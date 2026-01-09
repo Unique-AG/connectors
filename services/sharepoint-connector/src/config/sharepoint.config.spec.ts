@@ -5,6 +5,7 @@ import { SharepointConfigSchema } from './sharepoint.schema';
 
 describe('SharepointConfigSchema', () => {
   const validBaseConfig = {
+    tenantId: '12345678-1234-1234-1234-123456789abc',
     baseUrl: 'https://company.sharepoint.com',
     graphApiRateLimitPerMinute: 600,
     sitesSource: 'config_file' as const,
@@ -29,7 +30,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
       };
 
@@ -43,7 +43,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'client-secret' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
           clientId: 'client-id-123',
           clientSecret: 'secret-123',
         },
@@ -63,7 +62,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'certificate' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
           clientId: 'client-id-123',
           thumbprintSha1: 'abcdef1234567890abcdef1234567890abcdef12',
           privateKeyPath: '/path/to/key.pem',
@@ -83,7 +81,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'certificate' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
           clientId: 'client-id-123',
           thumbprintSha256:
             'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
@@ -99,7 +96,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sitesSource: 'config_file' as const,
         sites: [
@@ -137,7 +133,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sitesSource: 'sharepoint_list' as const,
         sharepointList: {
@@ -162,7 +157,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sitesSource: 'config_file' as const,
         sites: [],
@@ -178,7 +172,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sites: [
           {
@@ -196,7 +189,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sites: [
           {
@@ -214,7 +206,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sites: [
           {
@@ -232,7 +223,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sites: [
           {
@@ -253,7 +243,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sites: [
           {
@@ -271,7 +260,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sites: [
           {
@@ -289,7 +277,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sites: [
           {
@@ -307,7 +294,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sites: [
           {
@@ -327,7 +313,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         sites: [
           {
@@ -362,9 +347,9 @@ describe('SharepointConfigSchema', () => {
     it('rejects missing tenantId', () => {
       const config = {
         ...validBaseConfig,
+        tenantId: '',
         auth: {
           mode: 'oidc' as const,
-          tenantId: '',
         },
       };
 
@@ -376,7 +361,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         baseUrl: 'not-a-url',
       };
@@ -389,7 +373,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         baseUrl: 'https://company.sharepoint.com/',
       };
@@ -404,7 +387,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
         },
         graphApiRateLimitPerMinute: -1,
       };
@@ -417,7 +399,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'certificate' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
           clientId: 'client-id-123',
           privateKeyPath: '/path/to/key.pem',
           // missing both thumbprints
@@ -434,7 +415,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'client-secret' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
           clientSecret: 'secret-123',
           // missing clientId
         },
@@ -448,7 +428,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'client-secret' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
           clientId: 'client-id-123',
           // missing clientSecret
         },
@@ -462,7 +441,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'certificate' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
           clientId: 'client-id-123',
           thumbprintSha1: 'abcdef1234567890abcdef1234567890abcdef12',
           // missing privateKeyPath
@@ -477,7 +455,6 @@ describe('SharepointConfigSchema', () => {
         ...validBaseConfig,
         auth: {
           mode: 'certificate' as const,
-          tenantId: '12345678-1234-1234-1234-123456789abc',
           clientId: 'client-id-123',
           thumbprintSha1: 'gggggggggggggggggggggggggggggggggggggggg', // invalid hex
           privateKeyPath: '/path/to/key.pem',

@@ -21,7 +21,8 @@ export class ClientSecretAuthStrategy implements AuthStrategy {
       'ClientSecretAuthStrategy called but authentication mode is not "client-secret"',
     );
 
-    const { tenantId, clientId, clientSecret } = sharePointConfig.auth;
+    const { tenantId } = sharePointConfig;
+    const { clientId, clientSecret } = sharePointConfig.auth;
 
     const msalConfig: Configuration = {
       auth: {

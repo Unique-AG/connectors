@@ -16,12 +16,10 @@ export const PermissionsInheritanceModeSchema = z
 
 const oidcAuthConfig = z.object({
   mode: z.literal('oidc').describe('Authentication mode to use for Microsoft APIs'),
-  tenantId: z.string().min(1).describe('Azure AD tenant ID'),
 });
 
 const clientSecretAuthConfig = z.object({
   mode: z.literal('client-secret').describe('Authentication mode to use for Microsoft APIs'),
-  tenantId: z.string().min(1).describe('Azure AD tenant ID'),
   clientId: z.string().nonempty().describe('Azure AD application client ID'),
   clientSecret: z
     .string()
@@ -33,7 +31,6 @@ const clientSecretAuthConfig = z.object({
 const certificateAuthConfig = z
   .object({
     mode: z.literal('certificate').describe('Authentication mode to use for Microsoft APIs'),
-    tenantId: z.string().min(1).describe('Azure AD tenant ID'),
     clientId: z.string().nonempty().describe('Azure AD application client ID'),
     thumbprintSha1: z
       .hex()
@@ -146,6 +143,7 @@ const dynamicSitesConfig = z.object({
 });
 
 const baseConfig = z.object({
+  tenantId: z.string().min(1).describe('Azure AD tenant ID'),
   auth: AuthConfigSchema.describe('Authentication configuration for Microsoft APIs'),
   graphApiRateLimitPerMinute: z.coerce
     .number()
@@ -189,6 +187,7 @@ export type SharepointConfig = (
       sharepointList: DynamicSitesConfig['sharepointList'];
     }
 ) & {
+  tenantId: string;
   auth: AuthConfig & {
     privateKeyPassword?: string;
   };

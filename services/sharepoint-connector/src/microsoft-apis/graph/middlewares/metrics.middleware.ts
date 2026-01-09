@@ -36,7 +36,7 @@ export class MetricsMiddleware implements Middleware {
     configService: ConfigService<Config, true>,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(configService);
-    this.msTenantId = configService.get('sharepoint.auth.tenantId', { infer: true });
+    this.msTenantId = configService.get('sharepoint.tenantId', { infer: true });
 
     this.extractApiMethod = createApiMethodExtractor([
       'sites',

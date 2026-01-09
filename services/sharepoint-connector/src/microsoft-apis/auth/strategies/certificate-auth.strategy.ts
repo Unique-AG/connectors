@@ -23,8 +23,8 @@ export class CertificateAuthStrategy implements AuthStrategy {
       'CertificateAuthStrategy called but authentication mode is not "certificate"',
     );
 
+    const { tenantId } = sharePointConfig;
     const {
-      tenantId,
       clientId,
       privateKeyPath,
       thumbprintSha1: thumbprint,

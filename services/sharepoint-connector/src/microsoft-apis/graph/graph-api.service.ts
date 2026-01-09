@@ -63,6 +63,21 @@ export class GraphApiService {
   }
 
   /**
+   * Loads site configurations from the specified source (config file or SharePoint list).
+   */
+  public async loadSitesConfiguration(): Promise<SiteConfig[]> {
+    const sharepointConfig = this.configService.get('sharepoint', { infer: true });
+
+    if (sharepointConfig.sitesSource === 'config_file') {
+      this.logger.log('Loading sites configuration from static YAML');
+      return sharepointConfig.sites;
+    }
+
+    this.logger.debug('Loading sites configuration from SharePoint list');
+    return await this.fetchSitesFromSharePointList(sharepointConfig.sharepointList);
+  }
+
+  /**
    * Fetch site configurations from a SharePoint list.
    * In order to fetch the sites configuration from a SharePoint list, we need to:
    * 1. Get the list ID by display name in the specified site

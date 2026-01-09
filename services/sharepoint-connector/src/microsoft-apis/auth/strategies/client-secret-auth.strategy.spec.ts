@@ -19,9 +19,9 @@ describe('ClientSecretAuthStrategy', () => {
   const testScopes = ['https://graph.microsoft.com/.default'];
 
   const mockSharepointConfig = {
+    tenantId: 'tenant-123',
     auth: {
       mode: 'client-secret' as const,
-      tenantId: 'tenant-123',
       clientId: 'client-456',
       clientSecret: new Redacted('secret-789'),
     },

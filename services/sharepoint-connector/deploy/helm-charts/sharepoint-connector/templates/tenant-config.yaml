@@ -9,9 +9,9 @@ data:
   default-tenant-config.yaml: |
     # SharePoint Configuration
     sharepoint:
+      tenantId: {{ .Values.connectorConfig.sharepoint.tenantId | quote }}
       auth:
         mode: {{ .Values.connectorConfig.sharepoint.auth.mode | quote }}
-        tenantId: {{ .Values.connectorConfig.sharepoint.tenantId | quote }}
         {{- if eq .Values.connectorConfig.sharepoint.auth.mode "certificate" }}
         clientId: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
         privateKeyPath: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPath | quote }}
@@ -47,7 +47,9 @@ data:
           storeInternally: {{ .storeInternally | quote }}
           syncStatus: {{ .syncStatus | quote }}
           syncMode: {{ .syncMode | quote }}
+          {{- if .permissionsInheritanceMode }}
           permissionsInheritanceMode: {{ .permissionsInheritanceMode | quote }}
+          {{- end }}
         {{- end }}
       {{- end }}
 
@@ -78,7 +80,9 @@ data:
 
     # Processing Configuration
     processing:
+      {{- if .Values.connectorConfig.processing.stepTimeoutSeconds }}
       stepTimeoutSeconds: {{ .Values.connectorConfig.processing.stepTimeoutSeconds }}
+      {{- end }}
       concurrency: {{ .Values.connectorConfig.processing.concurrency }}
       {{- if .Values.connectorConfig.processing.maxFileSizeToIngestBytes }}
       maxFileSizeToIngestBytes: {{ .Values.connectorConfig.processing.maxFileSizeToIngestBytes }}

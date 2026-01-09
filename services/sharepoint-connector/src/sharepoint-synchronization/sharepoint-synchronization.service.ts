@@ -7,6 +7,9 @@ import { IngestionMode } from '../constants/ingestion.constants';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
+import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
+import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
+import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
@@ -27,6 +30,9 @@ export class SharepointSynchronizationService {
     private readonly contentSyncService: ContentSyncService,
     private readonly permissionsSyncService: PermissionsSyncService,
     private readonly scopeManagementService: ScopeManagementService,
+    private readonly uniqueFilesService: UniqueFilesService,
+    private readonly uniqueFileIngestionService: UniqueFileIngestionService,
+    private readonly uniqueScopesService: UniqueScopesService,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
   ) {
@@ -50,18 +56,9 @@ export class SharepointSynchronizationService {
     // We wrap the whole action in a try-finally block to ensure that the isScanning flag is reset
     // in case of some unexpected one-off error occurring.
     try {
-      const sharepointConfig = this.configService.get('sharepoint', { infer: true });
       let sites: SiteConfig[];
       try {
-        if (sharepointConfig.sitesSource === 'config_file') {
-          this.logger.log('Loading sites configuration from static YAML');
-          sites = sharepointConfig.sites;
-        } else {
-          this.logger.debug('Loading sites configuration from SharePoint list');
-          sites = await this.graphApiService.fetchSitesFromSharePointList(
-            sharepointConfig.sharepointList,
-          );
-        }
+        sites = await this.graphApiService.loadSitesConfiguration();
       } catch (error) {
         this.logger.error({
           msg: 'Failed to load sites configuration',
@@ -92,11 +89,27 @@ export class SharepointSynchronizationService {
         );
 
         try {
-          await this.scopeManagementService.deleteRootScopeRecursively(siteConfig.scopeId);
+          const files = await this.uniqueFilesService.getFilesForSite(siteConfig.siteId);
+
+          if (files.length > 0) {
+            this.logger.log(`${logPrefix} Deleting ${files.length} files`);
+            await this.uniqueFileIngestionService.deleteContentByContentIds(files.map((f) => f.id));
+          }
+
+          const rootScope = await this.uniqueScopesService.getScopeById(siteConfig.scopeId);
+
+          if (rootScope) {
+            await this.scopeManagementService.deleteRootScopeRecursively(siteConfig.scopeId);
+          } else {
+            this.logger.warn(
+              `${logPrefix} Root scope ${siteConfig.scopeId} not found. It was already deleted`,
+            );
+          }
+
           this.logger.log(`${logPrefix} Successfully processed deletion`);
         } catch (error) {
           this.logger.error({
-            msg: `${logPrefix} Failed to delete scope recursively - continuing with other sites`,
+            msg: `${logPrefix} Failed to process site deletion. Continuing with other sites`,
             scopeId: siteConfig.scopeId,
             error: sanitizeError(error),
           });
