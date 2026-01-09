@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1-alpha](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.1.0...teams-mcp@0.1.1-alpha) (2026-01-09)
+
+
+### Bug Fixes
+
+* **teams-mcp:** output key vault secret arm resource id 🪪 ([#196](https://github.com/Unique-AG/connectors/issues/196)) ([bf669cb](https://github.com/Unique-AG/connectors/commit/bf669cb24e8994daa7bb6ff18d17e67e6a7528a3))
+
 ## 0.1.0 (2026-01-07)
 
 
