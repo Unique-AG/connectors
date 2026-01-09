@@ -1,4 +1,5 @@
 # Project Instructions
+- never commit your changes using git!
 
 ## Code Comments
 - Keep comments minimal - code should be self-explanatory

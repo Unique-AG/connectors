@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { ItemProcessingOrchestratorService } from './item-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
@@ -104,6 +105,7 @@ describe('ItemProcessingOrchestratorService', () => {
     rootPath: '/Root',
     siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
     siteName: 'test-site',
+    siteConfig: createMockSiteConfig(),
   };
 
   it('processes all provided files', async () => {

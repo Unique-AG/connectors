@@ -4,6 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
 import { Config } from '../config';
+import { getInheritanceSettings } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
@@ -77,6 +78,39 @@ export class ScopeManagementService {
     this.logger.log(`Resolved root path: ${this.shouldConcealLogs ? redact(rootPath) : rootPath}`);
 
     return { serviceUserId: userId, rootScopeId: rootScopeId, rootPath };
+  }
+
+  public async deleteRootScopeRecursively(scopeId: string): Promise<void> {
+    const logPrefix = `[RootScopeId: ${scopeId}]`;
+    this.logger.log(`${logPrefix} Deleting root scope recursively`);
+
+    try {
+      const result = await this.uniqueScopesService.deleteScopeRecursively(scopeId);
+
+      if (result.successFolders.length > 0) {
+        this.logger.log(
+          `${logPrefix} Successfully deleted ${result.successFolders.length} folders`,
+        );
+      }
+
+      if (result.failedFolders.length > 0) {
+        this.logger.warn({
+          msg: `${logPrefix} Failed to delete ${result.failedFolders.length} folders`,
+          failedFolders: result.failedFolders.map((f) => ({
+            id: f.id,
+            name: f.name,
+            path: this.shouldConcealLogs ? redact(f.path) : f.path,
+            reason: f.failReason,
+          })),
+        });
+      }
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to delete root scope recursively`,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
   }
 
   private buildItemIdToScopePathMap(
@@ -153,7 +187,7 @@ export class ScopeManagementService {
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
-    const inheritScopes = this.configService.get('unique.inheritScopePermissions', { infer: true });
+    const { inheritScopes } = getInheritanceSettings(context.siteConfig);
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
       inheritAccess: inheritScopes,

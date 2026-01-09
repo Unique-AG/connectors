@@ -1,14 +1,17 @@
 import assert from 'node:assert';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { chunk } from 'remeda';
 import { Config } from '../../config';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
-import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
+  CONTENT_DELETE_BY_IDS_MUTATION,
   CONTENT_UPSERT_MUTATION,
+  ContentDeleteByContentIdsMutationInput,
+  ContentDeleteByContentIdsMutationResult,
   ContentUpsertMutationInput,
   ContentUpsertMutationResult,
 } from './unique-file-ingestion.consts';
@@ -21,8 +24,11 @@ import {
   IngestionFinalizationRequest,
 } from './unique-file-ingestion.types';
 
+const BATCH_SIZE = 50;
+
 @Injectable()
 export class UniqueFileIngestionService {
+  private readonly logger = new Logger(this.constructor.name);
   public constructor(
     @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
     private readonly ingestionHttpClient: IngestionHttpClient,
@@ -45,7 +51,7 @@ export class UniqueFileIngestionService {
       sourceOwnerType: request.sourceOwnerType,
       sourceKind: request.sourceKind,
       sourceName: request.sourceName,
-      storeInternally: uniqueConfig.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: request.storeInternally,
       baseUrl: request.baseUrl,
     };
 
@@ -83,7 +89,7 @@ export class UniqueFileIngestionService {
       sourceName: request.sourceName,
       sourceKind: request.sourceKind,
       fileUrl: request.fileUrl,
-      storeInternally: uniqueConfig.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: request.storeInternally,
       baseUrl: request.baseUrl,
     };
 
@@ -132,5 +138,40 @@ export class UniqueFileIngestionService {
     const responseData = await body.json();
     assert.ok(responseData, 'Invalid response from Unique API file diff');
     return responseData as FileDiffResponse;
+  }
+
+  public async deleteContentByContentIds(contentIds: string[]): Promise<void> {
+    if (contentIds.length === 0) {
+      return;
+    }
+
+    const chunkedContentIds = chunk(contentIds, BATCH_SIZE);
+
+    this.logger.debug({
+      msg: 'Starting batch content deletion',
+      totalItems: contentIds.length,
+      batchChunks: chunkedContentIds.length,
+    });
+
+    for (const [chunkIndex, contentIdsChunk] of chunkedContentIds.entries()) {
+      this.logger.debug({
+        msg: 'Executing batch content deletion chunk',
+        chunkIndex: chunkIndex + 1,
+        totalChunks: chunkedContentIds.length,
+        itemsInChunk: contentIdsChunk.length,
+      });
+
+      await this.ingestionClient.request<
+        ContentDeleteByContentIdsMutationResult,
+        ContentDeleteByContentIdsMutationInput
+      >(CONTENT_DELETE_BY_IDS_MUTATION, {
+        contentIds: contentIdsChunk,
+      });
+    }
+
+    this.logger.debug({
+      msg: 'Batch content deletion completed',
+      totalItems: contentIds.length,
+    });
   }
 }

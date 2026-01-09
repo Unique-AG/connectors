@@ -7,6 +7,7 @@ import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import type { DriveItem, ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { HttpClientService } from '../../shared/services/http-client.service';
+import { createMockSiteConfig } from '../../test-utils/mock-site-config';
 import { UniqueFilesService } from '../../unique-api/unique-files/unique-files.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { UploadContentStep } from './upload-content.step';
@@ -115,6 +116,7 @@ describe('UploadContentStep', () => {
       rootPath: '/Root',
       siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       siteName: 'test-site',
+      siteConfig: createMockSiteConfig(),
     },
     pipelineItem: {
       itemType: 'driveItem' as const,
@@ -144,6 +146,7 @@ describe('UploadContentStep', () => {
       rootPath: '/Root',
       siteId: 'site-1',
       siteName: 'test-site',
+      siteConfig: createMockSiteConfig(),
     },
     pipelineItem: {
       itemType: 'listItem' as const,

@@ -5,6 +5,7 @@ import { INGESTION_SOURCE_KIND } from '../../constants/ingestion.constants';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
+import { createMockSiteConfig } from '../../test-utils/mock-site-config';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import type { ProcessingContext } from '../types/processing-context';
 import { ContentRegistrationStep } from './content-registration.step';
@@ -50,6 +51,7 @@ describe('ContentRegistrationStep', () => {
       rootPath: '/Root',
       siteId: 'site',
       siteName: 'test-site',
+      siteConfig: createMockSiteConfig(),
     },
     pipelineItem: {
       itemType: 'listItem',
@@ -188,8 +190,6 @@ describe('ContentRegistrationStep', () => {
           if (k === 'unique.scopeId') return 'scope-1';
           if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
           if (k === 'unique.serviceAuthMode') return 'external';
-          if (k === 'unique.inheritFilePermissions') return false;
-          if (k === 'processing.syncMode') return 'content_only';
           return undefined;
         }),
       }))
@@ -198,7 +198,12 @@ describe('ContentRegistrationStep', () => {
       .compile();
 
     const context = createMockContext();
+    context.syncContext.siteConfig = createMockSiteConfig({
+      syncMode: 'content_only',
+      permissionsInheritanceMode: 'inherit_scopes', // inheritScopes: true, inheritFiles: false
+    });
     context.fileStatus = 'new';
+    context.syncContext.serviceUserId = 'user-1';
 
     await unit.execute(context);
 

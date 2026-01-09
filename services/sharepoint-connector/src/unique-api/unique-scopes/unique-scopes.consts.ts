@@ -154,3 +154,42 @@ export const UPDATE_SCOPE_MUTATION = gql`
     }
   }
 `;
+
+export interface DeleteFolderMutationInput {
+  scopeId: string;
+  recursive: boolean;
+}
+
+export interface DeleteFolderMutationResult {
+  deleteFolder: {
+    successFolders: Array<{
+      id: string;
+      name: string;
+      path: string;
+    }>;
+    failedFolders: Array<{
+      id: string;
+      name: string;
+      failReason: string;
+      path: string;
+    }>;
+  };
+}
+
+export const DELETE_FOLDER_MUTATION = gql`
+  mutation DeleteFolder($scopeId: String!, $recursive: Boolean!) {
+    deleteFolder(scopeId: $scopeId, recursive: $recursive) {
+      failedFolders {
+        id
+        name
+        failReason
+        path
+      }
+      successFolders {
+        id
+        name
+        path
+      }
+    }
+  }
+`;

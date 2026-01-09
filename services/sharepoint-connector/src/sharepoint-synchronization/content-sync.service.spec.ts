@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
+import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
@@ -11,6 +12,10 @@ import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './types';
+
+const mockSiteConfig = createMockSiteConfig({
+  maxFilesToIngest: 1000,
+});
 
 describe('ContentSyncService', () => {
   let service: ContentSyncService;
@@ -113,6 +118,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, maxFilesToIngest: 1 },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -122,14 +128,15 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 1;
-        }
-        return null;
-      });
+      const contextWithLimit = {
+        ...context,
+        siteConfig: {
+          ...context.siteConfig,
+          maxFilesToIngest: 1,
+        },
+      };
 
-      await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
+      await expect(service.syncContentForSite(items, scopes, contextWithLimit)).rejects.toThrow(
         /Too many files to ingest: 2. Limit is 1. Aborting sync./,
       );
     });
@@ -153,6 +160,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -162,17 +170,17 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
-        if (key === 'unique.scopeId') {
-          return 'scope-id';
-        }
-        return null;
-      });
+      const contextWithLimit = {
+        ...context,
+        siteConfig: {
+          ...context.siteConfig,
+          maxFilesToIngest: 2,
+        },
+      };
 
-      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
+      await expect(
+        service.syncContentForSite(items, scopes, contextWithLimit),
+      ).resolves.not.toThrow();
     });
 
     it('does not throw an error if the limit is not set', async () => {
@@ -194,6 +202,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -201,16 +210,6 @@ describe('ContentSyncService', () => {
         updatedFiles: [],
         movedFiles: [],
         deletedFiles: [],
-      });
-
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return undefined;
-        }
-        if (key === 'unique.scopeId') {
-          return 'scope-id';
-        }
-        return null;
       });
 
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
@@ -235,6 +234,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -256,10 +256,7 @@ describe('ContentSyncService', () => {
 
       vi.spyOn(uniqueFilesService, 'getFilesCountForSite').mockResolvedValue(5);
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 1;
-        }
+      vi.spyOn(configService, 'get').mockImplementation((_key: string) => {
         return null;
       });
 
@@ -285,6 +282,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -295,9 +293,6 @@ describe('ContentSyncService', () => {
       });
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 1;
-        }
         if (key === 'unique.scopeId') {
           return 'scope-id';
         }
@@ -342,6 +337,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, maxFilesToIngest: 2 },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -351,10 +347,7 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
+      vi.spyOn(configService, 'get').mockImplementation((_key: string) => {
         return null;
       });
 
@@ -390,6 +383,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -400,9 +394,6 @@ describe('ContentSyncService', () => {
       });
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
         if (key === 'unique.scopeId') {
           return 'scope-id';
         }
@@ -439,6 +430,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -449,9 +441,6 @@ describe('ContentSyncService', () => {
       });
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
         if (key === 'unique.scopeId') {
           return 'scope-id';
         }
@@ -488,6 +477,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -516,6 +506,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -551,6 +542,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -587,6 +579,7 @@ describe('ContentSyncService', () => {
         rootPath: '/root',
         siteId,
         siteName: 'test-site',
+        siteConfig: mockSiteConfig,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({

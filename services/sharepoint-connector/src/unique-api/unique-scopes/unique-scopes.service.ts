@@ -6,7 +6,10 @@ import {
   CREATE_SCOPE_ACCESSES_MUTATION,
   CreateScopeAccessesMutationInput,
   CreateScopeAccessesMutationResult,
+  DELETE_FOLDER_MUTATION,
   DELETE_SCOPE_ACCESSES_MUTATION,
+  DeleteFolderMutationInput,
+  DeleteFolderMutationResult,
   DeleteScopeAccessesMutationInput,
   DeleteScopeAccessesMutationResult,
   GenerateScopesBasedOnPathsMutationInput,
@@ -176,5 +179,25 @@ export class UniqueScopesService {
     } while (batchCount === BATCH_SIZE);
 
     return scopes;
+  }
+
+  public async deleteScopeRecursively(
+    scopeId: string,
+  ): Promise<DeleteFolderMutationResult['deleteFolder']> {
+    this.logger.debug(`Deleting scope recursively: ${scopeId}`);
+
+    const result = await this.scopeManagementClient.request<
+      DeleteFolderMutationResult,
+      DeleteFolderMutationInput
+    >(DELETE_FOLDER_MUTATION, {
+      scopeId,
+      recursive: true,
+    });
+
+    this.logger.debug(
+      `Deleted ${result.deleteFolder.successFolders.length} folders successfully, ${result.deleteFolder.failedFolders.length} failed`,
+    );
+
+    return result.deleteFolder;
   }
 }

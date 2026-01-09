@@ -182,3 +182,9 @@ export interface GroupMember {
   mail: string | null;
   userPrincipalName?: string;
 }
+
+export interface ListColumn {
+  id: string;
+  name: string;
+  displayName: string;
+}

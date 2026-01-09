@@ -6,6 +6,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { Config } from '../../config';
+import type { SiteConfig } from '../../config/sharepoint.schema';
+import { SiteConfigSchema } from '../../config/sharepoint.schema';
 import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
@@ -17,6 +19,7 @@ import {
   DriveItem,
   GraphApiResponse,
   GroupMember,
+  ListColumn,
   ListItem,
   ListItemDetailsResponse,
   SimplePermission,
@@ -59,13 +62,124 @@ export class GraphApiService {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
+  /**
+   * Loads site configurations from the specified source (config file or SharePoint list).
+   */
+  public async loadSitesConfiguration(): Promise<SiteConfig[]> {
+    const sharepointConfig = this.configService.get('sharepoint', { infer: true });
+
+    if (sharepointConfig.sitesSource === 'config_file') {
+      this.logger.log('Loading sites configuration from static YAML');
+      return sharepointConfig.sites;
+    }
+
+    this.logger.debug('Loading sites configuration from SharePoint list');
+    return await this.fetchSitesFromSharePointList(sharepointConfig.sharepointList);
+  }
+
+  /**
+   * Fetch site configurations from a SharePoint list.
+   * In order to fetch the sites configuration from a SharePoint list, we need to:
+   * 1. Get the list ID by display name in the specified site
+   * 2. Fetch the list items
+   * 3. Transform the list items to SiteConfig and validate with Zod
+   * Returns the SiteConfig array
+   */
+  public async fetchSitesFromSharePointList(sharepointList: {
+    siteId: string;
+    listDisplayName: string;
+  }): Promise<SiteConfig[]> {
+    const { siteId, listDisplayName } = sharepointList;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+
+    this.logger.debug(
+      `Fetching sites configuration from site: ${logSiteId}, list: ${listDisplayName}`,
+    );
+
+    // Unfortunately we cannot filter by list name using ms graph so we need to fetch all lists.
+    const lists = await this.getSiteLists(siteId);
+    const matchingList = lists.find((list) => list.displayName === listDisplayName);
+
+    assert.ok(matchingList?.id, `List "${listDisplayName}" not found in site ${logSiteId}`);
+    const listId = matchingList.id;
+
+    this.logger.debug(`Resolved list ID: ${listId} for list: ${listDisplayName}`);
+
+    const [listItems, columns] = await Promise.all([
+      this.getListItems(siteId, listId, { expand: 'fields' }),
+      this.getListColumns(siteId, listId),
+    ]);
+
+    this.logger.log(
+      `Fetched ${listItems.length} items and ${columns.length} columns from SharePoint list`,
+    );
+
+    const nameMap = this.createDisplayNameToInternalNameMap(columns);
+
+    const siteConfigs = listItems.map((item, index) =>
+      this.transformListItemToSiteConfig(item, index, nameMap),
+    );
+
+    this.logger.log(
+      `Successfully loaded ${siteConfigs.length} site configurations from SharePoint list`,
+    );
+    return siteConfigs;
+  }
+
+  private createDisplayNameToInternalNameMap(columns: ListColumn[]): Record<string, string> {
+    const map: Record<string, string> = {};
+    for (const column of columns) {
+      map[column.displayName] = column.name;
+    }
+    return map;
+  }
+
+  private transformListItemToSiteConfig(
+    item: ListItem,
+    index: number,
+    nameMap: Record<string, string>,
+  ): SiteConfig {
+    try {
+      const fields = item.fields;
+
+      const getFieldValue = (displayName: string) => {
+        const internalName = nameMap[displayName];
+        return internalName ? fields[internalName] : undefined;
+      };
+
+      const siteConfig = {
+        siteId: getFieldValue('siteId'),
+        syncColumnName: getFieldValue('syncColumnName'),
+        ingestionMode: getFieldValue('ingestionMode'),
+        scopeId: getFieldValue('uniqueScopeId'),
+        maxFilesToIngest: getFieldValue('maxFilesToIngest'),
+        storeInternally: getFieldValue('storeInternally'),
+        syncStatus: getFieldValue('syncStatus'),
+        syncMode: getFieldValue('syncMode'),
+        permissionsInheritanceMode: getFieldValue('permissionsInheritanceMode'),
+      };
+
+      return SiteConfigSchema.parse(siteConfig);
+    } catch (error) {
+      this.logger.error({
+        msg: `Failed to transform list item at index ${index} to SiteConfig`,
+        itemId: item.id,
+        error: sanitizeError(error),
+      });
+      throw new Error(
+        `Invalid site configuration at row ${index + 1}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   public async getAllSiteItems(
     siteId: string,
+    syncColumnName: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const [aspxPagesResult, filesResult] = await Promise.allSettled([
-      this.getAspxPagesForSite(siteId),
-      this.getAllFilesForSite(siteId),
+      this.getAspxPagesForSite(siteId, syncColumnName),
+      this.getAllFilesForSite(siteId, syncColumnName),
     ]);
 
     const sharepointContentItemsToSync: SharepointContentItem[] = [];
@@ -100,6 +214,7 @@ export class GraphApiService {
 
   public async getAllFilesForSite(
     siteId: string,
+    syncColumnName: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
@@ -128,6 +243,7 @@ export class GraphApiService {
         'root',
         siteId,
         drive.name,
+        syncColumnName,
         remainingLimit,
       );
 
@@ -176,7 +292,10 @@ export class GraphApiService {
     }
   }
 
-  public async getAspxPagesForSite(siteId: string): Promise<SharepointContentItem[]> {
+  public async getAspxPagesForSite(
+    siteId: string,
+    syncColumnName: string,
+  ): Promise<SharepointContentItem[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
     const lists = await this.getSiteLists(siteId);
@@ -196,6 +315,7 @@ export class GraphApiService {
       const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
         siteId,
         sitePagesList.id,
+        syncColumnName,
         maxFilesToScan,
       );
       this.logger.log(
@@ -217,7 +337,11 @@ export class GraphApiService {
 
     try {
       const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId}/lists`, (url) =>
-        this.graphClient.api(url).select('system,name,id').top(GRAPH_API_PAGE_SIZE).get(),
+        this.graphClient
+          .api(url)
+          .select('system,name,id,displayName')
+          .top(GRAPH_API_PAGE_SIZE)
+          .get(),
       );
 
       this.logger.log(`${logPrefix} Found ${allLists.length} lists`);
@@ -233,31 +357,68 @@ export class GraphApiService {
     }
   }
 
+  /**
+   * Fetch all columns for a specific SharePoint list.
+   * Documentation: https://learn.microsoft.com/en-us/graph/api/list-list-columns
+   */
+  public async getListColumns(siteId: string, listId: string): Promise<ListColumn[]> {
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}, List: ${listId}]`;
+
+    try {
+      const columns = await this.paginateGraphApiRequest<ListColumn>(
+        `/sites/${siteId}/lists/${listId}/columns`,
+        (url) => this.graphClient.api(url).select('id,name,displayName').get(),
+      );
+
+      this.logger.log(`${logPrefix} Found ${columns.length} columns`);
+
+      return columns;
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to fetch list columns`,
+        siteId: this.shouldConcealLogs ? smear(siteId) : siteId,
+        listId,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
+  }
+
+  public async getListItems(
+    siteId: string,
+    listId: string,
+    options: { select?: string; expand?: string } = {},
+  ): Promise<ListItem[]> {
+    const { select, expand } = options;
+    return await this.paginateGraphApiRequest<ListItem>(
+      `/sites/${siteId}/lists/${listId}/items`,
+      (url) => {
+        let builder = this.graphClient.api(url);
+        if (select) builder = builder.select(select);
+        if (expand) builder = builder.expand(expand);
+        return builder.top(GRAPH_API_PAGE_SIZE).get();
+      },
+    );
+  }
+
   public async getAspxListItems(
     siteId: string,
     listId: string,
+    syncColumnName: string,
     maxItemsToScan?: number,
   ): Promise<SharepointContentItem[]> {
-    const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
       const aspxItems: SharepointContentItem[] = [];
 
-      const items = await this.paginateGraphApiRequest<ListItem>(
-        `/sites/${siteId}/lists/${listId}/items`,
-        (url) =>
-          this.graphClient
-            .api(url)
-            .select('id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy')
-            .expand(
-              `fields($select=${syncColumnName},FileLeafRef,FileSizeDisplay,_ModerationStatus,Title,AuthorLookupId,EditorLookupId)`,
-            )
-            .top(GRAPH_API_PAGE_SIZE)
-            .get(),
-      );
+      const items = await this.getListItems(siteId, listId, {
+        select: 'id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy',
+        expand: `fields($select=${syncColumnName},FileLeafRef,FileSizeDisplay,_ModerationStatus,Title,AuthorLookupId,EditorLookupId)`,
+      });
 
       for (const item of items) {
-        if (!this.fileFilterService.isListItemValidForIngestion(item.fields)) continue;
+        if (!this.fileFilterService.isListItemValidForIngestion(item.fields, syncColumnName))
+          continue;
 
         const aspxSharepointContentItem: SharepointContentItem = {
           itemType: 'listItem',
@@ -432,6 +593,7 @@ export class GraphApiService {
     itemId: string,
     siteId: string,
     driveName: string,
+    syncColumnName: string,
     maxFiles?: number,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const loggedSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
@@ -458,6 +620,7 @@ export class GraphApiService {
             driveItem.id,
             siteId,
             driveName,
+            syncColumnName,
             remainingLimit,
           );
 
@@ -477,7 +640,7 @@ export class GraphApiService {
             fileName: driveItem.name,
           });
           sharepointDirectoryItemsToSync.push(...directories);
-        } else if (this.fileFilterService.isFileValidForIngestion(driveItem)) {
+        } else if (this.fileFilterService.isFileValidForIngestion(driveItem, syncColumnName)) {
           const folderPath = this.extractFolderPath(driveItem);
           sharepointContentItemsToSync.push({
             itemType: 'driveItem',

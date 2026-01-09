@@ -6,6 +6,7 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { ScopeManagementService } from './scope-management.service';
@@ -114,6 +115,7 @@ describe('ScopeManagementService', () => {
     rootPath: '/test1',
     siteId: 'site-123',
     siteName: 'test-site',
+    siteConfig: createMockSiteConfig(),
   };
 
   type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };
@@ -250,17 +252,17 @@ describe('ScopeManagementService', () => {
     });
 
     it('disables inheritance when permission sync mode is enabled', async () => {
-      configServiceMock.get.mockImplementation((key: string) => {
-        if (key === 'processing.syncMode') return 'content_and_permissions';
-        if (key === 'unique.inheritScopePermissions') return false;
-        if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
-        return undefined;
-      });
+      const contextWithPermissionsSync: SharepointSyncContext = {
+        ...mockContext,
+        siteConfig: createMockSiteConfig({
+          syncMode: 'content_and_permissions',
+        }),
+      };
 
       await service.batchCreateScopes(
         [createDriveContentItem('UniqueAG/SitePages')],
         [],
-        mockContext,
+        contextWithPermissionsSync,
       );
 
       const [, options] = createScopesMock.mock.calls[0] as [
@@ -271,17 +273,18 @@ describe('ScopeManagementService', () => {
     });
 
     it('uses explicit inheritAccess configuration when provided', async () => {
-      configServiceMock.get.mockImplementation((key: string) => {
-        if (key === 'unique.inheritScopePermissions') return true;
-        if (key === 'processing.syncMode') return 'content_only';
-        if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
-        return undefined;
-      });
+      const contextWithInheritScopes: SharepointSyncContext = {
+        ...mockContext,
+        siteConfig: createMockSiteConfig({
+          syncMode: 'content_only',
+          permissionsInheritanceMode: 'inherit_scopes',
+        }),
+      };
 
       await service.batchCreateScopes(
         [createDriveContentItem('UniqueAG/SitePages')],
         [],
-        mockContext,
+        contextWithInheritScopes,
       );
 
       const [, options] = createScopesMock.mock.calls[0] as [
