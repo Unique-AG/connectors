@@ -4,6 +4,8 @@
 
 This guide provides IT operators with the technical information needed to deploy, configure, and maintain the Teams MCP Connector.
 
+**Note:** The Teams MCP Connector is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once users connect, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction.
+
 For end-user and administrator documentation, see the [Teams MCP Overview](../overview.md).
 
 ## Documentation
@@ -14,7 +16,7 @@ For end-user and administrator documentation, see the [Teams MCP Overview](../ov
 | [Configuration](./configuration.md) | Environment variables, feature flags, tuning |
 | [Authentication](./authentication.md) | Microsoft Entra ID app registration, OAuth setup |
 | [Local Development](./local-development.md) | Setting up a development environment |
-| [FAQ](./faq.md) | Frequently asked questions and common mistakes |
+| [FAQ](../faq.md) | Frequently asked questions and common mistakes |
 
 ## Architecture Overview
 

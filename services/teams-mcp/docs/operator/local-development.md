@@ -242,6 +242,6 @@ Create `.vscode/launch.json`:
 
 - [Configuration Reference](./configuration.md) - All environment variables
 - [Authentication Setup](./authentication.md) - Entra app registration
-- [FAQ](./faq.md) - Frequently asked questions
+- [FAQ](../faq.md) - Frequently asked questions
 - [Architecture](../technical/architecture.md) - System design
 

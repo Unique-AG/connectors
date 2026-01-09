@@ -225,7 +225,7 @@ sequenceDiagram
 - [Token and Authentication](./token-auth-flows.md) - Detailed token lifecycle
 - [Architecture](./architecture.md) - Data model and infrastructure
 - [Configuration](../operator/configuration.md) - Secret configuration
-- [Operator FAQ](../operator/faq.md) - Common operator questions
+- [FAQ](../faq.md) - Frequently asked questions
 
 ## Standard References
 

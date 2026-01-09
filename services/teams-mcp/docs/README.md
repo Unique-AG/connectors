@@ -4,6 +4,8 @@
 
 The Teams MCP Connector is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
+**Note:** This is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction or tool calls.
+
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
 ## Quick Summary
@@ -321,13 +323,15 @@ Planned enhancements will be documented here.
 
 ## Related Documentation
 
+- [FAQ](./faq.md) - Frequently asked questions
+
 ### For IT Operators
 
 - [Operator Guide](./operator/README.md) - Deployment, configuration, and operations
   - [Deployment](./operator/deployment.md) - Kubernetes and Helm setup
   - [Configuration](./operator/configuration.md) - Environment variables and settings
   - [Authentication](./operator/authentication.md) - Microsoft Entra ID setup
-  - [FAQ](./operator/faq.md) - Frequently asked questions and common mistakes
+  - [FAQ](./faq.md) - Frequently asked questions
 
 ### Technical Reference
 
@@ -338,7 +342,6 @@ Planned enhancements will be documented here.
   - [Security](./technical/security.md) - Encryption, authentication, and threat model
   - [Token and Authentication](./technical/token-auth-flows.md) - OAuth token lifecycle
   - [Why RabbitMQ](./technical/why-rabbitmq.md) - Message queue rationale
-  - [FAQ](./technical/faq.md) - Technical questions and design decisions
 
 ## Standard References
 

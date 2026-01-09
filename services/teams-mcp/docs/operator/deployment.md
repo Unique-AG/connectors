@@ -186,4 +186,4 @@ See [Authentication Guide](./authentication.md) for Terraform usage.
 
 ## Troubleshooting Deployment
 
-See [FAQ](./faq.md) for common questions and deployment issues.
+See [FAQ](../faq.md) for common questions and deployment issues.
