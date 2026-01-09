@@ -104,6 +104,30 @@ Teams MCP uses delegated permissions for self-service user connections.
 
 ## Configuration
 
+### Why do I need a Zitadel service account?
+
+**Answer:** The Teams MCP Connector requires a Zitadel service account to authenticate with the Unique Public API and perform operations on behalf of the connector.
+
+**What the service account is used for:**
+- **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants from Microsoft Teams
+- **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts and recordings
+- **Set access permissions** - Grant appropriate read/write permissions to meeting organizers and participants based on their role in the meeting
+- **Upload transcript data** - Ingest transcript content (VTT files) and recordings (MP4 files) into the Unique knowledge base
+
+**How it works:**
+- The service account credentials are passed via the `x-company-id` and `x-user-id` headers in all API requests to the Unique Public API
+- This ensures proper access control and authorization for all operations
+- The service account must be created in the Zitadel organization where you want to ingest transcripts
+
+**How to create:**
+1. Log in to Zitadel and select the target organization
+2. Navigate to **Service Accounts** in the organization settings
+3. Create a new service account with appropriate permissions
+4. Note the company ID (organization ID) and user ID (service account ID)
+5. Configure these values in Helm values under `mcpConfig.unique.serviceExtraHeaders`
+
+**See also:** [Zitadel Service Account](./operator/configuration.md#zitadel-service-account)
+
 ### What's the redirect URI format?
 
 **Answer:** The redirect URI must match exactly:

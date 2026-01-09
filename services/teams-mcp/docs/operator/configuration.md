@@ -175,6 +175,55 @@ mcpConfig:
       x-company-id: "company-id"
 ```
 
+## Zitadel Service Account
+
+### Why a Zitadel Service Account is Required
+
+The Teams MCP Connector requires a Zitadel service account to authenticate with the Unique Public API. This service account is used to:
+
+1. **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants
+2. **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts
+3. **Set access permissions** - Grant appropriate read/write permissions to meeting organizers and participants
+4. **Upload transcript data** - Ingest transcript content and recordings into the Unique knowledge base
+
+The service account credentials are passed via the `x-company-id` and `x-user-id` headers in all API requests to ensure proper access control and authorization.
+
+### Creating a Zitadel Service Account
+
+1. **Navigate to Zitadel**
+   - Log in to your Zitadel instance
+   - Select the organization where you want to ingest transcripts
+
+2. **Create Service Account**
+   - Go to **Service Accounts** in the organization settings
+   - Click **New Service Account**
+   - Provide a descriptive name (e.g., "Teams MCP Connector Service Account")
+   - Set appropriate permissions for the service account
+
+3. **Note the Service Account Details**
+   - **Company ID**: The organization ID where the service account was created
+   - **User ID**: The service account user ID
+
+4. **Configure in Helm Values**
+   ```yaml
+   mcpConfig:
+     unique:
+       serviceAuthMode: cluster_local  # or external
+       serviceExtraHeaders:
+         x-company-id: "<your-company-id>"
+         x-user-id: "<your-service-account-user-id>"
+   ```
+
+### Service Account Permissions
+
+The service account must have permissions to:
+- Read user information (to resolve meeting participants)
+- Create scopes/folders in the organization
+- Create and modify access permissions
+- Upload content to the knowledge base
+
+Ensure the service account has sufficient permissions in the target organization to perform these operations.
+
 ## Database Configuration
 
 ### Connection String Format
