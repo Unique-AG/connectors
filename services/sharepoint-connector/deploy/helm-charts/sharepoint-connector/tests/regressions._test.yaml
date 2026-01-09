@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
 suite: Test Reported Regressions
 templates:
-  - config.yaml
+  - tenant-config.yaml
 release:
   name: sharepoint-connector
 tests:
@@ -11,18 +11,56 @@ tests:
     # capabilities:
     #   apiVersions:
     #     - keda.sh/v1alpha1
-    template: config.yaml
+    template: tenant-config.yaml
     set:
       connectorConfig:
+        enabled: true
         sharepoint:
-          siteIds:
-            - 00000000-0000-0000-0000-000000000000
-            - 00000000-0000-0000-0000-000000000001
-            - 00000000-0000-0000-0000-000000000002
-            - 00000000-0000-0000-0000-000000000003
+          tenantId: "12345678-1234-1234-1234-123456789012"
+          baseUrl: "https://acme.sharepoint.com"
+          auth:
+            mode: certificate
+            clientId: "00000000-0000-0000-0000-000000000000"
+            privateKeyPath: /app/key.pem
+            thumbprintSha1: "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"
+          graph:
+            apiRateLimitPerMinute: 780000
+          sitesSource: config_file
+          sites:
+            - siteId: 00000000-0000-0000-0000-000000000000
+              syncColumnName: FinanceGPTKnowledge
+              ingestionMode: recursive
+              scopeId: scope_1
+              storeInternally: enabled
+              syncStatus: active
+              syncMode: content_only
+              permissionsInheritanceMode: inherit_scopes_and_files
+            - siteId: 00000000-0000-0000-0000-000000000001
+              syncColumnName: HRKnowledge
+              ingestionMode: flat
+              scopeId: scope_2
+              storeInternally: enabled
+              syncStatus: active
+              syncMode: content_only
+              permissionsInheritanceMode: inherit_scopes_and_files
+        unique:
+          authMode: cluster_local
+          ingestionServiceBaseUrl: "http://ingestion"
+          scopeManagementServiceBaseUrl: "http://scope-management"
+        processing:
+          concurrency: 5
+          stepTimeoutSeconds: 60
+          allowedMimeTypes:
+            - "application/pdf"
     asserts:
       - isKind:
           of: ConfigMap
-      - equal:
-          path: data.SHAREPOINT_SITE_IDS
-          value: "00000000-0000-0000-0000-000000000000,00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002,00000000-0000-0000-0000-000000000003"
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "siteId: \"00000000-0000-0000-0000-000000000000\""
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "siteId: \"00000000-0000-0000-0000-000000000001\""
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "permissionsInheritanceMode: \"inherit_scopes_and_files\""
