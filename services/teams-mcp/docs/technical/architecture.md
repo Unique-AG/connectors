@@ -230,3 +230,10 @@ Enables asynchronous processing of webhook notifications. See [Why RabbitMQ](./w
 - [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
 - [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale
+
+## Standard References
+
+- [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Graph API overview
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/) - PostgreSQL official docs
+- [RabbitMQ Documentation](https://www.rabbitmq.com/documentation.html) - RabbitMQ official docs
+- [NestJS Documentation](https://docs.nestjs.com/) - NestJS framework docs

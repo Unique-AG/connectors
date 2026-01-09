@@ -209,8 +209,10 @@ Instead of `AMQP_URL`, you can set individual fields:
 
 ## Security Best Practices
 
-1. **Rotate secrets regularly** - Especially `MICROSOFT_CLIENT_SECRET`
-2. **Use managed identities** where possible (Azure, AWS, GCP)
-3. **Encrypt secrets at rest** - Use Kubernetes secrets encryption or external secret managers
-4. **Limit network access** - Enable network policies
-5. **Monitor for anomalies** - Use the provided Grafana dashboards and alerts
+1. Rotate secrets regularly (especially `MICROSOFT_CLIENT_SECRET`)
+2. Use managed identities where possible (Azure, AWS, GCP)
+3. Encrypt secrets at rest (Kubernetes secrets encryption or external secret managers)
+4. Limit network access (enable network policies)
+5. Monitor for anomalies (use provided Grafana dashboards and alerts)
+
+See [Security Documentation](../technical/security.md) for details.

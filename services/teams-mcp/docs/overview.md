@@ -44,7 +44,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `OnlineMeetingRecording.Read.All` | Delegated | Yes | No |
 | `offline_access` | Delegated | No | Yes |
 
-For detailed permission justifications, see [Microsoft Graph Permissions](./permissions.md).
+For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md).
 
 ## Features
 
@@ -52,7 +52,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./perm
 
 **Real-time Transcript Capture**
 
-- Webhook-based notifications from Microsoft Graph API
+- Webhook-based notifications from [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview)
 - Automatic capture when meeting transcripts become available
 - VTT format transcript content ingested into Unique
 
@@ -70,7 +70,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./perm
 
 **Self-Service User Connection**
 
-- Users connect their own Microsoft account via OAuth2
+- Users connect their own Microsoft account via [OAuth 2.1](https://oauth.net/2.1/) with [PKCE](https://datatracker.ietf.org/doc/html/rfc7636)
 - No IT administrator involvement required for individual connections
 
 **Automatic Subscription Management**
@@ -83,16 +83,18 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./perm
 
 **Security**
 
-- Authentication via OAuth2 with Microsoft Entra ID
-- All Microsoft tokens encrypted at rest using AES-GCM
-- Refresh token rotation with family-based revocation for theft detection
-- Short-lived access tokens (60 seconds) limit exposure window
+- OAuth 2.1 with PKCE for authentication ([RFC 7636](https://datatracker.ietf.org/doc/html/rfc7636))
+- Microsoft tokens encrypted at rest using AES-256-GCM
+- Refresh token rotation with family-based revocation
+- Short-lived access tokens (60 seconds default)
+- See [Security Documentation](./technical/security.md) for details
 
 **Reliability**
 
 - RabbitMQ message queue for asynchronous webhook processing
 - Dead Letter Exchange (DLX) for failed message inspection and retry
 - Meets Microsoft's strict webhook response requirements (< 10 seconds)
+- See [Why RabbitMQ](./technical/why-rabbitmq.md) for rationale
 
 **Observability**
 
@@ -144,6 +146,8 @@ flowchart TB
     UniqueAPI --> Storage
 ```
 
+See [Architecture Documentation](./technical/architecture.md) for detailed component diagrams.
+
 ### User Connection Flow
 
 ```mermaid
@@ -175,6 +179,8 @@ sequenceDiagram
 
     Note over TeamsMCP: Now listening for meeting transcripts
 ```
+
+See [User Connection Flow](./technical/flows.md#user-connection-flow) for additional details.
 
 ### Transcript Processing Flow
 
@@ -217,6 +223,8 @@ sequenceDiagram
     end
 ```
 
+See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow) for additional details.
+
 ### User Workflow
 
 1. **User Setup** (One-time)
@@ -246,6 +254,8 @@ sequenceDiagram
 | **No certificate auth** | Certificate auth only works with Client Credentials flow, incompatible with delegated permissions |
 | **Single app registration** | Each MCP server deployment uses one Entra ID app registration (multi-tenant capable) |
 | **Admin consent required** | `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` need admin approval |
+
+See [Token and Authentication Flows](./technical/token-auth-flows.md) for details.
 
 ### Operational Constraints
 
@@ -303,6 +313,8 @@ flowchart LR
 - **Shared infrastructure**: One deployment serves all tenants
 - **Data isolation**: Each user's data scoped by their Microsoft user ID
 
+See [Token and Authentication Flows](./technical/token-auth-flows.md#single-app-registration-architecture) for details.
+
 ## Future Versions
 
 Planned enhancements will be documented here.
@@ -326,3 +338,14 @@ Planned enhancements will be documented here.
   - [Security](./technical/security.md) - Encryption, authentication, and threat model
   - [Token and Authentication](./technical/token-auth-flows.md) - OAuth token lifecycle
   - [Why RabbitMQ](./technical/why-rabbitmq.md) - Message queue rationale
+
+## Standard References
+
+- [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Microsoft Graph documentation
+- [Microsoft Graph Permissions Reference](https://learn.microsoft.com/en-us/graph/permissions-reference) - Permission details
+- [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/) - Authentication and authorization
+- [OAuth 2.1](https://oauth.net/2.1/) - OAuth 2.1 specification
+- [RFC 7636 - PKCE](https://datatracker.ietf.org/doc/html/rfc7636) - Proof Key for Code Exchange
+- [RFC 6749 - OAuth 2.0](https://datatracker.ietf.org/doc/html/rfc6749) - OAuth 2.0 Authorization Framework
+- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP specification
+- [MCP Authorization](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization) - MCP authorization spec

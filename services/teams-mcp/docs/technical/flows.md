@@ -260,3 +260,9 @@ flowchart TB
 - [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
 - [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale
+
+## Standard References
+
+- [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Graph API overview
+- [Microsoft Graph Webhooks](https://learn.microsoft.com/en-us/graph/webhooks) - Webhook documentation
+- [Microsoft Graph Subscriptions](https://learn.microsoft.com/en-us/graph/api/subscription-post-subscriptions) - Subscription API reference

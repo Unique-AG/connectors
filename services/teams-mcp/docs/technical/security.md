@@ -115,7 +115,10 @@ sequenceDiagram
 - **Microsoft tokens**: Stay on server, encrypted at rest, used for Graph API calls
 - **MCP tokens**: Opaque JWTs issued to client, used for MCP API authentication
 
-Reference: [RFC 7636 - PKCE](https://datatracker.ietf.org/doc/html/rfc7636)
+**References:**
+- [RFC 7636 - PKCE](https://datatracker.ietf.org/doc/html/rfc7636) - Proof Key for Code Exchange
+- [OAuth 2.1](https://oauth.net/2.1/) - OAuth 2.1 specification
+- [RFC 6749 - OAuth 2.0](https://datatracker.ietf.org/doc/html/rfc6749) - OAuth 2.0 Authorization Framework
 
 ## Refresh Token Rotation
 
@@ -224,3 +227,10 @@ sequenceDiagram
 - [Configuration](../operator/configuration.md) - Secret configuration
 - [Troubleshooting](../operator/troubleshooting.md) - Authentication issues
 
+## Standard References
+
+- [RFC 7636 - PKCE](https://datatracker.ietf.org/doc/html/rfc7636) - Proof Key for Code Exchange
+- [RFC 6749 - OAuth 2.0](https://datatracker.ietf.org/doc/html/rfc6749) - OAuth 2.0 Authorization Framework
+- [OAuth 2.1](https://oauth.net/2.1/) - OAuth 2.1 specification
+- [NIST SP 800-38D](https://csrc.nist.gov/publications/detail/sp/800-38d/final) - AES-GCM specification
+- [MDN Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) - Web cryptography reference

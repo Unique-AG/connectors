@@ -290,6 +290,7 @@ server:
    - [Architecture](../technical/architecture.md)
    - [Token Flows](../technical/token-auth-flows.md)
    - [Permissions](../technical/permissions.md)
+   - [Security](../technical/security.md)
 
 2. **Collect diagnostic information**:
    - Pod logs
@@ -301,3 +302,9 @@ server:
    - Helm chart version
    - Relevant log excerpts
    - Steps to reproduce
+
+## Standard References
+
+- [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Graph API overview
+- [Microsoft Entra ID Troubleshooting](https://learn.microsoft.com/en-us/entra/identity-platform/troubleshoot-authentication) - Authentication troubleshooting
+- [Kubernetes Documentation](https://kubernetes.io/docs/) - Kubernetes official docs

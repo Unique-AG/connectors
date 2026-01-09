@@ -100,8 +100,9 @@ The MCP OAuth layer implements the [MCP Authorization specification](https://mod
 
 **References:**
 - [MCP Authorization](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization) - MCP protocol authorization spec
-- [OAuth 2.1 draft](https://oauth.net/2.1/) - OAuth 2.1 specification
+- [OAuth 2.1](https://oauth.net/2.1/) - OAuth 2.1 specification
 - [RFC 7636 - PKCE](https://datatracker.ietf.org/doc/html/rfc7636) - Proof Key for Code Exchange
+- [RFC 6749 - OAuth 2.0](https://datatracker.ietf.org/doc/html/rfc6749) - OAuth 2.0 Authorization Framework
 
 ## Microsoft OAuth (External)
 
@@ -204,6 +205,8 @@ For detailed explanation, see [Permissions - Why Delegated (Not Application)](./
 - [Authentication flows in MSAL](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows)
 - [Get access on behalf of a user](https://learn.microsoft.com/en-us/graph/auth-v2-user)
 - [Public and confidential client apps](https://learn.microsoft.com/en-us/entra/identity-platform/msal-client-applications)
+- [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/) - Authentication and authorization
+- [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Graph API overview
 
 ## Troubleshooting
 
@@ -246,3 +249,12 @@ For detailed explanation, see [Permissions - Why Delegated (Not Application)](./
 - [Security](./security.md) - Encryption, PKCE, and threat model
 - [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
+
+## Standard References
+
+- [MCP Authorization](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization) - MCP protocol authorization spec
+- [OAuth 2.1](https://oauth.net/2.1/) - OAuth 2.1 specification
+- [RFC 7636 - PKCE](https://datatracker.ietf.org/doc/html/rfc7636) - Proof Key for Code Exchange
+- [RFC 6749 - OAuth 2.0](https://datatracker.ietf.org/doc/html/rfc6749) - OAuth 2.0 Authorization Framework
+- [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/) - Authentication and authorization
+- [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Graph API overview

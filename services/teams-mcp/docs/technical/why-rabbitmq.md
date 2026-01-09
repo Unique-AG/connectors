@@ -140,3 +140,9 @@ Without a message queue, the service would fail to maintain Microsoft Graph subs
 - [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing
 - [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
+
+## Standard References
+
+- [Microsoft Graph Webhooks](https://learn.microsoft.com/en-us/graph/webhooks) - Webhook documentation
+- [RabbitMQ Documentation](https://www.rabbitmq.com/documentation.html) - RabbitMQ official docs
+- [AMQP 0-9-1 Model](https://www.rabbitmq.com/tutorials/amqp-concepts.html) - AMQP concepts
