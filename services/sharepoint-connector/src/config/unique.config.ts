@@ -1,4 +1,5 @@
 import { registerAs } from '@nestjs/config';
+import { NamespacedConfigType } from '@proventuslabs/nestjs-zod';
 import { Redacted } from '../utils/redacted';
 import { getTenantConfig } from './tenant-config-loader';
 import { type UniqueConfig, UniqueConfigSchema } from './unique.schema';
@@ -23,4 +24,19 @@ export const uniqueConfig = registerAs('unique', (): UniqueConfig => {
   return config;
 });
 
-export type UniqueConfigNamespaced = { unique: UniqueConfig };
+export type UniqueConfigNamespaced = NamespacedConfigType<typeof uniqueConfig>;
+
+interface InheritanceSettings {
+  inheritScopes: boolean;
+  inheritFiles: boolean;
+}
+
+const INHERITANCE_MODES_MAP: Record<
+  'inherit_scopes_and_files' | 'inherit_scopes' | 'inherit_files' | 'none',
+  InheritanceSettings
+> = {
+  inherit_scopes_and_files: { inheritScopes: true, inheritFiles: true },
+  inherit_scopes: { inheritScopes: true, inheritFiles: false },
+  inherit_files: { inheritScopes: false, inheritFiles: true },
+  none: { inheritScopes: false, inheritFiles: false },
+};
