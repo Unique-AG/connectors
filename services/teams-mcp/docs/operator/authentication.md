@@ -118,7 +118,7 @@ For detailed explanation, see [Microsoft Graph Permissions - Understanding Conse
 
 **First-time connection:** User sees full Microsoft consent screen and approves permissions.
 
-**Subsequent reconnections:** User sees a quick "flicker" (brief redirect sequence). This is **normal** - Microsoft validates the existing session through rapid OAuth redirects. Standard Microsoft OAuth behavior. See [Troubleshooting - Login "Flicker"](./troubleshooting.md#login-flicker-on-reconnection) for details.
+**Subsequent reconnections:** User sees a quick "flicker" (brief redirect sequence). This is **normal** - Microsoft validates the existing session through rapid OAuth redirects. Standard Microsoft OAuth behavior. See [FAQ - Login "Flicker"](./faq.md#what-is-the-login-flicker-when-users-reconnect) for details.
 
 ### Troubleshooting Consent Issues
 
@@ -128,7 +128,7 @@ For detailed explanation, see [Microsoft Graph Permissions - Understanding Conse
 | `AADSTS65005` | User consent required | User must sign in and approve the consent screen |
 | `AADSTS90094` | Admin consent required | Administrator must grant consent for permissions marked "Admin Consent: Yes" |
 
-See [Troubleshooting Guide](./troubleshooting.md) for more details.
+See [FAQ](./faq.md) for more details.
 
 ## Redirect URI Configuration
 

@@ -327,7 +327,7 @@ Planned enhancements will be documented here.
   - [Deployment](./operator/deployment.md) - Kubernetes and Helm setup
   - [Configuration](./operator/configuration.md) - Environment variables and settings
   - [Authentication](./operator/authentication.md) - Microsoft Entra ID setup
-  - [Troubleshooting](./operator/troubleshooting.md) - Common issues and solutions
+  - [FAQ](./operator/faq.md) - Frequently asked questions and common mistakes
 
 ### Technical Reference
 
@@ -338,6 +338,7 @@ Planned enhancements will be documented here.
   - [Security](./technical/security.md) - Encryption, authentication, and threat model
   - [Token and Authentication](./technical/token-auth-flows.md) - OAuth token lifecycle
   - [Why RabbitMQ](./technical/why-rabbitmq.md) - Message queue rationale
+  - [FAQ](./technical/faq.md) - Technical questions and design decisions
 
 ## Standard References
 

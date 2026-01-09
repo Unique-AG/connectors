@@ -1,4 +1,4 @@
-# Teams MCP Connector - IT Operator Guide
+# IT Operator Guide
 
 ## Overview
 
@@ -6,15 +6,15 @@ This guide provides IT operators with the technical information needed to deploy
 
 For end-user and administrator documentation, see the [Teams MCP Overview](../overview.md).
 
-## Quick Reference
+## Documentation
 
-| Topic | Description |
-|-------|-------------|
+| Document | Description |
+|----------|-------------|
 | [Deployment](./deployment.md) | Kubernetes deployment, Helm charts, infrastructure requirements |
 | [Configuration](./configuration.md) | Environment variables, feature flags, tuning |
 | [Authentication](./authentication.md) | Microsoft Entra ID app registration, OAuth setup |
 | [Local Development](./local-development.md) | Setting up a development environment |
-| [Troubleshooting](./troubleshooting.md) | Common issues, debugging, log analysis |
+| [FAQ](./faq.md) | Frequently asked questions and common mistakes |
 
 ## Architecture Overview
 
@@ -81,12 +81,3 @@ The Teams MCP Connector runs as a **single pod** that handles both API requests 
    - [ ] OAuth flow works end-to-end
    - [ ] Webhook endpoint accessible from Microsoft
    - [ ] Test transcript captured successfully
-
-## Related Documentation
-
-- [Deployment Guide](./deployment.md) - Step-by-step deployment instructions
-- [Configuration Reference](./configuration.md) - All environment variables and settings
-- [Authentication Setup](./authentication.md) - Microsoft Entra ID configuration
-- [Local Development](./local-development.md) - Setting up a development environment
-- [Troubleshooting Guide](./troubleshooting.md) - Common issues and solutions
-- [Technical Reference](../technical/README.md) - Architecture, flows, and design decisions

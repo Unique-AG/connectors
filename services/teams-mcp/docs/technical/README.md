@@ -1,5 +1,7 @@
 # Technical Reference
 
+## Overview
+
 This section contains detailed technical documentation for developers and architects working with the Teams MCP Connector.
 
 ## Documentation
@@ -12,8 +14,4 @@ This section contains detailed technical documentation for developers and archit
 | [Security](./security.md) | Encryption, authentication, and threat model |
 | [Token and Authentication](./token-auth-flows.md) | OAuth token lifecycle and validation |
 | [Why RabbitMQ](./why-rabbitmq.md) | Message queue design rationale |
-
-## Quick Links
-
-- [Main Overview](../overview.md) - Administrator and end-user documentation
-- [Operator Guide](../operator/README.md) - Deployment and operations
+| [FAQ](./faq.md) | Technical questions and design decisions |
