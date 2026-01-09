@@ -266,8 +266,8 @@ describe('GraphApiService', () => {
         },
       } as unknown as ListItem;
 
-      // biome-ignore lint/suspicious/noExplicitAny: Test private method
       expect(() =>
+        // biome-ignore lint/suspicious/noExplicitAny: Test private method
         (service as any).transformListItemToSiteConfig(listItem, 0, mockNameMap),
       ).toThrow('Invalid site configuration at row 1');
     });
@@ -486,7 +486,6 @@ describe('GraphApiService', () => {
         createdDateTime: '2024-01-02T00:00:00Z',
       };
 
-      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing limit
       vi.spyOn(service, 'getListItems').mockResolvedValue([
         firstItem,
         secondItem,

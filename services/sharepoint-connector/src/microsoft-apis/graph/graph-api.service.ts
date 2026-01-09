@@ -322,7 +322,11 @@ export class GraphApiService {
 
     try {
       const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId}/lists`, (url) =>
-        this.graphClient.api(url).select('system,name,id,displayName').top(GRAPH_API_PAGE_SIZE).get(),
+        this.graphClient
+          .api(url)
+          .select('system,name,id,displayName')
+          .top(GRAPH_API_PAGE_SIZE)
+          .get(),
       );
 
       this.logger.log(`${logPrefix} Found ${allLists.length} lists`);
