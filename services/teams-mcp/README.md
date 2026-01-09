@@ -35,7 +35,7 @@ Copy `.env.example` to `.env` and configure the following:
 
 | Variable | Description |
 |----------|-------------|
-| `SELF_URL` | Base URL for OAuth callbacks (e.g., `http://localhost:9542`) |
+| `SELF_URL` | Base URL for OAuth callbacks |
 | `DATABASE_URL` | PostgreSQL connection string |
 | `AMQP_URL` | RabbitMQ connection string |
 | `MICROSOFT_CLIENT_ID` | Azure AD application client ID |
@@ -44,6 +44,8 @@ Copy `.env.example` to `.env` and configure the following:
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | Publicly reachable URL for Microsoft webhooks |
 | `AUTH_HMAC_SECRET` | 64-char hex secret for JWT signing |
 | `ENCRYPTION_KEY` | 64-char hex secret for AES-GCM token encryption |
+
+For complete configuration reference, see [Configuration Guide](./docs/operator/configuration.md).
 
 ### Unique API Configuration
 
@@ -67,11 +69,12 @@ UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-i
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
-| `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `3` | Hour (UTC) for scheduled subscription expiry |
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `60` | Access token TTL |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `2592000` | Refresh token TTL (30 days) |
 | `UNIQUE_ROOT_SCOPE_PATH` | `Teams-MCP` | Root folder path in Unique |
 | `UNIQUE_USER_FETCH_CONCURRENCY` | `5` | Concurrent user resolution limit |
+
+For complete configuration reference, see [Configuration Guide](./docs/operator/configuration.md).
 
 ### Generating Secrets
 
@@ -163,14 +166,22 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
 OTEL_EXPORTER_PROMETHEUS_PORT=8081
 ```
 
-## Technical Documentation
+## Documentation
 
-Detailed technical documentation is available in the `docs/` directory:
+Full documentation is available in the `docs/` directory:
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](./docs/architecture.md) | System components, high-level diagrams, infrastructure |
-| [Flows](./docs/flows.md) | User connection, subscription lifecycle, transcript processing |
-| [Permissions](./docs/permissions.md) | Microsoft Graph permissions and least-privilege justification |
-| [Token & Auth](./docs/token-auth-flows.md) | Token types, validation, expiration, refresh flows |
-| [Why RabbitMQ](./docs/why-rabbitmq.md) | Message queue rationale and design decisions |
+| [Overview](./docs/README.md) | Features, requirements, limitations, and how it works |
+| [Operator Guide](./docs/operator/README.md) | Deployment, configuration, authentication, troubleshooting |
+| [Technical Reference](./docs/technical/README.md) | Architecture, flows, permissions, security |
+
+### Technical Deep Dives
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](./docs/technical/architecture.md) | System components, data model, infrastructure |
+| [Flows](./docs/technical/flows.md) | User connection, subscription lifecycle, transcript processing |
+| [Security](./docs/technical/security.md) | Encryption, PKCE, threat model |
+| [Permissions](./docs/technical/permissions.md) | Microsoft Graph permissions and least-privilege justification |
+| [Why RabbitMQ](./docs/technical/why-rabbitmq.md) | Message queue rationale and design decisions |

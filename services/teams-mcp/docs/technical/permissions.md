@@ -12,6 +12,30 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `OnlineMeetingRecording.Read.All` | Delegated | `190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3` | Yes | No |
 | `offline_access` | Delegated | `7427e0e9-2fba-42fe-b0c0-848c9e6a8182` | No | Yes |
 
+## Understanding Consent Requirements
+
+**This is standard Microsoft behavior, not Teams MCP specific.** All Microsoft 365 apps use the same consent model.
+
+### Standard Microsoft Consent Process
+
+1. **Admin adds the app and grants admin-required permissions**
+   - Organization-wide OR per-user
+   - For Teams MCP: `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` require admin consent
+
+2. **Admin approval workflow (if tenant has it enabled)**
+   - Users request admin approval
+   - Admin approves app for that user
+   - This is in addition to Step 1
+
+3. **User consent (always required for delegated permissions)**
+   - Each user must consent individually
+   - Required even after admin consent (Microsoft's requirement for delegated permissions)
+
+**Microsoft Documentation:**
+- [User and admin consent overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview) - Standard Microsoft consent flows
+- [Grant admin consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) - Step-by-step guide
+- [Admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) - Per-user approval process
+
 ## Least-Privilege Justification
 
 Each permission is the minimum required for its function. No narrower alternatives exist.
@@ -101,13 +125,15 @@ Application permissions would require tenant administrators to pre-configure acc
 
 ## Permission Reference Links
 
-- [OnlineMeetingTranscript.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingTranscript.Read.All)
-- [OnlineMeetingRecording.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingRecording.Read.All)
-- [Microsoft Graph Permissions Reference](https://learn.microsoft.com/en-us/graph/permissions-reference)
+- [Microsoft Graph Permissions Reference](https://learn.microsoft.com/en-us/graph/permissions-reference) - Official Microsoft documentation
+- [OnlineMeetingTranscript.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingTranscript.Read.All) - Third-party permission explorer
+- [OnlineMeetingRecording.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingRecording.Read.All) - Third-party permission explorer
+- [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Graph API overview
 
 ## Related Documentation
 
 - [Architecture](./architecture.md) - System components and infrastructure
+- [Security](./security.md) - Encryption, PKCE, and threat model
 - [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing
 - [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale
