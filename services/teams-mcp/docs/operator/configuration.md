@@ -179,7 +179,7 @@ mcpConfig:
 
 ### Why a Zitadel Service Account is Required
 
-The Teams MCP Connector requires a Zitadel service account to authenticate with the Unique Public API. This service account is used to:
+The Teams MCP Server requires a Zitadel service account to authenticate with the Unique Public API. This service account is used to:
 
 1. **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants
 2. **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts
@@ -197,7 +197,7 @@ The service account credentials are passed via the `x-company-id` and `x-user-id
 2. **Create Service Account**
    - Go to **Service Accounts** in the organization settings
    - Click **New Service Account**
-   - Provide a descriptive name (e.g., "Teams MCP Connector Service Account")
+   - Provide a descriptive name (e.g., "Teams MCP Server Service Account")
    - Set appropriate permissions for the service account
 
 3. **Note the Service Account Details**

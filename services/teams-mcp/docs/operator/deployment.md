@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-Before deploying the Teams MCP Connector, ensure you have:
+Before deploying the Teams MCP Server, ensure you have:
 
 - Kubernetes cluster (1.25+)
 - Helm 3.x installed
@@ -14,7 +14,7 @@ Before deploying the Teams MCP Connector, ensure you have:
 
 ## Helm Chart
 
-The Teams MCP Connector is deployed using a Helm chart that wraps the `backend-service` chart.
+The Teams MCP Server is deployed using a Helm chart that wraps the `backend-service` chart.
 
 ### Add Helm Repository
 
@@ -184,6 +184,6 @@ Terraform modules are available for:
 
 See [Authentication Guide](./authentication.md) for Terraform usage.
 
-## Troubleshooting Deployment
+## Troubleshooting
 
 See [FAQ](../faq.md) for common questions and deployment issues.

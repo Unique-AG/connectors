@@ -2,11 +2,11 @@
 
 ## Overview
 
-This guide provides IT operators with the technical information needed to deploy, configure, and maintain the Teams MCP Connector.
+This guide provides IT operators with the technical information needed to deploy, configure, and maintain the Teams MCP Server.
 
-**Note:** The Teams MCP Connector is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once users connect, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction.
+**Note:** The Teams MCP Server is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once users connect, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction.
 
-For end-user and administrator documentation, see the [Teams MCP Overview](../overview.md).
+For end-user and administrator documentation, see the [Teams MCP Overview](../README.md).
 
 ## Documentation
 
@@ -47,7 +47,7 @@ flowchart TB
     TeamsMCP --> PostgreSQL
 ```
 
-The Teams MCP Connector runs as a **single pod** that handles both API requests and background processing via RabbitMQ consumers.
+The Teams MCP Server runs as a **single pod** that handles both API requests and background processing via RabbitMQ consumers.
 
 ## Infrastructure Requirements
 

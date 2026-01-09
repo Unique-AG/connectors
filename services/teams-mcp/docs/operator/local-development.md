@@ -1,6 +1,6 @@
 # Local Development
 
-This guide walks through setting up the Teams MCP Connector for local development and testing.
+This guide walks through setting up the Teams MCP Server for local development and testing.
 
 ## Prerequisites
 
@@ -36,7 +36,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The server starts at `http://localhost:9542`.
+The server starts at the configured port.
 
 ## Infrastructure Setup
 
@@ -48,11 +48,11 @@ The included `docker-compose.yaml` provides PostgreSQL and RabbitMQ:
 docker compose up -d
 ```
 
-| Service | Port | Credentials |
-|---------|------|-------------|
-| PostgreSQL | 5432 | postgres:postgres |
-| RabbitMQ | 5672 | guest:guest |
-| RabbitMQ Management | 15672 | guest:guest |
+| Service | Credentials |
+|---------|-------------|
+| PostgreSQL | postgres:postgres |
+| RabbitMQ | guest:guest |
+| RabbitMQ Management | guest:guest |
 
 ### Manual Setup
 
@@ -81,7 +81,7 @@ For local development, configure:
 
 | Setting | Value |
 |---------|-------|
-| Redirect URI | `http://localhost:9542/auth/callback` |
+| Redirect URI | `http://localhost:<port>/auth/callback` |
 | Supported account types | Your organization only |
 
 ## Environment Configuration
@@ -96,7 +96,7 @@ cp .env.example .env
 
 ```env
 # Application
-SELF_URL=http://localhost:9542
+SELF_URL=http://localhost:<port>
 
 # Database
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teams_mcp
@@ -147,7 +147,7 @@ devtunnel user login
 devtunnel create teams-mcp --allow-anonymous
 
 # Start tunnel
-devtunnel port create teams-mcp -p 9542
+devtunnel port create teams-mcp -p <port>
 devtunnel host teams-mcp
 ```
 
@@ -182,7 +182,7 @@ This URL is used when creating Microsoft Graph subscriptions.
 ### Testing the OAuth Flow
 
 1. Start the dev server: `pnpm dev`
-2. Open `http://localhost:9542/.well-known/oauth-authorization-server`
+2. Open `http://localhost:<port>/.well-known/oauth-authorization-server`
 3. You should see the OAuth metadata JSON
 4. Connect with an MCP client that supports OAuth
 
@@ -231,7 +231,7 @@ Create `.vscode/launch.json`:
 
 **OAuth redirect mismatch:**
 - Verify `SELF_URL` matches the redirect URI in your Entra app registration
-- Include the exact path: `http://localhost:9542/auth/callback`
+- Include the exact path: `http://localhost:<port>/auth/callback`
 
 **Webhook not received:**
 - Check dev tunnel is running and accessible

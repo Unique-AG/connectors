@@ -1,8 +1,8 @@
-# Teams MCP Connector
+# Teams MCP Server
 
 ## Overview
 
-The Teams MCP Connector is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
+The Teams MCP Server is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
 **Note:** This is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction or tool calls.
 
@@ -46,7 +46,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `OnlineMeetingRecording.Read.All` | Delegated | Yes | No |
 | `offline_access` | Delegated | No | Yes |
 
-For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md).
+For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md#least-privilege-justification).
 
 ## Features
 
@@ -89,14 +89,14 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 - Microsoft tokens encrypted at rest using AES-256-GCM
 - Refresh token rotation with family-based revocation
 - Short-lived access tokens (60 seconds default)
-- See [Security Documentation](./technical/security.md) for details
+- See [Security Documentation](./technical/security.md#token-security) for details
 
 **Reliability**
 
 - RabbitMQ message queue for asynchronous webhook processing
 - Dead Letter Exchange (DLX) for failed message inspection and retry
 - Meets Microsoft's strict webhook response requirements (< 10 seconds)
-- See [Why RabbitMQ](./technical/why-rabbitmq.md) for rationale
+- See [Why RabbitMQ](./technical/why-rabbitmq.md#the-problem) for rationale
 
 **Observability**
 
@@ -105,7 +105,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 **Configuration**
 
 - Configurable token TTLs
-- Subscription scheduling (default renewal at 3 AM UTC)
+- Automatic subscription renewal via Microsoft lifecycle webhooks
 - Rate limiting support
 
 ## How It Works
@@ -119,7 +119,7 @@ flowchart TB
         EntraID["Microsoft Entra ID"]
     end
 
-    subgraph TeamsMCP["Teams MCP Connector"]
+    subgraph TeamsMCP["Teams MCP Server"]
         API["REST API"]
         OAuth["OAuth Module"]
         Processor["Transcript Processor"]
@@ -148,7 +148,7 @@ flowchart TB
     UniqueAPI --> Storage
 ```
 
-See [Architecture Documentation](./technical/architecture.md) for detailed component diagrams.
+See [Architecture Documentation](./technical/architecture.md#components) for detailed component diagrams.
 
 ### User Connection Flow
 
@@ -230,7 +230,7 @@ See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow
 ### User Workflow
 
 1. **User Setup** (One-time)
-   - Open MCP client and connect to Teams MCP server
+   - Open MCP client and connect to Teams MCP Server
    - Sign in with Microsoft account
    - Grant required permissions
 
@@ -257,7 +257,7 @@ See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow
 | **Single app registration** | Each MCP server deployment uses one Entra ID app registration (multi-tenant capable) |
 | **Admin consent required** | `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` need admin approval |
 
-See [Token and Authentication Flows](./technical/token-auth-flows.md) for details.
+See [Token and Authentication Flows - Single App Registration Architecture](./technical/token-auth-flows.md#single-app-registration-architecture) for details.
 
 ### Operational Constraints
 
@@ -286,7 +286,7 @@ See [Token and Authentication Flows](./technical/token-auth-flows.md) for detail
 
 ### Single App Registration Architecture
 
-Each Teams MCP server deployment uses **one Microsoft Entra ID app registration**:
+Each Teams MCP Server deployment uses **one Microsoft Entra ID app registration**:
 
 ```mermaid
 flowchart LR

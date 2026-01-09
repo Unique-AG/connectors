@@ -4,7 +4,7 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Teams MCP Connector is a connector-style MCP server, not a traditional MCP server. Unlike traditional MCP servers that provide tools, prompts, resources, or other interactive capabilities, this connector operates automatically in the background once connected.
+**Answer:** The Teams MCP Server is a connector-style MCP server, not a traditional MCP server. Unlike traditional MCP servers that provide tools, prompts, resources, or other interactive capabilities, this server operates automatically in the background once connected.
 
 **What it does:**
 - Once a user connects their Microsoft account, the connector automatically ingests meeting transcripts into the Unique knowledge base
@@ -106,7 +106,7 @@ Teams MCP uses delegated permissions for self-service user connections.
 
 ### Why do I need a Zitadel service account?
 
-**Answer:** The Teams MCP Connector requires a Zitadel service account to authenticate with the Unique Public API and perform operations on behalf of the connector.
+**Answer:** The Teams MCP Server requires a Zitadel service account to authenticate with the Unique Public API and perform operations on behalf of the server.
 
 **What the service account is used for:**
 - **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants from Microsoft Teams

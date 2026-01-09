@@ -1,6 +1,6 @@
 # Security
 
-This document describes the security architecture, cryptographic decisions, and threat model for the Teams MCP Connector.
+This document describes the security architecture, cryptographic decisions, and threat model for the Teams MCP Server.
 
 ## Security Layers
 

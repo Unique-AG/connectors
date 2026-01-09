@@ -130,12 +130,12 @@ sequenceDiagram
     end
 ```
 
-**Subscription Scheduling:**
-- Subscriptions are set to expire at a configured UTC hour (default: 3 AM)
-- This batches all renewals to a single time window
-- Daily renewal ensures token validity is checked consistently
-- Minimum 2-hour subscription lifetime required for lifecycle notifications
+**Subscription Renewal:**
+- Subscription renewal is driven by Microsoft Graph lifecycle webhooks
+- Microsoft sends lifecycle notifications before subscription expiration
+- The server automatically renews subscriptions when lifecycle notifications are received
 - **If renewal fails**: Subscription is deleted and user must reconnect to MCP server
+- See [Microsoft Graph Webhooks - Lifecycle Notifications](https://learn.microsoft.com/en-us/graph/webhooks#lifecycle-notifications) for details
 
 ## Transcript Processing Flow
 

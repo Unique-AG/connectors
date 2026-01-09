@@ -208,40 +208,7 @@ For detailed explanation, see [Permissions - Why Delegated (Not Application)](./
 - [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/) - Authentication and authorization
 - [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Graph API overview
 
-## Troubleshooting
-
-### MCP Token Expired
-
-**Symptom:** API requests rejected with authentication error
-
-**Resolution:** Client should use refresh token to obtain new access token
-
-### Microsoft Token Refresh Failed
-
-**Symptom:** Graph API calls fail even after refresh attempt
-
-**Possible Causes:**
-- Microsoft refresh token expired (90-day default)
-- User revoked consent in Microsoft account settings
-- Network issues reaching Microsoft token endpoint
-
-**Resolution:** User must reconnect to MCP server to re-authenticate
-
-### Token Family Revoked
-
-**Symptom:** All refresh operations fail for a user
-
-**Cause:** Refresh token reuse detected (possible token theft)
-
-**Resolution:** User must re-authenticate completely
-
-### Encryption Key Changed
-
-**Symptom:** All Microsoft API calls fail after deployment
-
-**Cause:** `ENCRYPTION_KEY` environment variable changed
-
-**Resolution:** All users must reconnect to obtain fresh tokens (stored tokens are unreadable with new key)
+For troubleshooting token and authentication issues, see [FAQ - Token Management](../faq.md#token-management).
 
 ## Related Documentation
 

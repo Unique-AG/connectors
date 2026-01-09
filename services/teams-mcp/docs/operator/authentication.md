@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Teams MCP Connector requires a Microsoft Entra ID (formerly Azure AD) app registration with delegated permissions to access Microsoft Graph API on behalf of users.
+The Teams MCP Server requires a Microsoft Entra ID (formerly Azure AD) app registration with delegated permissions to access Microsoft Graph API on behalf of users.
 
 For technical details about the OAuth flow and why client credentials are required, see [Token and Authentication Flows](../technical/token-auth-flows.md).
 
@@ -16,7 +16,7 @@ Use the provided Terraform module:
 module "teams_mcp_app" {
   source = "./deploy/terraform/azure/teams-mcp-entra-application"
 
-  display_name     = "Teams MCP Connector"
+  display_name     = "Teams MCP Server"
   sign_in_audience = "AzureADMyOrg"  # Single tenant
   notes            = "MCP server for Teams transcript capture"
 
@@ -44,7 +44,7 @@ module "teams_mcp_app" {
    - Click "New registration"
 
 2. **Configure Basic Settings**
-   - **Name**: Teams MCP Connector
+   - **Name**: Teams MCP Server
    - **Supported account types**: Accounts in this organizational directory only
    - **Redirect URI**: Web - `https://teams.mcp.example.com/auth/callback`
 
@@ -120,15 +120,7 @@ For detailed explanation, see [Microsoft Graph Permissions - Understanding Conse
 
 **Subsequent reconnections:** User sees a quick "flicker" (brief redirect sequence). This is **normal** - Microsoft validates the existing session through rapid OAuth redirects. Standard Microsoft OAuth behavior. See [FAQ - Login "Flicker"](../faq.md#what-is-the-login-flicker-when-users-reconnect) for details.
 
-### Troubleshooting Consent Issues
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `AADSTS65001` | Consent not granted | Grant admin consent in Azure Portal, then have user sign in again |
-| `AADSTS65005` | User consent required | User must sign in and approve the consent screen |
-| `AADSTS90094` | Admin consent required | Administrator must grant consent for permissions marked "Admin Consent: Yes" |
-
-See [FAQ](../faq.md) for more details.
+For troubleshooting consent issues, see [FAQ - Authentication & Permissions](../faq.md#authentication--permissions).
 
 ## Redirect URI Configuration
 
@@ -140,7 +132,7 @@ https://<your-domain>/auth/callback
 
 Examples:
 - Production: `https://teams.mcp.example.com/auth/callback`
-- Development: `http://localhost:3000/auth/callback`
+- Development: `http://localhost:<port>/auth/callback`
 
 **Multiple redirect URIs** can be configured for different environments.
 
@@ -203,29 +195,7 @@ The `MICROSOFT_WEBHOOK_SECRET` is used to validate incoming webhook notification
 
 This secret is passed to Microsoft when creating Graph subscriptions and returned in webhook payloads for validation.
 
-## Troubleshooting Authentication
-
-### Common Issues
-
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| `AADSTS700016` | Client ID not found | Verify `MICROSOFT_CLIENT_ID` matches app registration |
-| `AADSTS7000215` | Invalid client secret | Rotate client secret and update `MICROSOFT_CLIENT_SECRET` |
-| `AADSTS65001` | Consent not granted | User or admin must consent to permissions |
-| `AADSTS50011` | Redirect URI mismatch | Verify redirect URI matches exactly |
-
-### Verify Configuration
-
-```bash
-# Check app registration details
-az ad app show --id <client-id> --query "{name:displayName,appId:appId,signInAudience:signInAudience}"
-
-# List configured permissions
-az ad app permission list --id <client-id> --query "[].resourceAccess[].id"
-
-# Check admin consent status
-az ad app permission list-grants --id <client-id>
-```
+For troubleshooting authentication issues, see [FAQ - Authentication & Permissions](../faq.md#authentication--permissions).
 
 ## Microsoft Documentation
 
