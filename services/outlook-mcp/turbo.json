@@ -7,7 +7,7 @@
       "outputs": ["dist/**/*"]
     },
     "db:generate": {
-      "dependsOn": ["db:generate"],
+      "dependsOn": ["^db:generate"],
       "outputs": ["drizzle/**/*"]
     },
     "test": {

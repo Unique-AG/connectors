@@ -12,10 +12,7 @@
           "properties": {
             "LOGS_DIAGNOSTICS_DATA_POLICY": {
               "type": "string",
-              "enum": [
-                "conceal",
-                "disclose"
-              ],
+              "enum": ["conceal", "disclose"],
               "description": "Controls whether sensitive data like site names and IDs are logged in full or redacted",
               "default": "conceal"
             }
@@ -99,11 +96,7 @@
                         },
                         "severity": {
                           "type": "string",
-                          "enum": [
-                            "critical",
-                            "warning",
-                            "info"
-                          ],
+                          "enum": ["critical", "warning", "info"],
                           "description": "Alert severity",
                           "default": "warning"
                         }
@@ -156,11 +149,7 @@
                         },
                         "severity": {
                           "type": "string",
-                          "enum": [
-                            "critical",
-                            "warning",
-                            "info"
-                          ],
+                          "enum": ["critical", "warning", "info"],
                           "description": "Alert severity",
                           "default": "warning"
                         }
@@ -213,11 +202,7 @@
                         },
                         "severity": {
                           "type": "string",
-                          "enum": [
-                            "critical",
-                            "warning",
-                            "info"
-                          ],
+                          "enum": ["critical", "warning", "info"],
                           "description": "Alert severity",
                           "default": "warning"
                         }
@@ -243,12 +228,7 @@
     "connectorConfig": {
       "type": "object",
       "description": "SharePoint connector configuration",
-      "required": [
-        "enabled",
-        "sharepoint",
-        "unique",
-        "processing"
-      ],
+      "required": ["enabled", "sharepoint", "unique", "processing"],
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -257,98 +237,60 @@
         "sharepoint": {
           "type": "object",
           "description": "SharePoint configuration",
-          "required": [
-            "tenantId",
-            "baseUrl",
-            "siteIds",
-            "syncColumnName",
-            "auth",
-            "graph"
-          ],
+          "required": ["tenantId", "baseUrl", "siteIds", "syncColumnName", "auth", "graph"],
           "properties": {
             "tenantId": {
               "type": "string",
               "description": "Azure AD tenant ID against which the Graph API calls are made",
-              "examples": [
-                "00000000-0000-0000-0000-000000000000"
-              ]
+              "examples": ["00000000-0000-0000-0000-000000000000"]
             },
             "baseUrl": {
               "type": "string",
               "description": "SharePoint base URL",
-              "examples": [
-                "https://contoso.sharepoint.com",
-                "https://my-company.sharepoint.com"
-              ]
+              "examples": ["https://contoso.sharepoint.com", "https://my-company.sharepoint.com"]
             },
             "siteIds": {
               "type": "array",
               "items": {
                 "type": "string",
-                "examples": [
-                  "00000000-0000-0000-0000-000000000000"
-                ]
+                "examples": ["00000000-0000-0000-0000-000000000000"]
               },
               "description": "SharePoint sites list (UUIDs)",
-              "examples": [
-                [
-                  "00000000-0000-0000-0000-000000000000"
-                ]
-              ]
+              "examples": [["00000000-0000-0000-0000-000000000000"]]
             },
             "syncColumnName": {
               "type": "string",
               "description": "Column name for synchronization",
-              "examples": [
-                "FinanceGPTKnowledge",
-                "MyCustomColumn"
-              ]
+              "examples": ["FinanceGPTKnowledge", "MyCustomColumn"]
             },
             "auth": {
               "type": "object",
               "description": "SharePoint authentication configuration",
-              "required": [
-                "mode",
-                "clientId",
-                "privateKeyPath",
-                "thumbprintSha1"
-              ],
+              "required": ["mode", "clientId", "privateKeyPath", "thumbprintSha1"],
               "properties": {
                 "mode": {
                   "type": "string",
                   "description": "Authentication mode",
-                  "enum": [
-                    "certificate"
-                  ]
+                  "enum": ["certificate"]
                 },
                 "clientId": {
                   "type": "string",
                   "description": "Azure AD application client ID",
-                  "examples": [
-                    "00000000-0000-0000-0000-000000000000"
-                  ]
+                  "examples": ["00000000-0000-0000-0000-000000000000"]
                 },
                 "clientSecret": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": ["string", "null"],
                   "description": "Azure AD application client secret"
                 },
                 "privateKeyPath": {
                   "type": "string",
                   "description": "Path to the private key file of the Azure AD application certificate in PEM format",
-                  "examples": [
-                    "/app/key.pem",
-                    "/my/custom/mount/path/key.pem"
-                  ]
+                  "examples": ["/app/key.pem", "/my/custom/mount/path/key.pem"]
                 },
                 "thumbprintSha1": {
                   "type": "string",
                   "description": "SHA1 thumbprint of the Azure AD application certificate",
-                  "examples": [
-                    "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"
-                  ]
+                  "examples": ["2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"]
                 }
               },
               "additionalProperties": false
@@ -408,18 +350,13 @@
             },
             "ingestionMode": {
               "type": "string",
-              "enum": [
-                "flat",
-                "recursive"
-              ],
+              "enum": ["flat", "recursive"],
               "description": "Ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy (path-based ingestion)"
             },
             "scopeId": {
               "type": "string",
               "description": "Scope ID to be used as root for ingestion. Required for both flat and recursive modes.",
-              "examples": [
-                "scope_bu4gokr0atzj0kfiuaaaaaaa"
-              ]
+              "examples": ["scope_bu4gokr0atzj0kfiuaaaaaaa"]
             },
             "apiRateLimitPerMinute": {
               "type": "integer",
@@ -432,18 +369,12 @@
             },
             "storeInternally": {
               "type": "string",
-              "enum": [
-                "enabled",
-                "disabled"
-              ],
+              "enum": ["enabled", "disabled"],
               "description": "Whether to store content internally in Unique or not."
             },
             "authMode": {
               "type": "string",
-              "enum": [
-                "cluster_local",
-                "external"
-              ],
+              "enum": ["cluster_local", "external"],
               "description": "Communication mode for the Unique Services. cluster_local: communicates using in-cluster URLs and requires serviceExtraHeaders with x-company-id and x-user-id. external: communicates using external URLs and requires authentication via Zitadel."
             },
             "serviceExtraHeaders": {
@@ -469,32 +400,22 @@
             "zitadel": {
               "type": "object",
               "description": "Zitadel authentication configuration (required when authMode is external)",
-              "required": [
-                "clientId",
-                "oauthTokenUrl",
-                "projectId"
-              ],
+              "required": ["clientId", "oauthTokenUrl", "projectId"],
               "properties": {
                 "clientId": {
                   "type": "string",
                   "description": "Zitadel client ID",
-                  "examples": [
-                    "sharepoint-connector@idp.unique.app"
-                  ]
+                  "examples": ["sharepoint-connector@idp.unique.app"]
                 },
                 "oauthTokenUrl": {
                   "type": "string",
                   "description": "Zitadel OAuth token URL",
-                  "examples": [
-                    "https://idp.unique.app/oauth/v2/token"
-                  ]
+                  "examples": ["https://idp.unique.app/oauth/v2/token"]
                 },
                 "projectId": {
                   "type": "string",
                   "description": "Zitadel project ID",
-                  "examples": [
-                    "123456789101112131"
-                  ]
+                  "examples": ["123456789101112131"]
                 }
               },
               "additionalProperties": false
@@ -505,23 +426,13 @@
         "processing": {
           "type": "object",
           "description": "Files processing configuration",
-          "required": [
-            "allowedMimeTypes",
-            "concurrency",
-            "syncMode"
-          ],
+          "required": ["allowedMimeTypes", "concurrency", "syncMode"],
           "properties": {
             "syncMode": {
               "type": "string",
-              "enum": [
-                "content_only",
-                "content_and_permissions"
-              ],
+              "enum": ["content_only", "content_and_permissions"],
               "description": "Mode of synchronization from SharePoint to Unique",
-              "examples": [
-                "content_only",
-                "content_and_permissions"
-              ]
+              "examples": ["content_only", "content_and_permissions"]
             },
             "allowedMimeTypes": {
               "type": "array",
@@ -549,18 +460,13 @@
               "description": "Timeout in seconds for processing steps"
             },
             "maxFileSizeBytes": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": ["integer", "null"],
               "description": "Maximum allowed file size in bytes"
             },
             "scanIntervalCron": {
               "type": "string",
               "description": "Cron expression for the scheduled SharePoint scan interval",
-              "examples": [
-                "*/15 * * * *"
-              ]
+              "examples": ["*/15 * * * *"]
             }
           },
           "additionalProperties": false

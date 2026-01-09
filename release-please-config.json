@@ -64,6 +64,27 @@
           "path": "deploy/helm-charts/sharepoint-connector/values.yaml"
         }
       ]
+    },
+    "services/teams-mcp": {
+      "prerelease": true,
+      "prerelease-type": "alpha",
+      "versioning": "prerelease",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/teams-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/teams-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/teams-mcp/values.yaml"
+        }
+      ]
     }
   }
 }
