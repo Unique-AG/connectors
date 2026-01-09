@@ -30,6 +30,7 @@ sharepoint:
       storeInternally: enabled
       syncStatus: active
       syncMode: content_only
+      permissionsInheritanceMode: inherit_scopes_and_files
 
 unique:
   serviceAuthMode: cluster_local
