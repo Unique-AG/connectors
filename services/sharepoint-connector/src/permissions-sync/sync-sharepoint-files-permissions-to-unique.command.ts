@@ -124,8 +124,9 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
       this.logger.debug(
         `${logPrefix}[Scope: ${scopeId}] Adding ${permissionsToAdd.length} permissions`,
       );
-      await this.uniqueFilesService.addAccesses(scopeId, permissionsToAdd);
-      totalPermissionsAdded += permissionsToAdd.length;
+
+      const addedCount = await this.uniqueFilesService.addAccesses(scopeId, permissionsToAdd);
+      totalPermissionsAdded += addedCount;
     }
 
     this.logger.log(
@@ -136,8 +137,11 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
       this.logger.debug(
         `${logPrefix}[Scope: ${scopeId}] Removing ${permissionsToRemove.length} permissions`,
       );
-      await this.uniqueFilesService.removeAccesses(scopeId, permissionsToRemove);
-      totalPermissionsRemoved += permissionsToRemove.length;
+      const removedCount = await this.uniqueFilesService.removeAccesses(
+        scopeId,
+        permissionsToRemove,
+      );
+      totalPermissionsRemoved += removedCount;
     }
 
     if (totalPermissionsAdded > 0) {

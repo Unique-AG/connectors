@@ -160,7 +160,6 @@ describe('FetchGraphPermissionsMapQuery', () => {
           {
             user: {
               id: 'user-1',
-              email: 'sensitive.email@example.com',
             },
           } as SimpleIdentitySet,
         ],
@@ -193,7 +192,6 @@ describe('FetchGraphPermissionsMapQuery', () => {
           {
             siteUser: {
               id: 'site-user-1',
-              email: 'sensitive.siteuser@example.com',
               loginName: 'sensitive\\loginname',
             },
           } as SimpleIdentitySet,
@@ -235,13 +233,12 @@ describe('FetchGraphPermissionsMapQuery', () => {
           {
             user: {
               id: 'user-1',
-              email: 'sensitive.user@example.com',
+              email: 'sensitive.user-unparsable',
             },
           } as SimpleIdentitySet,
           {
             siteUser: {
               id: 'site-user-1',
-              email: 'sensitive.siteuser@example.com',
               loginName: 'sensitive\\login',
             },
           } as SimpleIdentitySet,

@@ -1,8 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { chunk } from 'remeda';
 import { Config } from '../../config';
-import { BatchProcessorService } from '../../shared/services/batch-processor.service';
+import { getErrorCodeFromGraphqlRequest } from '../../utils/graphql-error.util';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
+import { sanitizeError } from '../../utils/normalize-error';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   ADD_ACCESSES_MUTATION,
@@ -28,6 +30,11 @@ import { UniqueFile, UniqueFileAccessInput } from './unique-files.types';
 
 const BATCH_SIZE = 100;
 
+// We decide for this batch size because on the Unique side, for each permission requested we make a
+// concurrent call to node-ingestion and further to Zitadel, so we want to avoid overwhelming the
+// system when we have a huge folder with many files.
+const ACCESS_BATCH_SIZE = 20;
+
 @Injectable()
 export class UniqueFilesService {
   private readonly logger = new Logger(this.constructor.name);
@@ -35,7 +42,6 @@ export class UniqueFilesService {
   public constructor(
     @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
     private readonly configService: ConfigService<Config, true>,
-    private readonly batchProcessor: BatchProcessorService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -151,17 +157,24 @@ export class UniqueFilesService {
     return result.paginatedContent.totalCount;
   }
 
-  public async addAccesses(scopeId: string, fileAccesses: UniqueFileAccessInput[]): Promise<void> {
+  // We may encounter 400 errors when adding permissions to Unique, we encountered some cases where
+  // users do not have sufficient permissions to be even given file permissions. For that reason we
+  // retry one-by-one after 400 failure to pinpoint the exact user that is causing the issue and
+  // ensure the rest is handled as expected.
+  public async addAccesses(
+    scopeId: string,
+    fileAccesses: UniqueFileAccessInput[],
+  ): Promise<number> {
     if (fileAccesses.length === 0) {
-      return;
+      return 0;
     }
 
     const logPrefix = `[Scope: ${scopeId}]`;
+    const batches = chunk(fileAccesses, ACCESS_BATCH_SIZE);
+    let successCount = 0;
 
-    await this.batchProcessor.processInBatches({
-      items: fileAccesses,
-      batchSize: BATCH_SIZE,
-      processor: async (batch) => {
+    for (const batch of batches) {
+      try {
         await this.ingestionClient.request<AddAccessesMutationResult, AddAccessesMutationInput>(
           ADD_ACCESSES_MUTATION,
           {
@@ -169,27 +182,60 @@ export class UniqueFilesService {
             fileAccesses: batch,
           },
         );
-        return []; // No results to return for mutations
-      },
-      logger: this.logger,
-      logPrefix,
-    });
+        successCount += batch.length;
+      } catch (error) {
+        const statusCode = getErrorCodeFromGraphqlRequest(error);
+
+        if (statusCode !== 400) {
+          throw error;
+        }
+
+        this.logger.warn({
+          msg: `${logPrefix} Failed to batch add file accesses, retrying one-by-one`,
+          scopeId,
+          batchSize: batch.length,
+          statusCode,
+        });
+
+        for (const permission of batch) {
+          try {
+            await this.ingestionClient.request<AddAccessesMutationResult, AddAccessesMutationInput>(
+              ADD_ACCESSES_MUTATION,
+              {
+                scopeId,
+                fileAccesses: [permission],
+              },
+            );
+            successCount += 1;
+          } catch (singleError) {
+            this.logger.error({
+              msg: `${logPrefix} Failed to add single file access`,
+              scopeId,
+              permission,
+              error: sanitizeError(singleError),
+            });
+          }
+        }
+      }
+    }
+
+    return successCount;
   }
 
   public async removeAccesses(
     scopeId: string,
     fileAccesses: UniqueFileAccessInput[],
-  ): Promise<void> {
+  ): Promise<number> {
     if (fileAccesses.length === 0) {
-      return;
+      return 0;
     }
 
     const logPrefix = `[Scope: ${scopeId}]`;
+    const batches = chunk(fileAccesses, ACCESS_BATCH_SIZE);
+    let successCount = 0;
 
-    await this.batchProcessor.processInBatches({
-      items: fileAccesses,
-      batchSize: BATCH_SIZE,
-      processor: async (batch) => {
+    for (const batch of batches) {
+      try {
         await this.ingestionClient.request<
           RemoveAccessesMutationResult,
           RemoveAccessesMutationInput
@@ -197,10 +243,43 @@ export class UniqueFilesService {
           scopeId,
           fileAccesses: batch,
         });
-        return []; // No results to return for mutations
-      },
-      logger: this.logger,
-      logPrefix,
-    });
+        successCount += batch.length;
+      } catch (error) {
+        const statusCode = getErrorCodeFromGraphqlRequest(error);
+
+        if (statusCode !== 400) {
+          throw error;
+        }
+
+        this.logger.warn({
+          msg: `${logPrefix} Failed to batch remove file accesses, retrying one-by-one`,
+          scopeId,
+          batchSize: batch.length,
+          statusCode,
+        });
+
+        for (const permission of batch) {
+          try {
+            await this.ingestionClient.request<
+              RemoveAccessesMutationResult,
+              RemoveAccessesMutationInput
+            >(REMOVE_ACCESSES_MUTATION, {
+              scopeId,
+              fileAccesses: [permission],
+            });
+            successCount += 1;
+          } catch (singleError) {
+            this.logger.error({
+              msg: `${logPrefix} Failed to remove single file access`,
+              scopeId,
+              permission,
+              error: sanitizeError(singleError),
+            });
+          }
+        }
+      }
+    }
+
+    return successCount;
   }
 }
