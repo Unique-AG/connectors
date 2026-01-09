@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.0.0-beta.9](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.8...sharepoint-connector@2.0.0-beta.9) (2026-01-09)
+
+
+### Features
+
+* **sharepoint-connector:** add configurable file and scope inheritance ([#165](https://github.com/Unique-AG/connectors/issues/165)) ([dc03134](https://github.com/Unique-AG/connectors/commit/dc031342b2d7a280a155b7188d7fee25f1aa15be))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** Improve permissions sync error handling and reliability ([#197](https://github.com/Unique-AG/connectors/issues/197)) ([5129ce5](https://github.com/Unique-AG/connectors/commit/5129ce5339257afb5dbfee916c64e25c010c9842))
+* **sharepoint-connector:** removed sensitive data from warning log ([#186](https://github.com/Unique-AG/connectors/issues/186)) ([9d71b95](https://github.com/Unique-AG/connectors/commit/9d71b95885c5ddcae235fc79b4bd8fca9b0658a3))
+
 ## [2.0.0-beta.8](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.7...sharepoint-connector@2.0.0-beta.8) (2025-12-11)
 
 
