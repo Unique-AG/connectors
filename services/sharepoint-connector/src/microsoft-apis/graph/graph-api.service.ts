@@ -178,7 +178,12 @@ export class GraphApiService {
 
   public async getAspxPagesForSite(siteId: string): Promise<SharepointContentItem[]> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
     const lists = await this.getSiteLists(siteId);
+
+    if (maxFilesToScan) {
+      this.logger.warn(`Items scan limit set to ${maxFilesToScan} items for testing purpose.`);
+    }
 
     // Scan ASPX files from SitePages list
     const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
@@ -191,6 +196,7 @@ export class GraphApiService {
       const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
         siteId,
         sitePagesList.id,
+        maxFilesToScan,
       );
       this.logger.log(
         `${logPrefix} Found ${aspxSharepointContentItems.length} ASPX files from SitePages`,
@@ -227,7 +233,11 @@ export class GraphApiService {
     }
   }
 
-  public async getAspxListItems(siteId: string, listId: string): Promise<SharepointContentItem[]> {
+  public async getAspxListItems(
+    siteId: string,
+    listId: string,
+    maxItemsToScan?: number,
+  ): Promise<SharepointContentItem[]> {
     const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     try {
@@ -260,6 +270,13 @@ export class GraphApiService {
         };
 
         aspxItems.push(aspxSharepointContentItem);
+
+        if (maxItemsToScan && aspxItems.length >= maxItemsToScan) {
+          this.logger.log(
+            `${logPrefix} Reached scan limit of ${maxItemsToScan} items in SitePages list ${listId}, stopping scan`,
+          );
+          break;
+        }
       }
 
       this.logger.log(`${logPrefix} Found ${aspxItems.length} ASPX files in SitePages list`);

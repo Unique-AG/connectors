@@ -3,10 +3,10 @@
 
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 
-export type UserMembership = {
+export interface UserMembership {
   type: 'user';
   email: string;
-};
+}
 
 export type GroupMembership =
   | {

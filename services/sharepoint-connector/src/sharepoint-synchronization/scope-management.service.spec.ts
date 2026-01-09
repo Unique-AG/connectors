@@ -1,5 +1,7 @@
+import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Config } from '../config';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
@@ -114,8 +116,11 @@ describe('ScopeManagementService', () => {
     siteName: 'test-site',
   };
 
+  type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };
+
   let service: ScopeManagementService;
   let createScopesMock: ReturnType<typeof vi.fn>;
+  let configServiceMock: ConfigServiceMock;
 
   beforeEach(async () => {
     createScopesMock = vi.fn().mockResolvedValue(
@@ -127,12 +132,25 @@ describe('ScopeManagementService', () => {
       })),
     );
 
+    configServiceMock = {
+      get: vi.fn((key: string) => {
+        if (key === 'processing.syncMode') return 'content_only';
+        if (key === 'unique.inheritScopePermissions') return true;
+        if (key === 'app.logsDiagnosticsDataPolicy') {
+          return 'conceal';
+        }
+        return undefined;
+      }),
+    } as unknown as ConfigServiceMock;
+
     const { unit } = await TestBed.solitary(ScopeManagementService)
       .mock<UniqueScopesService>(UniqueScopesService)
       .impl((stubFn) => ({
         ...stubFn(),
         createScopesBasedOnPaths: createScopesMock,
       }))
+      .mock<ConfigService<Config, true>>(ConfigService)
+      .impl(() => configServiceMock)
       .compile();
 
     service = unit;
@@ -218,9 +236,9 @@ describe('ScopeManagementService', () => {
 
       const [paths, options] = createScopesMock.mock.calls[0] as [
         string[],
-        { includePermissions: boolean },
+        { includePermissions: boolean; inheritAccess: boolean },
       ];
-      expect(options).toEqual({ includePermissions: true });
+      expect(options).toEqual({ includePermissions: true, inheritAccess: true });
       expect(paths).toEqual(
         expect.arrayContaining([
           '/test1',
@@ -229,6 +247,48 @@ describe('ScopeManagementService', () => {
           '/test1/test1/UniqueAG/SitePages',
         ]),
       );
+    });
+
+    it('disables inheritance when permission sync mode is enabled', async () => {
+      configServiceMock.get.mockImplementation((key: string) => {
+        if (key === 'processing.syncMode') return 'content_and_permissions';
+        if (key === 'unique.inheritScopePermissions') return false;
+        if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
+        return undefined;
+      });
+
+      await service.batchCreateScopes(
+        [createDriveContentItem('UniqueAG/SitePages')],
+        [],
+        mockContext,
+      );
+
+      const [, options] = createScopesMock.mock.calls[0] as [
+        string[],
+        { includePermissions: boolean; inheritAccess: boolean },
+      ];
+      expect(options.inheritAccess).toBe(false);
+    });
+
+    it('uses explicit inheritAccess configuration when provided', async () => {
+      configServiceMock.get.mockImplementation((key: string) => {
+        if (key === 'unique.inheritScopePermissions') return true;
+        if (key === 'processing.syncMode') return 'content_only';
+        if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
+        return undefined;
+      });
+
+      await service.batchCreateScopes(
+        [createDriveContentItem('UniqueAG/SitePages')],
+        [],
+        mockContext,
+      );
+
+      const [, options] = createScopesMock.mock.calls[0] as [
+        string[],
+        { includePermissions: boolean; inheritAccess: boolean },
+      ];
+      expect(options.inheritAccess).toBe(true);
     });
 
     it('returns empty list when no items provided', async () => {
@@ -247,9 +307,7 @@ describe('ScopeManagementService', () => {
 
       // The logger is globally mocked, so we can check the mock calls
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].log).toHaveBeenCalledWith(
-        expect.stringContaining('[Site: site-123]'),
-      );
+      expect(service['logger'].log).toHaveBeenCalledWith(expect.stringContaining('[Site:'));
     });
   });
 
@@ -290,7 +348,9 @@ describe('ScopeManagementService', () => {
 
       // The logger is globally mocked, so we can check the mock calls
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].warn).toHaveBeenCalledWith(expect.stringContaining('UnknownFolder'));
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.stringContaining('Scope not found in cache for path'),
+      );
     });
   });
 
@@ -300,12 +360,23 @@ describe('ScopeManagementService', () => {
     beforeEach(async () => {
       updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
 
+      const configService = {
+        get: vi.fn((key: string) => {
+          if (key === 'processing.syncMode') return 'content_only';
+          if (key === 'unique.inheritScopePermissions') return true;
+          if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
+          return undefined;
+        }),
+      };
+
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
         .impl((stubFn) => ({
           ...stubFn(),
           updateScopeExternalId: updateScopeExternalIdMock,
         }))
+        .mock<ConfigService<Config, true>>(ConfigService)
+        .impl(() => configService as unknown as ConfigService<Config, true>)
         .compile();
 
       service = unit;
@@ -422,7 +493,7 @@ describe('ScopeManagementService', () => {
       );
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].warn).toHaveBeenCalledWith(
-        expect.stringContaining('No external ID found for path /test1/ChildScope'),
+        expect.stringContaining('No external ID found for path'),
       );
     });
 

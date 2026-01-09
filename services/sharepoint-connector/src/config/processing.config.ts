@@ -7,15 +7,18 @@ import {
   DEFAULT_PROCESSING_CONCURRENCY,
   DEFAULT_STEP_TIMEOUT_SECONDS,
 } from '../constants/defaults.constants';
+import { parseCommaSeparatedArray } from '../utils/config.util';
+
+export const SyncModeSchema = z
+  .enum(['content_only', 'content_and_permissions'])
+  .describe(
+    'Mode of synchronization from SharePoint to Unique. ' +
+      'content_only: sync only the content, ' +
+      'content_and_permissions: sync both content and permissions',
+  );
 
 export const ProcessingConfigSchema = z.object({
-  syncMode: z
-    .enum(['content_only', 'content_and_permissions'])
-    .describe(
-      'Mode of synchronization from SharePoint to Unique. ' +
-        'content_only: sync only the content, ' +
-        'content_and_permissions: sync both content and permissions',
-    ),
+  syncMode: SyncModeSchema,
   stepTimeoutSeconds: z.coerce
     .number()
     .int()
@@ -40,21 +43,17 @@ export const ProcessingConfigSchema = z.object({
     ),
   allowedMimeTypes: z
     .string()
-    .transform((val) =>
-      val
-        ? val
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [],
-    )
+    .transform(parseCommaSeparatedArray)
+    .pipe(z.array(z.string()))
     .describe('Comma-separated list of allowed MIME types for files to sync'),
   maxFilesToScan: z
     .preprocess(
       (val) => (val === '' ? undefined : val),
       z.coerce.number().int().positive().optional(),
     )
-    .describe('For testing purpose. Maximum number of files to scan. Unlimited if not set'),
+    .describe(
+      'For testing purpose. Maximum number of files and items to scan. They are treated separately, so if you set a value of 10 it will scan 10 files and 10 site pages. Unlimited if not set',
+    ),
   scanIntervalCron: z
     .string()
     .default(CRON_EVERY_15_MINUTES)

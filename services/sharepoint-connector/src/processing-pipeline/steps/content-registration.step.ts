@@ -58,10 +58,11 @@ export class ContentRegistrationStep implements IPipelineStep {
 
     context.metadata = contentRegistrationRequest.metadata;
 
-    const syncMode = this.configService.get('processing.syncMode', { infer: true });
+    const inheritFiles = this.configService.get('unique.inheritFilePermissions', { infer: true });
     // We add permissions only for new files, because existing ones should already have correct
-    // permissions (including service user permissions) and we don't want to override them.
-    if (syncMode === 'content_and_permissions' && context.fileStatus === 'new') {
+    // permissions (including service user permissions) and we don't want to override them; applies
+    // when inheritance is disabled or when syncing permissions.
+    if (!inheritFiles && context.fileStatus === 'new') {
       contentRegistrationRequest.fileAccess = [
         `u:${context.syncContext.serviceUserId}R`,
         `u:${context.syncContext.serviceUserId}W`,

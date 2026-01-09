@@ -1,14 +1,13 @@
 import { SetMetadata } from '@nestjs/common';
 import { MCP_RESOURCE_TEMPLATE_METADATA_KEY } from './constants';
 
-export type ResourceTemplateOptions =
+export interface ResourceTemplateOptions {
   // https://modelcontextprotocol.io/docs/concepts/resources#resource-templates
-  {
-    uriTemplate: string; // URI template following RFC 6570
-    name?: string; // Human-readable name
-    description?: string; // Optional description
-    mimeType?: string; // Optional MIME type
-  };
+  uriTemplate: string; // URI template following RFC 6570
+  name?: string; // Human-readable name
+  description?: string; // Optional description
+  mimeType?: string; // Optional MIME type
+}
 
 export interface ResourceTemplateMetadata {
   uriTemplate: string; // URI template following RFC 6570

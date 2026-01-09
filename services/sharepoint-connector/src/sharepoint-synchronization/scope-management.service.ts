@@ -153,8 +153,10 @@ export class ScopeManagementService {
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
+    const inheritScopes = this.configService.get('unique.inheritScopePermissions', { infer: true });
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
+      inheritAccess: inheritScopes,
     });
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes`);
 
