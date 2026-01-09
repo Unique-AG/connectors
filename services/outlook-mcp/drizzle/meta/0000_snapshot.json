@@ -101,12 +101,8 @@
           "name": "authorization_codes_user_profile_id_user_profiles_id_fk",
           "tableFrom": "authorization_codes",
           "tableTo": "user_profiles",
-          "columnsFrom": [
-            "user_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -116,9 +112,7 @@
         "authorization_codes_code_unique": {
           "name": "authorization_codes_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "code"
-          ]
+          "columns": ["code"]
         }
       },
       "policies": {},
@@ -229,9 +223,7 @@
         "oauth_clients_clientId_unique": {
           "name": "oauth_clients_clientId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "client_id"
-          ]
+          "columns": ["client_id"]
         }
       },
       "policies": {},
@@ -330,9 +322,7 @@
         "oauth_sessions_sessionId_unique": {
           "name": "oauth_sessions_sessionId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "session_id"
-          ]
+          "columns": ["session_id"]
         }
       },
       "policies": {},
@@ -483,12 +473,8 @@
           "name": "tokens_user_profile_id_user_profiles_id_fk",
           "tableFrom": "tokens",
           "tableTo": "user_profiles",
-          "columnsFrom": [
-            "user_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "cascade"
         }
@@ -498,9 +484,7 @@
         "tokens_token_unique": {
           "name": "tokens_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -593,10 +577,7 @@
         "user_profiles_provider_providerUserId_unique": {
           "name": "user_profiles_provider_providerUserId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "provider_user_id"
-          ]
+          "columns": ["provider", "provider_user_id"]
         }
       },
       "policies": {},
@@ -608,10 +589,7 @@
     "public.token_type": {
       "name": "token_type",
       "schema": "public",
-      "values": [
-        "ACCESS",
-        "REFRESH"
-      ]
+      "values": ["ACCESS", "REFRESH"]
     }
   },
   "schemas": {},

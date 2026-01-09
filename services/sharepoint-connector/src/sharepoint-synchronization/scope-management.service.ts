@@ -4,6 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
 import { Config } from '../config';
+import { getInheritanceSettings } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
@@ -186,8 +187,10 @@ export class ScopeManagementService {
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
+    const { inheritScopes } = getInheritanceSettings(context.siteConfig);
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
+      inheritAccess: inheritScopes,
     });
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes`);
 

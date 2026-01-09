@@ -294,9 +294,13 @@ export class FetchGroupsWithMembershipsQuery {
   }: SiteGroupMembership): Membership | null {
     const principalTypeMapper: Record<PrincipalType, () => Membership | null> = {
       [PrincipalType.User]: () => {
+        // In some specific cases, that are rather unclear, there may be no email specified in the
+        // SharePoint REST API response, but it may be present in loginName field which looks like
+        // "i:0#.f|membership|user@dogfood.industries".
         const userEmail = email || loginName.split('|').pop() || '';
-        // We check if the value resembles an email because of cases like SHAREPOINT\\system
-        return userEmail?.includes('@') ? { type: 'user', email: userEmail } : null;
+        // Ensure the value resembles an email and we did not get something else, like
+        // "SHAREPOINT\\system", from loginName split.
+        return userEmail.includes('@') ? { type: 'user', email: userEmail } : null;
       },
       [PrincipalType.DistributionList]: () => {
         const groupId = this.extractGroupId(loginName);

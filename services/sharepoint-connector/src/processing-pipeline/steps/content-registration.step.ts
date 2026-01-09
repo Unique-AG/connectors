@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
+import { getInheritanceSettings } from '../../config/sharepoint.schema';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { ModerationStatusValue } from '../../constants/moderation-status.constants';
@@ -61,10 +62,11 @@ export class ContentRegistrationStep implements IPipelineStep {
 
     context.metadata = contentRegistrationRequest.metadata;
 
-    const syncMode = context.syncContext.siteConfig.syncMode;
+    const { inheritFiles } = getInheritanceSettings(context.syncContext.siteConfig);
     // We add permissions only for new files, because existing ones should already have correct
-    // permissions (including service user permissions) and we don't want to override them.
-    if (syncMode === 'content_and_permissions' && context.fileStatus === 'new') {
+    // permissions (including service user permissions) and we don't want to override them; applies
+    // when inheritance is disabled or when syncing permissions.
+    if (!inheritFiles && context.fileStatus === 'new') {
       contentRegistrationRequest.fileAccess = [
         `u:${context.syncContext.serviceUserId}R`,
         `u:${context.syncContext.serviceUserId}W`,

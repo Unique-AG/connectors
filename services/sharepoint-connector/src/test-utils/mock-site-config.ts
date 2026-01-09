@@ -11,5 +11,6 @@ export const createMockSiteConfig = (overrides?: Partial<SiteConfig>): SiteConfi
   storeInternally: StoreInternallyMode.Enabled,
   syncStatus: 'active',
   syncMode: 'content_only',
+  permissionsInheritanceMode: 'inherit_scopes_and_files',
   ...overrides,
 });

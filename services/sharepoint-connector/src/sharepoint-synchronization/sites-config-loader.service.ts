@@ -222,6 +222,7 @@ export class SitesConfigLoaderService {
         storeInternally: fields.storeInternally,
         syncStatus: fields.syncStatus,
         syncMode: fields.syncMode,
+        permissionsInheritanceMode: fields.permissionsInheritanceMode,
       };
 
       return SiteConfigSchema.parse(siteConfig);

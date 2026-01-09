@@ -146,11 +146,29 @@ export class FetchGraphPermissionsMapQuery {
       };
     }
 
-    if (isNonNullish(simpleIdentitySet.user) && isNonNullish(simpleIdentitySet.siteUser)) {
-      return {
-        type: 'user',
-        email: simpleIdentitySet.user.email,
-      };
+    if (isNonNullish(simpleIdentitySet.user) || isNonNullish(simpleIdentitySet.siteUser)) {
+      let userEmail: string | undefined;
+
+      if (isNonNullish(simpleIdentitySet.user)) {
+        userEmail = simpleIdentitySet.user.email;
+      }
+
+      // We handle the case where only siteUser is present, because such case may occur when user is
+      // deleted from Entra but they still have old sharing permissions in SharePoint.
+      // This section is not handled with `else if` because `user` may be an object but email may be
+      // missing there, and we may fall back on the loginName from `siteUser`.
+      if (!userEmail && isNonNullish(simpleIdentitySet.siteUser)) {
+        // In some specific cases, that are rather unclear, there may be no email in the user object,
+        // but it may be present in the siteUser object, as part of the loginName which looks like
+        // "i:0#.f|membership|user@dogfood.industries".
+        userEmail =
+          simpleIdentitySet.siteUser.email || simpleIdentitySet.siteUser.loginName.split('|').pop();
+      }
+
+      // Ensure the value resembles an email and we did not get something else from loginName split.
+      if (userEmail?.includes('@')) {
+        return { type: 'user', email: userEmail };
+      }
     }
 
     this.logger.warn(`Unknown identity set: ${Object.keys(simpleIdentitySet).join(', ')}`);

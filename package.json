@@ -21,7 +21,7 @@
     "clean:force": "rimraf -g \"**/node_modules\" \"**/.turbo\" \"**/dist\" \"**/.turbo\" \"**/coverage\" \"**/@generated\" \"**/*.tsbuildinfo\" && pnpm store prune && pnpm cache delete"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.2",
+    "@biomejs/biome": "2.3.11",
     "rimraf": "^6.0.1",
     "syncpack": "14.0.0-alpha.19",
     "turbo": "^2.6.0",

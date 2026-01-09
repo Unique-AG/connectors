@@ -13,6 +13,7 @@ describe('GraphApiService', () => {
     api: ReturnType<typeof vi.fn>;
   };
   let mockFileFilterService: Partial<FileFilterService>;
+  let maxFilesToScanConfig: number | undefined;
 
   const mockDrive = { id: 'drive-1', name: 'Documents' };
 
@@ -20,6 +21,7 @@ describe('GraphApiService', () => {
     mockGraphClient = {
       api: vi.fn(),
     };
+    maxFilesToScanConfig = undefined;
 
     const mockChain = {
       get: vi.fn(),
@@ -54,6 +56,9 @@ describe('GraphApiService', () => {
       isFileValidForIngestion: vi
         .fn()
         .mockReturnValue(true) as unknown as FileFilterService['isFileValidForIngestion'],
+      isListItemValidForIngestion: vi
+        .fn()
+        .mockReturnValue(true) as unknown as FileFilterService['isListItemValidForIngestion'],
     };
 
     const { unit } = await TestBed.solitary(GraphApiService)
@@ -64,10 +69,11 @@ describe('GraphApiService', () => {
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
-        get: vi.fn((key: string, defaultValue?: number) => {
-          if (key === 'sharepoint.graphApiRateLimitPerMinute') return defaultValue ?? 10000;
+        get: vi.fn((key: string) => {
+          if (key === 'sharepoint.graphApiRateLimitPerMinute') return 10000;
           if (key === 'processing.maxFileSizeBytes') return 10485760;
-          return defaultValue;
+          if (key === 'processing.maxFilesToScan') return maxFilesToScanConfig;
+          return undefined;
         }),
       }))
       .mock(FileFilterService)
@@ -275,6 +281,43 @@ describe('GraphApiService', () => {
         expect(result.items[0].itemType === 'driveItem').toBe(true);
         expect((result.items[0].item as DriveItem).name).toBe('test.pdf');
       }
+    });
+
+    it('limits site pages by maxFilesToScan', async () => {
+      const firstItem = {
+        id: 'item-1',
+        fields: {
+          FileLeafRef: 'page1.aspx',
+          Title: 'Page 1',
+        },
+        webUrl: '/sites/site-1/sitepages/page1.aspx',
+        lastModifiedDateTime: '2024-01-01T00:00:00Z',
+        createdDateTime: '2024-01-01T00:00:00Z',
+      };
+      const secondItem = {
+        id: 'item-2',
+        fields: {
+          FileLeafRef: 'page2.aspx',
+          Title: 'Page 2',
+        },
+        webUrl: '/sites/site-1/sitepages/page2.aspx',
+        lastModifiedDateTime: '2024-01-02T00:00:00Z',
+        createdDateTime: '2024-01-02T00:00:00Z',
+      };
+
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing limit
+      (service as any).paginateGraphApiRequest = vi.fn().mockResolvedValue([firstItem, secondItem]);
+      maxFilesToScanConfig = 1;
+
+      const result = await service.getAspxListItems(
+        'site-1',
+        'list-1',
+        'FinanceGPTKnowledge',
+        maxFilesToScanConfig,
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.fileName).toBe('Page 1');
     });
   });
 

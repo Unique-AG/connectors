@@ -3,6 +3,11 @@ import { gql } from 'graphql-request';
 export interface ListUsersQueryInput {
   skip: number;
   take: number;
+  where?: {
+    active?: {
+      equals: boolean;
+    };
+  };
 }
 
 export interface ListUsersQueryResult {
@@ -17,8 +22,8 @@ export interface ListUsersQueryResult {
 }
 
 export const LIST_USERS_QUERY = gql`
-  query ListUsers($skip: Int!, $take: Int!) {
-    listUsers: paginatedUsers(skip: $skip, take: $take) {
+  query ListUsers($skip: Int!, $take: Int!, $where: UserWhereInput) {
+    listUsers: paginatedUsers(skip: $skip, take: $take, where: $where) {
       totalCount
       nodes {
         id

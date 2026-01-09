@@ -22,4 +22,6 @@ export const sharepointConfig = registerAs('sharepoint', (): SharepointConfig =>
   return config;
 });
 
-export type SharepointConfigNamespaced = { sharepoint: SharepointConfig };
+export interface SharepointConfigNamespaced {
+  sharepoint: SharepointConfig;
+}

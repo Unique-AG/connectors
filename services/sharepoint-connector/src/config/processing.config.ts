@@ -6,4 +6,6 @@ export const processingConfig = registerAs('processing', (): ProcessingConfig =>
   return ProcessingConfigSchema.parse(getTenantConfig().processing);
 });
 
-export type ProcessingConfigNamespaced = { processing: ProcessingConfig };
+export interface ProcessingConfigNamespaced {
+  processing: ProcessingConfig;
+}

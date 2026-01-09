@@ -189,10 +189,13 @@ export class SyncSharepointGroupsToUniqueCommand {
   ): Promise<[groupUpdated: boolean, UniqueGroupWithMembers | null]> {
     const memberIdsFromSharePoint = getUniqueMemberIds(sharePointGroup, uniqueUsersMap);
 
-    if (memberIdsFromSharePoint.length === 0) {
-      await this.uniqueGroupsService.deleteGroup(uniqueGroup.id);
-      return [true, null];
-    }
+    // TODO: Uncomment this once https://unique-ch.atlassian.net/browse/UN-15272 is resolved.
+    //       We've encountered a problem where scope accesses are not cleared correctly resulting in
+    //       orphaned scope accesses that we could no longer delete due to access checks.
+    // if (memberIdsFromSharePoint.length === 0) {
+    //   await this.uniqueGroupsService.deleteGroup(uniqueGroup.id);
+    //   return [true, null];
+    // }
 
     let groupUpdated = false;
 

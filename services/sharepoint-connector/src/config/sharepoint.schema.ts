@@ -3,6 +3,20 @@ import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.const
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { Redacted } from '../utils/redacted';
+import {
+  INHERITANCE_MODES_MAP,
+  type InheritanceSettings,
+  type PermissionsInheritanceMode,
+} from './unique.config';
+
+export const PermissionsInheritanceModeSchema = z
+  .enum(['inherit_scopes_and_files', 'inherit_scopes', 'inherit_files', 'none'] as const)
+  .default('inherit_scopes_and_files')
+  .describe(
+    'Inheritance mode for generated scopes and ingested files. ' +
+      'Only used in content_only sync mode; ignored in content_and_permissions mode. ' +
+      'Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.',
+  );
 
 const oidcAuthConfig = z.object({
   mode: z.literal('oidc').describe('Authentication mode to use for Microsoft APIs'),
@@ -95,9 +109,17 @@ export const SiteConfigSchema = z.object({
         'content_only: sync only the content, ' +
         'content_and_permissions: sync both content and permissions',
     ),
+  permissionsInheritanceMode: PermissionsInheritanceModeSchema,
 });
 
 export type SiteConfig = z.infer<typeof SiteConfigSchema>;
+
+export function getInheritanceSettings(siteConfig: SiteConfig): InheritanceSettings {
+  if (siteConfig.syncMode === 'content_and_permissions') {
+    return { inheritFiles: false, inheritScopes: false };
+  }
+  return INHERITANCE_MODES_MAP[siteConfig.permissionsInheritanceMode as PermissionsInheritanceMode];
+}
 
 // Configuration source options
 const staticSitesConfig = z.object({

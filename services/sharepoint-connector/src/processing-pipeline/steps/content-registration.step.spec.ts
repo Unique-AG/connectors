@@ -180,4 +180,37 @@ describe('ContentRegistrationStep', () => {
       }),
     );
   });
+
+  it('locks down file access when only scopes inheritance is enabled', async () => {
+    const { unit } = await TestBed.solitary(ContentRegistrationStep)
+      .mock(ConfigService)
+      .impl((stub) => ({
+        ...stub(),
+        get: vi.fn((k: string) => {
+          if (k === 'unique.scopeId') return 'scope-1';
+          if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
+          if (k === 'unique.serviceAuthMode') return 'external';
+          return undefined;
+        }),
+      }))
+      .mock(UniqueFileIngestionService)
+      .impl(() => uniqueFileIngestionServiceMock)
+      .compile();
+
+    const context = createMockContext();
+    context.syncContext.siteConfig = createMockSiteConfig({
+      syncMode: 'content_only',
+      permissionsInheritanceMode: 'inherit_scopes', // inheritScopes: true, inheritFiles: false
+    });
+    context.fileStatus = 'new';
+    context.syncContext.serviceUserId = 'user-1';
+
+    await unit.execute(context);
+
+    expect(uniqueFileIngestionServiceMock.registerContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileAccess: ['u:user-1R', 'u:user-1W', 'u:user-1M'],
+      }),
+    );
+  });
 });

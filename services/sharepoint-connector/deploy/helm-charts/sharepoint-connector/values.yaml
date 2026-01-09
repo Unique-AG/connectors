@@ -198,6 +198,10 @@ connectorConfig:
         storeInternally: enabled
         syncStatus: active
         syncMode: content_and_permissions
+        # -- THIS CONFIG HAS EFFECT ONLY IN CONTENT_ONLY SYNC MODE: inheritance mode for scopes and files.
+        # Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.
+        # When unset, defaults to inherit_scopes_and_files; ignored in content_and_permissions.
+        permissionsInheritanceMode: inherit_scopes_and_files
       # Example: Additional site with different settings
       # - siteId: 00000000-0000-0000-0000-000000000001
       #   syncColumnName: HRKnowledge
@@ -207,6 +211,7 @@ connectorConfig:
       #   storeInternally: enabled
       #   syncStatus: active
       #   syncMode: content_only
+      #   permissionsInheritanceMode: inherit_scopes_and_files
 
   unique:
     # -- communication mode for the Unique Services

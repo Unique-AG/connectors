@@ -20,6 +20,7 @@ describe('SitesConfigLoaderService', () => {
           storeInternally: StoreInternallyMode.Enabled,
           syncStatus: 'active',
           syncMode: 'content_only',
+          permissionsInheritanceMode: 'inherit_scopes_and_files',
         },
       ];
 
@@ -51,6 +52,7 @@ describe('SitesConfigLoaderService', () => {
         storeInternally: StoreInternallyMode.Enabled,
         syncStatus: 'active',
         syncMode: 'content_and_permissions',
+        permissionsInheritanceMode: 'inherit_scopes_and_files',
       };
 
       // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
@@ -159,6 +161,7 @@ describe('SitesConfigLoaderService', () => {
           storeInternally: 'enabled',
           syncStatus: 'active',
           syncMode: 'content_and_permissions',
+          permissionsInheritanceMode: 'inherit_scopes_and_files',
         },
       } as unknown as ListItem;
 
@@ -174,6 +177,7 @@ describe('SitesConfigLoaderService', () => {
         storeInternally: 'enabled',
         syncStatus: 'active',
         syncMode: 'content_and_permissions',
+        permissionsInheritanceMode: 'inherit_scopes_and_files',
       });
     });
 
@@ -303,6 +307,7 @@ describe('SitesConfigLoaderService', () => {
               storeInternally: 'enabled',
               syncStatus: 'active',
               syncMode: 'content_and_permissions',
+              permissionsInheritanceMode: 'inherit_scopes_and_files',
             },
           },
         ],
@@ -327,6 +332,7 @@ describe('SitesConfigLoaderService', () => {
         storeInternally: 'enabled',
         syncStatus: 'active',
         syncMode: 'content_and_permissions',
+        permissionsInheritanceMode: 'inherit_scopes_and_files',
       });
 
       expect(mockGraphClient.api).toHaveBeenCalledWith('/sites/test.sharepoint.com:/sites/Test');

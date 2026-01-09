@@ -18,6 +18,7 @@ describe('SharepointConfigSchema', () => {
         storeInternally: StoreInternallyMode.Enabled,
         syncStatus: 'active' as const,
         syncMode: 'content_and_permissions' as const,
+        permissionsInheritanceMode: 'inherit_scopes_and_files' as const,
       },
     ],
   };
@@ -108,6 +109,7 @@ describe('SharepointConfigSchema', () => {
             ingestionMode: IngestionMode.Recursive,
             scopeId: 'scope_finance',
             syncMode: 'content_and_permissions' as const,
+            permissionsInheritanceMode: 'inherit_scopes_and_files' as const,
           },
           {
             siteId: 'abcd1234-5678-4012-8346-789012345678',
@@ -118,6 +120,7 @@ describe('SharepointConfigSchema', () => {
             storeInternally: StoreInternallyMode.Disabled,
             syncStatus: 'inactive' as const,
             syncMode: 'content_only' as const,
+            permissionsInheritanceMode: 'inherit_scopes_and_files' as const,
           },
         ],
       };
@@ -326,6 +329,7 @@ describe('SharepointConfigSchema', () => {
         expect(site.syncColumnName).toBe('FinanceGPTKnowledge'); // default value
         expect(site.storeInternally).toBe(StoreInternallyMode.Enabled); // default value
         expect(site.syncStatus).toBe('active'); // default value
+        expect(site.permissionsInheritanceMode).toBe('inherit_scopes_and_files'); // default value
         expect(site.maxFilesToIngest).toBeUndefined(); // optional field
       }
     });

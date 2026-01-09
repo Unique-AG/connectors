@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.2.2/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
   "root": true,
   "vcs": {
     "enabled": false,
@@ -11,11 +11,14 @@
     "includes": [
       "**",
       "!**/dist",
+      "!**/.github",
       "!**/.turbo",
       "!**/@generated",
       "!**/coverage",
       "!**/drizzle",
-      "!**/helm-charts/**/values.schema.json"
+      "!**/helm-charts/**/values.schema.json",
+      "!**/scripts",
+      "!**/local-scripts"
     ]
   },
   "formatter": {
@@ -40,7 +43,8 @@
           "options": {
             "accessibility": "explicit"
           }
-        }
+        },
+        "useConsistentTypeDefinitions": "error"
       },
       "complexity": {
         "noUselessConstructor": "off"

@@ -17,12 +17,12 @@ import { ResourceTemplateMetadata } from '../decorators/resource-template.decora
 /**
  * Interface representing a discovered tool
  */
-export type DiscoveredTool<T extends object> = {
+export interface DiscoveredTool<T extends object> {
   type: 'tool' | 'resource' | 'resource-template' | 'prompt';
   metadata: T;
   providerClass: InjectionToken;
   methodName: string;
-};
+}
 
 export type InjectionTokenWithName = InjectionToken & { name: string };
 
