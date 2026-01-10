@@ -1,3 +1,5 @@
+<!-- confluence-page-id: 1788117085 -->
+<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
 # Microsoft Graph Permissions
 
 All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to.

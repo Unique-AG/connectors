@@ -1,3 +1,5 @@
+<!-- confluence-page-id: 1788084241 -->
+<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
 # Why RabbitMQ is Needed
 
 ## Overview
