@@ -1,3 +1,5 @@
+<!-- confluence-page-id: 1788182541 -->
+<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
 # Teams MCP Connector
 
 ## Overview
@@ -193,7 +195,7 @@ sequenceDiagram
     API->>Graph: 202 Accepted
 
     Queue->>Processor: Process transcript event
-
+    
     par Fetch meeting data
         Processor->>Graph: GET meeting details
         Graph->>Processor: Meeting + participants
@@ -262,3 +264,4 @@ Planned enhancements will be documented here.
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
 - [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale
+
