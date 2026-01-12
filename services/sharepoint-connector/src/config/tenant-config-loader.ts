@@ -12,11 +12,12 @@ import {
   UniqueConfigSchema,
 } from './tenant-config.schema';
 
-// Derive types from schemas instead of importing them
-type ProcessingConfig = z.infer<typeof ProcessingConfigSchema>;
-type SharepointConfig = z.infer<typeof SharepointConfigSchema>;
 type TenantConfig = z.infer<typeof TenantConfigSchema>;
+type SharepointConfig = z.infer<typeof SharepointConfigSchema>;
 type UniqueConfig = z.infer<typeof UniqueConfigSchema>;
+type ProcessingConfig = z.infer<typeof ProcessingConfigSchema>;
+
+// --- App Config (From Environment) ---
 
 export const appConfig = registerConfig('app', AppConfigSchema, {
   whitelistKeys: new Set([
@@ -28,34 +29,55 @@ export const appConfig = registerConfig('app', AppConfigSchema, {
   ]),
 });
 
-export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;
 export type AppConfig = ConfigType<typeof appConfig>;
+export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;
 
-export const sharepointConfig = registerAs('sharepoint', (): SharepointConfig => {
-  return SharepointConfigSchema.parse(getTenantConfig().sharepoint);
-});
+// --- Tenant Configs (From File) ---
 
+/**
+ * Helper to register configurations that are extracted and validated from the tenant YAML file.
+ */
+const fromTenant = <T extends z.ZodTypeAny>(key: keyof TenantConfig, schema: T) =>
+  registerAs(key as string, () => schema.parse(getTenantConfig()[key]) as Record<string, unknown>);
+
+export const sharepointConfig = fromTenant('sharepoint', SharepointConfigSchema);
 export interface SharepointConfigNamespaced {
   sharepoint: SharepointConfig;
 }
 
-export const uniqueConfig = registerAs('unique', (): UniqueConfig => {
-  return UniqueConfigSchema.parse(getTenantConfig().unique);
-});
-
+export const uniqueConfig = fromTenant('unique', UniqueConfigSchema);
 export interface UniqueConfigNamespaced {
   unique: UniqueConfig;
 }
 
-export const processingConfig = registerAs('processing', (): ProcessingConfig => {
-  return ProcessingConfigSchema.parse(getTenantConfig().processing);
-});
-
+export const processingConfig = fromTenant('processing', ProcessingConfigSchema);
 export interface ProcessingConfigNamespaced {
   processing: ProcessingConfig;
 }
 
 let cachedConfig: TenantConfig | null = null;
+
+// Intermediate schema for environment variable injection before final validation
+const IntermediateTenantSchema = z
+  .object({
+    sharepoint: z
+      .object({
+        auth: z
+          .object({
+            mode: z.string().optional(),
+            privateKeyPassword: z.string().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+    unique: z
+      .object({
+        serviceAuthMode: z.string().optional(),
+        zitadelClientSecret: z.instanceof(Redacted).optional(),
+      })
+      .optional(),
+  })
+  .passthrough();
 
 function loadTenantConfig(pathPattern: string): TenantConfig {
   const files = globSync(pathPattern);
@@ -78,40 +100,29 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
 
   try {
     const fileContent = readFileSync(configPath, 'utf-8');
-    const parsedConfig = load(fileContent) as Record<string, unknown>;
+    const rawConfig = load(fileContent);
 
-    // Type for intermediate manipulation before Zod validation
-    const raw = parsedConfig as {
-      sharepoint?: {
-        auth?: {
-          mode?: string;
-          privateKeyPassword?: string;
-        };
-      };
-      unique?: {
-        serviceAuthMode?: string;
-        zitadelClientSecret?: Redacted<string>;
-      };
-    };
+    // Initial parse into a partial schema to allow mutations safely
+    const initialConfig = IntermediateTenantSchema.parse(rawConfig);
 
-    if (raw.sharepoint?.auth?.mode === 'certificate') {
+    if (initialConfig.sharepoint?.auth?.mode === 'certificate') {
       const password = process.env.SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD;
       if (password) {
-        raw.sharepoint.auth.privateKeyPassword = password;
+        initialConfig.sharepoint.auth.privateKeyPassword = password;
       }
     }
 
-    if (raw.unique?.serviceAuthMode === 'external') {
+    if (initialConfig.unique?.serviceAuthMode === 'external') {
       const secret = process.env.ZITADEL_CLIENT_SECRET;
       if (!secret) {
         throw new Error(
           'ZITADEL_CLIENT_SECRET environment variable is required when using external auth mode',
         );
       }
-      raw.unique.zitadelClientSecret = new Redacted(secret);
+      initialConfig.unique.zitadelClientSecret = new Redacted(secret);
     }
 
-    return TenantConfigSchema.parse(parsedConfig);
+    return TenantConfigSchema.parse(initialConfig);
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(
