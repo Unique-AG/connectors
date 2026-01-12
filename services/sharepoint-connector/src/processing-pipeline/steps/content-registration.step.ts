@@ -56,7 +56,8 @@ export class ContentRegistrationStep implements IPipelineStep {
       baseUrl: this.sharepointBaseUrl,
       byteSize: context.fileSize ?? 0,
       metadata: this.extractMetadata(context.pipelineItem),
-      storeInternally: context.syncContext.siteConfig.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally:
+        context.syncContext.siteConfig.storeInternally === StoreInternallyMode.Enabled,
     };
 
     context.metadata = contentRegistrationRequest.metadata;
