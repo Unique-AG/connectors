@@ -172,7 +172,7 @@ describe('SharepointSynchronizationService', () => {
       [mockFile],
       null,
       expect.objectContaining({
-        config: expect.objectContaining({
+        siteConfig: expect.objectContaining({
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
           scopeId: 'scope-id',
         }),
@@ -190,7 +190,7 @@ describe('SharepointSynchronizationService', () => {
       [mockFile],
       null,
       expect.objectContaining({
-        config: expect.objectContaining({
+        siteConfig: expect.objectContaining({
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
           scopeId: 'scope-id',
         }),
@@ -307,7 +307,7 @@ describe('SharepointSynchronizationService', () => {
 
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
       context: expect.objectContaining({
-        config: expect.objectContaining({
+        siteConfig: expect.objectContaining({
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
           scopeId: 'scope-id',
         }),
@@ -449,7 +449,7 @@ describe('SharepointSynchronizationService', () => {
       [fileWithAllFields],
       null,
       expect.objectContaining({
-        config: expect.objectContaining({
+        siteConfig: expect.objectContaining({
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
         }),
       }),
@@ -532,7 +532,7 @@ describe('SharepointSynchronizationService', () => {
       [fileWithoutTimestamp],
       null,
       expect.objectContaining({
-        config: expect.objectContaining({
+        siteConfig: expect.objectContaining({
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
         }),
       }),
@@ -745,7 +745,7 @@ describe('SharepointSynchronizationService', () => {
       [file1, file2, file3],
       null,
       expect.objectContaining({
-        config: expect.objectContaining({
+        siteConfig: expect.objectContaining({
           siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
         }),
       }),
