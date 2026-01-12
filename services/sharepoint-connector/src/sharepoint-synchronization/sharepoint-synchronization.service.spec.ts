@@ -222,9 +222,11 @@ describe('SharepointSynchronizationService', () => {
     const firstScan = service.synchronize();
     const secondScan = service.synchronize();
 
-    await Promise.all([firstScan, secondScan]);
+    const [firstResult, secondResult] = await Promise.all([firstScan, secondScan]);
 
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
+    expect(firstResult.skippedDueToScanInProgress).toBe(false);
+    expect(secondResult.skippedDueToScanInProgress).toBe(true);
   });
 
   it('releases scan lock after completion', async () => {

@@ -56,7 +56,7 @@ export class SharepointSynchronizationService {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
-  public async synchronize(): Promise<void> {
+  public async synchronize(): Promise<{ skippedDueToScanInProgress: boolean }> {
     const syncStartTime = Date.now();
     if (this.isScanning) {
       this.logger.warn('Skipping scan - previous scan is still in progress.');
@@ -65,7 +65,7 @@ export class SharepointSynchronizationService {
         result: 'skipped',
         skip_reason: 'scan_in_progress',
       });
-      return;
+      return { skippedDueToScanInProgress: true };
     }
 
     this.isScanning = true;
@@ -84,7 +84,7 @@ export class SharepointSynchronizationService {
           result: 'failure',
           failure_step: this.MetricSteps.SITES_CONFIG_LOADING,
         });
-        return;
+        return { skippedDueToScanInProgress: false };
       }
 
       const { active, deleted, inactive } = this.categorizeSites(sites);
@@ -102,7 +102,7 @@ export class SharepointSynchronizationService {
           result: 'skipped',
           skip_reason: 'no_active_sites',
         });
-        return;
+        return { skippedDueToScanInProgress: false };
       }
 
       this.logger.log(`Starting scan of ${active.length} active SharePoint sites...`);
@@ -122,6 +122,7 @@ export class SharepointSynchronizationService {
         sync_type: 'full',
         result: 'success',
       });
+      return { skippedDueToScanInProgress: false };
     } catch (error) {
       this.logger.error({
         msg: 'Failed full synchronization',
