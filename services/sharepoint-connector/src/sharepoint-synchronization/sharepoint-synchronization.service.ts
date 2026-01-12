@@ -11,7 +11,6 @@ import type {
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
-import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
@@ -50,7 +49,6 @@ export class SharepointSynchronizationService {
     private readonly permissionsSyncService: PermissionsSyncService,
     private readonly scopeManagementService: ScopeManagementService,
     private readonly uniqueFilesService: UniqueFilesService,
-    private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly uniqueScopesService: UniqueScopesService,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
@@ -171,7 +169,7 @@ export class SharepointSynchronizationService {
 
       if (files.length > 0) {
         this.logger.log(`${logPrefix} Deleting ${files.length} files`);
-        await this.uniqueFileIngestionService.deleteContentByContentIds(files.map((f) => f.id));
+        await this.uniqueFilesService.deleteContentByContentIds(files.map((f) => f.id));
       }
 
       const rootScope = await this.uniqueScopesService.getScopeById(siteConfig.scopeId);
