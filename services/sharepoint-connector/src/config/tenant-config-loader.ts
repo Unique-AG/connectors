@@ -41,16 +41,15 @@ const fromTenant = <T extends z.ZodTypeAny>(key: keyof TenantConfig, schema: T) 
   registerAs(key as string, () => schema.parse(getTenantConfig()[key]) as Record<string, unknown>);
 
 export const sharepointConfig = fromTenant('sharepoint', SharepointConfigSchema);
+export const uniqueConfig = fromTenant('unique', UniqueConfigSchema);
+export const processingConfig = fromTenant('processing', ProcessingConfigSchema);
+
 export interface SharepointConfigNamespaced {
   sharepoint: SharepointConfig;
 }
-
-export const uniqueConfig = fromTenant('unique', UniqueConfigSchema);
 export interface UniqueConfigNamespaced {
   unique: UniqueConfig;
 }
-
-export const processingConfig = fromTenant('processing', ProcessingConfigSchema);
 export interface ProcessingConfigNamespaced {
   processing: ProcessingConfig;
 }
@@ -64,7 +63,7 @@ const IntermediateTenantSchema = z
       .object({
         auth: z
           .object({
-            mode: z.string().optional(),
+            mode: z.enum(['oidc', 'client-secret', 'certificate']).optional(),
             privateKeyPassword: z.string().optional(),
           })
           .optional(),
@@ -72,7 +71,7 @@ const IntermediateTenantSchema = z
       .optional(),
     unique: z
       .object({
-        serviceAuthMode: z.string().optional(),
+        serviceAuthMode: z.enum(['cluster_local', 'external']).optional(),
         zitadelClientSecret: z.instanceof(Redacted).optional(),
       })
       .optional(),
@@ -116,7 +115,7 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
       const secret = process.env.ZITADEL_CLIENT_SECRET;
       if (!secret) {
         throw new Error(
-          'ZITADEL_CLIENT_SECRET environment variable is required when using external auth mode',
+          `ZITADEL_CLIENT_SECRET environment variable is required when using external auth mode (configured in ${configPath})`,
         );
       }
       initialConfig.unique.zitadelClientSecret = new Redacted(secret);
