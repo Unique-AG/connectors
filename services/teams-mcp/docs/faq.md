@@ -62,7 +62,7 @@ This is a data ingestion connector that uses the MCP protocol for authentication
 
 ### Why can't I use certificate authentication?
 
-**Answer:** Certificate authentication only works with the Client Credentials flow, which requires application permissions. Teams MCP uses delegated permissions (user-specific access), which require the Authorization Code flow with a client secret.
+**Answer:** While it's technically possible to use certificate authentication with the Authorization Code flow, it would require significant additional implementation effort in our OAuth packages. The standard approach for delegated permissions is to use a client secret, which is simpler to implement and maintain.
 
 **See also:** [Unsupported Authentication Methods](./technical/token-auth-flows.md#unsupported-authentication-methods)
 
@@ -373,7 +373,7 @@ Hashing reduces attack surface (no decryption key needed for MCP tokens), while 
 
 ### Why can't I use certificate authentication?
 
-**Answer:** Certificate authentication only works with Client Credentials flow, which requires application permissions. Teams MCP uses delegated permissions (user-specific access), which require the Authorization Code flow with a client secret.
+**Answer:** While it's technically possible to use certificate authentication with the Authorization Code flow, it would require significant additional implementation effort in our OAuth packages. The standard approach for delegated permissions is to use a client secret, which is simpler to implement and maintain.
 
 **See also:** [Unsupported Authentication Methods](./technical/token-auth-flows.md#unsupported-authentication-methods)
 
