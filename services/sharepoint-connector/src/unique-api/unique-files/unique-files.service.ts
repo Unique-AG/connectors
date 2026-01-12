@@ -31,7 +31,7 @@ import {
 } from './unique-files.consts';
 import { UniqueFile, UniqueFileAccessInput } from './unique-files.types';
 
-const CONTENT_BATCH_SIZE = 50;
+const CONTENT_BATCH_SIZE = 20;
 
 // We decide for this batch size because on the Unique side, for each permission requested we make a
 // concurrent call to node-ingestion and further to Zitadel, so we want to avoid overwhelming the
