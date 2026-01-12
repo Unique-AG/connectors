@@ -6,9 +6,9 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
