@@ -171,6 +171,16 @@ https://<your-domain>/auth/callback
 
 **See also:** [Client Secret Management](./operator/authentication.md#client-secret-management)
 
+### What happens if I change the webhook secret?
+
+**Answer:** **Rotation is currently not possible** - There is no easy way to invalidate all existing subscriptions that were created with the old secret. The `MICROSOFT_WEBHOOK_SECRET` is sent to Microsoft as `clientState` when creating subscriptions. When the secret changes, all existing subscriptions will fail webhook validation because they contain the old secret, but there's no automated mechanism to recreate all subscriptions.
+
+> **Note:** Automated rotation might be part of a future release.
+
+If rotation becomes necessary, it would require manually deleting all subscriptions and having all users reconnect, which may miss transcripts created during the gap.
+
+**See also:** [MICROSOFT_WEBHOOK_SECRET Rotation](./technical/security.md#rotation-procedures)
+
 ## Architecture & Design
 
 ### Why are Microsoft tokens never sent to clients?
@@ -206,7 +216,9 @@ Hashing reduces attack surface (no decryption key needed for MCP tokens), while 
 
 ### Why are subscriptions renewed instead of recreated?
 
-**Answer:** Renewal (PATCH) is more efficient than recreation (DELETE + POST). It preserves the subscription ID and reduces API calls. Renewal happens automatically before expiration (default: 3 AM UTC daily) to ensure token validity is checked consistently.
+**Answer:** The biggest reason is that recreation may miss transcripts. Microsoft Graph only sends notifications for transcripts created while a subscription is active. When recreating a subscription (DELETE + POST), there's a gap where no subscription exists. Any transcripts created during that gap will never generate notifications—those transcripts are lost forever.
+
+Renewal (PATCH) keeps the subscription continuously active, eliminating this gap. Additionally, renewal is more efficient than recreation—it preserves the subscription ID and reduces API calls. Renewal happens automatically before expiration (default: 3 AM UTC daily) to ensure token validity is checked consistently.
 
 **See also:** [Subscription Lifecycle](./technical/flows.md#subscription-lifecycle)
 

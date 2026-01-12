@@ -10,6 +10,7 @@ This guide walks through setting up the Teams MCP Server for local development a
 | pnpm | 9+ | Package manager |
 | Docker | 24+ | Run PostgreSQL and RabbitMQ |
 | Azure CLI | Latest | Configure Entra app registration |
+| MCP Inspector | 0.17.2 | MCP Client |
 
 A public reverse proxy, recommended:
 - [Azure Dev Tunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/) for webhook testing
@@ -18,7 +19,7 @@ A public reverse proxy, recommended:
 
 ```bash
 # Clone and install
-git clone <repository>
+git clone git@github.com:Unique-AG/connectors.git
 cd services/teams-mcp
 pnpm install
 
@@ -53,25 +54,6 @@ docker compose up -d
 | PostgreSQL | postgres:postgres |
 | RabbitMQ | guest:guest |
 | RabbitMQ Management | guest:guest |
-
-### Manual Setup
-
-If you prefer running services natively:
-
-**PostgreSQL:**
-```bash
-# macOS
-brew install postgresql@17
-brew services start postgresql@17
-createdb teams_mcp
-```
-
-**RabbitMQ:**
-```bash
-# macOS
-brew install rabbitmq
-brew services start rabbitmq
-```
 
 ## Microsoft Entra App Registration
 
@@ -205,27 +187,6 @@ pnpm db:studio
 Opens a browser UI at `https://local.drizzle.studio`.
 
 ## Debugging
-
-### VS Code Configuration
-
-Create `.vscode/launch.json`:
-
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug NestJS",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["run", "start:debug"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen"
-    }
-  ]
-}
-```
 
 ### Common Issues
 

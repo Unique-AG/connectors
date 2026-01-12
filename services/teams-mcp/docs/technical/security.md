@@ -23,7 +23,7 @@ flowchart TB
         TokenRefresh["Token Refresh Middleware"]
     end
 
-    subgraph Data["Data Security"]
+    subgraph Data["Data Security (MCP server tokens)"]
         Encryption["AES-GCM Encryption"]
         Hashing["Token Hashing"]
         Secrets["Secret Management"]
@@ -208,6 +208,19 @@ sequenceDiagram
 2. Update Kubernetes secret
 3. Restart pods
 4. Delete old secret from Entra ID
+
+**MICROSOFT_WEBHOOK_SECRET Rotation:**
+**Currently not possible** - There is no easy way to invalidate all existing subscriptions that were created with the old secret. Existing subscriptions have the old secret as `clientState` and will fail validation if the secret changes, but there's no automated mechanism to recreate all subscriptions.
+
+> **Note:** Automated rotation might be part of a future release.
+
+If rotation becomes necessary, it would require:
+1. Generating new 128-character secret: `openssl rand -hex 64`
+2. Manually deleting all subscriptions via Microsoft Graph API
+3. Having all users reconnect to MCP server to trigger subscription recreation
+4. Updating Kubernetes secret and deploying
+
+**Important:** Recreation may miss transcripts created during the gap between deletion and recreation. See [Why are subscriptions renewed instead of recreated?](../faq.md#why-are-subscriptions-renewed-instead-of-recreated) for details.
 
 ## Security Checklist for Operators
 
