@@ -59,7 +59,7 @@ export class PermissionsSyncService {
 
   public async syncPermissionsForSite(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
-    const { siteId } = context.config;
+    const { siteId } = context.siteConfig;
 
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}]`;
@@ -116,7 +116,7 @@ export class PermissionsSyncService {
         unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
       });
 
-      if (context.config.ingestionMode === IngestionMode.Recursive) {
+      if (context.siteConfig.ingestionMode === IngestionMode.Recursive) {
         currentStep = 'folder_permissions_sync';
         assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
         await this.syncSharepointFolderPermissionsToUniqueCommand.run({

@@ -141,7 +141,7 @@ describe('ProcessingPipelineService', () => {
   });
 
   const mockSyncContext: SharepointSyncContext = {
-    config: createMockSiteConfig(),
+    siteConfig: createMockSiteConfig(),
     siteName: 'test-site',
     serviceUserId: 'test-user-id',
     rootPath: '/Root',
@@ -173,7 +173,7 @@ describe('ProcessingPipelineService', () => {
 
   it('correctly handles targetScopeId in ProcessingContext by prioritizing target scope over root scope', async () => {
     const targetScopeId = 'specific-folder-scope-id';
-    const rootScopeIdFromConfig = mockSyncContext.config.scopeId;
+    const rootScopeIdFromConfig = mockSyncContext.siteConfig.scopeId;
 
     // Ensure they are different for the test
     expect(targetScopeId).not.toBe(rootScopeIdFromConfig);
@@ -189,7 +189,7 @@ describe('ProcessingPipelineService', () => {
 
     // We should still have access to the root scope via syncContext.config.scopeId
     // which contains the SiteConfig (which is also the root scope)
-    expect(context?.syncContext.config.scopeId).toBe(mockSyncContext.config.scopeId);
+    expect(context?.syncContext.siteConfig.scopeId).toBe(mockSyncContext.siteConfig.scopeId);
   });
 
   it('calls cleanup for each completed step', async () => {

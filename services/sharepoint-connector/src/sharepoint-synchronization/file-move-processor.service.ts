@@ -42,7 +42,7 @@ export class FileMoveProcessor {
     scopes: ScopeWithPath[] | null,
     context: SharepointSyncContext,
   ): Promise<void> {
-    const { siteId } = context.config;
+    const { siteId } = context.siteConfig;
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}]`;
     const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId);
@@ -105,7 +105,7 @@ export class FileMoveProcessor {
     scopes: ScopeWithPath[] | null,
     context: SharepointSyncContext,
   ): FileMoveData[] {
-    const { siteId } = context.config;
+    const { siteId } = context.siteConfig;
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const filesToMove: FileMoveData[] = [];
 

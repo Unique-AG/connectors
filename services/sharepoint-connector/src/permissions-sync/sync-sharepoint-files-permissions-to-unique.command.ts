@@ -48,7 +48,7 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
-    const { siteId } = context.config;
+    const { siteId } = context.siteConfig;
     const { serviceUserId } = context;
 
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;

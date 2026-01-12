@@ -100,7 +100,7 @@ export class GraphApiService {
 
     // Unfortunately we cannot filter by list name using ms graph so we need to fetch all lists.
     const lists = await this.getSiteLists(siteId);
-    
+
     // Very important step to check by displayName and not name because in SharePoint when a column is renamed only displayName is updated
     const matchingList = lists.find((list) => list.displayName === listDisplayName);
 
@@ -118,10 +118,10 @@ export class GraphApiService {
       `Fetched ${listItems.length} items and ${columns.length} columns from SharePoint list`,
     );
 
-    const nameMap = this.createDisplayNameToInternalNameMap(columns);
+    const displayNameToNameMap = this.createDisplayNameToNameMap(columns);
 
     const siteConfigs = listItems.map((item, index) =>
-      this.transformListItemToSiteConfig(item, index, nameMap),
+      this.transformListItemToSiteConfig(item, index, displayNameToNameMap),
     );
 
     this.logger.log(
@@ -130,7 +130,7 @@ export class GraphApiService {
     return siteConfigs;
   }
 
-  private createDisplayNameToInternalNameMap(columns: ListColumn[]): Record<string, string> {
+  private createDisplayNameToNameMap(columns: ListColumn[]): Record<string, string> {
     const map: Record<string, string> = {};
     for (const column of columns) {
       map[column.displayName] = column.name;

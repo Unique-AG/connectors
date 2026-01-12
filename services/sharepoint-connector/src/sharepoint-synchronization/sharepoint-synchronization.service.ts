@@ -174,7 +174,7 @@ export class SharepointSynchronizationService {
         }
 
         const context: SharepointSyncContext = {
-          config: siteConfig,
+          siteConfig,
           siteName,
           serviceUserId: baseContext.serviceUserId,
           rootPath: baseContext.rootPath,
@@ -186,8 +186,8 @@ export class SharepointSynchronizationService {
         >['directories'];
         try {
           const result = await this.graphApiService.getAllSiteItems(
-            context.config.siteId,
-            context.config.syncColumnName,
+            context.siteConfig.siteId,
+            context.siteConfig.syncColumnName,
           );
           items = result.items;
           directories = result.directories;
@@ -217,7 +217,7 @@ export class SharepointSynchronizationService {
           continue;
         }
 
-        if (context.config.ingestionMode === IngestionMode.Recursive) {
+        if (context.siteConfig.ingestionMode === IngestionMode.Recursive) {
           try {
             // Create scopes for ALL paths (including moved file destinations)
             scopes = await this.scopeManagementService.batchCreateScopes(
@@ -256,7 +256,7 @@ export class SharepointSynchronizationService {
           continue;
         }
 
-        if (context.config.syncMode === 'content_and_permissions') {
+        if (context.siteConfig.syncMode === 'content_and_permissions') {
           try {
             await this.permissionsSyncService.syncPermissionsForSite({
               context,

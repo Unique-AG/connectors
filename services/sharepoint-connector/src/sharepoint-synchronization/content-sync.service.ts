@@ -46,7 +46,7 @@ export class ContentSyncService {
     scopes: ScopeWithPath[] | null,
     context: SharepointSyncContext,
   ): Promise<void> {
-    const { siteId } = context.config;
+    const { siteId } = context.siteConfig;
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}] `;
     const processStartTime = Date.now();
@@ -98,7 +98,7 @@ export class ContentSyncService {
 
     // Check limit only for new/updated files after deletions and moves are processed
     const totalFilesToIngest = newFileKeys.size + updatedFileKeys.size;
-    const maxFilesToIngest = context.config.maxFilesToIngest;
+    const maxFilesToIngest = context.siteConfig.maxFilesToIngest;
 
     assert.ok(
       !maxFilesToIngest || totalFilesToIngest <= maxFilesToIngest,
@@ -114,7 +114,7 @@ export class ContentSyncService {
     const updatedItems = items.filter((item) => updatedFileKeys.has(item.item.id));
 
     const getScopeIdForItem = (itemId: string): string => {
-      const scopeId = context.config.scopeId;
+      const scopeId = context.siteConfig.scopeId;
 
       if (!scopes || scopes.length === 0) {
         return scopeId;

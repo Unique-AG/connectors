@@ -101,7 +101,6 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
     const fileContent = readFileSync(configPath, 'utf-8');
     const rawConfig = load(fileContent);
 
-    // Initial parse into a partial schema to allow mutations safely
     const initialConfig = IntermediateTenantSchema.parse(rawConfig);
 
     if (initialConfig.sharepoint?.auth?.mode === 'certificate') {

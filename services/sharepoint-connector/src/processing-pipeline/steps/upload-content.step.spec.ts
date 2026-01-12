@@ -102,7 +102,7 @@ describe('UploadContentStep', () => {
 
   const baseDriveItemContext: ProcessingContext = {
     syncContext: {
-      config: createMockSiteConfig(),
+      siteConfig: createMockSiteConfig(),
       siteName: 'test-site',
       serviceUserId: 'user-1',
       rootPath: '/Root',
@@ -129,7 +129,7 @@ describe('UploadContentStep', () => {
 
   const baseListItemContext: ProcessingContext = {
     syncContext: {
-      config: createMockSiteConfig(),
+      siteConfig: createMockSiteConfig(),
       siteName: 'test-site',
       serviceUserId: 'user-1',
       rootPath: '/Root',

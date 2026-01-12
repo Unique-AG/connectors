@@ -100,7 +100,7 @@ describe('ItemProcessingOrchestratorService', () => {
   });
 
   const mockSyncContext: SharepointSyncContext = {
-    config: createMockSiteConfig(),
+    siteConfig: createMockSiteConfig(),
     siteName: 'test-site',
     serviceUserId: 'test-user-id',
     rootPath: '/Root',

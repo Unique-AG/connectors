@@ -177,7 +177,7 @@ export class ScopeManagementService {
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<ScopeWithPath[]> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.config.siteId) : context.config.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
 
     const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
@@ -192,7 +192,7 @@ export class ScopeManagementService {
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
-    const { inheritScopes } = getInheritanceSettings(context.config);
+    const { inheritScopes } = getInheritanceSettings(context.siteConfig);
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
       inheritAccess: inheritScopes,
@@ -228,14 +228,14 @@ export class ScopeManagementService {
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<void> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.config.siteId) : context.config.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
     const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
     // We're adding two cases that are special - the root scope that we want to have explicitly
     // marked as root and site pages that is a special colection we fetch for ASPX pages, but has no
     // folders.
     pathToExternalIdMap[context.rootPath] = `${EXTERNAL_ID_PREFIX}root-${Date.now()}`;
     pathToExternalIdMap[`${context.rootPath}/${context.siteName}/SitePages`] =
-      `${EXTERNAL_ID_PREFIX}${context.config.siteId}/sitePages`;
+      `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId}/sitePages`;
 
     for (const [index, scope] of scopes.entries()) {
       if (isNonNullish(scope.externalId)) {
@@ -262,7 +262,7 @@ export class ScopeManagementService {
           `${logPrefix} No external ID found for path ` +
             `${this.shouldConcealLogs ? smearPath(path) : path}`,
         );
-        externalId = `${EXTERNAL_ID_PREFIX}unknown:${context.config.siteId}/${scope.name}-${randomUUID()}`;
+        externalId = `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId}/${scope.name}-${randomUUID()}`;
       }
 
       try {
@@ -311,7 +311,7 @@ export class ScopeManagementService {
     scopes: ScopeWithPath[],
     context: SharepointSyncContext,
   ): Map<string, string> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.config.siteId) : context.config.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
     const itemIdToScopeIdMap = new Map<string, string>();
 
     if (scopes.length === 0) {
@@ -360,7 +360,7 @@ export class ScopeManagementService {
   ): string | undefined {
     if (!scopes || scopes.length === 0) {
       // Flat mode - return the configured scope ID
-      return context.config.scopeId;
+      return context.siteConfig.scopeId;
     }
 
     const scopePath = getUniqueParentPathFromItem(item, context.rootPath);

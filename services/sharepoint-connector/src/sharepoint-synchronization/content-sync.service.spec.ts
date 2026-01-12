@@ -115,7 +115,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id', maxFilesToIngest: 1 },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id', maxFilesToIngest: 1 },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -127,7 +127,7 @@ describe('ContentSyncService', () => {
 
       const contextWithLimit = {
         ...context,
-        config: { ...context.config, maxFilesToIngest: 1 },
+        config: { ...context.siteConfig, maxFilesToIngest: 1 },
       };
 
       await expect(service.syncContentForSite(items, scopes, contextWithLimit)).rejects.toThrow(
@@ -151,7 +151,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -163,7 +163,7 @@ describe('ContentSyncService', () => {
 
       const contextWithLimit = {
         ...context,
-        config: { ...context.config, maxFilesToIngest: 2 },
+        config: { ...context.siteConfig, maxFilesToIngest: 2 },
       };
 
       await expect(
@@ -187,7 +187,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -216,7 +216,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -261,7 +261,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -313,7 +313,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: {
+        siteConfig: {
           ...mockSiteConfig,
           siteId: 'test-site-123',
           scopeId: 'scope-id',
@@ -361,7 +361,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -406,7 +406,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -450,7 +450,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -477,7 +477,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -511,7 +511,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -546,7 +546,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        config: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({

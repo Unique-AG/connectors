@@ -56,12 +56,12 @@ export class ContentRegistrationStep implements IPipelineStep {
       baseUrl: this.sharepointBaseUrl,
       byteSize: context.fileSize ?? 0,
       metadata: this.extractMetadata(context.pipelineItem),
-      storeInternally: context.syncContext.config.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: context.syncContext.siteConfig.storeInternally === StoreInternallyMode.Enabled,
     };
 
     context.metadata = contentRegistrationRequest.metadata;
 
-    const { inheritFiles } = getInheritanceSettings(context.syncContext.config);
+    const { inheritFiles } = getInheritanceSettings(context.syncContext.siteConfig);
     // We add permissions only for new files, because existing ones should already have correct
     // permissions (including service user permissions) and we don't want to override them; applies
     // when inheritance is disabled or when syncing permissions.

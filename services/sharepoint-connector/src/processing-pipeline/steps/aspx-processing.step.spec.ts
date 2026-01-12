@@ -39,7 +39,7 @@ describe('AspxProcessingStep', () => {
 
   const mockContext: ProcessingContext = {
     syncContext: {
-      config: createMockSiteConfig(),
+      siteConfig: createMockSiteConfig(),
       siteName: 'test-site',
       serviceUserId: 'user-1',
       rootPath: '/Root',

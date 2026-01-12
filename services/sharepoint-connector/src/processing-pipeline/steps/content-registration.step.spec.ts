@@ -40,7 +40,7 @@ describe('ContentRegistrationStep', () => {
 
   const createMockContext = (): ProcessingContext => ({
     syncContext: {
-      config: createMockSiteConfig(),
+      siteConfig: createMockSiteConfig(),
       siteName: 'test-site',
       serviceUserId: 'user-1',
       rootPath: '/Root',
@@ -200,7 +200,7 @@ describe('ContentRegistrationStep', () => {
       syncMode: 'content_only',
       permissionsInheritanceMode: 'inherit_scopes', // inheritScopes: true, inheritFiles: false
     });
-    context.syncContext.config = updatedSiteConfig;
+    context.syncContext.siteConfig = updatedSiteConfig;
     context.fileStatus = 'new';
     context.syncContext.serviceUserId = 'user-1';
 

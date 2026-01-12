@@ -55,7 +55,7 @@ describe('IngestionFinalizationStep', () => {
 
     const context: ProcessingContext = {
       syncContext: {
-        config: createMockSiteConfig(),
+        siteConfig: createMockSiteConfig(),
         siteName: 'test-site',
         serviceUserId: 'user-1',
         rootPath: '/Root',
