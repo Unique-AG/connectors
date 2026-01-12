@@ -11,7 +11,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOCS_DIR="$SCRIPT_DIR/docs"
 
 CONFLUENCE_SPACE_KEY='~624ebe8d45ece00069ce737e'
-CONFLUENCE_PARENT_PAGE_ID='1788182541'
+# CONFLUENCE_PARENT_PAGE_ID='1788117060'
+CONFLUENCE_PARENT_PAGE_ID='1789788170'
 
 # role/developer vault – Atlassian Service User - Unique Code Publisher (Dev)
 # ⚠️ production publisher uses GitHub Actions secrets

@@ -1,4 +1,5 @@
-<!-- confluence-page-id: 1788117085 -->
+<!-- confluence-page-id: 1790017542 -->
+<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
 <!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
 # Microsoft Graph Permissions
 
