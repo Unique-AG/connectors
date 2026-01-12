@@ -255,7 +255,7 @@ connectorConfig:
 
   processing:
     # -- timeout in seconds for a file processing step before it will stop and skip processing the file
-    stepTimeoutSeconds: 30
+    stepTimeoutSeconds: 300
     # -- how many files you want to submit for ingestion into Unique at once
     concurrency: 1
     # -- list of allowed MIME types for files to sync

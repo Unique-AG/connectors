@@ -18,7 +18,7 @@ connector:
   # Secret only added for testing and demonstration (certificate for SharePoint auth)
   extraObjects:
     - apiVersion: v1
-    - kind: Secret
+      kind: Secret
       metadata:
         name: sharepoint-connector-secret
       type: Opaque
@@ -29,7 +29,7 @@ connector:
 connectorConfig:
   enabled: true
   sharepoint:
-    tenantId: d4a04d87-966a-4e28-a0d6-dcf7ce92490a
+    tenantId: d4a04d87-966a-4e28-a0d6-dcf7ce92490a # https://www.uuidgenerator.net/version4
     baseUrl: https://uniqueapp.sharepoint.com
     sitesSource: config_file
     sites:
@@ -42,7 +42,7 @@ connectorConfig:
         syncMode: content_and_permissions
     auth:
       mode: certificate
-      clientId: ff140e75-f52d-4312-b7ba-64d436895676
+      clientId: ff140e75-f52d-4312-b7ba-64d436895676 # https://www.uuidgenerator.net/version4
       privateKeyPath: /app/key.pem
       thumbprintSha1: 2fd4e1c67a2d28fced849ee1bb76e7391b93eb12
     graph:
