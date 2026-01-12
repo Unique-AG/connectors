@@ -116,8 +116,7 @@ export class PermissionsSyncService {
         unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
       });
 
-      const ingestionMode = context.ingestionMode;
-      if (ingestionMode === IngestionMode.Recursive) {
+      if (context.ingestionMode === IngestionMode.Recursive) {
         currentStep = 'folder_permissions_sync';
         assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
         await this.syncSharepointFolderPermissionsToUniqueCommand.run({
