@@ -406,7 +406,7 @@ export const AppConfigSchema = z
 export type AppConfigFromSchema = z.infer<typeof AppConfigSchema>;
 
 // ==========================================
-// 7. Final Tenant Configuration
+// 7. Tenant Configuration
 // ==========================================
 
 export const TenantConfigSchema = z.object({

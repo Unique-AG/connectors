@@ -18,6 +18,8 @@
   // biome-ignore lint/suspicious/noExplicitAny: Mock override private method
   vi.spyOn(service as any, 'validatePKCE').mockReturnValue(true);
   ```
+- When writing code focuse on consistency and follow DRY principles
+- Add export only when what you are exporting is actually used in another file
 
 ## Import Ordering
 - Follow this import order:
