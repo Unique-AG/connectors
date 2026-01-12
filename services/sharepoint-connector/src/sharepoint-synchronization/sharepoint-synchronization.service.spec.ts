@@ -119,7 +119,6 @@ describe('SharepointSynchronizationService', () => {
     mockScopeManagementService = {
       initializeRootScope: vi.fn().mockResolvedValue({
         serviceUserId: 'user-123',
-        rootScopeId: 'test-scope-id',
         rootPath: '/test-root',
       }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
@@ -173,9 +172,13 @@ describe('SharepointSynchronizationService', () => {
       [mockFile],
       null,
       expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-        rootScopeId: 'test-scope-id',
+        config: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          scopeId: 'scope-id',
+        }),
         siteName: 'test-site-name',
+        rootPath: '/test-root',
+        serviceUserId: 'user-123',
       }),
     );
   });
@@ -187,9 +190,13 @@ describe('SharepointSynchronizationService', () => {
       [mockFile],
       null,
       expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-        rootScopeId: 'test-scope-id',
+        config: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          scopeId: 'scope-id',
+        }),
         siteName: 'test-site-name',
+        rootPath: '/test-root',
+        serviceUserId: 'user-123',
       }),
     );
   });
@@ -300,9 +307,13 @@ describe('SharepointSynchronizationService', () => {
 
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
       context: expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-        rootScopeId: 'test-scope-id',
+        config: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          scopeId: 'scope-id',
+        }),
         siteName: 'test-site-name',
+        rootPath: '/test-root',
+        serviceUserId: 'user-123',
       }),
       sharePoint: { items: [mockFile], directories: [] },
       unique: { folders: null },
@@ -438,7 +449,9 @@ describe('SharepointSynchronizationService', () => {
       [fileWithAllFields],
       null,
       expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        config: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        }),
       }),
     );
   });
@@ -519,7 +532,9 @@ describe('SharepointSynchronizationService', () => {
       [fileWithoutTimestamp],
       null,
       expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        config: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        }),
       }),
     );
   });
@@ -730,7 +745,9 @@ describe('SharepointSynchronizationService', () => {
       [file1, file2, file3],
       null,
       expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        config: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        }),
       }),
     );
   });

@@ -11,7 +11,7 @@ import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.ty
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
-import type { SharepointSyncContext } from './types';
+import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 const mockSiteConfig = createMockSiteConfig({
   maxFilesToIngest: 1000,
@@ -113,11 +113,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
-        maxFilesToIngest: 1,
+        config: { ...mockSiteConfig, scopeId: 'scope-id', maxFilesToIngest: 1 },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -129,7 +127,7 @@ describe('ContentSyncService', () => {
 
       const contextWithLimit = {
         ...context,
-        maxFilesToIngest: 1,
+        config: { ...context.config, maxFilesToIngest: 1 },
       };
 
       await expect(service.syncContentForSite(items, scopes, contextWithLimit)).rejects.toThrow(
@@ -151,10 +149,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
+        config: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -166,7 +163,7 @@ describe('ContentSyncService', () => {
 
       const contextWithLimit = {
         ...context,
-        maxFilesToIngest: 2,
+        config: { ...context.config, maxFilesToIngest: 2 },
       };
 
       await expect(
@@ -188,10 +185,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
+        config: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -218,10 +214,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
+        config: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -264,10 +259,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
+        config: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -316,13 +310,15 @@ describe('ContentSyncService', () => {
       ] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
-        ...mockSiteConfig,
-        siteId: 'test-site-123',
-        maxFilesToIngest: 2,
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
+        config: {
+          ...mockSiteConfig,
+          siteId: 'test-site-123',
+          scopeId: 'scope-id',
+          maxFilesToIngest: 2,
+        },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -363,10 +359,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
+        config: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -409,10 +404,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
+        config: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -454,10 +448,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
+        config: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -482,10 +475,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
+        config: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -517,10 +509,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
+        config: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -553,10 +544,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
         siteName: 'test-site',
-        ...mockSiteConfig,
+        config: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({

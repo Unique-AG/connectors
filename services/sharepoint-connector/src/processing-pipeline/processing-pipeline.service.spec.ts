@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
@@ -141,11 +141,10 @@ describe('ProcessingPipelineService', () => {
   });
 
   const mockSyncContext: SharepointSyncContext = {
-    serviceUserId: 'test-user-id',
-    rootScopeId: 'root-scope-1',
-    rootPath: '/Root',
+    config: createMockSiteConfig(),
     siteName: 'test-site',
-    ...createMockSiteConfig(),
+    serviceUserId: 'test-user-id',
+    rootPath: '/Root',
   };
 
   it('processes file through all pipeline steps successfully', async () => {
@@ -174,7 +173,7 @@ describe('ProcessingPipelineService', () => {
 
   it('correctly handles targetScopeId in ProcessingContext by prioritizing target scope over root scope', async () => {
     const targetScopeId = 'specific-folder-scope-id';
-    const rootScopeIdFromConfig = mockSyncContext.scopeId;
+    const rootScopeIdFromConfig = mockSyncContext.config.scopeId;
 
     // Ensure they are different for the test
     expect(targetScopeId).not.toBe(rootScopeIdFromConfig);
@@ -188,10 +187,9 @@ describe('ProcessingPipelineService', () => {
     // not the root scopeId from mockSyncContext.
     expect(context?.targetScopeId).toBe(targetScopeId);
 
-    // We should still have access to the root scope via rootScopeId property (from BaseSyncContext)
-    // and also the original scopeId from SiteConfig (which is also the root scope)
-    expect(context?.rootScopeId).toBe(mockSyncContext.rootScopeId);
-    expect(context?.scopeId).toBe(mockSyncContext.scopeId);
+    // We should still have access to the root scope via syncContext.config.scopeId
+    // which contains the SiteConfig (which is also the root scope)
+    expect(context?.syncContext.config.scopeId).toBe(mockSyncContext.config.scopeId);
   });
 
   it('calls cleanup for each completed step', async () => {

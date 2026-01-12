@@ -10,7 +10,7 @@ import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { ScopeManagementService } from './scope-management.service';
-import type { SharepointSyncContext } from './types';
+import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 const createDriveContentItem = (path: string): SharepointContentItem => {
   const webUrl = `https://example.sharepoint.com/sites/test1/${path}/Page%201.aspx`;
@@ -111,10 +111,9 @@ describe('ScopeManagementService', () => {
 
   const mockContext: SharepointSyncContext = {
     serviceUserId: 'user-123',
-    rootScopeId: 'root-scope-123',
     rootPath: '/test1',
     siteName: 'test-site',
-    ...createMockSiteConfig({ siteId: 'site-123' }),
+    config: createMockSiteConfig({ siteId: 'site-123', scopeId: 'root-scope-123' }),
   };
 
   type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };
@@ -253,7 +252,7 @@ describe('ScopeManagementService', () => {
     it('disables inheritance when permission sync mode is enabled', async () => {
       const contextWithPermissionsSync: SharepointSyncContext = {
         ...mockContext,
-        ...createMockSiteConfig({
+        config: createMockSiteConfig({
           syncMode: 'content_and_permissions',
         }),
       };
@@ -274,7 +273,7 @@ describe('ScopeManagementService', () => {
     it('uses explicit inheritAccess configuration when provided', async () => {
       const contextWithInheritScopes: SharepointSyncContext = {
         ...mockContext,
-        ...createMockSiteConfig({
+        config: createMockSiteConfig({
           syncMode: 'content_only',
           permissionsInheritanceMode: 'inherit_scopes',
         }),

@@ -1,11 +1,12 @@
 import type { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { SharepointSyncContext } from '../../sharepoint-synchronization/types';
+import type { SharepointSyncContext } from '../../sharepoint-synchronization/sharepoint-sync-context.interface';
 import {
   ContentMetadata,
   IngestionApiResponse,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 
-export interface ProcessingContext extends SharepointSyncContext {
+export interface ProcessingContext {
+  syncContext: SharepointSyncContext;
   correlationId: string;
   pipelineItem: SharepointContentItem;
   knowledgeBaseUrl: string;

@@ -39,17 +39,18 @@ describe('ContentRegistrationStep', () => {
   });
 
   const createMockContext = (): ProcessingContext => ({
-    ...createMockSiteConfig(),
+    syncContext: {
+      config: createMockSiteConfig(),
+      siteName: 'test-site',
+      serviceUserId: 'user-1',
+      rootPath: '/Root',
+    },
     correlationId: 'c1',
     startTime: new Date(),
     knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
     mimeType: 'application/pdf',
     targetScopeId: 'scope-1',
     fileStatus: 'new',
-    serviceUserId: 'user-1',
-    rootScopeId: 'root-scope-1',
-    rootPath: '/Root',
-    siteName: 'test-site',
     pipelineItem: {
       itemType: 'listItem',
       item: createMockListItem(),
@@ -199,9 +200,9 @@ describe('ContentRegistrationStep', () => {
       syncMode: 'content_only',
       permissionsInheritanceMode: 'inherit_scopes', // inheritScopes: true, inheritFiles: false
     });
-    Object.assign(context, updatedSiteConfig);
+    context.syncContext.config = updatedSiteConfig;
     context.fileStatus = 'new';
-    context.serviceUserId = 'user-1';
+    context.syncContext.serviceUserId = 'user-1';
 
     await unit.execute(context);
 

@@ -21,7 +21,7 @@ import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
-import type { SharepointSyncContext } from './types';
+import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 @Injectable()
 export class ContentSyncService {
@@ -46,7 +46,7 @@ export class ContentSyncService {
     scopes: ScopeWithPath[] | null,
     context: SharepointSyncContext,
   ): Promise<void> {
-    const { siteId } = context;
+    const { siteId } = context.config;
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}] `;
     const processStartTime = Date.now();
@@ -98,7 +98,7 @@ export class ContentSyncService {
 
     // Check limit only for new/updated files after deletions and moves are processed
     const totalFilesToIngest = newFileKeys.size + updatedFileKeys.size;
-    const maxFilesToIngest = context.maxFilesToIngest;
+    const maxFilesToIngest = context.config.maxFilesToIngest;
 
     assert.ok(
       !maxFilesToIngest || totalFilesToIngest <= maxFilesToIngest,
@@ -114,7 +114,7 @@ export class ContentSyncService {
     const updatedItems = items.filter((item) => updatedFileKeys.has(item.item.id));
 
     const getScopeIdForItem = (itemId: string): string => {
-      const scopeId = context.rootScopeId;
+      const scopeId = context.config.scopeId;
 
       if (!scopes || scopes.length === 0) {
         return scopeId;

@@ -16,7 +16,7 @@ import {
 import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
@@ -57,7 +57,8 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
-    const { siteId, rootPath, serviceUserId } = context;
+    const { siteId } = context.config;
+    const { rootPath, serviceUserId } = context;
 
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}]`;

@@ -3,7 +3,7 @@ import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { ItemProcessingOrchestratorService } from './item-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
@@ -100,11 +100,10 @@ describe('ItemProcessingOrchestratorService', () => {
   });
 
   const mockSyncContext: SharepointSyncContext = {
-    serviceUserId: 'test-user-id',
-    rootScopeId: 'root-scope-1',
-    rootPath: '/Root',
+    config: createMockSiteConfig(),
     siteName: 'test-site',
-    ...createMockSiteConfig(),
+    serviceUserId: 'test-user-id',
+    rootPath: '/Root',
   };
 
   it('processes all provided files', async () => {

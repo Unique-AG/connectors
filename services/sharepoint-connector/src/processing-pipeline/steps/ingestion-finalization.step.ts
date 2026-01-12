@@ -51,7 +51,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
       fileUrl: context.registrationResponse.readUrl,
       url: context.knowledgeBaseUrl,
       baseUrl: this.sharepointBaseUrl,
-      storeInternally: context.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: context.syncContext.config.storeInternally === StoreInternallyMode.Enabled,
     };
 
     try {

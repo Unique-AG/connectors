@@ -14,7 +14,7 @@ import {
 } from 'remeda';
 import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL } from '../metrics';
-import { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile, UniqueFileAccessInput } from '../unique-api/unique-files/unique-files.types';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
@@ -48,7 +48,8 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
-    const { siteId, serviceUserId } = context;
+    const { siteId } = context.config;
+    const { serviceUserId } = context;
 
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}]`;

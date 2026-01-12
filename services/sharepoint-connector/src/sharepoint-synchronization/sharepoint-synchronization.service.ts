@@ -15,8 +15,8 @@ import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
-import { ScopeManagementService } from './scope-management.service';
-import type { BaseSyncContext, SharepointSyncContext } from './types';
+import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
+import { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -136,7 +136,7 @@ export class SharepointSynchronizationService {
         const siteStartTime = Date.now();
 
         // Initialize root scope for this site
-        let baseContext: BaseSyncContext;
+        let baseContext: RootScopeInfo;
         try {
           baseContext = await this.scopeManagementService.initializeRootScope(
             siteConfig.scopeId,
@@ -174,9 +174,10 @@ export class SharepointSynchronizationService {
         }
 
         const context: SharepointSyncContext = {
-          ...baseContext,
-          ...siteConfig,
+          config: siteConfig,
           siteName,
+          serviceUserId: baseContext.serviceUserId,
+          rootPath: baseContext.rootPath,
         };
 
         let items: Awaited<ReturnType<typeof this.graphApiService.getAllSiteItems>>['items'];
@@ -185,8 +186,8 @@ export class SharepointSynchronizationService {
         >['directories'];
         try {
           const result = await this.graphApiService.getAllSiteItems(
-            context.siteId,
-            context.syncColumnName,
+            context.config.siteId,
+            context.config.syncColumnName,
           );
           items = result.items;
           directories = result.directories;
@@ -216,7 +217,7 @@ export class SharepointSynchronizationService {
           continue;
         }
 
-        if (context.ingestionMode === IngestionMode.Recursive) {
+        if (context.config.ingestionMode === IngestionMode.Recursive) {
           try {
             // Create scopes for ALL paths (including moved file destinations)
             scopes = await this.scopeManagementService.batchCreateScopes(
@@ -255,7 +256,7 @@ export class SharepointSynchronizationService {
           continue;
         }
 
-        if (context.syncMode === 'content_and_permissions') {
+        if (context.config.syncMode === 'content_and_permissions') {
           try {
             await this.permissionsSyncService.syncPermissionsForSite({
               context,

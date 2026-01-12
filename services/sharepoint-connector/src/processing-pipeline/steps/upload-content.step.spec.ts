@@ -101,7 +101,12 @@ describe('UploadContentStep', () => {
   };
 
   const baseDriveItemContext: ProcessingContext = {
-    ...createMockSiteConfig(),
+    syncContext: {
+      config: createMockSiteConfig(),
+      siteName: 'test-site',
+      serviceUserId: 'user-1',
+      rootPath: '/Root',
+    },
     correlationId: 'c1',
     startTime: new Date(),
     knowledgeBaseUrl: 'https://example.sharepoint.com/sites/test/document.docx',
@@ -111,10 +116,6 @@ describe('UploadContentStep', () => {
     uploadUrl: 'https://storage.example.com/upload?key=encrypted-key',
     uniqueContentId: 'cont_abc123',
     fileSize: 20791,
-    serviceUserId: 'user-1',
-    rootScopeId: 'root-scope-1',
-    rootPath: '/Root',
-    siteName: 'test-site',
     pipelineItem: {
       itemType: 'driveItem' as const,
       item: mockDriveItem,
@@ -127,7 +128,12 @@ describe('UploadContentStep', () => {
   };
 
   const baseListItemContext: ProcessingContext = {
-    ...createMockSiteConfig(),
+    syncContext: {
+      config: createMockSiteConfig(),
+      siteName: 'test-site',
+      serviceUserId: 'user-1',
+      rootPath: '/Root',
+    },
     correlationId: 'c2',
     startTime: new Date(),
     knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/test/test.aspx',
@@ -138,10 +144,6 @@ describe('UploadContentStep', () => {
     uniqueContentId: 'cont_def456',
     htmlContent: '<div><h2>Test Page</h2><p>Content</p></div>',
     fileSize: 50,
-    serviceUserId: 'user-1',
-    rootScopeId: 'root-scope-1',
-    rootPath: '/Root',
-    siteName: 'test-site',
     pipelineItem: {
       itemType: 'listItem' as const,
       item: mockListItem,

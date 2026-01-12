@@ -10,7 +10,7 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/unique-groups/unique-groups.utils';
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
@@ -59,7 +59,7 @@ export class PermissionsSyncService {
 
   public async syncPermissionsForSite(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
-    const { siteId } = context;
+    const { siteId } = context.config;
 
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}]`;
@@ -116,7 +116,7 @@ export class PermissionsSyncService {
         unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
       });
 
-      if (context.ingestionMode === IngestionMode.Recursive) {
+      if (context.config.ingestionMode === IngestionMode.Recursive) {
         currentStep = 'folder_permissions_sync';
         assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
         await this.syncSharepointFolderPermissionsToUniqueCommand.run({

@@ -38,17 +38,18 @@ describe('AspxProcessingStep', () => {
   };
 
   const mockContext: ProcessingContext = {
-    ...createMockSiteConfig(),
+    syncContext: {
+      config: createMockSiteConfig(),
+      siteName: 'test-site',
+      serviceUserId: 'user-1',
+      rootPath: '/Root',
+    },
     correlationId: 'c1',
     startTime: new Date(),
     knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/test/test.aspx',
     mimeType: 'application/octet-stream',
     targetScopeId: 'scope-1', // forced save
     fileStatus: 'new',
-    serviceUserId: 'user-1',
-    rootScopeId: 'root-scope-1',
-    rootPath: '/Root',
-    siteName: 'test-site',
     pipelineItem: {
       itemType: 'listItem' as const,
       item: mockListItem,
