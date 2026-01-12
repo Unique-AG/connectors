@@ -66,14 +66,17 @@ const IntermediateTenantSchema = z
             mode: z.enum(['oidc', 'client-secret', 'certificate']).optional(),
             privateKeyPassword: z.string().optional(),
           })
+          .passthrough()
           .optional(),
       })
+      .passthrough()
       .optional(),
     unique: z
       .object({
         serviceAuthMode: z.enum(['cluster_local', 'external']).optional(),
         zitadelClientSecret: z.instanceof(Redacted).optional(),
       })
+      .passthrough()
       .optional(),
   })
   .passthrough();
