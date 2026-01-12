@@ -259,10 +259,8 @@ export class SharepointSynchronizationService {
         context.siteConfig.siteId,
         context.siteConfig.syncColumnName,
       );
-
       items = result.items;
       directories = result.directories;
-
     } catch (error) {
       this.logger.error({
         msg: `${logPrefix} Failed to get site items`,
