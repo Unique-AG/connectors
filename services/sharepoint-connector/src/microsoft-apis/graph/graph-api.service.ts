@@ -9,14 +9,13 @@ import { z } from 'zod';
 import { Config } from '../../config';
 import { SiteConfigSchema } from '../../config/tenant-config.schema';
 
-// Derive type from schema instead of importing it
 type SiteConfig = z.infer<typeof SiteConfigSchema>;
 
 import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
-import { sanitizeError } from '../../utils/normalize-error';
+import { normalizeError, sanitizeError } from '../../utils/normalize-error';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 import {
@@ -87,7 +86,6 @@ export class GraphApiService {
    * 1. Get the list ID by display name in the specified site
    * 2. Fetch the list items
    * 3. Transform the list items to SiteConfig and validate with Zod
-   * Returns the SiteConfig array
    */
   public async fetchSitesFromSharePointList(sharepointList: {
     siteId: string;
@@ -102,6 +100,8 @@ export class GraphApiService {
 
     // Unfortunately we cannot filter by list name using ms graph so we need to fetch all lists.
     const lists = await this.getSiteLists(siteId);
+    
+    // Very important step to check by displayName and not name because in SharePoint when a column is renamed only displayName is updated
     const matchingList = lists.find((list) => list.displayName === listDisplayName);
 
     assert.ok(matchingList?.id, `List "${listDisplayName}" not found in site ${logSiteId}`);
@@ -171,7 +171,7 @@ export class GraphApiService {
         error: sanitizeError(error),
       });
       throw new Error(
-        `Invalid site configuration at row ${index + 1}: ${error instanceof Error ? error.message : String(error)}`,
+        `Invalid site configuration at row ${index + 1}: ${normalizeError(error).message}`,
       );
     }
   }
@@ -397,10 +397,10 @@ export class GraphApiService {
     return await this.paginateGraphApiRequest<ListItem>(
       `/sites/${siteId}/lists/${listId}/items`,
       (url) => {
-        let builder = this.graphClient.api(url);
-        if (select) builder = builder.select(select);
-        if (expand) builder = builder.expand(expand);
-        return builder.top(GRAPH_API_PAGE_SIZE).get();
+        let requestBuilder = this.graphClient.api(url);
+        if (select) requestBuilder = requestBuilder.select(select);
+        if (expand) requestBuilder = requestBuilder.expand(expand);
+        return requestBuilder.top(GRAPH_API_PAGE_SIZE).get();
       },
     );
   }
