@@ -1,4 +1,4 @@
-import type { SiteConfig } from '../config/sharepoint.schema';
+import type { SiteConfig } from '../config/tenant-config.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 

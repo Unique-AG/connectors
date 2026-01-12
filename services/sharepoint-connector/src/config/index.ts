@@ -1,7 +1,9 @@
-import { AppConfigNamespaced } from './app.config';
-import { ProcessingConfigNamespaced } from './processing.config';
-import { SharepointConfigNamespaced } from './sharepoint.config';
-import { UniqueConfigNamespaced } from './unique.config';
+import {
+  AppConfigNamespaced,
+  ProcessingConfigNamespaced,
+  SharepointConfigNamespaced,
+  UniqueConfigNamespaced,
+} from './tenant-config-loader';
 
 export type Config = UniqueConfigNamespaced &
   ProcessingConfigNamespaced &

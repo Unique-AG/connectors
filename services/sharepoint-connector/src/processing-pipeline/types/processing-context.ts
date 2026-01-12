@@ -5,11 +5,11 @@ import {
   IngestionApiResponse,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 
-export interface ProcessingContext {
+export interface ProcessingContext extends SharepointSyncContext {
   correlationId: string;
   pipelineItem: SharepointContentItem;
   knowledgeBaseUrl: string;
-  scopeId: string;
+  targetScopeId: string;
   uploadUrl?: string;
   uniqueContentId?: string;
   uploadSucceeded?: boolean;
@@ -19,7 +19,6 @@ export interface ProcessingContext {
   mimeType?: string;
   registrationResponse?: IngestionApiResponse;
   fileStatus: 'new' | 'updated';
-  syncContext: SharepointSyncContext;
   metadata?: ContentMetadata;
 }
 

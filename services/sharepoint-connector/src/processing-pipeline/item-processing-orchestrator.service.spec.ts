@@ -103,9 +103,8 @@ describe('ItemProcessingOrchestratorService', () => {
     serviceUserId: 'test-user-id',
     rootScopeId: 'root-scope-1',
     rootPath: '/Root',
-    siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
     siteName: 'test-site',
-    siteConfig: createMockSiteConfig(),
+    ...createMockSiteConfig(),
   };
 
   it('processes all provided files', async () => {

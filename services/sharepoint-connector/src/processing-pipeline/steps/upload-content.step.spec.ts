@@ -101,23 +101,20 @@ describe('UploadContentStep', () => {
   };
 
   const baseDriveItemContext: ProcessingContext = {
+    ...createMockSiteConfig(),
     correlationId: 'c1',
     startTime: new Date(),
     knowledgeBaseUrl: 'https://example.sharepoint.com/sites/test/document.docx',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    scopeId: 'scope-1',
+    targetScopeId: 'scope-1', // forced save
     fileStatus: 'new',
     uploadUrl: 'https://storage.example.com/upload?key=encrypted-key',
     uniqueContentId: 'cont_abc123',
     fileSize: 20791,
-    syncContext: {
-      serviceUserId: 'user-1',
-      rootScopeId: 'root-scope-1',
-      rootPath: '/Root',
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-      siteName: 'test-site',
-      siteConfig: createMockSiteConfig(),
-    },
+    serviceUserId: 'user-1',
+    rootScopeId: 'root-scope-1',
+    rootPath: '/Root',
+    siteName: 'test-site',
     pipelineItem: {
       itemType: 'driveItem' as const,
       item: mockDriveItem,
@@ -130,24 +127,21 @@ describe('UploadContentStep', () => {
   };
 
   const baseListItemContext: ProcessingContext = {
+    ...createMockSiteConfig(),
     correlationId: 'c2',
     startTime: new Date(),
     knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/test/test.aspx',
     mimeType: 'text/html',
-    scopeId: 'scope-1',
+    targetScopeId: 'scope-1', // forced save
     fileStatus: 'new',
     uploadUrl: 'https://storage.example.com/upload?key=encrypted-key',
     uniqueContentId: 'cont_def456',
     htmlContent: '<div><h2>Test Page</h2><p>Content</p></div>',
     fileSize: 50,
-    syncContext: {
-      serviceUserId: 'user-1',
-      rootScopeId: 'root-scope-1',
-      rootPath: '/Root',
-      siteId: 'site-1',
-      siteName: 'test-site',
-      siteConfig: createMockSiteConfig(),
-    },
+    serviceUserId: 'user-1',
+    rootScopeId: 'root-scope-1',
+    rootPath: '/Root',
+    siteName: 'test-site',
     pipelineItem: {
       itemType: 'listItem' as const,
       item: mockListItem,

@@ -5,9 +5,13 @@ import type { Drive, List } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
+import { z } from 'zod';
 import { Config } from '../../config';
-import type { SiteConfig } from '../../config/sharepoint.schema';
-import { SiteConfigSchema } from '../../config/sharepoint.schema';
+import { SiteConfigSchema } from '../../config/tenant-config.schema';
+
+// Derive type from schema instead of importing it
+type SiteConfig = z.infer<typeof SiteConfigSchema>;
+
 import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';

@@ -96,6 +96,11 @@ describe('SharepointSynchronizationService', () => {
     mockGraphApiService = {
       getAllSiteItems: vi.fn().mockResolvedValue({ items: [mockFile], directories: [] }),
       getSiteName: vi.fn().mockResolvedValue('test-site-name'),
+      loadSitesConfiguration: vi
+        .fn()
+        .mockResolvedValue([
+          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
+        ]),
       fetchSitesFromSharePointList: vi
         .fn()
         .mockResolvedValue([
@@ -253,6 +258,13 @@ describe('SharepointSynchronizationService', () => {
       record: vi.fn(),
     };
 
+    const mockSiteConfigs = [
+      createMockSiteConfig({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        syncMode: 'content_and_permissions',
+      }),
+    ];
+
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -261,12 +273,7 @@ describe('SharepointSynchronizationService', () => {
           if (key === 'sharepoint')
             return {
               sitesSource: 'config_file',
-              sites: [
-                createMockSiteConfig({
-                  siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-                  syncMode: 'content_and_permissions',
-                }),
-              ],
+              sites: mockSiteConfigs,
             };
           if (key === 'processing.syncMode') return 'content_and_permissions';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
@@ -275,7 +282,10 @@ describe('SharepointSynchronizationService', () => {
         }),
       }))
       .mock(GraphApiService)
-      .impl(() => mockGraphApiService)
+      .impl(() => ({
+        ...mockGraphApiService,
+        loadSitesConfiguration: vi.fn().mockResolvedValue(mockSiteConfigs),
+      }))
       .mock(ContentSyncService)
       .impl(() => mockContentSyncService)
       .mock(PermissionsSyncService)
@@ -310,6 +320,10 @@ describe('SharepointSynchronizationService', () => {
       record: vi.fn(),
     };
 
+    const mockSiteConfigs = [
+      createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
+    ];
+
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
@@ -318,7 +332,7 @@ describe('SharepointSynchronizationService', () => {
           if (key === 'sharepoint')
             return {
               sitesSource: 'config_file',
-              sites: [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })],
+              sites: mockSiteConfigs,
             };
           if (key === 'processing.syncMode') return 'content_and_permissions';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
@@ -327,7 +341,10 @@ describe('SharepointSynchronizationService', () => {
         }),
       }))
       .mock(GraphApiService)
-      .impl(() => mockGraphApiService)
+      .impl(() => ({
+        ...mockGraphApiService,
+        loadSitesConfiguration: vi.fn().mockResolvedValue(mockSiteConfigs),
+      }))
       .mock(ContentSyncService)
       .impl(() => mockContentSyncService)
       .mock(PermissionsSyncService)

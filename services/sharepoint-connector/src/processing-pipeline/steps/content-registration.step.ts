@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
-import { getInheritanceSettings } from '../../config/sharepoint.schema';
+import { getInheritanceSettings } from '../../config/tenant-config.schema';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { ModerationStatusValue } from '../../constants/moderation-status.constants';
@@ -48,7 +48,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       title: context.pipelineItem.fileName,
       mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
       ownerType: UniqueOwnerType.Scope,
-      scopeId: context.scopeId,
+      scopeId: context.targetScopeId,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
@@ -56,21 +56,20 @@ export class ContentRegistrationStep implements IPipelineStep {
       baseUrl: this.sharepointBaseUrl,
       byteSize: context.fileSize ?? 0,
       metadata: this.extractMetadata(context.pipelineItem),
-      storeInternally:
-        context.syncContext.siteConfig.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: context.storeInternally === StoreInternallyMode.Enabled,
     };
 
     context.metadata = contentRegistrationRequest.metadata;
 
-    const { inheritFiles } = getInheritanceSettings(context.syncContext.siteConfig);
+    const { inheritFiles } = getInheritanceSettings(context);
     // We add permissions only for new files, because existing ones should already have correct
     // permissions (including service user permissions) and we don't want to override them; applies
     // when inheritance is disabled or when syncing permissions.
     if (!inheritFiles && context.fileStatus === 'new') {
       contentRegistrationRequest.fileAccess = [
-        `u:${context.syncContext.serviceUserId}R`,
-        `u:${context.syncContext.serviceUserId}W`,
-        `u:${context.syncContext.serviceUserId}M`,
+        `u:${context.serviceUserId}R`,
+        `u:${context.serviceUserId}W`,
+        `u:${context.serviceUserId}M`,
       ];
     }
 

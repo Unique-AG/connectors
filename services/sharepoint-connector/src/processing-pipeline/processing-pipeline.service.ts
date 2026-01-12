@@ -55,14 +55,14 @@ export class ProcessingPipelineService {
     const correlationId = randomUUID();
 
     const context: ProcessingContext = {
+      ...syncContext,
       correlationId,
       pipelineItem,
       startTime,
       knowledgeBaseUrl: getItemUrl(pipelineItem),
       mimeType: this.resolveMimeType(pipelineItem),
-      scopeId,
+      targetScopeId: scopeId,
       fileStatus,
-      syncContext,
     };
 
     const logSiteId = this.shouldConcealLogs ? smear(syncContext.siteId) : syncContext.siteId;

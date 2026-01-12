@@ -113,9 +113,8 @@ describe('ScopeManagementService', () => {
     serviceUserId: 'user-123',
     rootScopeId: 'root-scope-123',
     rootPath: '/test1',
-    siteId: 'site-123',
     siteName: 'test-site',
-    siteConfig: createMockSiteConfig(),
+    ...createMockSiteConfig({ siteId: 'site-123' }),
   };
 
   type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };
@@ -254,7 +253,7 @@ describe('ScopeManagementService', () => {
     it('disables inheritance when permission sync mode is enabled', async () => {
       const contextWithPermissionsSync: SharepointSyncContext = {
         ...mockContext,
-        siteConfig: createMockSiteConfig({
+        ...createMockSiteConfig({
           syncMode: 'content_and_permissions',
         }),
       };
@@ -275,7 +274,7 @@ describe('ScopeManagementService', () => {
     it('uses explicit inheritAccess configuration when provided', async () => {
       const contextWithInheritScopes: SharepointSyncContext = {
         ...mockContext,
-        siteConfig: createMockSiteConfig({
+        ...createMockSiteConfig({
           syncMode: 'content_only',
           permissionsInheritanceMode: 'inherit_scopes',
         }),

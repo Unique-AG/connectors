@@ -6,10 +6,13 @@ import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
-import { AppConfig, appConfig } from './config/app.config';
-import { processingConfig } from './config/processing.config';
-import { sharepointConfig } from './config/sharepoint.config';
-import { uniqueConfig } from './config/unique.config';
+import {
+  AppConfig,
+  appConfig,
+  processingConfig,
+  sharepointConfig,
+  uniqueConfig,
+} from './config/tenant-config-loader';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { Redacted } from './utils/redacted';
 

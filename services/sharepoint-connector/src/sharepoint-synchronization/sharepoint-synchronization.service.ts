@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Histogram } from '@opentelemetry/api';
 import { Config } from '../config';
-import type { SiteConfig } from '../config/sharepoint.schema';
+import type { SiteConfig } from '../config/tenant-config.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
@@ -173,12 +173,10 @@ export class SharepointSynchronizationService {
           continue;
         }
 
-        // todo flatten siteConfig maybe as we don't have conflicts on baseContext
         const context: SharepointSyncContext = {
           ...baseContext,
-          siteId: siteConfig.siteId,
+          ...siteConfig,
           siteName,
-          siteConfig,
         };
 
         let items: Awaited<ReturnType<typeof this.graphApiService.getAllSiteItems>>['items'];
@@ -187,8 +185,8 @@ export class SharepointSynchronizationService {
         >['directories'];
         try {
           const result = await this.graphApiService.getAllSiteItems(
-            siteConfig.siteId,
-            siteConfig.syncColumnName,
+            context.siteId,
+            context.syncColumnName,
           );
           items = result.items;
           directories = result.directories;
@@ -218,7 +216,7 @@ export class SharepointSynchronizationService {
           continue;
         }
 
-        if (siteConfig.ingestionMode === IngestionMode.Recursive) {
+        if (context.ingestionMode === IngestionMode.Recursive) {
           try {
             // Create scopes for ALL paths (including moved file destinations)
             scopes = await this.scopeManagementService.batchCreateScopes(
@@ -257,7 +255,7 @@ export class SharepointSynchronizationService {
           continue;
         }
 
-        if (siteConfig.syncMode === 'content_and_permissions') {
+        if (context.syncMode === 'content_and_permissions') {
           try {
             await this.permissionsSyncService.syncPermissionsForSite({
               context,

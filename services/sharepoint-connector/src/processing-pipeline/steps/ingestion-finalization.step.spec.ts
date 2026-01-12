@@ -54,20 +54,17 @@ describe('IngestionFinalizationStep', () => {
     };
 
     const context: ProcessingContext = {
+      ...createMockSiteConfig(),
       correlationId: 'c1',
       startTime: new Date(),
       knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
       mimeType: 'application/pdf',
-      scopeId: 'scope-1',
+      targetScopeId: 'scope-1',
       fileStatus: 'new',
-      syncContext: {
-        serviceUserId: 'user-1',
-        rootScopeId: 'root-scope-1',
-        rootPath: '/Root',
-        siteId: 'site-1',
-        siteName: 'test-site',
-        siteConfig: createMockSiteConfig(),
-      },
+      serviceUserId: 'user-1',
+      rootScopeId: 'root-scope-1',
+      rootPath: '/Root',
+      siteName: 'test-site',
       pipelineItem: {
         itemType: 'listItem',
         item: listItem,

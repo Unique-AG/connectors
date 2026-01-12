@@ -144,9 +144,8 @@ describe('ProcessingPipelineService', () => {
     serviceUserId: 'test-user-id',
     rootScopeId: 'root-scope-1',
     rootPath: '/Root',
-    siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
     siteName: 'test-site',
-    siteConfig: createMockSiteConfig(),
+    ...createMockSiteConfig(),
   };
 
   it('processes file through all pipeline steps successfully', async () => {
@@ -171,6 +170,28 @@ describe('ProcessingPipelineService', () => {
       'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     );
     expect(context?.correlationId).toBeDefined();
+  });
+
+  it('correctly handles targetScopeId in ProcessingContext by prioritizing target scope over root scope', async () => {
+    const targetScopeId = 'specific-folder-scope-id';
+    const rootScopeIdFromConfig = mockSyncContext.scopeId;
+
+    // Ensure they are different for the test
+    expect(targetScopeId).not.toBe(rootScopeIdFromConfig);
+
+    await service.processItem(mockFile, targetScopeId, 'new', mockSyncContext);
+
+    const executeCalls = vi.mocked(mockSteps.contentRegistration.execute).mock.calls;
+    const context = executeCalls[0]?.[0];
+
+    // The context.targetScopeId should be the targetScopeId passed to processItem,
+    // not the root scopeId from mockSyncContext.
+    expect(context?.targetScopeId).toBe(targetScopeId);
+
+    // We should still have access to the root scope via rootScopeId property (from BaseSyncContext)
+    // and also the original scopeId from SiteConfig (which is also the root scope)
+    expect(context?.rootScopeId).toBe(mockSyncContext.rootScopeId);
+    expect(context?.scopeId).toBe(mockSyncContext.scopeId);
   });
 
   it('calls cleanup for each completed step', async () => {

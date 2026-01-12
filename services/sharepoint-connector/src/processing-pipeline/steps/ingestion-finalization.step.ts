@@ -44,15 +44,14 @@ export class IngestionFinalizationStep implements IPipelineStep {
       mimeType: context.registrationResponse.mimeType,
       ownerType: context.registrationResponse.ownerType,
       byteSize: context.registrationResponse.byteSize,
-      scopeId: context.scopeId,
+      scopeId: context.targetScopeId,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceName: INGESTION_SOURCE_NAME,
       sourceKind: INGESTION_SOURCE_KIND,
       fileUrl: context.registrationResponse.readUrl,
       url: context.knowledgeBaseUrl,
       baseUrl: this.sharepointBaseUrl,
-      storeInternally:
-        context.syncContext.siteConfig.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: context.storeInternally === StoreInternallyMode.Enabled,
     };
 
     try {

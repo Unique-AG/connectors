@@ -1,4 +1,4 @@
-import type { SiteConfig } from '../config/sharepoint.schema';
+import type { SiteConfig } from '../config/tenant-config.schema';
 
 export interface BaseSyncContext {
   // ID of the current user/service account performing operations
@@ -9,11 +9,7 @@ export interface BaseSyncContext {
   rootPath: string;
 }
 
-export interface SharepointSyncContext extends BaseSyncContext {
-  // SharePoint Site ID being processed
-  siteId: string;
+export interface SharepointSyncContext extends BaseSyncContext, SiteConfig {
   // SharePoint Site Name being processed
   siteName: string;
-  // Site-specific configuration
-  siteConfig: SiteConfig;
 }
