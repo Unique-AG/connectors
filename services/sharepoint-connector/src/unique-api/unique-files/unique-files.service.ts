@@ -83,38 +83,54 @@ export class UniqueFilesService {
     return result.contentDelete;
   }
 
-  public async deleteContentByContentIds(contentIds: string[]): Promise<void> {
-    if (contentIds.length === 0) {
-      return;
-    }
+  public async deleteFilesBySiteId(siteId: string): Promise<number> {
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    this.logger.log(`${logPrefix} Starting iterative file deletion`);
 
-    const chunkedContentIds = chunk(contentIds, CONTENT_BATCH_SIZE);
+    let totalDeleted = 0;
+    let hasMore = true;
 
-    this.logger.debug({
-      msg: 'Starting batch content deletion',
-      totalItems: contentIds.length,
-      batchChunks: chunkedContentIds.length,
-    });
-
-    for (const [chunkIndex, contentIdsChunk] of chunkedContentIds.entries()) {
-      this.logger.debug({
-        msg: 'Executing batch content deletion chunk',
-        chunkIndex: chunkIndex + 1,
-        totalChunks: chunkedContentIds.length,
-        itemsInChunk: contentIdsChunk.length,
+    while (hasMore) {
+      const batchResult = await this.ingestionClient.request<
+        PaginatedContentQueryResult,
+        PaginatedContentQueryInput
+      >(PAGINATED_CONTENT_QUERY, {
+        skip: 0,
+        take: CONTENT_BATCH_SIZE,
+        where: {
+          key: {
+            startsWith: `${siteId}/`,
+          },
+        },
       });
 
-      await this.ingestionClient.request<
-        ContentDeleteByContentIdsMutationResult,
-        ContentDeleteByContentIdsMutationInput
-      >(CONTENT_DELETE_BY_IDS_MUTATION, {
-        contentIds: contentIdsChunk,
-      });
+      const fileIds = batchResult.paginatedContent.nodes.map((f) => f.id);
+
+      if (fileIds.length === 0) {
+        hasMore = false;
+        continue;
+      }
+
+      await this.deleteContentIdsBatch(fileIds);
+
+      totalDeleted += fileIds.length;
+      this.logger.debug(
+        `${logPrefix} Deleted batch of ${fileIds.length} files (Total: ${totalDeleted})`,
+      );
     }
 
-    this.logger.debug({
-      msg: 'Batch content deletion completed',
-      totalItems: contentIds.length,
+    this.logger.log(
+      `${logPrefix} Iterative file deletion completed. Total deleted: ${totalDeleted}`,
+    );
+    return totalDeleted;
+  }
+
+  private async deleteContentIdsBatch(contentIds: string[]): Promise<void> {
+    await this.ingestionClient.request<
+      ContentDeleteByContentIdsMutationResult,
+      ContentDeleteByContentIdsMutationInput
+    >(CONTENT_DELETE_BY_IDS_MUTATION, {
+      contentIds,
     });
   }
 

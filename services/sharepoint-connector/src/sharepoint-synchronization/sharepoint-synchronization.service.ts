@@ -165,22 +165,17 @@ export class SharepointSynchronizationService {
     );
 
     try {
-      const files = await this.uniqueFilesService.getFilesForSite(siteConfig.siteId);
-
-      if (files.length > 0) {
-        this.logger.log(`${logPrefix} Deleting ${files.length} files`);
-        await this.uniqueFilesService.deleteContentByContentIds(files.map((f) => f.id));
-      }
-
       const rootScope = await this.uniqueScopesService.getScopeById(siteConfig.scopeId);
 
-      if (rootScope) {
-        await this.scopeManagementService.deleteRootScopeRecursively(siteConfig.scopeId);
-      } else {
-        this.logger.warn(
-          `${logPrefix} Root scope ${siteConfig.scopeId} not found. It was already deleted`,
+      if (!rootScope) {
+        this.logger.log(
+          `${logPrefix} Root scope ${siteConfig.scopeId} not found. Skipping deletion process.`,
         );
+        return;
       }
+
+      await this.uniqueFilesService.deleteFilesBySiteId(siteConfig.siteId);
+      await this.scopeManagementService.deleteRootScopeRecursively(siteConfig.scopeId);
 
       this.logger.log(`${logPrefix} Successfully processed deletion`);
     } catch (error) {
