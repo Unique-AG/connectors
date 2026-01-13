@@ -2,5 +2,5 @@
   "services/factset-mcp": "0.2.4",
   "services/outlook-mcp": "0.5.1",
   "services/sharepoint-connector": "2.0.0-beta.9",
-  "services/teams-mcp": "0.1.0"
+  "services/teams-mcp": "0.1.1"
 }
