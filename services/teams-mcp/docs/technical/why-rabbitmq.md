@@ -1,8 +1,5 @@
-<!-- confluence-page-id: 1789329445 -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-# Why RabbitMQ is Needed
-
+<!-- confluence-page-id: 1797980170 -->
+<!-- confluence-space-key: PUBDOC -->
 ## Overview
 
 RabbitMQ serves as the message broker in the Teams MCP service, enabling asynchronous processing of Microsoft Graph webhook notifications. This document explains why this architectural decision is essential.

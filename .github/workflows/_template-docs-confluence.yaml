@@ -1,0 +1,44 @@
+name: "[TEMPLATE] Docs to Confluence"
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: "Name of the service (e.g., teams-mcp)"
+        required: true
+        type: string
+      docs-path:
+        description: "Path to the docs directory relative to repo root"
+        required: true
+        type: string
+
+jobs:
+  publish-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Publish docs to Confluence
+        env:
+          CONFLUENCE_DOMAIN: unique-ch.atlassian.net
+          CONFLUENCE_PATH: /wiki/
+          CONFLUENCE_USER_NAME: ${{ secrets.ATLASSIAN_UNIQUE_CODE_PUBLISHER_USERNAME }}
+          CONFLUENCE_API_KEY: ${{ secrets.ATLASSIAN_UNIQUE_CODE_PUBLISHER_APIKEY }}
+          DOCS_PATH: ${{ inputs.docs-path }}
+          SERVICE_NAME: ${{ inputs.service-name }}
+          MD2CONF_IMAGE: leventehunyadi/md2conf@sha256:c3e971d77323c96ca4d827a08bd8ed3536e4dd5637c5aa50904178e56bec9b2f # 0.5.3
+        run: |
+          echo "-- Publishing $SERVICE_NAME docs to Confluence --"
+          docker run --rm \
+            -v "${{ github.workspace }}/$DOCS_PATH:/data" \
+            -e CONFLUENCE_DOMAIN="$CONFLUENCE_DOMAIN" \
+            -e CONFLUENCE_PATH="$CONFLUENCE_PATH" \
+            -e CONFLUENCE_USER_NAME="$CONFLUENCE_USER_NAME" \
+            -e CONFLUENCE_API_KEY="$CONFLUENCE_API_KEY" \
+            $MD2CONF_IMAGE \
+            --generated-by 'These pages are auto-generated from the <a href="https://github.com/unique-ag/connectors/tree/main/${{ inputs.docs-path }}">${{ inputs.service-name }} docs</a>.' \
+            ./
+          echo "-- Publishing complete --"

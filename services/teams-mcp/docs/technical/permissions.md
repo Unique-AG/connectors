@@ -1,8 +1,5 @@
-<!-- confluence-page-id: 1790017542 -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-# Microsoft Graph Permissions
-
+<!-- confluence-page-id: 1798275078 -->
+<!-- confluence-space-key: PUBDOC -->
 All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to.
 
 ## Permission Summary
@@ -91,7 +88,10 @@ Each permission is the minimum required for its function. No narrower alternativ
 
 ## Why Delegated (Not Application) Permissions
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart LR
     subgraph Delegated["Delegated Permissions (Used)"]
         U1["User signs in"]
@@ -111,6 +111,8 @@ flowchart LR
     style Delegated fill:#e8f5e9
     style Application fill:#ffebee
 ```
+
+</div>
 
 | Factor | Delegated | Application |
 |--------|-----------|-------------|

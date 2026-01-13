@@ -1,8 +1,5 @@
-<!-- confluence-page-id: 1789493298 -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-# Architecture
-
+<!-- confluence-page-id: 1798438916 -->
+<!-- confluence-space-key: PUBDOC -->
 ## Overview
 
 The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Teams meetings with the Unique platform through the Model Context Protocol (MCP). It captures meeting transcripts and recordings from Microsoft Teams and ingests them into Unique with proper access controls.
@@ -16,7 +13,10 @@ The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Te
 
 ## High-Level Architecture
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart TB
     subgraph External["External Services"]
         MSGraph["Microsoft Graph API"]
@@ -60,9 +60,14 @@ flowchart TB
     UniqueAPI --> Storage
 ```
 
+</div>
+
 ## Components
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart LR
     subgraph Auth["Authentication"]
         MicrosoftProvider["Microsoft OAuth Provider"]
@@ -109,6 +114,8 @@ flowchart LR
     MSGraph --> Data
     Queue --> Transcript
 ```
+
+</div>
 
 ### Component Descriptions
 

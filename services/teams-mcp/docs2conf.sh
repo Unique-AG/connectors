@@ -10,10 +10,6 @@ set -eux
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOCS_DIR="$SCRIPT_DIR/docs"
 
-CONFLUENCE_SPACE_KEY='~624ebe8d45ece00069ce737e'
-# CONFLUENCE_PARENT_PAGE_ID='1788117060'
-CONFLUENCE_PARENT_PAGE_ID='1789788170'
-
 # role/developer vault – Atlassian Service User - Unique Code Publisher (Dev)
 # ⚠️ production publisher uses GitHub Actions secrets
 CONFLUENCE_USER_NAME="$(op read 'op://s6nhjzc6dvkbn734b4vfquxcl4/svli6rcupjkpbv5qd3kjnjq6ua/username')"
@@ -26,10 +22,8 @@ docker run --rm \
     -e CONFLUENCE_PATH='/wiki/' \
     -e CONFLUENCE_USER_NAME="$CONFLUENCE_USER_NAME" \
     -e CONFLUENCE_API_KEY="$CONFLUENCE_API_KEY" \
-    -e CONFLUENCE_SPACE_KEY="$CONFLUENCE_SPACE_KEY" \
     leventehunyadi/md2conf:latest \
-    -r "$CONFLUENCE_PARENT_PAGE_ID" \
-    --generated-by 'This page is auto-generated from the <a href="https://github.com/unique-ag/connectors/tree/main/services/teams-mcp/docs">teams-mcp docs</a>. Do not edit manually.' \
+    --generated-by 'This pages are auto-generated from the <a href="https://github.com/unique-ag/connectors/tree/main/services/teams-mcp/docs">teams-mcp docs</a>.' \
     ./
 
 echo -e "\n-- Publishing complete --\n"

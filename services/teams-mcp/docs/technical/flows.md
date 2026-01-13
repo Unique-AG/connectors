@@ -1,13 +1,13 @@
-<!-- confluence-page-id: 1790148616 -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-# Flows
-
+<!-- confluence-page-id: 1798242322 -->
+<!-- confluence-space-key: PUBDOC -->
 ## User Connection Flow
 
 Everything starts when a user connects to the MCP server. This triggers OAuth authentication and sets up the subscription for receiving meeting notifications.
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart LR
     subgraph Connection["User Connects to MCP Server"]
         Connect["User opens MCP client"]
@@ -46,7 +46,12 @@ flowchart LR
     Active --> Listen
 ```
 
+</div>
+
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 sequenceDiagram
     autonumber
     actor User
@@ -77,13 +82,18 @@ sequenceDiagram
     Note over TeamsMCP: Now listening for meeting transcripts
 ```
 
+</div>
+
 **OAuth Scopes Required:** See [Microsoft Graph Permissions](./permissions.md) for detailed justification.
 
 ## Subscription Lifecycle
 
 Subscriptions are **renewed** (not recreated) before they expire. If renewal fails for any reason, the subscription is deleted and the user must reconnect to the MCP server to re-authenticate.
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 stateDiagram-v2
     [*] --> Creating: User connects to MCP
 
@@ -105,7 +115,12 @@ stateDiagram-v2
     end note
 ```
 
+</div>
+
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 sequenceDiagram
     autonumber
     participant TeamsMCP as Teams MCP Server
@@ -133,10 +148,13 @@ sequenceDiagram
     end
 ```
 
-**Subscription Renewal:**
-- Subscription renewal is driven by Microsoft Graph lifecycle webhooks
-- Microsoft sends lifecycle notifications before subscription expiration
-- The server automatically renews subscriptions when lifecycle notifications are received
+</div>
+
+**Subscription Scheduling:**
+- Subscriptions are set to expire at a configured UTC hour (default: 3 AM)
+- This batches all renewals to a single time window
+- Daily renewal ensures token validity is checked consistently
+- Minimum 2-hour subscription lifetime required for lifecycle notifications
 - **If renewal fails**: Subscription is deleted and user must reconnect to MCP server
 - See [Microsoft Graph Webhooks - Lifecycle Notifications](https://learn.microsoft.com/en-us/graph/webhooks#lifecycle-notifications) for details
 
@@ -144,7 +162,10 @@ sequenceDiagram
 
 When a meeting transcript becomes available, Microsoft Graph sends a webhook notification. The recording is fetched **only if the user has recording permissions**.
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 sequenceDiagram
     autonumber
     participant MSGraph as Microsoft Graph API
@@ -185,7 +206,12 @@ sequenceDiagram
     end
 ```
 
+</div>
+
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart TB
     subgraph Input["Microsoft Graph Webhook"]
         Notification["Change Notification"]
@@ -240,6 +266,8 @@ flowchart TB
     CheckRecording -->|No| Done
     UploadMP4 --> Done
 ```
+
+</div>
 
 **Webhook Validation:**
 - Microsoft Graph sends a `clientState` value with each notification

@@ -1,6 +1,5 @@
-<!-- confluence-page-id: 1789919237 -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
+<!-- confluence-page-id: 1799094275 -->
+<!-- confluence-space-key: PUBDOC -->
 # Token and Authentication Flows
 
 ## Overview
@@ -14,7 +13,10 @@ This document explains how tokens work, their lifecycle, and validation behavior
 
 ## Token Architecture
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart LR
     subgraph External["External"]
         Client["MCP Client"]
@@ -30,6 +32,8 @@ flowchart LR
     API -->|"MS Access Token"| Graph
     API <--> TokenStore
 ```
+
+</div>
 
 ## MCP OAuth Tokens (Internal)
 
@@ -57,7 +61,10 @@ Tokens are validated **locally** by:
 
 ### Token Storage Architecture
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart LR
     Request["Incoming Request"]
     Cache["In-Memory Cache"]
@@ -72,6 +79,8 @@ flowchart LR
     style DB fill:#fff3e0
 ```
 
+</div>
+
 **Storage Characteristics:**
 
 | Layer | Behavior |
@@ -85,7 +94,10 @@ Token deletion removes from both cache and database simultaneously.
 
 The service implements **refresh token rotation** with family tracking for security:
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart TB
     subgraph Family["Token Family: xyz"]
         A["Refresh Token A<br/>generation: 0"]
@@ -104,6 +116,8 @@ flowchart TB
     A -.->|"Attempted reuse"| Reuse
     Reuse -->|"Yes"| Revoke
 ```
+
+</div>
 
 **Security Features:**
 
@@ -136,7 +150,10 @@ Expired tokens are cleaned up periodically:
 
 Microsoft tokens are refreshed **on-demand** when the Graph API returns a 401 error:
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 sequenceDiagram
     autonumber
     participant GC as Graph Client
@@ -165,6 +182,8 @@ sequenceDiagram
     MW-->>GC: Return success
 ```
 
+</div>
+
 **Key Behaviors:**
 
 | Step | Behavior |
@@ -180,7 +199,10 @@ sequenceDiagram
 
 All Microsoft tokens are encrypted at rest:
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart LR
     subgraph Encryption["Token Encryption"]
         Plain["Plaintext Token"]
@@ -197,6 +219,8 @@ flowchart LR
     Plain --> Encrypt --> Cipher
     Cipher2 --> Decrypt --> Plain2
 ```
+
+</div>
 
 **Encryption Requirements:**
 
@@ -263,7 +287,10 @@ For detailed explanation of why delegated permissions are required, see [Permiss
 
 **Short Answer:** Certificates are only supported in the Client Credentials flow, which is incompatible with delegated permissions.
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart LR
     subgraph CertSupport["Certificate Authentication Support"]
         CC["Client Credentials Flow"]
@@ -286,6 +313,8 @@ flowchart LR
     style Cert fill:#e8f5e9
     style Secret fill:#e8f5e9
 ```
+
+</div>
 
 **Technical Explanation:**
 

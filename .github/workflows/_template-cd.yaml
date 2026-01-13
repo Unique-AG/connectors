@@ -15,6 +15,10 @@ on:
         description: "Path to a specific Dockerfile (e.g., services/factset-mcp/deploy/Dockerfile)"
         default: "./Dockerfile"
         type: string
+      docs-path:
+        description: "Path to the docs directory relative to repo root (optional)"
+        required: false
+        type: string
 
 jobs:
   # Build and push container to registry
@@ -145,3 +149,11 @@ jobs:
           --destination ${{ env.DESTINATION }} \
           --registry oci://${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_CHART_REPO }} \
           --registry oci://${{ env.GHCR_REGISTRY }}/${{ env.GHCR_CHART_REPO }}
+
+  publish-docs:
+    if: ${{ inputs.docs-path != '' }}
+    uses: ./.github/workflows/_template-docs-confluence.yaml
+    with:
+      service-name: ${{ inputs.service-name }}
+      docs-path: ${{ inputs.docs-path }}
+    secrets: inherit

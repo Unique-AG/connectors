@@ -1,7 +1,17 @@
-<!-- confluence-page-id: 1789788170 -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-<!-- confluence-space-key: ~624ebe8d45ece00069ce737e -->
-# Teams MCP Connector
+<!-- confluence-page-id: 1780973577 -->
+<!-- confluence-space-key: PUBDOC -->
+
+!!! danger "Pre-Release Disclaimer"
+    **`teams-mcp` is pre-release software.**
+
+    - **No SLA/SSLA**: No service level agreements or support level agreements apply
+    - **No Support**: No guaranteed support, response times, or issue resolution
+    - **Breaking Changes**: APIs, configurations, and behavior may change without notice between versions
+    - **No Stability Guarantees**: Features may be incomplete, modified, or removed at any time
+    - **Data Loss Risk**: Bugs or changes may result in data loss or corruption
+    - **Use at Your Own Risk**: This software is provided "as-is" without warranties of any kind
+
+    Pre-release software is intended for evaluation and testing purposes only. Do not rely on this software for production workloads without understanding these limitations. 
 
 ## Overview
 
@@ -111,7 +121,10 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./perm
 
 ### High-Level Architecture
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart TB
     subgraph External["External Services"]
         MSGraph["Microsoft Graph API"]
@@ -147,9 +160,14 @@ flowchart TB
     UniqueAPI --> Storage
 ```
 
+</div>
+
 ### User Connection Flow
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 sequenceDiagram
     autonumber
     actor User
@@ -178,9 +196,14 @@ sequenceDiagram
     Note over Teams: Now listening for meeting transcripts
 ```
 
+</div>
+
 ### Transcript Processing Flow
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 sequenceDiagram
     autonumber
     participant Graph as Microsoft Graph
@@ -218,6 +241,8 @@ sequenceDiagram
         Processor->>Unique: Upload recording
     end
 ```
+
+</div>
 
 ### User Workflow
 

@@ -75,3 +75,4 @@ jobs:
       service-name: teams-mcp
       service-version: ${{ needs.release-please.outputs['services/teams-mcp--version'] }}
       dockerfile: services/teams-mcp/deploy/Dockerfile
+      docs-path: services/teams-mcp/docs
