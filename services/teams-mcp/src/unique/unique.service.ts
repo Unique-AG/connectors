@@ -112,6 +112,11 @@ export class UniqueService {
       entityType: ScopeAccessEntityType.User,
       type: ScopeAccessType.Read,
     });
+    accesses.push({
+      entityId: owner.id,
+      entityType: ScopeAccessEntityType.User,
+      type: ScopeAccessType.Manage,
+    });
     await this.addScopeAccesses(scope.id, accesses);
 
     this.logger.log(
@@ -279,7 +284,7 @@ export class UniqueService {
     const span = this.trace.getSpan();
     span?.setAttribute('path', path);
 
-    const payload = PublicCreateScopeRequestSchema.encode({ paths: [path] });
+    const payload = PublicCreateScopeRequestSchema.encode({ paths: [path], inheritAccess: false });
     const endpoint = new URL('folder', this.config.get('unique.apiBaseUrl', { infer: true }));
 
     this.logger.debug(

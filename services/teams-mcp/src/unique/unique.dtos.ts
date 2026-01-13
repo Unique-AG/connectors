@@ -38,6 +38,7 @@ export type PublicUsersResult = z.infer<typeof PublicUsersResultSchema>;
 
 export const PublicCreateScopeRequestSchema = z.object({
   paths: z.array(z.string()),
+  inheritAccess: z.boolean(),
 });
 export type PublicCreateScopeRequest = z.infer<typeof PublicCreateScopeRequestSchema>;
 
