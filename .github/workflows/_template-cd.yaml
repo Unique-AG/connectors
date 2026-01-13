@@ -152,6 +152,8 @@ jobs:
 
   publish-docs:
     if: ${{ inputs.docs-path != '' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_template-docs-confluence.yaml
     with:
       service-name: ${{ inputs.service-name }}

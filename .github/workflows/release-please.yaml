@@ -71,6 +71,7 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs['services/teams-mcp--release_created'] == 'true' }}
     uses: ./.github/workflows/_template-cd.yaml
+    secrets: inherit
     with:
       service-name: teams-mcp
       service-version: ${{ needs.release-please.outputs['services/teams-mcp--version'] }}

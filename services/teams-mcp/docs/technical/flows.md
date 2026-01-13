@@ -4,8 +4,6 @@
 
 Everything starts when a user connects to the MCP server. This triggers OAuth authentication and sets up the subscription for receiving meeting notifications.
 
-<div style="max-width: 800px;">
-
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart LR
@@ -46,10 +44,6 @@ flowchart LR
     Active --> Listen
 ```
 
-</div>
-
-<div style="max-width: 800px;">
-
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 sequenceDiagram
@@ -82,15 +76,11 @@ sequenceDiagram
     Note over TeamsMCP: Now listening for meeting transcripts
 ```
 
-</div>
-
 **OAuth Scopes Required:** See [Microsoft Graph Permissions](./permissions.md) for detailed justification.
 
 ## Subscription Lifecycle
 
 Subscriptions are **renewed** (not recreated) before they expire. If renewal fails for any reason, the subscription is deleted and the user must reconnect to the MCP server to re-authenticate.
-
-<div style="max-width: 800px;">
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -114,10 +104,6 @@ stateDiagram-v2
         MCP server and re-authenticate
     end note
 ```
-
-</div>
-
-<div style="max-width: 800px;">
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -148,8 +134,6 @@ sequenceDiagram
     end
 ```
 
-</div>
-
 **Subscription Scheduling:**
 - Subscriptions are set to expire at a configured UTC hour (default: 3 AM)
 - This batches all renewals to a single time window
@@ -161,8 +145,6 @@ sequenceDiagram
 ## Transcript Processing Flow
 
 When a meeting transcript becomes available, Microsoft Graph sends a webhook notification. The recording is fetched **only if the user has recording permissions**.
-
-<div style="max-width: 800px;">
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -205,10 +187,6 @@ sequenceDiagram
         Service->>Unique: Upload recording (MP4)
     end
 ```
-
-</div>
-
-<div style="max-width: 800px;">
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -266,8 +244,6 @@ flowchart TB
     CheckRecording -->|No| Done
     UploadMP4 --> Done
 ```
-
-</div>
 
 **Webhook Validation:**
 - Microsoft Graph sends a `clientState` value with each notification

@@ -39,6 +39,8 @@ jobs:
             -e CONFLUENCE_USER_NAME="$CONFLUENCE_USER_NAME" \
             -e CONFLUENCE_API_KEY="$CONFLUENCE_API_KEY" \
             $MD2CONF_IMAGE \
+            --render-mermaid \
+            --max-image-width 800 \
             --generated-by 'These pages are auto-generated from the <a href="https://github.com/unique-ag/connectors/tree/main/${{ inputs.docs-path }}">${{ inputs.service-name }} docs</a>.' \
             ./
           echo "-- Publishing complete --"
