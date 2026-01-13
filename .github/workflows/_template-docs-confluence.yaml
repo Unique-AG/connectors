@@ -30,6 +30,7 @@ jobs:
           DOCS_PATH: ${{ inputs.docs-path }}
           SERVICE_NAME: ${{ inputs.service-name }}
           MD2CONF_IMAGE: leventehunyadi/md2conf@sha256:c3e971d77323c96ca4d827a08bd8ed3536e4dd5637c5aa50904178e56bec9b2f # 0.5.3
+          MAX_IMAGE_WIDTH: 800
         run: |
           echo "-- Publishing $SERVICE_NAME docs to Confluence --"
           docker run --rm \
@@ -40,7 +41,7 @@ jobs:
             -e CONFLUENCE_API_KEY="$CONFLUENCE_API_KEY" \
             $MD2CONF_IMAGE \
             --render-mermaid \
-            --max-image-width 800 \
+            --max-image-width "$MAX_IMAGE_WIDTH" \
             --generated-by 'These pages are auto-generated from the <a href="https://github.com/unique-ag/connectors/tree/main/${{ inputs.docs-path }}">${{ inputs.service-name }} docs</a>.' \
             ./
           echo "-- Publishing complete --"

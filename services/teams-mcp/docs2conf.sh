@@ -9,6 +9,7 @@ set -eux
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOCS_DIR="$SCRIPT_DIR/docs"
+MAX_IMAGE_WIDTH=800
 
 # role/developer vault – Atlassian Service User - Unique Code Publisher (Dev)
 # ⚠️ production publisher uses GitHub Actions secrets
@@ -23,6 +24,8 @@ docker run --rm \
     -e CONFLUENCE_USER_NAME="$CONFLUENCE_USER_NAME" \
     -e CONFLUENCE_API_KEY="$CONFLUENCE_API_KEY" \
     leventehunyadi/md2conf:latest \
+    --render-mermaid \
+    --max-image-width "$MAX_IMAGE_WIDTH" \
     --generated-by 'This pages are auto-generated from the <a href="https://github.com/unique-ag/connectors/tree/main/services/teams-mcp/docs">teams-mcp docs</a>.' \
     ./
 
