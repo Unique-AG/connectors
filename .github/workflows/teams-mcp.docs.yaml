@@ -6,11 +6,6 @@ permissions:
 on:
   workflow_dispatch:
   workflow_call:
-  pull_request: # FIXME: remove before merge!
-    paths:
-      - .github/workflows/teams-mcp.docs.yaml
-    branches:
-      - main
 
 jobs:
   publish-docs:
