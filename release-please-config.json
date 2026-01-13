@@ -67,7 +67,6 @@
     },
     "services/teams-mcp": {
       "prerelease": true,
-      "prerelease-type": "alpha",
       "versioning": "prerelease",
       "extra-files": [
         {
