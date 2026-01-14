@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0-beta.10](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.9...sharepoint-connector@2.0.0-beta.10) (2026-01-14)
+
+
+### Features
+
+* **teams-mcp:** auto admin consent ([#201](https://github.com/Unique-AG/connectors/issues/201)) ([39d89c2](https://github.com/Unique-AG/connectors/commit/39d89c20a416192526b3c3882fa3a9d33461c05a))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** remove unused tags variable from terraform ([39d89c2](https://github.com/Unique-AG/connectors/commit/39d89c20a416192526b3c3882fa3a9d33461c05a))
+
 ## [2.0.0-beta.9](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.8...sharepoint-connector@2.0.0-beta.9) (2026-01-09)
 
 
