@@ -1,4 +1,5 @@
-# Frequently Asked Questions
+<!-- confluence-page-id: 1801846803 -->
+<!-- confluence-space-key: PUBDOC -->
 
 ## General
 
@@ -64,15 +65,21 @@ This is a data ingestion connector that uses the MCP protocol for authentication
 
 **Answer:** While it's technically possible to use certificate authentication with the Authorization Code flow, it would require significant additional implementation effort in our OAuth packages. The standard approach for delegated permissions is to use a client secret, which is simpler to implement and maintain.
 
-**See also:** [Unsupported Authentication Methods](./technical/token-auth-flows.md#unsupported-authentication-methods)
+**See also:**
+- [Authentication Architecture - Unsupported Authentication Methods](./technical/architecture.md#unsupported-authentication-methods)
+- [Microsoft Entra ID - Authentication flows](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows)
 
-### Why do I need a client secret?
+### Why do I need a client ID and client secret?
 
-**Answer:** The client secret proves to Microsoft that your server is the legitimate application (not an imposter). It's used during the OAuth token exchange to securely obtain Microsoft access and refresh tokens.
+**Answer:** Microsoft Graph API uses OAuth 2.0 for authentication, which requires a `CLIENT_ID` to identify and authorize applications. The `CLIENT_SECRET` proves to Microsoft that your server is the legitimate application (not an imposter). It's used during the OAuth token exchange to securely obtain Microsoft access and refresh tokens.
+
+The `CLIENT_ID` enables Microsoft to verify application identity, enforce permissions, enable consent flows, track and audit API usage, and ensure delegated authorization is scoped to data the signed-in user can access.
 
 **Security note:** The client secret is never sent to clients - it's only used server-side during the OAuth flow.
 
-**See also:** [Why Client ID is Required](./technical/token-auth-flows.md#why-client-id-is-required)
+**See also:**
+- [Authentication Architecture - Required App Registration Components](./technical/architecture.md#required-app-registration-components)
+- [Microsoft Graph API - Get access on behalf of a user](https://learn.microsoft.com/en-us/graph/auth-v2-user)
 
 ### Why can't I use application permissions instead of delegated?
 
@@ -94,13 +101,25 @@ Teams MCP uses delegated permissions for self-service user connections.
 
 **Answer:** Client Credentials flow only supports application permissions, which would require tenant admins to create Application Access Policies per user via PowerShell. This is impractical for self-service MCP connections. Delegated permissions require the Authorization Code flow.
 
-**See also:** [Unsupported Authentication Methods](./technical/token-auth-flows.md#unsupported-authentication-methods)
+**See also:**
+- [Authentication Architecture - Unsupported Authentication Methods](./technical/architecture.md#unsupported-authentication-methods)
+- [Microsoft Entra ID - Authentication flows](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows)
 
 ### Why can't I use multiple app registrations?
 
 **Answer:** Each Teams MCP deployment uses one Microsoft Entra ID app registration. The app can be configured as multi-tenant to serve users from multiple organizations, but you don't need separate app registrations per tenant.
 
-**See also:** [Single App Registration Architecture](./technical/token-auth-flows.md#single-app-registration-architecture)
+**Single App Registration Architecture:**
+- **Single App Registration**: One `CLIENT_ID`/`CLIENT_SECRET` pair per deployment
+- **Multi-Tenant Capable**: The app registration can be configured to accept users from multiple Microsoft tenants
+- **Cross-Tenant Authentication**: Users from different organizations authenticate via Enterprise Applications in their tenant that reference the original app registration
+- **Enterprise Application Creation**: When tenant admin grants consent, Microsoft creates an Enterprise Application in their tenant as a proxy to the original app registration
+
+This design uses a single OAuth application that can serve users across multiple tenants, rather than requiring separate app registrations per organization.
+
+**See also:**
+- [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture)
+- [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/) - Authentication and authorization
 
 ## Configuration
 
@@ -190,7 +209,15 @@ If rotation becomes necessary, it would require manually deleting all subscripti
 - Clients cannot access Microsoft Graph API directly
 - All Microsoft API calls are made by the server on behalf of authenticated users
 
-**See also:** [Token Isolation](./technical/token-auth-flows.md#token-isolation)
+**Token Isolation Design:**
+1. **Microsoft OAuth Flow**: User authenticates with Microsoft Entra ID
+2. **Token Exchange**: Server exchanges authorization code for Microsoft tokens (using `CLIENT_SECRET`)
+3. **Token Storage**: Microsoft tokens are encrypted and stored on the server only
+4. **Client Authentication**: Server issues separate opaque JWT tokens to the client for MCP API access
+
+**See also:**
+- [Authentication Architecture - Token Isolation](./technical/architecture.md#token-isolation)
+- [Authentication Architecture - Token Storage](./technical/architecture.md#token-storage)
 
 ### Why are MCP tokens hashed but Microsoft tokens encrypted?
 
@@ -234,25 +261,33 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 
 **Resolution:** User must reconnect to MCP server to re-authenticate.
 
-**See also:** [Microsoft Token Refresh Failed](./technical/token-auth-flows.md#microsoft-token-refresh-failed)
+**See also:**
+- [Microsoft Token Refresh Flow](./technical/flows.md#microsoft-token-refresh-flow)
+- [Microsoft Entra ID Troubleshooting](https://learn.microsoft.com/en-us/entra/identity-platform/troubleshoot-authentication)
 
 ### What happens if a token family is revoked?
 
 **Answer:** All refresh operations fail for that user. The user must re-authenticate completely. This happens automatically when refresh token reuse is detected (possible token theft).
 
-**See also:** [Token Family Revoked](./technical/token-auth-flows.md#token-family-revoked)
+**See also:**
+- [Architecture - Token Family Tracking](./technical/architecture.md#key-design-decisions)
+- [Security - Refresh Token Rotation](./technical/security.md#refresh-token-rotation)
 
 ### What happens if the encryption key changes?
 
 **Answer:** All stored Microsoft tokens become unreadable. All users must reconnect to obtain fresh tokens. There is no zero-downtime rotation for the encryption key.
 
-**See also:** [Encryption Key Changed](./technical/token-auth-flows.md#encryption-key-changed)
+**See also:**
+- [Authentication Architecture - Token Encryption](./technical/architecture.md#token-encryption)
+- [Security - ENCRYPTION_KEY Rotation](./technical/security.md#rotation-procedures)
 
-### Why are access tokens so short-lived (60 seconds)?
+### Why are MCP access tokens so short-lived (60 seconds)?
 
 **Answer:** Short-lived access tokens reduce the impact of token theft. If an access token is compromised, it expires quickly. Refresh tokens are used to obtain new access tokens without user re-authentication.
 
-**See also:** [MCP OAuth (Internal)](./technical/token-auth-flows.md#mcp-oauth-internal)
+**See also:**
+- [Authentication Architecture - MCP OAuth (Internal)](./technical/architecture.md#mcp-oauth-internal)
+- [MCP Authorization](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization) - MCP protocol authorization spec
 
 ## Subscriptions & Processing
 
@@ -286,9 +321,25 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 
 ### Why use RabbitMQ for webhook processing?
 
-**Answer:** Microsoft requires webhook responses in < 10 seconds. Transcript processing can take minutes (fetching meeting data, transcript content, recordings, uploading to Unique). RabbitMQ decouples webhook reception (fast 202 response) from processing (asynchronous), ensuring we meet Microsoft's strict timeout requirements.
+**Answer:** Microsoft requires webhook endpoints to respond within **10 seconds**, or it considers the delivery failed and retries. However, processing transcript notifications involves database lookups, multiple Microsoft Graph API calls, user resolution, and content ingestion, which can take **30+ seconds**.
 
-**See also:** [Why RabbitMQ](./technical/why-rabbitmq.md)
+RabbitMQ decouples webhook reception from processing:
+- **Webhook Controller** receives the notification, validates it, publishes to RabbitMQ, and returns `202 Accepted` immediately
+- **RabbitMQ** durably stores the message until a consumer processes it
+- **Transcript Service** consumes messages and performs the slow processing asynchronously
+
+This ensures we meet Microsoft's strict timeout requirements while processing transcripts reliably.
+
+**Benefits:**
+- Meets Microsoft's 10-second webhook response requirement
+- Avoids Microsoft retry storms from failed deliveries
+- Provides reliability via Dead Letter Exchange for failed message inspection and retry
+- Enables horizontal scaling with multiple service replicas
+- Handles burst traffic gracefully with message buffering
+
+**See also:**
+- [Microsoft Graph Webhooks](https://learn.microsoft.com/en-us/graph/webhooks) - Microsoft webhook documentation
+- [Microsoft Graph Change Notifications](https://learn.microsoft.com/en-us/graph/webhooks#change-notifications) - Change notification requirements
 
 ### Can I deploy without RabbitMQ?
 
@@ -307,12 +358,6 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 **See also:** [Webhook Validation](./technical/security.md#webhook-validation)
 
 ## Deployment
-
-### Why do I need RabbitMQ?
-
-**Answer:** Microsoft requires webhook responses in < 10 seconds. RabbitMQ decouples webhook reception (fast response) from transcript processing (slower, can take minutes). This ensures we meet Microsoft's strict timeout requirements.
-
-**See also:** [Why RabbitMQ](./technical/why-rabbitmq.md)
 
 ### What happens if the database is full?
 
@@ -369,7 +414,9 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 - All Microsoft API calls are made by the server on behalf of authenticated users
 - Client tokens are opaque JWTs that only authenticate with the MCP server
 
-**See also:** [Token Isolation](./technical/token-auth-flows.md#token-isolation)
+**See also:**
+- [Authentication Architecture - Token Isolation](./technical/architecture.md#token-isolation)
+- [Microsoft Graph - Get access on behalf of a user](https://learn.microsoft.com/en-us/graph/auth-v2-user)
 
 ### What's the threat model?
 
@@ -383,17 +430,13 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 
 ## Microsoft Graph Integration
 
-### Why can't I use certificate authentication?
-
-**Answer:** While it's technically possible to use certificate authentication with the Authorization Code flow, it would require significant additional implementation effort in our OAuth packages. The standard approach for delegated permissions is to use a client secret, which is simpler to implement and maintain.
-
-**See also:** [Unsupported Authentication Methods](./technical/token-auth-flows.md#unsupported-authentication-methods)
-
 ### Why single app registration architecture?
 
 **Answer:** Each MCP deployment uses one Microsoft Entra ID app registration that can serve users from multiple Microsoft tenants. When tenant admins grant consent, Microsoft creates Enterprise Applications in their tenants. This is simpler than managing multiple app registrations.
 
-**See also:** [Single App Registration Architecture](./technical/token-auth-flows.md#single-app-registration-architecture)
+**See also:**
+- [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture)
+- [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/)
 
 ### How does multi-tenant authentication work?
 
@@ -403,7 +446,9 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 3. Users authenticate via Enterprise Application in their tenant
 4. One MCP deployment serves all tenants
 
-**See also:** [Single App Registration Architecture](./technical/token-auth-flows.md#single-app-registration-architecture)
+**See also:**
+- [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture)
+- [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/)
 
 ## Multi-Tenant
 
@@ -422,10 +467,8 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 
 - [Architecture](./technical/architecture.md) - System components and infrastructure
 - [Security](./technical/security.md) - Encryption, authentication, and threat model
-- [Token and Authentication](./technical/token-auth-flows.md) - Token types, validation, refresh flows
 - [Flows](./technical/flows.md) - User connection, subscription lifecycle, transcript processing
 - [Permissions](./technical/permissions.md) - Required scopes and least-privilege justification
-- [Why RabbitMQ](./technical/why-rabbitmq.md) - Message queue rationale
 - [Operator Guide](./operator/README.md) - Deployment and operations
 
 ## Standard References

@@ -1,4 +1,5 @@
-# Microsoft Graph Permissions
+<!-- confluence-page-id: 1802240023 -->
+<!-- confluence-space-key: PUBDOC -->
 
 All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to.
 
@@ -88,7 +89,10 @@ Each permission is the minimum required for its function. No narrower alternativ
 
 ## Why Delegated (Not Application) Permissions
 
+<div style="max-width: 800px;">
+
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart LR
     subgraph Delegated["Delegated Permissions (Used)"]
         U1["User signs in"]
@@ -108,6 +112,8 @@ flowchart LR
     style Delegated fill:#e8f5e9
     style Application fill:#ffebee
 ```
+
+</div>
 
 | Factor | Delegated | Application |
 |--------|-----------|-------------|
@@ -135,5 +141,3 @@ Application permissions would require tenant administrators to pre-configure acc
 - [Architecture](./architecture.md) - System components and infrastructure
 - [Security](./security.md) - Encryption, PKCE, and threat model
 - [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing
-- [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
-- [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale

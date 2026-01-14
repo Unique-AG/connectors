@@ -1,4 +1,5 @@
-# Security
+<!-- confluence-page-id: 1802993676 -->
+<!-- confluence-space-key: PUBDOC -->
 
 This document describes the security architecture, cryptographic decisions, and threat model for the Teams MCP Server.
 
@@ -235,7 +236,9 @@ If rotation becomes necessary, it would require:
 
 ## Related Documentation
 
-- [Token and Authentication](./token-auth-flows.md) - Detailed token lifecycle
+- [Authentication Architecture](./architecture.md#authentication-architecture) - Token isolation, storage, and encryption
+- [Microsoft OAuth Setup Flow](./flows.md#microsoft-oauth-setup-flow) - OAuth flow sequence
+- [Microsoft Token Refresh Flow](./flows.md#microsoft-token-refresh-flow) - Token refresh sequence
 - [Architecture](./architecture.md) - Data model and infrastructure
 - [Configuration](../operator/configuration.md) - Secret configuration
 - [FAQ](../faq.md) - Frequently asked questions

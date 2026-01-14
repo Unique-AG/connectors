@@ -1,10 +1,14 @@
-# Authentication Setup
+<!-- confluence-page-id: 1803026436 -->
+<!-- confluence-space-key: PUBDOC -->
 
 ## Overview
 
 The Teams MCP Server requires a Microsoft Entra ID (formerly Azure AD) app registration with delegated permissions to access Microsoft Graph API on behalf of users.
 
-For technical details about the OAuth flow and why client credentials are required, see [Token and Authentication Flows](../technical/token-auth-flows.md).
+For technical details about the OAuth flow and why client credentials are required, see:
+- [Microsoft OAuth Setup Flow](../technical/flows.md#microsoft-oauth-setup-flow)
+- [Authentication Architecture - Required App Registration Components](../technical/architecture.md#required-app-registration-components)
+- [FAQ - Why do I need a client ID and client secret?](../faq.md#why-do-i-need-a-client-id-and-client-secret)
 
 ## App Registration
 
@@ -166,7 +170,7 @@ For SaaS deployments serving multiple organizations:
 - Enterprise Application management: Each tenant admin controls user assignment and access
 - Compliance: Some organizations may require dedicated infrastructure for data residency
 
-See [Token and Authentication Flows - Single App Registration Architecture](../technical/token-auth-flows.md#single-app-registration-architecture) for details.
+See [Authentication Architecture - Single App Registration Architecture](../technical/architecture.md#single-app-registration-architecture) for details.
 
 ## Client Secret Management
 

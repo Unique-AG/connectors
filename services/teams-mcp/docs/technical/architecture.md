@@ -1,6 +1,5 @@
-# Architecture
-
-## Overview
+<!-- confluence-page-id: 1802502170 -->
+<!-- confluence-space-key: PUBDOC -->
 
 The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Teams meetings with the Unique platform through the Model Context Protocol (MCP). It captures meeting transcripts and recordings from Microsoft Teams and ingests them into Unique with proper access controls.
 
@@ -14,97 +13,79 @@ The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Te
 ## High-Level Architecture
 
 ```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart TB
     subgraph External["External Services"]
-        MSGraph["Microsoft Graph API"]
+        User["Teams User"]
         EntraID["Microsoft Entra ID"]
+        MSGraph["Microsoft Graph"]
+        Unique["Unique Platform"]
     end
 
     subgraph TeamsMCP["Teams MCP Server"]
-        API["REST API<br/>(NestJS)"]
         OAuth["OAuth Module"]
-        TranscriptSvc["Transcript Services"]
-        GraphClient["Graph Client Factory"]
-        TokenProvider["Token Provider"]
-        UniqueClient["Unique Service Client"]
+        API["REST API"]
+        Processor["Transcript Processor"]
+        GraphClient["Graph Client"]
     end
 
     subgraph Infrastructure["Infrastructure"]
-        RabbitMQ["RabbitMQ"]
-        PostgreSQL["PostgreSQL"]
+        Queue["RabbitMQ"]
+        DB["PostgreSQL"]
     end
 
-    subgraph Unique["Unique Platform"]
-        UniqueAPI["Unique Public API"]
-        Storage["Content Storage"]
-    end
-
-    User["Teams User"] --> EntraID
+    User --> EntraID
     EntraID --> OAuth
-    OAuth --> PostgreSQL
-
-    MSGraph -->|"Webhook Notifications"| API
-    API --> RabbitMQ
-    RabbitMQ --> TranscriptSvc
-
-    TranscriptSvc --> GraphClient
-    GraphClient --> TokenProvider
-    TokenProvider --> PostgreSQL
+    OAuth --> DB
+    
+    MSGraph -->|"Webhooks"| API
+    API --> Queue
+    Queue --> Processor
+    
+    Processor --> GraphClient
+    GraphClient --> DB
     GraphClient --> MSGraph
-
-    TranscriptSvc --> UniqueClient
-    UniqueClient --> UniqueAPI
-    UniqueAPI --> Storage
+    
+    Processor --> Unique
 ```
 
 ## Components
 
 ```mermaid
-flowchart LR
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+flowchart TB
     subgraph Auth["Authentication"]
-        MicrosoftProvider["Microsoft OAuth Provider"]
-        McpOAuthStore["MCP OAuth Store"]
-        TokenMgmt["Token Management"]
+        AuthModule["OAuth Provider<br/>Token Store"]
     end
 
     subgraph Transcript["Transcript Module"]
-        WebhookController["Webhook Controller"]
-        SubscriptionCreate["Subscription Create"]
-        SubscriptionRemove["Subscription Remove"]
-        SubscriptionReauth["Subscription Reauthorize"]
-        TranscriptCreated["Transcript Created"]
+        Webhook["Webhook Controller"]
+        Services["Subscription & Processing Services"]
     end
 
-    subgraph MSGraph["Microsoft Graph"]
-        GraphFactory["Graph Client Factory"]
-        TokenProvider["Token Provider"]
-        MetricsMiddleware["Metrics Middleware"]
-        RefreshMiddleware["Token Refresh Middleware"]
+    subgraph GraphModule["Microsoft Graph"]
+        GraphClient["Graph Client Factory<br/>Token Provider, Middleware"]
+    end
+
+    subgraph Data["Data Layer"]
+        DB[("PostgreSQL<br/>users, subscriptions, tokens")]
+    end
+
+    subgraph Queue["Message Queue"]
+        RabbitMQ["RabbitMQ<br/>Exchanges & Queues"]
     end
 
     subgraph UniqueIntegration["Unique Integration"]
         UniqueService["Unique Service"]
     end
 
-    subgraph Data["Data Layer"]
-        DrizzleORM["Drizzle ORM"]
-        Subscriptions[("subscriptions")]
-        UserProfiles[("user_profiles")]
-        OAuthState[("oauth_*")]
-    end
-
-    subgraph Queue["Message Queue"]
-        AMQPModule["AMQP Module"]
-        MainExchange{{"Main Exchange"}}
-        DLX{{"Dead Letter Exchange"}}
-    end
-
-    Auth --> Data
-    Transcript --> Queue
-    Transcript --> MSGraph
-    Transcript --> UniqueIntegration
-    MSGraph --> Data
-    Queue --> Transcript
+    AuthModule --> DB
+    Webhook --> RabbitMQ
+    RabbitMQ --> Services
+    Services --> GraphClient
+    Services --> UniqueService
+    GraphClient --> DB
+    GraphClient --> MSGraph["Microsoft Graph API"]
 ```
 
 ### Component Descriptions
@@ -210,7 +191,7 @@ erDiagram
 
 ### RabbitMQ
 
-Enables asynchronous processing of webhook notifications. See [Why RabbitMQ](./why-rabbitmq.md) for detailed rationale.
+Enables asynchronous processing of webhook notifications. See [FAQ - Why use RabbitMQ for webhook processing?](../faq.md#why-use-rabbitmq-for-webhook-processing) for details.
 
 | Exchange | Type | Purpose |
 |----------|------|---------|
@@ -223,13 +204,127 @@ Enables asynchronous processing of webhook notifications. See [Why RabbitMQ](./w
 | `unique.teams-mcp.transcript.lifecycle-notifications` | Subscription management |
 | `unique.teams-mcp.dead` | Dead letter collection |
 
+## Authentication Architecture
+
+The Teams MCP service handles **two layers of authentication**:
+
+1. **MCP OAuth** - Authentication between MCP clients and this server
+2. **Microsoft OAuth** - Authentication with Microsoft Entra ID for Graph API access
+
+```mermaid
+flowchart TB
+    subgraph External["External"]
+        Client["MCP Client"]
+        Graph["Microsoft Graph API"]
+    end
+
+    subgraph TeamsMCP["Teams MCP Server"]
+        API["API Layer"]
+        TokenStore["Token Store"]
+    end
+
+    Client -->|"MCP Access Token"| API
+    API -->|"MS Access Token"| Graph
+    API <--> TokenStore
+```
+
+### Token Isolation
+
+**Critical Security Design:** Microsoft OAuth tokens (access and refresh) are **never exposed to clients**. The OAuth flow happens entirely on the server:
+
+1. **Microsoft OAuth Flow**: User authenticates with Microsoft Entra ID
+2. **Token Exchange**: Server exchanges authorization code for Microsoft tokens (using `CLIENT_SECRET`)
+3. **Token Storage**: Microsoft tokens are encrypted and stored on the server only
+4. **Client Authentication**: Server issues separate opaque JWT tokens to the client for MCP API access
+
+This design ensures that:
+- Microsoft tokens never leave the server
+- Clients cannot access Microsoft Graph API directly
+- All Microsoft API calls are made by the server on behalf of authenticated users
+- Client tokens are opaque JWTs that only authenticate with the MCP server
+
+### Token Storage
+
+| Token Type | Source | Storage Location | Client Access |
+|------------|--------|------------------|---------------|
+| Access Token | Microsoft Entra ID | Encrypted in `user_profiles` table | **Never** |
+| Refresh Token | Microsoft Entra ID | Encrypted in `user_profiles` table | **Never** |
+
+**Required Scopes:** See [Microsoft Graph Permissions](./permissions.md) for the complete list with least-privilege justification.
+
+### Token Encryption
+
+All Microsoft tokens are encrypted at rest using **AES-GCM** (authenticated encryption) with a 256-bit key stored in environment variables.
+
+### Single App Registration Architecture
+
+Each MCP server deployment uses **one Microsoft Entra ID app registration**:
+
+- **Single App Registration**: One `CLIENT_ID`/`CLIENT_SECRET` pair per deployment
+- **Multi-Tenant Capable**: The app registration can be configured to accept users from multiple Microsoft tenants
+- **Cross-Tenant Authentication**: Users from different organizations authenticate via Enterprise Applications in their tenant that reference the original app registration
+- **Enterprise Application Creation**: When tenant admin grants consent, Microsoft creates an Enterprise Application in their tenant as a proxy to the original app registration
+
+This design uses a single OAuth application that can serve users across multiple tenants, rather than requiring separate app registrations per organization.
+
+For detailed explanation, see [Permissions - Why Delegated (Not Application)](./permissions.md#why-delegated-not-application-permissions).
+
+### Required App Registration Components
+
+| Component | Purpose | Security Function |
+|-----------|---------|-------------------|
+| `CLIENT_ID` | Application identifier | Identifies which app is requesting access |
+| `CLIENT_SECRET` | Application credential | Proves the server is the legitimate app (not an imposter) |
+| **Redirect URI** | OAuth callback endpoint | Prevents authorization code interception |
+| **API Permissions** | Graph scopes | Limits what data the app can access |
+| **Admin Consent** | Privileged scopes | Required for transcript/recording access |
+
+Without proper app registration, Microsoft Graph API will reject all authentication attempts with `invalid_client` errors.
+
+### Unsupported Authentication Methods
+
+| Method | Supported | Reason |
+|--------|-----------|--------|
+| Client Secret + Delegated | **Yes** | Standard OAuth2 flow for user-specific access |
+| Client Credentials (OIDC) | **No** | No user context; requires admin policy setup |
+| Certificate Authentication | **No** | Only works with Client Credentials flow |
+| Federated Identity | **No** | Only works with Client Credentials flow |
+| Multiple App Registrations | **No** | Each MCP server deployment uses one Entra ID app registration |
+
+The Teams MCP service requires **delegated permissions** to access user-specific resources. Client Credentials flow only supports application permissions, which would require tenant admins to create Application Access Policies via PowerShell—impractical for self-service MCP connections.
+
+**See also:**
+- [Microsoft Entra ID - Authentication flows](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows)
+- [Microsoft Graph - Get access on behalf of a user](https://learn.microsoft.com/en-us/graph/auth-v2-user)
+
+### MCP OAuth (Internal)
+
+The MCP OAuth layer implements the [MCP Authorization specification](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization):
+
+- **OAuth 2.1 Authorization Code + PKCE** flow
+- **Refresh token rotation** with family-based revocation for theft detection
+- **Cache-first token validation** (no introspection endpoint)
+- **Token cleanup** for expired tokens
+
+| Token Type | Default TTL | Purpose |
+|------------|-------------|---------|
+| Access Token | 60 seconds | Short-lived API access |
+| Refresh Token | 30 days | Obtain new access tokens |
+
+### Configuration Reference
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | 60 | MCP access token TTL |
+| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | 2592000 | MCP refresh token TTL (30 days) |
+| `AUTH_HMAC_SECRET` | (required) | 64-char hex for JWT signing |
+| `ENCRYPTION_KEY` | (required) | 64-char hex for AES-GCM encryption |
+
 ## Related Documentation
 
 - [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing
 - [Security](./security.md) - Encryption, authentication, and threat model
-- [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
-- [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale
 
 ## Standard References
 

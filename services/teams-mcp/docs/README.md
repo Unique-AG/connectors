@@ -1,4 +1,17 @@
-# Teams MCP Server
+<!-- confluence-page-id: 1802633229 -->
+<!-- confluence-space-key: PUBDOC -->
+
+!!! danger "Pre-Release Disclaimer"
+    **`teams-mcp` is pre-release software.**
+
+    - **No SLA/SSLA**: No service level agreements or support level agreements apply
+    - **No Support**: No guaranteed support, response times, or issue resolution
+    - **Breaking Changes**: APIs, configurations, and behavior may change without notice between versions
+    - **No Stability Guarantees**: Features may be incomplete, modified, or removed at any time
+    - **Data Loss Risk**: Bugs or changes may result in data loss or corruption
+    - **Use at Your Own Risk**: This software is provided "as-is" without warranties of any kind
+
+    Pre-release software is intended for evaluation and testing purposes only. Do not rely on this software for production workloads without understanding these limitations.
 
 ## Overview
 
@@ -96,7 +109,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 - RabbitMQ message queue for asynchronous webhook processing
 - Dead Letter Exchange (DLX) for failed message inspection and retry
 - Meets Microsoft's strict webhook response requirements (< 10 seconds)
-- See [Why RabbitMQ](./technical/why-rabbitmq.md#the-problem) for rationale
+- See [FAQ - Why use RabbitMQ for webhook processing?](./faq.md#why-use-rabbitmq-for-webhook-processing) for details
 
 **Observability**
 
@@ -257,7 +270,7 @@ See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow
 | **Single app registration** | Each MCP server deployment uses one Entra ID app registration (multi-tenant capable) |
 | **Admin consent required** | `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` need admin approval |
 
-See [Token and Authentication Flows - Single App Registration Architecture](./technical/token-auth-flows.md#single-app-registration-architecture) for details.
+See [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture) for details.
 
 ### Operational Constraints
 
@@ -315,7 +328,7 @@ flowchart LR
 - **Shared infrastructure**: One deployment serves all tenants
 - **Data isolation**: Each user's data scoped by their Microsoft user ID
 
-See [Token and Authentication Flows](./technical/token-auth-flows.md#single-app-registration-architecture) for details.
+See [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture) for details.
 
 ## Future Versions
 
@@ -340,8 +353,6 @@ Planned enhancements will be documented here.
   - [Flows](./technical/flows.md) - User connection, subscription lifecycle, transcript processing
   - [Permissions](./technical/permissions.md) - Microsoft Graph permissions with justification
   - [Security](./technical/security.md) - Encryption, authentication, and threat model
-  - [Token and Authentication](./technical/token-auth-flows.md) - OAuth token lifecycle
-  - [Why RabbitMQ](./technical/why-rabbitmq.md) - Message queue rationale
 
 ## Standard References
 

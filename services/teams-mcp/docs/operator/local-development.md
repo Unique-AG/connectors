@@ -1,4 +1,5 @@
-# Local Development
+<!-- confluence-page-id: 1802371115 -->
+<!-- confluence-space-key: PUBDOC -->
 
 This guide walks through setting up the Teams MCP Server for local development and testing.
 
