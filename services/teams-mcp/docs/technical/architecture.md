@@ -13,109 +13,81 @@ The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Te
 
 ## High-Level Architecture
 
-<div style="max-width: 800px;">
-
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart TB
     subgraph External["External Services"]
-        MSGraph["Microsoft Graph API"]
+        User["Teams User"]
         EntraID["Microsoft Entra ID"]
+        MSGraph["Microsoft Graph"]
+        Unique["Unique Platform"]
     end
 
     subgraph TeamsMCP["Teams MCP Server"]
-        API["REST API<br/>(NestJS)"]
         OAuth["OAuth Module"]
-        TranscriptSvc["Transcript Services"]
-        GraphClient["Graph Client Factory"]
-        TokenProvider["Token Provider"]
-        UniqueClient["Unique Service Client"]
+        API["REST API"]
+        Processor["Transcript Processor"]
+        GraphClient["Graph Client"]
     end
 
     subgraph Infrastructure["Infrastructure"]
-        RabbitMQ["RabbitMQ"]
-        PostgreSQL["PostgreSQL"]
+        Queue["RabbitMQ"]
+        DB["PostgreSQL"]
     end
 
-    subgraph Unique["Unique Platform"]
-        UniqueAPI["Unique Public API"]
-        Storage["Content Storage"]
-    end
-
-    User["Teams User"] --> EntraID
+    User --> EntraID
     EntraID --> OAuth
-    OAuth --> PostgreSQL
-
-    MSGraph -->|"Webhook Notifications"| API
-    API --> RabbitMQ
-    RabbitMQ --> TranscriptSvc
-
-    TranscriptSvc --> GraphClient
-    GraphClient --> TokenProvider
-    TokenProvider --> PostgreSQL
+    OAuth --> DB
+    
+    MSGraph -->|"Webhooks"| API
+    API --> Queue
+    Queue --> Processor
+    
+    Processor --> GraphClient
+    GraphClient --> DB
     GraphClient --> MSGraph
-
-    TranscriptSvc --> UniqueClient
-    UniqueClient --> UniqueAPI
-    UniqueAPI --> Storage
+    
+    Processor --> Unique
 ```
-
-</div>
 
 ## Components
 
-<div style="max-width: 800px;">
-
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-flowchart LR
+flowchart TB
     subgraph Auth["Authentication"]
-        MicrosoftProvider["Microsoft OAuth Provider"]
-        McpOAuthStore["MCP OAuth Store"]
-        TokenMgmt["Token Management"]
+        AuthModule["OAuth Provider<br/>Token Store"]
     end
 
     subgraph Transcript["Transcript Module"]
-        WebhookController["Webhook Controller"]
-        SubscriptionCreate["Subscription Create"]
-        SubscriptionRemove["Subscription Remove"]
-        SubscriptionReauth["Subscription Reauthorize"]
-        TranscriptCreated["Transcript Created"]
+        Webhook["Webhook Controller"]
+        Services["Subscription & Processing Services"]
     end
 
-    subgraph MSGraph["Microsoft Graph"]
-        GraphFactory["Graph Client Factory"]
-        TokenProvider["Token Provider"]
-        MetricsMiddleware["Metrics Middleware"]
-        RefreshMiddleware["Token Refresh Middleware"]
+    subgraph GraphModule["Microsoft Graph"]
+        GraphClient["Graph Client Factory<br/>Token Provider, Middleware"]
+    end
+
+    subgraph Data["Data Layer"]
+        DB[("PostgreSQL<br/>users, subscriptions, tokens")]
+    end
+
+    subgraph Queue["Message Queue"]
+        RabbitMQ["RabbitMQ<br/>Exchanges & Queues"]
     end
 
     subgraph UniqueIntegration["Unique Integration"]
         UniqueService["Unique Service"]
     end
 
-    subgraph Data["Data Layer"]
-        DrizzleORM["Drizzle ORM"]
-        Subscriptions[("subscriptions")]
-        UserProfiles[("user_profiles")]
-        OAuthState[("oauth_*")]
-    end
-
-    subgraph Queue["Message Queue"]
-        AMQPModule["AMQP Module"]
-        MainExchange{{"Main Exchange"}}
-        DLX{{"Dead Letter Exchange"}}
-    end
-
-    Auth --> Data
-    Transcript --> Queue
-    Transcript --> MSGraph
-    Transcript --> UniqueIntegration
-    MSGraph --> Data
-    Queue --> Transcript
+    AuthModule --> DB
+    Webhook --> RabbitMQ
+    RabbitMQ --> Services
+    Services --> GraphClient
+    Services --> UniqueService
+    GraphClient --> DB
+    GraphClient --> MSGraph["Microsoft Graph API"]
 ```
-
-</div>
 
 ### Component Descriptions
 
@@ -241,7 +213,7 @@ The Teams MCP service handles **two layers of authentication**:
 2. **Microsoft OAuth** - Authentication with Microsoft Entra ID for Graph API access
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph External["External"]
         Client["MCP Client"]
         Graph["Microsoft Graph API"]
