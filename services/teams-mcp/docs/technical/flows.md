@@ -78,6 +78,75 @@ sequenceDiagram
 
 **OAuth Scopes Required:** See [Microsoft Graph Permissions](./permissions.md) for detailed justification.
 
+**Important:** Microsoft access and refresh tokens are **never sent to the client**. They are received by the server, encrypted, and stored securely. After the Microsoft OAuth flow completes, the server issues **opaque JWT tokens** to the client for MCP authentication.
+
+## Microsoft OAuth Setup Flow
+
+The following sequence shows the complete Microsoft OAuth authentication flow with detailed token handling:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Client as MCP Client
+    participant TeamsMCP as Teams MCP Server
+    participant EntraID as Microsoft Entra ID
+    participant GraphAPI as Microsoft Graph API
+
+    Note over TeamsMCP, EntraID: App Registration Required
+    Note over TeamsMCP: CLIENT_ID + CLIENT_SECRET<br/>configured from app registration
+
+    User->>Client: 1. Connect to MCP Server
+    Client->>TeamsMCP: 2. GET /mcp (OAuth request)
+    TeamsMCP->>EntraID: 3. OAuth redirect with CLIENT_ID<br/>+ required scopes + PKCE
+    EntraID->>User: 4. Login & consent prompt
+    User->>EntraID: 5. Sign in + grant permissions
+    EntraID->>TeamsMCP: 6. Authorization code (callback)
+    TeamsMCP->>EntraID: 7. Exchange code for tokens<br/>(using CLIENT_ID + CLIENT_SECRET)
+    EntraID->>TeamsMCP: 8. Microsoft access & refresh tokens
+    
+    Note over TeamsMCP: Microsoft tokens NEVER sent to client<br/>Encrypted and stored on server only
+    
+    TeamsMCP->>Client: 9. Issue opaque JWT tokens<br/>(MCP access + refresh tokens)
+    
+    Note over TeamsMCP: Server uses Microsoft tokens internally
+    
+    TeamsMCP->>GraphAPI: 10. API calls with Microsoft access token
+    GraphAPI->>TeamsMCP: 11. Teams transcript data
+```
+
+## Microsoft Token Refresh Flow
+
+Microsoft tokens are refreshed **on-demand** when the Graph API returns a 401 error:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant GC as Graph Client
+    participant MW as Token Refresh Middleware
+    participant MS as Microsoft Token API
+    participant DB as Database
+
+    GC->>MW: API Request with stored token
+    MW->>MS: Forward request to Graph API
+    MS-->>MW: 401 InvalidAuthenticationToken
+
+    Note over MW: Token expired, initiate refresh
+
+    MW->>DB: Retrieve encrypted refresh token
+    DB-->>MW: Encrypted refresh token
+    MW->>MW: Decrypt refresh token
+
+    MW->>MS: POST /oauth2/v2.0/token<br/>(grant_type=refresh_token)
+    MS-->>MW: New access + refresh tokens
+
+    MW->>MW: Encrypt new tokens
+    MW->>DB: Store encrypted tokens
+
+    MW->>MS: Retry original request<br/>with new access token
+    MS-->>MW: Success response
+    MW-->>GC: Return success
+```
+
 ## Subscription Lifecycle
 
 Subscriptions are **renewed** (not recreated) before they expire. If renewal fails for any reason, the subscription is deleted and the user must reconnect to the MCP server to re-authenticate.
@@ -264,7 +333,6 @@ flowchart TB
 
 - [Architecture](./architecture.md) - System components and infrastructure
 - [Security](./security.md) - Encryption, PKCE, and threat model
-- [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
 
 ## Standard References

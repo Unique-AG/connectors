@@ -14,5 +14,4 @@ This section contains detailed technical documentation for developers and archit
 | [Flows](./flows.md) | Sequence diagrams for user connection, subscriptions, and processing |
 | [Permissions](./permissions.md) | Microsoft Graph permissions with least-privilege justification |
 | [Security](./security.md) | Encryption, authentication, and threat model |
-| [Token and Authentication](./token-auth-flows.md) | OAuth token lifecycle and validation |
 | [FAQ](../faq.md) | Frequently asked questions |

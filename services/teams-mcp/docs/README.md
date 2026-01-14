@@ -272,7 +272,7 @@ See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow
 | **Single app registration** | Each MCP server deployment uses one Entra ID app registration (multi-tenant capable) |
 | **Admin consent required** | `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` need admin approval |
 
-See [Token and Authentication Flows - Single App Registration Architecture](./technical/token-auth-flows.md#single-app-registration-architecture) for details.
+See [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture) for details.
 
 ### Operational Constraints
 
@@ -330,7 +330,7 @@ flowchart LR
 - **Shared infrastructure**: One deployment serves all tenants
 - **Data isolation**: Each user's data scoped by their Microsoft user ID
 
-See [Token and Authentication Flows](./technical/token-auth-flows.md#single-app-registration-architecture) for details.
+See [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture) for details.
 
 ## Future Versions
 
@@ -355,7 +355,6 @@ Planned enhancements will be documented here.
   - [Flows](./technical/flows.md) - User connection, subscription lifecycle, transcript processing
   - [Permissions](./technical/permissions.md) - Microsoft Graph permissions with justification
   - [Security](./technical/security.md) - Encryption, authentication, and threat model
-  - [Token and Authentication](./technical/token-auth-flows.md) - OAuth token lifecycle
 
 ## Standard References
 
