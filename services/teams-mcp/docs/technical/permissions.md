@@ -1,5 +1,6 @@
-<!-- confluence-page-id: 1798275078 -->
+<!-- confluence-page-id: 1802240023 -->
 <!-- confluence-space-key: PUBDOC -->
+
 All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to.
 
 ## Permission Summary

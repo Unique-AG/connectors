@@ -1,4 +1,5 @@
-# Security
+<!-- confluence-page-id: 1802993676 -->
+<!-- confluence-space-key: PUBDOC -->
 
 This document describes the security architecture, cryptographic decisions, and threat model for the Teams MCP Server.
 

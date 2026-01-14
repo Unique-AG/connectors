@@ -1,4 +1,4 @@
-<!-- confluence-page-id: 1780973577 -->
+<!-- confluence-page-id: 1802633229 -->
 <!-- confluence-space-key: PUBDOC -->
 
 !!! danger "Pre-Release Disclaimer"
@@ -11,9 +11,7 @@
     - **Data Loss Risk**: Bugs or changes may result in data loss or corruption
     - **Use at Your Own Risk**: This software is provided "as-is" without warranties of any kind
 
-    Pre-release software is intended for evaluation and testing purposes only. Do not rely on this software for production workloads without understanding these limitations. 
-
-# Teams MCP Server
+    Pre-release software is intended for evaluation and testing purposes only. Do not rely on this software for production workloads without understanding these limitations.
 
 ## Overview
 

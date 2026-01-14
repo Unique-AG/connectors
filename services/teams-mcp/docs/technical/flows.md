@@ -1,5 +1,6 @@
-<!-- confluence-page-id: 1798242322 -->
+<!-- confluence-page-id: 1800962147 -->
 <!-- confluence-space-key: PUBDOC -->
+
 ## User Connection Flow
 
 Everything starts when a user connects to the MCP server. This triggers OAuth authentication and sets up the subscription for receiving meeting notifications.

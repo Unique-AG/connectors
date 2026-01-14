@@ -1,6 +1,5 @@
-<!-- confluence-page-id: 1798438916 -->
+<!-- confluence-page-id: 1802502170 -->
 <!-- confluence-space-key: PUBDOC -->
-## Overview
 
 The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Teams meetings with the Unique platform through the Model Context Protocol (MCP). It captures meeting transcripts and recordings from Microsoft Teams and ingests them into Unique with proper access controls.
 
