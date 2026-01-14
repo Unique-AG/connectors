@@ -286,9 +286,25 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 
 ### Why use RabbitMQ for webhook processing?
 
-**Answer:** Microsoft requires webhook responses in < 10 seconds. Transcript processing can take minutes (fetching meeting data, transcript content, recordings, uploading to Unique). RabbitMQ decouples webhook reception (fast 202 response) from processing (asynchronous), ensuring we meet Microsoft's strict timeout requirements.
+**Answer:** Microsoft requires webhook endpoints to respond within **10 seconds**, or it considers the delivery failed and retries. However, processing transcript notifications involves database lookups, multiple Microsoft Graph API calls, user resolution, and content ingestion, which can take **30+ seconds**.
 
-**See also:** [Why RabbitMQ](./technical/why-rabbitmq.md)
+RabbitMQ decouples webhook reception from processing:
+- **Webhook Controller** receives the notification, validates it, publishes to RabbitMQ, and returns `202 Accepted` immediately
+- **RabbitMQ** durably stores the message until a consumer processes it
+- **Transcript Service** consumes messages and performs the slow processing asynchronously
+
+This ensures we meet Microsoft's strict timeout requirements while processing transcripts reliably.
+
+**Benefits:**
+- Meets Microsoft's 10-second webhook response requirement
+- Avoids Microsoft retry storms from failed deliveries
+- Provides reliability via Dead Letter Exchange for failed message inspection and retry
+- Enables horizontal scaling with multiple service replicas
+- Handles burst traffic gracefully with message buffering
+
+**See also:**
+- [Microsoft Graph Webhooks](https://learn.microsoft.com/en-us/graph/webhooks) - Microsoft webhook documentation
+- [Microsoft Graph Change Notifications](https://learn.microsoft.com/en-us/graph/webhooks#change-notifications) - Change notification requirements
 
 ### Can I deploy without RabbitMQ?
 
@@ -307,12 +323,6 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 **See also:** [Webhook Validation](./technical/security.md#webhook-validation)
 
 ## Deployment
-
-### Why do I need RabbitMQ?
-
-**Answer:** Microsoft requires webhook responses in < 10 seconds. RabbitMQ decouples webhook reception (fast response) from transcript processing (slower, can take minutes). This ensures we meet Microsoft's strict timeout requirements.
-
-**See also:** [Why RabbitMQ](./technical/why-rabbitmq.md)
 
 ### What happens if the database is full?
 
@@ -425,7 +435,6 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 - [Token and Authentication](./technical/token-auth-flows.md) - Token types, validation, refresh flows
 - [Flows](./technical/flows.md) - User connection, subscription lifecycle, transcript processing
 - [Permissions](./technical/permissions.md) - Required scopes and least-privilege justification
-- [Why RabbitMQ](./technical/why-rabbitmq.md) - Message queue rationale
 - [Operator Guide](./operator/README.md) - Deployment and operations
 
 ## Standard References

@@ -266,7 +266,6 @@ flowchart TB
 - [Security](./security.md) - Encryption, PKCE, and threat model
 - [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
-- [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale
 
 ## Standard References
 

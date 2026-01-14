@@ -111,7 +111,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 - RabbitMQ message queue for asynchronous webhook processing
 - Dead Letter Exchange (DLX) for failed message inspection and retry
 - Meets Microsoft's strict webhook response requirements (< 10 seconds)
-- See [Why RabbitMQ](./technical/why-rabbitmq.md#the-problem) for rationale
+- See [FAQ - Why use RabbitMQ for webhook processing?](./faq.md#why-use-rabbitmq-for-webhook-processing) for details
 
 **Observability**
 
@@ -356,7 +356,6 @@ Planned enhancements will be documented here.
   - [Permissions](./technical/permissions.md) - Microsoft Graph permissions with justification
   - [Security](./technical/security.md) - Encryption, authentication, and threat model
   - [Token and Authentication](./technical/token-auth-flows.md) - OAuth token lifecycle
-  - [Why RabbitMQ](./technical/why-rabbitmq.md) - Message queue rationale
 
 ## Standard References
 

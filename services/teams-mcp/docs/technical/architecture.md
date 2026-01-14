@@ -220,7 +220,7 @@ erDiagram
 
 ### RabbitMQ
 
-Enables asynchronous processing of webhook notifications. See [Why RabbitMQ](./why-rabbitmq.md) for detailed rationale.
+Enables asynchronous processing of webhook notifications. See [FAQ - Why use RabbitMQ for webhook processing?](../faq.md#why-use-rabbitmq-for-webhook-processing) for details.
 
 | Exchange | Type | Purpose |
 |----------|------|---------|
@@ -239,7 +239,6 @@ Enables asynchronous processing of webhook notifications. See [Why RabbitMQ](./w
 - [Security](./security.md) - Encryption, authentication, and threat model
 - [Token and Authentication](./token-auth-flows.md) - Token types, validation, refresh flows
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
-- [Why RabbitMQ](./why-rabbitmq.md) - Message queue rationale
 
 ## Standard References
 

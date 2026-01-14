@@ -184,4 +184,3 @@ Full documentation is available in the `docs/` directory:
 | [Flows](./docs/technical/flows.md) | User connection, subscription lifecycle, transcript processing |
 | [Security](./docs/technical/security.md) | Encryption, PKCE, threat model |
 | [Permissions](./docs/technical/permissions.md) | Microsoft Graph permissions and least-privilege justification |
-| [Why RabbitMQ](./docs/technical/why-rabbitmq.md) | Message queue rationale and design decisions |
