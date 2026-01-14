@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.1.1...teams-mcp@0.1.2) (2026-01-14)
+
+
+### Features
+
+* **teams-mcp:** merge docs to add auto docs publish workflows ([#202](https://github.com/Unique-AG/connectors/issues/202)) ([13081f0](https://github.com/Unique-AG/connectors/commit/13081f01cf12d510af130672c2ab8eca0137d975))
+
 ## [0.1.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.1.0...teams-mcp@0.1.1) (2026-01-13)
 
 
