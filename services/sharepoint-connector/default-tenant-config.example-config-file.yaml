@@ -10,7 +10,7 @@ sharepoint:
     thumbprintSha1: your-sha1-thumbprint-here
   baseUrl: https://yourcompany.sharepoint.com
   graphApiRateLimitPerMinute: 600
-  
+
   # Sites configuration
   sitesSource: config_file
   sites:
@@ -22,7 +22,6 @@ sharepoint:
       storeInternally: enabled
       syncStatus: active
       syncMode: content_and_permissions
-    
     - siteId: 87654321-4321-4321-4321-cba987654321
       syncColumnName: HRKnowledge
       ingestionMode: flat
@@ -31,7 +30,6 @@ sharepoint:
       syncStatus: active
       syncMode: content_only
       permissionsInheritanceMode: inherit_scopes_and_files
-
 unique:
   serviceAuthMode: cluster_local
   serviceExtraHeaders:
@@ -40,7 +38,6 @@ unique:
   ingestionServiceBaseUrl: https://ingestion.your-unique-instance.com
   scopeManagementServiceBaseUrl: https://scope-management.your-unique-instance.com
   apiRateLimitPerMinute: 60
-
 processing:
   stepTimeoutSeconds: 300
   concurrency: 5
