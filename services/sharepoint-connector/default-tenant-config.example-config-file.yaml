@@ -1,6 +1,5 @@
 # SharePoint Connector - Static Configuration Example
 # Sites are defined directly in this YAML file
-
 sharepoint:
   tenantId: your-tenant-id-here
   auth:
@@ -10,7 +9,6 @@ sharepoint:
     thumbprintSha1: your-sha1-thumbprint-here
   baseUrl: https://yourcompany.sharepoint.com
   graphApiRateLimitPerMinute: 600
-
   # Sites configuration
   sitesSource: config_file
   sites:

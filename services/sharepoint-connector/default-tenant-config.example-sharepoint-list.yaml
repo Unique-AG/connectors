@@ -1,6 +1,5 @@
 # SharePoint Connector - Dynamic Configuration Example
 # Sites are loaded from a SharePoint list
-
 sharepoint:
   tenantId: your-tenant-id-here
   auth:
@@ -10,13 +9,11 @@ sharepoint:
     thumbprintSha1: your-sha1-thumbprint-here
   baseUrl: https://yourcompany.sharepoint.com
   graphApiRateLimitPerMinute: 600
-  
   # Sites configuration from SharePoint list
   sitesSource: sharepoint_list
   sharepointList:
     siteId: your-config-site-id-here
     listDisplayName: SharePoint Sites to Sync
-  
   # Required SharePoint list columns:
   # - siteId (Single line text) - SharePoint site ID
   # - syncColumnName (Single line text) - Column that marks files for sync
@@ -26,7 +23,6 @@ sharepoint:
   # - storeInternally (Choice: enabled, disabled)
   # - syncStatus (Choice: active, inactive, deleted)
   # - syncMode (Choice: content_only, content_and_permissions)
-
 unique:
   serviceAuthMode: cluster_local
   serviceExtraHeaders:
@@ -35,7 +31,6 @@ unique:
   ingestionServiceBaseUrl: https://ingestion.your-unique-instance.com
   scopeManagementServiceBaseUrl: https://scope-management.your-unique-instance.com
   apiRateLimitPerMinute: 60
-
 processing:
   stepTimeoutSeconds: 300
   concurrency: 5
