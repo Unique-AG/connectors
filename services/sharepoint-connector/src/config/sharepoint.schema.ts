@@ -3,12 +3,11 @@ import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.const
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { Redacted } from '../utils/redacted';
-
-const baseUrlSchema = (description: string, message: string) =>
-  z
-    .url()
-    .describe(description)
-    .refine((url) => !url.endsWith('/'), { message });
+import {
+  coercedPositiveIntSchema,
+  requiredStringSchema,
+  urlWithoutTrailingSlashSchema,
+} from '../utils/zod.util';
 
 // ==========================================
 // Inheritance & Permissions
@@ -51,7 +50,7 @@ const oidcAuthConfig = z.object({
 
 const clientSecretAuthConfig = z.object({
   mode: z.literal('client-secret').describe('Authentication mode to use for Microsoft APIs'),
-  clientId: z.string().nonempty().describe('Azure AD application client ID'),
+  clientId: requiredStringSchema.describe('Azure AD application client ID'),
   clientSecret: z
     .string()
     .nonempty()
@@ -62,7 +61,7 @@ const clientSecretAuthConfig = z.object({
 const certificateAuthConfig = z
   .object({
     mode: z.literal('certificate').describe('Authentication mode to use for Microsoft APIs'),
-    clientId: z.string().nonempty().describe('Azure AD application client ID'),
+    clientId: requiredStringSchema.describe('Azure AD application client ID'),
     thumbprintSha1: z
       .hex()
       .nonempty()
@@ -170,28 +169,21 @@ const dynamicSitesConfig = z.object({
     .describe('Load sites configuration dynamically from SharePoint list'),
   sharepointList: z
     .object({
-      siteId: z
-        .string()
-        .nonempty()
-        .describe('SharePoint site ID containing the configuration list'),
-      listDisplayName: z
-        .string()
-        .nonempty()
-        .describe('Display name of the SharePoint configuration list'),
+      siteId: requiredStringSchema.describe('SharePoint site ID containing the configuration list'),
+      listDisplayName: requiredStringSchema.describe(
+        'Display name of the SharePoint configuration list',
+      ),
     })
     .describe('SharePoint list details containing site configurations'),
 });
 
 const sharepointBaseConfig = z.object({
-  tenantId: z.string().min(1).describe('Azure AD tenant ID'),
+  tenantId: requiredStringSchema.describe('Azure AD tenant ID'),
   auth: AuthConfigSchema.describe('Authentication configuration for Microsoft APIs'),
-  graphApiRateLimitPerMinute: z.coerce
-    .number()
-    .int()
-    .positive()
+  graphApiRateLimitPerMinute: coercedPositiveIntSchema
     .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE)
     .describe('Number of MS Graph API requests allowed per minute'),
-  baseUrl: baseUrlSchema(
+  baseUrl: urlWithoutTrailingSlashSchema(
     "Your company's sharepoint URL",
     'Base URL must not end with a trailing slash',
   ),

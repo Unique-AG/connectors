@@ -76,7 +76,7 @@ export class SharepointSynchronizationService {
         });
         const result: FullSyncResult = {
           status: 'failure',
-          step: SyncStep.SITES_CONFIG_LOADING,
+          step: SyncStep.SitesConfigLoading,
         };
         this.recordFullSyncMetric(syncStartTime, result);
         return result;
@@ -121,7 +121,7 @@ export class SharepointSynchronizationService {
       this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
         sync_type: 'full',
         result: 'failure',
-        failure_step: SyncStep.UNKNOWN,
+        failure_step: SyncStep.Unknown,
       });
       throw error;
     } finally {
@@ -208,7 +208,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to initialize root scope`,
         error: sanitizeError(error),
       });
-      return { failureStep: SyncStep.ROOT_SCOPE_INIT };
+      return { failureStep: SyncStep.RootScopeInit };
     }
 
     let siteName: string;
@@ -219,7 +219,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to get site name`,
         error: sanitizeError(error),
       });
-      return { failureStep: SyncStep.SITE_NAME_FETCH };
+      return { failureStep: SyncStep.SiteNameFetch };
     }
 
     return {
@@ -259,7 +259,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to get site items`,
         error: sanitizeError(error),
       });
-      return { status: 'failure', step: SyncStep.SITE_ITEMS_FETCH };
+      return { status: 'failure', step: SyncStep.SiteItemsFetch };
     }
 
     this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
@@ -277,7 +277,7 @@ export class SharepointSynchronizationService {
           msg: `${logPrefix} Failed to create scopes. Skipping site.`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.SCOPES_CREATION };
+        return { status: 'failure', step: SyncStep.ScopesCreation };
       }
     }
 
@@ -288,7 +288,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to synchronize content`,
         error: sanitizeError(error),
       });
-      return { status: 'failure', step: SyncStep.CONTENT_SYNC };
+      return { status: 'failure', step: SyncStep.ContentSync };
     }
 
     if (context.siteConfig.syncMode === 'content_and_permissions') {
@@ -303,7 +303,7 @@ export class SharepointSynchronizationService {
           msg: `${logPrefix} Failed to synchronize permissions`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.PERMISSIONS_SYNC };
+        return { status: 'failure', step: SyncStep.PermissionsSync };
       }
     }
 

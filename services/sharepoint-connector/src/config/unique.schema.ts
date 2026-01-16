@@ -1,12 +1,7 @@
 import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import { Redacted } from '../utils/redacted';
-
-const baseUrlSchema = (description: string, message: string) =>
-  z
-    .url()
-    .describe(description)
-    .refine((url) => !url.endsWith('/'), { message });
+import { coercedPositiveIntSchema, urlWithoutTrailingSlashSchema } from '../utils/zod.util';
 
 // ==========================================
 // Unique Configuration
@@ -49,18 +44,15 @@ const externalConfig = z.object({
 });
 
 const uniqueBaseConfig = z.object({
-  ingestionServiceBaseUrl: baseUrlSchema(
+  ingestionServiceBaseUrl: urlWithoutTrailingSlashSchema(
     'Base URL for Unique ingestion service',
     'ingestionServiceBaseUrl must not end with a trailing slash',
   ),
-  scopeManagementServiceBaseUrl: baseUrlSchema(
+  scopeManagementServiceBaseUrl: urlWithoutTrailingSlashSchema(
     'Base URL for Unique scope management service',
     'scopeManagementServiceBaseUrl must not end with a trailing slash',
   ),
-  apiRateLimitPerMinute: z.coerce
-    .number()
-    .int()
-    .positive()
+  apiRateLimitPerMinute: coercedPositiveIntSchema
     .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
     .describe('Number of Unique API requests allowed per minute'),
   ingestionConfig: z

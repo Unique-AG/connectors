@@ -65,7 +65,7 @@ export class PermissionsSyncService {
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}]`;
     const startTime = Date.now();
-    let currentStep: SyncStep = SyncStep.PERMISSIONS_FETCH;
+    let currentStep: SyncStep = SyncStep.PermissionsFetch;
 
     try {
       this.logger.log(
@@ -81,7 +81,7 @@ export class PermissionsSyncService {
         `${logPrefix} Fetched permissions for ${sharePoint.items.length} items in ${elapsedSecondsLog(permissionsFetchStartTime)}`,
       );
 
-      currentStep = SyncStep.GROUPS_MEMBERSHIPS_FETCH;
+      currentStep = SyncStep.GroupsMembershipsFetch;
       const groupsWithMembershipsMap = await this.fetchGroupsWithMembershipsForSite(
         siteId,
         permissionsMap,
@@ -91,7 +91,7 @@ export class PermissionsSyncService {
         `${logPrefix} Fetched ${Object.keys(groupsWithMembershipsMap).length} groups with memberships`,
       );
 
-      currentStep = SyncStep.UNIQUE_DATA_FETCH;
+      currentStep = SyncStep.UniqueDataFetch;
       const uniqueUsersMap = await this.getUniqueUsersMap();
       const uniqueGroupsMap = await this.getUniqueGroupsMap(siteId);
 
@@ -99,7 +99,7 @@ export class PermissionsSyncService {
         `${logPrefix} Found ${Object.keys(uniqueGroupsMap).length} unique groups and ${Object.keys(uniqueUsersMap).length} unique users`,
       );
 
-      currentStep = SyncStep.GROUPS_SYNC;
+      currentStep = SyncStep.GroupsSync;
       const { updatedUniqueGroupsMap } = await this.syncSharepointGroupsToUniqueCommand.run({
         siteId,
         sharePoint: { groupsMap: groupsWithMembershipsMap },
@@ -110,7 +110,7 @@ export class PermissionsSyncService {
         `${logPrefix} Synced ${Object.keys(updatedUniqueGroupsMap).length} resulting unique groups`,
       );
 
-      currentStep = SyncStep.FILE_PERMISSIONS_SYNC;
+      currentStep = SyncStep.FilePermissionsSync;
       await this.syncSharepointFilesPermissionsToUniqueCommand.run({
         context,
         sharePoint: { permissionsMap },
@@ -118,7 +118,7 @@ export class PermissionsSyncService {
       });
 
       if (ingestionMode === IngestionMode.Recursive) {
-        currentStep = SyncStep.FOLDER_PERMISSIONS_SYNC;
+        currentStep = SyncStep.FolderPermissionsSync;
         assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
         await this.syncSharepointFolderPermissionsToUniqueCommand.run({
           context,

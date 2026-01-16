@@ -1,16 +1,18 @@
-export enum SyncStep {
-  SITES_CONFIG_LOADING = 'sites_config_loading',
-  ROOT_SCOPE_INIT = 'root_scope_initialization',
-  SITE_NAME_FETCH = 'site_name_fetch',
-  SITE_ITEMS_FETCH = 'site_items_fetch',
-  SCOPES_CREATION = 'scopes_creation',
-  CONTENT_SYNC = 'content_sync',
-  PERMISSIONS_SYNC = 'permissions_sync',
-  PERMISSIONS_FETCH = 'permissions_fetch',
-  GROUPS_MEMBERSHIPS_FETCH = 'groups_memberships_fetch',
-  UNIQUE_DATA_FETCH = 'unique_data_fetch',
-  GROUPS_SYNC = 'groups_sync',
-  FILE_PERMISSIONS_SYNC = 'file_permissions_sync',
-  FOLDER_PERMISSIONS_SYNC = 'folder_permissions_sync',
-  UNKNOWN = 'unknown',
-}
+export const SyncStep = {
+  SitesConfigLoading: 'sites_config_loading',
+  RootScopeInit: 'root_scope_initialization',
+  SiteNameFetch: 'site_name_fetch',
+  SiteItemsFetch: 'site_items_fetch',
+  ScopesCreation: 'scopes_creation',
+  ContentSync: 'content_sync',
+  PermissionsSync: 'permissions_sync',
+  PermissionsFetch: 'permissions_fetch',
+  GroupsMembershipsFetch: 'groups_memberships_fetch',
+  UniqueDataFetch: 'unique_data_fetch',
+  GroupsSync: 'groups_sync',
+  FilePermissionsSync: 'file_permissions_sync',
+  FolderPermissionsSync: 'folder_permissions_sync',
+  Unknown: 'unknown',
+} as const;
+
+export type SyncStep = (typeof SyncStep)[keyof typeof SyncStep];

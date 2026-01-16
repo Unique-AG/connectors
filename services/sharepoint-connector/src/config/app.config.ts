@@ -1,5 +1,6 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
+import { requiredStringSchema } from '../utils/zod.util';
 
 // ==========================================
 // App Configuration
@@ -28,12 +29,9 @@ export const AppConfigSchema = z
       .describe(
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
-    tenantConfigPathPattern: z
-      .string()
-      .nonempty()
-      .describe(
-        'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/config/*-tenant-config.yaml)',
-      ),
+    tenantConfigPathPattern: requiredStringSchema.describe(
+      'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/config/*-tenant-config.yaml)',
+    ),
   })
   .transform((c) => ({
     ...c,

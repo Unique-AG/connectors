@@ -67,9 +67,10 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
     const fileContent = readFileSync(configPath, 'utf-8');
     const config = load(fileContent);
 
-    if (!isPlainObject(config)) {
-      throw new Error(`Invalid tenant config: expected a plain object, got ${typeof config}`);
-    }
+    assert.ok(
+      isPlainObject(config),
+      `Invalid tenant config: expected a plain object, got ${typeof config}`,
+    );
 
     injectSecretsFromEnvironment(config);
 
