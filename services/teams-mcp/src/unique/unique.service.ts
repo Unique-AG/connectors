@@ -175,7 +175,7 @@ export class UniqueService {
           },
         },
       });
-      await this.uploadToStorage(recordingUpload.writeUrl, recording.content, 'video/mp4');
+      await this.uploadToStorageMultipart(recordingUpload.writeUrl, recording.content, 'video/mp4');
       await this.upsertContent({
         storeInternally: true,
         scopeId: scope.id,
@@ -494,6 +494,138 @@ export class UniqueService {
     this.logger.debug(
       { storageEndpoint },
       'Successfully completed content upload to storage system',
+    );
+  }
+
+  /**
+   * Upload content to Azure Blob Storage using block upload (multipart).
+   * This method splits the content into blocks and commits them, which is more
+   * reliable for large files and allows for resumable uploads.
+   *
+   * @see https://learn.microsoft.com/en-us/rest/api/storageservices/put-block
+   * @see https://learn.microsoft.com/en-us/rest/api/storageservices/put-block-list
+   */
+  @Span()
+  private async uploadToStorageMultipart(
+    writeUrl: string,
+    content: ReadableStream<Uint8Array<ArrayBuffer>>,
+    mime: string,
+    blockSize = 4 * 1024 * 1024, // 4MB default block size
+  ): Promise<void> {
+    const span = this.trace.getSpan();
+
+    const urlObj = new URL(writeUrl);
+    const storageEndpoint = `${urlObj.protocol}//${urlObj.hostname}`;
+    span?.setAttribute('storage_endpoint', storageEndpoint);
+    span?.setAttribute('block_size', blockSize);
+
+    this.logger.debug(
+      { storageEndpoint, blockSize },
+      'Beginning multipart block upload to Unique storage system',
+    );
+
+    const blockIds: string[] = [];
+    const reader = content.getReader();
+    let buffer = new Uint8Array(0);
+    let blockIndex = 0;
+
+    const uploadBlock = async (blockData: Uint8Array): Promise<string> => {
+      // Block ID must be base64-encoded and same length for all blocks
+      const blockId = Buffer.from(String(blockIndex).padStart(6, '0')).toString('base64');
+      const blockUrl = new URL(writeUrl);
+      blockUrl.searchParams.set('comp', 'block');
+      blockUrl.searchParams.set('blockid', blockId);
+
+      this.logger.debug({ blockIndex, blockSize: blockData.length }, 'Uploading block to storage');
+
+      const response = await fetch(blockUrl.toString(), {
+        method: 'PUT',
+        headers: {
+          'Content-Length': String(blockData.length),
+        },
+        body: blockData,
+      });
+
+      if (!response.ok) {
+        this.logger.error(
+          { status: response.status, blockIndex },
+          'Failed to upload block to storage',
+        );
+        assert.fail(`Block upload failed: ${response.status}`);
+      }
+
+      blockIndex++;
+      return blockId;
+    };
+
+    // Read stream and upload in blocks
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (value) {
+        // Append new data to buffer
+        const newBuffer = new Uint8Array(buffer.length + value.length);
+        newBuffer.set(buffer);
+        newBuffer.set(value, buffer.length);
+        buffer = newBuffer;
+      }
+
+      // Upload complete blocks
+      while (buffer.length >= blockSize) {
+        const block = buffer.slice(0, blockSize);
+        buffer = buffer.slice(blockSize);
+        const blockId = await uploadBlock(block);
+        blockIds.push(blockId);
+      }
+
+      if (done) {
+        // Upload remaining data as final block
+        if (buffer.length > 0) {
+          const blockId = await uploadBlock(buffer);
+          blockIds.push(blockId);
+        }
+        break;
+      }
+    }
+
+    span?.setAttribute('total_blocks', blockIds.length);
+    this.logger.debug(
+      { totalBlocks: blockIds.length },
+      'All blocks uploaded, committing block list',
+    );
+
+    // Commit the block list
+    const commitUrl = new URL(writeUrl);
+    commitUrl.searchParams.set('comp', 'blocklist');
+
+    const blockListXml = `<?xml version="1.0" encoding="utf-8"?>
+<BlockList>
+${blockIds.map((id) => `  <Latest>${id}</Latest>`).join('\n')}
+</BlockList>`;
+
+    const commitResponse = await fetch(commitUrl.toString(), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/xml',
+        'x-ms-blob-content-type': mime,
+      },
+      body: blockListXml,
+    });
+
+    if (!commitResponse.ok) {
+      span?.setAttribute('error', true);
+      span?.setAttribute('http_status', commitResponse.status);
+      this.logger.error(
+        { status: commitResponse.status, storageEndpoint },
+        'Failed to commit block list to storage',
+      );
+      assert.fail(`Block list commit failed: ${commitResponse.status}`);
+    }
+
+    span?.setAttribute('http_status', commitResponse.status);
+    this.logger.debug(
+      { storageEndpoint, totalBlocks: blockIds.length },
+      'Successfully completed multipart block upload to storage system',
     );
   }
 
