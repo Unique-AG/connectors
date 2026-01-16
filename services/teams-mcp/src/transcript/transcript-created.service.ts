@@ -160,8 +160,7 @@ export class TranscriptCreatedService {
       .then(CalendarEventCollection.parseAsync);
 
     const calendarEvent = calendarEvents.value.at(0);
-    const isRecurring =
-      calendarEvent?.type !== 'singleInstance' || !!calendarEvent?.seriesMasterId;
+    const isRecurring = calendarEvent?.type !== 'singleInstance' || !!calendarEvent?.seriesMasterId;
 
     span?.setAttribute('is_recurring', isRecurring);
     span?.setAttribute('calendar_event_type', calendarEvent?.type ?? 'unknown');
