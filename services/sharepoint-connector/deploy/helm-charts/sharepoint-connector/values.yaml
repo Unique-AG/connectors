@@ -197,7 +197,7 @@ connectorConfig:
     #   - siteId: 00000000-0000-0000-0000-000000000000
     #     syncColumnName: FinanceGPTKnowledge
     #     ingestionMode: recursive
-    #     scopeId: scope_...
+    #     scopeId: scope_example123456789
     #     maxFilesToIngest: 1000
     #     storeInternally: enabled
     #     syncStatus: active
