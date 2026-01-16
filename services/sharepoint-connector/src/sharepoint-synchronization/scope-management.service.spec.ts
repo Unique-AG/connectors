@@ -451,7 +451,7 @@ describe('ScopeManagementService', () => {
         { id: 'scope-1', name: 'test1', externalId: 'existing-external-id' },
         { id: 'scope-2', name: 'SitePages', externalId: null },
       ];
-      const paths = ['/test1', '/test1/test-site/SitePages'];
+      const paths = ['/test1', '/test1/SitePages'];
       const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
