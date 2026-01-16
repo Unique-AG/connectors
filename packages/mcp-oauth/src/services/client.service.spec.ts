@@ -26,6 +26,7 @@ describe('ClientService', () => {
     };
 
     it('registers a dynamic oauthclient', async () => {
+      store.storeClient.mockImplementation((client) => Promise.resolve(client));
       const client = await clientService.registerClient(registerClientDto);
       expect(client).toBeDefined();
     });
@@ -38,16 +39,47 @@ describe('ClientService', () => {
     });
 
     it('stores the client', async () => {
+      store.storeClient.mockImplementation((client) => Promise.resolve(client));
       await clientService.registerClient(registerClientDto);
       expect(store.storeClient).toHaveBeenCalled();
     });
 
     it('returns the client with the plaintext secret', async () => {
+      store.storeClient.mockImplementation((client) => Promise.resolve(client));
       const client = await clientService.registerClient({
         ...registerClientDto,
         token_endpoint_auth_method: 'client_secret_basic',
       });
       expect(client.client_secret).toBeDefined();
+    });
+
+    it('returns RFC 7591 compliant response with client_id_issued_at', async () => {
+      store.generateClientId.mockReturnValue('test-client-id');
+      store.storeClient.mockImplementation((client) => Promise.resolve(client));
+      const client = await clientService.registerClient(registerClientDto);
+
+      expect(client.client_id_issued_at).toBeDefined();
+      expect(typeof client.client_id_issued_at).toBe('number');
+      expect(client.client_id_issued_at).toBeGreaterThan(0);
+    });
+
+    it('returns client_secret_expires_at when client_secret is issued', async () => {
+      store.storeClient.mockImplementation((client) => Promise.resolve(client));
+      const client = await clientService.registerClient({
+        ...registerClientDto,
+        token_endpoint_auth_method: 'client_secret_basic',
+      });
+
+      expect(client.client_secret).toBeDefined();
+      expect(client.client_secret_expires_at).toBe(0);
+    });
+
+    it('does not include client_secret_expires_at for public clients', async () => {
+      store.storeClient.mockImplementation((client) => Promise.resolve(client));
+      const client = await clientService.registerClient(registerClientDto);
+
+      expect(client.client_secret).toBeUndefined();
+      expect(client.client_secret_expires_at).toBeUndefined();
     });
   });
 

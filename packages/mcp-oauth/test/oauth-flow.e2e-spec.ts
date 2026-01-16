@@ -45,6 +45,11 @@ describe('OAuth Authorization Code Flow (E2E)', () => {
         token_endpoint_auth_method: 'none',
       });
 
+    expect(response.status).toBe(201);
+    expect(response.body.client_id).toBeDefined();
+    expect(response.body.client_id_issued_at).toBeDefined();
+    expect(typeof response.body.client_id_issued_at).toBe('number');
+
     registeredClient = response.body;
   });
 
@@ -169,6 +174,81 @@ describe('OAuth Authorization Code Flow (E2E)', () => {
 
       expect(introspectRevokedResponse.status).toBe(200);
       expect(introspectRevokedResponse.body).toEqual({ active: false });
+    });
+  });
+
+  describe('RFC 7591 Dynamic Client Registration', () => {
+    it('registers a public client without client_id in request and returns RFC 7591 compliant response', async () => {
+      const response = await request(app.getHttpServer())
+        .post(OAUTH_ENDPOINTS.register)
+        .send({
+          client_name: 'Dynamic Public Client',
+          redirect_uris: ['http://localhost:5000/callback'],
+          grant_types: ['authorization_code', 'refresh_token'],
+          response_types: ['code'],
+          token_endpoint_auth_method: 'none',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        client_id: expect.any(String),
+        client_name: 'Dynamic Public Client',
+        redirect_uris: ['http://localhost:5000/callback'],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+        client_id_issued_at: expect.any(Number),
+      });
+      expect(response.body.client_secret).toBeUndefined();
+      expect(response.body.client_secret_expires_at).toBeUndefined();
+    });
+
+    it('registers a confidential client and returns client_secret with client_secret_expires_at', async () => {
+      const response = await request(app.getHttpServer())
+        .post(OAUTH_ENDPOINTS.register)
+        .send({
+          client_name: 'Dynamic Confidential Client',
+          redirect_uris: ['http://localhost:5000/callback'],
+          grant_types: ['authorization_code', 'refresh_token'],
+          response_types: ['code'],
+          token_endpoint_auth_method: 'client_secret_basic',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        client_id: expect.any(String),
+        client_name: 'Dynamic Confidential Client',
+        client_secret: expect.any(String),
+        client_id_issued_at: expect.any(Number),
+        client_secret_expires_at: 0,
+        token_endpoint_auth_method: 'client_secret_basic',
+      });
+    });
+
+    it('generates unique client_id for each registration', async () => {
+      const response1 = await request(app.getHttpServer())
+        .post(OAUTH_ENDPOINTS.register)
+        .send({
+          client_name: 'Client One',
+          redirect_uris: ['http://localhost:5000/callback'],
+          grant_types: ['authorization_code'],
+          response_types: ['code'],
+          token_endpoint_auth_method: 'none',
+        });
+
+      const response2 = await request(app.getHttpServer())
+        .post(OAUTH_ENDPOINTS.register)
+        .send({
+          client_name: 'Client Two',
+          redirect_uris: ['http://localhost:5001/callback'],
+          grant_types: ['authorization_code'],
+          response_types: ['code'],
+          token_endpoint_auth_method: 'none',
+        });
+
+      expect(response1.status).toBe(201);
+      expect(response2.status).toBe(201);
+      expect(response1.body.client_id).not.toBe(response2.body.client_id);
     });
   });
 
