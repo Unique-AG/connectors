@@ -96,7 +96,11 @@ export class UniqueService {
       'Successfully resolved meeting participant accounts in Unique system',
     );
 
-    const path = this.mapMeetingToScope(meeting.subject, meeting.startDateTime, meeting.isRecurring);
+    const path = this.mapMeetingToScope(
+      meeting.subject,
+      meeting.startDateTime,
+      meeting.isRecurring,
+    );
     const scope = await this.createScope(path);
     span?.setAttribute('scope_id', scope.id);
 

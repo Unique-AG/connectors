@@ -355,6 +355,11 @@ export const CalendarEvent = z.object({
   subject: z.string().nullish(),
   type: z.enum(['singleInstance', 'occurrence', 'exception', 'seriesMaster']),
   seriesMasterId: z.string().nullish(),
+  onlineMeeting: z
+    .object({
+      joinUrl: z.string(),
+    })
+    .nullish(),
 });
 export type CalendarEvent = z.infer<typeof CalendarEvent>;
 
