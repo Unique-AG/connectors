@@ -34,8 +34,7 @@ describe('ClientController', () => {
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
       token_endpoint_auth_method: 'none',
-      created_at: new Date(),
-      updated_at: new Date(),
+      client_id_issued_at: Math.floor(Date.now() / 1000),
     };
 
     it('registers a new OAuth client successfully', async () => {
@@ -48,7 +47,17 @@ describe('ClientController', () => {
       expect(result).toEqual(mockRegisteredClient);
     });
 
-    it('returns client with secret for confidential clients', async () => {
+    it('returns RFC 7591 compliant response with client_id_issued_at', async () => {
+      clientService.registerClient.mockResolvedValue(mockRegisteredClient);
+
+      const result = await controller.registerClient(mockRegisterDto);
+
+      expect(result.client_id).toBe('generated-client-id');
+      expect(result.client_id_issued_at).toBeDefined();
+      expect(typeof result.client_id_issued_at).toBe('number');
+    });
+
+    it('returns client with secret and client_secret_expires_at for confidential clients', async () => {
       const confidentialDto: RegisterClientDto = {
         ...mockRegisterDto,
         token_endpoint_auth_method: 'client_secret_basic',
@@ -58,6 +67,7 @@ describe('ClientController', () => {
         ...mockRegisteredClient,
         token_endpoint_auth_method: 'client_secret_basic',
         client_secret: 'generated-secret-123',
+        client_secret_expires_at: 0,
       };
 
       clientService.registerClient.mockResolvedValue(mockConfidentialClient);
@@ -65,6 +75,7 @@ describe('ClientController', () => {
       const result = await controller.registerClient(confidentialDto);
 
       expect(result.client_secret).toBe('generated-secret-123');
+      expect(result.client_secret_expires_at).toBe(0);
       expect(result.token_endpoint_auth_method).toBe('client_secret_basic');
     });
 
