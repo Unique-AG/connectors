@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
+import { createMockSiteConfig } from '../../utils/test-utils/mock-site-config';
 import type { ProcessingContext } from '../types/processing-context';
 import { AspxProcessingStep } from './aspx-processing.step';
 
@@ -37,19 +38,18 @@ describe('AspxProcessingStep', () => {
   };
 
   const mockContext: ProcessingContext = {
+    syncContext: {
+      siteConfig: createMockSiteConfig(),
+      siteName: 'test-site',
+      serviceUserId: 'user-1',
+      rootPath: '/Root',
+    },
     correlationId: 'c1',
     startTime: new Date(),
     knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/test/test.aspx',
     mimeType: 'application/octet-stream',
-    scopeId: 'scope-1',
+    targetScopeId: 'scope-1', // forced save
     fileStatus: 'new',
-    syncContext: {
-      serviceUserId: 'user-1',
-      rootScopeId: 'root-scope-1',
-      rootPath: '/Root',
-      siteId: 'site-1',
-      siteName: 'test-site',
-    },
     pipelineItem: {
       itemType: 'listItem' as const,
       item: mockListItem,

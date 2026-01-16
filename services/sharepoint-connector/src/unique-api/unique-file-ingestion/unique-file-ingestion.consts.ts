@@ -77,3 +77,7 @@ export const CONTENT_UPSERT_MUTATION = gql`
     }
   }
 `;
+
+export interface ContentDeleteByContentIdsMutationInput {
+  contentIds: string[];
+}

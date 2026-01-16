@@ -3,7 +3,6 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
-import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
@@ -45,7 +44,7 @@ export class UniqueFileIngestionService {
       sourceOwnerType: request.sourceOwnerType,
       sourceKind: request.sourceKind,
       sourceName: request.sourceName,
-      storeInternally: uniqueConfig.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: request.storeInternally,
       baseUrl: request.baseUrl,
     };
 
@@ -83,7 +82,7 @@ export class UniqueFileIngestionService {
       sourceName: request.sourceName,
       sourceKind: request.sourceKind,
       fileUrl: request.fileUrl,
-      storeInternally: uniqueConfig.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: request.storeInternally,
       baseUrl: request.baseUrl,
     };
 

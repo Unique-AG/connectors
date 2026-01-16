@@ -30,13 +30,15 @@ describe('MicrosoftAuthenticationService', () => {
 
   it('uses ClientSecretAuthStrategy when corresponding mode is selected', () => {
     mockConfigService.get.mockImplementation((key: string) => {
-      if (key === 'sharepoint.authMode') return 'client-secret';
+      if (key === 'sharepoint.auth.mode') return 'client-secret';
       if (key === 'sharepoint') {
         return {
-          authMode: 'client-secret',
-          authTenantId: 'tenant-123',
-          authClientId: 'client-456',
-          authClientSecret: new Redacted('secret-789'),
+          tenantId: 'tenant-123',
+          auth: {
+            mode: 'client-secret',
+            clientId: 'client-456',
+            clientSecret: new Redacted('secret-789'),
+          },
         };
       }
       return undefined;
@@ -51,11 +53,13 @@ describe('MicrosoftAuthenticationService', () => {
 
   it('uses OidcAuthStrategy when corresponding mode is selected', () => {
     mockConfigService.get.mockImplementation((key: string) => {
-      if (key === 'sharepoint.authMode') return 'oidc';
+      if (key === 'sharepoint.auth.mode') return 'oidc';
       if (key === 'sharepoint') {
         return {
-          authMode: 'oidc',
-          authTenantId: 'tenant-123',
+          tenantId: 'tenant-123',
+          auth: {
+            mode: 'oidc',
+          },
         };
       }
       return undefined;
@@ -77,13 +81,15 @@ describe('MicrosoftAuthenticationService', () => {
     };
 
     mockConfigService.get.mockImplementation((key: string) => {
-      if (key === 'sharepoint.authMode') return 'client-secret';
+      if (key === 'sharepoint.auth.mode') return 'client-secret';
       if (key === 'sharepoint') {
         return {
-          authMode: 'client-secret',
-          authTenantId: 'tenant-123',
-          authClientId: 'client-456',
-          authClientSecret: new Redacted('secret-789'),
+          tenantId: 'tenant-123',
+          auth: {
+            mode: 'client-secret',
+            clientId: 'client-456',
+            clientSecret: new Redacted('secret-789'),
+          },
         };
       }
       return undefined;

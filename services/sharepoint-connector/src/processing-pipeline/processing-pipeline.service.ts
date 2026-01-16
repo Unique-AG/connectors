@@ -7,7 +7,7 @@ import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { normalizeError, sanitizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
@@ -55,17 +55,18 @@ export class ProcessingPipelineService {
     const correlationId = randomUUID();
 
     const context: ProcessingContext = {
+      syncContext,
       correlationId,
       pipelineItem,
       startTime,
       knowledgeBaseUrl: getItemUrl(pipelineItem),
       mimeType: this.resolveMimeType(pipelineItem),
-      scopeId,
+      targetScopeId: scopeId,
       fileStatus,
-      syncContext,
     };
 
-    const logSiteId = this.shouldConcealLogs ? smear(syncContext.siteId) : syncContext.siteId;
+    const { siteId } = syncContext.siteConfig;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}][CorrelationId: ${correlationId}]`;
     this.logger.log(`${logPrefix} Starting processing pipeline for item: ${pipelineItem.item.id}`);
 

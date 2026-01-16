@@ -2,9 +2,11 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
+import { getInheritanceSettings } from '../../config/sharepoint.schema';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { ModerationStatusValue } from '../../constants/moderation-status.constants';
+import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { SharePointUser } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
@@ -46,7 +48,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       title: context.pipelineItem.fileName,
       mimeType: context.mimeType ?? DEFAULT_MIME_TYPE,
       ownerType: UniqueOwnerType.Scope,
-      scopeId: context.scopeId,
+      scopeId: context.targetScopeId,
       sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
@@ -54,11 +56,13 @@ export class ContentRegistrationStep implements IPipelineStep {
       baseUrl: this.sharepointBaseUrl,
       byteSize: context.fileSize ?? 0,
       metadata: this.extractMetadata(context.pipelineItem),
+      storeInternally:
+        context.syncContext.siteConfig.storeInternally === StoreInternallyMode.Enabled,
     };
 
     context.metadata = contentRegistrationRequest.metadata;
 
-    const inheritFiles = this.configService.get('unique.inheritFilePermissions', { infer: true });
+    const { inheritFiles } = getInheritanceSettings(context.syncContext.siteConfig);
     // We add permissions only for new files, because existing ones should already have correct
     // permissions (including service user permissions) and we don't want to override them; applies
     // when inheritance is disabled or when syncing permissions.

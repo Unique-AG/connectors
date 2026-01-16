@@ -1,15 +1,16 @@
 import type { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { SharepointSyncContext } from '../../sharepoint-synchronization/types';
+import type { SharepointSyncContext } from '../../sharepoint-synchronization/sharepoint-sync-context.interface';
 import {
   ContentMetadata,
   IngestionApiResponse,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 
 export interface ProcessingContext {
+  syncContext: SharepointSyncContext;
   correlationId: string;
   pipelineItem: SharepointContentItem;
   knowledgeBaseUrl: string;
-  scopeId: string;
+  targetScopeId: string;
   uploadUrl?: string;
   uniqueContentId?: string;
   uploadSucceeded?: boolean;
@@ -19,7 +20,6 @@ export interface ProcessingContext {
   mimeType?: string;
   registrationResponse?: IngestionApiResponse;
   fileStatus: 'new' | 'updated';
-  syncContext: SharepointSyncContext;
   metadata?: ContentMetadata;
 }
 

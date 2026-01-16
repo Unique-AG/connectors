@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
+import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
 import { ContentRegistrationStep } from './steps/content-registration.step';
@@ -140,11 +141,10 @@ describe('ProcessingPipelineService', () => {
   });
 
   const mockSyncContext: SharepointSyncContext = {
-    serviceUserId: 'test-user-id',
-    rootScopeId: 'root-scope-1',
-    rootPath: '/Root',
-    siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+    siteConfig: createMockSiteConfig(),
     siteName: 'test-site',
+    serviceUserId: 'test-user-id',
+    rootPath: '/Root',
   };
 
   it('processes file through all pipeline steps successfully', async () => {
@@ -169,6 +169,27 @@ describe('ProcessingPipelineService', () => {
       'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     );
     expect(context?.correlationId).toBeDefined();
+  });
+
+  it('correctly handles targetScopeId in ProcessingContext by prioritizing target scope over root scope', async () => {
+    const targetScopeId = 'specific-folder-scope-id';
+    const rootScopeIdFromConfig = mockSyncContext.siteConfig.scopeId;
+
+    // Ensure they are different for the test
+    expect(targetScopeId).not.toBe(rootScopeIdFromConfig);
+
+    await service.processItem(mockFile, targetScopeId, 'new', mockSyncContext);
+
+    const executeCalls = vi.mocked(mockSteps.contentRegistration.execute).mock.calls;
+    const context = executeCalls[0]?.[0];
+
+    // The context.targetScopeId should be the targetScopeId passed to processItem,
+    // not the root scopeId from mockSyncContext.
+    expect(context?.targetScopeId).toBe(targetScopeId);
+
+    // We should still have access to the root scope via syncContext.config.scopeId
+    // which contains the SiteConfig (which is also the root scope)
+    expect(context?.syncContext.siteConfig.scopeId).toBe(mockSyncContext.siteConfig.scopeId);
   });
 
   it('calls cleanup for each completed step', async () => {

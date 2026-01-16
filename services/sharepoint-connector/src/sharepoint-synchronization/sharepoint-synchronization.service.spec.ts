@@ -5,8 +5,10 @@ import { IngestionMode } from '../constants/ingestion.constants';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
+import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
+import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
@@ -14,6 +16,7 @@ import { SharepointSynchronizationService } from './sharepoint-synchronization.s
 describe('SharepointSynchronizationService', () => {
   let service: SharepointSynchronizationService;
   let mockGraphApiService: Partial<GraphApiService>;
+  let mockSitesConfigurationService: Partial<SitesConfigurationService>;
   let mockContentSyncService: {
     syncContentForSite: ReturnType<typeof vi.fn>;
   };
@@ -23,6 +26,7 @@ describe('SharepointSynchronizationService', () => {
   let mockScopeManagementService: {
     initializeRootScope: ReturnType<typeof vi.fn>;
     batchCreateScopes: ReturnType<typeof vi.fn>;
+    deleteRootScopeRecursively: ReturnType<typeof vi.fn>;
   };
 
   const mockFile: SharepointContentItem = {
@@ -96,6 +100,19 @@ describe('SharepointSynchronizationService', () => {
       getSiteName: vi.fn().mockResolvedValue('test-site-name'),
     };
 
+    mockSitesConfigurationService = {
+      loadSitesConfiguration: vi
+        .fn()
+        .mockResolvedValue([
+          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
+        ]),
+      fetchSitesFromSharePointList: vi
+        .fn()
+        .mockResolvedValue([
+          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
+        ]),
+    };
+
     mockContentSyncService = {
       syncContentForSite: vi.fn().mockResolvedValue(undefined),
     };
@@ -107,10 +124,10 @@ describe('SharepointSynchronizationService', () => {
     mockScopeManagementService = {
       initializeRootScope: vi.fn().mockResolvedValue({
         serviceUserId: 'user-123',
-        rootScopeId: 'test-scope-id',
         rootPath: '/test-root',
       }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
+      deleteRootScopeRecursively: vi.fn().mockResolvedValue(undefined),
     };
 
     const mockHistogram = {
@@ -122,7 +139,11 @@ describe('SharepointSynchronizationService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
+          if (key === 'sharepoint')
+            return {
+              sitesSource: 'config_file',
+              sites: [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })],
+            };
           if (key === 'processing.syncMode') return 'content_only';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
           if (key === 'unique.scopeId') return 'test-scope-id';
@@ -131,6 +152,8 @@ describe('SharepointSynchronizationService', () => {
       }))
       .mock(GraphApiService)
       .impl(() => mockGraphApiService)
+      .mock(SitesConfigurationService)
+      .impl(() => mockSitesConfigurationService)
       .mock(ContentSyncService)
       .impl(() => mockContentSyncService)
       .mock(PermissionsSyncService)
@@ -150,14 +173,19 @@ describe('SharepointSynchronizationService', () => {
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
       'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      'TestColumn',
     );
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       [mockFile],
       null,
       expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-        rootScopeId: 'test-scope-id',
+        siteConfig: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          scopeId: 'scope-id',
+        }),
         siteName: 'test-site-name',
+        rootPath: '/test-root',
+        serviceUserId: 'user-123',
       }),
     );
   });
@@ -169,9 +197,13 @@ describe('SharepointSynchronizationService', () => {
       [mockFile],
       null,
       expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-        rootScopeId: 'test-scope-id',
+        siteConfig: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          scopeId: 'scope-id',
+        }),
         siteName: 'test-site-name',
+        rootPath: '/test-root',
+        serviceUserId: 'user-123',
       }),
     );
   });
@@ -197,9 +229,14 @@ describe('SharepointSynchronizationService', () => {
     const firstScan = service.synchronize();
     const secondScan = service.synchronize();
 
-    await Promise.all([firstScan, secondScan]);
+    const [firstResult, secondResult] = await Promise.all([firstScan, secondScan]);
 
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
+    expect(firstResult.status).toBe('success');
+    expect(secondResult.status).toBe('skipped');
+    if (secondResult.status === 'skipped') {
+      expect(secondResult.reason).toBe('scan_in_progress');
+    }
   });
 
   it('releases scan lock after completion', async () => {
@@ -240,12 +277,23 @@ describe('SharepointSynchronizationService', () => {
       record: vi.fn(),
     };
 
+    const mockSiteConfigs = [
+      createMockSiteConfig({
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        syncMode: 'content_and_permissions',
+      }),
+    ];
+
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
+          if (key === 'sharepoint')
+            return {
+              sitesSource: 'config_file',
+              sites: mockSiteConfigs,
+            };
           if (key === 'processing.syncMode') return 'content_and_permissions';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
           if (key === 'unique.scopeId') return 'test-scope-id';
@@ -253,7 +301,14 @@ describe('SharepointSynchronizationService', () => {
         }),
       }))
       .mock(GraphApiService)
-      .impl(() => mockGraphApiService)
+      .impl(() => ({
+        ...mockGraphApiService,
+      }))
+      .mock(SitesConfigurationService)
+      .impl(() => ({
+        ...mockSitesConfigurationService,
+        loadSitesConfiguration: vi.fn().mockResolvedValue(mockSiteConfigs),
+      }))
       .mock(ContentSyncService)
       .impl(() => mockContentSyncService)
       .mock(PermissionsSyncService)
@@ -268,9 +323,13 @@ describe('SharepointSynchronizationService', () => {
 
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
       context: expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
-        rootScopeId: 'test-scope-id',
+        siteConfig: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          scopeId: 'scope-id',
+        }),
         siteName: 'test-site-name',
+        rootPath: '/test-root',
+        serviceUserId: 'user-123',
       }),
       sharePoint: { items: [mockFile], directories: [] },
       unique: { folders: null },
@@ -288,12 +347,20 @@ describe('SharepointSynchronizationService', () => {
       record: vi.fn(),
     };
 
+    const mockSiteConfigs = [
+      createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
+    ];
+
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.siteIds') return ['bd9c85ee-998f-4665-9c44-577cf5a08a66'];
+          if (key === 'sharepoint')
+            return {
+              sitesSource: 'config_file',
+              sites: mockSiteConfigs,
+            };
           if (key === 'processing.syncMode') return 'content_and_permissions';
           if (key === 'unique.ingestionMode') return IngestionMode.Flat;
           if (key === 'unique.scopeId') return 'test-scope-id';
@@ -301,7 +368,14 @@ describe('SharepointSynchronizationService', () => {
         }),
       }))
       .mock(GraphApiService)
-      .impl(() => mockGraphApiService)
+      .impl(() => ({
+        ...mockGraphApiService,
+      }))
+      .mock(SitesConfigurationService)
+      .impl(() => ({
+        ...mockSitesConfigurationService,
+        loadSitesConfiguration: vi.fn().mockResolvedValue(mockSiteConfigs),
+      }))
       .mock(ContentSyncService)
       .impl(() => mockContentSyncService)
       .mock(PermissionsSyncService)
@@ -395,7 +469,9 @@ describe('SharepointSynchronizationService', () => {
       [fileWithAllFields],
       null,
       expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        siteConfig: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        }),
       }),
     );
   });
@@ -476,7 +552,9 @@ describe('SharepointSynchronizationService', () => {
       [fileWithoutTimestamp],
       null,
       expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        siteConfig: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        }),
       }),
     );
   });
@@ -687,7 +765,9 @@ describe('SharepointSynchronizationService', () => {
       [file1, file2, file3],
       null,
       expect.objectContaining({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        siteConfig: expect.objectContaining({
+          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        }),
       }),
     );
   });

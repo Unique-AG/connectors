@@ -21,7 +21,7 @@ import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
-import type { SharepointSyncContext } from './types';
+import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 @Injectable()
 export class ContentSyncService {
@@ -46,7 +46,7 @@ export class ContentSyncService {
     scopes: ScopeWithPath[] | null,
     context: SharepointSyncContext,
   ): Promise<void> {
-    const { siteId } = context;
+    const { siteId } = context.siteConfig;
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}] `;
     const processStartTime = Date.now();
@@ -98,11 +98,11 @@ export class ContentSyncService {
 
     // Check limit only for new/updated files after deletions and moves are processed
     const totalFilesToIngest = newFileKeys.size + updatedFileKeys.size;
-    const maxIngestedFiles = this.configService.get('unique.maxIngestedFiles', { infer: true });
+    const maxFilesToIngest = context.siteConfig.maxFilesToIngest;
 
     assert.ok(
-      !maxIngestedFiles || totalFilesToIngest <= maxIngestedFiles,
-      `${logPrefix} Too many files to ingest: ${totalFilesToIngest}. Limit is ${maxIngestedFiles}. Aborting sync.`,
+      !maxFilesToIngest || totalFilesToIngest <= maxFilesToIngest,
+      `${logPrefix} Too many files to ingest: ${totalFilesToIngest}. Limit is ${maxFilesToIngest}. Aborting sync.`,
     );
 
     if (newFileKeys.size === 0 && updatedFileKeys.size === 0) {
@@ -114,7 +114,7 @@ export class ContentSyncService {
     const updatedItems = items.filter((item) => updatedFileKeys.has(item.item.id));
 
     const getScopeIdForItem = (itemId: string): string => {
-      const scopeId = context.rootScopeId;
+      const scopeId = context.siteConfig.scopeId;
 
       if (!scopes || scopes.length === 0) {
         return scopeId;

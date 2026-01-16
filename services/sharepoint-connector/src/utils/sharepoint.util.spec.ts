@@ -69,55 +69,55 @@ function createDirectoryItem(webUrl: string): AnySharepointItem {
 }
 
 describe('getUniqueParentPathFromItem', () => {
-  it('returns parent path for driveItem with listItem.webUrl', () => {
+  it('returns parent path for driveItem with listItem.webUrl and strips siteName', () => {
     const item = createDriveItem(
       'https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf',
     );
 
-    const result = getUniqueParentPathFromItem(item, 'MyScope');
+    const result = getUniqueParentPathFromItem(item, 'MyScope', 'TestTeamSite');
 
-    expect(result).toBe("/MyScope/TestTeamSite/Shared Documents/lorand's files/acer-pdf");
+    expect(result).toBe("/MyScope/Shared Documents/lorand's files/acer-pdf");
   });
 
-  it('returns parent path for driveItem falling back to item.webUrl when listItem.webUrl is missing', () => {
+  it('returns parent path for driveItem falling back to item.webUrl when listItem.webUrl is missing and strips siteName', () => {
     const item = createDriveItem(
       '',
       'https://contoso.sharepoint.com/sites/Engineering/Documents/project/docs/readme.pdf',
     );
 
-    const result = getUniqueParentPathFromItem(item, 'EngineeringScope');
+    const result = getUniqueParentPathFromItem(item, 'EngineeringScope', 'Engineering');
 
-    expect(result).toBe('/EngineeringScope/Engineering/Documents/project/docs');
+    expect(result).toBe('/EngineeringScope/Documents/project/docs');
   });
 
-  it('returns parent path for listItem', () => {
+  it('returns parent path for listItem and strips siteName', () => {
     const item = createListItem(
       'https://company.sharepoint.com/sites/Marketing/SitePages/article.aspx',
     );
 
-    const result = getUniqueParentPathFromItem(item, 'MarketingScope');
+    const result = getUniqueParentPathFromItem(item, 'MarketingScope', 'Marketing');
 
-    expect(result).toBe('/MarketingScope/Marketing/SitePages');
+    expect(result).toBe('/MarketingScope/SitePages');
   });
 
-  it('returns parent path for directory item', () => {
+  it('returns parent path for directory item and strips siteName', () => {
     const item = createDirectoryItem(
       'https://tenant.sharepoint.com/sites/Team/Shared Documents/2024/Q1',
     );
 
-    const result = getUniqueParentPathFromItem(item, 'TeamScope');
+    const result = getUniqueParentPathFromItem(item, 'TeamScope', 'Team');
 
-    expect(result).toBe('/TeamScope/Team/Shared Documents/2024');
+    expect(result).toBe('/TeamScope/Shared Documents/2024');
   });
 
-  it('handles root-level item returning site and drive path', () => {
+  it('handles root-level item returning site and drive path and strips siteName', () => {
     const item = createDriveItem(
       'https://company.sharepoint.com/sites/Project/Documents/root-file.pdf',
     );
 
-    const result = getUniqueParentPathFromItem(item, 'ProjectScope');
+    const result = getUniqueParentPathFromItem(item, 'ProjectScope', 'Project');
 
-    expect(result).toBe('/ProjectScope/Project/Documents');
+    expect(result).toBe('/ProjectScope/Documents');
   });
 
   it('handles URLs with special characters and encoding', () => {
@@ -198,57 +198,57 @@ describe('getUniqueParentPathFromItem', () => {
 });
 
 describe('getUniquePathFromItem', () => {
-  it('returns full path for driveItem with listItem.webUrl', () => {
+  it('returns full path for driveItem with listItem.webUrl and strips siteName', () => {
     const item = createDriveItem(
       'https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf',
     );
 
-    const result = getUniquePathFromItem(item, 'MyScope');
+    const result = getUniquePathFromItem(item, 'MyScope', 'TestTeamSite');
 
     expect(result).toBe(
-      "/MyScope/TestTeamSite/Shared Documents/lorand's files/acer-pdf/Extensa 5635_5635g_5635z_5635zg_5235 (ba50_mv).pdf",
+      "/MyScope/Shared Documents/lorand's files/acer-pdf/Extensa 5635_5635g_5635z_5635zg_5235 (ba50_mv).pdf",
     );
   });
 
-  it('returns full path for driveItem falling back to item.webUrl when listItem.webUrl is missing', () => {
+  it('returns full path for driveItem falling back to item.webUrl when listItem.webUrl is missing and strips siteName', () => {
     const item = createDriveItem(
       '',
       'https://contoso.sharepoint.com/sites/Engineering/Documents/project/docs/readme.pdf',
     );
 
-    const result = getUniquePathFromItem(item, 'EngineeringScope');
+    const result = getUniquePathFromItem(item, 'EngineeringScope', 'Engineering');
 
-    expect(result).toBe('/EngineeringScope/Engineering/Documents/project/docs/readme.pdf');
+    expect(result).toBe('/EngineeringScope/Documents/project/docs/readme.pdf');
   });
 
-  it('returns full path for listItem', () => {
+  it('returns full path for listItem and strips siteName', () => {
     const item = createListItem(
       'https://company.sharepoint.com/sites/Marketing/SitePages/article.aspx',
     );
 
-    const result = getUniquePathFromItem(item, 'MarketingScope');
+    const result = getUniquePathFromItem(item, 'MarketingScope', 'Marketing');
 
-    expect(result).toBe('/MarketingScope/Marketing/SitePages/article.aspx');
+    expect(result).toBe('/MarketingScope/SitePages/article.aspx');
   });
 
-  it('returns full path for directory item', () => {
+  it('returns full path for directory item and strips siteName', () => {
     const item = createDirectoryItem(
       'https://tenant.sharepoint.com/sites/Team/Shared Documents/2024/Q1',
     );
 
-    const result = getUniquePathFromItem(item, 'TeamScope');
+    const result = getUniquePathFromItem(item, 'TeamScope', 'Team');
 
-    expect(result).toBe('/TeamScope/Team/Shared Documents/2024/Q1');
+    expect(result).toBe('/TeamScope/Shared Documents/2024/Q1');
   });
 
-  it('handles root-level item returning site and drive path with filename', () => {
+  it('handles root-level item returning site and drive path with filename and strips siteName', () => {
     const item = createDriveItem(
       'https://company.sharepoint.com/sites/Project/Documents/root-file.pdf',
     );
 
-    const result = getUniquePathFromItem(item, 'ProjectScope');
+    const result = getUniquePathFromItem(item, 'ProjectScope', 'Project');
 
-    expect(result).toBe('/ProjectScope/Project/Documents/root-file.pdf');
+    expect(result).toBe('/ProjectScope/Documents/root-file.pdf');
   });
 
   it('handles URLs with special characters and encoding', () => {

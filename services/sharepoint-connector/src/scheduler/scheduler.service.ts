@@ -49,9 +49,11 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     try {
       this.logger.log('Scheduler triggered');
 
-      await this.sharepointScanner.synchronize();
+      const result = await this.sharepointScanner.synchronize();
 
-      this.logger.log('SharePoint scan ended');
+      if (result.status !== 'skipped' || result.reason !== 'scan_in_progress') {
+        this.logger.log('SharePoint scan ended');
+      }
     } catch (error) {
       this.logger.error({
         msg: 'An unexpected error occurred during the scheduled scan',
