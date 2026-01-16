@@ -15,7 +15,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.17.5",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "path-to-regexp": "^8.2.0",
     "zod": "^4.1.5"
   },
