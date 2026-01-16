@@ -22,8 +22,7 @@ export class GraphErrorFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 
-    const status = exception.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
-
+    const formattedCode = exception.code ? `[${exception.code ?? ''}] ` : ' ';
     this.logger.error(
       {
         statusCode: exception.statusCode,
@@ -33,11 +32,11 @@ export class GraphErrorFilter implements ExceptionFilter {
         body: exception.body,
         message: exception.message,
       },
-      `Microsoft Graph API error: ${exception.code ?? exception.message}`,
+      `${formattedCode}Microsoft Graph API: ${exception.message}`,
     );
 
-    response.status(status).json({
-      statusCode: status,
+    response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      statusCode: exception.statusCode,
       error: 'Microsoft Graph API Error',
       code: exception.code,
       message: exception.message,
