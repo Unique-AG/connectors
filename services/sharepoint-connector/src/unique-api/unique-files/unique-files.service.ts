@@ -31,7 +31,7 @@ import {
 } from './unique-files.consts';
 import { UniqueFile, UniqueFileAccessInput } from './unique-files.types';
 
-const CONTENT_BATCH_SIZE = 20;
+const CONTENT_BATCH_SIZE = 50;
 
 // We decide for this batch size because on the Unique side, for each permission requested we make a
 // concurrent call to node-ingestion and further to Zitadel, so we want to avoid overwhelming the
@@ -111,7 +111,12 @@ export class UniqueFilesService {
         continue;
       }
 
-      await this.deleteContentIdsBatch(fileIds);
+      await this.ingestionClient.request<
+        ContentDeleteByContentIdsMutationResult,
+        ContentDeleteByContentIdsMutationInput
+      >(CONTENT_DELETE_BY_IDS_MUTATION, {
+        contentIds: fileIds,
+      });
 
       totalDeleted += fileIds.length;
       this.logger.debug(
@@ -123,15 +128,6 @@ export class UniqueFilesService {
       `${logPrefix} Iterative file deletion completed. Total deleted: ${totalDeleted}`,
     );
     return totalDeleted;
-  }
-
-  private async deleteContentIdsBatch(contentIds: string[]): Promise<void> {
-    await this.ingestionClient.request<
-      ContentDeleteByContentIdsMutationResult,
-      ContentDeleteByContentIdsMutationInput
-    >(CONTENT_DELETE_BY_IDS_MUTATION, {
-      contentIds,
-    });
   }
 
   public async getFilesByKeys(keys: string[]): Promise<UniqueFile[]> {

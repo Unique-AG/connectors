@@ -115,7 +115,7 @@ describe('ContentSyncService', () => {
         serviceUserId: 'user-123',
         rootPath: '/root',
         siteName: 'test-site',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id', maxFilesToIngest: 1 },
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -127,7 +127,7 @@ describe('ContentSyncService', () => {
 
       const contextWithLimit = {
         ...context,
-        config: { ...context.siteConfig, maxFilesToIngest: 1 },
+        siteConfig: { ...context.siteConfig, maxFilesToIngest: 1 },
       };
 
       await expect(service.syncContentForSite(items, scopes, contextWithLimit)).rejects.toThrow(
@@ -163,7 +163,7 @@ describe('ContentSyncService', () => {
 
       const contextWithLimit = {
         ...context,
-        config: { ...context.siteConfig, maxFilesToIngest: 2 },
+        siteConfig: { ...context.siteConfig, maxFilesToIngest: 2 },
       };
 
       await expect(
@@ -382,7 +382,6 @@ describe('ContentSyncService', () => {
     });
 
     it('handles limit validation with only updated files', async () => {
-      const _siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -470,7 +469,6 @@ describe('ContentSyncService', () => {
     });
 
     it('throws an error when 0 files are submitted but file diff indicates deletions', async () => {
-      const _siteId = 'site-id';
       const items = [] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
@@ -495,7 +493,6 @@ describe('ContentSyncService', () => {
     });
 
     it('does not throw an error when partial deletions occur', async () => {
-      const _siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -539,7 +536,6 @@ describe('ContentSyncService', () => {
     });
 
     it('does not throw an error for empty site with no deleted files', async () => {
-      const _siteId = 'site-id';
       const items = [] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {

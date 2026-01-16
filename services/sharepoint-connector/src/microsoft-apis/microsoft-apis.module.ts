@@ -7,6 +7,7 @@ import { FileFilterService } from './graph/file-filter.service';
 import { GraphApiService } from './graph/graph-api.service';
 import { GraphClientFactory } from './graph/graph-client.factory';
 import { GraphAuthenticationService } from './graph/middlewares/graph-authentication.service';
+import { SitesConfigurationService } from './graph/sites-configuration.service';
 import { SharepointRestClientService } from './sharepoint-rest/sharepoint-rest-client.service';
 import { SharepointRestHttpService } from './sharepoint-rest/sharepoint-rest-http.service';
 
@@ -18,10 +19,11 @@ import { SharepointRestHttpService } from './sharepoint-rest/sharepoint-rest-htt
     FileFilterService,
     GraphAuthenticationService,
     GraphApiService,
-    SharepointRestHttpService,
+    SitesConfigurationService,
     SharepointRestClientService,
+    SharepointRestHttpService,
     BottleneckFactory,
   ],
-  exports: [GraphApiService, SharepointRestClientService],
+  exports: [GraphApiService, SitesConfigurationService, SharepointRestClientService],
 })
 export class MicrosoftApisModule {}

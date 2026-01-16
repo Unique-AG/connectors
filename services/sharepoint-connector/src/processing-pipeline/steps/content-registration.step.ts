@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
-import { getInheritanceSettings } from '../../config/tenant-config.schema';
+import { getInheritanceSettings } from '../../config/sharepoint.schema';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { ModerationStatusValue } from '../../constants/moderation-status.constants';

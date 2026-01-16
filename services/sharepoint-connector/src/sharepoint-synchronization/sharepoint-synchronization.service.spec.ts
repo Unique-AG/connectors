@@ -5,6 +5,7 @@ import { IngestionMode } from '../constants/ingestion.constants';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
+import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
@@ -15,6 +16,7 @@ import { SharepointSynchronizationService } from './sharepoint-synchronization.s
 describe('SharepointSynchronizationService', () => {
   let service: SharepointSynchronizationService;
   let mockGraphApiService: Partial<GraphApiService>;
+  let mockSitesConfigurationService: Partial<SitesConfigurationService>;
   let mockContentSyncService: {
     syncContentForSite: ReturnType<typeof vi.fn>;
   };
@@ -96,6 +98,9 @@ describe('SharepointSynchronizationService', () => {
     mockGraphApiService = {
       getAllSiteItems: vi.fn().mockResolvedValue({ items: [mockFile], directories: [] }),
       getSiteName: vi.fn().mockResolvedValue('test-site-name'),
+    };
+
+    mockSitesConfigurationService = {
       loadSitesConfiguration: vi
         .fn()
         .mockResolvedValue([
@@ -147,6 +152,8 @@ describe('SharepointSynchronizationService', () => {
       }))
       .mock(GraphApiService)
       .impl(() => mockGraphApiService)
+      .mock(SitesConfigurationService)
+      .impl(() => mockSitesConfigurationService)
       .mock(ContentSyncService)
       .impl(() => mockContentSyncService)
       .mock(PermissionsSyncService)
@@ -225,8 +232,11 @@ describe('SharepointSynchronizationService', () => {
     const [firstResult, secondResult] = await Promise.all([firstScan, secondScan]);
 
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
-    expect(firstResult.skippedDueToScanInProgress).toBe(false);
-    expect(secondResult.skippedDueToScanInProgress).toBe(true);
+    expect(firstResult.status).toBe('success');
+    expect(secondResult.status).toBe('skipped');
+    if (secondResult.status === 'skipped') {
+      expect(secondResult.reason).toBe('scan_in_progress');
+    }
   });
 
   it('releases scan lock after completion', async () => {
@@ -293,6 +303,10 @@ describe('SharepointSynchronizationService', () => {
       .mock(GraphApiService)
       .impl(() => ({
         ...mockGraphApiService,
+      }))
+      .mock(SitesConfigurationService)
+      .impl(() => ({
+        ...mockSitesConfigurationService,
         loadSitesConfiguration: vi.fn().mockResolvedValue(mockSiteConfigs),
       }))
       .mock(ContentSyncService)
@@ -356,6 +370,10 @@ describe('SharepointSynchronizationService', () => {
       .mock(GraphApiService)
       .impl(() => ({
         ...mockGraphApiService,
+      }))
+      .mock(SitesConfigurationService)
+      .impl(() => ({
+        ...mockSitesConfigurationService,
         loadSitesConfiguration: vi.fn().mockResolvedValue(mockSiteConfigs),
       }))
       .mock(ContentSyncService)

@@ -1,0 +1,16 @@
+export enum SyncStep {
+  SITES_CONFIG_LOADING = 'sites_config_loading',
+  ROOT_SCOPE_INIT = 'root_scope_initialization',
+  SITE_NAME_FETCH = 'site_name_fetch',
+  SITE_ITEMS_FETCH = 'site_items_fetch',
+  SCOPES_CREATION = 'scopes_creation',
+  CONTENT_SYNC = 'content_sync',
+  PERMISSIONS_SYNC = 'permissions_sync',
+  PERMISSIONS_FETCH = 'permissions_fetch',
+  GROUPS_MEMBERSHIPS_FETCH = 'groups_memberships_fetch',
+  UNIQUE_DATA_FETCH = 'unique_data_fetch',
+  GROUPS_SYNC = 'groups_sync',
+  FILE_PERMISSIONS_SYNC = 'file_permissions_sync',
+  FOLDER_PERMISSIONS_SYNC = 'folder_permissions_sync',
+  UNKNOWN = 'unknown',
+}

@@ -1,36 +1,30 @@
+import assert from 'node:assert';
 import { globSync, readFileSync } from 'node:fs';
 import { registerAs } from '@nestjs/config';
-import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { load } from 'js-yaml';
+import { isPlainObject } from 'remeda';
+import { Redacted } from 'src/utils/redacted';
 import { z } from 'zod';
-import { Redacted } from '../utils/redacted';
-import {
-  AppConfigSchema,
-  ProcessingConfigSchema,
-  SharepointConfigSchema,
-  TenantConfigSchema,
-  UniqueConfigSchema,
-} from './tenant-config.schema';
+import { type ProcessingConfig, ProcessingConfigSchema } from './processing.schema';
+import { type SharepointConfig, SharepointConfigSchema } from './sharepoint.schema';
+import { type UniqueConfig, UniqueConfigSchema } from './unique.schema';
 
-type TenantConfig = z.infer<typeof TenantConfigSchema>;
-type SharepointConfig = z.infer<typeof SharepointConfigSchema>;
-type UniqueConfig = z.infer<typeof UniqueConfigSchema>;
-type ProcessingConfig = z.infer<typeof ProcessingConfigSchema>;
+export { type AppConfig, type AppConfigNamespaced, appConfig } from './app.config';
+export type { ProcessingConfig } from './processing.schema';
+export type { SharepointConfig } from './sharepoint.schema';
+export type { UniqueConfig } from './unique.schema';
 
-// --- App Config (From Environment) ---
+// ==========================================
+// Tenant Configuration
+// ==========================================
 
-export const appConfig = registerConfig('app', AppConfigSchema, {
-  whitelistKeys: new Set([
-    'LOG_LEVEL',
-    'PORT',
-    'NODE_ENV',
-    'LOGS_DIAGNOSTICS_DATA_POLICY',
-    'TENANT_CONFIG_PATH_PATTERN',
-  ]),
+const TenantConfigSchema = z.object({
+  sharepoint: SharepointConfigSchema,
+  unique: UniqueConfigSchema,
+  processing: ProcessingConfigSchema,
 });
 
-export type AppConfig = ConfigType<typeof appConfig>;
-export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;
+type TenantConfig = z.infer<typeof TenantConfigSchema>;
 
 // --- Tenant Configs (From File) ---
 
@@ -56,74 +50,30 @@ export interface ProcessingConfigNamespaced {
 
 let cachedConfig: TenantConfig | null = null;
 
-// Intermediate schema for environment variable injection before final validation
-const IntermediateTenantSchema = z
-  .object({
-    sharepoint: z
-      .object({
-        auth: z
-          .object({
-            mode: z.enum(['oidc', 'client-secret', 'certificate']).optional(),
-            privateKeyPassword: z.string().optional(),
-          })
-          .passthrough()
-          .optional(),
-      })
-      .passthrough()
-      .optional(),
-    unique: z
-      .object({
-        serviceAuthMode: z.enum(['cluster_local', 'external']).optional(),
-        zitadelClientSecret: z.instanceof(Redacted).optional(),
-      })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough();
-
 function loadTenantConfig(pathPattern: string): TenantConfig {
   const files = globSync(pathPattern);
 
-  if (files.length === 0) {
-    throw new Error(`No tenant configuration files found matching pattern '${pathPattern}'`);
-  }
-
   // We do not support multiple tenants for now: UN-13091
-  if (files.length > 1) {
-    throw new Error(
-      `Multiple tenant configuration files found matching pattern '${pathPattern}': ${files.join(', ')}. Only one tenant config file is supported for now.`,
-    );
-  }
+  assert.ok(
+    files.length < 2,
+    `Multiple tenant configuration files found matching pattern '${pathPattern}': ${files.join(', ')}. Only one tenant config file is supported for now.`,
+  );
 
-  const configPath = files[0];
-  if (!configPath) {
-    throw new Error(`No tenant configuration files found matching pattern '${pathPattern}'`);
-  }
+  const configPath =
+    files[0] ??
+    assert.fail(`No tenant configuration files found matching pattern '${pathPattern}'`);
 
   try {
     const fileContent = readFileSync(configPath, 'utf-8');
-    const rawConfig = load(fileContent);
+    const config = load(fileContent);
 
-    const initialConfig = IntermediateTenantSchema.parse(rawConfig);
-
-    if (initialConfig.sharepoint?.auth?.mode === 'certificate') {
-      const password = process.env.SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD;
-      if (password) {
-        initialConfig.sharepoint.auth.privateKeyPassword = password;
-      }
+    if (!isPlainObject(config)) {
+      throw new Error(`Invalid tenant config: expected a plain object, got ${typeof config}`);
     }
 
-    if (initialConfig.unique?.serviceAuthMode === 'external') {
-      const secret = process.env.ZITADEL_CLIENT_SECRET;
-      if (!secret) {
-        throw new Error(
-          `ZITADEL_CLIENT_SECRET environment variable is required when using external auth mode (configured in ${configPath})`,
-        );
-      }
-      initialConfig.unique.zitadelClientSecret = new Redacted(secret);
-    }
+    injectSecretsFromEnvironment(config);
 
-    return TenantConfigSchema.parse(initialConfig);
+    return TenantConfigSchema.parse(config);
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(
@@ -131,6 +81,24 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
       );
     }
     throw error;
+  }
+}
+
+function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
+  // Type assertion for discriminated union
+  const typedConfig = config as TenantConfig;
+
+  // we throw an error if the object path is not defined
+  if (
+    process.env.SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD &&
+    typedConfig.sharepoint.auth.mode === 'certificate'
+  ) {
+    typedConfig.sharepoint.auth.privateKeyPassword =
+      process.env.SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD;
+  }
+
+  if (process.env.ZITADEL_CLIENT_SECRET && typedConfig.unique.serviceAuthMode === 'external') {
+    typedConfig.unique.zitadelClientSecret = new Redacted(process.env.ZITADEL_CLIENT_SECRET);
   }
 }
 

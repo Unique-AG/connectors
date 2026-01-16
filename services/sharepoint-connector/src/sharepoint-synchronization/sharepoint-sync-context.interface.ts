@@ -1,4 +1,4 @@
-import type { SiteConfig } from '../config/tenant-config.schema';
+import type { SiteConfig } from '../config/sharepoint.schema';
 
 export interface SharepointSyncContext {
   siteConfig: SiteConfig;

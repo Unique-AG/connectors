@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
-import { SharepointConfigSchema } from './tenant-config.schema';
+import { SharepointConfigSchema } from './sharepoint.schema';
 
 describe('SharepointConfigSchema', () => {
   const validBaseConfig = {

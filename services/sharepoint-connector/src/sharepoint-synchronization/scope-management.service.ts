@@ -4,7 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
 import { Config } from '../config';
-import { getInheritanceSettings } from '../config/tenant-config.schema';
+import { getInheritanceSettings } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
