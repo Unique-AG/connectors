@@ -6,7 +6,7 @@ import { ProbeModule } from '@unique-ag/probe';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { context, trace } from '@opentelemetry/api';
 import { Cache } from 'cache-manager';
@@ -37,6 +37,7 @@ import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
 import { TranscriptModule } from './transcript/transcript.module';
+import { GraphErrorFilter } from './utils/graph-error.filter';
 
 @Module({
   imports: [
@@ -148,6 +149,7 @@ import { TranscriptModule } from './transcript/transcript.module';
   ],
   controllers: [ManifestController],
   providers: [
+    { provide: APP_FILTER, useClass: GraphErrorFilter },
     { provide: APP_GUARD, useClass: McpAuthJwtGuard },
     { provide: APP_PIPE, useClass: ZodValidationPipe },
     { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
