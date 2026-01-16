@@ -346,6 +346,21 @@ export type Meeting = z.infer<typeof Meeting>;
 export const MeetingCollection = Collection(Meeting);
 
 /**
+ * See docs on {@link https://learn.microsoft.com/en-us/graph/api/resources/event?view=graph-rest-1.0 calendar event}.
+ *
+ * Used to determine if a meeting is recurring by checking the `type` or `seriesMasterId` properties.
+ */
+export const CalendarEvent = z.object({
+  id: z.string(),
+  subject: z.string().nullish(),
+  type: z.enum(['singleInstance', 'occurrence', 'exception', 'seriesMaster']),
+  seriesMasterId: z.string().nullish(),
+});
+export type CalendarEvent = z.infer<typeof CalendarEvent>;
+
+export const CalendarEventCollection = Collection(CalendarEvent);
+
+/**
  * See docs on {@link https://learn.microsoft.com/en-us/graph/api/resources/callrecording?view=graph-rest-1.0 call recording}.
  */
 export const Recording = z.object({
