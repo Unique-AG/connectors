@@ -15,7 +15,11 @@ export type {
   IOAuthStore,
   RefreshTokenMetadata,
 } from './interfaces/io-auth-store.interface';
-export type { AuthorizationCode, OAuthClient } from './interfaces/oauth-client.interface';
+export type {
+  AuthorizationCode,
+  ClientRegistrationResponse,
+  OAuthClient,
+} from './interfaces/oauth-client.interface';
 export type {
   OAuthProviderConfig,
   OAuthSession,

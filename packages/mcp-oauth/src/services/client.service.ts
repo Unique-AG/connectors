@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { RegisterClientDto } from '../dtos/register-client.dto';
 import type { IOAuthStore } from '../interfaces/io-auth-store.interface';
-import { OAuthClient } from '../interfaces/oauth-client.interface';
+import { ClientRegistrationResponse, OAuthClient } from '../interfaces/oauth-client.interface';
 import { OAUTH_STORE_TOKEN } from '../mcp-oauth.module-definition';
 
 @Injectable()
@@ -13,11 +13,14 @@ export class ClientService {
   public constructor(@Inject(OAUTH_STORE_TOKEN) private readonly store: IOAuthStore) {}
 
   /**
-   * Register a client application.
+   * Register a client application per RFC 7591 Dynamic Client Registration.
    * Always creates a new client record. client_name is not treated as unique.
-   * Returns the client with the plaintext secret (only time it's available).
+   * Returns the RFC 7591 compliant response with the plaintext secret (only time it's available).
+   * @see https://datatracker.ietf.org/doc/html/rfc7591#section-3.2.1
    */
-  public async registerClient(registerClientDto: RegisterClientDto): Promise<OAuthClient> {
+  public async registerClient(
+    registerClientDto: RegisterClientDto,
+  ): Promise<ClientRegistrationResponse> {
     this.logger.log({
       msg: 'Register new oAuth client',
       name: registerClientDto.client_name,
@@ -30,11 +33,12 @@ export class ClientService {
       tokenEndpointAuthMethod: registerClientDto.token_endpoint_auth_method,
     });
 
+    const now = new Date();
     const clientId = this.store.generateClientId({
       ...registerClientDto,
       client_id: '',
-      created_at: new Date(),
-      updated_at: new Date(),
+      created_at: now,
+      updated_at: now,
     });
 
     const plaintextSecret =
@@ -48,8 +52,8 @@ export class ClientService {
       ...registerClientDto,
       client_id: clientId,
       client_secret: hashedSecret,
-      created_at: new Date(),
-      updated_at: new Date(),
+      created_at: now,
+      updated_at: now,
     };
 
     this.logger.log({
@@ -60,11 +64,30 @@ export class ClientService {
 
     const storedClient = await this.store.storeClient(newClient);
 
-    // Return the client with plaintext secret (only time it's visible)
-    return {
-      ...storedClient,
-      client_secret: plaintextSecret,
+    // Return RFC 7591 compliant response with plaintext secret (only time it's visible)
+    const response: ClientRegistrationResponse = {
+      client_id: storedClient.client_id,
+      client_name: storedClient.client_name,
+      client_description: storedClient.client_description,
+      logo_uri: storedClient.logo_uri,
+      client_uri: storedClient.client_uri,
+      developer_name: storedClient.developer_name,
+      developer_email: storedClient.developer_email,
+      redirect_uris: storedClient.redirect_uris,
+      grant_types: storedClient.grant_types,
+      response_types: storedClient.response_types,
+      token_endpoint_auth_method: storedClient.token_endpoint_auth_method,
+      client_id_issued_at: Math.floor(storedClient.created_at.getTime() / 1000),
     };
+
+    if (plaintextSecret) {
+      response.client_secret = plaintextSecret;
+      // RFC 7591: client_secret_expires_at is REQUIRED if client_secret is issued
+      // 0 means the client_secret does not expire
+      response.client_secret_expires_at = 0;
+    }
+
+    return response;
   }
 
   public async getClient(clientId: string): Promise<OAuthClient | null> {
