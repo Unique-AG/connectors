@@ -2,8 +2,8 @@ apiVersion: v2
 name: mcp-server-outlook
 description: An experimental MCP server for Outlook leveraging the Microsoft Graph API.
 type: application
-version: 0.5.1
-appVersion: 0.5.1
+version: 0.6.0
+appVersion: 0.6.0
 dependencies:
   - alias: server
     name: backend-service
