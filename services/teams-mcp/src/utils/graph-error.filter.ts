@@ -35,8 +35,11 @@ export class GraphErrorFilter implements ExceptionFilter {
       `${formattedCode}Microsoft Graph API: ${exception.message}`,
     );
 
+    // Always return 500 regardless of the Graph API's actual status code (e.g., 401/403).
+    // These errors occur during internal async processing, so from the client's perspective
+    // this is an internal server error. We intentionally don't expose the upstream status
+    // to avoid leaking implementation details about our internal MS Graph API interactions.
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-      statusCode: exception.statusCode,
       error: 'Microsoft Graph API Error',
       code: exception.code,
       message: exception.message,
