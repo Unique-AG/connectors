@@ -88,24 +88,17 @@ describe('ScopeManagementService', () => {
     { id: 'scope_1', name: 'test1', parentId: null, externalId: null, path: '/test1' },
     {
       id: 'scope_2',
-      name: 'test1',
+      name: 'UniqueAG',
       parentId: 'scope_1',
       externalId: null,
-      path: '/test1/test1',
+      path: '/test1/UniqueAG',
     },
     {
       id: 'scope_3',
-      name: 'UniqueAG',
+      name: 'SitePages',
       parentId: 'scope_2',
       externalId: null,
-      path: '/test1/test1/UniqueAG',
-    },
-    {
-      id: 'scope_4',
-      name: 'SitePages',
-      parentId: 'scope_3',
-      externalId: null,
-      path: '/test1/test1/UniqueAG/SitePages',
+      path: '/test1/UniqueAG/SitePages',
     },
   ];
 
@@ -220,16 +213,15 @@ describe('ScopeManagementService', () => {
       expect(result).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: 'scope_1', name: 'test1', path: '/test1' }),
-          expect.objectContaining({ id: 'scope_2', name: 'test1', path: '/test1/test1' }),
           expect.objectContaining({
-            id: 'scope_3',
+            id: 'scope_2',
             name: 'UniqueAG',
-            path: '/test1/test1/UniqueAG',
+            path: '/test1/UniqueAG',
           }),
           expect.objectContaining({
-            id: 'scope_4',
+            id: 'scope_3',
             name: 'SitePages',
-            path: '/test1/test1/UniqueAG/SitePages',
+            path: '/test1/UniqueAG/SitePages',
           }),
         ]),
       );
@@ -240,12 +232,7 @@ describe('ScopeManagementService', () => {
       ];
       expect(options).toEqual({ includePermissions: true, inheritAccess: true });
       expect(paths).toEqual(
-        expect.arrayContaining([
-          '/test1',
-          '/test1/test1',
-          '/test1/test1/UniqueAG',
-          '/test1/test1/UniqueAG/SitePages',
-        ]),
+        expect.arrayContaining(['/test1', '/test1/UniqueAG', '/test1/UniqueAG/SitePages']),
       );
     });
 
@@ -320,7 +307,7 @@ describe('ScopeManagementService', () => {
       const result = service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
 
       // biome-ignore lint/style/noNonNullAssertion: Test data is guaranteed to exist
-      expect(result.get(item!.item.id)).toBe('scope_4');
+      expect(result.get(item!.item.id)).toBe('scope_3');
     });
 
     it('decodes URL-encoded paths before lookup', () => {
