@@ -8,7 +8,7 @@ sharepoint:
     privateKeyPath: /path/to/private-key.pem
     thumbprintSha1: your-sha1-thumbprint-here
   baseUrl: https://yourcompany.sharepoint.com
-  graphApiRateLimitPerMinute: 600
+  graphApiRateLimitPerMinuteThousands: 6
   # Sites configuration from SharePoint list
   sitesSource: sharepoint_list
   sharepointList:

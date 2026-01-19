@@ -7,4 +7,5 @@ export const urlWithoutTrailingSlashSchema = (description: string, message: stri
     .refine((url) => !url.endsWith('/'), { message });
 
 export const coercedPositiveIntSchema = z.coerce.number().int().positive();
+export const coercedPositiveNumberSchema = z.coerce.number().positive();
 export const requiredStringSchema = z.string().min(1);

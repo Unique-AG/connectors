@@ -43,10 +43,11 @@ export class GraphApiService {
   ) {
     this.graphClient = this.graphClientFactory.createClient();
 
-    const msGraphRateLimitPerMinute = this.configService.get(
-      'sharepoint.graphApiRateLimitPerMinute',
+    const msGraphRateLimitPerMinuteThousands = this.configService.get(
+      'sharepoint.graphApiRateLimitPerMinuteThousands',
       { infer: true },
     );
+    const msGraphRateLimitPerMinute = msGraphRateLimitPerMinuteThousands * 1000;
 
     this.limiter = this.bottleneckFactory.createLimiter(
       {

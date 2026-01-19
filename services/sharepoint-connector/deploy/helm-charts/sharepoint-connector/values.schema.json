@@ -418,9 +418,9 @@
               "description": "Microsoft Graph API configuration",
               "required": [],
               "properties": {
-                "apiRateLimitPerMinute": {
-                  "type": "integer",
-                  "description": "Rate limiting for Graph API requests per minute"
+                "apiRateLimitPerMinuteThousands": {
+                  "type": "number",
+                  "description": "Rate limiting for Graph API requests per minute (in thousands)"
                 }
               },
               "additionalProperties": false

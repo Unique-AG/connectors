@@ -180,7 +180,8 @@ connectorConfig:
       # One of thumbprintSha1 or thumbprintSha256 must be provided
       thumbprintSha256: ""
     graph:
-      apiRateLimitPerMinute: 780000
+      # -- Rate limiting for Graph API requests per minute (in thousands)
+      apiRateLimitPerMinuteThousands: 780
     # -- Sites source configuration
     # Determines how sites are configured: from static YAML (config_file) or dynamically from SharePoint list (sharepoint_list)
     # possible values: config_file, sharepoint_list

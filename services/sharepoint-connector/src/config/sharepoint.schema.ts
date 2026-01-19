@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
+import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS } from '../constants/defaults.constants';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { Redacted } from '../utils/redacted';
 import {
-  coercedPositiveIntSchema,
+  coercedPositiveNumberSchema,
   requiredStringSchema,
   urlWithoutTrailingSlashSchema,
 } from '../utils/zod.util';
@@ -180,9 +180,9 @@ const dynamicSitesConfig = z.object({
 const sharepointBaseConfig = z.object({
   tenantId: requiredStringSchema.describe('Azure AD tenant ID'),
   auth: AuthConfigSchema.describe('Authentication configuration for Microsoft APIs'),
-  graphApiRateLimitPerMinute: coercedPositiveIntSchema
-    .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE)
-    .describe('Number of MS Graph API requests allowed per minute'),
+  graphApiRateLimitPerMinuteThousands: coercedPositiveNumberSchema
+    .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS)
+    .describe('Number of MS Graph API requests allowed per minute (in thousands)'),
   baseUrl: urlWithoutTrailingSlashSchema(
     "Your company's sharepoint URL",
     'Base URL must not end with a trailing slash',
@@ -210,6 +210,6 @@ export type SharepointConfig = (
   auth: AuthConfig & {
     privateKeyPassword?: string;
   };
-  graphApiRateLimitPerMinute: number;
+  graphApiRateLimitPerMinuteThousands: number;
   baseUrl: string;
 };

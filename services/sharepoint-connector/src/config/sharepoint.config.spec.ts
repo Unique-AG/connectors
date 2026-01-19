@@ -7,7 +7,7 @@ describe('SharepointConfigSchema', () => {
   const validBaseConfig = {
     tenantId: '12345678-1234-1234-1234-123456789abc',
     baseUrl: 'https://company.sharepoint.com',
-    graphApiRateLimitPerMinute: 600,
+    graphApiRateLimitPerMinuteThousands: 0.6,
     sitesSource: 'config_file' as const,
     sites: [
       {
@@ -382,13 +382,13 @@ describe('SharepointConfigSchema', () => {
       );
     });
 
-    it('rejects negative graphApiRateLimitPerMinute', () => {
+    it('rejects negative graphApiRateLimitPerMinuteThousands', () => {
       const config = {
         ...validBaseConfig,
         auth: {
           mode: 'oidc' as const,
         },
-        graphApiRateLimitPerMinute: -1,
+        graphApiRateLimitPerMinuteThousands: -1,
       };
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
