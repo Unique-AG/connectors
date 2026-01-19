@@ -10,6 +10,7 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UniqueService } from '~/unique/unique.service';
 import { normalizeError } from '~/utils/normalize-error';
 import {
+  CalendarEventCollection,
   CreatedEventDto,
   Meeting,
   RecordingCollection,
@@ -151,6 +152,41 @@ export class TranscriptCreatedService {
     );
     assert.ok(vttStream, 'expected a vtt transcript body');
 
+    // Query events within the meeting time window, then match by joinUrl client-side
+    // (filtering by onlineMeeting properties is not supported by the Graph API)
+    const calendarEvents = await client
+      .api(`/users/${userId}/calendarView`)
+      .query({
+        startDateTime: meeting.startDateTime.toISOString(),
+        endDateTime: meeting.endDateTime.toISOString(),
+      })
+      .select('id,subject,type,seriesMasterId,onlineMeeting')
+      .get()
+      .then(CalendarEventCollection.parseAsync);
+
+    const calendarEvent = calendarEvents.value.find(
+      (e) => e.onlineMeeting?.joinUrl.href === meeting.joinWebUrl.href,
+    );
+    const isRecurring =
+      calendarEvent?.type === 'occurrence' ||
+      calendarEvent?.type === 'exception' ||
+      calendarEvent?.type === 'seriesMaster' ||
+      !!calendarEvent?.seriesMasterId;
+
+    span?.setAttribute('is_recurring', isRecurring);
+    span?.setAttribute('calendar_event_type', calendarEvent?.type ?? 'unknown');
+    span?.setAttribute('has_calendar_event', !!calendarEvent);
+    this.logger.debug(
+      {
+        type: calendarEvent?.type,
+        calendarEventId: calendarEvent?.id,
+        eventType: calendarEvent?.type,
+        seriesMasterId: calendarEvent?.seriesMasterId,
+        isRecurring,
+      },
+      'Determined meeting recurrence status from calendar event',
+    );
+
     let recording: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> } | undefined;
     try {
       this.logger.debug(
@@ -183,6 +219,7 @@ export class TranscriptCreatedService {
           .api(
             `/users/${userId}/onlineMeetings/${meetingId}/recordings/${recordingData.id}/content`,
           )
+          .header('Accept', 'video/mp4')
           .getStream(),
       };
 
@@ -204,6 +241,7 @@ export class TranscriptCreatedService {
 
     span?.addEvent('transcript processing completed', {
       hasRecording: recording !== undefined,
+      isRecurring,
     });
 
     await this.unique.ingestTranscript(
@@ -211,6 +249,7 @@ export class TranscriptCreatedService {
         subject: meeting.subject ?? '',
         startDateTime: meeting.startDateTime,
         endDateTime: meeting.endDateTime,
+        isRecurring,
         owner: {
           id: meeting.participants.organizer.identity.user.id,
           name: meeting.participants.organizer.identity.user.displayName ?? '',

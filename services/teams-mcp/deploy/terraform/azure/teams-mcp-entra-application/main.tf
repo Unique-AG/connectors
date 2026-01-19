@@ -10,6 +10,7 @@ locals {
   # Based on SCOPES in services/teams-mcp/src/auth/microsoft.provider.ts
   graph_scopes = toset([
     "User.Read",
+    "Calendars.Read",
     "OnlineMeetings.Read",
     "OnlineMeetingRecording.Read.All",
     "OnlineMeetingTranscript.Read.All",

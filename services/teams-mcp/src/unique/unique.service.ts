@@ -42,6 +42,7 @@ export class UniqueService {
       subject: string;
       startDateTime: Date;
       endDateTime: Date;
+      isRecurring: boolean;
       participants: { id?: string; name: string; email: string }[];
       owner: { id: string; name: string; email: string };
     },
@@ -54,6 +55,7 @@ export class UniqueService {
     span?.setAttribute('participant_count', meeting.participants.length);
     span?.setAttribute('meeting_date', meeting.startDateTime.toISOString());
     span?.setAttribute('owner_id', meeting.owner.id);
+    span?.setAttribute('is_recurring', meeting.isRecurring);
 
     this.logger.log(
       {
@@ -61,6 +63,7 @@ export class UniqueService {
         recordingId: recording?.id,
         participantCount: meeting.participants.length,
         meetingDate: meeting.startDateTime.toISOString(),
+        isRecurring: meeting.isRecurring,
       },
       'Beginning processing of meeting transcript and recording for ingestion',
     );
@@ -93,7 +96,11 @@ export class UniqueService {
       'Successfully resolved meeting participant accounts in Unique system',
     );
 
-    const path = this.mapMeetingToScope(meeting.subject, meeting.startDateTime);
+    const path = this.mapMeetingToScope(
+      meeting.subject,
+      meeting.startDateTime,
+      meeting.isRecurring,
+    );
     const scope = await this.createScope(path);
     span?.setAttribute('scope_id', scope.id);
 

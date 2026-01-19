@@ -60,6 +60,7 @@ module "teams_mcp_app" {
    | Permission | Type | Admin Consent |
    |------------|------|---------------|
    | `User.Read` | Delegated | No |
+   | `Calendars.Read` | Delegated | No |
    | `OnlineMeetings.Read` | Delegated | No |
    | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** |
    | `OnlineMeetingRecording.Read.All` | Delegated | **Yes** |
@@ -88,6 +89,7 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 
 **Required:**
 - `User.Read` - Read user profile
+- `Calendars.Read` - Read calendar events (for recurring meeting detection)
 - `OnlineMeetings.Read` - Read meeting details
 - `OnlineMeetingTranscript.Read.All` - Read transcripts (admin consent required)
 - `offline_access` - Obtain refresh tokens
