@@ -165,7 +165,7 @@ export class TranscriptCreatedService {
       .then(CalendarEventCollection.parseAsync);
 
     const calendarEvent = calendarEvents.value.find(
-      (e) => e.onlineMeeting?.joinUrl === meeting.joinWebUrl.href,
+      (e) => e.onlineMeeting?.joinUrl.href === meeting.joinWebUrl.href,
     );
     const isRecurring =
       calendarEvent?.type === 'occurrence' ||

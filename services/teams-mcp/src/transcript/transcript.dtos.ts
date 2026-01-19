@@ -357,7 +357,7 @@ export const CalendarEvent = z.object({
   seriesMasterId: z.string().nullish(),
   onlineMeeting: z
     .object({
-      joinUrl: z.string(),
+      joinUrl: stringToURL(),
     })
     .nullish(),
 });
