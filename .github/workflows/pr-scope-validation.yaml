@@ -1,0 +1,112 @@
+name: PR Scope Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+    branches:
+      - main
+
+jobs:
+  validate-scope:
+    runs-on: ubuntu-latest
+    name: Validate PR scope matches changed files
+    # Skip bot PRs (release-please, dependabot, etc.)
+    if: ${{ !contains(fromJson('["github-actions[bot]", "release-please[bot]", "dependabot[bot]"]'), github.event.pull_request.user.login) }}
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Validate scope matches files
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const prTitle = context.payload.pull_request.title;
+            const prNumber = context.payload.pull_request.number;
+
+            // Extract scope(s) from PR title
+            // Matches: type(scope): message or type(scope1,scope2): message
+            const scopeMatch = prTitle.match(/^\w+\(([^)]+)\):/);
+            const scopes = scopeMatch
+              ? scopeMatch[1].split(',').map(s => s.trim())
+              : [];
+
+            console.log(`PR #${prNumber}: "${prTitle}"`);
+            console.log(`Extracted scopes: [${scopes.join(', ')}]`);
+
+            // Get all changed files in the PR
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100
+            });
+
+            const changedFiles = files.map(f => f.filename);
+            console.log(`Changed files (${changedFiles.length}):`);
+            changedFiles.forEach(f => console.log(`  - ${f}`));
+
+            // Determine required scope from file path
+            function getRequiredScope(filePath) {
+              // Check services directory
+              const serviceMatch = filePath.match(/^services\/([^/]+)\//);
+              if (serviceMatch) {
+                return serviceMatch[1];
+              }
+
+              // Check packages directory
+              const packageMatch = filePath.match(/^packages\/([^/]+)\//);
+              if (packageMatch) {
+                return packageMatch[1];
+              }
+
+              // Root-level files don't require a specific scope
+              return null;
+            }
+
+            // Validate each file
+            const errors = [];
+            const requiredScopes = new Set();
+
+            for (const file of changedFiles) {
+              const requiredScope = getRequiredScope(file);
+
+              if (requiredScope) {
+                requiredScopes.add(requiredScope);
+
+                if (!scopes.includes(requiredScope)) {
+                  errors.push({
+                    file,
+                    requiredScope,
+                    message: `File "${file}" requires scope "${requiredScope}" but PR title has scopes: [${scopes.join(', ') || 'none'}]`
+                  });
+                }
+              }
+            }
+
+            // Report results
+            if (errors.length > 0) {
+              console.log('\n--- VALIDATION FAILED ---\n');
+              console.log('The following files require scopes not present in the PR title:\n');
+
+              for (const error of errors) {
+                console.log(`  ${error.file}`);
+                console.log(`    Required scope: ${error.requiredScope}\n`);
+              }
+
+              const missingScopes = [...new Set(errors.map(e => e.requiredScope))];
+              console.log(`\nMissing scopes: [${missingScopes.join(', ')}]`);
+              console.log(`Current scopes: [${scopes.join(', ') || 'none'}]`);
+
+              if (scopes.length === 0) {
+                console.log(`\nSuggested PR title format:`);
+                console.log(`  type(${[...requiredScopes].join(',')}): your message`);
+              } else {
+                const allScopes = [...new Set([...scopes, ...missingScopes])];
+                console.log(`\nSuggested PR title format:`);
+                console.log(`  type(${allScopes.join(',')}): your message`);
+              }
+
+              core.setFailed(`PR scope validation failed. Missing scopes: [${missingScopes.join(', ')}]`);
+            } else {
+              console.log('\n--- VALIDATION PASSED ---');
+              console.log(`All ${changedFiles.length} files match the PR scope(s): [${scopes.join(', ') || 'root-only'}]`);
+            }
