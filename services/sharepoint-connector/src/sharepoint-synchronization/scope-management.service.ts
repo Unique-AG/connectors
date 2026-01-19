@@ -242,7 +242,8 @@ export class ScopeManagementService {
     // We're adding two cases that are special - the root scope that we want to have explicitly
     // marked as site root and site pages that is a special colection we fetch for ASPX pages,
     // but has no folders.
-    pathToExternalIdMap[context.rootPath] = `${EXTERNAL_ID_PREFIX}root-${Date.now()}`;
+    pathToExternalIdMap[context.rootPath] =
+      `${EXTERNAL_ID_PREFIX}root-${context.siteConfig.siteId}-${Date.now()}`;
     pathToExternalIdMap[`${context.rootPath}/SitePages`] =
       `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId}/sitePages`;
 
