@@ -35,72 +35,55 @@ export function buildIngestionItemKey(sharepointContentItem: AnySharepointItem):
   return `${sharepointContentItem.siteId}/${sharepointContentItem.item.id}`;
 }
 
-// Gets SharePoint URL and returns the relative unique path like without context of the root scope
-// Example 1:
-// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf
-// returns
-// /TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf
-// Example 2:
-// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files
-// returns
-// /TestTeamSite/Shared%20Documents/lorand%27s%20files
-function getRelativeUniquePathFromUrl(url: string, siteName?: string): string {
+/**
+ * Extracts a relative path from a SharePoint URL.
+ *
+ * We always strip the site segment (the first segment after /sites/) from the path
+ * to avoid redundant nesting, as we already ingest into site-specific root scopes.
+ */
+function getRelativeUniquePathFromUrl(url: string): string {
   const urlObj = new URL(url);
   const pathName = decodeURIComponent(urlObj.pathname);
 
-  // Path start with /sites/ and we don't want to include it in the path
-  let relativePath = normalizeSlashes(pathName.replace(/\/sites\//, '/'));
+  // SharePoint paths typically look like /sites/SiteName/Library/Folder/File
+  // We normalize to SiteName/Library/Folder/File
+  const normalizedPath = normalizeSlashes(pathName.replace(/\/sites\//, '/'));
+  const segments = normalizedPath.split('/').filter(Boolean);
 
-  if (siteName) {
-    const segments = relativePath.split('/');
-    // We remove the first segment (expected to be site name) to avoid redundant nesting
-    // because we already ingest into a site-specific root scope.
-    segments.shift();
-    relativePath = segments.join('/');
-  }
+  // Remove the first segment (site name) to avoid redundant nesting
+  segments.shift();
 
-  return `/${normalizeSlashes(relativePath)}`;
+  const relativePath = segments.join('/');
+  return relativePath ? `/${relativePath}` : '/';
 }
 
-// Gets SharePoint URL and returns the relative unique parent path like without context of the root scope
-// Example 1:
-// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf
-// returns
-// /TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf
-// Example 2:
-// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files
-// returns
-// /TestTeamSite/Shared%20Documents
-function getRelativeUniqueParentPathFromUrl(url: string, siteName?: string): string {
-  const uniqueItemPath = getRelativeUniquePathFromUrl(url, siteName);
+/**
+ * Extracts the relative parent path from a SharePoint URL.
+ */
+function getRelativeUniqueParentPathFromUrl(url: string): string {
+  const uniqueItemPath = getRelativeUniquePathFromUrl(url);
   const lastSlashIndex = uniqueItemPath.lastIndexOf('/');
-  if (lastSlashIndex !== -1) {
+
+  // If the path is just "/" or "/Segment", the parent is the root "" (relative to rootPath)
+  if (lastSlashIndex > 0) {
     return uniqueItemPath.substring(0, lastSlashIndex);
   }
   // This case shouldn't really happen because the path will always at least have {site}/{drive}
   return '';
 }
 
-export function getUniquePathFromItem(
-  item: AnySharepointItem,
-  rootPath: string,
-  siteName?: string,
-): string {
+export function getUniquePathFromItem(item: AnySharepointItem, rootPath: string): string {
   assert.ok(rootPath, 'rootPath cannot be empty');
   const fileUrl = extractFileUrl(item);
-  const uniquePath = getRelativeUniquePathFromUrl(fileUrl, siteName);
+  const uniquePath = getRelativeUniquePathFromUrl(fileUrl);
 
   return `/${normalizeSlashes(rootPath)}${uniquePath}`;
 }
 
-export function getUniqueParentPathFromItem(
-  item: AnySharepointItem,
-  rootPath: string,
-  siteName?: string,
-): string {
+export function getUniqueParentPathFromItem(item: AnySharepointItem, rootPath: string): string {
   assert.ok(rootPath, 'rootPath cannot be empty');
   const fileUrl = extractFileUrl(item);
-  const uniqueParentPath = getRelativeUniqueParentPathFromUrl(fileUrl, siteName);
+  const uniqueParentPath = getRelativeUniqueParentPathFromUrl(fileUrl);
 
   return `/${normalizeSlashes(rootPath)}${uniqueParentPath}`;
 }

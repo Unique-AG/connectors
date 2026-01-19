@@ -11,3 +11,5 @@ export const globalConfig: ViteUserConfig = {
   },
   plugins: [swc.vite({ module: { type: 'es6' } })],
 };
+
+export default globalConfig;

@@ -72,7 +72,6 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const sharePointDirectoriesPathMap = this.getSharePointDirectoriesPathMap(
       sharePoint.directories,
       rootPath,
-      context.siteName,
     );
 
     const uniqueFoldersToProcess = unique.folders.filter(
@@ -147,11 +146,8 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   private getSharePointDirectoriesPathMap(
     directories: SharepointDirectoryItem[],
     rootPath: string,
-    siteName: string,
   ): Record<string, SharepointDirectoryItem> {
-    return indexBy(directories, (directory) =>
-      getUniquePathFromItem(directory, rootPath, siteName),
-    );
+    return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootPath));
   }
 
   private isTopFolder(path: string, rootPath: string): boolean {
