@@ -53,11 +53,9 @@ function getRelativeUniquePathFromUrl(url: string, siteName?: string): string {
 
   if (siteName) {
     const segments = relativePath.split('/');
-    // We remove the site name segment to avoid redundant nesting (e.g., /SiteName/SiteName/...)
+    // We remove the first segment (expected to be site name) to avoid redundant nesting
     // because we already ingest into a site-specific root scope.
-    if (segments[0] === siteName) {
-      segments.shift();
-    }
+    segments.shift();
     relativePath = segments.join('/');
   }
 
