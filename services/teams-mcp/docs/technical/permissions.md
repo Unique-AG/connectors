@@ -8,6 +8,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | Permission | Type | ID | Admin Consent | Required |
 |------------|------|-----|---------------|----------|
 | `User.Read` | Delegated | `e1fe6dd8-ba31-4d61-89e7-88639da4683d` | No | Yes |
+| `Calendars.Read` | Delegated | `465a38f9-76ea-45b9-9f34-9e8b0d4b0b42` | No | Yes |
 | `OnlineMeetings.Read` | Delegated | `9be106e1-f4e3-4df5-bdff-e4bc531cbe43` | No | Yes |
 | `OnlineMeetingTranscript.Read.All` | Delegated | `30b87d18-ebb1-45db-97f8-82ccb1f0190c` | Yes | Yes |
 | `OnlineMeetingRecording.Read.All` | Delegated | `190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3` | Yes | No |
@@ -49,6 +50,15 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Used For** | Identifying the user when storing tokens and creating subscriptions |
 | **Why Not Less** | This is the minimum permission to read any user data |
 | **Why Not `User.ReadBasic.All`** | That permission reads other users; we only need the signed-in user |
+
+### `Calendars.Read`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Read the user's calendar events |
+| **Used For** | Determining if a meeting is recurring by querying the calendar event associated with an online meeting |
+| **Why Not Less** | No narrower permission exists for reading calendar events |
+| **Why Not `Calendars.ReadWrite`** | We don't create or modify calendar events, only read them |
 
 ### `OnlineMeetings.Read`
 
@@ -132,6 +142,7 @@ Application permissions would require tenant administrators to pre-configure acc
 ## Permission Reference Links
 
 - [Microsoft Graph Permissions Reference](https://learn.microsoft.com/en-us/graph/permissions-reference) - Official Microsoft documentation
+- [Calendars.Read](https://graphpermissions.merill.net/permission/Calendars.Read) - Third-party permission explorer
 - [OnlineMeetingTranscript.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingTranscript.Read.All) - Third-party permission explorer
 - [OnlineMeetingRecording.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingRecording.Read.All) - Third-party permission explorer
 - [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Graph API overview
