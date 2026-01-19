@@ -45,15 +45,10 @@ function getRelativeUniquePathFromUrl(url: string): string {
   const urlObj = new URL(url);
   const pathName = decodeURIComponent(urlObj.pathname);
 
-  // SharePoint paths typically look like /sites/SiteName/Library/Folder/File
-  // We normalize to SiteName/Library/Folder/File
-  const normalizedPath = normalizeSlashes(pathName.replace(/\/sites\//, '/'));
-  const segments = normalizedPath.split('/').filter(Boolean);
-
-  // Remove the first segment (site name) to avoid redundant nesting
-  segments.shift();
-
-  const relativePath = segments.join('/');
+  // SharePoint paths look like /sites/SiteName/Library/Folder/File
+  const segments = normalizeSlashes(pathName).split('/').filter(Boolean);
+  // We remove the first two segments ('sites' and 'SiteName') to avoid redundant nesting, as we already ingest into site-specific root scopes.
+  const relativePath = segments.slice(2).join('/');
   return relativePath ? `/${relativePath}` : '/';
 }
 
