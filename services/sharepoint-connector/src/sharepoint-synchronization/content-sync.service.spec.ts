@@ -7,10 +7,15 @@ import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-p
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
-import type { SharepointSyncContext } from './types';
+import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
+
+const mockSiteConfig = createMockSiteConfig({
+  maxFilesToIngest: 1000,
+});
 
 describe('ContentSyncService', () => {
   let service: ContentSyncService;
@@ -87,7 +92,6 @@ describe('ContentSyncService', () => {
 
   describe('syncContentForSite', () => {
     it('throws an error if the number of files to ingest exceeds the limit', async () => {
-      const siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -109,10 +113,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -122,20 +125,17 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 1;
-        }
-        return null;
-      });
+      const contextWithLimit = {
+        ...context,
+        siteConfig: { ...context.siteConfig, maxFilesToIngest: 1 },
+      };
 
-      await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
+      await expect(service.syncContentForSite(items, scopes, contextWithLimit)).rejects.toThrow(
         /Too many files to ingest: 2. Limit is 1. Aborting sync./,
       );
     });
 
     it('does not throw an error if the number of files to ingest is within the limit', async () => {
-      const siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -149,10 +149,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -162,21 +161,17 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
-        if (key === 'unique.scopeId') {
-          return 'scope-id';
-        }
-        return null;
-      });
+      const contextWithLimit = {
+        ...context,
+        siteConfig: { ...context.siteConfig, maxFilesToIngest: 2 },
+      };
 
-      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
+      await expect(
+        service.syncContentForSite(items, scopes, contextWithLimit),
+      ).resolves.not.toThrow();
     });
 
     it('does not throw an error if the limit is not set', async () => {
-      const siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -190,10 +185,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -201,23 +195,12 @@ describe('ContentSyncService', () => {
         updatedFiles: [],
         movedFiles: [],
         deletedFiles: [],
-      });
-
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return undefined;
-        }
-        if (key === 'unique.scopeId') {
-          return 'scope-id';
-        }
-        return null;
       });
 
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
     it('does not throw an error when no files need to be ingested', async () => {
-      const siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -231,10 +214,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -256,10 +238,7 @@ describe('ContentSyncService', () => {
 
       vi.spyOn(uniqueFilesService, 'getFilesCountForSite').mockResolvedValue(5);
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 1;
-        }
+      vi.spyOn(configService, 'get').mockImplementation((_key: string) => {
         return null;
       });
 
@@ -267,7 +246,6 @@ describe('ContentSyncService', () => {
     });
 
     it('does not throw an error when total files to ingest equals the limit', async () => {
-      const siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -281,10 +259,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -295,9 +272,6 @@ describe('ContentSyncService', () => {
       });
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 1;
-        }
         if (key === 'unique.scopeId') {
           return 'scope-id';
         }
@@ -308,7 +282,6 @@ describe('ContentSyncService', () => {
     });
 
     it('throws an error with correct message format when limit is exceeded', async () => {
-      const siteId = 'test-site-123';
       const items = [
         {
           itemType: 'driveItem',
@@ -338,10 +311,14 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: {
+          ...mockSiteConfig,
+          siteId: 'test-site-123',
+          scopeId: 'scope-id',
+          maxFilesToIngest: 2,
+        },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -351,10 +328,7 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
+      vi.spyOn(configService, 'get').mockImplementation((_key: string) => {
         return null;
       });
 
@@ -364,7 +338,6 @@ describe('ContentSyncService', () => {
     });
 
     it('handles limit validation with only new files', async () => {
-      const siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -386,10 +359,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -400,9 +372,6 @@ describe('ContentSyncService', () => {
       });
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
         if (key === 'unique.scopeId') {
           return 'scope-id';
         }
@@ -413,7 +382,6 @@ describe('ContentSyncService', () => {
     });
 
     it('handles limit validation with only updated files', async () => {
-      const siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -435,10 +403,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -449,9 +416,6 @@ describe('ContentSyncService', () => {
       });
 
       vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.maxIngestedFiles') {
-          return 2;
-        }
         if (key === 'unique.scopeId') {
           return 'scope-id';
         }
@@ -462,7 +426,6 @@ describe('ContentSyncService', () => {
     });
 
     it('throws an error when file diff would delete all files in Unique', async () => {
-      const siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -484,10 +447,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -507,15 +469,13 @@ describe('ContentSyncService', () => {
     });
 
     it('throws an error when 0 files are submitted but file diff indicates deletions', async () => {
-      const siteId = 'site-id';
       const items = [] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -533,7 +493,6 @@ describe('ContentSyncService', () => {
     });
 
     it('does not throw an error when partial deletions occur', async () => {
-      const siteId = 'site-id';
       const items = [
         {
           itemType: 'driveItem',
@@ -547,10 +506,9 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -578,15 +536,13 @@ describe('ContentSyncService', () => {
     });
 
     it('does not throw an error for empty site with no deleted files', async () => {
-      const siteId = 'site-id';
       const items = [] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootScopeId: 'scope-id',
         rootPath: '/root',
-        siteId,
         siteName: 'test-site',
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({

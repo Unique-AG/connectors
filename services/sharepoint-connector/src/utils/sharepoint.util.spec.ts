@@ -69,14 +69,14 @@ function createDirectoryItem(webUrl: string): AnySharepointItem {
 }
 
 describe('getUniqueParentPathFromItem', () => {
-  it('returns parent path for driveItem with listItem.webUrl', () => {
+  it('returns parent path for driveItem with listItem.webUrl and strips siteName', () => {
     const item = createDriveItem(
       'https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf',
     );
 
     const result = getUniqueParentPathFromItem(item, 'MyScope');
 
-    expect(result).toBe("/MyScope/TestTeamSite/Shared Documents/lorand's files/acer-pdf");
+    expect(result).toBe("/MyScope/Shared Documents/lorand's files/acer-pdf");
   });
 
   it('returns parent path for driveItem falling back to item.webUrl when listItem.webUrl is missing', () => {
@@ -87,7 +87,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, 'EngineeringScope');
 
-    expect(result).toBe('/EngineeringScope/Engineering/Documents/project/docs');
+    expect(result).toBe('/EngineeringScope/Documents/project/docs');
   });
 
   it('returns parent path for listItem', () => {
@@ -97,7 +97,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, 'MarketingScope');
 
-    expect(result).toBe('/MarketingScope/Marketing/SitePages');
+    expect(result).toBe('/MarketingScope/SitePages');
   });
 
   it('returns parent path for directory item', () => {
@@ -107,17 +107,17 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, 'TeamScope');
 
-    expect(result).toBe('/TeamScope/Team/Shared Documents/2024');
+    expect(result).toBe('/TeamScope/Shared Documents/2024');
   });
 
-  it('handles root-level item returning site and drive path', () => {
+  it('handles root-level item returning drive path', () => {
     const item = createDriveItem(
       'https://company.sharepoint.com/sites/Project/Documents/root-file.pdf',
     );
 
     const result = getUniqueParentPathFromItem(item, 'ProjectScope');
 
-    expect(result).toBe('/ProjectScope/Project/Documents');
+    expect(result).toBe('/ProjectScope/Documents');
   });
 
   it('handles URLs with special characters and encoding', () => {
@@ -127,7 +127,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, 'TestScope');
 
-    expect(result).toBe('/TestScope/TestSite/Shared Documents/folder with spaces/sub-folder');
+    expect(result).toBe('/TestScope/Shared Documents/folder with spaces/sub-folder');
   });
 
   it('throws error when rootScopeName is empty', () => {
@@ -145,7 +145,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, 'DeepScope');
 
-    expect(result).toBe('/DeepScope/DeepSite/Documents/level1/level2/level3/level4');
+    expect(result).toBe('/DeepScope/Documents/level1/level2/level3/level4');
   });
 
   it('handles rootPath with trailing slash', () => {
@@ -153,7 +153,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, 'ProjectScope/');
 
-    expect(result).toBe('/ProjectScope/Project/Documents');
+    expect(result).toBe('/ProjectScope/Documents');
   });
 
   it('handles rootPath with leading slash', () => {
@@ -161,7 +161,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, '/ProjectScope');
 
-    expect(result).toBe('/ProjectScope/Project/Documents');
+    expect(result).toBe('/ProjectScope/Documents');
   });
 
   it('handles rootPath with both leading and trailing slashes', () => {
@@ -169,7 +169,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, '/ProjectScope/');
 
-    expect(result).toBe('/ProjectScope/Project/Documents');
+    expect(result).toBe('/ProjectScope/Documents');
   });
 
   it('handles rootPath with multiple consecutive slashes', () => {
@@ -177,7 +177,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, 'Project//Scope');
 
-    expect(result).toBe('/Project/Scope/Project/Documents');
+    expect(result).toBe('/Project/Scope/Documents');
   });
 
   it('handles rootPath with multiple slashes at start and end', () => {
@@ -185,7 +185,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, '///ProjectScope///');
 
-    expect(result).toBe('/ProjectScope/Project/Documents');
+    expect(result).toBe('/ProjectScope/Documents');
   });
 
   it('handles rootPath with multiple slashes in the middle', () => {
@@ -193,7 +193,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, 'Project///Scope//Test');
 
-    expect(result).toBe('/Project/Scope/Test/Project/Documents');
+    expect(result).toBe('/Project/Scope/Test/Documents');
   });
 });
 
@@ -206,7 +206,7 @@ describe('getUniquePathFromItem', () => {
     const result = getUniquePathFromItem(item, 'MyScope');
 
     expect(result).toBe(
-      "/MyScope/TestTeamSite/Shared Documents/lorand's files/acer-pdf/Extensa 5635_5635g_5635z_5635zg_5235 (ba50_mv).pdf",
+      "/MyScope/Shared Documents/lorand's files/acer-pdf/Extensa 5635_5635g_5635z_5635zg_5235 (ba50_mv).pdf",
     );
   });
 
@@ -218,7 +218,7 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, 'EngineeringScope');
 
-    expect(result).toBe('/EngineeringScope/Engineering/Documents/project/docs/readme.pdf');
+    expect(result).toBe('/EngineeringScope/Documents/project/docs/readme.pdf');
   });
 
   it('returns full path for listItem', () => {
@@ -228,7 +228,7 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, 'MarketingScope');
 
-    expect(result).toBe('/MarketingScope/Marketing/SitePages/article.aspx');
+    expect(result).toBe('/MarketingScope/SitePages/article.aspx');
   });
 
   it('returns full path for directory item', () => {
@@ -238,17 +238,17 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, 'TeamScope');
 
-    expect(result).toBe('/TeamScope/Team/Shared Documents/2024/Q1');
+    expect(result).toBe('/TeamScope/Shared Documents/2024/Q1');
   });
 
-  it('handles root-level item returning site and drive path with filename', () => {
+  it('handles root-level item returning drive path with filename', () => {
     const item = createDriveItem(
       'https://company.sharepoint.com/sites/Project/Documents/root-file.pdf',
     );
 
     const result = getUniquePathFromItem(item, 'ProjectScope');
 
-    expect(result).toBe('/ProjectScope/Project/Documents/root-file.pdf');
+    expect(result).toBe('/ProjectScope/Documents/root-file.pdf');
   });
 
   it('handles URLs with special characters and encoding', () => {
@@ -258,9 +258,7 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, 'TestScope');
 
-    expect(result).toBe(
-      '/TestScope/TestSite/Shared Documents/folder with spaces/sub-folder/file (1).pdf',
-    );
+    expect(result).toBe('/TestScope/Shared Documents/folder with spaces/sub-folder/file (1).pdf');
   });
 
   it('throws error when rootScopeName is empty', () => {
@@ -278,7 +276,7 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, 'DeepScope');
 
-    expect(result).toBe('/DeepScope/DeepSite/Documents/level1/level2/level3/level4/deep-file.pdf');
+    expect(result).toBe('/DeepScope/Documents/level1/level2/level3/level4/deep-file.pdf');
   });
 
   it('handles rootPath with trailing slash', () => {
@@ -286,7 +284,7 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, 'ProjectScope/');
 
-    expect(result).toBe('/ProjectScope/Project/Documents/file.pdf');
+    expect(result).toBe('/ProjectScope/Documents/file.pdf');
   });
 
   it('handles rootPath with leading slash', () => {
@@ -294,7 +292,7 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, '/ProjectScope');
 
-    expect(result).toBe('/ProjectScope/Project/Documents/file.pdf');
+    expect(result).toBe('/ProjectScope/Documents/file.pdf');
   });
 
   it('handles rootPath with both leading and trailing slashes', () => {
@@ -302,7 +300,7 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, '/ProjectScope/');
 
-    expect(result).toBe('/ProjectScope/Project/Documents/file.pdf');
+    expect(result).toBe('/ProjectScope/Documents/file.pdf');
   });
 
   it('handles rootPath with multiple consecutive slashes', () => {
@@ -310,7 +308,7 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, 'Project//Scope');
 
-    expect(result).toBe('/Project/Scope/Project/Documents/file.pdf');
+    expect(result).toBe('/Project/Scope/Documents/file.pdf');
   });
 
   it('handles rootPath with multiple slashes at start and end', () => {
@@ -318,7 +316,7 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, '///ProjectScope///');
 
-    expect(result).toBe('/ProjectScope/Project/Documents/file.pdf');
+    expect(result).toBe('/ProjectScope/Documents/file.pdf');
   });
 
   it('handles rootPath with multiple slashes in the middle', () => {
@@ -326,6 +324,6 @@ describe('getUniquePathFromItem', () => {
 
     const result = getUniquePathFromItem(item, 'Project///Scope//Test');
 
-    expect(result).toBe('/Project/Scope/Test/Project/Documents/file.pdf');
+    expect(result).toBe('/Project/Scope/Test/Documents/file.pdf');
   });
 });

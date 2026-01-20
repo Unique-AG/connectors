@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileFilterService } from './file-filter.service';
 import { GraphApiService } from './graph-api.service';
 import { GraphClientFactory } from './graph-client.factory';
-import type { DriveItem } from './types/sharepoint.types';
+import type { DriveItem, ListColumn, ListItem } from './types/sharepoint.types';
 import type { SharepointContentItem } from './types/sharepoint-content-item.interface';
 
 describe('GraphApiService', () => {
@@ -27,11 +27,13 @@ describe('GraphApiService', () => {
       get: vi.fn(),
       select: vi.fn(),
       expand: vi.fn(),
+      top: vi.fn(),
       getStream: vi.fn(),
     };
 
     mockChain.select.mockReturnValue(mockChain);
     mockChain.expand.mockReturnValue(mockChain);
+    mockChain.top.mockReturnValue(mockChain);
     mockGraphClient.api.mockReturnValue(mockChain);
 
     // Mock get() calls based on the API endpoint
@@ -70,7 +72,7 @@ describe('GraphApiService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.graphApiRateLimitPerMinute') return 10000;
+          if (key === 'sharepoint.graphApiRateLimitPerMinuteThousands') return 10;
           if (key === 'processing.maxFileSizeBytes') return 10485760;
           if (key === 'processing.maxFilesToScan') return maxFilesToScanConfig;
           return undefined;
@@ -90,6 +92,34 @@ describe('GraphApiService', () => {
         return requestFn();
       },
     );
+  });
+
+  describe('getListColumns', () => {
+    it('successfully fetches list columns', async () => {
+      const mockColumns: ListColumn[] = [
+        { id: '1', name: 'Title', displayName: 'Title' },
+        { id: '2', name: 'Created', displayName: 'Created' },
+      ];
+
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).paginateGraphApiRequest = vi.fn().mockResolvedValue(mockColumns);
+
+      const result = await service.getListColumns('site-1', 'list-1');
+
+      expect(result).toEqual(mockColumns);
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method call
+      expect((service as any).paginateGraphApiRequest).toHaveBeenCalledWith(
+        '/sites/site-1/lists/list-1/columns',
+        expect.any(Function),
+      );
+    });
+
+    it('throws error when fetching columns fails', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).paginateGraphApiRequest = vi.fn().mockRejectedValue(new Error('API Error'));
+
+      await expect(service.getListColumns('site-1', 'list-1')).rejects.toThrow('API Error');
+    });
   });
 
   describe('getAllFilesAndPagesForSite', () => {
@@ -182,12 +212,12 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
     });
 
     it('skips drives without IDs', async () => {
@@ -197,12 +227,12 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
     });
 
     it('handles pagination correctly', async () => {
@@ -219,12 +249,12 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(2);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
     });
 
     it('filters out non-syncable files', async () => {
@@ -238,7 +268,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(0);
       expect(result.directories).toHaveLength(0);
@@ -251,12 +281,12 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
     });
 
     it('counts total files vs syncable files', async () => {
@@ -272,7 +302,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1');
+      const result = await service.getAllSiteItems('site-1', 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
@@ -305,14 +335,22 @@ describe('GraphApiService', () => {
         createdDateTime: '2024-01-02T00:00:00Z',
       };
 
-      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing limit
-      (service as any).paginateGraphApiRequest = vi.fn().mockResolvedValue([firstItem, secondItem]);
+      vi.spyOn(service, 'getListItems').mockResolvedValue([
+        firstItem,
+        secondItem,
+      ] as unknown as ListItem[]);
       maxFilesToScanConfig = 1;
 
-      const result = await service.getAspxListItems('site-1', 'list-1', maxFilesToScanConfig);
+      const result = await service.getAspxListItems(
+        'site-1',
+        'list-1',
+        'FinanceGPTKnowledge',
+        maxFilesToScanConfig,
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0]?.fileName).toBe('Page 1');
+      expect(service.getListItems).toHaveBeenCalled();
     });
   });
 

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import pLimit from 'p-limit';
 import { Config } from '../config';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import type { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 
@@ -27,7 +27,8 @@ export class ItemProcessingOrchestratorService {
   ): Promise<void> {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(syncContext.siteId) : syncContext.siteId}]`;
+    const { siteId } = syncContext.siteConfig;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
 
     if (newItems.length === 0 && updatedItems.length === 0) {
       this.logger.log(`${logPrefix} No items to process`);

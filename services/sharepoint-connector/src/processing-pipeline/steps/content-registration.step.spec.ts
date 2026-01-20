@@ -6,6 +6,7 @@ import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
+import { createMockSiteConfig } from '../../utils/test-utils/mock-site-config';
 import type { ProcessingContext } from '../types/processing-context';
 import { ContentRegistrationStep } from './content-registration.step';
 
@@ -38,19 +39,18 @@ describe('ContentRegistrationStep', () => {
   });
 
   const createMockContext = (): ProcessingContext => ({
+    syncContext: {
+      siteConfig: createMockSiteConfig(),
+      siteName: 'test-site',
+      serviceUserId: 'user-1',
+      rootPath: '/Root',
+    },
     correlationId: 'c1',
     startTime: new Date(),
     knowledgeBaseUrl: 'https://contoso.sharepoint.com/sites/Engineering/file.pdf',
     mimeType: 'application/pdf',
-    scopeId: 'scope-1',
+    targetScopeId: 'scope-1',
     fileStatus: 'new',
-    syncContext: {
-      serviceUserId: 'user-1',
-      rootScopeId: 'root-scope-1',
-      rootPath: '/Root',
-      siteId: 'site',
-      siteName: 'test-site',
-    },
     pipelineItem: {
       itemType: 'listItem',
       item: createMockListItem(),
@@ -188,8 +188,6 @@ describe('ContentRegistrationStep', () => {
           if (k === 'unique.scopeId') return 'scope-1';
           if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
           if (k === 'unique.serviceAuthMode') return 'external';
-          if (k === 'unique.inheritFilePermissions') return false;
-          if (k === 'processing.syncMode') return 'content_only';
           return undefined;
         }),
       }))
@@ -198,7 +196,13 @@ describe('ContentRegistrationStep', () => {
       .compile();
 
     const context = createMockContext();
+    const updatedSiteConfig = createMockSiteConfig({
+      syncMode: 'content_only',
+      permissionsInheritanceMode: 'inherit_scopes', // inheritScopes: true, inheritFiles: false
+    });
+    context.syncContext.siteConfig = updatedSiteConfig;
     context.fileStatus = 'new';
+    context.syncContext.serviceUserId = 'user-1';
 
     await unit.execute(context);
 

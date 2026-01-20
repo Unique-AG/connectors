@@ -10,8 +10,11 @@ import {
   ADD_ACCESSES_MUTATION,
   AddAccessesMutationInput,
   AddAccessesMutationResult,
+  CONTENT_DELETE_BY_IDS_MUTATION,
   CONTENT_DELETE_MUTATION,
   CONTENT_UPDATE_MUTATION,
+  ContentDeleteByContentIdsMutationInput,
+  ContentDeleteByContentIdsMutationResult,
   ContentDeleteMutationInput,
   ContentDeleteMutationResult,
   ContentUpdateMutationInput,
@@ -28,7 +31,8 @@ import {
 } from './unique-files.consts';
 import { UniqueFile, UniqueFileAccessInput } from './unique-files.types';
 
-const BATCH_SIZE = 100;
+const CONTENT_BATCH_SIZE = 100;
+const DELETE_BATCH_SIZE = 20;
 
 // We decide for this batch size because on the Unique side, for each permission requested we make a
 // concurrent call to node-ingestion and further to Zitadel, so we want to avoid overwhelming the
@@ -80,6 +84,56 @@ export class UniqueFilesService {
     return result.contentDelete;
   }
 
+  public async deleteFilesBySiteId(siteId: string): Promise<number> {
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    this.logger.log(`${logPrefix} Starting iterative file deletion`);
+
+    let totalDeleted = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const batchResult = await this.ingestionClient.request<
+        PaginatedContentQueryResult,
+        PaginatedContentQueryInput
+      >(PAGINATED_CONTENT_QUERY, {
+        skip: 0,
+        take: CONTENT_BATCH_SIZE,
+        where: {
+          key: {
+            startsWith: `${siteId}/`,
+          },
+        },
+      });
+
+      const fileIds = batchResult.paginatedContent.nodes.map((f) => f.id);
+
+      if (fileIds.length === 0) {
+        hasMore = false;
+        continue;
+      }
+
+      const deleteBatches = chunk(fileIds, DELETE_BATCH_SIZE);
+      for (const deleteBatch of deleteBatches) {
+        await this.ingestionClient.request<
+          ContentDeleteByContentIdsMutationResult,
+          ContentDeleteByContentIdsMutationInput
+        >(CONTENT_DELETE_BY_IDS_MUTATION, {
+          contentIds: deleteBatch,
+        });
+
+        totalDeleted += deleteBatch.length;
+        this.logger.debug(
+          `${logPrefix} Deleted batch of ${deleteBatch.length} files (Total: ${totalDeleted})`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `${logPrefix} Iterative file deletion completed. Total deleted: ${totalDeleted}`,
+    );
+    return totalDeleted;
+  }
+
   public async getFilesByKeys(keys: string[]): Promise<UniqueFile[]> {
     if (keys.length === 0) {
       return [];
@@ -95,7 +149,7 @@ export class UniqueFilesService {
         PaginatedContentQueryInput
       >(PAGINATED_CONTENT_QUERY, {
         skip,
-        take: BATCH_SIZE,
+        take: CONTENT_BATCH_SIZE,
         where: {
           key: {
             in: keys,
@@ -104,8 +158,8 @@ export class UniqueFilesService {
       });
       files.push(...batchResult.paginatedContent.nodes);
       batchCount = batchResult.paginatedContent.nodes.length;
-      skip += BATCH_SIZE;
-    } while (batchCount === BATCH_SIZE);
+      skip += CONTENT_BATCH_SIZE;
+    } while (batchCount === CONTENT_BATCH_SIZE);
 
     return files;
   }
@@ -124,7 +178,7 @@ export class UniqueFilesService {
         PaginatedContentQueryInput
       >(PAGINATED_CONTENT_QUERY, {
         skip,
-        take: BATCH_SIZE,
+        take: CONTENT_BATCH_SIZE,
         where: {
           key: {
             startsWith: `${siteId}/`,
@@ -133,8 +187,8 @@ export class UniqueFilesService {
       });
       files.push(...batchResult.paginatedContent.nodes);
       batchCount = batchResult.paginatedContent.nodes.length;
-      skip += BATCH_SIZE;
-    } while (batchCount === BATCH_SIZE);
+      skip += CONTENT_BATCH_SIZE;
+    } while (batchCount === CONTENT_BATCH_SIZE);
 
     return files;
   }

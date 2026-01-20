@@ -237,7 +237,12 @@
         "sharepoint": {
           "type": "object",
           "description": "SharePoint configuration",
-          "required": ["tenantId", "baseUrl", "siteIds", "syncColumnName", "auth", "graph"],
+          "required": [
+            "tenantId",
+            "baseUrl",
+            "sitesSource",
+            "auth"
+          ],
           "properties": {
             "tenantId": {
               "type": "string",
@@ -249,24 +254,131 @@
               "description": "SharePoint base URL",
               "examples": ["https://contoso.sharepoint.com", "https://my-company.sharepoint.com"]
             },
-            "siteIds": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "examples": ["00000000-0000-0000-0000-000000000000"]
-              },
-              "description": "SharePoint sites list (UUIDs)",
-              "examples": [["00000000-0000-0000-0000-000000000000"]]
-            },
-            "syncColumnName": {
+            "sitesSource": {
               "type": "string",
-              "description": "Column name for synchronization",
-              "examples": ["FinanceGPTKnowledge", "MyCustomColumn"]
+              "enum": [
+                "config_file",
+                "sharepoint_list"
+              ],
+              "description": "Sites source configuration. Determines how sites are configured: from static YAML (config_file) or dynamically from SharePoint list (sharepoint_list)"
+            },
+            "sharepointList": {
+              "type": "object",
+              "description": "SharePoint list details containing site configurations. Only used when sitesSource is 'sharepoint_list'",
+              "required": ["siteId", "listDisplayName"],
+              "properties": {
+                "siteId": {
+                  "type": "string",
+                  "description": "SharePoint site ID containing the configuration list",
+                  "examples": ["00000000-0000-0000-0000-000000000000"]
+                },
+                "listDisplayName": {
+                  "type": "string",
+                  "description": "Display name of the SharePoint configuration list",
+                  "examples": ["SharePoint Sites to Sync"]
+                }
+              },
+              "additionalProperties": false
+            },
+            "sites": {
+              "type": "array",
+              "description": "Array of SharePoint sites to sync with their individual configurations. Only used when sitesSource is 'config_file'",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "siteId",
+                  "syncColumnName",
+                  "ingestionMode",
+                  "scopeId",
+                  "storeInternally",
+                  "syncStatus",
+                  "syncMode"
+                ],
+                "properties": {
+                  "siteId": {
+                    "type": "string",
+                    "description": "SharePoint site ID (UUID)",
+                    "examples": [
+                      "00000000-0000-0000-0000-000000000000"
+                    ]
+                  },
+                  "syncColumnName": {
+                    "type": "string",
+                    "description": "Column name for synchronization in this site",
+                    "examples": [
+                      "FinanceGPTKnowledge",
+                      "HRKnowledge"
+                    ]
+                  },
+                  "ingestionMode": {
+                    "type": "string",
+                    "enum": [
+                      "flat",
+                      "recursive"
+                    ],
+                    "description": "Ingestion mode for this site: flat ingests all files to a single root scope, recursive maintains the folder hierarchy"
+                  },
+                  "scopeId": {
+                    "type": "string",
+                    "description": "Scope ID to be used as root for ingestion for this site",
+                    "examples": [
+                      "scope_bu4gokr0atzj0kfiuaaaaaaa"
+                    ]
+                  },
+                  "maxFilesToIngest": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum number of files to ingest for this site in a single run"
+                  },
+                  "storeInternally": {
+                    "type": "string",
+                    "enum": [
+                      "enabled",
+                      "disabled"
+                    ],
+                    "description": "Whether to store content internally in Unique for this site"
+                  },
+                  "syncStatus": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "inactive",
+                      "deleted"
+                    ],
+                    "description": "Sync status: active = sync normally, inactive = skip, deleted = delete scope recursively"
+                  },
+                  "syncMode": {
+                    "type": "string",
+                    "enum": [
+                      "content_only",
+                      "content_and_permissions"
+                    ],
+                    "description": "Mode of synchronization for this site"
+                  },
+                  "permissionsInheritanceMode": {
+                    "type": "string",
+                    "enum": [
+                      "inherit_scopes_and_files",
+                      "inherit_scopes",
+                      "inherit_files",
+                      "none"
+                    ],
+                    "description": "Inheritance mode for scopes and files. Only used in content_only sync mode; ignored in content_and_permissions mode.",
+                    "default": "inherit_scopes_and_files"
+                  }
+                },
+                "additionalProperties": false
+              }
             },
             "auth": {
               "type": "object",
               "description": "SharePoint authentication configuration",
-              "required": ["mode", "clientId", "privateKeyPath", "thumbprintSha1"],
+              "required": ["mode", "clientId", "privateKeyPath"],
+              "anyOf": [
+                { "required": ["thumbprintSha1"] },
+                { "required": ["thumbprintSha256"] }
+              ],
               "properties": {
                 "mode": {
                   "type": "string",
@@ -291,21 +403,18 @@
                   "type": "string",
                   "description": "SHA1 thumbprint of the Azure AD application certificate",
                   "examples": ["2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"]
+                },
+                "thumbprintSha256": {
+                  "type": "string",
+                  "description": "SHA256 thumbprint of the Azure AD application certificate",
+                  "examples": ["abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"]
                 }
               },
               "additionalProperties": false
             },
-            "graph": {
-              "type": "object",
-              "description": "Microsoft Graph API configuration",
-              "required": [],
-              "properties": {
-                "apiRateLimitPerMinute": {
-                  "type": "integer",
-                  "description": "Rate limiting for Graph API requests per minute"
-                }
-              },
-              "additionalProperties": false
+            "apiRateLimitPerMinuteThousands": {
+              "type": "number",
+              "description": "Rate limiting for Graph API requests per minute (in thousands)"
             }
           },
           "additionalProperties": false
@@ -316,9 +425,7 @@
           "required": [
             "ingestionServiceBaseUrl",
             "scopeManagementServiceBaseUrl",
-            "ingestionMode",
-            "authMode",
-            "scopeId"
+            "authMode"
           ],
           "properties": {
             "ingestionServiceBaseUrl": {
@@ -337,40 +444,9 @@
                 "https://api.unique.app/scope-management"
               ]
             },
-            "permissionsInheritanceMode": {
-              "type": "string",
-              "enum": [
-                "inherit_scopes_and_files",
-                "inherit_scopes",
-                "inherit_files",
-                "none"
-              ],
-              "description": "This config has effect only in content_only sync mode. It indicates whether we should inherit permissions for newly created scopes and files in Unique Knowledge Base. Allowed values: none, inherit_scopes, inherit_files, inherit_scopes_and_files",
-              "default": "inherit_scopes_and_files"
-            },
-            "ingestionMode": {
-              "type": "string",
-              "enum": ["flat", "recursive"],
-              "description": "Ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy (path-based ingestion)"
-            },
-            "scopeId": {
-              "type": "string",
-              "description": "Scope ID to be used as root for ingestion. Required for both flat and recursive modes.",
-              "examples": ["scope_bu4gokr0atzj0kfiuaaaaaaa"]
-            },
             "apiRateLimitPerMinute": {
               "type": "integer",
               "description": "Number of Unique API requests allowed per minute"
-            },
-            "maxIngestedFiles": {
-              "type": "integer",
-              "minimum": 1,
-              "description": "Maximum number of files to ingest per site in a single run. If the number of new + updated files for a site exceeds this limit, the sync for that site will fail."
-            },
-            "storeInternally": {
-              "type": "string",
-              "enum": ["enabled", "disabled"],
-              "description": "Whether to store content internally in Unique or not."
             },
             "authMode": {
               "type": "string",
@@ -426,14 +502,11 @@
         "processing": {
           "type": "object",
           "description": "Files processing configuration",
-          "required": ["allowedMimeTypes", "concurrency", "syncMode"],
+          "required": [
+            "allowedMimeTypes",
+            "concurrency"
+          ],
           "properties": {
-            "syncMode": {
-              "type": "string",
-              "enum": ["content_only", "content_and_permissions"],
-              "description": "Mode of synchronization from SharePoint to Unique",
-              "examples": ["content_only", "content_and_permissions"]
-            },
             "allowedMimeTypes": {
               "type": "array",
               "items": {
@@ -459,9 +532,12 @@
               "type": "integer",
               "description": "Timeout in seconds for processing steps"
             },
-            "maxFileSizeBytes": {
-              "type": ["integer", "null"],
-              "description": "Maximum allowed file size in bytes"
+            "maxFileSizeToIngestBytes": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Maximum file size in bytes to ingest"
             },
             "scanIntervalCron": {
               "type": "string",

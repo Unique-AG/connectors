@@ -4,6 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
 import { Config } from '../config';
+import { getInheritanceSettings } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
@@ -16,9 +17,14 @@ import { redact, shouldConcealLogs, smear, smearPath } from '../utils/logging.ut
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
-import type { BaseSyncContext, SharepointSyncContext } from './types';
+import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 const EXTERNAL_ID_PREFIX = 'spc:' as const;
+
+export interface RootScopeInfo {
+  serviceUserId: string;
+  rootPath: string;
+}
 
 @Injectable()
 export class ScopeManagementService {
@@ -36,7 +42,7 @@ export class ScopeManagementService {
   public async initializeRootScope(
     rootScopeId: string,
     ingestionMode: IngestionMode,
-  ): Promise<BaseSyncContext> {
+  ): Promise<RootScopeInfo> {
     const userId = await this.uniqueUsersService.getCurrentUserId();
     assert.ok(userId, 'User ID must be available');
     const logPrefix = `[RootScopeId: ${rootScopeId}]`;
@@ -76,7 +82,40 @@ export class ScopeManagementService {
     const rootPath = `/${pathSegments.join('/')}`;
     this.logger.log(`Resolved root path: ${this.shouldConcealLogs ? redact(rootPath) : rootPath}`);
 
-    return { serviceUserId: userId, rootScopeId: rootScopeId, rootPath };
+    return { serviceUserId: userId, rootPath };
+  }
+
+  public async deleteRootScopeRecursively(scopeId: string): Promise<void> {
+    const logPrefix = `[RootScopeId: ${scopeId}]`;
+    this.logger.log(`${logPrefix} Deleting root scope recursively`);
+
+    try {
+      const result = await this.uniqueScopesService.deleteScopeRecursively(scopeId);
+
+      if (result.successFolders.length > 0) {
+        this.logger.log(
+          `${logPrefix} Successfully deleted ${result.successFolders.length} folders`,
+        );
+      }
+
+      if (result.failedFolders.length > 0) {
+        this.logger.warn({
+          msg: `${logPrefix} Failed to delete ${result.failedFolders.length} folders`,
+          failedFolders: result.failedFolders.map((f) => ({
+            id: f.id,
+            name: f.name,
+            path: this.shouldConcealLogs ? redact(f.path) : f.path,
+            reason: f.failReason,
+          })),
+        });
+      }
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to delete root scope recursively`,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
   }
 
   private buildItemIdToScopePathMap(
@@ -138,7 +177,7 @@ export class ScopeManagementService {
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<ScopeWithPath[]> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
 
     const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
@@ -153,7 +192,7 @@ export class ScopeManagementService {
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
-    const inheritScopes = this.configService.get('unique.inheritScopePermissions', { infer: true });
+    const { inheritScopes } = getInheritanceSettings(context.siteConfig);
     const scopes = await this.uniqueScopesService.createScopesBasedOnPaths(allPathsWithParents, {
       includePermissions: true,
       inheritAccess: inheritScopes,
@@ -189,14 +228,15 @@ export class ScopeManagementService {
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<void> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
     const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
     // We're adding two cases that are special - the root scope that we want to have explicitly
-    // marked as root and site pages that is a special colection we fetch for ASPX pages, but has no
-    // folders.
-    pathToExternalIdMap[context.rootPath] = `${EXTERNAL_ID_PREFIX}root-${Date.now()}`;
-    pathToExternalIdMap[`${context.rootPath}/${context.siteName}/SitePages`] =
-      `${EXTERNAL_ID_PREFIX}${context.siteId}/sitePages`;
+    // marked as site root and site pages that is a special colection we fetch for ASPX pages,
+    // but has no folders.
+    pathToExternalIdMap[context.rootPath] =
+      `${EXTERNAL_ID_PREFIX}root-${context.siteConfig.siteId}}`;
+    pathToExternalIdMap[`${context.rootPath}/SitePages`] =
+      `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId}/sitePages`;
 
     for (const [index, scope] of scopes.entries()) {
       if (isNonNullish(scope.externalId)) {
@@ -223,7 +263,7 @@ export class ScopeManagementService {
           `${logPrefix} No external ID found for path ` +
             `${this.shouldConcealLogs ? smearPath(path) : path}`,
         );
-        externalId = `${EXTERNAL_ID_PREFIX}unknown:${context.siteId}/${scope.name}-${randomUUID()}`;
+        externalId = `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId}/${scope.name}-${randomUUID()}`;
       }
 
       try {
@@ -258,9 +298,8 @@ export class ScopeManagementService {
       const segments = pathWithoutRoot.split('/').filter(Boolean);
       pathToExternalIdMap[path] =
         `${EXTERNAL_ID_PREFIX}folder:${directory.siteId}/${directory.item.id}`;
+      // siteName is now stripped, so first segment is already the drive
       pathToExternalIdMap[`${rootPath}/${segments[0]}`] ??=
-        `${EXTERNAL_ID_PREFIX}site:${directory.siteId}`;
-      pathToExternalIdMap[`${rootPath}/${segments[0]}/${segments[1]}`] ??=
         `${EXTERNAL_ID_PREFIX}drive:${directory.siteId}/${directory.driveId}`;
     }
 
@@ -272,7 +311,7 @@ export class ScopeManagementService {
     scopes: ScopeWithPath[],
     context: SharepointSyncContext,
   ): Map<string, string> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteId) : context.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
     const itemIdToScopeIdMap = new Map<string, string>();
 
     if (scopes.length === 0) {
@@ -321,7 +360,7 @@ export class ScopeManagementService {
   ): string | undefined {
     if (!scopes || scopes.length === 0) {
       // Flat mode - return the configured scope ID
-      return context.rootScopeId;
+      return context.siteConfig.scopeId;
     }
 
     const scopePath = getUniqueParentPathFromItem(item, context.rootPath);

@@ -5,12 +5,13 @@ import { type Histogram } from '@opentelemetry/api';
 import { filter, flat, indexBy, mapKeys, mapValues, pipe, prop, uniqueBy, values } from 'remeda';
 import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
+import { SyncStep } from '../constants/sync-step.enum';
 import { SPC_PERMISSIONS_SYNC_DURATION_SECONDS } from '../metrics';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/unique-groups/unique-groups.utils';
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
@@ -59,12 +60,12 @@ export class PermissionsSyncService {
 
   public async syncPermissionsForSite(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
-    const { siteId } = context;
+    const { siteId, ingestionMode } = context.siteConfig;
 
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}]`;
     const startTime = Date.now();
-    let currentStep = 'permissions_fetch';
+    let currentStep: SyncStep = SyncStep.PermissionsFetch;
 
     try {
       this.logger.log(
@@ -80,7 +81,7 @@ export class PermissionsSyncService {
         `${logPrefix} Fetched permissions for ${sharePoint.items.length} items in ${elapsedSecondsLog(permissionsFetchStartTime)}`,
       );
 
-      currentStep = 'groups_memberships_fetch';
+      currentStep = SyncStep.GroupsMembershipsFetch;
       const groupsWithMembershipsMap = await this.fetchGroupsWithMembershipsForSite(
         siteId,
         permissionsMap,
@@ -90,7 +91,7 @@ export class PermissionsSyncService {
         `${logPrefix} Fetched ${Object.keys(groupsWithMembershipsMap).length} groups with memberships`,
       );
 
-      currentStep = 'unique_data_fetch';
+      currentStep = SyncStep.UniqueDataFetch;
       const uniqueUsersMap = await this.getUniqueUsersMap();
       const uniqueGroupsMap = await this.getUniqueGroupsMap(siteId);
 
@@ -98,7 +99,7 @@ export class PermissionsSyncService {
         `${logPrefix} Found ${Object.keys(uniqueGroupsMap).length} unique groups and ${Object.keys(uniqueUsersMap).length} unique users`,
       );
 
-      currentStep = 'groups_sync';
+      currentStep = SyncStep.GroupsSync;
       const { updatedUniqueGroupsMap } = await this.syncSharepointGroupsToUniqueCommand.run({
         siteId,
         sharePoint: { groupsMap: groupsWithMembershipsMap },
@@ -109,16 +110,15 @@ export class PermissionsSyncService {
         `${logPrefix} Synced ${Object.keys(updatedUniqueGroupsMap).length} resulting unique groups`,
       );
 
-      currentStep = 'file_permissions_sync';
+      currentStep = SyncStep.FilePermissionsSync;
       await this.syncSharepointFilesPermissionsToUniqueCommand.run({
         context,
         sharePoint: { permissionsMap },
         unique: { groupsMap: updatedUniqueGroupsMap, usersMap: uniqueUsersMap },
       });
 
-      const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
       if (ingestionMode === IngestionMode.Recursive) {
-        currentStep = 'folder_permissions_sync';
+        currentStep = SyncStep.FolderPermissionsSync;
         assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
         await this.syncSharepointFolderPermissionsToUniqueCommand.run({
           context,

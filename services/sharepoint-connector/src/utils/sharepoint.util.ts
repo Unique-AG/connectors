@@ -35,36 +35,31 @@ export function buildIngestionItemKey(sharepointContentItem: AnySharepointItem):
   return `${sharepointContentItem.siteId}/${sharepointContentItem.item.id}`;
 }
 
-// Gets SharePoint URL and returns the relative unique path like without context of the root scope
-// Example 1:
-// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf
-// returns
-// /TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf
-// Example 2:
-// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files
-// returns
-// /TestTeamSite/Shared%20Documents/lorand%27s%20files
+/**
+ * Extracts a relative path from a SharePoint URL.
+ *
+ * We always strip the site segment (the first segment after /sites/) from the path
+ * to avoid redundant nesting, as we already ingest into site-specific root scopes.
+ */
 function getRelativeUniquePathFromUrl(url: string): string {
   const urlObj = new URL(url);
   const pathName = decodeURIComponent(urlObj.pathname);
 
-  // Path start with /sites/ and we don't want to include it in the path
-  return `/${normalizeSlashes(pathName.replace(/\/sites\//, '/'))}`;
+  // SharePoint paths look like /sites/SiteName/Library/Folder/File
+  // We remove the first two segments ('sites' and 'SiteName') to avoid redundant nesting, as we already ingest into site-specific root scopes.
+  const relativePath = normalizeSlashes(pathName).split('/').slice(2).join('/');
+  return relativePath ? `/${relativePath}` : '/';
 }
 
-// Gets SharePoint URL and returns the relative unique parent path like without context of the root scope
-// Example 1:
-// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf
-// returns
-// /TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf
-// Example 2:
-// https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files
-// returns
-// /TestTeamSite/Shared%20Documents
+/**
+ * Extracts the relative parent path from a SharePoint URL.
+ */
 function getRelativeUniqueParentPathFromUrl(url: string): string {
   const uniqueItemPath = getRelativeUniquePathFromUrl(url);
   const lastSlashIndex = uniqueItemPath.lastIndexOf('/');
-  if (lastSlashIndex !== -1) {
+
+  // If the path is just "/" or "/Segment", the parent is the root "" (relative to rootPath)
+  if (lastSlashIndex > 0) {
     return uniqueItemPath.substring(0, lastSlashIndex);
   }
   // This case shouldn't really happen because the path will always at least have {site}/{drive}

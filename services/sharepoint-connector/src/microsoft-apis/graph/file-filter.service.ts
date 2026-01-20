@@ -8,8 +8,7 @@ import { DriveItem, ListItem } from './types/sharepoint.types';
 export class FileFilterService {
   public constructor(private readonly configService: ConfigService<Config, true>) {}
 
-  public isListItemValidForIngestion(fields: ListItem['fields']) {
-    const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
+  public isListItemValidForIngestion(fields: ListItem['fields'], syncColumnName: string) {
     return Boolean(
       fields.FileLeafRef?.toLowerCase().endsWith('.aspx') &&
         fields[syncColumnName] === true &&
@@ -17,11 +16,12 @@ export class FileFilterService {
     );
   }
 
-  public isFileValidForIngestion(item: DriveItem): boolean {
+  public isFileValidForIngestion(item: DriveItem, syncColumnName: string): boolean {
     const fields = item.listItem?.fields as Record<string, unknown>;
-    const syncColumnName = this.configService.get('sharepoint.syncColumnName', { infer: true });
     const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
-    const maxFileSizeBytes = this.configService.get('processing.maxFileSizeBytes', { infer: true });
+    const maxFileSizeToIngestBytes = this.configService.get('processing.maxFileSizeToIngestBytes', {
+      infer: true,
+    });
 
     if (
       !item.file ||
@@ -36,7 +36,7 @@ export class FileFilterService {
       return false;
     }
 
-    if (item.size > maxFileSizeBytes) {
+    if (item.size > maxFileSizeToIngestBytes) {
       return false;
     }
 

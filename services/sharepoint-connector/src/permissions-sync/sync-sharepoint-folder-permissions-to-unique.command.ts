@@ -16,7 +16,7 @@ import {
 import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { SharepointSyncContext } from '../sharepoint-synchronization/types';
+import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
@@ -57,7 +57,8 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
-    const { siteId, rootPath, serviceUserId } = context;
+    const { siteId } = context.siteConfig;
+    const { rootPath, serviceUserId } = context;
 
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}]`;
@@ -151,10 +152,10 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
   private isTopFolder(path: string, rootPath: string): boolean {
     // We're removing the root scope part, in case it has any slashes, to make it predictable.
-    // Then we can check if the remaining part has at most 2 levels, because it indicates it is
-    // either the site or the drive level.
-    // Example: /RootScope/Site/Drive/Folder -> Site/Drive/Folder -> 3 levels -> false
-    // Example: /RootScope/Site/Drive -> Site/Drive -> 2 levels -> true
+    // Then we can check if the remaining part has at most 1 level, because it indicates it is
+    // the drive level.
+    // Example: /RootScope/Drive/Folder -> Drive/Folder -> 2 levels -> false
+    // Example: /RootScope/Drive -> Drive -> 1 level -> true
     // Top folders don't have permissions fetched from SharePoint, so we use root group permission
     // instead.
     // The actual root path will not have replacement working for them because of no trailing slash,
@@ -162,7 +163,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     if (path === rootPath) {
       return true;
     }
-    return path.replace(`/${normalizeSlashes(rootPath)}/`, '').split('/').length <= 2;
+    return path.replace(`/${normalizeSlashes(rootPath)}/`, '').split('/').length <= 1;
   }
 
   private mapSharePointPermissionsToScopeAccesses(

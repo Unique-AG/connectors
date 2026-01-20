@@ -8,8 +8,9 @@ import type {
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ScopeManagementService } from './scope-management.service';
-import type { SharepointSyncContext } from './types';
+import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 const createDriveContentItem = (path: string): SharepointContentItem => {
   const webUrl = `https://example.sharepoint.com/sites/test1/${path}/Page%201.aspx`;
@@ -87,33 +88,25 @@ describe('ScopeManagementService', () => {
     { id: 'scope_1', name: 'test1', parentId: null, externalId: null, path: '/test1' },
     {
       id: 'scope_2',
-      name: 'test1',
+      name: 'UniqueAG',
       parentId: 'scope_1',
       externalId: null,
-      path: '/test1/test1',
+      path: '/test1/UniqueAG',
     },
     {
       id: 'scope_3',
-      name: 'UniqueAG',
+      name: 'SitePages',
       parentId: 'scope_2',
       externalId: null,
-      path: '/test1/test1/UniqueAG',
-    },
-    {
-      id: 'scope_4',
-      name: 'SitePages',
-      parentId: 'scope_3',
-      externalId: null,
-      path: '/test1/test1/UniqueAG/SitePages',
+      path: '/test1/UniqueAG/SitePages',
     },
   ];
 
   const mockContext: SharepointSyncContext = {
     serviceUserId: 'user-123',
-    rootScopeId: 'root-scope-123',
     rootPath: '/test1',
-    siteId: 'site-123',
     siteName: 'test-site',
+    siteConfig: createMockSiteConfig({ siteId: 'site-123', scopeId: 'root-scope-123' }),
   };
 
   type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };
@@ -220,16 +213,15 @@ describe('ScopeManagementService', () => {
       expect(result).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: 'scope_1', name: 'test1', path: '/test1' }),
-          expect.objectContaining({ id: 'scope_2', name: 'test1', path: '/test1/test1' }),
           expect.objectContaining({
-            id: 'scope_3',
+            id: 'scope_2',
             name: 'UniqueAG',
-            path: '/test1/test1/UniqueAG',
+            path: '/test1/UniqueAG',
           }),
           expect.objectContaining({
-            id: 'scope_4',
+            id: 'scope_3',
             name: 'SitePages',
-            path: '/test1/test1/UniqueAG/SitePages',
+            path: '/test1/UniqueAG/SitePages',
           }),
         ]),
       );
@@ -240,27 +232,22 @@ describe('ScopeManagementService', () => {
       ];
       expect(options).toEqual({ includePermissions: true, inheritAccess: true });
       expect(paths).toEqual(
-        expect.arrayContaining([
-          '/test1',
-          '/test1/test1',
-          '/test1/test1/UniqueAG',
-          '/test1/test1/UniqueAG/SitePages',
-        ]),
+        expect.arrayContaining(['/test1', '/test1/UniqueAG', '/test1/UniqueAG/SitePages']),
       );
     });
 
     it('disables inheritance when permission sync mode is enabled', async () => {
-      configServiceMock.get.mockImplementation((key: string) => {
-        if (key === 'processing.syncMode') return 'content_and_permissions';
-        if (key === 'unique.inheritScopePermissions') return false;
-        if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
-        return undefined;
-      });
+      const contextWithPermissionsSync: SharepointSyncContext = {
+        ...mockContext,
+        siteConfig: createMockSiteConfig({
+          syncMode: 'content_and_permissions',
+        }),
+      };
 
       await service.batchCreateScopes(
         [createDriveContentItem('UniqueAG/SitePages')],
         [],
-        mockContext,
+        contextWithPermissionsSync,
       );
 
       const [, options] = createScopesMock.mock.calls[0] as [
@@ -271,17 +258,18 @@ describe('ScopeManagementService', () => {
     });
 
     it('uses explicit inheritAccess configuration when provided', async () => {
-      configServiceMock.get.mockImplementation((key: string) => {
-        if (key === 'unique.inheritScopePermissions') return true;
-        if (key === 'processing.syncMode') return 'content_only';
-        if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
-        return undefined;
-      });
+      const contextWithInheritScopes: SharepointSyncContext = {
+        ...mockContext,
+        siteConfig: createMockSiteConfig({
+          syncMode: 'content_only',
+          permissionsInheritanceMode: 'inherit_scopes',
+        }),
+      };
 
       await service.batchCreateScopes(
         [createDriveContentItem('UniqueAG/SitePages')],
         [],
-        mockContext,
+        contextWithInheritScopes,
       );
 
       const [, options] = createScopesMock.mock.calls[0] as [
@@ -319,7 +307,7 @@ describe('ScopeManagementService', () => {
       const result = service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
 
       // biome-ignore lint/style/noNonNullAssertion: Test data is guaranteed to exist
-      expect(result.get(item!.item.id)).toBe('scope_4');
+      expect(result.get(item!.item.id)).toBe('scope_3');
     });
 
     it('decodes URL-encoded paths before lookup', () => {
@@ -450,7 +438,7 @@ describe('ScopeManagementService', () => {
         { id: 'scope-1', name: 'test1', externalId: 'existing-external-id' },
         { id: 'scope-2', name: 'SitePages', externalId: null },
       ];
-      const paths = ['/test1', '/test1/test-site/SitePages'];
+      const paths = ['/test1', '/test1/SitePages'];
       const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method

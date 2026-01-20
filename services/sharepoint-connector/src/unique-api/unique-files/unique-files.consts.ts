@@ -41,6 +41,24 @@ export const CONTENT_DELETE_MUTATION = gql`
   }
 `;
 
+export interface ContentDeleteByContentIdsMutationInput {
+  contentIds: string[];
+}
+
+export interface ContentDeleteByContentIdsMutationResult {
+  contentDeleteByContentIds: {
+    id: string;
+  }[];
+}
+
+export const CONTENT_DELETE_BY_IDS_MUTATION = gql`
+  mutation ContentDeleteByContentIds($contentIds: [String!]!) {
+    contentDeleteByContentIds(contentIds: $contentIds) {
+      id
+    }
+  }
+`;
+
 export interface PaginatedContentQueryInput {
   skip: number;
   take: number;

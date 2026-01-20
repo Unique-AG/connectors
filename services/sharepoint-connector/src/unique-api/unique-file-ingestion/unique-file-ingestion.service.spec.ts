@@ -59,6 +59,7 @@ describe('UniqueFileIngestionService', () => {
       sourceKind: 'sharepoint',
       sourceName: 'Sharepoint',
       byteSize: 1024,
+      storeInternally: true,
       metadata: {
         Author: 'John Doe',
         Modified: '2024-01-01',
@@ -92,6 +93,7 @@ describe('UniqueFileIngestionService', () => {
       sourceName: 'Sharepoint',
       sourceKind: 'sharepoint',
       fileUrl: 'https://file-url',
+      storeInternally: true,
       metadata: {
         Author: 'Jane Doe',
         Created: '2024-01-02',

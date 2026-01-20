@@ -16,16 +16,13 @@ export class ClientSecretAuthStrategy implements AuthStrategy {
     const sharePointConfig = this.configService.get('sharepoint', { infer: true });
 
     assert.strictEqual(
-      sharePointConfig.authMode,
+      sharePointConfig.auth.mode,
       'client-secret',
       'ClientSecretAuthStrategy called but authentication mode is not "client-secret"',
     );
 
-    const {
-      authTenantId: tenantId,
-      authClientId: clientId,
-      authClientSecret: clientSecret,
-    } = sharePointConfig;
+    const { tenantId } = sharePointConfig;
+    const { clientId, clientSecret } = sharePointConfig.auth;
 
     const msalConfig: Configuration = {
       auth: {

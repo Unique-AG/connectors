@@ -12,18 +12,25 @@ connector:
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
-  # -- Environment variables from secrets. Required when authMode is 'external'.
-  # When using external authMode, add the following to load the Zitadel client secret:
+    # Glob pattern to match tenant configuration YAML files
+    TENANT_CONFIG_PATH_PATTERN: /app/tenant-configs/*-tenant-config.yaml
+  # -- Environment variables from secrets.
+  # Example for loading secrets (uncomment and customize as needed):
   #   envVars:
-  #     - name: UNIQUE_ZITADEL_CLIENT_SECRET
+  #     # For Zitadel authentication (required when authMode is 'external')
+  #     - name: ZITADEL_CLIENT_SECRET
   #       valueFrom:
   #         secretKeyRef:
   #           name: sharepoint-connector-secret
-  #           key: UNIQUE_ZITADEL_CLIENT_SECRET
+  #           key: ZITADEL_CLIENT_SECRET
+  #     # For encrypted certificate private key (optional, only if key is password-protected)
+  #     - name: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: sharepoint-connector-secret
+  #           key: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
-  extraEnvCM:
-    - sharepoint-connector-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
     tag: 2.0.0-beta.9 # x-release-please-version
@@ -63,12 +70,20 @@ connector:
         items:
           - key: key.pem
             path: key.pem
+      # -- Tenant configuration YAML file mounted from ConfigMap
+    - name: tenant-config
+      configMap:
+        name: sharepoint-connector-tenant-config
   volumeMounts:
     - name: tmp
       mountPath: /tmp
     - name: sharepoint-connector-secret
       mountPath: /app/key.pem
       subPath: key.pem
+      readOnly: true
+      # -- Mount tenant configuration directory
+    - name: tenant-config
+      mountPath: /app/tenant-configs
       readOnly: true
 
 # -- Grafana dashboard configuration
@@ -138,14 +153,6 @@ connectorConfig:
     # -- base url of the sharepoint instance
     # example: https://acme.sharepoint.com
     baseUrl: unset_default_value
-    # -- Array of site IDs to scan
-    siteIds:
-      # Example values
-      - 00000000-0000-0000-0000-000000000000
-      - 00000000-0000-0000-0000-000000000001
-    # -- column name against which the files are synced
-    # example: FinanceGPTKnowledge
-    syncColumnName: unset_default_value
     auth:
       # -- authentication mode
       # possible values: certificate
@@ -163,9 +170,46 @@ connectorConfig:
       # -- SHA1 thumbprint of the Azure AD application certificate
       # users of the sharepoint-connector-secrets terraform module can get this from the modules outputs (thumbprint_sha1)
       # users that provision their application registration manually can get this from the Azure portal
-      thumbprintSha1: unset_default_value
-    graph:
-      apiRateLimitPerMinute: 780000
+      thumbprintSha1: ""
+      # One of thumbprintSha1 or thumbprintSha256 must be provided
+      thumbprintSha256: ""
+    # -- Rate limiting for Graph API requests per minute (in thousands)
+    apiRateLimitPerMinuteThousands: 780
+    # -- Sites source configuration
+    # Determines how sites are configured: from static YAML (config_file) or dynamically from SharePoint list (sharepoint_list)
+    # possible values: config_file, sharepoint_list
+    sitesSource: config_file
+    # -- SharePoint list configuration (only used when sitesSource is "sharepoint_list")
+    # siteId: SharePoint site ID containing the configuration list
+    # listDisplayName: Display name of the SharePoint configuration list
+    # sharepointList:
+    #   siteId: 00000000-0000-0000-0000-000000000000
+    #   listDisplayName: MyConfigurationList
+    # -- Array of sites to sync. Each site has its own configuration.
+    # Only used when sitesSource is "config_file"
+    # sites:
+    #   - siteId: 00000000-0000-0000-0000-000000000000
+    #     syncColumnName: FinanceGPTKnowledge
+    #     ingestionMode: recursive
+    #     scopeId: scope_example123456789
+    #     maxFilesToIngest: 1000
+    #     storeInternally: enabled
+    #     syncStatus: active
+    #     syncMode: content_and_permissions
+    #     # -- THIS CONFIG HAS EFFECT ONLY IN CONTENT_ONLY SYNC MODE: inheritance mode for scopes and files.
+    #     # Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.
+    #     # When unset, defaults to inherit_scopes_and_files; ignored in content_and_permissions.
+    #     permissionsInheritanceMode: inherit_scopes_and_files
+      # Example: Additional site with different settings
+      # - siteId: 00000000-0000-0000-0000-000000000001
+      #   syncColumnName: HRKnowledge
+      #   ingestionMode: flat
+      #   scopeId: scope_bu4gokr0atzj0kfiubbbbbb
+      #   maxFilesToIngest: 500
+      #   storeInternally: enabled
+      #   syncStatus: active
+      #   syncMode: content_only
+      #   permissionsInheritanceMode: inherit_scopes_and_files
 
   unique:
     # -- communication mode for the Unique Services
@@ -181,22 +225,6 @@ connectorConfig:
     # example: https://api.unique.app/scope-management
     # example: http://node-scope-management.finance-gpt:8094
     scopeManagementServiceBaseUrl: unset_default_value
-    # -- THIS CONFIG HAS EFFECT ONLY IN CONTENT_ONLY SYNC MODE: inheritance mode for scopes and files.
-    # Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.
-    # When unset, defaults to inherit_scopes_and_files; ignored in content_and_permissions.
-    permissionsInheritanceMode: inherit_scopes_and_files
-    # -- ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy (path-based ingestion)
-    # possible values: flat, recursive
-    ingestionMode: recursive
-    # -- Scope ID to be used as root for ingestion. Required for both flat and recursive modes.
-    # example: scope_bu4gokr0atzj0kfiuaaaaaaa
-    scopeId: unset_default_value
-    # -- Maximum number of files to ingest per site in a single run.
-    # If the number of new + updated files for a site exceeds this limit, the sync for that site will fail.
-    maxIngestedFiles: 1000
-    # -- Whether to store content internally in Unique or not.
-    # possible values: enabled, disabled
-    storeInternally: enabled
     # -- Number of Unique API requests allowed per minute
     apiRateLimitPerMinute: 100
     # -- Object containing extra HTTP headers for Unique API requests (GraphQL and REST)
@@ -205,7 +233,7 @@ connectorConfig:
     serviceExtraHeaders:
       x-company-id: unset_default_value
       x-user-id: unset_default_value
-    # -- Object containing config to pass when submitting file for ingestion
+    # -- Optional object containing config to pass when submitting file for ingestion
     # ingestionConfig:
     #   uniqueIngestionMode: SKIP_INGESTION
     #   customProperty: value
@@ -222,11 +250,6 @@ connectorConfig:
       # clientSecret is loaded from a secret, see connector.envVars
 
   processing:
-    # -- mode of synchronization from SharePoint to Unique.
-    # Possible values:
-    # - content_only: sync only the content,
-    # - content_and_permissions: sync both content and permissions,
-    syncMode: content_only
     # -- timeout in seconds for a file processing step before it will stop and skip processing the file
     stepTimeoutSeconds: 300
     # -- how many files you want to submit for ingestion into Unique at once
@@ -241,6 +264,6 @@ connectorConfig:
       - application/vnd.ms-excel
       - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
       - application/vnd.openxmlformats-officedocument.presentationml.presentation
-    maxFileSizeBytes: null
+    maxFileSizeToIngestBytes: null
     # -- cron expression for the scheduled SharePoint scan interval default: every 15 minutes
     scanIntervalCron: "*/15 * * * *"

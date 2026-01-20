@@ -2,17 +2,36 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Histogram } from '@opentelemetry/api';
 import { Config } from '../config';
+import type { SiteConfig } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
+import { SyncStep } from '../constants/sync-step.enum';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
+import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
+import type {
+  SharepointContentItem,
+  SharepointDirectoryItem,
+} from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
+import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
+import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
-import { ScopeManagementService } from './scope-management.service';
-import type { BaseSyncContext, SharepointSyncContext } from './types';
+import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
+import { SharepointSyncContext } from './sharepoint-sync-context.interface';
+
+type SiteSyncResult =
+  | { status: 'success' }
+  | { status: 'failure'; step: SyncStep }
+  | { status: 'skipped'; reason: string };
+
+type FullSyncResult =
+  | { status: 'success' }
+  | { status: 'failure'; step: SyncStep }
+  | { status: 'skipped'; reason: string };
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -23,158 +42,77 @@ export class SharepointSynchronizationService {
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly graphApiService: GraphApiService,
+    private readonly sitesConfigurationService: SitesConfigurationService,
     private readonly contentSyncService: ContentSyncService,
     private readonly permissionsSyncService: PermissionsSyncService,
     private readonly scopeManagementService: ScopeManagementService,
+    private readonly uniqueFilesService: UniqueFilesService,
+    private readonly uniqueScopesService: UniqueScopesService,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
-  public async synchronize(): Promise<void> {
+  public async synchronize(): Promise<FullSyncResult> {
     const syncStartTime = Date.now();
     if (this.isScanning) {
       this.logger.warn('Skipping scan - previous scan is still in progress.');
-      this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
-        sync_type: 'full',
-        result: 'skipped',
-        skip_reason: 'scan_in_progress',
-      });
-      return;
+      const result: FullSyncResult = { status: 'skipped', reason: 'scan_in_progress' };
+      this.recordFullSyncMetric(syncStartTime, result);
+      return result;
     }
 
     this.isScanning = true;
 
-    // We wrap the whole action in a try-finally block to ensure that the isScanning flag is reset
-    // in case of some unexpected one-off error occurring.
     try {
-      const siteIdsToScan = this.configService.get('sharepoint.siteIds', { infer: true });
-      const ingestionMode = this.configService.get('unique.ingestionMode', { infer: true });
-      const scopeId = this.configService.get('unique.scopeId', { infer: true });
-
-      // Initialize root scope and context (once)
-      let baseContext: BaseSyncContext;
+      let sites: SiteConfig[];
       try {
-        baseContext = await this.scopeManagementService.initializeRootScope(scopeId, ingestionMode);
+        sites = await this.sitesConfigurationService.loadSitesConfiguration();
       } catch (error) {
         this.logger.error({
-          msg: 'Failed to initialize root scope',
+          msg: 'Failed to load sites configuration',
           error: sanitizeError(error),
         });
-        this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
-          sync_type: 'full',
-          result: 'failure',
-          failure_step: 'root_scope_initialization',
-        });
-        return;
+        const result: FullSyncResult = {
+          status: 'failure',
+          step: SyncStep.SitesConfigLoading,
+        };
+        this.recordFullSyncMetric(syncStartTime, result);
+        return result;
       }
 
-      this.logger.log(`Starting scan of ${siteIdsToScan.length} SharePoint sites...`);
+      const { active, deleted, inactive } = this.categorizeSites(sites);
 
-      for (const siteId of siteIdsToScan) {
+      this.logger.log(
+        `Sites configuration: ${active.length} active, ${inactive.length} inactive, ${deleted.length} marked for deletion`,
+      );
+
+      await this.processSiteDeletions(deleted);
+
+      if (active.length === 0) {
+        this.logger.warn('No active sites configured for synchronization');
+        const result: FullSyncResult = { status: 'skipped', reason: 'no_active_sites' };
+        this.recordFullSyncMetric(syncStartTime, result);
+        return result;
+      }
+
+      this.logger.log(`Starting scan of ${active.length} active SharePoint sites...`);
+
+      for (const siteConfig of active) {
         const siteSyncStartTime = Date.now();
-        const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-        const logPrefix = `[Site: ${logSiteId}]`;
-        let scopes: ScopeWithPath[] | null = null;
-        const siteStartTime = Date.now();
+        const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
 
-        const context: SharepointSyncContext = {
-          ...baseContext,
-          siteId,
-          siteName: await this.graphApiService.getSiteName(siteId),
-        };
-
-        const { items, directories } = await this.graphApiService.getAllSiteItems(siteId);
-        this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
-
-        if (items.length === 0) {
-          this.logger.log(`${logPrefix} Found no items marked for synchronization.`);
-          this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
-            sync_type: 'site',
-            sp_site_id: logSiteId,
-            result: 'skipped',
-            skip_reason: 'no_items_to_sync',
-          });
-          continue;
-        }
-
-        if (ingestionMode === IngestionMode.Recursive) {
-          try {
-            // Create scopes for ALL paths (including moved file destinations)
-            scopes = await this.scopeManagementService.batchCreateScopes(
-              items,
-              directories,
-              context,
-            );
-          } catch (error) {
-            this.logger.error({
-              msg: `${logPrefix} Failed to create scopes. Skipping site.`,
-              error: sanitizeError(error),
-            });
-            this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
-              sync_type: 'site',
-              sp_site_id: logSiteId,
-              result: 'failure',
-              failure_step: 'scopes_creation',
-            });
-            continue;
-          }
-        }
-
-        try {
-          await this.contentSyncService.syncContentForSite(items, scopes, context);
-        } catch (error) {
-          this.logger.error({
-            msg: `${logPrefix} Failed to synchronize content`,
-            error: sanitizeError(error),
-          });
-          this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
-            sync_type: 'site',
-            sp_site_id: logSiteId,
-            result: 'failure',
-            failure_step: 'content_sync',
-          });
-          continue;
-        }
-
-        const syncMode = this.configService.get('processing.syncMode', { infer: true });
-        if (syncMode === 'content_and_permissions') {
-          try {
-            await this.permissionsSyncService.syncPermissionsForSite({
-              context,
-              sharePoint: { items, directories },
-              unique: { folders: scopes },
-            });
-          } catch (error) {
-            this.logger.error({
-              msg: `${logPrefix} Failed to synchronize permissions`,
-              error: sanitizeError(error),
-            });
-            this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
-              sync_type: 'site',
-              sp_site_id: logSiteId,
-              result: 'failure',
-              failure_step: 'permissions_sync',
-            });
-            continue;
-          }
-        }
-
-        this.spcSyncDurationSeconds.record(elapsedSeconds(siteSyncStartTime), {
-          sync_type: 'site',
-          sp_site_id: logSiteId,
-          result: 'success',
-        });
+        const result = await this.syncSite(siteConfig);
+        this.recordSiteMetric(siteSyncStartTime, logSiteId, result);
       }
 
       this.logger.log(
         `SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`,
       );
-      this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
-        sync_type: 'full',
-        result: 'success',
-      });
+      const result: FullSyncResult = { status: 'success' };
+      this.recordFullSyncMetric(syncStartTime, result);
+      return result;
     } catch (error) {
       this.logger.error({
         msg: 'Failed full synchronization',
@@ -183,11 +121,192 @@ export class SharepointSynchronizationService {
       this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
         sync_type: 'full',
         result: 'failure',
-        failure_step: 'unknown',
+        failure_step: SyncStep.Unknown,
       });
       throw error;
     } finally {
       this.isScanning = false;
     }
+  }
+
+  private recordFullSyncMetric(startTime: number, result: FullSyncResult): void {
+    this.spcSyncDurationSeconds.record(elapsedSeconds(startTime), {
+      sync_type: 'full',
+      result: result.status,
+      ...(result.status === 'failure' && { failure_step: result.step }),
+      ...(result.status === 'skipped' && { skip_reason: result.reason }),
+    });
+  }
+
+  private recordSiteMetric(startTime: number, logSiteId: string, result: SiteSyncResult): void {
+    this.spcSyncDurationSeconds.record(elapsedSeconds(startTime), {
+      sync_type: 'site',
+      sp_site_id: logSiteId,
+      result: result.status,
+      ...(result.status === 'failure' && { failure_step: result.step }),
+      ...(result.status === 'skipped' && { skip_reason: result.reason }),
+    });
+  }
+
+  private categorizeSites(sites: SiteConfig[]) {
+    return {
+      active: sites.filter((site) => site.syncStatus === 'active'),
+      deleted: sites.filter((site) => site.syncStatus === 'deleted'),
+      inactive: sites.filter((site) => site.syncStatus === 'inactive'),
+    };
+  }
+
+  private async processSingleSiteDeletion(siteConfig: SiteConfig): Promise<void> {
+    const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
+
+    this.logger.log(
+      `${logPrefix} Processing site marked for deletion (ScopeId: ${siteConfig.scopeId})`,
+    );
+
+    try {
+      const rootScope = await this.uniqueScopesService.getScopeById(siteConfig.scopeId);
+
+      if (!rootScope) {
+        this.logger.log(
+          `${logPrefix} Root scope ${siteConfig.scopeId} not found. Skipping deletion process.`,
+        );
+        return;
+      }
+
+      await this.uniqueFilesService.deleteFilesBySiteId(siteConfig.siteId);
+      await this.scopeManagementService.deleteRootScopeRecursively(siteConfig.scopeId);
+
+      this.logger.log(`${logPrefix} Successfully processed deletion`);
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to process site deletion. Continuing with other sites`,
+        scopeId: siteConfig.scopeId,
+        error: sanitizeError(error),
+      });
+    }
+  }
+
+  private async processSiteDeletions(deletedSites: SiteConfig[]): Promise<void> {
+    for (const siteConfig of deletedSites) {
+      await this.processSingleSiteDeletion(siteConfig);
+    }
+  }
+
+  private async initializeSiteContext(
+    siteConfig: SiteConfig,
+    logPrefix: string,
+  ): Promise<{ context: SharepointSyncContext } | { failureStep: SyncStep }> {
+    let baseContext: RootScopeInfo;
+    try {
+      baseContext = await this.scopeManagementService.initializeRootScope(
+        siteConfig.scopeId,
+        siteConfig.ingestionMode,
+      );
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to initialize root scope`,
+        error: sanitizeError(error),
+      });
+      return { failureStep: SyncStep.RootScopeInit };
+    }
+
+    let siteName: string;
+    try {
+      siteName = await this.graphApiService.getSiteName(siteConfig.siteId);
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to get site name`,
+        error: sanitizeError(error),
+      });
+      return { failureStep: SyncStep.SiteNameFetch };
+    }
+
+    return {
+      context: {
+        siteConfig,
+        siteName,
+        serviceUserId: baseContext.serviceUserId,
+        rootPath: baseContext.rootPath,
+      },
+    };
+  }
+
+  private async syncSite(siteConfig: SiteConfig): Promise<SiteSyncResult> {
+    const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
+    const logPrefix = `[Site: ${logSiteId}]`;
+    let scopes: ScopeWithPath[] | null = null;
+    const siteStartTime = Date.now();
+
+    const initResult = await this.initializeSiteContext(siteConfig, logPrefix);
+    if ('failureStep' in initResult) {
+      return { status: 'failure', step: initResult.failureStep };
+    }
+    const { context } = initResult;
+
+    let items: SharepointContentItem[];
+    let directories: SharepointDirectoryItem[];
+
+    try {
+      const result = await this.graphApiService.getAllSiteItems(
+        context.siteConfig.siteId,
+        context.siteConfig.syncColumnName,
+      );
+      items = result.items;
+      directories = result.directories;
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to get site items`,
+        error: sanitizeError(error),
+      });
+      return { status: 'failure', step: SyncStep.SiteItemsFetch };
+    }
+
+    this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
+
+    if (items.length === 0) {
+      this.logger.log(`${logPrefix} Found no items marked for synchronization.`);
+      return { status: 'skipped', reason: 'no_items_to_sync' };
+    }
+
+    if (context.siteConfig.ingestionMode === IngestionMode.Recursive) {
+      try {
+        scopes = await this.scopeManagementService.batchCreateScopes(items, directories, context);
+      } catch (error) {
+        this.logger.error({
+          msg: `${logPrefix} Failed to create scopes. Skipping site.`,
+          error: sanitizeError(error),
+        });
+        return { status: 'failure', step: SyncStep.ScopesCreation };
+      }
+    }
+
+    try {
+      await this.contentSyncService.syncContentForSite(items, scopes, context);
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to synchronize content`,
+        error: sanitizeError(error),
+      });
+      return { status: 'failure', step: SyncStep.ContentSync };
+    }
+
+    if (context.siteConfig.syncMode === 'content_and_permissions') {
+      try {
+        await this.permissionsSyncService.syncPermissionsForSite({
+          context,
+          sharePoint: { items, directories },
+          unique: { folders: scopes },
+        });
+      } catch (error) {
+        this.logger.error({
+          msg: `${logPrefix} Failed to synchronize permissions`,
+          error: sanitizeError(error),
+        });
+        return { status: 'failure', step: SyncStep.PermissionsSync };
+      }
+    }
+
+    return { status: 'success' };
   }
 }

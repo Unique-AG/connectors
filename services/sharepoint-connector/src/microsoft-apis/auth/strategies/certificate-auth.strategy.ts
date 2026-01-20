@@ -18,19 +18,19 @@ export class CertificateAuthStrategy implements AuthStrategy {
     const sharePointConfig = this.configService.get('sharepoint', { infer: true });
 
     assert.strictEqual(
-      sharePointConfig.authMode,
+      sharePointConfig.auth.mode,
       'certificate',
       'CertificateAuthStrategy called but authentication mode is not "certificate"',
     );
 
+    const { tenantId } = sharePointConfig;
     const {
-      authTenantId: tenantId,
-      authClientId: clientId,
-      authPrivateKeyPath: privateKeyPath,
-      authThumbprintSha1: thumbprint,
-      authThumbprintSha256: thumbprintSha256,
-      authPrivateKeyPassword: privateKeyPassword,
-    } = sharePointConfig;
+      clientId,
+      privateKeyPath,
+      thumbprintSha1: thumbprint,
+      thumbprintSha256,
+      privateKeyPassword,
+    } = sharePointConfig.auth;
 
     const privateKeyRaw = readFileSync(privateKeyPath, 'utf8').trim();
 

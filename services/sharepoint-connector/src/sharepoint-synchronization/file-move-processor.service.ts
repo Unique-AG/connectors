@@ -11,7 +11,7 @@ import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { ScopeManagementService } from './scope-management.service';
-import type { SharepointSyncContext } from './types';
+import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 interface FileMoveData {
   contentId: string; // ingested file id
@@ -42,7 +42,7 @@ export class FileMoveProcessor {
     scopes: ScopeWithPath[] | null,
     context: SharepointSyncContext,
   ): Promise<void> {
-    const { siteId } = context;
+    const { siteId } = context.siteConfig;
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
     const logPrefix = `[Site: ${logSiteId}]`;
     const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId);
@@ -105,7 +105,7 @@ export class FileMoveProcessor {
     scopes: ScopeWithPath[] | null,
     context: SharepointSyncContext,
   ): FileMoveData[] {
-    const { siteId } = context;
+    const { siteId } = context.siteConfig;
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
     const filesToMove: FileMoveData[] = [];
 
