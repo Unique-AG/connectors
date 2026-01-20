@@ -13,7 +13,7 @@ connector:
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
     # Glob pattern to match tenant configuration YAML files
-    TENANT_CONFIG_PATH_PATTERN: /app/config/*-tenant-config.yaml
+    TENANT_CONFIG_PATH_PATTERN: /app/tenant-configs/*-tenant-config.yaml
   # -- Environment variables from secrets.
   # Example for loading secrets (uncomment and customize as needed):
   #   envVars:
@@ -89,7 +89,7 @@ connector:
       readOnly: true
       # -- Mount tenant configuration directory
     - name: tenant-config
-      mountPath: /app/config
+      mountPath: /app/tenant-configs
       readOnly: true
 
 # -- Grafana dashboard configuration

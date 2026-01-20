@@ -30,7 +30,7 @@ export const AppConfigSchema = z
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
     tenantConfigPathPattern: requiredStringSchema.describe(
-      'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/config/*-tenant-config.yaml)',
+      'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/tenant-configs/*-tenant-config.yaml)',
     ),
   })
   .transform((c) => ({
