@@ -24,8 +24,8 @@ data:
         {{- end }}
         {{- end }}
       baseUrl: {{ .Values.connectorConfig.sharepoint.baseUrl | quote }}
-      {{- if .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinuteThousands }}
-      graphApiRateLimitPerMinuteThousands: {{ .Values.connectorConfig.sharepoint.graph.apiRateLimitPerMinuteThousands }}
+      {{- if .Values.connectorConfig.sharepoint.apiRateLimitPerMinuteThousands }}
+      graphApiRateLimitPerMinuteThousands: {{ .Values.connectorConfig.sharepoint.apiRateLimitPerMinuteThousands }}
       {{- end }}
       # Sites Configuration
       sitesSource: {{ .Values.connectorConfig.sharepoint.sitesSource | quote }}

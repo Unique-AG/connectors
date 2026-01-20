@@ -241,8 +241,7 @@
             "tenantId",
             "baseUrl",
             "sitesSource",
-            "auth",
-            "graph"
+            "auth"
           ],
           "properties": {
             "tenantId": {
@@ -413,17 +412,9 @@
               },
               "additionalProperties": false
             },
-            "graph": {
-              "type": "object",
-              "description": "Microsoft Graph API configuration",
-              "required": [],
-              "properties": {
-                "apiRateLimitPerMinuteThousands": {
-                  "type": "number",
-                  "description": "Rate limiting for Graph API requests per minute (in thousands)"
-                }
-              },
-              "additionalProperties": false
+            "apiRateLimitPerMinuteThousands": {
+              "type": "number",
+              "description": "Rate limiting for Graph API requests per minute (in thousands)"
             }
           },
           "additionalProperties": false
