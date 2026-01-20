@@ -33,7 +33,7 @@ connector:
   envVars: []
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
-    tag: 2.0.0-beta.9 # x-release-please-version
+    tag: 2.0.0-beta.10 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
