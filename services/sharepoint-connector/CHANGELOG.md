@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.0-beta.10](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.9...sharepoint-connector@2.0.0-beta.10) (2026-01-20)
+
+
+### Features
+
+* **sharepoint-connector:** sharepoint connector external site config ([#193](https://github.com/Unique-AG/connectors/issues/193)) ([e2973d9](https://github.com/Unique-AG/connectors/commit/e2973d9be537252ea23c8cadb8f9393168a2109b))
+* **teams-mcp:** auto admin consent ([#201](https://github.com/Unique-AG/connectors/issues/201)) ([39d89c2](https://github.com/Unique-AG/connectors/commit/39d89c20a416192526b3c3882fa3a9d33461c05a))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** remove default network policy block in values.yaml ([#217](https://github.com/Unique-AG/connectors/issues/217)) ([7720852](https://github.com/Unique-AG/connectors/commit/7720852c3051b56af9c73df0501cd06f0f7db85d))
+* **sharepoint-connector:** remove unused tags variable from terraform ([39d89c2](https://github.com/Unique-AG/connectors/commit/39d89c20a416192526b3c3882fa3a9d33461c05a))
+
 ## [2.0.0-beta.9](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.8...sharepoint-connector@2.0.0-beta.9) (2026-01-09)
 
 
