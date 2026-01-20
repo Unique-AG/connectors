@@ -27,12 +27,6 @@ connector:
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
     tag: 2.0.0-beta.9 # x-release-please-version
-  networkPolicy:
-    enabled: true
-    policyTypes:
-      # - Egress # We can not yet leverage egress policies as Kubernetes flavor policies do not support FQDN and MS Graph IP-Addresses are not easily deterministic
-      - Ingress
-    egress: null
   ports:
     application: 51345
     metrics: 51346
