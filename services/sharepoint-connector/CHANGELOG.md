@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-beta.11](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.10...sharepoint-connector@2.0.0-beta.11) (2026-01-21)
+
+
+### Features
+
+* **sharepoint-connector:** change the external id for the scope where we ingest the site to be prefixed by site not root ([#218](https://github.com/Unique-AG/connectors/issues/218)) ([bad2520](https://github.com/Unique-AG/connectors/commit/bad2520b0953b4618b1b8b6e2c33cd497a7b3ce2))
+
 ## [2.0.0-beta.10](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.9...sharepoint-connector@2.0.0-beta.10) (2026-01-20)
 
 
