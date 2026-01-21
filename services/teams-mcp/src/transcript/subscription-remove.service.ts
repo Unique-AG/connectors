@@ -3,10 +3,23 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
+import type { TypeID } from 'typeid-js';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { SubscriptionRemovedEventDto } from './transcript.dtos';
+
+export interface RemoveResult {
+  status: 'removed' | 'not_found';
+  subscription: {
+    id: string;
+    subscriptionId: string;
+    expiresAt: Date;
+    userProfileId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  } | null;
+}
 
 @Injectable()
 export class SubscriptionRemoveService {
@@ -54,7 +67,29 @@ export class SubscriptionRemoveService {
   }
 
   @Span()
-  public async remove(subscriptionId: string): Promise<void> {
+  public async removeByUserProfileId(userProfileId: TypeID<'user_profile'>): Promise<RemoveResult> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('user_profile_id', userProfileId.toString());
+    span?.setAttribute('operation', 'remove_subscription_by_user');
+
+    const existingSubscription = await this.db.query.subscriptions.findFirst({
+      where: and(
+        eq(subscriptions.internalType, 'transcript'),
+        eq(subscriptions.userProfileId, userProfileId.toString()),
+      ),
+    });
+
+    if (!existingSubscription) {
+      span?.addEvent('no subscription found for user');
+      this.logger.debug({ userProfileId }, 'No active subscription found for user');
+      return { status: 'not_found', subscription: null };
+    }
+
+    return this.remove(existingSubscription.subscriptionId);
+  }
+
+  @Span()
+  public async remove(subscriptionId: string): Promise<RemoveResult> {
     const span = this.trace.getSpan();
     span?.setAttribute('subscription_id', subscriptionId);
     span?.setAttribute('operation', 'remove_subscription');
@@ -80,7 +115,7 @@ export class SubscriptionRemoveService {
     if (!deletedSubscription) {
       span?.addEvent('no subscription found to delete');
       this.logger.debug({ subscriptionId }, 'No matching subscription found in database to delete');
-      return;
+      return { status: 'not_found', subscription: null };
     }
 
     span?.setAttribute('user_profile_id', deletedSubscription.userProfileId);
@@ -103,5 +138,7 @@ export class SubscriptionRemoveService {
       { subscriptionId },
       'Successfully removed subscription from Microsoft Graph API',
     );
+
+    return { status: 'removed', subscription: deletedSubscription };
   }
 }

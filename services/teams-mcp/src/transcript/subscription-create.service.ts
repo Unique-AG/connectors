@@ -14,6 +14,18 @@ import {
 } from './transcript.dtos';
 import { TranscriptUtilsService } from './transcript-utils.service';
 
+export interface SubscribeResult {
+  status: 'created' | 'already_active' | 'expiring_soon';
+  subscription: {
+    id: string;
+    subscriptionId: string;
+    expiresAt: Date;
+    userProfileId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}
+
 @Injectable()
 export class SubscriptionCreateService {
   private readonly logger = new Logger(SubscriptionCreateService.name);
@@ -64,7 +76,7 @@ export class SubscriptionCreateService {
   }
 
   @Span()
-  public async subscribe(userProfileId: TypeID<'user_profile'>): Promise<void> {
+  public async subscribe(userProfileId: TypeID<'user_profile'>): Promise<SubscribeResult> {
     const span = this.trace.getSpan();
     span?.setAttribute('user_profile_id', userProfileId.toString());
     span?.setAttribute('operation', 'create_subscription');
@@ -74,21 +86,21 @@ export class SubscriptionCreateService {
       'Starting Microsoft Graph subscription creation process for user',
     );
 
-    const subscription = await this.db.query.subscriptions.findFirst({
+    const existingSubscription = await this.db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.internalType, 'transcript'),
         eq(subscriptions.userProfileId, userProfileId.toString()),
       ),
     });
 
-    if (subscription) {
-      span?.addEvent('found managed subscription', { id: subscription.id });
+    if (existingSubscription) {
+      span?.addEvent('found managed subscription', { id: existingSubscription.id });
       this.logger.debug(
-        { id: subscription.id },
+        { id: existingSubscription.id },
         'Located existing managed subscription in database',
       );
 
-      const expiresAt = new Date(subscription.expiresAt);
+      const expiresAt = new Date(existingSubscription.expiresAt);
       const now = new Date();
       const diffFromNow = expiresAt.getTime() - now.getTime();
 
@@ -96,7 +108,7 @@ export class SubscriptionCreateService {
       span?.setAttribute('subscription.diffFromNowMs', diffFromNow);
 
       this.logger.debug(
-        { id: subscription.id, expiresAt, now: now, diffFromNow },
+        { id: existingSubscription.id, expiresAt, now: now, diffFromNow },
         'Evaluating managed subscription expiration status',
       );
 
@@ -111,41 +123,45 @@ export class SubscriptionCreateService {
 
         const result = await this.db
           .delete(subscriptions)
-          .where(eq(subscriptions.id, subscription.id));
+          .where(eq(subscriptions.id, existingSubscription.id));
 
         span?.addEvent('expired managed subscription deleted', {
-          id: subscription.id,
+          id: existingSubscription.id,
           count: result.rowCount ?? NaN,
         });
 
         this.logger.log(
-          { id: subscription.id, count: result.rowCount ?? NaN },
+          { id: existingSubscription.id, count: result.rowCount ?? NaN },
           'Successfully deleted expired managed subscription from database',
         );
+        // Continue to create a new subscription below
       } else if (diffFromNow <= minimalTimeForLifecycleNotificationsInMinutes * 60 * 1000) {
         // NOTE: here we are below the threshold and ideally we should also be discarding the existing subscription
         // but there might be an edge case where this event gets picked up while a renewal is already in progress or
         // is about to happen very soon - this is a very unlikely edge case (never happened in prod),
         // but to be safe we just skip creating a new subscription here and let it naturally renew later or eventually expire.
         span?.addEvent('subscription expiration below renewal threshold', {
-          id: subscription.id,
+          id: existingSubscription.id,
           thresholdMinutes: minimalTimeForLifecycleNotificationsInMinutes,
         });
 
         this.logger.warn(
-          { id: subscription.id, thresholdMinutes: minimalTimeForLifecycleNotificationsInMinutes },
-          'Subscription expires too soon to renew safely, skipping creation',
+          {
+            id: existingSubscription.id,
+            thresholdMinutes: minimalTimeForLifecycleNotificationsInMinutes,
+          },
+          'Subscription expires too soon to renew safely, returning existing',
         );
-        return;
+        return { status: 'expiring_soon', subscription: existingSubscription };
       } else {
         // NOTE: here we have enough time left on the subscription, so we do nothing
         span?.addEvent('subscription valid, skipping creation');
 
         this.logger.debug(
-          { id: subscription.id },
+          { id: existingSubscription.id },
           'Existing subscription is valid, skipping new subscription creation',
         );
-        return;
+        return { status: 'already_active', subscription: existingSubscription };
       }
     }
 
@@ -232,7 +248,7 @@ export class SubscriptionCreateService {
         userProfileId: userProfileId.toString(),
         subscriptionId: graphSubscription.id,
       })
-      .returning({ id: subscriptions.id });
+      .returning();
 
     const created = newManagedSubscriptions.at(0);
     if (!created) {
@@ -242,5 +258,7 @@ export class SubscriptionCreateService {
 
     span?.addEvent('new managed subscription created', { id: created.id });
     this.logger.log({ id: created.id }, 'Successfully created new managed subscription record');
+
+    return { status: 'created', subscription: created };
   }
 }

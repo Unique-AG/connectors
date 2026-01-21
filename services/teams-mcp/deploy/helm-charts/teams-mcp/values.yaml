@@ -23,7 +23,7 @@ server:
     - teams-mcp-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/teams-mcp
-    tag: 0.1.1 # x-release-please-version
+    tag: 0.2.0 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
