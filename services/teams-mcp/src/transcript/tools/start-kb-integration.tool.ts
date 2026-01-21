@@ -2,7 +2,7 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
-import { type TypeID, typeid } from 'typeid-js';
+import { fromString, parseTypeId, typeid } from 'typeid-js';
 import * as z from 'zod';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
@@ -64,10 +64,9 @@ export class StartKbIntegrationTool {
 
     this.logger.log({ userProfileId }, 'Starting knowledge base integration for user');
 
-    const userProfileTypeid = typeid(
-      'user_profile',
-      userProfileId.replace('user_profile_', ''),
-    ) as TypeID<'user_profile'>;
+    const tid = fromString(userProfileId, 'user_profile');
+    const pid = parseTypeId(tid);
+    const userProfileTypeid = typeid(pid.prefix, pid.suffix);
 
     const result = await this.subscriptionCreate.subscribe(userProfileTypeid);
     const { status, subscription } = result;
