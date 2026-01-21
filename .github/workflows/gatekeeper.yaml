@@ -14,8 +14,6 @@ jobs:
   conventional-pr-title:
     runs-on: ubuntu-latest
     name: Validate PR title and scope
-    # Skip bot PRs (release-please, dependabot, github-actions)
-    if: ${{ !contains(fromJson('["github-actions[bot]", "release-please[bot]", "dependabot[bot]"]'), github.event.pull_request.user.login) }}
     permissions:
       pull-requests: read
     env:
@@ -23,9 +21,9 @@ jobs:
       PR_NUMBER: ${{ github.event.number }}
       PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v6
 
-      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
+      - uses: cachix/install-nix-action@v30
 
       - name: Validate PR title
         run: |

@@ -19,6 +19,7 @@ docs = Documentation only changes
 chore = Other changes that don't modify src or test files
 refactor = A code change that neither fixes a bug nor adds a feature
 test = Adding missing tests or correcting existing tests
+build = Changes that affect the build system or external dependencies
 revert = Reverts a previous commit
 
 [scopes]
@@ -39,3 +40,4 @@ probe = packages/probe/**
 # Special scopes
 ci = .github/**
 main = *, .*
+deps = **/package.json, **/pnpm-lock.yaml, pnpm-lock.yaml
