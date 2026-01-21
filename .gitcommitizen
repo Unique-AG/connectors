@@ -19,7 +19,6 @@ docs = Documentation only changes
 chore = Other changes that don't modify src or test files
 refactor = A code change that neither fixes a bug nor adds a feature
 test = Adding missing tests or correcting existing tests
-ci = Changes to CI configuration files and scripts
 revert = Reverts a previous commit
 
 [scopes]
