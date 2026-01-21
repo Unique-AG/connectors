@@ -271,10 +271,7 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.scopeId') {
-          return 'scope-id';
-        }
+      vi.spyOn(configService, 'get').mockImplementation(() => {
         return null;
       });
 
@@ -371,10 +368,7 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.scopeId') {
-          return 'scope-id';
-        }
+      vi.spyOn(configService, 'get').mockImplementation(() => {
         return null;
       });
 
@@ -415,10 +409,7 @@ describe('ContentSyncService', () => {
         deletedFiles: [],
       });
 
-      vi.spyOn(configService, 'get').mockImplementation((key: string) => {
-        if (key === 'unique.scopeId') {
-          return 'scope-id';
-        }
+      vi.spyOn(configService, 'get').mockImplementation(() => {
         return null;
       });
 

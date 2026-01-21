@@ -1,7 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { IngestionMode } from '../constants/ingestion.constants';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
@@ -87,8 +86,6 @@ describe('ItemProcessingOrchestratorService', () => {
         ...stub(),
         get: vi.fn((key: string) => {
           if (key === 'processing.concurrency') return 3;
-          if (key === 'unique.ingestionMode') return IngestionMode.Flat;
-          if (key === 'unique.scopeId') return 'test-scope-id';
           return undefined;
         }),
       }))

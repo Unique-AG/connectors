@@ -73,7 +73,6 @@ describe('GraphApiService', () => {
         ...stub(),
         get: vi.fn((key: string) => {
           if (key === 'sharepoint.graphApiRateLimitPerMinuteThousands') return 10;
-          if (key === 'processing.maxFileSizeBytes') return 10485760;
           if (key === 'processing.maxFilesToScan') return maxFilesToScanConfig;
           return undefined;
         }),

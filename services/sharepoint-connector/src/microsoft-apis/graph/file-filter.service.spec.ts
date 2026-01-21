@@ -89,7 +89,6 @@ describe('FileFilterService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.syncColumnName') return 'FinanceGPTKnowledge';
           if (key === 'processing.allowedMimeTypes') return ['application/pdf', 'text/plain'];
           if (key === 'processing.maxFileSizeToIngestBytes') return DEFAULT_MAX_FILE_SIZE_BYTES;
           return undefined;

@@ -19,7 +19,6 @@ describe('IngestionFinalizationStep', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((k: string) => {
-          if (k === 'unique.scopeId') return 'scope-1';
           if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
           return undefined;
         }),

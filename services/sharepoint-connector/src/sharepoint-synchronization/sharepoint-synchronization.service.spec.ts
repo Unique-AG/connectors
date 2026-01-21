@@ -1,7 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { IngestionMode } from '../constants/ingestion.constants';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
@@ -144,9 +143,6 @@ describe('SharepointSynchronizationService', () => {
               sitesSource: 'config_file',
               sites: [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })],
             };
-          if (key === 'processing.syncMode') return 'content_only';
-          if (key === 'unique.ingestionMode') return IngestionMode.Flat;
-          if (key === 'unique.scopeId') return 'test-scope-id';
           return undefined;
         }),
       }))
@@ -294,9 +290,6 @@ describe('SharepointSynchronizationService', () => {
               sitesSource: 'config_file',
               sites: mockSiteConfigs,
             };
-          if (key === 'processing.syncMode') return 'content_and_permissions';
-          if (key === 'unique.ingestionMode') return IngestionMode.Flat;
-          if (key === 'unique.scopeId') return 'test-scope-id';
           return undefined;
         }),
       }))
@@ -361,9 +354,6 @@ describe('SharepointSynchronizationService', () => {
               sitesSource: 'config_file',
               sites: mockSiteConfigs,
             };
-          if (key === 'processing.syncMode') return 'content_and_permissions';
-          if (key === 'unique.ingestionMode') return IngestionMode.Flat;
-          if (key === 'unique.scopeId') return 'test-scope-id';
           return undefined;
         }),
       }))

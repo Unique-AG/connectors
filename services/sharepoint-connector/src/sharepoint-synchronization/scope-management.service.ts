@@ -231,10 +231,10 @@ export class ScopeManagementService {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
     const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
     // We're adding two cases that are special - the root scope that we want to have explicitly
-    // marked as site root and site pages that is a special colection we fetch for ASPX pages,
+    // marked with the site ID and site pages that is a special collection we fetch for ASPX pages,
     // but has no folders.
     pathToExternalIdMap[context.rootPath] =
-      `${EXTERNAL_ID_PREFIX}root-${context.siteConfig.siteId}}`;
+      `${EXTERNAL_ID_PREFIX}site:${context.siteConfig.siteId}`;
     pathToExternalIdMap[`${context.rootPath}/SitePages`] =
       `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId}/sitePages`;
 
