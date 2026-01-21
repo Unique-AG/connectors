@@ -3,7 +3,7 @@
 
 ## User Connection Flow
 
-Everything starts when a user connects to the MCP server. This triggers OAuth authentication and sets up the subscription for receiving meeting notifications.
+Everything starts when a user connects to the MCP server. This triggers OAuth authentication. After authentication, the user can start the KB integration via the `start_kb_integration` tool to begin receiving meeting notifications.
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -21,8 +21,8 @@ flowchart LR
         Store["Store encrypted tokens"]
     end
 
-    subgraph Setup["Subscription Setup"]
-        UserUpsert["Emit UserUpsertEvent"]
+    subgraph Setup["Subscription Setup (via Tool)"]
+        StartTool["User calls start_kb_integration"]
         CreateSub["Create Graph subscription"]
         StoreSub["Store subscription record"]
     end
@@ -38,8 +38,8 @@ flowchart LR
     Consent --> Callback
     Callback --> Exchange
     Exchange --> Store
-    Store --> UserUpsert
-    UserUpsert --> CreateSub
+    Store --> StartTool
+    StartTool --> CreateSub
     CreateSub --> StoreSub
     StoreSub --> Active
     Active --> Listen
@@ -67,12 +67,15 @@ sequenceDiagram
     EntraID->>TeamsMCP: Microsoft access + refresh tokens
     Note over TeamsMCP: Microsoft tokens NEVER sent to client<br/>Encrypted and stored on server only
     TeamsMCP->>DB: Store encrypted Microsoft tokens
+    TeamsMCP->>MCPClient: Issue opaque JWT tokens<br/>(MCP access + refresh tokens)
 
-    Note over TeamsMCP: Emit UserUpsertEvent
+    Note over User,MCPClient: User starts KB integration via tool
+    User->>MCPClient: Call start_kb_integration tool
+    MCPClient->>TeamsMCP: Tool invocation
     TeamsMCP->>MSGraph: POST /subscriptions<br/>(using Microsoft access token)
     MSGraph->>TeamsMCP: Subscription created (ID, expiry)
     TeamsMCP->>DB: Store subscription record
-    TeamsMCP->>MCPClient: Issue opaque JWT tokens<br/>(MCP access + refresh tokens)
+    TeamsMCP->>MCPClient: Success response
 
     Note over TeamsMCP: Now listening for meeting transcripts
 ```
