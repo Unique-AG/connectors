@@ -1,11 +1,9 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import { type TypeID, typeid } from 'typeid-js';
 import * as z from 'zod';
-import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
 const StartKbIntegrationInputSchema = z.object({});
@@ -18,7 +16,7 @@ const StartKbIntegrationOutputSchema = z.object({
       id: z.string(),
       expiresAt: z.string(),
       minutesUntilExpiration: z.number(),
-      status: z.enum(['created', 'already_active']),
+      status: z.enum(['created', 'already_active', 'expiring_soon']),
     })
     .nullable(),
 });
@@ -28,7 +26,6 @@ export class StartKbIntegrationTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly traceService: TraceService,
     private readonly subscriptionCreate: SubscriptionCreateService,
   ) {}
@@ -67,84 +64,37 @@ export class StartKbIntegrationTool {
 
     this.logger.log({ userProfileId }, 'Starting knowledge base integration for user');
 
-    // Check if subscription already exists and is valid
-    const existingSubscription = await this.db.query.subscriptions.findFirst({
-      where: and(
-        eq(subscriptions.internalType, 'transcript'),
-        eq(subscriptions.userProfileId, userProfileId),
-      ),
-    });
-
-    if (existingSubscription) {
-      const expiresAt = new Date(existingSubscription.expiresAt);
-      const now = new Date();
-      const diffFromNow = expiresAt.getTime() - now.getTime();
-      const minutesUntilExpiration = Math.floor(diffFromNow / (1000 * 60));
-
-      // Subscription is still valid (more than 15 minutes until expiration)
-      if (diffFromNow > 15 * 60 * 1000) {
-        this.logger.debug(
-          { userProfileId, subscriptionId: existingSubscription.id },
-          'Knowledge base integration already active for user',
-        );
-
-        return {
-          success: true,
-          message: 'Knowledge base integration is already active.',
-          subscription: {
-            id: existingSubscription.id,
-            expiresAt: expiresAt.toISOString(),
-            minutesUntilExpiration,
-            status: 'already_active',
-          },
-        };
-      }
-    }
-
-    // Create new subscription by calling the service directly
     const userProfileTypeid = typeid(
       'user_profile',
       userProfileId.replace('user_profile_', ''),
     ) as TypeID<'user_profile'>;
-    await this.subscriptionCreate.subscribe(userProfileTypeid);
 
-    // Fetch the newly created subscription
-    const newSubscription = await this.db.query.subscriptions.findFirst({
-      where: and(
-        eq(subscriptions.internalType, 'transcript'),
-        eq(subscriptions.userProfileId, userProfileId),
-      ),
-    });
+    const result = await this.subscriptionCreate.subscribe(userProfileTypeid);
+    const { status, subscription } = result;
 
-    if (!newSubscription) {
-      this.logger.error(
-        { userProfileId },
-        'Failed to create knowledge base integration subscription',
-      );
-      return {
-        success: false,
-        message: 'Failed to start knowledge base integration. Please try again.',
-        subscription: null,
-      };
-    }
-
-    const expiresAt = new Date(newSubscription.expiresAt);
+    const expiresAt = new Date(subscription.expiresAt);
     const minutesUntilExpiration = Math.floor((expiresAt.getTime() - Date.now()) / (1000 * 60));
 
+    const messages: Record<typeof status, string> = {
+      created:
+        'Knowledge base integration started successfully. Meeting transcripts will now be ingested automatically.',
+      already_active: 'Knowledge base integration is already active.',
+      expiring_soon: `Knowledge base integration is active but expiring in ${minutesUntilExpiration} minutes. It will be automatically renewed.`,
+    };
+
     this.logger.log(
-      { userProfileId, subscriptionId: newSubscription.id },
-      'Successfully started knowledge base integration',
+      { userProfileId, subscriptionId: subscription.id, status },
+      'Knowledge base integration operation completed',
     );
 
     return {
       success: true,
-      message:
-        'Knowledge base integration started successfully. Meeting transcripts will now be ingested automatically.',
+      message: messages[status],
       subscription: {
-        id: newSubscription.id,
+        id: subscription.id,
         expiresAt: expiresAt.toISOString(),
         minutesUntilExpiration,
-        status: 'created',
+        status,
       },
     };
   }

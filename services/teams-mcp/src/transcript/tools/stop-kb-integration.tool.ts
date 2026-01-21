@@ -1,10 +1,9 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
+import { type TypeID, typeid } from 'typeid-js';
 import * as z from 'zod';
-import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { SubscriptionRemoveService } from '../subscription-remove.service';
 
 const StopKbIntegrationInputSchema = z.object({});
@@ -15,7 +14,7 @@ const StopKbIntegrationOutputSchema = z.object({
   subscription: z
     .object({
       id: z.string(),
-      status: z.literal('removed'),
+      status: z.enum(['removed', 'not_found']),
     })
     .nullable(),
 });
@@ -25,7 +24,6 @@ export class StopKbIntegrationTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly traceService: TraceService,
     private readonly subscriptionRemove: SubscriptionRemoveService,
   ) {}
@@ -64,40 +62,29 @@ export class StopKbIntegrationTool {
 
     this.logger.log({ userProfileId }, 'Stopping knowledge base integration for user');
 
-    // Find the existing subscription
-    const existingSubscription = await this.db.query.subscriptions.findFirst({
-      where: and(
-        eq(subscriptions.internalType, 'transcript'),
-        eq(subscriptions.userProfileId, userProfileId),
-      ),
-    });
+    const userProfileTypeid = typeid(
+      'user_profile',
+      userProfileId.replace('user_profile_', ''),
+    ) as TypeID<'user_profile'>;
 
-    if (!existingSubscription) {
-      this.logger.debug({ userProfileId }, 'No active knowledge base integration found for user');
+    const result = await this.subscriptionRemove.removeByUserProfileId(userProfileTypeid);
+    const { status, subscription } = result;
 
-      return {
-        success: true,
-        message: 'Knowledge base integration is not active. Nothing to stop.',
-        subscription: null,
-      };
-    }
-
-    // Remove the subscription by calling the service directly
-    await this.subscriptionRemove.remove(existingSubscription.subscriptionId);
+    const messages: Record<typeof status, string> = {
+      removed:
+        'Knowledge base integration stopped successfully. New meeting transcripts will no longer be ingested.',
+      not_found: 'Knowledge base integration is not active. Nothing to stop.',
+    };
 
     this.logger.log(
-      { userProfileId, subscriptionId: existingSubscription.id },
-      'Successfully stopped knowledge base integration',
+      { userProfileId, subscriptionId: subscription?.id, status },
+      'Knowledge base integration stop operation completed',
     );
 
     return {
       success: true,
-      message:
-        'Knowledge base integration stopped successfully. New meeting transcripts will no longer be ingested.',
-      subscription: {
-        id: existingSubscription.id,
-        status: 'removed',
-      },
+      message: messages[status],
+      subscription: subscription ? { id: subscription.id, status } : null,
     };
   }
 }
