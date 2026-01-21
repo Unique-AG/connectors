@@ -14,6 +14,8 @@ jobs:
   conventional-pr-title:
     runs-on: ubuntu-latest
     name: Validate PR title and scope
+    # Skip automated PRs (release-please, dependabot) by label
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') && !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') && !contains(github.event.pull_request.labels.*.name, 'dependencies') }}
     permissions:
       pull-requests: read
     env:
