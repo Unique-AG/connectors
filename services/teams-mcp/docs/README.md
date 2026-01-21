@@ -185,12 +185,15 @@ sequenceDiagram
     TeamsMCP->>EntraID: Exchange code for tokens
     EntraID->>TeamsMCP: Access + Refresh tokens
     TeamsMCP->>DB: Store encrypted tokens
+    TeamsMCP->>MCPClient: Opaque JWT for auth
 
-    Note over TeamsMCP: Emit UserUpsertEvent
+    Note over User,MCPClient: User starts KB integration via tool
+    User->>MCPClient: Call start_kb_integration tool
+    MCPClient->>TeamsMCP: Tool invocation
     TeamsMCP->>MSGraph: POST /subscriptions
     MSGraph->>TeamsMCP: Subscription created (ID, expiry)
     TeamsMCP->>DB: Store subscription record
-    TeamsMCP->>MCPClient: Opaque JWT for auth
+    TeamsMCP->>MCPClient: Success response
 
     Note over TeamsMCP: Now listening for meeting transcripts
 ```

@@ -13,12 +13,10 @@ import {
   Post,
   UseInterceptors,
 } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { Span, TraceService } from 'nestjs-otel';
+import { TraceService } from 'nestjs-otel';
 import { serializeError } from 'serialize-error-cjs';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
-import { UserUpsertEvent } from '~/auth/events';
 import { normalizeError } from '~/utils/normalize-error';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
 import { SubscriptionCreateService } from './subscription-create.service';
@@ -270,14 +268,5 @@ export class TranscriptController {
         );
         break;
     }
-  }
-
-  @Span()
-  @OnEvent('user.upsert')
-  public async userUpsert(payload: unknown) {
-    const event = UserUpsertEvent.parse(payload);
-    this.logger.debug({ event }, 'Processing user upsert event to trigger subscription creation');
-
-    return this.subscriptionCreate.enqueueSubscriptionRequested(event.id);
   }
 }
