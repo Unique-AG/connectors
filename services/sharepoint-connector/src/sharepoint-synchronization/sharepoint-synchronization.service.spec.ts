@@ -761,4 +761,38 @@ describe('SharepointSynchronizationService', () => {
       }),
     );
   });
+
+  it('ensures unique scopeIds and logs errors for duplicates', async () => {
+    const site1 = createMockSiteConfig({ siteId: 'site-1', scopeId: 'duplicate-scope' });
+    const site2 = createMockSiteConfig({ siteId: 'site-2', scopeId: 'duplicate-scope' });
+    const site3 = createMockSiteConfig({ siteId: 'site-3', scopeId: 'unique-scope' });
+
+    mockSitesConfigurationService.loadSitesConfiguration = vi
+      .fn()
+      .mockResolvedValue([site1, site2, site3]);
+
+    // biome-ignore lint/suspicious/noExplicitAny: Access private logger to verify error logging
+    const loggerSpy = vi.spyOn((service as any).logger, 'error');
+
+    await service.synchronize();
+
+    // Should only sync site1 and site3
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+      site1.siteId,
+      expect.any(String),
+    );
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+      site3.siteId,
+      expect.any(String),
+    );
+    expect(mockGraphApiService.getAllSiteItems).not.toHaveBeenCalledWith(
+      site2.siteId,
+      expect.any(String),
+    );
+
+    // Verify error logging
+    expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('DUPLICATE SCOPE ID DETECTED!'));
+    expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('duplicate-scope'));
+  });
 });

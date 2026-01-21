@@ -348,7 +348,7 @@ describe('ScopeManagementService', () => {
 
       const configService = {
         get: vi.fn((key: string) => {
-          if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
+          if (key === 'app.logsDiagnosticsDataPolicy') return 'show'; // Don't conceal logs for this test
           return undefined;
         }),
       };

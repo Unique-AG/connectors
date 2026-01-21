@@ -41,6 +41,7 @@ export class ScopeManagementService {
 
   public async initializeRootScope(
     rootScopeId: string,
+    siteId: string,
     ingestionMode: IngestionMode,
   ): Promise<RootScopeInfo> {
     const userId = await this.uniqueUsersService.getCurrentUserId();
@@ -57,6 +58,17 @@ export class ScopeManagementService {
 
     const rootScope = await this.uniqueScopesService.getScopeById(rootScopeId);
     assert.ok(rootScope, `Root scope with ID ${rootScopeId} not found`);
+
+    const isValid = this.isValidScopeOwnership(rootScope, siteId);
+    if (!isValid) {
+      const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
+      const logActualExternalId = this.shouldConcealLogs
+        ? smear(rootScope.externalId)
+        : rootScope.externalId;
+      throw new Error(
+        `Root scope ${rootScopeId} is owned by a different site. Expected externalId "${expectedExternalId}" but got "${logActualExternalId}". This scope cannot be synced by this site.`,
+      );
+    }
 
     const pathSegments = [rootScope.name];
     let currentScope: Scope = rootScope;
@@ -116,6 +128,15 @@ export class ScopeManagementService {
       });
       throw error;
     }
+  }
+
+  private isValidScopeOwnership(rootScope: Scope, siteId: string): boolean {
+    if (!rootScope.externalId) {
+      return true;
+    }
+
+    const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
+    return rootScope.externalId === expectedExternalId;
   }
 
   private buildItemIdToScopePathMap(
@@ -272,7 +293,9 @@ export class ScopeManagementService {
           externalId,
         );
         scope.externalId = updatedScope.externalId;
-        this.logger.debug(`Updated scope ${scope.id} with externalId: ${externalId}`);
+        this.logger.debug(
+          `Updated scope ${scope.id} with externalId: ${this.shouldConcealLogs ? smear(externalId) : externalId}`,
+        );
       } catch (error) {
         this.logger.warn({
           msg: `Failed to update externalId for scope ${scope.id}`,
