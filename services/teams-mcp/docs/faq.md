@@ -8,18 +8,21 @@
 **Answer:** The Teams MCP Server is a connector-style MCP server, not a traditional MCP server. Unlike traditional MCP servers that provide tools, prompts, resources, or other interactive capabilities, this server operates automatically in the background once connected.
 
 **What it does:**
+
 - Once a user connects their Microsoft account, the connector automatically ingests meeting transcripts into the Unique knowledge base
 - It does not expose any MCP tools, prompts, or resources
 - It does not require any tool calls or additional interaction after the initial connection
 - It operates continuously in the background, processing transcripts as they become available
 
 **What it does not do:**
+
 - Provide MCP tools for querying or manipulating data
 - Offer prompts or prompt templates
 - Expose resources for browsing or accessing
 - Require any interaction beyond the initial connection
 
 **Architecture:**
+
 - Uses MCP OAuth for user authentication and connection
 - Does not implement MCP tools, prompts, or resources
 - Operates as a background service that automatically ingests transcripts
@@ -27,6 +30,7 @@
 - Ingests content into Unique knowledge base without requiring tool calls
 
 **Design rationale:**
+
 - The connector model allows for automatic, continuous data ingestion
 - Users connect once and transcripts are automatically captured
 - No need for interactive tool calls or resource browsing
@@ -41,6 +45,7 @@ This is a data ingestion connector that uses the MCP protocol for authentication
 **Answer:** `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` require admin consent because they access sensitive meeting content. This is a Microsoft requirement, not a Teams MCP requirement.
 
 **What to do:**
+
 1. Go to Azure Portal → App Registration → API permissions
 2. Click "Grant admin consent for [Your Organization]"
 3. Users can then connect and grant their own consent
@@ -66,6 +71,7 @@ This is a data ingestion connector that uses the MCP protocol for authentication
 **Answer:** While it's technically possible to use certificate authentication with the Authorization Code flow, it would require significant additional implementation effort in our OAuth packages. The standard approach for delegated permissions is to use a client secret, which is simpler to implement and maintain.
 
 **See also:**
+
 - [Authentication Architecture - Unsupported Authentication Methods](./technical/architecture.md#unsupported-authentication-methods)
 - [Microsoft Entra ID - Authentication flows](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows)
 
@@ -78,6 +84,7 @@ The `CLIENT_ID` enables Microsoft to verify application identity, enforce permis
 **Security note:** The client secret is never sent to clients - it's only used server-side during the OAuth flow.
 
 **See also:**
+
 - [Authentication Architecture - Required App Registration Components](./technical/architecture.md#required-app-registration-components)
 - [Microsoft Graph API - Get access on behalf of a user](https://learn.microsoft.com/en-us/graph/auth-v2-user)
 
@@ -90,6 +97,7 @@ The `CLIENT_ID` enables Microsoft to verify application identity, enforce permis
 ### What's the difference between delegated and application permissions?
 
 **Answer:**
+
 - **Delegated:** Acts on behalf of the signed-in user, only accesses data that user can access
 - **Application:** Acts as the application itself, requires admin-configured policies per user
 
@@ -102,6 +110,7 @@ Teams MCP uses delegated permissions for self-service user connections.
 **Answer:** Client Credentials flow only supports application permissions, which would require tenant admins to create Application Access Policies per user via PowerShell. This is impractical for self-service MCP connections. Delegated permissions require the Authorization Code flow.
 
 **See also:**
+
 - [Authentication Architecture - Unsupported Authentication Methods](./technical/architecture.md#unsupported-authentication-methods)
 - [Microsoft Entra ID - Authentication flows](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows)
 
@@ -110,6 +119,7 @@ Teams MCP uses delegated permissions for self-service user connections.
 **Answer:** Each Teams MCP deployment uses one Microsoft Entra ID app registration. The app can be configured as multi-tenant to serve users from multiple organizations, but you don't need separate app registrations per tenant.
 
 **Single App Registration Architecture:**
+
 - **Single App Registration**: One `CLIENT_ID`/`CLIENT_SECRET` pair per deployment
 - **Multi-Tenant Capable**: The app registration can be configured to accept users from multiple Microsoft tenants
 - **Cross-Tenant Authentication**: Users from different organizations authenticate via Enterprise Applications in their tenant that reference the original app registration
@@ -118,6 +128,7 @@ Teams MCP uses delegated permissions for self-service user connections.
 This design uses a single OAuth application that can serve users across multiple tenants, rather than requiring separate app registrations per organization.
 
 **See also:**
+
 - [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture)
 - [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/) - Authentication and authorization
 
@@ -128,17 +139,20 @@ This design uses a single OAuth application that can serve users across multiple
 **Answer:** The Teams MCP Server requires a Zitadel service account to authenticate with the Unique Public API and perform operations on behalf of the server.
 
 **What the service account is used for:**
+
 - **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants from Microsoft Teams
 - **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts and recordings
 - **Set access permissions** - Grant appropriate read/write permissions to meeting organizers and participants based on their role in the meeting
 - **Upload transcript data** - Ingest transcript content (VTT files) and recordings (MP4 files) into the Unique knowledge base
 
 **How it works:**
+
 - The service account credentials are passed via the `x-company-id` and `x-user-id` headers in all API requests to the Unique Public API
 - This ensures proper access control and authorization for all operations
 - The service account must be created in the Zitadel organization where you want to ingest transcripts
 
 **How to create:**
+
 1. Log in to Zitadel and select the target organization
 2. Navigate to **Service Accounts** in the organization settings
 3. Create a new service account with appropriate permissions
@@ -155,6 +169,7 @@ https://<your-domain>/auth/callback
 ```
 
 **Common mistakes:**
+
 - Missing trailing slash (if configured with one)
 - Using `http://` instead of `https://` in production
 - Wrong path (must be `/auth/callback`)
@@ -182,6 +197,7 @@ https://<your-domain>/auth/callback
 **Answer:** Update the Kubernetes secret and restart the pods. Users don't need to reconnect - the server will use the new secret for token refresh operations.
 
 **Rotation process:**
+
 1. Create new secret in Entra ID
 2. Update Kubernetes secret
 3. Restart pods
@@ -210,18 +226,21 @@ If rotation becomes necessary, it would require manually deleting all subscripti
 - All Microsoft API calls are made by the server on behalf of authenticated users
 
 **Token Isolation Design:**
+
 1. **Microsoft OAuth Flow**: User authenticates with Microsoft Entra ID
 2. **Token Exchange**: Server exchanges authorization code for Microsoft tokens (using `CLIENT_SECRET`)
 3. **Token Storage**: Microsoft tokens are encrypted and stored on the server only
 4. **Client Authentication**: Server issues separate opaque JWT tokens to the client for MCP API access
 
 **See also:**
+
 - [Authentication Architecture - Token Isolation](./technical/architecture.md#token-isolation)
 - [Authentication Architecture - Token Storage](./technical/architecture.md#token-storage)
 
 ### Why are MCP tokens hashed but Microsoft tokens encrypted?
 
 **Answer:**
+
 - **MCP tokens:** Opaque JWTs that the server doesn't need to read - hash comparison is sufficient for validation
 - **Microsoft tokens:** Must be decrypted to use for Graph API calls - encryption allows retrieval
 
@@ -254,6 +273,7 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 ### What happens if token refresh fails?
 
 **Possible causes:**
+
 - Microsoft refresh token expired (~90 days of inactivity)
 - User revoked consent in Microsoft account settings
 - Network issues reaching Microsoft token endpoint
@@ -262,6 +282,7 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 **Resolution:** User must reconnect to MCP server to re-authenticate.
 
 **See also:**
+
 - [Microsoft Token Refresh Flow](./technical/flows.md#microsoft-token-refresh-flow)
 - [Microsoft Entra ID Troubleshooting](https://learn.microsoft.com/en-us/entra/identity-platform/troubleshoot-authentication)
 
@@ -270,6 +291,7 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 **Answer:** All refresh operations fail for that user. The user must re-authenticate completely. This happens automatically when refresh token reuse is detected (possible token theft).
 
 **See also:**
+
 - [Architecture - Token Family Tracking](./technical/architecture.md#key-design-decisions)
 - [Security - Refresh Token Rotation](./technical/security.md#refresh-token-rotation)
 
@@ -278,6 +300,7 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 **Answer:** All stored Microsoft tokens become unreadable. All users must reconnect to obtain fresh tokens. There is no zero-downtime rotation for the encryption key.
 
 **See also:**
+
 - [Authentication Architecture - Token Encryption](./technical/architecture.md#token-encryption)
 - [Security - ENCRYPTION_KEY Rotation](./technical/security.md#rotation-procedures)
 
@@ -286,6 +309,7 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 **Answer:** Short-lived access tokens reduce the impact of token theft. If an access token is compromised, it expires quickly. Refresh tokens are used to obtain new access tokens without user re-authentication.
 
 **See also:**
+
 - [Authentication Architecture - MCP OAuth (Internal)](./technical/architecture.md#mcp-oauth-internal)
 - [MCP Authorization](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization) - MCP protocol authorization spec
 
@@ -324,6 +348,7 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 **Answer:** Microsoft requires webhook endpoints to respond within **10 seconds**, or it considers the delivery failed and retries. However, processing transcript notifications involves database lookups, multiple Microsoft Graph API calls, user resolution, and content ingestion, which can take **30+ seconds**.
 
 RabbitMQ decouples webhook reception from processing:
+
 - **Webhook Controller** receives the notification, validates it, publishes to RabbitMQ, and returns `202 Accepted` immediately
 - **RabbitMQ** durably stores the message until a consumer processes it
 - **Transcript Service** consumes messages and performs the slow processing asynchronously
@@ -331,6 +356,7 @@ RabbitMQ decouples webhook reception from processing:
 This ensures we meet Microsoft's strict timeout requirements while processing transcripts reliably.
 
 **Benefits:**
+
 - Meets Microsoft's 10-second webhook response requirement
 - Avoids Microsoft retry storms from failed deliveries
 - Provides reliability via Dead Letter Exchange for failed message inspection and retry
@@ -338,6 +364,7 @@ This ensures we meet Microsoft's strict timeout requirements while processing tr
 - Handles burst traffic gracefully with message buffering
 
 **See also:**
+
 - [Microsoft Graph Webhooks](https://learn.microsoft.com/en-us/graph/webhooks) - Microsoft webhook documentation
 - [Microsoft Graph Change Notifications](https://learn.microsoft.com/en-us/graph/webhooks#change-notifications) - Change notification requirements
 
@@ -362,6 +389,7 @@ This ensures we meet Microsoft's strict timeout requirements while processing tr
 ### What happens if the database is full?
 
 **Answer:** Write operations will fail. Solutions:
+
 - Run token cleanup job manually
 - Increase database storage
 - Archive old data
@@ -409,18 +437,21 @@ This ensures we meet Microsoft's strict timeout requirements while processing tr
 ### Why separate MCP tokens from Microsoft tokens?
 
 **Answer:** This design ensures:
+
 - Microsoft tokens never leave the server
 - Clients cannot access Microsoft Graph API directly
 - All Microsoft API calls are made by the server on behalf of authenticated users
 - Client tokens are opaque JWTs that only authenticate with the MCP server
 
 **See also:**
+
 - [Authentication Architecture - Token Isolation](./technical/architecture.md#token-isolation)
 - [Microsoft Graph - Get access on behalf of a user](https://learn.microsoft.com/en-us/graph/auth-v2-user)
 
 ### What's the threat model?
 
 **Answer:** The security architecture protects against:
+
 - Token theft (refresh token rotation, family-based revocation)
 - Authorization code interception (PKCE)
 - Webhook spoofing (clientState validation)
@@ -435,18 +466,21 @@ This ensures we meet Microsoft's strict timeout requirements while processing tr
 **Answer:** Each MCP deployment uses one Microsoft Entra ID app registration that can serve users from multiple Microsoft tenants. When tenant admins grant consent, Microsoft creates Enterprise Applications in their tenants. This is simpler than managing multiple app registrations.
 
 **See also:**
+
 - [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture)
 - [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/)
 
 ### How does multi-tenant authentication work?
 
 **Answer:**
+
 1. App registration configured as multi-tenant ("Accounts in any organizational directory")
 2. Tenant admin grants consent → Microsoft creates Enterprise Application in their tenant
 3. Users authenticate via Enterprise Application in their tenant
 4. One MCP deployment serves all tenants
 
 **See also:**
+
 - [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture)
 - [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/)
 
@@ -457,6 +491,7 @@ This ensures we meet Microsoft's strict timeout requirements while processing tr
 **Answer:** Yes. Configure the app registration with "Accounts in any organizational directory" (multi-tenant). When each organization's admin grants consent, Microsoft creates an Enterprise Application in their tenant. One MCP deployment serves all tenants.
 
 **Considerations:**
+
 - Data isolation: All tenant data stored in same database (with tenant-scoped access controls)
 - Enterprise Application management: Each tenant admin controls user assignment
 - Compliance: Some organizations may require dedicated infrastructure

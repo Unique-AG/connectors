@@ -14,6 +14,7 @@ This guide walks through setting up the Teams MCP Server for local development a
 | MCP Inspector | 0.17.2 | MCP Client |
 
 A public reverse proxy, recommended:
+
 - [Azure Dev Tunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/) for webhook testing
 
 ## Quick Start
@@ -192,10 +193,12 @@ Opens a browser UI at `https://local.drizzle.studio`.
 ### Common Issues
 
 **OAuth redirect mismatch:**
+
 - Verify `SELF_URL` matches the redirect URI in your Entra app registration
 - Include the exact path: `http://localhost:<port>/auth/callback`
 
 **Webhook not received:**
+
 - Check dev tunnel is running and accessible
 - Verify `MICROSOFT_PUBLIC_WEBHOOK_URL` is set correctly
 - Check Microsoft Graph subscription was created (see logs)

@@ -21,19 +21,23 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 ### Standard Microsoft Consent Process
 
 1. **Admin adds the app and grants admin-required permissions**
+
    - Organization-wide OR per-user
    - For Teams MCP: `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` require admin consent
 
 2. **Admin approval workflow (if tenant has it enabled)**
+
    - Users request admin approval
    - Admin approves app for that user
    - This is in addition to Step 1
 
 3. **User consent (always required for delegated permissions)**
+
    - Each user must consent individually
    - Required even after admin consent (Microsoft's requirement for delegated permissions)
 
 **Microsoft Documentation:**
+
 - [User and admin consent overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview) - Standard Microsoft consent flows
 - [Grant admin consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) - Step-by-step guide
 - [Admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) - Per-user approval process
@@ -133,6 +137,7 @@ flowchart LR
 | Least privilege | Yes - user controls their own data | No - broad tenant access |
 
 The MCP model requires **self-service user connections** where each user:
+
 1. Connects their own account
 2. Controls what data they share
 3. Can disconnect at any time

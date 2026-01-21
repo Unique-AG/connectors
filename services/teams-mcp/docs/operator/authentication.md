@@ -6,6 +6,7 @@
 The Teams MCP Server requires a Microsoft Entra ID (formerly Azure AD) app registration with delegated permissions to access Microsoft Graph API on behalf of users.
 
 For technical details about the OAuth flow and why client credentials are required, see:
+
 - [Microsoft OAuth Setup Flow](../technical/flows.md#microsoft-oauth-setup-flow)
 - [Authentication Architecture - Required App Registration Components](../technical/architecture.md#required-app-registration-components)
 - [FAQ - Why do I need a client ID and client secret?](../faq.md#why-do-i-need-a-client-id-and-client-secret)
@@ -43,16 +44,19 @@ module "teams_mcp_app" {
 ### Option 2: Azure Portal (Manual)
 
 1. **Navigate to App Registrations**
+
    - Go to [Azure Portal](https://portal.azure.com)
    - Search for "App registrations"
    - Click "New registration"
 
 2. **Configure Basic Settings**
+
    - **Name**: Teams MCP Server
    - **Supported account types**: Accounts in this organizational directory only
    - **Redirect URI**: Web - `https://teams.mcp.example.com/auth/callback`
 
 3. **Add API Permissions**
+
    - Go to "API permissions"
    - Click "Add a permission" → "Microsoft Graph" → "Delegated permissions"
    - Add the following permissions:
@@ -67,18 +71,21 @@ module "teams_mcp_app" {
    | `offline_access` | Delegated | No |
 
 4. **Grant Admin Consent**
+
    - Click "Grant admin consent for [Tenant]"
    - Confirm the action
    
    **Important**: Admin consent is required for `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` permissions. Without admin consent, users will see an error when trying to connect. See [Understanding Admin Consent](#understanding-admin-consent-and-user-consent) below for details.
 
 5. **Create Client Secret**
+
    - Go to "Certificates & secrets"
    - Click "New client secret"
    - Set description and expiration
    - **Copy the secret value immediately** (shown only once)
 
 6. **Note Application Details**
+
    - Go to "Overview"
    - Copy the **Application (client) ID**
    - Copy the **Directory (tenant) ID**
@@ -88,6 +95,7 @@ module "teams_mcp_app" {
 All permissions are **delegated**, meaning they act on behalf of the signed-in user. See [Microsoft Graph Permissions](../technical/permissions.md) for the complete list with justifications.
 
 **Required:**
+
 - `User.Read` - Read user profile
 - `Calendars.Read` - Read calendar events (for recurring meeting detection)
 - `OnlineMeetings.Read` - Read meeting details
@@ -95,6 +103,7 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 - `offline_access` - Obtain refresh tokens
 
 **Optional:**
+
 - `OnlineMeetingRecording.Read.All` - Read recordings (admin consent required)
 
 ## Understanding Microsoft Consent Flows
@@ -104,16 +113,19 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 ### Standard Microsoft Consent Process
 
 1. **Admin grants consent** for permissions requiring admin approval (`OnlineMeetingTranscript.Read.All`, `OnlineMeetingRecording.Read.All`)
+
    - Organization-wide OR per-user
 2. **Admin approval workflow** (if enabled in tenant) - users request approval
 3. **User consent** (always required for delegated permissions, even after admin consent)
 
 **How to grant admin consent:**
+
 1. Azure Portal → App Registration → API permissions
 2. Click "Grant admin consent for [Your Organization]"
 3. Or use [admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) for per-user approval
 
 **Microsoft Documentation:**
+
 - [User and admin consent overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview) - Standard Microsoft consent flows
 - [Grant admin consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) - Step-by-step guide
 - [Admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) - Per-user approval process
@@ -137,6 +149,7 @@ https://<your-domain>/auth/callback
 ```
 
 Examples:
+
 - Production: `https://teams.mcp.example.com/auth/callback`
 - Development: `http://localhost:<port>/auth/callback`
 
@@ -168,6 +181,7 @@ For SaaS deployments serving multiple organizations:
 4. **Shared Infrastructure**: One MCP deployment serves all tenants
 
 **Considerations:**
+
 - Data isolation: All tenant data stored in the same database (with tenant-scoped access controls)
 - Enterprise Application management: Each tenant admin controls user assignment and access
 - Compliance: Some organizations may require dedicated infrastructure for data residency
@@ -206,15 +220,18 @@ For troubleshooting authentication issues, see [FAQ - Authentication & Permissio
 ## Microsoft Documentation
 
 ### App Registration
+
 - [Register an application](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app)
 - [Configure permissions](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-configure-app-access-web-apis)
 
 ### Consent and Permissions
+
 - [Grant admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent)
 - [Understanding user and admin consent](https://learn.microsoft.com/en-us/entra/identity-platform/howto-convert-app-to-be-multi-tenant#understand-user-and-admin-consent)
 - [Configure user consent settings](https://learn.microsoft.com/en-us/entra/identity/manage-apps/configure-user-consent)
 - [Admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow)
 
 ### Reference
+
 - [Microsoft Graph permissions reference](https://learn.microsoft.com/en-us/graph/permissions-reference)
 - [Microsoft Graph API overview](https://learn.microsoft.com/en-us/graph/overview)
