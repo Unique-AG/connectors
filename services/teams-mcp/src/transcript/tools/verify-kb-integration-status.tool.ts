@@ -19,8 +19,8 @@ const VerifyKbIntegrationStatusOutputSchema = z.object({
       id: z.string(),
       expiresAt: z.string(),
       minutesUntilExpiration: z.number(),
-      createdAt: z.coerce.date(),
-      updatedAt: z.coerce.date(),
+      createdAt: z.string(),
+      updatedAt: z.string(),
     })
     .nullable(),
 });
@@ -121,8 +121,8 @@ export class VerifyKbIntegrationStatusTool {
         id: subscription.id,
         expiresAt: expiresAt.toISOString(),
         minutesUntilExpiration,
-        createdAt: subscription.createdAt,
-        updatedAt: subscription.updatedAt,
+        createdAt: subscription.createdAt.toISOString(),
+        updatedAt: subscription.updatedAt.toISOString(),
       },
     };
   }
