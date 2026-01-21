@@ -429,7 +429,7 @@ describe('ScopeManagementService', () => {
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-1',
-        expect.stringMatching(/^spc:root-/),
+        expect.stringMatching(/^spc:site:/),
       );
     });
 
@@ -473,7 +473,7 @@ describe('ScopeManagementService', () => {
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-1',
-        expect.stringMatching(/^spc:root-/),
+        expect.stringMatching(/^spc:site:/),
       );
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-2',
@@ -500,7 +500,7 @@ describe('ScopeManagementService', () => {
 
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
-        expect.stringMatching(/^Updated scope scope-1 with externalId: spc:root-/),
+        expect.stringMatching(/^Updated scope scope-1 with externalId: spc:site:site-123$/),
       );
     });
 
