@@ -8,7 +8,22 @@ import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 
 const VerifyKbIntegrationStatusInputSchema = z.object({});
 
-type SubscriptionStatus = 'active' | 'expiring_soon' | 'expired' | 'not_configured';
+const SubscriptionStatusSchema = z.enum(['active', 'expiring_soon', 'expired', 'not_configured']);
+type SubscriptionStatus = z.infer<typeof SubscriptionStatusSchema>;
+
+const VerifyKbIntegrationStatusOutputSchema = z.object({
+  status: SubscriptionStatusSchema,
+  message: z.string(),
+  subscription: z
+    .object({
+      id: z.string(),
+      expiresAt: z.string(),
+      minutesUntilExpiration: z.number(),
+      createdAt: z.coerce.date(),
+      updatedAt: z.coerce.date(),
+    })
+    .nullable(),
+});
 
 @Injectable()
 export class VerifyKbIntegrationStatusTool {
@@ -25,6 +40,7 @@ export class VerifyKbIntegrationStatusTool {
     description:
       'Check the status of the knowledge base integration for Microsoft Teams meeting transcripts. Returns whether ingestion is active, expiring soon, expired, or not configured.',
     parameters: VerifyKbIntegrationStatusInputSchema,
+    outputSchema: VerifyKbIntegrationStatusOutputSchema,
     annotations: {
       title: 'Verify Knowledge Base Integration Status',
       readOnlyHint: true,

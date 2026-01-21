@@ -9,6 +9,17 @@ import { SubscriptionRemoveService } from '../subscription-remove.service';
 
 const StopKbIntegrationInputSchema = z.object({});
 
+const StopKbIntegrationOutputSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  subscription: z
+    .object({
+      id: z.string(),
+      status: z.literal('removed'),
+    })
+    .nullable(),
+});
+
 @Injectable()
 export class StopKbIntegrationTool {
   private readonly logger = new Logger(this.constructor.name);
@@ -25,6 +36,7 @@ export class StopKbIntegrationTool {
     description:
       'Stop the knowledge base integration to cease ingesting Microsoft Teams meeting transcripts. This removes the subscription with Microsoft Graph.',
     parameters: StopKbIntegrationInputSchema,
+    outputSchema: StopKbIntegrationOutputSchema,
     annotations: {
       title: 'Stop Knowledge Base Integration',
       readOnlyHint: false,

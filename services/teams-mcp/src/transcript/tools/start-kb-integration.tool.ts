@@ -10,6 +10,19 @@ import { SubscriptionCreateService } from '../subscription-create.service';
 
 const StartKbIntegrationInputSchema = z.object({});
 
+const StartKbIntegrationOutputSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  subscription: z
+    .object({
+      id: z.string(),
+      expiresAt: z.string(),
+      minutesUntilExpiration: z.number(),
+      status: z.enum(['created', 'already_active']),
+    })
+    .nullable(),
+});
+
 @Injectable()
 export class StartKbIntegrationTool {
   private readonly logger = new Logger(this.constructor.name);
@@ -26,6 +39,7 @@ export class StartKbIntegrationTool {
     description:
       'Start the knowledge base integration to begin ingesting Microsoft Teams meeting transcripts. This creates a subscription with Microsoft Graph to receive notifications when new transcripts are available.',
     parameters: StartKbIntegrationInputSchema,
+    outputSchema: StartKbIntegrationOutputSchema,
     annotations: {
       title: 'Start Knowledge Base Integration',
       readOnlyHint: false,
