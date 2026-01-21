@@ -56,3 +56,6 @@ __snapshot__
 # local scripts
 **/local-scripts/**
 services/sharepoint-connector/src/tenant-configs/**
+
+# Nix
+result
