@@ -4,6 +4,7 @@
 The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Teams meetings with the Unique platform through the Model Context Protocol (MCP). It captures meeting transcripts and recordings from Microsoft Teams and ingests them into Unique with proper access controls.
 
 **Core Capabilities:**
+
 - Captures Microsoft Teams meeting transcripts and recordings in real-time
 - Manages webhook subscriptions to Microsoft Graph API for notifications
 - Handles OAuth2 authentication with Microsoft Entra ID
@@ -294,6 +295,7 @@ Without proper app registration, Microsoft Graph API will reject all authenticat
 The Teams MCP service requires **delegated permissions** to access user-specific resources. Client Credentials flow only supports application permissions, which would require tenant admins to create Application Access Policies via PowerShell—impractical for self-service MCP connections.
 
 **See also:**
+
 - [Microsoft Entra ID - Authentication flows](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows)
 - [Microsoft Graph - Get access on behalf of a user](https://learn.microsoft.com/en-us/graph/auth-v2-user)
 

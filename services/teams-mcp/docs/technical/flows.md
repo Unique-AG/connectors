@@ -208,6 +208,7 @@ sequenceDiagram
 ```
 
 **Subscription Scheduling:**
+
 - Subscriptions are set to expire at a configured UTC hour (default: 3 AM)
 - This batches all renewals to a single time window
 - Daily renewal ensures token validity is checked consistently
@@ -319,16 +320,19 @@ flowchart TB
 ```
 
 **Webhook Validation:**
+
 - Microsoft Graph sends a `clientState` value with each notification
 - The server validates this matches the secret configured during subscription creation
 - Invalid `clientState` results in request rejection
 
 **Recording Permissions:**
+
 - Recording fetch requires `OnlineMeetingRecording.Read.All` scope
 - If the user hasn't granted this permission, only the transcript is captured
 - Recording availability is checked before attempting upload
 
 **Access Control:**
+
 - Meeting organizer receives **write + read** access
 - Meeting participants receive **read** access
 - Users are resolved by email or username in Unique platform

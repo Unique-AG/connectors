@@ -54,11 +54,13 @@ Microsoft access and refresh tokens are stored encrypted using **AES-256-GCM**:
 | Key Storage | `ENCRYPTION_KEY` environment variable |
 
 **Why AES-GCM:**
+
 - Provides both confidentiality and integrity (authenticated encryption)
 - Prevents tampering with ciphertext
 - Industry standard for token encryption
 
 **Token Lifecycle:**
+
 1. Microsoft issues tokens during OAuth flow
 2. Tokens encrypted immediately before database write
 3. Tokens decrypted only when needed for Graph API calls
@@ -74,6 +76,7 @@ MCP access and refresh tokens use a different approach:
 | Refresh Token | SHA-256 hash | Database lookup with family check |
 
 **Why Hashing (not Encryption):**
+
 - Tokens are opaque JWTs—the server doesn't need to read them
 - Hash comparison is sufficient for validation
 - Reduces attack surface (no decryption key needed)
@@ -108,15 +111,18 @@ sequenceDiagram
 ```
 
 **PKCE Protection:**
+
 - Prevents authorization code interception attacks
 - Required for all OAuth flows (no exceptions)
 - Uses `S256` challenge method (SHA-256)
 
 **Token Separation:**
+
 - **Microsoft tokens**: Stay on server, encrypted at rest, used for Graph API calls
 - **MCP tokens**: Opaque JWTs issued to client, used for MCP API authentication
 
 **References:**
+
 - [RFC 7636 - PKCE](https://datatracker.ietf.org/doc/html/rfc7636) - Proof Key for Code Exchange
 - [OAuth 2.1](https://oauth.net/2.1/) - OAuth 2.1 specification
 - [RFC 6749 - OAuth 2.0](https://datatracker.ietf.org/doc/html/rfc6749) - OAuth 2.0 Authorization Framework
@@ -175,6 +181,7 @@ sequenceDiagram
 ```
 
 **Validation Details:**
+
 - `MICROSOFT_WEBHOOK_SECRET` is a 128-character random string
 - Sent to Microsoft when creating subscriptions
 - Returned in every webhook payload
@@ -194,17 +201,20 @@ sequenceDiagram
 ### Rotation Procedures
 
 **ENCRYPTION_KEY Rotation:**
+
 1. There is no zero-downtime rotation—key change invalidates all stored tokens
 2. Deploy with new key
 3. All users must reconnect to MCP server
 4. Consider warning users before rotation
 
 **AUTH_HMAC_SECRET Rotation:**
+
 1. Change secret and deploy
 2. All MCP sessions immediately invalidated
 3. Clients will re-authenticate automatically
 
 **MICROSOFT_CLIENT_SECRET Rotation:**
+
 1. Create new secret in Entra ID
 2. Update Kubernetes secret
 3. Restart pods
@@ -216,6 +226,7 @@ sequenceDiagram
 > **Note:** Automated rotation might be part of a future release.
 
 If rotation becomes necessary, it would require:
+
 1. Generating new 128-character secret: `openssl rand -hex 64`
 2. Manually deleting all subscriptions via Microsoft Graph API
 3. Having all users reconnect to MCP server to trigger subscription recreation

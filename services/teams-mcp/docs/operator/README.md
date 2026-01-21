@@ -63,24 +63,28 @@ The Teams MCP Server runs as a **single pod** that handles both API requests and
 ## Deployment Checklist
 
 1. **Infrastructure**
+
    - [ ] PostgreSQL database provisioned
    - [ ] RabbitMQ instance running
    - [ ] Kubernetes namespace created
    - [ ] Kong route configured for public access
 
 2. **Microsoft Entra ID**
+
    - [ ] App registration created ([Authentication Guide](./authentication.md))
    - [ ] API permissions granted
    - [ ] Admin consent completed
    - [ ] Client secret configured
 
 3. **Application**
+
    - [ ] Helm values configured ([Configuration Guide](./configuration.md))
    - [ ] Secrets created in Kubernetes
    - [ ] Helm chart deployed ([Deployment Guide](./deployment.md))
    - [ ] Health checks passing
 
 4. **Verification**
+
    - [ ] OAuth flow works end-to-end
    - [ ] Webhook endpoint accessible from Microsoft
    - [ ] Test transcript captured successfully

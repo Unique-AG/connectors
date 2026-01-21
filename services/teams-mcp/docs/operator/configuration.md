@@ -192,16 +192,19 @@ The service account credentials are passed via the `x-company-id` and `x-user-id
 ### Creating a Zitadel Service Account
 
 1. **Navigate to Zitadel**
+
    - Log in to your Zitadel instance
    - Select the organization where you want to ingest transcripts
 
 2. **Create Service Account**
+
    - Go to **Service Accounts** in the organization settings
    - Click **New Service Account**
    - Provide a descriptive name (e.g., "Teams MCP Server Service Account")
    - Set appropriate permissions for the service account
 
 3. **Note the Service Account Details**
+
    - **Company ID**: The organization ID where the service account was created
    - **User ID**: The service account user ID
 
@@ -218,6 +221,7 @@ The service account credentials are passed via the `x-company-id` and `x-user-id
 ### Service Account Permissions
 
 The service account must have permissions to:
+
 - Read user information (to resolve meeting participants)
 - Create scopes/folders in the organization
 - Create and modify access permissions
