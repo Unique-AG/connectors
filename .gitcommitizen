@@ -1,0 +1,42 @@
+# Conventional Commits configuration
+# Validated by: github:proventuslabs/scriptorium#cz
+# See: https://www.conventionalcommits.org/
+
+[settings]
+# Allow multiple scopes (e.g., feat(teams-mcp,mcp-oauth): ...)
+multi-scope = true
+# Always require a scope in commit messages
+require-scope = true
+# Scope must be defined in [scopes] section
+defined-scope = true
+# Files must match the scope's glob patterns
+enforce-patterns = true
+
+[types]
+feat = A new feature
+fix = A bug fix
+docs = Documentation only changes
+chore = Other changes that don't modify src or test files
+refactor = A code change that neither fixes a bug nor adds a feature
+test = Adding missing tests or correcting existing tests
+ci = Changes to CI configuration files and scripts
+revert = Reverts a previous commit
+
+[scopes]
+# Services
+factset-mcp = services/factset-mcp/**
+outlook-mcp = services/outlook-mcp/**
+sharepoint-connector = services/sharepoint-connector/**
+teams-mcp = services/teams-mcp/**
+
+# Packages
+aes-gcm-encryption = packages/aes-gcm-encryption/**
+instrumentation = packages/instrumentation/**
+logger = packages/logger/**
+mcp-oauth = packages/mcp-oauth/**
+mcp-server-module = packages/mcp-server-module/**
+probe = packages/probe/**
+
+# Special scopes
+ci = .github/**
+main = *, .*
