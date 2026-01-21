@@ -46,9 +46,9 @@ pnpm check-types                          # TypeScript check
 
 ## Pull Requests
 
-### Title (Conventional Commits)
+### Title
 
-PR titles must follow conventional commits format with strict scope validation. This becomes the squash commit message.
+PR titles must follow conventional commits format. This becomes the squash commit message.
 
 ```
 <type>(<scope>): <description>
@@ -56,7 +56,14 @@ PR titles must follow conventional commits format with strict scope validation. 
 
 ### Description
 
-Write PR descriptions naturally. No "Test plan" sections.
+Keep concise - ends up in commit history. No "Test plan" sections.
+
+```
+<summary of changes>
+
+- bullet points of what changed
+- keep it brief
+```
 
 ### Allowed Types
 
@@ -100,3 +107,20 @@ Deploy folders contain:
 - `terraform/` - Azure infrastructure (Entra apps, secrets)
 - `helm-charts/` - Kubernetes deployments
 - `Dockerfile` - Container builds
+
+## Change Checklist
+
+Before creating a PR, verify:
+
+- [ ] **Tests pass** - `pnpm test --filter=@unique-ag/<package>`
+- [ ] **Types check** - `pnpm check-types`
+- [ ] **Style passes** - `pnpm style` (or `pnpm style:fix`)
+
+If applicable:
+
+- [ ] **Docs updated** - Update `services/<name>/docs/` for user-facing changes
+- [ ] **Helm values.schema.json** - Update when changing helm chart values
+- [ ] **Syncpack** - Run `pnpm syncpack lint` after dependency changes
+- [ ] **.env.example** - Update when adding/changing env vars
+- [ ] **Terraform outputs** - Keep outputs.tf in sync with main.tf changes
+- [ ] **CHANGELOG.md** - Don't edit manually (managed by release-please)
