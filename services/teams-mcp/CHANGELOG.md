@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.0](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.1.1...teams-mcp@0.2.0) (2026-01-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **teams-mcp:** Subscriptions are no longer created automatically on authentication. Users must explicitly call start_kb_integration to begin transcript ingestion.
+
+### Features
+
+* **teams-mcp:** add GraphError exception filter ([#211](https://github.com/Unique-AG/connectors/issues/211)) ([ade292c](https://github.com/Unique-AG/connectors/commit/ade292ce2a98440219d397e441d15b9f27f022a1))
+* **teams-mcp:** add KB integration MCP tools for explicit subscription management ([2f11dee](https://github.com/Unique-AG/connectors/commit/2f11deea20d29f05eef5bb84beb8ea79a7593f9a))
+* **teams-mcp:** detect recurring meetings via calendar events ([#210](https://github.com/Unique-AG/connectors/issues/210)) ([644af78](https://github.com/Unique-AG/connectors/commit/644af785ce48db762adbc1554f8b4194a5c0b7e1))
+* **teams-mcp:** merge docs to add auto docs publish workflows ([#202](https://github.com/Unique-AG/connectors/issues/202)) ([13081f0](https://github.com/Unique-AG/connectors/commit/13081f01cf12d510af130672c2ab8eca0137d975))
+
+
+### Bug Fixes
+
+* **outlook:** Fixes the MCP connector to work with the v1.25.2 sdk ([#213](https://github.com/Unique-AG/connectors/issues/213)) ([52e028b](https://github.com/Unique-AG/connectors/commit/52e028b890f249907331e005ca97e770db5b95d1))
+
 ## [0.1.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.1.0...teams-mcp@0.1.1) (2026-01-13)
 
 
