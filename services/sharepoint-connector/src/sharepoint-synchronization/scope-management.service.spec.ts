@@ -127,8 +127,6 @@ describe('ScopeManagementService', () => {
 
     configServiceMock = {
       get: vi.fn((key: string) => {
-        if (key === 'processing.syncMode') return 'content_only';
-        if (key === 'unique.inheritScopePermissions') return true;
         if (key === 'app.logsDiagnosticsDataPolicy') {
           return 'conceal';
         }
@@ -350,8 +348,6 @@ describe('ScopeManagementService', () => {
 
       const configService = {
         get: vi.fn((key: string) => {
-          if (key === 'processing.syncMode') return 'content_only';
-          if (key === 'unique.inheritScopePermissions') return true;
           if (key === 'app.logsDiagnosticsDataPolicy') return 'conceal';
           return undefined;
         }),

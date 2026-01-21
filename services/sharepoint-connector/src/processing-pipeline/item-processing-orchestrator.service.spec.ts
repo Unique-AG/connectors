@@ -87,8 +87,6 @@ describe('ItemProcessingOrchestratorService', () => {
         ...stub(),
         get: vi.fn((key: string) => {
           if (key === 'processing.concurrency') return 3;
-          if (key === 'unique.ingestionMode') return IngestionMode.Flat;
-          if (key === 'unique.scopeId') return 'test-scope-id';
           return undefined;
         }),
       }))

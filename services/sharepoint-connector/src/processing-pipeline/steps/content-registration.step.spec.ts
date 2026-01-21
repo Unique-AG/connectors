@@ -86,7 +86,6 @@ describe('ContentRegistrationStep', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((k: string) => {
-          if (k === 'unique.scopeId') return 'scope-1';
           if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
           if (k === 'unique.serviceAuthMode') return 'external';
           return undefined;
@@ -136,7 +135,6 @@ describe('ContentRegistrationStep', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((k: string) => {
-          if (k === 'unique.scopeId') return 'scope-1';
           if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
           if (k === 'unique.serviceAuthMode') return 'cluster_local';
           if (k === 'unique.ingestionServiceBaseUrl') return mockIngestionServiceBaseUrl;
@@ -185,7 +183,6 @@ describe('ContentRegistrationStep', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((k: string) => {
-          if (k === 'unique.scopeId') return 'scope-1';
           if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
           if (k === 'unique.serviceAuthMode') return 'external';
           return undefined;
