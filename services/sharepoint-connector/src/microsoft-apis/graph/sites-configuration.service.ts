@@ -106,7 +106,8 @@ export class SitesConfigurationService {
 
       const getFieldValue = (displayName: string) => {
         const internalName = nameMap[displayName];
-        return internalName ? fields[internalName] : undefined;
+        const value = internalName ? fields[internalName] : undefined;
+        return typeof value === 'string' ? value.trim() : value;
       };
 
       const siteConfig = {
