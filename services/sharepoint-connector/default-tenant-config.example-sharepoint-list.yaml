@@ -13,7 +13,7 @@ sharepoint:
   sitesSource: sharepoint_list
   sharepointList:
     siteId: your-config-site-id-here
-    listId: your-config-list-guid-here # Get it via: https://{tenant}.sharepoint.com/sites/{site}/_api/web/lists/GetByTitle('{listName}')?$select=Id
+    listId: your-config-list-guid-here
   # Required SharePoint list columns:
   # - siteId (Single line text) - SharePoint site ID
   # - syncColumnName (Single line text) - Column that marks files for sync
