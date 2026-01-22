@@ -2,11 +2,13 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '../config';
+import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
+import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ScopeManagementService } from './scope-management.service';
@@ -161,6 +163,129 @@ describe('ScopeManagementService', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('initializeRootScope', () => {
+    let getScopeByIdMock: ReturnType<typeof vi.fn>;
+    let createScopeAccessesMock: ReturnType<typeof vi.fn>;
+    let getCurrentUserIdMock: ReturnType<typeof vi.fn>;
+    let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      getScopeByIdMock = vi.fn();
+      createScopeAccessesMock = vi.fn();
+      getCurrentUserIdMock = vi.fn().mockResolvedValue('user-123');
+      updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
+
+      const configService = {
+        get: vi.fn((key: string) => {
+          if (key === 'app.logsDiagnosticsDataPolicy') return 'show';
+          return undefined;
+        }),
+      };
+
+      const { unit } = await TestBed.solitary(ScopeManagementService)
+        .mock<UniqueScopesService>(UniqueScopesService)
+        .impl((stubFn) => ({
+          ...stubFn(),
+          getScopeById: getScopeByIdMock,
+          createScopeAccesses: createScopeAccessesMock,
+          updateScopeExternalId: updateScopeExternalIdMock,
+        }))
+        .mock<UniqueUsersService>(UniqueUsersService)
+        .impl((stubFn) => ({
+          ...stubFn(),
+          getCurrentUserId: getCurrentUserIdMock,
+        }))
+        .mock<ConfigService<Config, true>>(ConfigService)
+        .impl(() => configService as unknown as ConfigService<Config, true>)
+        .compile();
+
+      service = unit;
+
+      // Mock the logger property
+      Object.defineProperty(service, 'logger', {
+        value: {
+          log: vi.fn(),
+          error: vi.fn(),
+          warn: vi.fn(),
+          debug: vi.fn(),
+          verbose: vi.fn(),
+        },
+        writable: true,
+      });
+    });
+
+    it('claims the root scope if externalId is missing', async () => {
+      getScopeByIdMock.mockResolvedValueOnce({
+        id: 'root-scope-123',
+        name: 'test1',
+        externalId: null,
+        parentId: null,
+      });
+
+      await service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat);
+
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', 'spc:site:site-123');
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].debug).toHaveBeenCalledWith(
+        expect.stringContaining('Claimed root scope root-scope-123 with externalId: spc:site:site-123'),
+      );
+    });
+
+    it('skips claiming if externalId is already set to the correct site', async () => {
+      getScopeByIdMock.mockResolvedValueOnce({
+        id: 'root-scope-123',
+        name: 'test1',
+        externalId: 'spc:site:site-123',
+        parentId: null,
+      });
+
+      await service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat);
+
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+    });
+
+    it('throws error if externalId is set to a different site', async () => {
+      getScopeByIdMock.mockResolvedValueOnce({
+        id: 'root-scope-123',
+        name: 'test1',
+        externalId: 'spc:site:different-site',
+        parentId: null,
+      });
+
+      await expect(
+        service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat),
+      ).rejects.toThrow(/is owned by a different site/);
+
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+    });
+
+    it('grants permissions and resolves root path', async () => {
+      getScopeByIdMock
+        .mockResolvedValueOnce({
+          id: 'root-scope-123',
+          name: 'test1',
+          externalId: 'spc:site:site-123',
+          parentId: 'parent-1',
+        })
+        .mockResolvedValueOnce({
+          id: 'parent-1',
+          name: 'Root',
+          externalId: null,
+          parentId: null,
+        });
+
+      const result = await service.initializeRootScope(
+        'root-scope-123',
+        'site-123',
+        IngestionMode.Flat,
+      );
+
+      expect(result).toEqual({ serviceUserId: 'user-123', rootPath: '/Root/test1' });
+      expect(createScopeAccessesMock).toHaveBeenCalledWith('root-scope-123', expect.any(Array));
+      expect(createScopeAccessesMock).toHaveBeenCalledWith('parent-1', expect.any(Array));
+    });
   });
 
   describe('extractAllParentPaths', () => {
@@ -409,26 +534,6 @@ describe('ScopeManagementService', () => {
       );
     });
 
-    it('sets externalId for root path when no directories provided', async () => {
-      const scopes = [{ id: 'scope-1', name: 'test1', externalId: null }];
-      const paths = ['/test1'];
-      const directories: SharepointDirectoryItem[] = []; // No directories provided
-
-      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
-      await (service as any).updateNewlyCreatedScopesWithExternalId(
-        scopes,
-        paths,
-        directories,
-        mockContext,
-      );
-
-      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-1',
-        expect.stringMatching(/^spc:site:/),
-      );
-    });
-
     it('skips scopes that already have externalId', async () => {
       const scopes = [
         { id: 'scope-1', name: 'test1', externalId: 'existing-external-id' },
@@ -451,10 +556,11 @@ describe('ScopeManagementService', () => {
 
     it('skips scopes that are ancestors of root path', async () => {
       const scopes = [
-        { id: 'scope-1', name: 'test1', externalId: null }, // This is the root path itself
+        { id: 'scope-1', name: 'Root', externalId: null },
         { id: 'scope-2', name: 'ChildScope', externalId: null },
       ];
-      const paths = ['/test1', '/test1/ChildScope'];
+      const paths = ['/', '/test1/ChildScope'];
+      // mockContext.rootPath is '/test1'
       const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
@@ -465,19 +571,12 @@ describe('ScopeManagementService', () => {
         mockContext,
       );
 
-      // Root path gets externalId (special case), ChildScope gets fallback externalId
-      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-1',
-        expect.stringMatching(/^spc:site:/),
-      );
+      // Root (/) is an ancestor of /test1, so it is skipped.
+      // ChildScope (/test1/ChildScope) gets fallback externalId.
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-2',
         expect.stringMatching(/^spc:unknown:site-123\/ChildScope-/),
-      );
-      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].warn).toHaveBeenCalledWith(
-        expect.stringContaining('No external ID found for path'),
       );
     });
 
@@ -496,7 +595,7 @@ describe('ScopeManagementService', () => {
 
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
-        expect.stringMatching(/^Updated scope scope-1 with externalId: spc:site:site-123$/),
+        expect.stringMatching(/^Updated scope scope-1 with externalId: spc:unknown:site-123\/test1-/),
       );
     });
 

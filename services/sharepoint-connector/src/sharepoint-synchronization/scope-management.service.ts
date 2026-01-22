@@ -62,12 +62,36 @@ export class ScopeManagementService {
     const isValid = this.isValidScopeOwnership(rootScope, siteId);
     if (!isValid) {
       const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
+      const logExpectedExternalId = this.shouldConcealLogs
+        ? `${EXTERNAL_ID_PREFIX}site:${smear(siteId)}`
+        : expectedExternalId;
       const logActualExternalId = this.shouldConcealLogs
         ? smear(rootScope.externalId)
         : rootScope.externalId;
       throw new Error(
-        `Root scope ${rootScopeId} is owned by a different site. Expected externalId "${expectedExternalId}" but got "${logActualExternalId}". This scope cannot be synced by this site.`,
+        `Root scope ${rootScopeId} is owned by a different site. Expected externalId "${logExpectedExternalId}" but got "${logActualExternalId}". This scope cannot be synced by this site.`,
       );
+    }
+
+    if (!rootScope.externalId) {
+      const externalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
+      try {
+        const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
+          rootScopeId,
+          externalId,
+        );
+        rootScope.externalId = updatedScope.externalId;
+        this.logger.debug(
+          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${
+            this.shouldConcealLogs ? smear(externalId) : externalId
+          }`,
+        );
+      } catch (error) {
+        this.logger.warn({
+          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${externalId}`,
+          error: sanitizeError(error),
+        });
+      }
     }
 
     const pathSegments = [rootScope.name];
@@ -251,11 +275,7 @@ export class ScopeManagementService {
   ): Promise<void> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
     const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
-    // We're adding two cases that are special - the root scope that we want to have explicitly
-    // marked with the site ID and site pages that is a special collection we fetch for ASPX pages,
-    // but has no folders.
-    pathToExternalIdMap[context.rootPath] =
-      `${EXTERNAL_ID_PREFIX}site:${context.siteConfig.siteId}`;
+    // Site pages is a special collection we fetch for ASPX pages, but has no folders.
     pathToExternalIdMap[`${context.rootPath}/SitePages`] =
       `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId}/sitePages`;
 
