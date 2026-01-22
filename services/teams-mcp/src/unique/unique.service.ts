@@ -137,7 +137,8 @@ export class UniqueService {
         byteSize: 1,
         metadata: {
           date: meeting.startDateTime.toISOString(),
-          participants: meeting.participants,
+          participant_names: meeting.participants.map((p) => p.name).join(', '),
+          participant_emails: meeting.participants.map((p) => p.email).join(', '),
         },
       },
     });
