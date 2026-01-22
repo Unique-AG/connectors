@@ -13,13 +13,18 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { redact, shouldConcealLogs, smear, smearPath } from '../utils/logging.util';
+import {
+  EXTERNAL_ID_PREFIX,
+  redact,
+  shouldConcealLogs,
+  smear,
+  smearExternalId,
+  smearPath,
+} from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
-
-const EXTERNAL_ID_PREFIX = 'spc:' as const;
 
 export interface RootScopeInfo {
   serviceUserId: string;
@@ -41,6 +46,7 @@ export class ScopeManagementService {
 
   public async initializeRootScope(
     rootScopeId: string,
+    siteId: string,
     ingestionMode: IngestionMode,
   ): Promise<RootScopeInfo> {
     const userId = await this.uniqueUsersService.getCurrentUserId();
@@ -57,6 +63,39 @@ export class ScopeManagementService {
 
     const rootScope = await this.uniqueScopesService.getScopeById(rootScopeId);
     assert.ok(rootScope, `Root scope with ID ${rootScopeId} not found`);
+
+    const isValid = this.isValidScopeOwnership(rootScope, siteId);
+    if (!isValid) {
+      const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
+      throw new Error(
+        `Root scope ${rootScopeId} is owned by a different site. Expected externalId "${
+          this.shouldConcealLogs ? smearExternalId(expectedExternalId) : expectedExternalId
+        }" but got "${
+          this.shouldConcealLogs ? smearExternalId(rootScope.externalId) : rootScope.externalId
+        }". This scope cannot be synced by this site.`,
+      );
+    }
+
+    if (!rootScope.externalId) {
+      const externalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
+      try {
+        const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
+          rootScopeId,
+          externalId,
+        );
+        rootScope.externalId = updatedScope.externalId;
+        this.logger.debug(
+          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${
+            this.shouldConcealLogs ? smearExternalId(externalId) : externalId
+          }`,
+        );
+      } catch (error) {
+        this.logger.warn({
+          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${externalId}`,
+          error: sanitizeError(error),
+        });
+      }
+    }
 
     const pathSegments = [rootScope.name];
     let currentScope: Scope = rootScope;
@@ -116,6 +155,15 @@ export class ScopeManagementService {
       });
       throw error;
     }
+  }
+
+  private isValidScopeOwnership(rootScope: Scope, siteId: string): boolean {
+    if (!rootScope.externalId) {
+      return true;
+    }
+
+    const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
+    return rootScope.externalId === expectedExternalId;
   }
 
   private buildItemIdToScopePathMap(
@@ -230,11 +278,7 @@ export class ScopeManagementService {
   ): Promise<void> {
     const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
     const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
-    // We're adding two cases that are special - the root scope that we want to have explicitly
-    // marked with the site ID and site pages that is a special collection we fetch for ASPX pages,
-    // but has no folders.
-    pathToExternalIdMap[context.rootPath] =
-      `${EXTERNAL_ID_PREFIX}site:${context.siteConfig.siteId}`;
+    // Site pages is a special collection we fetch for ASPX pages, but has no folders.
     pathToExternalIdMap[`${context.rootPath}/SitePages`] =
       `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId}/sitePages`;
 
@@ -272,7 +316,11 @@ export class ScopeManagementService {
           externalId,
         );
         scope.externalId = updatedScope.externalId;
-        this.logger.debug(`Updated scope ${scope.id} with externalId: ${externalId}`);
+        this.logger.debug(
+          `Updated scope ${scope.id} with externalId: ${
+            this.shouldConcealLogs ? smearExternalId(externalId) : externalId
+          }`,
+        );
       } catch (error) {
         this.logger.warn({
           msg: `Failed to update externalId for scope ${scope.id}`,

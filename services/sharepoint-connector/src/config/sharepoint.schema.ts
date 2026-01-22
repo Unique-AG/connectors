@@ -98,9 +98,10 @@ export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 // ==========================================
 
 export const SiteConfigSchema = z.object({
-  siteId: z.uuidv4().describe('SharePoint site ID'),
+  siteId: z.string().trim().pipe(z.uuidv4()).describe('SharePoint site ID'),
   syncColumnName: z
     .string()
+    .trim()
     .prefault('FinanceGPTKnowledge')
     .describe('Name of the SharePoint column indicating sync flag'),
   ingestionMode: z
@@ -110,6 +111,7 @@ export const SiteConfigSchema = z.object({
     ),
   scopeId: z
     .string()
+    .trim()
     .describe(
       'Scope ID to be used as root for ingestion. For flat mode, all files are ingested in this scope. For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
     ),

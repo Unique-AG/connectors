@@ -1,6 +1,8 @@
+import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Histogram } from '@opentelemetry/api';
+import { entries, groupBy } from 'remeda';
 import { Config } from '../config';
 import type { SiteConfig } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
@@ -82,6 +84,8 @@ export class SharepointSynchronizationService {
         return result;
       }
 
+      sites = this.deduplicateByScopeId(sites);
+
       const { active, deleted, inactive } = this.categorizeSites(sites);
 
       this.logger.log(
@@ -156,6 +160,34 @@ export class SharepointSynchronizationService {
     };
   }
 
+  private deduplicateByScopeId(sites: SiteConfig[]): SiteConfig[] {
+    const groups = groupBy(sites, (site) => site.scopeId);
+
+    return entries(groups).map(([scopeId, group]) => {
+      if (group.length > 1) {
+        this.logDuplicateScopeId(scopeId, group);
+      }
+      const site = group[0];
+      assert.ok(site, `No site configuration found for scopeId: ${scopeId}`);
+      return site;
+    });
+  }
+
+  private logDuplicateScopeId(
+    scopeId: string,
+    sitesWithSameScopeId: ReadonlyArray<SiteConfig>,
+  ): void {
+    this.logger.error('DUPLICATE SCOPE ID DETECTED!');
+    this.logger.error(`ScopeId: ${scopeId} is configured for multiple sites:`);
+
+    for (const [index, site] of sitesWithSameScopeId.entries()) {
+      const logSiteId = this.shouldConcealLogs ? smear(site.siteId) : site.siteId;
+      const status = index === 0 ? 'WILL SYNC - first occurrence' : 'SKIPPED - duplicate scopeId';
+      this.logger.error(`  - siteId: ${logSiteId} (${status})`);
+    }
+    this.logger.error('Only the first site will be synchronized.');
+  }
+
   private async processSingleSiteDeletion(siteConfig: SiteConfig): Promise<void> {
     const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
     const logPrefix = `[Site: ${logSiteId}]`;
@@ -201,6 +233,7 @@ export class SharepointSynchronizationService {
     try {
       baseContext = await this.scopeManagementService.initializeRootScope(
         siteConfig.scopeId,
+        siteConfig.siteId,
         siteConfig.ingestionMode,
       );
     } catch (error) {
