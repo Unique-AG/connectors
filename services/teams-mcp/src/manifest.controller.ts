@@ -22,7 +22,7 @@ export class ManifestController {
       },
       features: [
         'Microsoft Graph integration',
-        'Teams recordings management',
+        'Teams transcripts management',
         'OAuth2 authentication',
         'Secure token handling',
         'RESTful API endpoints',

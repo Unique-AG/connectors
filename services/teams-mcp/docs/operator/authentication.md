@@ -67,7 +67,6 @@ module "teams_mcp_app" {
    | `Calendars.Read` | Delegated | No |
    | `OnlineMeetings.Read` | Delegated | No |
    | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** |
-   | `OnlineMeetingRecording.Read.All` | Delegated | **Yes** |
    | `offline_access` | Delegated | No |
 
 4. **Grant Admin Consent**
@@ -75,7 +74,7 @@ module "teams_mcp_app" {
    - Click "Grant admin consent for [Tenant]"
    - Confirm the action
    
-   **Important**: Admin consent is required for `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` permissions. Without admin consent, users will see an error when trying to connect. See [Understanding Admin Consent](#understanding-admin-consent-and-user-consent) below for details.
+   **Important**: Admin consent is required for `OnlineMeetingTranscript.Read.All` permission. Without admin consent, users will see an error when trying to connect. See [Understanding Admin Consent](#understanding-admin-consent-and-user-consent) below for details.
 
 5. **Create Client Secret**
 
@@ -102,17 +101,13 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 - `OnlineMeetingTranscript.Read.All` - Read transcripts (admin consent required)
 - `offline_access` - Obtain refresh tokens
 
-**Optional:**
-
-- `OnlineMeetingRecording.Read.All` - Read recordings (admin consent required)
-
 ## Understanding Microsoft Consent Flows
 
 **This is standard Microsoft behavior, not Teams MCP specific.** All Microsoft 365 apps use the same consent model.
 
 ### Standard Microsoft Consent Process
 
-1. **Admin grants consent** for permissions requiring admin approval (`OnlineMeetingTranscript.Read.All`, `OnlineMeetingRecording.Read.All`)
+1. **Admin grants consent** for permissions requiring admin approval (`OnlineMeetingTranscript.Read.All`)
 
    - Organization-wide OR per-user
 2. **Admin approval workflow** (if enabled in tenant) - users request approval

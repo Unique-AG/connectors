@@ -11,7 +11,6 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `Calendars.Read` | Delegated | `465a38f9-76ea-45b9-9f34-9e8b0d4b0b42` | No | Yes |
 | `OnlineMeetings.Read` | Delegated | `9be106e1-f4e3-4df5-bdff-e4bc531cbe43` | No | Yes |
 | `OnlineMeetingTranscript.Read.All` | Delegated | `30b87d18-ebb1-45db-97f8-82ccb1f0190c` | Yes | Yes |
-| `OnlineMeetingRecording.Read.All` | Delegated | `190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3` | Yes | No |
 | `offline_access` | Delegated | `7427e0e9-2fba-42fe-b0c0-848c9e6a8182` | No | Yes |
 
 ## Understanding Consent Requirements
@@ -23,7 +22,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 1. **Admin adds the app and grants admin-required permissions**
 
    - Organization-wide OR per-user
-   - For Teams MCP: `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` require admin consent
+   - For Teams MCP: `OnlineMeetingTranscript.Read.All` requires admin consent
 
 2. **Admin approval workflow (if tenant has it enabled)**
 
@@ -83,16 +82,6 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Why Not Application Permission** | Would require tenant admin to create Application Access Policies per-user; impractical for self-service MCP connections |
 | **Admin Consent** | Required because transcripts may contain sensitive meeting content |
 
-### `OnlineMeetingRecording.Read.All`
-
-| Aspect | Detail |
-|--------|--------|
-| **Purpose** | Read recordings from all meetings the user can access |
-| **Used For** | Downloading MP4 recording files (optional feature) |
-| **Why Not Less** | No per-meeting recording permission exists; `.All` is the minimum |
-| **Why Optional** | Users can decline this permission; transcripts still work without recordings |
-| **Admin Consent** | Required because recordings contain audio/video of meetings |
-
 ### `offline_access`
 
 | Aspect | Detail |
@@ -149,7 +138,6 @@ Application permissions would require tenant administrators to pre-configure acc
 - [Microsoft Graph Permissions Reference](https://learn.microsoft.com/en-us/graph/permissions-reference) - Official Microsoft documentation
 - [Calendars.Read](https://graphpermissions.merill.net/permission/Calendars.Read) - Third-party permission explorer
 - [OnlineMeetingTranscript.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingTranscript.Read.All) - Third-party permission explorer
-- [OnlineMeetingRecording.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingRecording.Read.All) - Third-party permission explorer
 - [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Graph API overview
 
 ## Related Documentation
