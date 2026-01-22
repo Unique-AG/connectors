@@ -172,9 +172,7 @@ const dynamicSitesConfig = z.object({
   sharepointList: z
     .object({
       siteId: requiredStringSchema.describe('SharePoint site ID containing the configuration list'),
-      listDisplayName: requiredStringSchema.describe(
-        'Display name of the SharePoint configuration list',
-      ),
+      listId: requiredStringSchema.describe('GUID of the SharePoint configuration list'),
     })
     .describe('SharePoint list details containing site configurations'),
 });

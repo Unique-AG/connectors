@@ -181,10 +181,10 @@ connectorConfig:
     sitesSource: config_file
     # -- SharePoint list configuration (only used when sitesSource is "sharepoint_list")
     # siteId: SharePoint site ID containing the configuration list
-    # listDisplayName: Display name of the SharePoint configuration list
+    # listId: GUID of the SharePoint configuration list
     # sharepointList:
     #   siteId: 00000000-0000-0000-0000-000000000000
-    #   listDisplayName: MyConfigurationList
+    #   listId: 00000000-0000-0000-0000-000000000000
     # -- Array of sites to sync. Each site has its own configuration.
     # Only used when sitesSource is "config_file"
     # sites:
