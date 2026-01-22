@@ -133,7 +133,7 @@ export class UniqueService {
       input: {
         key: transcript.id,
         mimeType: 'text/vtt',
-        title: meeting.subject,
+        title: `${meeting.subject}.vtt`,
         byteSize: 1,
         metadata: {
           date: meeting.startDateTime.toISOString(),
@@ -149,7 +149,7 @@ export class UniqueService {
       input: {
         key: transcript.id,
         mimeType: 'text/vtt',
-        title: meeting.subject,
+        title: `${meeting.subject}.vtt`,
       },
     });
     span?.addEvent('ingestion_completed', {
@@ -474,9 +474,13 @@ export class UniqueService {
     const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
     // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
     const formattedDate = happenedAt.toISOString().split('T').at(0)!;
+    const sanitizedSubject = subject 
+      .replace(/[^a-zA-Z0-9\s/-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
     return recurring
-      ? `/${rootScopePath}/${subject}/${formattedDate}`
-      : `/${rootScopePath}/${subject} - ${formattedDate}`;
+      ? `/${rootScopePath}/${sanitizedSubject}/${formattedDate}`
+      : `/${rootScopePath}/${sanitizedSubject} - ${formattedDate}`;
   }
 
   // HACK:

@@ -149,7 +149,7 @@ export class TranscriptCreatedService {
     );
     assert.ok(vttStream, 'expected a vtt transcript body');
 
-    // Query events within the meeting time window, then match by joinUrl client-side
+    // Query events within the meeting time window, then match by threadId client-side
     // (filtering by onlineMeeting properties is not supported by the Graph API)
     const calendarEvents = await client
       .api(`/users/${userId}/calendarView`)
@@ -157,13 +157,10 @@ export class TranscriptCreatedService {
         startDateTime: meeting.startDateTime.toISOString(),
         endDateTime: meeting.endDateTime.toISOString(),
       })
-      .select('id,subject,type,seriesMasterId,onlineMeeting')
       .get()
       .then(CalendarEventCollection.parseAsync);
 
-    const calendarEvent = calendarEvents.value.find(
-      (e) => e.onlineMeeting?.joinUrl.href === meeting.joinWebUrl.href,
-    );
+    const calendarEvent = calendarEvents.value.find((e) => e.threadId === meeting.threadId);
     const isRecurring =
       calendarEvent?.type === 'occurrence' ||
       calendarEvent?.type === 'exception' ||

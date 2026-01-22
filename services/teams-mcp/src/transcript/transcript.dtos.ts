@@ -304,43 +304,59 @@ export type Transcript = z.infer<typeof Transcript>;
 
 export const TranscriptCollection = Collection(Transcript);
 
+const extractThreadId = (url: URL, ctx: z.RefinementCtx): string => {
+  const match = url.pathname.match(/\/meetup-join\/([^/]+)/);
+  const threadId = match?.[1];
+  if (!threadId) {
+    ctx.addIssue({
+      code: 'invalid_format',
+      format: 'url',
+      message: `Expected Teams meeting URL with threadId in path (e.g., /meetup-join/{threadId}/...), got: ${url.pathname}`,
+    });
+    return z.NEVER;
+  }
+  return decodeURIComponent(threadId);
+};
+
 /**
  * See docs on {@link https://learn.microsoft.com/en-us/graph/api/resources/onlinemeeting?view=graph-rest-1.0#properties online meeting properties}.
  */
-export const Meeting = z.object({
-  id: z.string(),
-  recordAutomatically: z.boolean().nullish(),
-  allowTranscription: z.boolean().nullish(),
-  allowRecording: z.boolean().nullish(),
-  subject: z.string().nullish(),
-  startDateTime: isoDatetimeToDate({ offset: true }),
-  endDateTime: isoDatetimeToDate({ offset: true }),
-  joinWebUrl: stringToURL(),
-  participants: z.object({
-    attendees: z.array(
-      z.object({
+export const Meeting = z
+  .object({
+    id: z.string(),
+    recordAutomatically: z.boolean().nullish(),
+    allowTranscription: z.boolean().nullish(),
+    allowRecording: z.boolean().nullish(),
+    subject: z.string().nullish(),
+    startDateTime: isoDatetimeToDate({ offset: true }),
+    endDateTime: isoDatetimeToDate({ offset: true }),
+    joinWebUrl: stringToURL(),
+    participants: z.object({
+      attendees: z.array(
+        z.object({
+          upn: z.string(),
+          identity: z.object({
+            user: z.object({
+              id: z.string().nullish(),
+              tenantId: z.string().nullish(),
+              displayName: z.string().nullish(),
+            }),
+          }),
+        }),
+      ),
+      organizer: z.object({
         upn: z.string(),
         identity: z.object({
           user: z.object({
-            id: z.string().nullish(),
-            tenantId: z.string().nullish(),
+            id: z.string(),
+            tenantId: z.string(),
             displayName: z.string().nullish(),
           }),
         }),
       }),
-    ),
-    organizer: z.object({
-      upn: z.string(),
-      identity: z.object({
-        user: z.object({
-          id: z.string(),
-          tenantId: z.string(),
-          displayName: z.string().nullish(),
-        }),
-      }),
     }),
-  }),
-});
+  })
+  .transform((m, ctx) => ({ ...m, threadId: extractThreadId(m.joinWebUrl, ctx) }));
 export type Meeting = z.infer<typeof Meeting>;
 
 export const MeetingCollection = Collection(Meeting);
@@ -350,17 +366,22 @@ export const MeetingCollection = Collection(Meeting);
  *
  * Used to determine if a meeting is recurring by checking the `type` or `seriesMasterId` properties.
  */
-export const CalendarEvent = z.object({
-  id: z.string(),
-  subject: z.string().nullish(),
-  type: z.enum(['singleInstance', 'occurrence', 'exception', 'seriesMaster']),
-  seriesMasterId: z.string().nullish(),
-  onlineMeeting: z
-    .object({
-      joinUrl: stringToURL(),
-    })
-    .nullish(),
-});
+export const CalendarEvent = z
+  .object({
+    id: z.string(),
+    subject: z.string().nullish(),
+    type: z.enum(['singleInstance', 'occurrence', 'exception', 'seriesMaster']),
+    seriesMasterId: z.string().nullish(),
+    onlineMeeting: z
+      .object({
+        joinUrl: stringToURL(),
+      })
+      .nullish(),
+  })
+  .transform((e, ctx) => ({
+    ...e,
+    threadId: e.onlineMeeting ? extractThreadId(e.onlineMeeting.joinUrl, ctx) : null,
+  }));
 export type CalendarEvent = z.infer<typeof CalendarEvent>;
 
 export const CalendarEventCollection = Collection(CalendarEvent);
