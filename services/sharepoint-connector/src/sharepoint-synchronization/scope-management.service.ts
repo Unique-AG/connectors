@@ -13,13 +13,18 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { redact, shouldConcealLogs, smear, smearPath } from '../utils/logging.util';
+import {
+  EXTERNAL_ID_PREFIX,
+  redact,
+  shouldConcealLogs,
+  smear,
+  smearExternalId,
+  smearPath,
+} from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
-
-const EXTERNAL_ID_PREFIX = 'spc:' as const;
 
 export interface RootScopeInfo {
   serviceUserId: string;
@@ -62,14 +67,12 @@ export class ScopeManagementService {
     const isValid = this.isValidScopeOwnership(rootScope, siteId);
     if (!isValid) {
       const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
-      const logExpectedExternalId = this.shouldConcealLogs
-        ? `${EXTERNAL_ID_PREFIX}site:${smear(siteId)}`
-        : expectedExternalId;
-      const logActualExternalId = this.shouldConcealLogs
-        ? smear(rootScope.externalId)
-        : rootScope.externalId;
       throw new Error(
-        `Root scope ${rootScopeId} is owned by a different site. Expected externalId "${logExpectedExternalId}" but got "${logActualExternalId}". This scope cannot be synced by this site.`,
+        `Root scope ${rootScopeId} is owned by a different site. Expected externalId "${
+          this.shouldConcealLogs ? smearExternalId(expectedExternalId) : expectedExternalId
+        }" but got "${
+          this.shouldConcealLogs ? smearExternalId(rootScope.externalId) : rootScope.externalId
+        }". This scope cannot be synced by this site.`,
       );
     }
 
@@ -83,7 +86,7 @@ export class ScopeManagementService {
         rootScope.externalId = updatedScope.externalId;
         this.logger.debug(
           `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${
-            this.shouldConcealLogs ? smear(externalId) : externalId
+            this.shouldConcealLogs ? smearExternalId(externalId) : externalId
           }`,
         );
       } catch (error) {
@@ -314,7 +317,9 @@ export class ScopeManagementService {
         );
         scope.externalId = updatedScope.externalId;
         this.logger.debug(
-          `Updated scope ${scope.id} with externalId: ${this.shouldConcealLogs ? smear(externalId) : externalId}`,
+          `Updated scope ${scope.id} with externalId: ${
+            this.shouldConcealLogs ? smearExternalId(externalId) : externalId
+          }`,
         );
       } catch (error) {
         this.logger.warn({

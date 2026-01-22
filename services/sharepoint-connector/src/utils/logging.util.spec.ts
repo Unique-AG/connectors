@@ -7,6 +7,8 @@ import {
   redactSiteNameFromPath,
   shouldConcealLogs,
   smear,
+  smearExternalId,
+  smearPath,
   smearSiteIdFromPath,
 } from './logging.util';
 
@@ -205,6 +207,90 @@ describe('logging utilities', () => {
       expect(
         concealIngestionKey('a1b2c3d4-e5f6-7890-abcd-ef1234567890/folder/subfolder/file.txt'),
       ).toBe('********-****-****-****-********7890/folder/subfolder/file.txt');
+    });
+  });
+
+  describe('smearExternalId', () => {
+    it('returns __erroneous__ for null or undefined input', () => {
+      expect(smearExternalId(null)).toBe('__erroneous__');
+      expect(smearExternalId(undefined)).toBe('__erroneous__');
+    });
+
+    it('smears the entire string if it does not start with spc:', () => {
+      const externalId = 'otherid12345678';
+      const result = smearExternalId(externalId);
+      expect(result).toMatch(/^\*+5678$/);
+    });
+
+    it('smears the entire string if it starts with spc: but has no second colon and no slash', () => {
+      const externalId = 'spc12345678';
+      const result = smearExternalId(externalId);
+      expect(result).toMatch(/^\*+5678$/);
+    });
+
+    it('preserves prefix and smears ID part for site external IDs', () => {
+      const externalId = 'spc:site:site12345678';
+      const result = smearExternalId(externalId);
+      // site12345678 (len 12) -> ********5678 (8 stars + 4 chars)
+      expect(result).toBe('spc:site:********5678');
+    });
+
+    it('preserves prefix and uses smearPath for folder external IDs with slashes', () => {
+      const externalId = 'spc:folder:site123/folder456';
+      const result = smearExternalId(externalId);
+      // smearPath('site123/folder456') -> /***e123/*****r456
+      // substring(1) removes leading /
+      expect(result).toBe('spc:folder:***e123/*****r456');
+    });
+
+    it('handles drive external IDs correctly', () => {
+      const externalId = 'spc:drive:site123/drive789';
+      const result = smearExternalId(externalId);
+      // site123 -> ***e123, drive789 -> ****e789
+      expect(result).toBe('spc:drive:***e123/****e789');
+    });
+
+    it('handles sitePages special case correctly', () => {
+      // In ScopeManagementService: `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId}/sitePages`
+      const externalId = 'spc:site123/sitePages';
+      const result = smearExternalId(externalId);
+      // site123 -> ***e123, sitePages -> *****ages
+      expect(result).toBe('spc:***e123/*****ages');
+    });
+
+    it('handles unknown external IDs correctly', () => {
+      // In ScopeManagementService: `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId}/${scope.name}-${randomUUID()}`
+      const externalId = 'spc:unknown:site123/MyFolder-uuid123';
+      const result = smearExternalId(externalId);
+      // site123 -> ***e123, MyFolder-uuid123 -> ********-***d123
+      expect(result).toBe('spc:unknown:***e123/********-***d123');
+    });
+  });
+
+  describe('smearPath', () => {
+    it('handles paths starting with slash', () => {
+      // normalizeSlashes removes leading/trailing slashes
+      // smearPath prepends one back
+      // /a/b/c -> a/b/c -> [Smeared]/[Smeared]/[Smeared] -> /[Smeared]/[Smeared]/[Smeared]
+      expect(smearPath('/a/b/c', 1)).toBe('/[Smeared]/[Smeared]/[Smeared]');
+    });
+
+    it('handles paths NOT starting with slash', () => {
+      // a/b/c -> a/b/c -> [Smeared]/[Smeared]/[Smeared] -> /[Smeared]/[Smeared]/[Smeared]
+      expect(smearPath('a/b/c', 1)).toBe('/[Smeared]/[Smeared]/[Smeared]');
+    });
+
+    it('handles empty path', () => {
+      expect(smearPath('')).toBe('/[Smeared]');
+    });
+
+    it('honors addLeadingSlash option', () => {
+      expect(smearPath('a/b/c', 1, { addLeadingSlash: false })).toBe(
+        '[Smeared]/[Smeared]/[Smeared]',
+      );
+      expect(smearPath('a/b/c', 1, { addLeadingSlash: true })).toBe(
+        '/[Smeared]/[Smeared]/[Smeared]',
+      );
     });
   });
 

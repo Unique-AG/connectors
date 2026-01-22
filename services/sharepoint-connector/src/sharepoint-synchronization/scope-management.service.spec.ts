@@ -8,8 +8,8 @@ import type {
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
-import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
@@ -229,7 +229,9 @@ describe('ScopeManagementService', () => {
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', 'spc:site:site-123');
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
-        expect.stringContaining('Claimed root scope root-scope-123 with externalId: spc:site:site-123'),
+        expect.stringContaining(
+          'Claimed root scope root-scope-123 with externalId: spc:site:site-123',
+        ),
       );
     });
 
@@ -595,7 +597,9 @@ describe('ScopeManagementService', () => {
 
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
-        expect.stringMatching(/^Updated scope scope-1 with externalId: spc:unknown:site-123\/test1-/),
+        expect.stringMatching(
+          /^Updated scope scope-1 with externalId: spc:unknown:site-123\/test1-/,
+        ),
       );
     });
 
