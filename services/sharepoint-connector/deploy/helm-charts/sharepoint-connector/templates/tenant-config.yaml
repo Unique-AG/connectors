@@ -33,7 +33,7 @@ data:
       sharepointList:
         {{- with .Values.connectorConfig.sharepoint.sharepointList }}
         siteId: {{ .siteId | quote }}
-        listDisplayName: {{ .listDisplayName | quote }}
+        listId: {{ .listId | quote }}
         {{- end }}
       {{- else if eq .Values.connectorConfig.sharepoint.sitesSource "config_file" }}
       sites:

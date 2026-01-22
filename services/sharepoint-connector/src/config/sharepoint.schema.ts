@@ -115,11 +115,8 @@ export const SiteConfigSchema = z.object({
     .describe(
       'Scope ID to be used as root for ingestion. For flat mode, all files are ingested in this scope. For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
     ),
-  maxFilesToIngest: z.coerce
-    .number()
-    .int()
-    .positive()
-    .optional()
+  maxFilesToIngest: z
+    .union([z.undefined(), z.coerce.number().int().positive()])
     .describe(
       'Maximum number of files to ingest per site in a single sync run. If the number of new + updated files exceeds this limit, the sync for that site will fail.',
     ),
@@ -172,9 +169,7 @@ const dynamicSitesConfig = z.object({
   sharepointList: z
     .object({
       siteId: requiredStringSchema.describe('SharePoint site ID containing the configuration list'),
-      listDisplayName: requiredStringSchema.describe(
-        'Display name of the SharePoint configuration list',
-      ),
+      listId: requiredStringSchema.describe('GUID of the SharePoint configuration list'),
     })
     .describe('SharePoint list details containing site configurations'),
 });

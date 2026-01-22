@@ -265,17 +265,17 @@
             "sharepointList": {
               "type": "object",
               "description": "SharePoint list details containing site configurations. Only used when sitesSource is 'sharepoint_list'",
-              "required": ["siteId", "listDisplayName"],
+              "required": ["siteId", "listId"],
               "properties": {
                 "siteId": {
                   "type": "string",
                   "description": "SharePoint site ID containing the configuration list",
                   "examples": ["00000000-0000-0000-0000-000000000000"]
                 },
-                "listDisplayName": {
+                "listId": {
                   "type": "string",
-                  "description": "Display name of the SharePoint configuration list",
-                  "examples": ["SharePoint Sites to Sync"]
+                  "description": "GUID of the SharePoint configuration list",
+                  "examples": ["00000000-0000-0000-0000-000000000000"]
                 }
               },
               "additionalProperties": false
