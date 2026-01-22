@@ -115,10 +115,8 @@ export const SiteConfigSchema = z.object({
     .describe(
       'Scope ID to be used as root for ingestion. For flat mode, all files are ingested in this scope. For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
     ),
-  maxFilesToIngest: z.coerce
-    .number()
-    .int()
-    .optional()
+  maxFilesToIngest: z
+    .union([z.undefined(), z.coerce.number().int().positive()])
     .describe(
       'Maximum number of files to ingest per site in a single sync run. If the number of new + updated files exceeds this limit, the sync for that site will fail.',
     ),
