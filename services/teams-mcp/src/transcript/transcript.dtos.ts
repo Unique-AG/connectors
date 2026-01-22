@@ -304,16 +304,11 @@ export type Transcript = z.infer<typeof Transcript>;
 
 export const TranscriptCollection = Collection(Transcript);
 
-const extractThreadId = (url: URL, ctx: z.RefinementCtx): string => {
+const extractThreadId = (url: URL): string | null => {
   const match = url.pathname.match(/\/meetup-join\/([^/]+)/);
   const threadId = match?.[1];
   if (!threadId) {
-    ctx.addIssue({
-      code: 'invalid_format',
-      format: 'url',
-      message: `Expected Teams meeting URL with threadId in path (e.g., /meetup-join/{threadId}/...), got: ${url.pathname}`,
-    });
-    return z.NEVER;
+    return null;
   }
   return decodeURIComponent(threadId);
 };
@@ -356,7 +351,17 @@ export const Meeting = z
       }),
     }),
   })
-  .transform((m, ctx) => ({ ...m, threadId: extractThreadId(m.joinWebUrl, ctx) }));
+  .transform((m, ctx) => {
+    const threadId = extractThreadId(m.joinWebUrl);
+    if (!threadId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Expected Teams meeting URL with threadId in path (e.g., /meetup-join/{threadId}/...), got: ${m.joinWebUrl.pathname}`,
+      });
+      return z.NEVER;
+    }
+    return { ...m, threadId };
+  });
 export type Meeting = z.infer<typeof Meeting>;
 
 export const MeetingCollection = Collection(Meeting);
@@ -378,9 +383,9 @@ export const CalendarEvent = z
       })
       .nullish(),
   })
-  .transform((e, ctx) => ({
+  .transform((e) => ({
     ...e,
-    threadId: e.onlineMeeting ? extractThreadId(e.onlineMeeting.joinUrl, ctx) : null,
+    threadId: e.onlineMeeting ? extractThreadId(e.onlineMeeting.joinUrl) : null,
   }));
 export type CalendarEvent = z.infer<typeof CalendarEvent>;
 

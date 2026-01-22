@@ -474,10 +474,11 @@ export class UniqueService {
     const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
     // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
     const formattedDate = happenedAt.toISOString().split('T').at(0)!;
-    const sanitizedSubject = subject
-      .replace(/[^a-zA-Z0-9\s/-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
+    const sanitizedSubject =
+      subject
+        .replace(/[^a-zA-Z0-9\s/-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'Untitled Meeting';
     return recurring
       ? `/${rootScopePath}/${sanitizedSubject}/${formattedDate}`
       : `/${rootScopePath}/${sanitizedSubject} - ${formattedDate}`;
