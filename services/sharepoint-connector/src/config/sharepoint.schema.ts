@@ -118,7 +118,6 @@ export const SiteConfigSchema = z.object({
   maxFilesToIngest: z.coerce
     .number()
     .int()
-    .positive()
     .optional()
     .describe(
       'Maximum number of files to ingest per site in a single sync run. If the number of new + updated files exceeds this limit, the sync for that site will fail.',
