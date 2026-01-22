@@ -62,7 +62,7 @@ export class PermissionsSyncService {
     const { context, sharePoint, unique } = input;
     const { siteId, ingestionMode } = context.siteConfig;
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId.value) : siteId.value;
     const logPrefix = `[Site: ${logSiteId}]`;
     const startTime = Date.now();
     let currentStep: SyncStep = SyncStep.PermissionsFetch;
@@ -73,7 +73,7 @@ export class PermissionsSyncService {
           `${sharePoint.directories.length} directories`,
       );
       const permissionsFetchStartTime = Date.now();
-      const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(siteId, [
+      const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(siteId.value, [
         ...sharePoint.items,
         ...sharePoint.directories,
       ]);
@@ -83,7 +83,7 @@ export class PermissionsSyncService {
 
       currentStep = SyncStep.GroupsMembershipsFetch;
       const groupsWithMembershipsMap = await this.fetchGroupsWithMembershipsForSite(
-        siteId,
+        siteId.value,
         permissionsMap,
       );
 
@@ -93,7 +93,7 @@ export class PermissionsSyncService {
 
       currentStep = SyncStep.UniqueDataFetch;
       const uniqueUsersMap = await this.getUniqueUsersMap();
-      const uniqueGroupsMap = await this.getUniqueGroupsMap(siteId);
+      const uniqueGroupsMap = await this.getUniqueGroupsMap(siteId.value);
 
       this.logger.log(
         `${logPrefix} Found ${Object.keys(uniqueGroupsMap).length} unique groups and ${Object.keys(uniqueUsersMap).length} unique users`,
@@ -101,7 +101,7 @@ export class PermissionsSyncService {
 
       currentStep = SyncStep.GroupsSync;
       const { updatedUniqueGroupsMap } = await this.syncSharepointGroupsToUniqueCommand.run({
-        siteId,
+        siteId: siteId.value,
         sharePoint: { groupsMap: groupsWithMembershipsMap },
         unique: { groupsMap: uniqueGroupsMap, usersMap: uniqueUsersMap },
       });

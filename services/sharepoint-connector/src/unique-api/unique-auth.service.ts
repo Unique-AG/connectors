@@ -42,9 +42,9 @@ export class UniqueAuthService {
     });
 
     try {
-      const basicAuth = Buffer.from(`${zitadelClientId}:${zitadelClientSecret.value}`).toString(
-        'base64',
-      );
+      const basicAuth = Buffer.from(
+        `${zitadelClientId.value}:${zitadelClientSecret.value}`,
+      ).toString('base64');
       const { statusCode, body } = await this.httpClientService.request(zitadelOauthTokenUrl, {
         method: 'POST',
         headers: {

@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { Redacted } from '../utils/redacted';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
@@ -312,7 +313,7 @@ describe('ContentSyncService', () => {
         siteName: 'test-site',
         siteConfig: {
           ...mockSiteConfig,
-          siteId: 'test-site-123',
+          siteId: new Redacted('test-site-123'),
           scopeId: 'scope-id',
           maxFilesToIngest: 2,
         },

@@ -7,6 +7,7 @@ import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
+import { Redacted } from '../utils/redacted';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
@@ -100,16 +101,16 @@ describe('SharepointSynchronizationService', () => {
     };
 
     mockSitesConfigurationService = {
-      loadSitesConfiguration: vi
-        .fn()
-        .mockResolvedValue([
-          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
-        ]),
-      fetchSitesFromSharePointList: vi
-        .fn()
-        .mockResolvedValue([
-          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
-        ]),
+      loadSitesConfiguration: vi.fn().mockResolvedValue([
+        createMockSiteConfig({
+          siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+        }),
+      ]),
+      fetchSitesFromSharePointList: vi.fn().mockResolvedValue([
+        createMockSiteConfig({
+          siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+        }),
+      ]),
     };
 
     mockContentSyncService = {
@@ -141,7 +142,11 @@ describe('SharepointSynchronizationService', () => {
           if (key === 'sharepoint')
             return {
               sitesSource: 'config_file',
-              sites: [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })],
+              sites: [
+                createMockSiteConfig({
+                  siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+                }),
+              ],
             };
           return undefined;
         }),
@@ -275,7 +280,7 @@ describe('SharepointSynchronizationService', () => {
 
     const mockSiteConfigs = [
       createMockSiteConfig({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
         syncMode: 'content_and_permissions',
       }),
     ];
@@ -341,7 +346,7 @@ describe('SharepointSynchronizationService', () => {
     };
 
     const mockSiteConfigs = [
-      createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
+      createMockSiteConfig({ siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66') }),
     ];
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)

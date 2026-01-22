@@ -29,6 +29,12 @@ export const AppConfigSchema = z
       .describe(
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
+    logsDiagnosticsConfigEmitPolicy: z
+      .enum(['on_startup', 'none'])
+      .prefault('on_startup')
+      .describe(
+        'Controls whether the effective configuration is logged on startup. on_startup: log once on start, none: disable logging.',
+      ),
     tenantConfigPathPattern: requiredStringSchema.describe(
       'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/tenant-configs/*-tenant-config.yaml)',
     ),
@@ -46,6 +52,7 @@ export const appConfig = registerConfig('app', AppConfigSchema, {
     'PORT',
     'NODE_ENV',
     'LOGS_DIAGNOSTICS_DATA_POLICY',
+    'LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY',
     'TENANT_CONFIG_PATH_PATTERN',
   ]),
 });

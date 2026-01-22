@@ -101,7 +101,7 @@ export class SharepointSynchronizationService {
 
       for (const siteConfig of active) {
         const siteSyncStartTime = Date.now();
-        const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
+        const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId.value) : siteConfig.siteId.value;
 
         const result = await this.syncSite(siteConfig);
         this.recordSiteMetric(siteSyncStartTime, logSiteId, result);
@@ -157,7 +157,7 @@ export class SharepointSynchronizationService {
   }
 
   private async processSingleSiteDeletion(siteConfig: SiteConfig): Promise<void> {
-    const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
+    const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId.value) : siteConfig.siteId.value;
     const logPrefix = `[Site: ${logSiteId}]`;
 
     this.logger.log(
@@ -174,7 +174,7 @@ export class SharepointSynchronizationService {
         return;
       }
 
-      await this.uniqueFilesService.deleteFilesBySiteId(siteConfig.siteId);
+      await this.uniqueFilesService.deleteFilesBySiteId(siteConfig.siteId.value);
       await this.scopeManagementService.deleteRootScopeRecursively(siteConfig.scopeId);
 
       this.logger.log(`${logPrefix} Successfully processed deletion`);
@@ -213,7 +213,7 @@ export class SharepointSynchronizationService {
 
     let siteName: string;
     try {
-      siteName = await this.graphApiService.getSiteName(siteConfig.siteId);
+      siteName = await this.graphApiService.getSiteName(siteConfig.siteId.value);
     } catch (error) {
       this.logger.error({
         msg: `${logPrefix} Failed to get site name`,
@@ -233,7 +233,7 @@ export class SharepointSynchronizationService {
   }
 
   private async syncSite(siteConfig: SiteConfig): Promise<SiteSyncResult> {
-    const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
+    const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId.value) : siteConfig.siteId.value;
     const logPrefix = `[Site: ${logSiteId}]`;
     let scopes: ScopeWithPath[] | null = null;
     const siteStartTime = Date.now();
@@ -249,7 +249,7 @@ export class SharepointSynchronizationService {
 
     try {
       const result = await this.graphApiService.getAllSiteItems(
-        context.siteConfig.siteId,
+        context.siteConfig.siteId.value,
         context.siteConfig.syncColumnName,
       );
       items = result.items;

@@ -94,8 +94,9 @@ function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
     process.env.SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD &&
     typedConfig.sharepoint.auth.mode === 'certificate'
   ) {
-    typedConfig.sharepoint.auth.privateKeyPassword =
-      process.env.SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD;
+    typedConfig.sharepoint.auth.privateKeyPassword = new Redacted(
+      process.env.SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD,
+    );
   }
 
   if (process.env.ZITADEL_CLIENT_SECRET && typedConfig.unique.serviceAuthMode === 'external') {

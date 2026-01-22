@@ -51,7 +51,7 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
     const { siteId } = context.siteConfig;
     const { serviceUserId } = context;
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId.value) : siteId.value;
     const logPrefix = `[Site: ${logSiteId}]`;
     this.logger.log(
       `${logPrefix} Starting permissions sync for ` +
@@ -59,7 +59,7 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
     );
 
     this.logger.log(`${logPrefix} Fetching unique files`);
-    const uniqueFiles = await this.uniqueFilesService.getFilesForSite(siteId);
+    const uniqueFiles = await this.uniqueFilesService.getFilesForSite(siteId.value);
     this.logger.log(`${logPrefix} Fetched ${uniqueFiles.length} unique files`);
     // Maps from scope id to permissions to add/remove, because API calls are limited to the scope
     const permissionsToAddByScopeId: Record<string, UniqueFileAccessInput[]> = {};

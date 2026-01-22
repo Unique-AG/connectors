@@ -8,6 +8,7 @@ import type {
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { Redacted } from '../utils/redacted';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
@@ -106,7 +107,7 @@ describe('ScopeManagementService', () => {
     serviceUserId: 'user-123',
     rootPath: '/test1',
     siteName: 'test-site',
-    siteConfig: createMockSiteConfig({ siteId: 'site-123', scopeId: 'root-scope-123' }),
+    siteConfig: createMockSiteConfig({ siteId: new Redacted('site-123'), scopeId: 'root-scope-123' }),
   };
 
   type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };
