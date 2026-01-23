@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.1...teams-mcp@0.2.2) (2026-01-23)
+
+
+### Bug Fixes
+
+* **teams-mcp:** add debug logging for write URL transformation ([#233](https://github.com/Unique-AG/connectors/issues/233)) ([7442123](https://github.com/Unique-AG/connectors/commit/7442123b7f67197dd86b9a6a81aa5888114333b9))
+* **teams-mcp:** include port in storage endpoint logging ([#231](https://github.com/Unique-AG/connectors/issues/231)) ([92a4c6f](https://github.com/Unique-AG/connectors/commit/92a4c6ffdde4dff9a6a9eb4edfd49021da427c90))
+
 ## [0.2.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.0...teams-mcp@0.2.1) (2026-01-22)
 
 
