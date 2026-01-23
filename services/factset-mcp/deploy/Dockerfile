@@ -7,9 +7,8 @@ RUN corepack enable
 
 FROM base AS pruner
 WORKDIR /app
-ARG APP_NAME
 RUN --mount=type=bind,source=.,target=/src,ro \
-    pnpm dlx turbo prune @unique-ag/${APP_NAME} --docker --cwd /src --out-dir /app/out
+    pnpm dlx turbo prune @unique-ag/factset-mcp --docker --cwd /src --out-dir /app/out
 
 FROM base AS deps
 WORKDIR /app
@@ -22,25 +21,24 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
 FROM base AS builder
-ARG APP_NAME
 WORKDIR /app
 
 COPY --from=deps /app/ .
 COPY ./tsconfig.json ./tsconfig.json
 COPY ./turbo.json ./turbo.json
 COPY --from=pruner /app/out/full/ .
-COPY ./services/${APP_NAME}/prisma ./services/${APP_NAME}/prisma
+COPY ./services/factset-mcp/prisma ./services/factset-mcp/prisma
 
-RUN pnpm --filter=@unique-ag/${APP_NAME} db:generate && \
+RUN pnpm --filter=@unique-ag/factset-mcp db:generate && \
     # This triggers Prisma to download the engines, so we can stash them in the image.
-    pnpm --filter=@unique-ag/${APP_NAME} exec prisma --version && \
-    pnpm --filter=@unique-ag/${APP_NAME} codegen
+    pnpm --filter=@unique-ag/factset-mcp exec prisma --version && \
+    pnpm --filter=@unique-ag/factset-mcp codegen
 RUN --mount=type=cache,target=/root/.cache/turbo \
-    pnpm turbo build --filter=@unique-ag/${APP_NAME}... && \
-    pnpm --filter=@unique-ag/${APP_NAME} deploy out
+    pnpm turbo build --filter=@unique-ag/factset-mcp... && \
+    pnpm --filter=@unique-ag/factset-mcp deploy out
 
 RUN set -eux; \
-    cd services/${APP_NAME}; \
+    cd services/factset-mcp; \
     ENG_DIR="$(node -e "console.log(require.resolve('@prisma/engines/package.json'))" | xargs dirname)"; \
     echo "Engines resolved to: $ENG_DIR"; \
     test -d "$ENG_DIR"; \
@@ -48,7 +46,6 @@ RUN set -eux; \
     cp -R "$ENG_DIR"/. /app/_engines;
 
 FROM node:24-bookworm-slim AS runner
-ARG APP_NAME
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -68,10 +65,10 @@ RUN mkdir -p /tmp/.cache/corepack && chown -R nestjs:nodejs /tmp/.cache/corepack
 
 ENV NODE_ENV=production
 
-COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/@generated ./@generated
-COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/public ./public
-COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/prisma ./prisma
+COPY --from=builder --chown=nestjs:nodejs /app/services/factset-mcp/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/services/factset-mcp/@generated ./@generated
+COPY --from=builder --chown=nestjs:nodejs /app/services/factset-mcp/public ./public
+COPY --from=builder --chown=nestjs:nodejs /app/services/factset-mcp/prisma ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/out/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/out/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/_engines /prisma/engines
