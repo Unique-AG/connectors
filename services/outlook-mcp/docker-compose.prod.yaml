@@ -6,10 +6,6 @@ services:
     build:
       context: ../..  # Build from monorepo root
       dockerfile: ./services/outlook-mcp/deploy/Dockerfile
-      args:
-        - MAX_HEAP_MB=1024
-        - APP_NAME=outlook-mcp
-        - PNPM_VERSION=10.15.1
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/outlook_mcp?schema=public
@@ -26,10 +22,6 @@ services:
     build:
       context: ../..  # Build from monorepo root
       dockerfile: ./services/outlook-mcp/deploy/Dockerfile
-      args:
-        - MAX_HEAP_MB=1024
-        - APP_NAME=outlook-mcp
-        - PNPM_VERSION=10.15.1
     ports:
       - "3000:3000"
     environment:

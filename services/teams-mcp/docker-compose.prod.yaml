@@ -4,10 +4,6 @@ services:
     build:
       context: ../.. # Build from monorepo root
       dockerfile: ./services/teams-mcp/deploy/Dockerfile
-      args:
-        - MAX_HEAP_MB=1024
-        - APP_NAME=teams-mcp
-        - PNPM_VERSION=10.15.1
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/teams_mcp?schema=public
@@ -24,10 +20,6 @@ services:
     build:
       context: ../.. # Build from monorepo root
       dockerfile: ./services/teams-mcp/deploy/Dockerfile
-      args:
-        - MAX_HEAP_MB=1024
-        - APP_NAME=teams-mcp
-        - PNPM_VERSION=10.15.1
     ports:
       - "3000:3000"
     environment:
