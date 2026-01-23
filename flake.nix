@@ -71,7 +71,7 @@
 
         # Node.js development
         nodePkgs = with pkgs; [
-          nodejs_22 # as per engines in package.json
+          nodejs_24 # matches Dockerfiles
           corepack # pnpm version managed via corepack
           turbo
           biome
