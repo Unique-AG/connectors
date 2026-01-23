@@ -397,6 +397,8 @@ export class UniqueService {
     const body = await response.json();
     const result = PublicContentUpsertResultSchema.parse(body);
 
+    const correctedWriteUrl = this.correctWriteUrl(result.writeUrl);
+
     this.logger.log(
       {
         scopeId: content.scopeId,
@@ -407,10 +409,17 @@ export class UniqueService {
       },
       'Successfully created or updated content record in Unique system',
     );
+    this.logger.debug(
+      {
+        originalWriteUrl: result.writeUrl,
+        correctedWriteUrl,
+      },
+      'Write URL transformation applied',
+    );
 
     return {
       ...result,
-      writeUrl: this.correctWriteUrl(result.writeUrl),
+      writeUrl: result.writeUrl,
     };
   }
 
