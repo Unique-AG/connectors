@@ -20,6 +20,50 @@
           config.allowUnfree = true;
         };
 
+        lib = pkgs.lib;
+
+        # Microsoft Dev Tunnels CLI (not in nixpkgs)
+        devtunnel =
+          let
+            version = "1.0.1516+7e996fe917";
+            platform = {
+              aarch64-darwin = { name = "osx-arm64";   hash = "sha256-nxfXdt4WnutbOFTmu2Zo6eJ2xD/j4ZhskGSDsoz2pSQ="; };
+              x86_64-darwin  = { name = "osx-x64";     hash = lib.fakeHash; };
+              x86_64-linux   = { name = "linux-x64";   hash = lib.fakeHash; };
+              aarch64-linux  = { name = "linux-arm64"; hash = lib.fakeHash; };
+            }.${system} or (throw "Unsupported system: ${system}");
+          in
+          pkgs.stdenv.mkDerivation {
+            pname = "devtunnel";
+            inherit version;
+
+            src = pkgs.fetchurl {
+              url = "https://tunnelsassetsprod.blob.core.windows.net/cli/${version}/${platform.name}-devtunnel";
+              hash = platform.hash;
+            };
+
+            nativeBuildInputs = lib.optionals pkgs.stdenv.isDarwin [
+              pkgs.darwin.sigtool
+            ];
+
+            dontUnpack = true;
+
+            installPhase = ''
+              mkdir -p $out/bin
+              cp $src $out/bin/devtunnel
+              chmod 755 $out/bin/devtunnel
+            '' + lib.optionalString pkgs.stdenv.isDarwin ''
+              codesign --force --sign - $out/bin/devtunnel
+            '';
+
+            meta = with lib; {
+              description = "Microsoft Dev Tunnels CLI";
+              homepage = "https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/";
+              license = licenses.unfree;
+              platforms = [ "aarch64-darwin" "x86_64-darwin" "x86_64-linux" "aarch64-linux" ];
+            };
+          };
+
         # Shell
         shellPkgs = with pkgs; [
           zsh
@@ -35,12 +79,12 @@
         ];
 
         # Infrastructure (deploy/)
-        # Note: devtunnel not in nixpkgs, install via: brew install --cask devtunnel
-        infraPkgs = with pkgs; [
-          terraform
-          kubectl
-          kubernetes-helm
-          azure-cli
+        infraPkgs = [
+          devtunnel
+          pkgs.terraform
+          pkgs.kubectl
+          pkgs.kubernetes-helm
+          pkgs.azure-cli
         ];
 
         # Utilities
@@ -54,9 +98,6 @@
           buildInputs = shellPkgs ++ nodePkgs ++ infraPkgs ++ utilPkgs;
 
           shellHook = ''
-            # Enable corepack for pnpm version management
-            corepack enable
-
             echo "Connectors dev environment loaded"
             echo "Node.js: $(node --version)"
             echo "pnpm: $(pnpm --version)"
