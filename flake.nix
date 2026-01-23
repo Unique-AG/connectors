@@ -28,9 +28,9 @@
             version = "1.0.1516+7e996fe917";
             platform = {
               aarch64-darwin = { name = "osx-arm64";   hash = "sha256-nxfXdt4WnutbOFTmu2Zo6eJ2xD/j4ZhskGSDsoz2pSQ="; };
-              x86_64-darwin  = { name = "osx-x64";     hash = lib.fakeHash; };
-              x86_64-linux   = { name = "linux-x64";   hash = lib.fakeHash; };
-              aarch64-linux  = { name = "linux-arm64"; hash = lib.fakeHash; };
+              x86_64-darwin  = { name = "osx-x64";     hash = "sha256-BLWX1qoxlCs3HN71JPKEf7lUVy9zH11oas3MKYWxdwI="; };
+              x86_64-linux   = { name = "linux-x64";   hash = "sha256-mRJ0btEY+ja34i1si4ykJvGt1T0xQlYw/ngIw9AV6Mo="; };
+              aarch64-linux  = { name = "linux-arm64"; hash = "sha256-FSVyCu0pIEro0ToCDK8AG5YF4GRABsxQCfiam8HjNRA="; };
             }.${system} or (throw "Unsupported system: ${system}");
           in
           pkgs.stdenv.mkDerivation {
