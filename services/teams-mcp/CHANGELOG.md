@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.0...teams-mcp@0.2.1) (2026-01-22)
+
+
+### Features
+
+* **teams-mcp:** remove MP4 recording ingestion from transcript processing ([#221](https://github.com/Unique-AG/connectors/issues/221)) ([73f2024](https://github.com/Unique-AG/connectors/commit/73f2024d83ccf8494a05a59ff7e16b704c967b9a))
+
+
+### Bug Fixes
+
+* **teams-mcp:** improve calendar event matching, scope paths, and metadata handling ([#230](https://github.com/Unique-AG/connectors/issues/230)) ([ef16658](https://github.com/Unique-AG/connectors/commit/ef16658d27d112da37ae973700935e2977e4adce))
+
 ## [0.2.0](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.1.1...teams-mcp@0.2.0) (2026-01-21)
 
 
