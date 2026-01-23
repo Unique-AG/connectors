@@ -424,7 +424,7 @@ export class UniqueService {
 
     // Extract only the storage account hostname for logging (no query params or paths with sensitive data)
     const urlObj = new URL(writeUrl);
-    const storageEndpoint = `${urlObj.protocol}//${urlObj.hostname}`;
+    const storageEndpoint = urlObj.origin;
     span?.setAttribute('storage_endpoint', storageEndpoint);
 
     this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
