@@ -1,14 +1,17 @@
 # syntax=docker/dockerfile:1.7
 
+ARG APP_NAME=sharepoint-connector
+
 FROM node:24-bookworm AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
 FROM base AS pruner
+ARG APP_NAME
 WORKDIR /app
 RUN --mount=type=bind,source=.,target=/src,ro \
-    pnpm dlx turbo prune @unique-ag/sharepoint-connector --docker --cwd /src --out-dir /app/out
+    pnpm dlx turbo prune @unique-ag/${APP_NAME} --docker --cwd /src --out-dir /app/out
 
 FROM base AS deps
 WORKDIR /app
@@ -21,6 +24,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
 FROM base AS builder
+ARG APP_NAME
 WORKDIR /app
 
 COPY --from=deps /app/ .
@@ -29,10 +33,11 @@ COPY ./turbo.json ./turbo.json
 COPY --from=pruner /app/out/full/ .
 
 RUN --mount=type=cache,target=/root/.cache/turbo \
-    pnpm turbo build --filter=@unique-ag/sharepoint-connector... && \
-    pnpm --filter=@unique-ag/sharepoint-connector deploy out
+    pnpm turbo build --filter=@unique-ag/${APP_NAME}... && \
+    pnpm --filter=@unique-ag/${APP_NAME} deploy out
 
 FROM node:24-bookworm-slim AS runner
+ARG APP_NAME
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -52,7 +57,7 @@ RUN mkdir -p /tmp/.cache/corepack && chown -R nestjs:nodejs /tmp/.cache/corepack
 
 ENV NODE_ENV=production
 
-COPY --from=builder --chown=nestjs:nodejs /app/services/sharepoint-connector/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/services/${APP_NAME}/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/out/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/out/package.json ./package.json
 
