@@ -1,10 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-bookworm AS base
+FROM node:24-bookworm AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-ARG PNPM_VERSION=10.18.3
-RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+RUN corepack enable
 
 FROM base AS pruner
 WORKDIR /app
@@ -48,9 +47,8 @@ RUN set -eux; \
     mkdir -p /app/_engines; \
     cp -R "$ENG_DIR"/. /app/_engines;
 
-FROM node:22-bookworm-slim AS runner
+FROM node:24-bookworm-slim AS runner
 ARG APP_NAME
-ARG PNPM_VERSION=10.18.3
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -66,7 +64,6 @@ ENV PNPM_HOME="/tmp/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV COREPACK_HOME="/tmp/.cache/corepack"
 RUN corepack enable
-RUN corepack prepare pnpm@${PNPM_VERSION} --activate
 RUN mkdir -p /tmp/.cache/corepack && chown -R nestjs:nodejs /tmp/.cache/corepack
 
 ENV NODE_ENV=production

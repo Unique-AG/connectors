@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-bookworm AS base
+FROM node:24-bookworm AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=/root/.cache/turbo \
     pnpm turbo build --filter=@unique-ag/${APP_NAME}... && \
     pnpm --filter=@unique-ag/${APP_NAME} deploy out
 
-FROM node:22-bookworm-slim AS runner
+FROM node:24-bookworm-slim AS runner
 ARG APP_NAME
 WORKDIR /app
 
