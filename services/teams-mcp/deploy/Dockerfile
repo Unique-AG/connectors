@@ -10,8 +10,14 @@ ARG APP_NAME=teams-mcp
 FROM node:24-bookworm AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+# Set explicit cache location so we can copy it to runner stage
+ENV COREPACK_HOME="/corepack"
+# Copy root package.json so corepack can read "packageManager" field
+COPY package.json /tmp/package.json
+WORKDIR /tmp
 # Corepack manages pnpm version from package.json "packageManager" field
-RUN corepack enable
+# prepare --activate downloads and caches pnpm for offline use in runner
+RUN corepack enable && corepack prepare --activate
 
 # ------------------------------------------------------------------------------
 # Stage 2: pruner
@@ -89,7 +95,8 @@ ENV PNPM_HOME="/tmp/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV COREPACK_HOME="/tmp/.cache/corepack"
 RUN corepack enable
-RUN mkdir -p $COREPACK_HOME && chown -R nestjs:nodejs $COREPACK_HOME
+# Copy pre-downloaded pnpm from base stage (avoids runtime download)
+COPY --from=base --chown=nestjs:nodejs /corepack $COREPACK_HOME
 
 ENV NODE_ENV=production
 
