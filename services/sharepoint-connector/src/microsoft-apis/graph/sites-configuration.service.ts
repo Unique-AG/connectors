@@ -32,7 +32,10 @@ export class SitesConfigurationService {
 
     if (sharepointConfig.sitesSource === 'config_file') {
       this.logger.log('Loading sites configuration from YAML file');
-      this.configDiagnosticsService.logConfig('Loaded SharePoint Sites Configurations', sharepointConfig.sites);
+      this.configDiagnosticsService.logConfig(
+        'Loaded SharePoint Sites Configurations',
+        sharepointConfig.sites,
+      );
       return sharepointConfig.sites;
     }
 

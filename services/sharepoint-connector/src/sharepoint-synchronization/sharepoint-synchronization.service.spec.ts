@@ -181,7 +181,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
           scopeId: 'scope-id',
         }),
         siteName: 'test-site-name',
@@ -199,7 +199,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
           scopeId: 'scope-id',
         }),
         siteName: 'test-site-name',
@@ -322,7 +322,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
       context: expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
           scopeId: 'scope-id',
         }),
         siteName: 'test-site-name',
@@ -465,7 +465,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
         }),
       }),
     );
@@ -548,7 +548,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
         }),
       }),
     );
@@ -761,7 +761,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
         }),
       }),
     );

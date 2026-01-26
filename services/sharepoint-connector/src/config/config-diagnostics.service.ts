@@ -1,6 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { shouldConcealLogs } from '../utils/logging.util';
 import { Redacted } from '../utils/redacted';
 import type { Config } from './index';
 
@@ -12,9 +11,6 @@ export class ConfigDiagnosticsService implements OnModuleInit {
 
   public async onModuleInit() {
     await ConfigModule.envVariablesLoaded;
-
-    // Configure the Redacted class to respect the diagnostic data policy
-    Redacted.setConceal(shouldConcealLogs(this.configService));
 
     const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
       infer: true,
@@ -38,16 +34,37 @@ export class ConfigDiagnosticsService implements OnModuleInit {
       return;
     }
 
-    //Redacted fields are always concealed for diagnostics because we never want to log secrets
-    const previousConceal = Redacted.getConceal();
-    // Redacted.setConceal(true);
-    try {
-      this.logger.log({
-        msg: `Configuration: ${name}`,
-        config: value,
-      });
-    } finally {
-      Redacted.setConceal(previousConceal);
-    }
+    const filteredValue = filterRedactedFields(value);
+    this.logger.log({
+      msg: `Configuration: ${name}`,
+      config: filteredValue,
+    });
   }
+}
+
+/**
+ * Recursively filters out Redacted fields from an object or array.
+ * Useful for logging configuration without revealing secret field names.
+ */
+export function filterRedactedFields(value: unknown): unknown {
+  if (value instanceof Redacted) {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(filterRedactedFields).filter((item) => item !== undefined);
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const filtered: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      const filteredVal = filterRedactedFields(val);
+      if (filteredVal !== undefined) {
+        filtered[key] = filteredVal;
+      }
+    }
+    return filtered;
+  }
+
+  return value;
 }

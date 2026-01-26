@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Redacted } from '../../utils/redacted';
 import { GraphApiService } from './graph-api.service';
 import { SitesConfigurationService } from './sites-configuration.service';
 import type { ListColumn, ListItem } from './types/sharepoint.types';
@@ -30,7 +31,7 @@ describe('SitesConfigurationService', () => {
               sitesSource: 'config_file',
               sites: [
                 {
-                  siteId: '12345678-1234-4234-8123-123456789abc',
+                  siteId: new Redacted('12345678-1234-4234-8123-123456789abc'),
                   syncColumnName: 'TestColumn',
                   ingestionMode: 'recursive',
                   scopeId: 'scope_test',
@@ -57,7 +58,7 @@ describe('SitesConfigurationService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
-        siteId: '12345678-1234-4234-8123-123456789abc',
+        siteId: expect.any(Redacted),
         syncColumnName: 'TestColumn',
         ingestionMode: 'recursive',
         scopeId: 'scope_test',
@@ -116,7 +117,7 @@ describe('SitesConfigurationService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
-        siteId: '12345678-1234-4234-8123-123456789abc',
+        siteId: expect.any(Redacted),
         syncColumnName: 'TestColumn',
         ingestionMode: 'recursive',
         scopeId: 'scope_test',
@@ -170,7 +171,7 @@ describe('SitesConfigurationService', () => {
       const result = (service as any).transformListItemToSiteConfig(listItem, 0, mockNameMap);
 
       expect(result).toEqual({
-        siteId: '12345678-1234-4234-8234-123456789abc',
+        siteId: expect.any(Redacted),
         syncColumnName: 'TestColumn',
         ingestionMode: 'recursive',
         scopeId: 'scope_test',

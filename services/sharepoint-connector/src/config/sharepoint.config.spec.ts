@@ -52,7 +52,7 @@ describe('SharepointConfigSchema', () => {
       const result = SharepointConfigSchema.parse(config);
       expect(result.auth.mode).toBe('client-secret');
       if (result.auth.mode === 'client-secret') {
-        expect(result.auth.clientId).toBe('client-id-123');
+        expect(result.auth.clientId.value).toBe('client-id-123');
         expect(result.auth.clientSecret).toBeInstanceOf(Object); // Redacted
       }
     });
@@ -72,7 +72,7 @@ describe('SharepointConfigSchema', () => {
       const result = SharepointConfigSchema.parse(config);
       expect(result.auth.mode).toBe('certificate');
       if (result.auth.mode === 'certificate') {
-        expect(result.auth.thumbprintSha1).toBe('abcdef1234567890abcdef1234567890abcdef12');
+        expect(result.auth.thumbprintSha1?.value).toBe('abcdef1234567890abcdef1234567890abcdef12');
       }
     });
 
@@ -145,7 +145,7 @@ describe('SharepointConfigSchema', () => {
       const result = SharepointConfigSchema.parse(config);
       expect(result.sitesSource).toBe('sharepoint_list');
       if (result.sitesSource === 'sharepoint_list') {
-        expect(result.sharepointList.siteId).toBe('87654321-4321-4321-8321-cba987654321');
+        expect(result.sharepointList.siteId.value).toBe('87654321-4321-4321-8321-cba987654321');
         expect(result.sharepointList.listId).toBe('87654321-4321-4321-8321-cba987654321');
       }
     });

@@ -37,7 +37,7 @@ export class UniqueAuthService {
     const params = new URLSearchParams({
       scope:
         `openid profile email urn:zitadel:iam:user:resourceowner ` +
-        `urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${zitadelProjectId}:aud`,
+        `urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${zitadelProjectId.value}:aud`,
       grant_type: 'client_credentials',
     });
 
