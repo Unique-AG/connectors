@@ -109,7 +109,10 @@ describe('ScopeManagementService', () => {
     serviceUserId: 'user-123',
     rootPath: '/test1',
     siteName: 'test-site',
-    siteConfig: createMockSiteConfig({ siteId: new Redacted('site-123'), scopeId: 'root-scope-123' }),
+    siteConfig: createMockSiteConfig({
+      siteId: new Redacted('site-123'),
+      scopeId: 'root-scope-123',
+    }),
   };
 
   type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };

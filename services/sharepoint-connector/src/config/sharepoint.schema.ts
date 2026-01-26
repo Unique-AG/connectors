@@ -107,7 +107,12 @@ export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 // ==========================================
 
 export const SiteConfigSchema = z.object({
-  siteId: z.string().trim().pipe(z.uuidv4()).transform((val) => new Redacted(val)).describe('SharePoint site ID'),
+  siteId: z
+    .string()
+    .trim()
+    .pipe(z.uuidv4())
+    .transform((val) => new Redacted(val))
+    .describe('SharePoint site ID'),
   syncColumnName: z
     .string()
     .trim()
@@ -215,7 +220,7 @@ export type SharepointConfig = (
       sitesSource: 'sharepoint_list';
       sharepointList: {
         siteId: Redacted<string>;
-        listDisplayName: string;
+        listId: string;
       };
     }
 ) & {

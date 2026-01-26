@@ -1,7 +1,7 @@
-import { Redacted } from '../redacted';
 import type { SiteConfig } from '../../config/sharepoint.schema';
 import { IngestionMode } from '../../constants/ingestion.constants';
 import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
+import { Redacted } from '../redacted';
 
 export const createMockSiteConfig = (overrides?: Partial<SiteConfig>): SiteConfig => ({
   siteId: new Redacted('site-id'),

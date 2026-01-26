@@ -39,7 +39,7 @@ export class SitesConfigurationService {
     this.logger.debug('Loading sites configuration from SharePoint list');
     const sites = await this.fetchSitesFromSharePointList({
       siteId: sharepointConfig.sharepointList.siteId.value,
-      listDisplayName: sharepointConfig.sharepointList.listDisplayName,
+      listId: sharepointConfig.sharepointList.listId,
     });
     this.configDiagnosticsService.logConfig('SharePoint Sites (Dynamic)', sites);
     return sites;

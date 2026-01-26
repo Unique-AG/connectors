@@ -105,7 +105,9 @@ export class SharepointSynchronizationService {
 
       for (const siteConfig of active) {
         const siteSyncStartTime = Date.now();
-        const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId.value) : siteConfig.siteId.value;
+        const logSiteId = this.shouldConcealLogs
+          ? smear(siteConfig.siteId.value)
+          : siteConfig.siteId.value;
 
         const result = await this.syncSite(siteConfig);
         this.recordSiteMetric(siteSyncStartTime, logSiteId, result);
@@ -181,7 +183,7 @@ export class SharepointSynchronizationService {
     this.logger.error(`ScopeId: ${scopeId} is configured for multiple sites:`);
 
     for (const [index, site] of sitesWithSameScopeId.entries()) {
-      const logSiteId = this.shouldConcealLogs ? smear(site.siteId) : site.siteId;
+      const logSiteId = this.shouldConcealLogs ? smear(site.siteId.value) : site.siteId.value;
       const status = index === 0 ? 'WILL SYNC - first occurrence' : 'SKIPPED - duplicate scopeId';
       this.logger.error(`  - siteId: ${logSiteId} (${status})`);
     }
@@ -189,7 +191,9 @@ export class SharepointSynchronizationService {
   }
 
   private async processSingleSiteDeletion(siteConfig: SiteConfig): Promise<void> {
-    const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId.value) : siteConfig.siteId.value;
+    const logSiteId = this.shouldConcealLogs
+      ? smear(siteConfig.siteId.value)
+      : siteConfig.siteId.value;
     const logPrefix = `[Site: ${logSiteId}]`;
 
     this.logger.log(
@@ -233,7 +237,7 @@ export class SharepointSynchronizationService {
     try {
       baseContext = await this.scopeManagementService.initializeRootScope(
         siteConfig.scopeId,
-        siteConfig.siteId,
+        siteConfig.siteId.value,
         siteConfig.ingestionMode,
       );
     } catch (error) {
@@ -266,7 +270,9 @@ export class SharepointSynchronizationService {
   }
 
   private async syncSite(siteConfig: SiteConfig): Promise<SiteSyncResult> {
-    const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId.value) : siteConfig.siteId.value;
+    const logSiteId = this.shouldConcealLogs
+      ? smear(siteConfig.siteId.value)
+      : siteConfig.siteId.value;
     const logPrefix = `[Site: ${logSiteId}]`;
     let scopes: ScopeWithPath[] | null = null;
     const siteStartTime = Date.now();
