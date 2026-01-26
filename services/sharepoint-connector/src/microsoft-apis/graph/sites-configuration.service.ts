@@ -73,7 +73,7 @@ export class SitesConfigurationService {
     ]);
 
     this.logger.log(
-      `Fetched ${listItems.length} items and ${columns.length} columns from SharePoint list`,
+      `Fetched ${listItems.length} sharepoint site configurations from SharePoint list`,
     );
 
     const displayNameToNameMap = this.createDisplayNameToNameMap(columns);

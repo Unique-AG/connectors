@@ -69,8 +69,7 @@ export function concealIngestionKey(key: string): string {
 
 export function smearExternalId(externalId: string | null | undefined): string {
   if (externalId === undefined || externalId === null) {
-    // prints __erroneous__ instead of the original value
-    return smear(externalId);
+    return smear(externalId); // prints an errenous string instead
   }
 
   if (externalId.startsWith(EXTERNAL_ID_PREFIX)) {
