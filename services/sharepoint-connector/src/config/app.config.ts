@@ -33,7 +33,7 @@ export const AppConfigSchema = z
       .enum(['on_startup', 'none'])
       .prefault('on_startup')
       .describe(
-        'Controls whether the effective configuration is logged on startup. on_startup: log once on start, none: disable logging.',
+        'Controls whether the configuration is logged on startup. on_startup: log once on start, none: disable logging.',
       ),
     tenantConfigPathPattern: requiredStringSchema.describe(
       'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/tenant-configs/*-tenant-config.yaml)',
