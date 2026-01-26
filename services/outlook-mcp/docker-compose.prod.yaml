@@ -1,15 +1,9 @@
-version: '3.8'
-
 services:
   outlook-mcp-migration:
-    # image: ghcr.io/unique-ag/connectors/services/outlook-mcp:0.3.4
+    # image: ghcr.io/unique-ag/connectors/services/outlook-mcp:latest
     build:
-      context: ../..  # Build from monorepo root
+      context: ../.. # Build from monorepo root
       dockerfile: ./services/outlook-mcp/deploy/Dockerfile
-      args:
-        - MAX_HEAP_MB=1024
-        - APP_NAME=outlook-mcp
-        - PNPM_VERSION=10.15.1
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/outlook_mcp?schema=public
@@ -22,14 +16,10 @@ services:
     restart: "no"
 
   outlook-mcp:
-    # image: ghcr.io/unique-ag/connectors/services/outlook-mcp:0.3.4
+    # image: ghcr.io/unique-ag/connectors/services/outlook-mcp:latest
     build:
-      context: ../..  # Build from monorepo root
+      context: ../.. # Build from monorepo root
       dockerfile: ./services/outlook-mcp/deploy/Dockerfile
-      args:
-        - MAX_HEAP_MB=1024
-        - APP_NAME=outlook-mcp
-        - PNPM_VERSION=10.15.1
     ports:
       - "3000:3000"
     environment:

@@ -48,6 +48,7 @@ jobs:
     with:
       service-name: factset-mcp
       service-version: ${{ needs.release-please.outputs['services/factset-mcp--version'] }}
+      dockerfile: services/factset-mcp/deploy/Dockerfile
 
   release-outlook-mcp:
     needs: release-please
