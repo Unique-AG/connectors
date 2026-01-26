@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.2...teams-mcp@0.2.3) (2026-01-26)
+
+
+### Features
+
+* **teams-mcp:** use flat folder structure and fix meeting dates ([#235](https://github.com/Unique-AG/connectors/issues/235)) ([4105c02](https://github.com/Unique-AG/connectors/commit/4105c02c1f881517768e1e552c37621812694dda))
+
 ## [0.2.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.1...teams-mcp@0.2.2) (2026-01-23)
 
 
