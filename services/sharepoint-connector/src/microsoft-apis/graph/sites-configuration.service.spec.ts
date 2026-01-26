@@ -8,14 +8,12 @@ import type { ListColumn, ListItem } from './types/sharepoint.types';
 describe('SitesConfigurationService', () => {
   let service: SitesConfigurationService;
   let mockGraphApiService: {
-    getSiteLists: ReturnType<typeof vi.fn>;
     getListItems: ReturnType<typeof vi.fn>;
     getListColumns: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
     mockGraphApiService = {
-      getSiteLists: vi.fn(),
       getListItems: vi.fn(),
       getListColumns: vi.fn(),
     };
@@ -74,11 +72,6 @@ describe('SitesConfigurationService', () => {
 
   describe('fetchSitesFromSharePointList', () => {
     it('successfully fetches and transforms sites from SharePoint list', async () => {
-      // Mock getSiteLists response
-      mockGraphApiService.getSiteLists.mockResolvedValue([
-        { id: 'list-id-456', name: 'Test List', displayName: 'Test List' },
-      ]);
-
       const mockColumns: ListColumn[] = [
         { id: 'c1', name: 'internal_siteId', displayName: 'siteId' },
         { id: 'c2', name: 'internal_syncColumnName', displayName: 'syncColumnName' },
@@ -116,7 +109,7 @@ describe('SitesConfigurationService', () => {
 
       const sharepointList = {
         siteId: 'test-site-id',
-        listDisplayName: 'Test List',
+        listId: 'list-id-456',
       };
 
       const result = await service.fetchSitesFromSharePointList(sharepointList);
@@ -134,28 +127,12 @@ describe('SitesConfigurationService', () => {
         permissionsInheritanceMode: 'inherit_scopes_and_files',
       });
 
-      expect(mockGraphApiService.getSiteLists).toHaveBeenCalledWith('test-site-id');
       expect(mockGraphApiService.getListItems).toHaveBeenCalledWith('test-site-id', 'list-id-456', {
         expand: 'fields',
       });
       expect(mockGraphApiService.getListColumns).toHaveBeenCalledWith(
         'test-site-id',
         'list-id-456',
-      );
-    });
-
-    it('throws error when list is not found', async () => {
-      mockGraphApiService.getSiteLists.mockResolvedValue([
-        { id: 'other-list', name: 'Other', displayName: 'Other' },
-      ]);
-
-      const sharepointList = {
-        siteId: 'test-site-id',
-        listDisplayName: 'Missing List',
-      };
-
-      await expect(service.fetchSitesFromSharePointList(sharepointList)).rejects.toThrow(
-        'List "Missing List" not found',
       );
     });
   });

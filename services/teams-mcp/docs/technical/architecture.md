@@ -1,11 +1,11 @@
 <!-- confluence-page-id: 1802502170 -->
 <!-- confluence-space-key: PUBDOC -->
 
-The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Teams meetings with the Unique platform through the Model Context Protocol (MCP). It captures meeting transcripts and recordings from Microsoft Teams and ingests them into Unique with proper access controls.
+The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Teams meetings with the Unique platform through the Model Context Protocol (MCP). It captures meeting transcripts from Microsoft Teams and ingests them into Unique with proper access controls.
 
 **Core Capabilities:**
 
-- Captures Microsoft Teams meeting transcripts and recordings in real-time
+- Captures Microsoft Teams meeting transcripts in real-time
 - Manages webhook subscriptions to Microsoft Graph API for notifications
 - Handles OAuth2 authentication with Microsoft Entra ID
 - Ingests content into the Unique platform with participant-based access controls
@@ -99,7 +99,7 @@ flowchart TB
 | **Graph Client Factory** | Creates authenticated Microsoft Graph API clients |
 | **Webhook Controller** | Receives notifications from Microsoft Graph |
 | **Subscription Services** | Manages Graph API subscription lifecycle |
-| **Transcript Created Service** | Processes new transcripts and recordings |
+| **Transcript Created Service** | Processes new transcripts |
 | **Unique Service** | Interfaces with Unique Public API for content ingestion |
 | **AMQP Module** | RabbitMQ integration for async message processing |
 
@@ -278,7 +278,7 @@ For detailed explanation, see [Permissions - Why Delegated (Not Application)](./
 | `CLIENT_SECRET` | Application credential | Proves the server is the legitimate app (not an imposter) |
 | **Redirect URI** | OAuth callback endpoint | Prevents authorization code interception |
 | **API Permissions** | Graph scopes | Limits what data the app can access |
-| **Admin Consent** | Privileged scopes | Required for transcript/recording access |
+| **Admin Consent** | Privileged scopes | Required for transcript access |
 
 Without proper app registration, Microsoft Graph API will reject all authentication attempts with `invalid_client` errors.
 

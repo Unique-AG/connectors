@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-beta.12](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.11...sharepoint-connector@2.0.0-beta.12) (2026-01-22)
+
+
+### Features
+
+* **sharepoint-connector:** Improve scope deduplication and add ownership validation for config site ([#222](https://github.com/Unique-AG/connectors/issues/222)) ([30558cb](https://github.com/Unique-AG/connectors/commit/30558cb82f268178feed928a40097318ee7ec0fb))
+* **sharepoint-connector:** Use SharePoint list ID instead of display name for configuration ([#228](https://github.com/Unique-AG/connectors/issues/228)) ([870d126](https://github.com/Unique-AG/connectors/commit/870d126f00170ad924c8d44492f171d6ccd01ddf))
+
 ## [2.0.0-beta.11](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.10...sharepoint-connector@2.0.0-beta.11) (2026-01-21)
 
 

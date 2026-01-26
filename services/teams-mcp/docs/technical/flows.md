@@ -218,7 +218,7 @@ sequenceDiagram
 
 ## Transcript Processing Flow
 
-When a meeting transcript becomes available, Microsoft Graph sends a webhook notification. The recording is fetched **only if the user has recording permissions**.
+When a meeting transcript becomes available, Microsoft Graph sends a webhook notification.
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -247,19 +247,10 @@ sequenceDiagram
         MSGraph->>Service: VTT content stream
     end
 
-    opt Recording permissions available
-        Service->>MSGraph: GET /recordings?filter=correlationId
-        MSGraph->>Service: Recording metadata + stream
-    end
-
     Service->>Unique: Resolve participants to user IDs
     Service->>Unique: Create scope (folder)
     Service->>Unique: Set access permissions
     Service->>Unique: Upload transcript (VTT)
-
-    opt Recording was fetched
-        Service->>Unique: Upload recording (MP4)
-    end
 ```
 
 ```mermaid
@@ -281,9 +272,6 @@ flowchart TB
     subgraph Processing["Transcript Processing"]
         FetchMeeting["Fetch Meeting Details"]
         FetchTranscript["Fetch Transcript Content"]
-        CheckPerms{"Recording<br/>permissions?"}
-        FetchRecording["Fetch Recording"]
-        SkipRecording["Skip Recording"]
         ResolveUsers["Resolve Participants"]
     end
 
@@ -291,8 +279,6 @@ flowchart TB
         CreateScope["Create Scope"]
         SetAccess["Set Permissions"]
         UploadVTT["Upload Transcript"]
-        CheckRecording{"Recording<br/>available?"}
-        UploadMP4["Upload Recording"]
         Done["Done"]
     end
 
@@ -304,19 +290,12 @@ flowchart TB
     Exchange -.->|Failed| DLX
 
     FetchMeeting --> FetchTranscript
-    FetchTranscript --> CheckPerms
-    CheckPerms -->|Yes| FetchRecording
-    CheckPerms -->|No| SkipRecording
-    FetchRecording --> ResolveUsers
-    SkipRecording --> ResolveUsers
+    FetchTranscript --> ResolveUsers
 
     ResolveUsers --> CreateScope
     CreateScope --> SetAccess
     SetAccess --> UploadVTT
-    UploadVTT --> CheckRecording
-    CheckRecording -->|Yes| UploadMP4
-    CheckRecording -->|No| Done
-    UploadMP4 --> Done
+    UploadVTT --> Done
 ```
 
 **Webhook Validation:**
@@ -324,12 +303,6 @@ flowchart TB
 - Microsoft Graph sends a `clientState` value with each notification
 - The server validates this matches the secret configured during subscription creation
 - Invalid `clientState` results in request rejection
-
-**Recording Permissions:**
-
-- Recording fetch requires `OnlineMeetingRecording.Read.All` scope
-- If the user hasn't granted this permission, only the transcript is captured
-- Recording availability is checked before attempting upload
 
 **Access Control:**
 

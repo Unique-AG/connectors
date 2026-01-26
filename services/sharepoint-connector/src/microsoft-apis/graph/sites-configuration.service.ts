@@ -1,4 +1,3 @@
-import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
@@ -41,31 +40,17 @@ export class SitesConfigurationService {
   /**
    * Fetch site configurations from a SharePoint list.
    * In order to fetch the sites configuration from a SharePoint list, we need to:
-   * 1. Get the list ID by display name in the specified site
-   * 2. Fetch the list items
-   * 3. Transform the list items to SiteConfig and validate with Zod
+   * 1. Fetch the list items
+   * 2. Transform the list items to SiteConfig and validate with Zod
    */
   public async fetchSitesFromSharePointList(sharepointList: {
     siteId: string;
-    listDisplayName: string;
+    listId: string;
   }): Promise<SiteConfig[]> {
-    const { siteId, listDisplayName } = sharepointList;
+    const { siteId, listId } = sharepointList;
     const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
 
-    this.logger.debug(
-      `Fetching sites configuration from site: ${logSiteId}, list: ${listDisplayName}`,
-    );
-
-    // Unfortunately we cannot filter by list name using ms graph so we need to fetch all lists.
-    const lists = await this.graphApiService.getSiteLists(siteId);
-
-    // Very important step to check by displayName and not name because in SharePoint when a column is renamed only displayName is updated
-    const matchingList = lists.find((list) => list.displayName === listDisplayName);
-
-    assert.ok(matchingList?.id, `List "${listDisplayName}" not found in site ${logSiteId}`);
-    const listId = matchingList.id;
-
-    this.logger.debug(`Resolved list ID: ${listId} for list: ${listDisplayName}`);
+    this.logger.debug(`Fetching sites configuration from site: ${logSiteId}, list: ${listId}`);
 
     const [listItems, columns] = await Promise.all([
       this.graphApiService.getListItems(siteId, listId, { expand: 'fields' }),

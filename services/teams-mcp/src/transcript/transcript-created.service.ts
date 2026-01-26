@@ -3,17 +3,14 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
-import { serializeError } from 'serialize-error-cjs';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UniqueService } from '~/unique/unique.service';
-import { normalizeError } from '~/utils/normalize-error';
 import {
   CalendarEventCollection,
   CreatedEventDto,
   Meeting,
-  RecordingCollection,
   Transcript,
   TranscriptResourceSchema,
 } from './transcript.dtos';
@@ -152,7 +149,7 @@ export class TranscriptCreatedService {
     );
     assert.ok(vttStream, 'expected a vtt transcript body');
 
-    // Query events within the meeting time window, then match by joinUrl client-side
+    // Query events within the meeting time window, then match by threadId client-side
     // (filtering by onlineMeeting properties is not supported by the Graph API)
     const calendarEvents = await client
       .api(`/users/${userId}/calendarView`)
@@ -160,13 +157,10 @@ export class TranscriptCreatedService {
         startDateTime: meeting.startDateTime.toISOString(),
         endDateTime: meeting.endDateTime.toISOString(),
       })
-      .select('id,subject,type,seriesMasterId,onlineMeeting')
       .get()
       .then(CalendarEventCollection.parseAsync);
 
-    const calendarEvent = calendarEvents.value.find(
-      (e) => e.onlineMeeting?.joinUrl.href === meeting.joinWebUrl.href,
-    );
+    const calendarEvent = calendarEvents.value.find((e) => e.threadId === meeting.threadId);
     const isRecurring =
       calendarEvent?.type === 'occurrence' ||
       calendarEvent?.type === 'exception' ||
@@ -187,62 +181,7 @@ export class TranscriptCreatedService {
       'Determined meeting recurrence status from calendar event',
     );
 
-    let recording: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> } | undefined;
-    try {
-      this.logger.debug(
-        { contentCorrelationId: transcript.contentCorrelationId },
-        'Attempting to retrieve correlated meeting recording from Microsoft Graph',
-      );
-
-      const recordingResponse = await client
-        .api(`users/${userId}/onlineMeetings/${meetingId}/recordings`)
-        .filter(`contentCorrelationId eq '${transcript.contentCorrelationId}'`)
-        .get();
-
-      const recordingData = await RecordingCollection.refine(
-        (r) => r.value.length > 0,
-        'correlated recording was not found',
-      )
-        // biome-ignore lint/style/noNonNullAssertion: checked above
-        .transform((rc) => rc.value[0]!)
-        .parseAsync(recordingResponse);
-
-      span?.setAttribute('recording.id', recordingData.id);
-      this.logger.debug(
-        { recordingId: recordingData.id },
-        'Located correlated meeting recording in Microsoft Graph',
-      );
-
-      recording = {
-        id: recordingData.id,
-        content: await client
-          .api(
-            `/users/${userId}/onlineMeetings/${meetingId}/recordings/${recordingData.id}/content`,
-          )
-          .header('Accept', 'video/mp4')
-          .getStream(),
-      };
-
-      span?.addEvent('recording content retrieved');
-      this.logger.debug(
-        { recordingId: recordingData.id },
-        'Successfully downloaded meeting recording content',
-      );
-    } catch (error) {
-      span?.addEvent('failed to retrieve recording', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      this.logger.warn(
-        { error: serializeError(normalizeError(error)) },
-        'Failed to retrieve or locate meeting recording, proceeding without it',
-      );
-    }
-
-    span?.addEvent('transcript processing completed', {
-      hasRecording: recording !== undefined,
-      isRecurring,
-    });
+    span?.addEvent('transcript processing completed', { isRecurring });
 
     await this.unique.ingestTranscript(
       {
@@ -262,7 +201,6 @@ export class TranscriptCreatedService {
         })),
       },
       { id: transcript.id, content: vttStream },
-      recording ? { id: recording.id, content: recording.content } : undefined,
     );
   }
 }

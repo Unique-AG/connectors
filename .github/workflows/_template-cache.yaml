@@ -33,12 +33,6 @@ jobs:
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
-      - name: Extract PNPM version from package.json
-        id: pnpm-version
-        run: |
-          PNPM_VERSION=$(jq -r '.packageManager | split("@")[1]' package.json)
-          echo "version=$PNPM_VERSION" >> $GITHUB_OUTPUT
-
       - name: Skip if no changes in last 3 days under ${{ inputs.service-path }}
         run: |
           if ! git log --since="3 days ago" --name-only --pretty=format: | grep -q '^${{ inputs.service-path }}/'; then
@@ -70,6 +64,3 @@ jobs:
           cache-to: |
             type=gha,scope=${{ env.GHA_CACHE_SCOPE }},mode=max,ignore-error=true
 
-          build-args: |
-            APP_NAME=${{ inputs.service-name }}
-            PNPM_VERSION=${{ steps.pnpm-version.outputs.version }}
