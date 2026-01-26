@@ -41,7 +41,6 @@ export class UniqueService {
       subject: string;
       startDateTime: Date;
       endDateTime: Date;
-      isRecurring: boolean;
       participants: { id?: string; name: string; email: string }[];
       owner: { id: string; name: string; email: string };
     },
@@ -52,14 +51,12 @@ export class UniqueService {
     span?.setAttribute('participant_count', meeting.participants.length);
     span?.setAttribute('meeting_date', meeting.startDateTime.toISOString());
     span?.setAttribute('owner_id', meeting.owner.id);
-    span?.setAttribute('is_recurring', meeting.isRecurring);
 
     this.logger.log(
       {
         transcriptId: transcript.id,
         participantCount: meeting.participants.length,
         meetingDate: meeting.startDateTime.toISOString(),
-        isRecurring: meeting.isRecurring,
       },
       'Beginning processing of meeting transcript for ingestion',
     );
@@ -92,13 +89,13 @@ export class UniqueService {
       'Successfully resolved meeting participant accounts in Unique system',
     );
 
-    const path = this.mapMeetingToScope(
+    const { parentPath, childPath } = this.mapMeetingToScopePaths(
       meeting.subject,
       meeting.startDateTime,
-      meeting.isRecurring,
     );
-    const scope = await this.createScope(path);
-    span?.setAttribute('scope_id', scope.id);
+
+    const parentScope = await this.createScope(parentPath, false);
+    span?.setAttribute('parent_scope_id', parentScope.id);
 
     const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
       entityId: p.id,
@@ -120,16 +117,19 @@ export class UniqueService {
       entityType: ScopeAccessEntityType.User,
       type: ScopeAccessType.Manage,
     });
-    await this.addScopeAccesses(scope.id, accesses);
+    await this.addScopeAccesses(parentScope.id, accesses);
+
+    const childScope = await this.createScope(childPath, true);
+    span?.setAttribute('child_scope_id', childScope.id);
 
     this.logger.log(
-      { transcriptId: transcript.id, scopeId: scope.id },
+      { transcriptId: transcript.id, scopeId: childScope.id },
       'Beginning transcript upload to Unique system',
     );
 
     const transcriptUpload = await this.upsertContent({
       storeInternally: true,
-      scopeId: scope.id,
+      scopeId: childScope.id,
       input: {
         key: transcript.id,
         mimeType: 'text/vtt',
@@ -145,7 +145,7 @@ export class UniqueService {
     await this.uploadToStorage(transcriptUpload.writeUrl, transcript.content, 'text/vtt');
     await this.upsertContent({
       storeInternally: true,
-      scopeId: scope.id,
+      scopeId: childScope.id,
       fileUrl: transcriptUpload.readUrl,
       input: {
         key: transcript.id,
@@ -155,13 +155,15 @@ export class UniqueService {
     });
     span?.addEvent('ingestion_completed', {
       transcriptId: transcript.id,
-      scopeId: scope.id,
+      parentScopeId: parentScope.id,
+      childScopeId: childScope.id,
     });
 
     this.logger.log(
       {
         transcriptId: transcript.id,
-        scopeId: scope.id,
+        parentScopeId: parentScope.id,
+        childScopeId: childScope.id,
       },
       'Successfully completed meeting transcript ingestion process',
     );
@@ -242,11 +244,12 @@ export class UniqueService {
   }
 
   @Span()
-  private async createScope(path: string): Promise<Scope> {
+  private async createScope(path: string, inheritAccess = false): Promise<Scope> {
     const span = this.trace.getSpan();
     span?.setAttribute('path', path);
+    span?.setAttribute('inherit_access', inheritAccess);
 
-    const payload = PublicCreateScopeRequestSchema.encode({ paths: [path], inheritAccess: false });
+    const payload = PublicCreateScopeRequestSchema.encode({ paths: [path], inheritAccess });
     const endpoint = new URL('folder', this.config.get('unique.apiBaseUrl', { infer: true }));
 
     this.logger.debug(
@@ -271,6 +274,7 @@ export class UniqueService {
       assert.fail(`Unique Public API return an error for content upsert: ${response.status}`);
     }
     const body = await response.json();
+    // NOTE: API is idempotent, calls to the an existing folder will result in success with the scopes as if they were just created
     const result = PublicCreateScopeResultSchema.refine(
       (s) => s.createdFolders.length > 0,
       'no scopes were created',
@@ -480,18 +484,17 @@ export class UniqueService {
     };
   }
 
-  private mapMeetingToScope(subject: string, happenedAt: Date, recurring = false): string {
+  private mapMeetingToScopePaths(
+    subject: string,
+    happenedAt: Date,
+  ): { parentPath: string; childPath: string } {
     const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
     // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
     const formattedDate = happenedAt.toISOString().split('T').at(0)!;
-    const sanitizedSubject =
-      subject
-        .replace(/[^a-zA-Z0-9\s/-]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '') || 'Untitled Meeting';
-    return recurring
-      ? `/${rootScopePath}/${sanitizedSubject}/${formattedDate}`
-      : `/${rootScopePath}/${sanitizedSubject} - ${formattedDate}`;
+    const meetingSubject = subject || 'Untitled Meeting';
+    const parentPath = `/${rootScopePath}/${meetingSubject}`;
+    const childPath = `${parentPath}/${formattedDate}`;
+    return { parentPath, childPath };
   }
 
   // HACK:
