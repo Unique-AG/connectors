@@ -1,10 +1,8 @@
-version: '3.8'
-
 services:
   outlook-mcp-migration:
-    # image: ghcr.io/unique-ag/connectors/services/outlook-mcp:0.3.4
+    # image: ghcr.io/unique-ag/connectors/services/outlook-mcp:latest
     build:
-      context: ../..  # Build from monorepo root
+      context: ../.. # Build from monorepo root
       dockerfile: ./services/outlook-mcp/deploy/Dockerfile
     environment:
       - NODE_ENV=production
@@ -18,9 +16,9 @@ services:
     restart: "no"
 
   outlook-mcp:
-    # image: ghcr.io/unique-ag/connectors/services/outlook-mcp:0.3.4
+    # image: ghcr.io/unique-ag/connectors/services/outlook-mcp:latest
     build:
-      context: ../..  # Build from monorepo root
+      context: ../.. # Build from monorepo root
       dockerfile: ./services/outlook-mcp/deploy/Dockerfile
     ports:
       - "3000:3000"

@@ -1,6 +1,6 @@
 services:
   teams-mcp-migration:
-    # image: ghcr.io/unique-ag/connectors/services/teams-mcp:0.1.0
+    # image: ghcr.io/unique-ag/connectors/services/teams-mcp:latest
     build:
       context: ../.. # Build from monorepo root
       dockerfile: ./services/teams-mcp/deploy/Dockerfile
@@ -16,7 +16,7 @@ services:
     restart: "no"
 
   teams-mcp:
-    # image: ghcr.io/unique-ag/connectors/services/teams-mcp:0.1.0
+    # image: ghcr.io/unique-ag/connectors/services/teams-mcp:latest
     build:
       context: ../.. # Build from monorepo root
       dockerfile: ./services/teams-mcp/deploy/Dockerfile
