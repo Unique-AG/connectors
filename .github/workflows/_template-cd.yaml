@@ -46,13 +46,6 @@ jobs:
       - name: Setup docker buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
-      # TODO: remove me and let `corepack` do its job to use and setup the correct package manager in the dockerfile
-      - name: Extract PNPM version for build
-        id: pnpm-version
-        run: |
-          PNPM_VERSION=$(jq -r '.packageManager | split("@")[1]' package.json)
-          echo "version=$PNPM_VERSION" >> $GITHUB_OUTPUT
-
       - name: Add docker metadata
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
@@ -113,9 +106,6 @@ jobs:
             type=registry,ref=${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:cache
           cache-to: |
             type=registry,ref=${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:cache,mode=min
-          build-args: |
-            APP_NAME=${{ inputs.service-name }}
-            PNPM_VERSION=${{ steps.pnpm-version.outputs.version }}
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0

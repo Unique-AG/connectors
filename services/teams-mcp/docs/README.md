@@ -15,7 +15,7 @@
 
 ## Overview
 
-The Teams MCP Server is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
+The Teams MCP Server is a cloud-native application that automatically captures meeting transcripts from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
 **Note:** This is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction or tool calls.
 
@@ -23,7 +23,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ## Quick Summary
 
-**What it does:** Automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into Unique's AI knowledge base with participant-based access controls
+**What it does:** Automatically captures meeting transcripts from Microsoft Teams and ingests them into Unique's AI knowledge base with participant-based access controls
 
 **Deployment:** Kubernetes-based NestJS microservice
 
@@ -56,7 +56,6 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `User.Read` | Delegated | No | Yes |
 | `OnlineMeetings.Read` | Delegated | No | Yes |
 | `OnlineMeetingTranscript.Read.All` | Delegated | Yes | Yes |
-| `OnlineMeetingRecording.Read.All` | Delegated | Yes | No |
 | `offline_access` | Delegated | No | Yes |
 
 For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md#least-privilege-justification).
@@ -70,12 +69,6 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 - Webhook-based notifications from [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview)
 - Automatic capture when meeting transcripts become available
 - VTT format transcript content ingested into Unique
-
-**Automatic Recording Capture** (Optional)
-
-- MP4 recording files captured alongside transcripts
-- Requires optional `OnlineMeetingRecording.Read.All` permission to be enabled
-- Admins can decline this permission; transcripts still work without recordings
 
 **Participant-Based Access Control**
 
@@ -227,18 +220,10 @@ sequenceDiagram
         Graph->>Processor: VTT content
     end
 
-    opt Recording permission granted
-        Processor->>Graph: GET recording
-        Graph->>Processor: MP4 stream
-    end
-
     Processor->>Unique: Resolve participants
     Processor->>Unique: Create scope (folder)
     Processor->>Unique: Set access permissions
     Processor->>Unique: Upload transcript
-    opt Recording available
-        Processor->>Unique: Upload recording
-    end
 ```
 
 See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow) for additional details.
@@ -254,7 +239,7 @@ See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow
    - Attend Microsoft Teams meetings with transcription enabled
    - Meeting ends and transcript becomes available
    - Teams MCP automatically receives webhook notification
-   - Transcript (and recording if permitted) captured and uploaded
+   - Transcript captured and uploaded
 
 3. **Access in Unique** (Ongoing)
    - Meeting content available in Unique knowledge base
@@ -271,7 +256,7 @@ See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow
 | **Delegated permissions only** | Requires user sign-in; application-only access would need admin-configured policies per user |
 | **No certificate auth** | Certificate auth only works with Client Credentials flow, incompatible with delegated permissions |
 | **Single app registration** | Each MCP server deployment uses one Entra ID app registration (multi-tenant capable) |
-| **Admin consent required** | `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` need admin approval |
+| **Admin consent required** | `OnlineMeetingTranscript.Read.All` needs admin approval |
 
 See [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture) for details.
 
@@ -290,7 +275,6 @@ See [Authentication Architecture - Single App Registration Architecture](./techn
 |--------|-------|-------|
 | **Microsoft Graph rate limits** | ~10,000 requests/10 min per app | Shared across all users of the app registration |
 | **Concurrent user lookups** | Configurable (default: 5) | Set via `UNIQUE_USER_FETCH_CONCURRENCY` |
-| **Recording file size** | Limited by `/tmp` volume | Default 20Gi emptyDir; increase for long meetings |
 | **Database connections** | PostgreSQL pool size | Monitor connection usage under load |
 
 ### Not Supported

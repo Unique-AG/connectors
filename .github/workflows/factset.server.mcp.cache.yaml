@@ -11,3 +11,4 @@ jobs:
     with:
       service-name: factset-mcp
       service-path: services/factset-mcp
+      dockerfile: services/factset-mcp/deploy/Dockerfile

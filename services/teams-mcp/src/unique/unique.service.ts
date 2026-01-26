@@ -22,7 +22,6 @@ import {
   type Scope,
   ScopeAccessEntityType,
   ScopeAccessType,
-  UniqueIngestionMode,
 } from './unique.dtos';
 
 @Injectable()
@@ -42,30 +41,24 @@ export class UniqueService {
       subject: string;
       startDateTime: Date;
       endDateTime: Date;
-      isRecurring: boolean;
       participants: { id?: string; name: string; email: string }[];
       owner: { id: string; name: string; email: string };
     },
     transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
-    recording?: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
   ): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('transcript_id', transcript.id);
-    span?.setAttribute('recording_id', recording?.id ?? '');
     span?.setAttribute('participant_count', meeting.participants.length);
     span?.setAttribute('meeting_date', meeting.startDateTime.toISOString());
     span?.setAttribute('owner_id', meeting.owner.id);
-    span?.setAttribute('is_recurring', meeting.isRecurring);
 
     this.logger.log(
       {
         transcriptId: transcript.id,
-        recordingId: recording?.id,
         participantCount: meeting.participants.length,
         meetingDate: meeting.startDateTime.toISOString(),
-        isRecurring: meeting.isRecurring,
       },
-      'Beginning processing of meeting transcript and recording for ingestion',
+      'Beginning processing of meeting transcript for ingestion',
     );
 
     const concurrency = this.config.get('unique.userFetchConcurrency', { infer: true });
@@ -96,13 +89,13 @@ export class UniqueService {
       'Successfully resolved meeting participant accounts in Unique system',
     );
 
-    const path = this.mapMeetingToScope(
+    const { parentPath, childPath } = this.mapMeetingToScopePaths(
       meeting.subject,
       meeting.startDateTime,
-      meeting.isRecurring,
     );
-    const scope = await this.createScope(path);
-    span?.setAttribute('scope_id', scope.id);
+
+    const parentScope = await this.createScope(parentPath, false);
+    span?.setAttribute('parent_scope_id', parentScope.id);
 
     const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
       entityId: p.id,
@@ -124,91 +117,55 @@ export class UniqueService {
       entityType: ScopeAccessEntityType.User,
       type: ScopeAccessType.Manage,
     });
-    await this.addScopeAccesses(scope.id, accesses);
+    await this.addScopeAccesses(parentScope.id, accesses);
+
+    const childScope = await this.createScope(childPath, true);
+    span?.setAttribute('child_scope_id', childScope.id);
 
     this.logger.log(
-      { transcriptId: transcript.id, scopeId: scope.id },
+      { transcriptId: transcript.id, scopeId: childScope.id },
       'Beginning transcript upload to Unique system',
     );
 
     const transcriptUpload = await this.upsertContent({
       storeInternally: true,
-      scopeId: scope.id,
+      scopeId: childScope.id,
       input: {
         key: transcript.id,
         mimeType: 'text/vtt',
-        title: meeting.subject,
+        title: `${meeting.subject}.vtt`,
         byteSize: 1,
         metadata: {
           date: meeting.startDateTime.toISOString(),
-          participants: meeting.participants,
+          participant_names: meeting.participants.map((p) => p.name).join(', '),
+          participant_emails: meeting.participants.map((p) => p.email).join(', '),
         },
       },
     });
     await this.uploadToStorage(transcriptUpload.writeUrl, transcript.content, 'text/vtt');
     await this.upsertContent({
       storeInternally: true,
-      scopeId: scope.id,
+      scopeId: childScope.id,
       fileUrl: transcriptUpload.readUrl,
       input: {
         key: transcript.id,
         mimeType: 'text/vtt',
-        title: meeting.subject,
+        title: `${meeting.subject}.vtt`,
       },
     });
-    span?.addEvent('transcript_uploaded', { transcriptId: transcript.id });
-
-    if (recording) {
-      this.logger.log(
-        { recordingId: recording.id, scopeId: scope.id },
-        'Beginning meeting recording upload to Unique system',
-      );
-
-      const recordingUpload = await this.upsertContent({
-        storeInternally: true,
-        scopeId: scope.id,
-        input: {
-          key: recording.id,
-          mimeType: 'video/mp4',
-          title: meeting.subject,
-          byteSize: 1, // NOTE: byteSize is required to be `> 0` so that the file would show up in the UI while the file is being "ingested"
-          metadata: {
-            date: meeting.startDateTime.toISOString(),
-            participants: meeting.participants,
-          },
-          ingestionConfig: {
-            // NOTE: we don't want to ingest recordings, we only store them to have a reference to eventually share to users when needed
-            uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
-          },
-        },
-      });
-      await this.uploadToStorage(recordingUpload.writeUrl, recording.content, 'video/mp4');
-      await this.upsertContent({
-        storeInternally: true,
-        scopeId: scope.id,
-        fileUrl: recordingUpload.readUrl,
-        input: {
-          key: recording.id,
-          mimeType: 'video/mp4',
-          title: meeting.subject,
-        },
-      });
-      span?.addEvent('recording_uploaded', { recordingId: recording.id });
-    }
-
     span?.addEvent('ingestion_completed', {
       transcriptId: transcript.id,
-      recordingId: recording?.id ?? '',
-      scopeId: scope.id,
+      parentScopeId: parentScope.id,
+      childScopeId: childScope.id,
     });
 
     this.logger.log(
       {
         transcriptId: transcript.id,
-        recordingId: recording?.id,
-        scopeId: scope.id,
+        parentScopeId: parentScope.id,
+        childScopeId: childScope.id,
       },
-      'Successfully completed meeting transcript and recording ingestion process',
+      'Successfully completed meeting transcript ingestion process',
     );
   }
 
@@ -287,11 +244,12 @@ export class UniqueService {
   }
 
   @Span()
-  private async createScope(path: string): Promise<Scope> {
+  private async createScope(path: string, inheritAccess = false): Promise<Scope> {
     const span = this.trace.getSpan();
     span?.setAttribute('path', path);
+    span?.setAttribute('inherit_access', inheritAccess);
 
-    const payload = PublicCreateScopeRequestSchema.encode({ paths: [path], inheritAccess: false });
+    const payload = PublicCreateScopeRequestSchema.encode({ paths: [path], inheritAccess });
     const endpoint = new URL('folder', this.config.get('unique.apiBaseUrl', { infer: true }));
 
     this.logger.debug(
@@ -316,6 +274,7 @@ export class UniqueService {
       assert.fail(`Unique Public API return an error for content upsert: ${response.status}`);
     }
     const body = await response.json();
+    // NOTE: API is idempotent, calls to the an existing folder will result in success with the scopes as if they were just created
     const result = PublicCreateScopeResultSchema.refine(
       (s) => s.createdFolders.length > 0,
       'no scopes were created',
@@ -442,6 +401,8 @@ export class UniqueService {
     const body = await response.json();
     const result = PublicContentUpsertResultSchema.parse(body);
 
+    const correctedWriteUrl = this.correctWriteUrl(result.writeUrl);
+
     this.logger.log(
       {
         scopeId: content.scopeId,
@@ -452,10 +413,17 @@ export class UniqueService {
       },
       'Successfully created or updated content record in Unique system',
     );
+    this.logger.debug(
+      {
+        originalWriteUrl: result.writeUrl,
+        correctedWriteUrl,
+      },
+      'Write URL transformation applied',
+    );
 
     return {
       ...result,
-      writeUrl: this.correctWriteUrl(result.writeUrl),
+      writeUrl: result.writeUrl,
     };
   }
 
@@ -469,7 +437,7 @@ export class UniqueService {
 
     // Extract only the storage account hostname for logging (no query params or paths with sensitive data)
     const urlObj = new URL(writeUrl);
-    const storageEndpoint = `${urlObj.protocol}//${urlObj.hostname}`;
+    const storageEndpoint = urlObj.origin;
     span?.setAttribute('storage_endpoint', storageEndpoint);
 
     this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
@@ -516,13 +484,17 @@ export class UniqueService {
     };
   }
 
-  private mapMeetingToScope(subject: string, happenedAt: Date, recurring = false): string {
+  private mapMeetingToScopePaths(
+    subject: string,
+    happenedAt: Date,
+  ): { parentPath: string; childPath: string } {
     const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
     // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
     const formattedDate = happenedAt.toISOString().split('T').at(0)!;
-    return recurring
-      ? `/${rootScopePath}/${subject}/${formattedDate}`
-      : `/${rootScopePath}/${subject} - ${formattedDate}`;
+    const meetingSubject = subject || 'Untitled Meeting';
+    const parentPath = `/${rootScopePath}/${meetingSubject}`;
+    const childPath = `${parentPath}/${formattedDate}`;
+    return { parentPath, childPath };
   }
 
   // HACK:

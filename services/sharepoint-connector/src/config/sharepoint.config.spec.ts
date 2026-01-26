@@ -137,7 +137,7 @@ describe('SharepointConfigSchema', () => {
         sitesSource: 'sharepoint_list' as const,
         sharepointList: {
           siteId: '87654321-4321-4321-8321-cba987654321',
-          listDisplayName: 'Sharepoint Sites to Sync',
+          listId: '87654321-4321-4321-8321-cba987654321',
         },
       };
 
@@ -146,7 +146,7 @@ describe('SharepointConfigSchema', () => {
       expect(result.sitesSource).toBe('sharepoint_list');
       if (result.sitesSource === 'sharepoint_list') {
         expect(result.sharepointList.siteId).toBe('87654321-4321-4321-8321-cba987654321');
-        expect(result.sharepointList.listDisplayName).toBe('Sharepoint Sites to Sync');
+        expect(result.sharepointList.listId).toBe('87654321-4321-4321-8321-cba987654321');
       }
     });
   });
@@ -253,6 +253,96 @@ describe('SharepointConfigSchema', () => {
       };
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('rejects maxFilesToIngest when null', () => {
+      const config = {
+        ...validBaseConfig,
+        auth: {
+          mode: 'oidc' as const,
+        },
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            maxFilesToIngest: null,
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('rejects maxFilesToIngest when empty string', () => {
+      const config = {
+        ...validBaseConfig,
+        auth: {
+          mode: 'oidc' as const,
+        },
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            maxFilesToIngest: '',
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('rejects maxFilesToIngest when zero', () => {
+      const config = {
+        ...validBaseConfig,
+        auth: {
+          mode: 'oidc' as const,
+        },
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            maxFilesToIngest: 0,
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
+    it('accepts maxFilesToIngest when undefined (omitted)', () => {
+      const config = {
+        ...validBaseConfig,
+        auth: {
+          mode: 'oidc' as const,
+        },
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            // maxFilesToIngest is omitted (undefined)
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
+    });
+
+    it('accepts maxFilesToIngest when positive integer', () => {
+      const config = {
+        ...validBaseConfig,
+        auth: {
+          mode: 'oidc' as const,
+        },
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            maxFilesToIngest: 100,
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
+      const result = SharepointConfigSchema.parse(config);
+      if (result.sitesSource === 'config_file') {
+        const site = result.sites[0];
+        expect(site?.maxFilesToIngest).toBe(100);
+      }
     });
 
     it('validates storeInternally enum values', () => {

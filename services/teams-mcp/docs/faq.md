@@ -42,7 +42,7 @@ This is a data ingestion connector that uses the MCP protocol for authentication
 
 ### Why do I need admin consent?
 
-**Answer:** `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` require admin consent because they access sensitive meeting content. This is a Microsoft requirement, not a Teams MCP requirement.
+**Answer:** `OnlineMeetingTranscript.Read.All` requires admin consent because it accesses sensitive meeting content. This is a Microsoft requirement, not a Teams MCP requirement.
 
 **What to do:**
 
@@ -141,9 +141,9 @@ This design uses a single OAuth application that can serve users across multiple
 **What the service account is used for:**
 
 - **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants from Microsoft Teams
-- **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts and recordings
+- **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts
 - **Set access permissions** - Grant appropriate read/write permissions to meeting organizers and participants based on their role in the meeting
-- **Upload transcript data** - Ingest transcript content (VTT files) and recordings (MP4 files) into the Unique knowledge base
+- **Upload transcript data** - Ingest transcript content (VTT files) into the Unique knowledge base
 
 **How it works:**
 
