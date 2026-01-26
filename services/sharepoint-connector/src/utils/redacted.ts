@@ -8,6 +8,10 @@ export class Redacted<T> {
     Redacted._conceal = conceal;
   }
 
+  public static getConceal(): boolean {
+    return Redacted._conceal;
+  }
+
   public constructor(value: T) {
     this._value = value;
   }
@@ -25,13 +29,9 @@ export class Redacted<T> {
 
   /**
    * Used for structured logging (Pino/JSON.stringify).
-   * Respects the conceal/disclose policy.
+   * Always redacts; never discloses raw values.
    */
   public toJSON() {
-    if (!Redacted._conceal) {
-      return this._value;
-    }
-
     if (typeof this._value === 'string') {
       return redact(this._value);
     }

@@ -31,8 +31,8 @@ export class SitesConfigurationService {
     const sharepointConfig = this.configService.get('sharepoint', { infer: true });
 
     if (sharepointConfig.sitesSource === 'config_file') {
-      this.logger.log('Loading sites configuration from static YAML');
-      this.configDiagnosticsService.logConfig('SharePoint Sites (Static)', sharepointConfig.sites);
+      this.logger.log('Loading sites configuration from YAML file');
+      this.configDiagnosticsService.logConfig('Loaded SharePoint Sites Configurations', sharepointConfig.sites);
       return sharepointConfig.sites;
     }
 
@@ -41,7 +41,7 @@ export class SitesConfigurationService {
       siteId: sharepointConfig.sharepointList.siteId.value,
       listId: sharepointConfig.sharepointList.listId,
     });
-    this.configDiagnosticsService.logConfig('SharePoint Sites (Dynamic)', sites);
+    this.configDiagnosticsService.logConfig('Loaded SharePoint Sites Configurations', sites);
     return sites;
   }
 
@@ -108,7 +108,11 @@ export class SitesConfigurationService {
         syncColumnName: getFieldValue('syncColumnName'),
         ingestionMode: getFieldValue('ingestionMode'),
         scopeId: getFieldValue('uniqueScopeId'),
-        maxFilesToIngest: getFieldValue('maxFilesToIngest'),
+        // when unset sharepoint list item, maxFilesToIngest is set to 0
+        maxFilesToIngest: (() => {
+          const value = getFieldValue('maxFilesToIngest');
+          return value === 0 ? undefined : value;
+        })(),
         storeInternally: getFieldValue('storeInternally'),
         syncStatus: getFieldValue('syncStatus'),
         syncMode: getFieldValue('syncMode'),

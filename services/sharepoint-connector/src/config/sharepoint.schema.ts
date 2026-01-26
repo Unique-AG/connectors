@@ -84,10 +84,7 @@ const certificateAuthConfig = z
       .describe(
         'Path to the private key file of the Azure AD application certificate in PEM format',
       ),
-    privateKeyPassword: z
-      .string()
-      .optional()
-      .transform((val) => (val ? new Redacted(val) : undefined)),
+    privateKeyPassword: z.instanceof(Redacted).optional(),
   })
   .refine((config) => config.thumbprintSha1 || config.thumbprintSha256, {
     message:

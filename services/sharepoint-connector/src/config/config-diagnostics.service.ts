@@ -23,17 +23,13 @@ export class ConfigDiagnosticsService implements OnModuleInit {
       return;
     }
 
-    this.logger.log('Emitting effective configuration on startup...');
-
+    this.logger.log('Emitting configuration on startup:');
     this.logConfig('App Config', this.configService.get('app', { infer: true }));
     this.logConfig('SharePoint Config', this.configService.get('sharepoint', { infer: true }));
     this.logConfig('Unique Config', this.configService.get('unique', { infer: true }));
     this.logConfig('Processing Config', this.configService.get('processing', { infer: true }));
   }
 
-  /**
-   * Logs the configuration. Redacted fields will handle their own redaction via toJSON().
-   */
   public logConfig(name: string, value: unknown) {
     const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
       infer: true,
@@ -42,9 +38,16 @@ export class ConfigDiagnosticsService implements OnModuleInit {
       return;
     }
 
-    this.logger.log({
-      msg: `Effective configuration: ${name}`,
-      config: value,
-    });
+    //Redacted fields are always concealed for diagnostics because we never want to log secrets
+    const previousConceal = Redacted.getConceal();
+    // Redacted.setConceal(true);
+    try {
+      this.logger.log({
+        msg: `Configuration: ${name}`,
+        config: value,
+      });
+    } finally {
+      Redacted.setConceal(previousConceal);
+    }
   }
 }

@@ -14,41 +14,19 @@ export type { ProcessingConfig } from './processing.schema';
 export type { SharepointConfig } from './sharepoint.schema';
 export type { UniqueConfig } from './unique.schema';
 
-// ==========================================
-// Tenant Configuration
-// ==========================================
-
-const TenantConfigSchema = z.object({
-  sharepoint: SharepointConfigSchema,
-  unique: UniqueConfigSchema,
-  processing: ProcessingConfigSchema,
-});
-
-type TenantConfig = z.infer<typeof TenantConfigSchema>;
-
-// --- Tenant Configs (From File) ---
-
-/**
- * Helper to register configurations that are extracted and validated from the tenant YAML file.
- */
-const fromTenant = <T extends z.ZodTypeAny>(key: keyof TenantConfig, schema: T) =>
-  registerAs(key as string, () => schema.parse(getTenantConfig()[key]) as Record<string, unknown>);
-
-export const sharepointConfig = fromTenant('sharepoint', SharepointConfigSchema);
-export const uniqueConfig = fromTenant('unique', UniqueConfigSchema);
-export const processingConfig = fromTenant('processing', ProcessingConfigSchema);
-
-export interface SharepointConfigNamespaced {
-  sharepoint: SharepointConfig;
-}
-export interface UniqueConfigNamespaced {
-  unique: UniqueConfig;
-}
-export interface ProcessingConfigNamespaced {
-  processing: ProcessingConfig;
-}
-
 let cachedConfig: TenantConfig | null = null;
+export function getTenantConfig(): TenantConfig {
+  if (!cachedConfig) {
+    const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
+
+    if (!tenantConfigPathPattern) {
+      throw new Error('TENANT_CONFIG_PATH_PATTERN environment variable is not set');
+    }
+
+    cachedConfig = loadTenantConfig(tenantConfigPathPattern);
+  }
+  return cachedConfig;
+}
 
 function loadTenantConfig(pathPattern: string): TenantConfig {
   const files = globSync(pathPattern);
@@ -104,15 +82,35 @@ function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
   }
 }
 
-export function getTenantConfig(): TenantConfig {
-  if (!cachedConfig) {
-    const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
+/**
+ * Helper to register tenant config sections. They are already validated in loadTenantConfig.
+ */
+const registerTenantSection = (key: keyof TenantConfig) =>
+  registerAs(key as string, () => getTenantConfig()[key] as Record<string, unknown>);
 
-    if (!tenantConfigPathPattern) {
-      throw new Error('TENANT_CONFIG_PATH_PATTERN environment variable is not set');
-    }
+// ==========================================
+// Tenant Configuration
+// ==========================================
 
-    cachedConfig = loadTenantConfig(tenantConfigPathPattern);
-  }
-  return cachedConfig;
+const TenantConfigSchema = z.object({
+  sharepoint: SharepointConfigSchema,
+  unique: UniqueConfigSchema,
+  processing: ProcessingConfigSchema,
+});
+
+type TenantConfig = z.infer<typeof TenantConfigSchema>;
+
+// --- Tenant Configs (From File) ---
+export const sharepointConfig = registerTenantSection('sharepoint');
+export const uniqueConfig = registerTenantSection('unique');
+export const processingConfig = registerTenantSection('processing');
+
+export interface SharepointConfigNamespaced {
+  sharepoint: SharepointConfig;
+}
+export interface UniqueConfigNamespaced {
+  unique: UniqueConfig;
+}
+export interface ProcessingConfigNamespaced {
+  processing: ProcessingConfig;
 }

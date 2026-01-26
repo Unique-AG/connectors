@@ -53,11 +53,11 @@ const uniqueBaseConfig = z.object({
   ingestionServiceBaseUrl: urlWithoutTrailingSlashSchema(
     'Base URL for Unique ingestion service',
     'ingestionServiceBaseUrl must not end with a trailing slash',
-  ).transform((val) => new Redacted(val)),
+  ),
   scopeManagementServiceBaseUrl: urlWithoutTrailingSlashSchema(
     'Base URL for Unique scope management service',
     'scopeManagementServiceBaseUrl must not end with a trailing slash',
-  ).transform((val) => new Redacted(val)),
+  ),
   apiRateLimitPerMinute: coercedPositiveIntSchema
     .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
     .describe('Number of Unique API requests allowed per minute'),

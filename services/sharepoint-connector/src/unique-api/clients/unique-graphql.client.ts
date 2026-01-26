@@ -31,7 +31,11 @@ export class UniqueGraphqlClient {
     private readonly spcUniqueApiSlowRequestsTotal: Counter,
   ) {
     const uniqueConfig = this.configService.get('unique', { infer: true });
-    const graphqlUrl = `${uniqueConfig[`${clientTarget}ServiceBaseUrl`]}/graphql`;
+    const serviceBaseUrl =
+      clientTarget === 'ingestion'
+        ? uniqueConfig.ingestionServiceBaseUrl
+        : uniqueConfig.scopeManagementServiceBaseUrl;
+    const graphqlUrl = `${serviceBaseUrl}/graphql`;
 
     this.graphQlClient = new GraphQLClient(graphqlUrl, {
       requestMiddleware: async (request) => {
