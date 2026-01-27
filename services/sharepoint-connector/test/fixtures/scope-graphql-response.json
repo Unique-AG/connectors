@@ -1,0 +1,57 @@
+{
+  "data": {
+    "me": {
+      "user": {
+        "id": "unique-user-1"
+      }
+    },
+    "paginatedScope": {
+      "totalCount": 1,
+      "nodes": [
+        {
+          "id": "scope_root_1",
+          "name": "RootScope",
+          "parentId": null,
+          "externalId": null
+        }
+      ]
+    },
+    "createScopeAccesses": true,
+    "updateScope": {
+      "id": "scope_root_1",
+      "name": "RootScope",
+      "externalId": "spc:site:11111111-1111-4111-8111-111111111111"
+    },
+    "listUsers": {
+      "totalCount": 1,
+      "nodes": [
+        {
+          "id": "unique-user-2",
+          "active": true,
+          "email": "user@example.com"
+        }
+      ]
+    },
+    "listGroups": [],
+    "createGroup": {
+      "id": "unique-group-1",
+      "name": "Group A",
+      "externalId": "SPC-test"
+    },
+    "updateGroup": {
+      "id": "unique-group-1",
+      "name": "Group A",
+      "externalId": "SPC-test"
+    },
+    "addGroupMembers": [
+      {
+        "entityId": "unique-user-2",
+        "groupId": "unique-group-1"
+      }
+    ],
+    "removeGroupMember": true,
+    "deleteGroup": {
+      "id": "unique-group-1"
+    }
+  }
+}

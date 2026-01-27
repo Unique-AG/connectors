@@ -6,6 +6,7 @@ env.GRAPH_TENANT_ID = 'test-tenant-id';
 env.UNIQUE_INGESTION_SERVICE_BASE_URL = 'https://api.test.example.com';
 env.UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL = 'https://api.test.example.com';
 env.UNIQUE_SCOPE_ID = 'test-scope-id';
+env.TENANT_CONFIG_PATH_PATTERN = `${process.cwd()}/test/fixtures/tenant-config.yaml`;
 env.ZITADEL_OAUTH_TOKEN_URL = 'https://auth.test.example.com/oauth/token';
 env.ZITADEL_PROJECT_ID = 'test-project-id';
 env.ZITADEL_CLIENT_ID = 'test-zitadel-client-id';
