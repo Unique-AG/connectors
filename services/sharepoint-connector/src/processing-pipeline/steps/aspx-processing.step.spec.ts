@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
-import { createMockSiteConfig } from '../../utils/test-utils/mock-site-config';
+import { createMockSiteConfig } from '../../../test/test-utils/mock-site-config';
 import type { ProcessingContext } from '../types/processing-context';
 import { AspxProcessingStep } from './aspx-processing.step';
 

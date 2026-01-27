@@ -1,10 +1,10 @@
 import { Readable } from 'node:stream';
 import { vi } from 'vitest';
-import type { SimplePermission } from '../../microsoft-apis/graph/types/sharepoint.types';
+import type { SimplePermission } from '../../src/microsoft-apis/graph/types/sharepoint.types';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
-} from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
+} from '../../src/microsoft-apis/graph/types/sharepoint-content-item.interface';
 
 export class MockGraphApiService {
   public items: SharepointContentItem[] = [this.createDefaultItem()];

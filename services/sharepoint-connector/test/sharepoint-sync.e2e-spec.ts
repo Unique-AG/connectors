@@ -2,8 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { MockAgent, setGlobalDispatcher } from 'undici';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { GraphApiService } from '../src/microsoft-apis/graph/graph-api.service';
 import { SharepointRestClientService } from '../src/microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
@@ -11,123 +10,29 @@ import { SchedulerService } from '../src/scheduler/scheduler.service';
 import { HttpClientService } from '../src/shared/services/http-client.service';
 import { SharepointSynchronizationService } from '../src/sharepoint-synchronization/sharepoint-synchronization.service';
 import { IngestionHttpClient } from '../src/unique-api/clients/ingestion-http.client';
-import { FileDiffRequest } from '../src/unique-api/unique-file-ingestion/unique-file-ingestion.types';
-import { MockGraphApiService } from '../src/utils/test-utils/mock-graph-api.service';
-import { MockHttpClientService } from '../src/utils/test-utils/mock-http-client.service';
-import { MockIngestionHttpClient } from '../src/utils/test-utils/mock-ingestion-http.client';
-import { MockSharepointRestClientService } from '../src/utils/test-utils/mock-sharepoint-rest-client.service';
-import { RequestCapture } from '../src/utils/test-utils/request-capture';
-
-const fixturePath = (fileName: string) => join(process.cwd(), 'test', 'fixtures', fileName);
-
-const loadJson = <T>(fileName: string): T =>
-  JSON.parse(readFileSync(fixturePath(fileName), 'utf-8')) as T;
-
-const ingestionGraphqlResponse = loadJson('ingestion-graphql-response.json');
-const scopeGraphqlResponse = loadJson('scope-graphql-response.json');
+import { INGESTION_CLIENT, SCOPE_MANAGEMENT_CLIENT } from '../src/unique-api/clients/unique-graphql.client';
+import { MockGraphApiService } from './test-utils/mock-graph-api.service';
+import { MockHttpClientService } from './test-utils/mock-http-client.service';
+import { MockIngestionHttpClient } from './test-utils/mock-ingestion-http.client';
+import { MockSharepointRestClientService } from './test-utils/mock-sharepoint-rest-client.service';
+import { MockUniqueGraphqlClient } from './test-utils/mock-unique-graphql.client';
 
 describe('SharePoint synchronization (e2e)', () => {
   let app: INestApplication;
-  let mockAgent: MockAgent;
   let mockGraphApiService: MockGraphApiService;
   let mockSharepointRestClientService: MockSharepointRestClientService;
   let mockHttpClientService: MockHttpClientService;
   let mockIngestionHttpClient: MockIngestionHttpClient;
-  let capture: RequestCapture;
-
-  beforeAll(() => {
-    mockAgent = new MockAgent();
-    mockAgent.disableNetConnect();
-    setGlobalDispatcher(mockAgent);
-
-    const ingestionPool = mockAgent.get('https://unique-ingestion.test');
-    const scopePool = mockAgent.get('https://unique-scope.test');
-
-    ingestionPool
-      .intercept({ method: 'POST', path: '/v2/content/file-diff' })
-      .reply(
-        200,
-        (opts) => {
-          capture?.capture(
-            'POST',
-            '/v2/content/file-diff',
-            opts.body,
-            opts.headers as Record<string, string>,
-          );
-          return JSON.stringify(loadJson('file-diff-response.json'));
-        },
-        {
-          headers: { 'content-type': 'application/json' },
-        },
-      )
-      .persist();
-
-    ingestionPool
-      .intercept({ method: 'POST', path: '/graphql' })
-      .reply(
-        200,
-        (opts) => {
-          capture?.capture('POST', '/graphql', opts.body, opts.headers as Record<string, string>);
-          return JSON.stringify(ingestionGraphqlResponse);
-        },
-        {
-          headers: { 'content-type': 'application/json' },
-        },
-      )
-      .persist();
-
-    scopePool
-      .intercept({ method: 'POST', path: '/graphql' })
-      .reply(
-        200,
-        (opts) => {
-          capture?.capture('POST', '/graphql', opts.body, opts.headers as Record<string, string>);
-          return JSON.stringify(scopeGraphqlResponse);
-        },
-        {
-          headers: { 'content-type': 'application/json' },
-        },
-      )
-      .persist();
-  });
-
-  afterAll(async () => {
-    await mockAgent.close();
-  });
+  let mockIngestionGraphqlClient: MockUniqueGraphqlClient;
+  let mockScopeGraphqlClient: MockUniqueGraphqlClient;
 
   beforeEach(async () => {
-    capture = new RequestCapture();
     mockGraphApiService = new MockGraphApiService();
     mockSharepointRestClientService = new MockSharepointRestClientService();
     mockHttpClientService = new MockHttpClientService();
     mockIngestionHttpClient = new MockIngestionHttpClient();
-
-    // Wrap mocks to capture requests
-    // biome-ignore lint/suspicious/noExplicitAny: Test mock needs to handle any request options
-    mockIngestionHttpClient.request.mockImplementation(async (options: any) => {
-      capture.capture(options.method || 'POST', options.path, options.body, options.headers || {});
-      return {
-        statusCode: 200,
-        body: {
-          text: async () => JSON.stringify(mockIngestionHttpClient.fileDiffResponse),
-          json: async () => mockIngestionHttpClient.fileDiffResponse,
-        },
-        headers: {},
-      };
-    });
-
-    // biome-ignore lint/suspicious/noExplicitAny: Test mock needs to handle any request options
-    mockHttpClientService.request.mockImplementation(async (options: any) => {
-      capture.capture(options.method || 'PUT', options.path, options.body, options.headers || {});
-      return {
-        statusCode: mockHttpClientService.response.statusCode,
-        body: {
-          text: async () => JSON.stringify(mockHttpClientService.response.body),
-          json: async () => mockHttpClientService.response.body,
-        },
-        headers: {},
-      };
-    });
+    mockIngestionGraphqlClient = new MockUniqueGraphqlClient();
+    mockScopeGraphqlClient = new MockUniqueGraphqlClient();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -140,6 +45,10 @@ describe('SharePoint synchronization (e2e)', () => {
       .useValue(mockHttpClientService)
       .overrideProvider(IngestionHttpClient)
       .useValue(mockIngestionHttpClient)
+      .overrideProvider(INGESTION_CLIENT)
+      .useValue(mockIngestionGraphqlClient)
+      .overrideProvider(SCOPE_MANAGEMENT_CLIENT)
+      .useValue(mockScopeGraphqlClient)
       .overrideProvider(SchedulerService)
       .useValue({
         onModuleInit: () => {},
@@ -155,7 +64,12 @@ describe('SharePoint synchronization (e2e)', () => {
     if (app) {
       await app.close();
     }
-    capture.clear();
+    
+    // Clear mock call history
+    mockIngestionHttpClient.clear();
+    mockHttpClientService.clear();
+    mockIngestionGraphqlClient.clear();
+    mockScopeGraphqlClient.clear();
   });
 
   describe('Content Ingestion', () => {
@@ -164,8 +78,8 @@ describe('SharePoint synchronization (e2e)', () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        // ContentUpsert goes to ingestion service, which may capture multiple operations
-        const upserts = capture.getGraphQLOperations('ContentUpsert');
+        // Query the ingestion GraphQL client mock directly
+        const upserts = mockIngestionGraphqlClient.getOperations('ContentUpsert');
         expect(upserts.length).toBeGreaterThan(0);
 
         // Find the upsert for our test file
@@ -199,10 +113,11 @@ describe('SharePoint synchronization (e2e)', () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        const fileDiffCalls = capture.getRestCalls('/v2/content/file-diff');
+        // Query the ingestion HTTP client mock directly
+        const fileDiffCalls = mockIngestionHttpClient.getFileDiffCalls();
         expect(fileDiffCalls).toHaveLength(1);
 
-        const requestBody = fileDiffCalls[0]?.body as FileDiffRequest;
+        const requestBody = fileDiffCalls[0]?.body;
         expect(requestBody).toMatchObject({
           sourceKind: 'MICROSOFT_365_SHAREPOINT',
           sourceName: 'Sharepoint',
@@ -216,10 +131,10 @@ describe('SharePoint synchronization (e2e)', () => {
         });
 
         // Verify file is included
-        expect(requestBody.fileList).toHaveLength(1);
+        expect(requestBody?.fileList).toHaveLength(1);
 
         // Verify ContentUpsert GraphQL payload
-        const upserts = capture.getGraphQLOperations('ContentUpsert');
+        const upserts = mockIngestionGraphqlClient.getOperations('ContentUpsert');
         expect(upserts.length).toBeGreaterThan(0);
 
         // Find the upsert for our xlsx file
@@ -257,7 +172,7 @@ describe('SharePoint synchronization (e2e)', () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        const fileDiffCalls = capture.getRestCalls('/v2/content/file-diff');
+        const fileDiffCalls = mockIngestionHttpClient.getFileDiffCalls();
         if (fileDiffCalls.length > 0 && fileDiffCalls[0]) {
           expect(fileDiffCalls[0].body).toMatchObject({
             fileList: [],
@@ -278,7 +193,7 @@ describe('SharePoint synchronization (e2e)', () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        const fileDiffCalls = capture.getRestCalls('/v2/content/file-diff');
+        const fileDiffCalls = mockIngestionHttpClient.getFileDiffCalls();
         if (fileDiffCalls.length > 0 && fileDiffCalls[0]) {
           expect(fileDiffCalls[0].body).toMatchObject({
             fileList: [],
@@ -309,12 +224,12 @@ describe('SharePoint synchronization (e2e)', () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        const fileDiffCalls = capture.getRestCalls('/v2/content/file-diff');
-        const requestBody = fileDiffCalls[0]?.body as FileDiffRequest;
-        expect(requestBody.fileList).toHaveLength(1);
-        expect(requestBody.fileList[0]?.key).toContain('item-1');
+        const fileDiffCalls = mockIngestionHttpClient.getFileDiffCalls();
+        const requestBody = fileDiffCalls[0]?.body;
+        expect(requestBody?.fileList).toHaveLength(1);
+        expect(requestBody?.fileList[0]?.key).toContain('item-1');
 
-        const upserts = capture.getGraphQLOperations('ContentUpsert');
+        const upserts = mockIngestionGraphqlClient.getOperations('ContentUpsert');
         expect(upserts.length).toBeGreaterThan(0);
 
         // Find the upsert for test.pdf
@@ -339,8 +254,8 @@ describe('SharePoint synchronization (e2e)', () => {
           'item-1',
         );
 
-        // Verify that CreateFileAccessesForContents was called
-        const accessCalls = capture.getGraphQLOperations('CreateFileAccessesForContents');
+        // Verify that CreateFileAccessesForContents was called on the ingestion client
+        const accessCalls = mockIngestionGraphqlClient.getOperations('CreateFileAccessesForContents');
         expect(accessCalls.length).toBeGreaterThan(0);
       });
     });
@@ -373,8 +288,10 @@ describe('SharePoint synchronization (e2e)', () => {
       );
 
       expect(mockIngestionHttpClient.request).toHaveBeenCalled();
-      const requests = capture.getAll();
-      expect(requests.length).toBeGreaterThan(0);
+      
+      // Verify requests were tracked
+      const allCalls = mockIngestionGraphqlClient.getAllCalls();
+      expect(allCalls.length).toBeGreaterThan(0);
 
       expect(mockGraphApiService.getFileContentStream).toHaveBeenCalled();
       expect(mockHttpClientService.request).toHaveBeenCalled();

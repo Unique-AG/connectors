@@ -8,7 +8,7 @@ import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import type { DriveItem, ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { HttpClientService } from '../../shared/services/http-client.service';
 import { UniqueFilesService } from '../../unique-api/unique-files/unique-files.service';
-import { createMockSiteConfig } from '../../utils/test-utils/mock-site-config';
+import { createMockSiteConfig } from '../../../test/test-utils/mock-site-config';
 import type { ProcessingContext } from '../types/processing-context';
 import { UploadContentStep } from './upload-content.step';
 

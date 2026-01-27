@@ -7,7 +7,7 @@ import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-p
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
+import { createMockSiteConfig } from '../../test/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
