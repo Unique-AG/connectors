@@ -150,7 +150,6 @@ export class ProxyService implements OnModuleDestroy {
 | GraphClientFactory | `'always'` | MS API - always external |
 | CertificateAuthStrategy (MSAL) | `'always'` | MS login - always external |
 | ClientSecretAuthStrategy (MSAL) | `'always'` | MS login - always external |
-| OidcAuthStrategy (Azure Identity) | `'always'` | MS login - always external |
 | UniqueGraphqlClient | `'external-only'` | Unique API - only when external |
 | IngestionHttpClient | `'external-only'` | Unique API - only when external |
 | HttpClientService (Zitadel) | `'external-only'` | Zitadel auth - only when external |
@@ -221,7 +220,6 @@ connector:
 | `src/microsoft-apis/graph/graph-client.factory.ts` | Inject ProxyService, pass fetchOptions |
 | `src/microsoft-apis/auth/strategies/certificate-auth.strategy.ts` | Configure MSAL with proxy |
 | `src/microsoft-apis/auth/strategies/client-secret-auth.strategy.ts` | Configure MSAL with proxy |
-| `src/microsoft-apis/auth/strategies/oidc-auth.strategy.ts` | Configure Azure Identity with proxy |
 | `src/unique-api/clients/unique-graphql.client.ts` | Inject ProxyService, custom fetch |
 | `src/unique-api/clients/ingestion-http.client.ts` | Inject ProxyService |
 | `deploy/helm-charts/.../values.yaml` | Add proxy section |

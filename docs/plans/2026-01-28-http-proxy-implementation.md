@@ -6,7 +6,7 @@
 
 **Architecture:** Centralized `ProxyService` creates undici `ProxyAgent` or `Agent` based on configuration. All HTTP clients inject this service and use its dispatcher. Proxy mode (`always` vs `external-only`) determines when proxy is applied.
 
-**Tech Stack:** NestJS, undici (ProxyAgent), Zod, @azure/msal-node, @azure/identity, graphql-request, Helm
+**Tech Stack:** NestJS, undici (ProxyAgent), Zod, @azure/msal-node, graphql-request, Helm
 
 **Design Document:** `docs/plans/2026-01-28-http-proxy-design.md`
 
@@ -24,16 +24,23 @@
 // services/sharepoint-connector/src/config/proxy.schema.ts
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
+import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { coercedPositiveIntSchema, requiredStringSchema } from '../utils/zod.util';
 
 const portSchema = coercedPositiveIntSchema.max(65535);
+
+const proxyHeadersSchema = parseJsonEnvironmentVariable('PROXY_HEADERS').pipe(
+  z.record(z.string()),
+);
 
 const baseProxyFields = {
   host: requiredStringSchema.describe('Proxy server hostname'),
   port: portSchema.describe('Proxy server port'),
   protocol: z.enum(['http', 'https']).describe('Proxy protocol'),
   caBundlePath: z.string().optional().describe('Path to CA bundle for proxy server verification'),
-  headers: z.record(z.string()).optional().describe('Custom headers for CONNECT request'),
+  headers: proxyHeadersSchema
+    .optional()
+    .describe('Custom headers for CONNECT request (JSON string in PROXY_HEADERS)'),
 };
 
 export const ProxyConfigSchema = z.discriminatedUnion('authMode', [
@@ -188,6 +195,10 @@ export class ProxyService implements OnModuleDestroy {
 
     if (proxyConfig.caBundlePath) {
       proxyOptions.proxyTls = { ca: readFileSync(proxyConfig.caBundlePath) };
+    }
+
+    if (proxyConfig.headers) {
+      proxyOptions.headers = proxyConfig.headers;
     }
 
     this.logger.log({
@@ -702,9 +713,6 @@ public constructor(
   const dispatcher = this.proxyService.getDispatcher('always');
 
   switch (authMode) {
-    case 'oidc':
-      this.strategy = new OidcAuthStrategy(configService, this.proxyService);
-      break;
     case 'client-secret':
       this.strategy = new ClientSecretAuthStrategy(configService, dispatcher);
       break;
@@ -762,120 +770,7 @@ git commit -m "feat(sharepoint-connector): use ProxyService in MSAL auth strateg
 
 ---
 
-## Task 10: Update OidcAuthStrategy (Azure Identity)
-
-**Files:**
-- Modify: `services/sharepoint-connector/src/microsoft-apis/auth/strategies/oidc-auth.strategy.ts`
-
-Azure Identity SDK has native `proxyOptions` support - cleaner than custom network client.
-
-**Step 1: Update OidcAuthStrategy to use proxyOptions**
-
-```typescript
-import assert from 'node:assert';
-import { DefaultAzureCredential } from '@azure/identity';
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { z } from 'zod';
-import { Config } from '../../../config';
-import { ProxyConfig } from '../../../config/proxy.schema';
-import { ProxyService } from '../../../proxy';
-import { sanitizeError } from '../../../utils/normalize-error';
-import { TokenAcquisitionResult } from '../types';
-import { AuthStrategy } from './auth-strategy.interface';
-
-const TokenResponseSchema = z.object({
-  token: z.string().min(1),
-  expiresOnTimestamp: z.number().positive(),
-});
-
-@Injectable()
-export class OidcAuthStrategy implements AuthStrategy {
-  private readonly logger = new Logger(this.constructor.name);
-  private readonly credential: DefaultAzureCredential;
-
-  public constructor(
-    private readonly configService: ConfigService<Config, true>,
-    private readonly proxyService: ProxyService,
-  ) {
-    const sharePointConfig = this.configService.get('sharepoint', { infer: true });
-
-    assert.strictEqual(
-      sharePointConfig.auth.mode,
-      'oidc',
-      'OidcAuthStrategy called but authentication mode is not "oidc"',
-    );
-
-    const proxyConfig = this.proxyService.getProxyConfig();
-    const proxyOptions = this.buildProxyOptions(proxyConfig);
-
-    this.credential = new DefaultAzureCredential({
-      tenantId: sharePointConfig.tenantId,
-      ...(proxyOptions && { proxyOptions }),
-    });
-  }
-
-  public async acquireNewToken(scopes: string[]): Promise<TokenAcquisitionResult> {
-    this.logger.log('Acquiring new Graph API token using OIDC');
-
-    try {
-      const tokenResponse = await this.credential.getToken(scopes);
-      const validatedResponse = TokenResponseSchema.parse(tokenResponse);
-
-      return {
-        token: validatedResponse.token,
-        expiresAt: validatedResponse.expiresOnTimestamp,
-      };
-    } catch (error) {
-      this.logger.error({
-        msg: 'Failed to acquire Graph API token using OIDC',
-        error: sanitizeError(error),
-      });
-
-      throw error;
-    }
-  }
-
-  private buildProxyOptions(proxyConfig: ProxyConfig) {
-    if (proxyConfig.authMode === 'none') {
-      return undefined;
-    }
-
-    const baseOptions = {
-      host: `${proxyConfig.protocol}://${proxyConfig.host}`,
-      port: proxyConfig.port,
-    };
-
-    if (proxyConfig.authMode === 'basic') {
-      return {
-        ...baseOptions,
-        username: proxyConfig.username,
-        password: proxyConfig.password,
-      };
-    }
-
-    // For TLS mode, Azure Identity doesn't support client certs for proxy auth directly
-    // The TLS cert would be for authenticating TO the proxy, which is less common
-    // Fall back to basic proxy settings without auth
-    return baseOptions;
-  }
-}
-```
-
-**Step 2: Update AuthStrategy interface if needed**
-
-Check if interface needs changes to accommodate different constructor signatures.
-
-**Step 3: Commit**
-
-```bash
-git add services/sharepoint-connector/src/microsoft-apis/auth/strategies/oidc-auth.strategy.ts
-git commit -m "feat(sharepoint-connector): use native proxyOptions in OidcAuthStrategy"
-```
-
----
-
-## Task 11: Update Helm Chart - values.yaml
+## Task 10: Update Helm Chart - values.yaml
 
 **Files:**
 - Modify: `services/sharepoint-connector/deploy/helm-charts/sharepoint-connector/values.yaml`
@@ -885,28 +780,30 @@ git commit -m "feat(sharepoint-connector): use native proxyOptions in OidcAuthSt
 Add after `processing` section (inside `connectorConfig`):
 
 ```yaml
-  # -- HTTP proxy configuration for external API calls
-  # Required for environments where internet access is only available through a proxy
-  proxy:
-    # -- Proxy authentication mode
-    # none: proxy disabled
-    # basic: username/password authentication
-    # tls: TLS client certificate authentication
-    authMode: none
-    # -- Proxy server hostname (required for basic/tls modes)
-    # host: proxy.example.com
-    # -- Proxy server port (required for basic/tls modes)
-    # port: 8080
-    # -- Proxy protocol: http or https (required for basic/tls modes)
-    # protocol: http
-    # -- Basic auth username (required for basic mode)
-    # username: ""
-    # -- Path to TLS client certificate (required for tls mode)
-    # tlsCertPath: /app/proxy-certs/client.crt
-    # -- Path to TLS client key (required for tls mode)
-    # tlsKeyPath: /app/proxy-certs/client.key
-    # -- Path to CA bundle for verifying proxy server certificate (optional)
-    # caBundlePath: /app/proxy-certs/ca.crt
+# -- HTTP proxy configuration for external API calls
+# Required for environments where internet access is only available through a proxy
+proxy:
+  # -- Proxy authentication mode
+  # none: proxy disabled
+  # basic: username/password authentication
+  # tls: TLS client certificate authentication
+  authMode: none
+  # -- Proxy server hostname (required for basic/tls modes)
+  # host: proxy.example.com
+  # -- Proxy server port (required for basic/tls modes)
+  # port: 8080
+  # -- Proxy protocol: http or https (required for basic/tls modes)
+  # protocol: http
+  # -- Basic auth username (required for basic mode)
+  # username: ""
+  # -- Path to TLS client certificate (required for tls mode)
+  # tlsCertPath: /app/proxy-certs/client.crt
+  # -- Path to TLS client key (required for tls mode)
+  # tlsKeyPath: /app/proxy-certs/client.key
+  # -- Path to CA bundle for verifying proxy server certificate (optional)
+  # caBundlePath: /app/proxy-certs/ca.crt
+  # -- Optional JSON string of headers for CONNECT
+  # headers: '{"X-Proxy-Header":"value"}'
 ```
 
 **Step 2: Commit**
@@ -918,7 +815,7 @@ git commit -m "feat(sharepoint-connector): add proxy config to Helm values"
 
 ---
 
-## Task 12: Create Helm Chart - proxy ConfigMap template
+## Task 11: Create Helm Chart - proxy ConfigMap template
 
 **Files:**
 - Create: `services/sharepoint-connector/deploy/helm-charts/sharepoint-connector/templates/proxy-configmap.yaml`
@@ -953,6 +850,8 @@ data:
   {{- end }}
 ```
 
+Note: `PROXY_PASSWORD` must come from a Secret via `connector.envVars` (do not include in ConfigMap).
+
 **Step 2: Commit**
 
 ```bash
@@ -962,7 +861,7 @@ git commit -m "feat(sharepoint-connector): add proxy ConfigMap template"
 
 ---
 
-## Task 13: Update Helm Chart - reference ConfigMap in deployment
+## Task 12: Update Helm Chart - reference ConfigMap in deployment
 
 **Files:**
 - Check: `services/sharepoint-connector/deploy/helm-charts/sharepoint-connector/templates/` for deployment template or helpers
@@ -970,6 +869,8 @@ git commit -m "feat(sharepoint-connector): add proxy ConfigMap template"
 **Step 1: Add extraEnvCM reference**
 
 Find how existing ConfigMaps are referenced. Add `sharepoint-connector-proxy-config` to the list of ConfigMaps loaded as environment variables.
+
+Also ensure `connector.envVars` supports adding `PROXY_PASSWORD` from a Secret for `authMode: basic`.
 
 This may involve:
 - Updating `connector.extraEnvCM` default value
@@ -984,7 +885,7 @@ git commit -m "feat(sharepoint-connector): reference proxy ConfigMap in deployme
 
 ---
 
-## Task 14: Fix Existing Tests
+## Task 13: Fix Existing Tests
 
 **Files:**
 - Various test files that test services now requiring ProxyService
@@ -1020,7 +921,7 @@ git commit -m "test(sharepoint-connector): mock ProxyService in existing tests"
 
 ---
 
-## Task 15: Final Verification
+## Task 14: Final Verification
 
 **Step 1: Run all checks**
 
@@ -1054,9 +955,8 @@ git commit -m "fix(sharepoint-connector): address review feedback"
 | 7 | Update UniqueGraphqlClient |
 | 8 | Update GraphClientFactory |
 | 9 | Update MSAL auth strategies (custom network client) |
-| 10 | Update OidcAuthStrategy (native proxyOptions) |
-| 11 | Update Helm values.yaml |
-| 12 | Create proxy ConfigMap template (no required helpers) |
-| 13 | Reference ConfigMap in deployment |
-| 14 | Fix existing tests |
-| 15 | Final verification |
+| 10 | Update Helm values.yaml |
+| 11 | Create proxy ConfigMap template (no required helpers) |
+| 12 | Reference ConfigMap in deployment |
+| 13 | Fix existing tests |
+| 14 | Final verification |
