@@ -14,10 +14,18 @@ describe('MicrosoftAuthenticationService', () => {
   let mockConfigService: {
     get: ReturnType<typeof vi.fn>;
   };
+  let mockProxyService: {
+    getDispatcher: ReturnType<typeof vi.fn>;
+  };
+  let mockDispatcher: unknown;
 
   beforeEach(async () => {
     mockConfigService = {
       get: vi.fn(),
+    };
+    mockDispatcher = {};
+    mockProxyService = {
+      getDispatcher: vi.fn().mockReturnValue(mockDispatcher),
     };
   });
 
@@ -37,9 +45,13 @@ describe('MicrosoftAuthenticationService', () => {
       return undefined;
     });
 
-    const service = new MicrosoftAuthenticationService(mockConfigService as never);
+    const service = new MicrosoftAuthenticationService(
+      mockConfigService as never,
+      mockProxyService as never,
+    );
 
     expect(service).toBeDefined();
+    expect(mockProxyService.getDispatcher).toHaveBeenCalledWith('always');
     // biome-ignore lint/suspicious/noExplicitAny: Access private property for testing
     expect((service as any).strategy).toBeInstanceOf(ClientSecretAuthStrategy);
   });
@@ -67,7 +79,10 @@ describe('MicrosoftAuthenticationService', () => {
       return undefined;
     });
 
-    const service = new MicrosoftAuthenticationService(mockConfigService as never);
+    const service = new MicrosoftAuthenticationService(
+      mockConfigService as never,
+      mockProxyService as never,
+    );
     // biome-ignore lint/suspicious/noExplicitAny: Override private property for testing
     (service as any).strategy = mockStrategy;
 
