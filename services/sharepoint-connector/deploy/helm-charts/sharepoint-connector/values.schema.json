@@ -546,6 +546,59 @@
             }
           },
           "additionalProperties": false
+        },
+        "proxy": {
+          "type": "object",
+          "description": "HTTP proxy configuration for outbound requests",
+          "required": ["authMode"],
+          "properties": {
+            "authMode": {
+              "type": "string",
+              "enum": ["none", "basic", "tls"],
+              "description": "Proxy authentication mode: none (no auth), basic (username/password), tls (client certificate)"
+            },
+            "host": {
+              "type": "string",
+              "description": "Proxy server hostname",
+              "examples": ["proxy.example.com"]
+            },
+            "port": {
+              "type": "integer",
+              "description": "Proxy server port",
+              "examples": [8080, 3128]
+            },
+            "protocol": {
+              "type": "string",
+              "enum": ["http", "https"],
+              "description": "Proxy server protocol",
+              "default": "http"
+            },
+            "username": {
+              "type": "string",
+              "description": "Username for basic authentication (required when authMode is 'basic')"
+            },
+            "tlsCertPath": {
+              "type": "string",
+              "description": "Path to TLS client certificate (required when authMode is 'tls')",
+              "examples": ["/app/proxy-cert.pem"]
+            },
+            "tlsKeyPath": {
+              "type": "string",
+              "description": "Path to TLS client key (required when authMode is 'tls')",
+              "examples": ["/app/proxy-key.pem"]
+            },
+            "caBundlePath": {
+              "type": "string",
+              "description": "Path to CA bundle for proxy server certificate verification",
+              "examples": ["/app/proxy-ca.pem"]
+            },
+            "headers": {
+              "type": "string",
+              "description": "Additional headers to send with proxy requests (JSON string)",
+              "examples": ["{\"X-Custom-Header\": \"value\"}"]
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

@@ -37,6 +37,9 @@ connector:
   #           key: PROXY_PASSWORD
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
+  # -- List of ConfigMaps to load as environment variables
+  extraEnvCM:
+    - sharepoint-connector-proxy-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
     tag: 2.0.0-beta.12 # x-release-please-version
