@@ -105,6 +105,7 @@ export class ScopeManagementService {
       // via `getScopeById` call.
       await this.uniqueScopesService.createScopeAccesses(currentScope.parentId, [
         { type: 'READ', entityId: userId, entityType: 'USER' },
+        { type: 'WRITE', entityId: userId, entityType: 'USER' },
       ]);
 
       const parent = await this.uniqueScopesService.getScopeById(currentScope.parentId);
