@@ -2,18 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Redacted } from '../../utils/redacted';
 import { MicrosoftAuthenticationService } from './microsoft-authentication.service';
 import { ClientSecretAuthStrategy } from './strategies/client-secret-auth.strategy';
-import { OidcAuthStrategy } from './strategies/oidc-auth.strategy';
 import { AuthenticationScope } from './types';
 
 vi.mock('@azure/msal-node', () => ({
   ConfidentialClientApplication: vi.fn().mockImplementation(() => ({
     acquireTokenByClientCredential: vi.fn(),
-  })),
-}));
-
-vi.mock('@azure/identity', () => ({
-  DefaultAzureCredential: vi.fn().mockImplementation(() => ({
-    getToken: vi.fn(),
   })),
 }));
 
@@ -49,27 +42,6 @@ describe('MicrosoftAuthenticationService', () => {
     expect(service).toBeDefined();
     // biome-ignore lint/suspicious/noExplicitAny: Access private property for testing
     expect((service as any).strategy).toBeInstanceOf(ClientSecretAuthStrategy);
-  });
-
-  it('uses OidcAuthStrategy when corresponding mode is selected', () => {
-    mockConfigService.get.mockImplementation((key: string) => {
-      if (key === 'sharepoint.auth.mode') return 'oidc';
-      if (key === 'sharepoint') {
-        return {
-          tenantId: 'tenant-123',
-          auth: {
-            mode: 'oidc',
-          },
-        };
-      }
-      return undefined;
-    });
-
-    const service = new MicrosoftAuthenticationService(mockConfigService as never);
-
-    expect(service).toBeDefined();
-    // biome-ignore lint/suspicious/noExplicitAny: Access private property for testing
-    expect((service as any).strategy).toBeInstanceOf(OidcAuthStrategy);
   });
 
   it('delegates getAccessToken to the selected strategy', async () => {

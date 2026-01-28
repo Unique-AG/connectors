@@ -44,10 +44,6 @@ export const PermissionsInheritanceModeSchema = z
 // Auth Configuration
 // ==========================================
 
-const oidcAuthConfig = z.object({
-  mode: z.literal('oidc').describe('Authentication mode to use for Microsoft APIs'),
-});
-
 const clientSecretAuthConfig = z.object({
   mode: z.literal('client-secret').describe('Authentication mode to use for Microsoft APIs'),
   clientId: requiredStringSchema.describe('Azure AD application client ID'),
@@ -86,7 +82,6 @@ const certificateAuthConfig = z
   });
 
 const AuthConfigSchema = z.discriminatedUnion('mode', [
-  oidcAuthConfig,
   clientSecretAuthConfig,
   certificateAuthConfig,
 ]);

@@ -4,7 +4,6 @@ import { Config } from '../../config';
 import { AuthStrategy } from './strategies/auth-strategy.interface';
 import { CertificateAuthStrategy } from './strategies/certificate-auth.strategy';
 import { ClientSecretAuthStrategy } from './strategies/client-secret-auth.strategy';
-import { OidcAuthStrategy } from './strategies/oidc-auth.strategy';
 import { TokenCache } from './token-cache';
 import { AuthenticationScope } from './types';
 
@@ -12,7 +11,6 @@ import { AuthenticationScope } from './types';
  * Microsoft Authentication Provider.
  * Uses strategy pattern to support different authentication methods:
  * - Client Secret Strategy (for local development)
- * - OIDC/Workload Identity Strategy (for AKS deployment)
  * - Client Certificate (for Sharepoint REST V1 API access)
  */
 @Injectable()
@@ -36,9 +34,6 @@ export class MicrosoftAuthenticationService {
 
     const authMode = this.configService.get('sharepoint.auth.mode', { infer: true });
     switch (authMode) {
-      case 'oidc':
-        this.strategy = new OidcAuthStrategy(configService);
-        break;
       case 'client-secret':
         this.strategy = new ClientSecretAuthStrategy(configService);
         break;
