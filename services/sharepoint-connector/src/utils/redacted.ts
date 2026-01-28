@@ -9,10 +9,17 @@ export class Redacted<T> {
     return this._value;
   }
 
+  /**
+   * Always returns [Redacted] for safety in string concatenations and templates.
+   */
   public toString() {
     return '[Redacted]';
   }
 
+  /**
+   * Used for structured logging (Pino/JSON.stringify).
+   * Always redacts; never discloses raw values.
+   */
   public toJSON() {
     return '[Redacted]';
   }

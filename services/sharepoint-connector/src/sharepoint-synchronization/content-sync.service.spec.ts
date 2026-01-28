@@ -7,6 +7,7 @@ import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-p
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import { Redacted } from '../utils/redacted';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
@@ -312,7 +313,7 @@ describe('ContentSyncService', () => {
         siteName: 'test-site',
         siteConfig: {
           ...mockSiteConfig,
-          siteId: 'test-site-123',
+          siteId: new Redacted('test-site-123'),
           scopeId: 'scope-id',
           maxFilesToIngest: 2,
         },

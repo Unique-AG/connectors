@@ -37,14 +37,14 @@ export class UniqueAuthService {
     const params = new URLSearchParams({
       scope:
         `openid profile email urn:zitadel:iam:user:resourceowner ` +
-        `urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${zitadelProjectId}:aud`,
+        `urn:zitadel:iam:org:projects:roles urn:zitadel:iam:org:project:id:${zitadelProjectId.value}:aud`,
       grant_type: 'client_credentials',
     });
 
     try {
-      const basicAuth = Buffer.from(`${zitadelClientId}:${zitadelClientSecret.value}`).toString(
-        'base64',
-      );
+      const basicAuth = Buffer.from(
+        `${zitadelClientId.value}:${zitadelClientSecret.value}`,
+      ).toString('base64');
       const { statusCode, body } = await this.httpClientService.request(zitadelOauthTokenUrl, {
         method: 'POST',
         headers: {

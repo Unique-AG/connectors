@@ -35,8 +35,14 @@ const externalConfig = z.object({
     .literal('external')
     .describe('Authentication mode to use for accessing Unique API services'),
   zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
-  zitadelProjectId: z.string().describe('Zitadel project ID'),
-  zitadelClientId: z.string().describe('Zitadel client ID'),
+  zitadelProjectId: z
+    .string()
+    .transform((val) => new Redacted(val))
+    .describe('Zitadel project ID'),
+  zitadelClientId: z
+    .string()
+    .transform((val) => new Redacted(val))
+    .describe('Zitadel client ID'),
   zitadelClientSecret: z
     .instanceof(Redacted)
     .optional()

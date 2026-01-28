@@ -28,7 +28,7 @@ export class ItemProcessingOrchestratorService {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
     const { siteId } = syncContext.siteConfig;
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId.value) : siteId.value}]`;
 
     if (newItems.length === 0 && updatedItems.length === 0) {
       this.logger.log(`${logPrefix} No items to process`);

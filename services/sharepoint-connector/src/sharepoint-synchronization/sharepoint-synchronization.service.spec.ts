@@ -7,6 +7,7 @@ import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
+import { Redacted } from '../utils/redacted';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
@@ -100,16 +101,16 @@ describe('SharepointSynchronizationService', () => {
     };
 
     mockSitesConfigurationService = {
-      loadSitesConfiguration: vi
-        .fn()
-        .mockResolvedValue([
-          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
-        ]),
-      fetchSitesFromSharePointList: vi
-        .fn()
-        .mockResolvedValue([
-          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
-        ]),
+      loadSitesConfiguration: vi.fn().mockResolvedValue([
+        createMockSiteConfig({
+          siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+        }),
+      ]),
+      fetchSitesFromSharePointList: vi.fn().mockResolvedValue([
+        createMockSiteConfig({
+          siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+        }),
+      ]),
     };
 
     mockContentSyncService = {
@@ -141,7 +142,11 @@ describe('SharepointSynchronizationService', () => {
           if (key === 'sharepoint')
             return {
               sitesSource: 'config_file',
-              sites: [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })],
+              sites: [
+                createMockSiteConfig({
+                  siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+                }),
+              ],
             };
           return undefined;
         }),
@@ -176,7 +181,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
           scopeId: 'scope-id',
         }),
         siteName: 'test-site-name',
@@ -194,7 +199,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
           scopeId: 'scope-id',
         }),
         siteName: 'test-site-name',
@@ -275,7 +280,7 @@ describe('SharepointSynchronizationService', () => {
 
     const mockSiteConfigs = [
       createMockSiteConfig({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
         syncMode: 'content_and_permissions',
       }),
     ];
@@ -317,7 +322,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
       context: expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
           scopeId: 'scope-id',
         }),
         siteName: 'test-site-name',
@@ -341,7 +346,7 @@ describe('SharepointSynchronizationService', () => {
     };
 
     const mockSiteConfigs = [
-      createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
+      createMockSiteConfig({ siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66') }),
     ];
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
@@ -460,7 +465,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
         }),
       }),
     );
@@ -543,7 +548,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
         }),
       }),
     );
@@ -756,16 +761,25 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Redacted),
         }),
       }),
     );
   });
 
   it('ensures unique scopeIds and logs errors for duplicates', async () => {
-    const site1 = createMockSiteConfig({ siteId: 'site-1', scopeId: 'duplicate-scope' });
-    const site2 = createMockSiteConfig({ siteId: 'site-2', scopeId: 'duplicate-scope' });
-    const site3 = createMockSiteConfig({ siteId: 'site-3', scopeId: 'unique-scope' });
+    const site1 = createMockSiteConfig({
+      siteId: new Redacted('site-1'),
+      scopeId: 'duplicate-scope',
+    });
+    const site2 = createMockSiteConfig({
+      siteId: new Redacted('site-2'),
+      scopeId: 'duplicate-scope',
+    });
+    const site3 = createMockSiteConfig({
+      siteId: new Redacted('site-3'),
+      scopeId: 'unique-scope',
+    });
 
     mockSitesConfigurationService.loadSitesConfiguration = vi
       .fn()
@@ -779,15 +793,15 @@ describe('SharepointSynchronizationService', () => {
     // Should only sync site1 and site3
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-      site1.siteId,
+      site1.siteId.value,
       expect.any(String),
     );
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-      site3.siteId,
+      site3.siteId.value,
       expect.any(String),
     );
     expect(mockGraphApiService.getAllSiteItems).not.toHaveBeenCalledWith(
-      site2.siteId,
+      site2.siteId.value,
       expect.any(String),
     );
 

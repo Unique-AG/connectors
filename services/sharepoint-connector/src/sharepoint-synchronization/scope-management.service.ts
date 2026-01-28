@@ -227,7 +227,7 @@ export class ScopeManagementService {
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<ScopeWithPath[]> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId.value) : context.siteConfig.siteId.value}]`;
 
     const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
@@ -278,11 +278,11 @@ export class ScopeManagementService {
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<void> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId.value) : context.siteConfig.siteId.value}]`;
     const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
     // Site pages is a special collection we fetch for ASPX pages, but has no folders.
     pathToExternalIdMap[`${context.rootPath}/SitePages`] =
-      `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId}/sitePages`;
+      `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId.value}/sitePages`;
 
     for (const [index, scope] of scopes.entries()) {
       if (isNonNullish(scope.externalId)) {
@@ -309,7 +309,7 @@ export class ScopeManagementService {
           `${logPrefix} No external ID found for path ` +
             `${this.shouldConcealLogs ? smearPath(path) : path}`,
         );
-        externalId = `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId}/${scope.name}-${randomUUID()}`;
+        externalId = `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId.value}/${scope.name}-${randomUUID()}`;
       }
 
       try {
@@ -361,7 +361,7 @@ export class ScopeManagementService {
     scopes: ScopeWithPath[],
     context: SharepointSyncContext,
   ): Map<string, string> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId) : context.siteConfig.siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId.value) : context.siteConfig.siteId.value}]`;
     const itemIdToScopeIdMap = new Map<string, string>();
 
     if (scopes.length === 0) {

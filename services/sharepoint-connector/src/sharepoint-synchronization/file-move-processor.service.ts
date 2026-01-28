@@ -43,9 +43,9 @@ export class FileMoveProcessor {
     context: SharepointSyncContext,
   ): Promise<void> {
     const { siteId } = context.siteConfig;
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId.value) : siteId.value;
     const logPrefix = `[Site: ${logSiteId}]`;
-    const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId);
+    const movedFileCompleteKeys = this.convertToFullKeys(movedFileKeys, siteId.value);
     let ingestedFiles: UniqueFile[] = [];
 
     try {
@@ -106,11 +106,11 @@ export class FileMoveProcessor {
     context: SharepointSyncContext,
   ): FileMoveData[] {
     const { siteId } = context.siteConfig;
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId.value) : siteId.value}]`;
     const filesToMove: FileMoveData[] = [];
 
     for (const ingestedFile of ingestedFiles) {
-      const relativeKey = ingestedFile.key.replace(`${siteId}/`, '');
+      const relativeKey = ingestedFile.key.replace(`${siteId.value}/`, '');
 
       // Find the corresponding SharePoint item
       const sharepointItem = sharepointItems.find((item) => item.item.id === relativeKey);

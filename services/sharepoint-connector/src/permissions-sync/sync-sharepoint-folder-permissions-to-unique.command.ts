@@ -60,7 +60,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const { siteId } = context.siteConfig;
     const { rootPath, serviceUserId } = context;
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId.value) : siteId.value;
     const logPrefix = `[Site: ${logSiteId}]`;
 
     const rootGroup = await this.uniqueGroupsService.getRootGroup();

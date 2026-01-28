@@ -6,6 +6,7 @@ import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
+import { ConfigDiagnosticsModule } from './config/config-diagnostics.module';
 import {
   AppConfig,
   appConfig,
@@ -23,6 +24,7 @@ import { Redacted } from './utils/redacted';
       ignoreEnvFile: true,
       load: [appConfig, sharepointConfig, processingConfig, uniqueConfig],
     }),
+    ConfigDiagnosticsModule,
     LoggerModule.forRootAsync({
       useFactory(appConfig: AppConfig) {
         return {

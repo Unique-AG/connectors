@@ -47,11 +47,11 @@ export class ContentSyncService {
     context: SharepointSyncContext,
   ): Promise<void> {
     const { siteId } = context.siteConfig;
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
+    const logSiteId = this.shouldConcealLogs ? smear(siteId.value) : siteId.value;
     const logPrefix = `[Site: ${logSiteId}] `;
     const processStartTime = Date.now();
 
-    const diffResult = await this.calculateDiffForSite(items, siteId);
+    const diffResult = await this.calculateDiffForSite(items, siteId.value);
 
     if (diffResult.newFiles.length > 0) {
       this.spcFileDiffEventsTotal.add(diffResult.newFiles.length, {
@@ -84,7 +84,7 @@ export class ContentSyncService {
 
     // 1. Delete removed files first
     if (diffResult.deletedFiles.length > 0) {
-      await this.deleteRemovedFiles(siteId, diffResult.deletedFiles);
+      await this.deleteRemovedFiles(siteId.value, diffResult.deletedFiles);
     }
 
     // 2. Handle moved files (update scopes)

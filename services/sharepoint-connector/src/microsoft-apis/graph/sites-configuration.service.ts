@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 import { Config } from '../../config';
+import { ConfigDiagnosticsService } from '../../config/config-diagnostics.service';
 import { SiteConfigSchema } from '../../config/sharepoint.schema';
 import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { normalizeError, sanitizeError } from '../../utils/normalize-error';
@@ -18,6 +19,7 @@ export class SitesConfigurationService {
   public constructor(
     private readonly graphApiService: GraphApiService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly configDiagnosticsService: ConfigDiagnosticsService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -29,12 +31,21 @@ export class SitesConfigurationService {
     const sharepointConfig = this.configService.get('sharepoint', { infer: true });
 
     if (sharepointConfig.sitesSource === 'config_file') {
-      this.logger.log('Loading sites configuration from static YAML');
+      this.logger.log('Loading sites configuration from YAML file');
+      this.configDiagnosticsService.logConfig(
+        'Loaded SharePoint Sites Configurations',
+        sharepointConfig.sites,
+      );
       return sharepointConfig.sites;
     }
 
     this.logger.debug('Loading sites configuration from SharePoint list');
-    return await this.fetchSitesFromSharePointList(sharepointConfig.sharepointList);
+    const sites = await this.fetchSitesFromSharePointList({
+      siteId: sharepointConfig.sharepointList.siteId.value,
+      listId: sharepointConfig.sharepointList.listId,
+    });
+    this.configDiagnosticsService.logConfig('Loaded SharePoint Sites Configurations', sites);
+    return sites;
   }
 
   /**
@@ -100,7 +111,11 @@ export class SitesConfigurationService {
         syncColumnName: getFieldValue('syncColumnName'),
         ingestionMode: getFieldValue('ingestionMode'),
         scopeId: getFieldValue('uniqueScopeId'),
-        maxFilesToIngest: getFieldValue('maxFilesToIngest'),
+        // when unset sharepoint list item, maxFilesToIngest is set to 0
+        maxFilesToIngest: (() => {
+          const value = getFieldValue('maxFilesToIngest');
+          return value === 0 ? undefined : value;
+        })(),
         storeInternally: getFieldValue('storeInternally'),
         syncStatus: getFieldValue('syncStatus'),
         syncMode: getFieldValue('syncMode'),

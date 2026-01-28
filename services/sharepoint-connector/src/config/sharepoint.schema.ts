@@ -50,7 +50,9 @@ const oidcAuthConfig = z.object({
 
 const clientSecretAuthConfig = z.object({
   mode: z.literal('client-secret').describe('Authentication mode to use for Microsoft APIs'),
-  clientId: requiredStringSchema.describe('Azure AD application client ID'),
+  clientId: requiredStringSchema
+    .transform((val) => new Redacted(val))
+    .describe('Azure AD application client ID'),
   clientSecret: z
     .string()
     .nonempty()
@@ -61,16 +63,20 @@ const clientSecretAuthConfig = z.object({
 const certificateAuthConfig = z
   .object({
     mode: z.literal('certificate').describe('Authentication mode to use for Microsoft APIs'),
-    clientId: requiredStringSchema.describe('Azure AD application client ID'),
+    clientId: requiredStringSchema
+      .transform((val) => new Redacted(val))
+      .describe('Azure AD application client ID'),
     thumbprintSha1: z
       .hex()
       .nonempty()
       .optional()
+      .transform((val) => (val ? new Redacted(val) : undefined))
       .describe('SHA1 thumbprint of the Azure AD application certificate'),
     thumbprintSha256: z
       .hex()
       .nonempty()
       .optional()
+      .transform((val) => (val ? new Redacted(val) : undefined))
       .describe('SHA256 thumbprint of the Azure AD application certificate'),
     privateKeyPath: z
       .string()
@@ -78,7 +84,7 @@ const certificateAuthConfig = z
       .describe(
         'Path to the private key file of the Azure AD application certificate in PEM format',
       ),
-    privateKeyPassword: z.string().optional(),
+    privateKeyPassword: z.instanceof(Redacted).optional(),
   })
   .refine((config) => config.thumbprintSha1 || config.thumbprintSha256, {
     message:
@@ -98,7 +104,12 @@ export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 // ==========================================
 
 export const SiteConfigSchema = z.object({
-  siteId: z.string().trim().pipe(z.uuidv4()).describe('SharePoint site ID'),
+  siteId: z
+    .string()
+    .trim()
+    .pipe(z.uuidv4())
+    .transform((val) => new Redacted(val))
+    .describe('SharePoint site ID'),
   syncColumnName: z
     .string()
     .trim()
@@ -168,14 +179,18 @@ const dynamicSitesConfig = z.object({
     .describe('Load sites configuration dynamically from SharePoint list'),
   sharepointList: z
     .object({
-      siteId: requiredStringSchema.describe('SharePoint site ID containing the configuration list'),
+      siteId: requiredStringSchema
+        .transform((val) => new Redacted(val))
+        .describe('SharePoint site ID containing the configuration list'),
       listId: requiredStringSchema.describe('GUID of the SharePoint configuration list'),
     })
     .describe('SharePoint list details containing site configurations'),
 });
 
 const sharepointBaseConfig = z.object({
-  tenantId: requiredStringSchema.describe('Azure AD tenant ID'),
+  tenantId: requiredStringSchema
+    .transform((val) => new Redacted(val))
+    .describe('Azure AD tenant ID'),
   auth: AuthConfigSchema.describe('Authentication configuration for Microsoft APIs'),
   graphApiRateLimitPerMinuteThousands: coercedPositiveNumberSchema
     .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS)
@@ -200,12 +215,15 @@ export type SharepointConfig = (
     }
   | {
       sitesSource: 'sharepoint_list';
-      sharepointList: DynamicSitesConfig['sharepointList'];
+      sharepointList: {
+        siteId: Redacted<string>;
+        listId: string;
+      };
     }
 ) & {
-  tenantId: string;
+  tenantId: Redacted<string>;
   auth: AuthConfig & {
-    privateKeyPassword?: string;
+    privateKeyPassword?: Redacted<string>;
   };
   graphApiRateLimitPerMinuteThousands: number;
   baseUrl: string;
