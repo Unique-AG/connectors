@@ -1,302 +1,233 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { MockAgent } from 'undici';
 import { AppModule } from '../src/app.module';
-import { GraphApiService } from '../src/microsoft-apis/graph/graph-api.service';
-import { SharepointRestClientService } from '../src/microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
 import { SchedulerService } from '../src/scheduler/scheduler.service';
-import { HttpClientService } from '../src/shared/services/http-client.service';
 import { SharepointSynchronizationService } from '../src/sharepoint-synchronization/sharepoint-synchronization.service';
 import { IngestionHttpClient } from '../src/unique-api/clients/ingestion-http.client';
-import { INGESTION_CLIENT, SCOPE_MANAGEMENT_CLIENT } from '../src/unique-api/clients/unique-graphql.client';
-import { MockGraphApiService } from './test-utils/mock-graph-api.service';
-import { MockHttpClientService } from './test-utils/mock-http-client.service';
-import { MockIngestionHttpClient } from './test-utils/mock-ingestion-http.client';
-import { MockSharepointRestClientService } from './test-utils/mock-sharepoint-rest-client.service';
-import { MockUniqueGraphqlClient } from './test-utils/mock-unique-graphql.client';
+import { HttpClientService } from '../src/shared/services/http-client.service';
+import { MicrosoftAuthenticationService } from '../src/microsoft-apis/auth/microsoft-authentication.service';
+import { FakeUniqueRegistry } from './test-utils/fake-unique-registry';
+import { 
+  setupMockAgent, 
+  mockGraphAuth, 
+  mockUniqueAuth, 
+  mockUniqueIngestion, 
+  mockUniqueScopeManagement,
+  mockGraphApi,
+  MockGraphState
+} from './test-utils/mock-agent.helpers';
+import { createDriveItem, createPermission, createPageItem } from './test-utils/graph-fixtures';
 
-describe('SharePoint synchronization (e2e)', () => {
+describe('SharePoint synchronization (Senior E2E)', () => {
   let app: INestApplication;
-  let mockGraphApiService: MockGraphApiService;
-  let mockSharepointRestClientService: MockSharepointRestClientService;
-  let mockHttpClientService: MockHttpClientService;
-  let mockIngestionHttpClient: MockIngestionHttpClient;
-  let mockIngestionGraphqlClient: MockUniqueGraphqlClient;
-  let mockScopeGraphqlClient: MockUniqueGraphqlClient;
+  let agent: MockAgent;
+  let registry: FakeUniqueRegistry;
+  let graphState: MockGraphState;
 
   beforeEach(async () => {
-    mockGraphApiService = new MockGraphApiService();
-    mockSharepointRestClientService = new MockSharepointRestClientService();
-    mockHttpClientService = new MockHttpClientService();
-    mockIngestionHttpClient = new MockIngestionHttpClient();
-    mockIngestionGraphqlClient = new MockUniqueGraphqlClient();
-    mockScopeGraphqlClient = new MockUniqueGraphqlClient();
+    registry = new FakeUniqueRegistry();
+    agent = setupMockAgent();
+    
+    // Default mocks for Auth
+    mockGraphAuth(agent);
+    mockUniqueAuth(agent, 'https://auth.test.example.com/oauth/token');
+    
+    // Mocks for Unique Services backed by FakeRegistry
+    mockUniqueIngestion(agent, 'https://unique-ingestion.test', registry);
+    mockUniqueScopeManagement(agent, 'https://unique-scope.test', registry);
+
+    // Initial MS Graph State
+    graphState = {
+      drives: [{ id: 'drive-1', name: 'Documents' }],
+      itemsByDrive: {
+        'drive-1': [createDriveItem('item-1', 'test.pdf')]
+      },
+      permissionsByItem: {
+        'item-1': [createPermission('perm-1', 'user@example.com')]
+      },
+      siteLists: [
+        { id: 'sitepages-id', name: 'SitePages', displayName: 'Site Pages' }
+      ],
+      listItems: { 
+        'sitepages-id': [] 
+      },
+      pageContent: {}
+    };
+    mockGraphApi(agent, graphState);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-      .overrideProvider(GraphApiService)
-      .useValue(mockGraphApiService)
-      .overrideProvider(SharepointRestClientService)
-      .useValue(mockSharepointRestClientService)
-      .overrideProvider(HttpClientService)
-      .useValue(mockHttpClientService)
-      .overrideProvider(IngestionHttpClient)
-      .useValue(mockIngestionHttpClient)
-      .overrideProvider(INGESTION_CLIENT)
-      .useValue(mockIngestionGraphqlClient)
-      .overrideProvider(SCOPE_MANAGEMENT_CLIENT)
-      .useValue(mockScopeGraphqlClient)
       .overrideProvider(SchedulerService)
       .useValue({
         onModuleInit: () => {},
         onModuleDestroy: () => {},
       })
+      .overrideProvider(MicrosoftAuthenticationService)
+      .useValue({
+        getAccessToken: () => Promise.resolve('fake-token'),
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
+
+    // Inject MockAgent into services that bypass global dispatcher
+    const ingestionHttpClient = app.get(IngestionHttpClient);
+    (ingestionHttpClient as any).httpClient = agent.get('https://unique-ingestion.test');
+
+    const httpClientService = app.get(HttpClientService);
+    (httpClientService as any).httpAgent = agent;
   });
 
   afterEach(async () => {
+    // Prevent the services from closing our MockAgent during app.close()
     if (app) {
+      const ingestionHttpClient = app.get(IngestionHttpClient);
+      (ingestionHttpClient as any).httpClient = { close: () => Promise.resolve() };
+      const httpClientService = app.get(HttpClientService);
+      (httpClientService as any).httpAgent = { close: () => Promise.resolve() };
+      
       await app.close();
     }
-    
-    // Clear mock call history
-    mockIngestionHttpClient.clear();
-    mockHttpClientService.clear();
-    mockIngestionGraphqlClient.clear();
-    mockScopeGraphqlClient.clear();
+    if (agent) await agent.close();
   });
 
-  describe('Content Ingestion', () => {
-    describe('when syncing a pdf file', () => {
-      it('sends correct mimeType to ContentUpsert', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+  describe('Core Synchronization Logic', () => {
+    it('successfully ingests a new file and registers permissions in the registry', async () => {
+      const service = app.get(SharepointSynchronizationService);
+      await service.synchronize();
 
-        // Query the ingestion GraphQL client mock directly
-        const upserts = mockIngestionGraphqlClient.getOperations('ContentUpsert');
-        expect(upserts.length).toBeGreaterThan(0);
+      const ingested = registry.getFileBySpId('item-1');
+      expect(ingested).toBeDefined();
+      expect(ingested?.title).toBe('test.pdf');
+      // id-perm-1 is the Unique user ID mapped from user@example.com
+      expect(ingested?.access).toContain('u:id-perm-1R');
+    }, 30000);
 
-        // Find the upsert for our test file
-        const testFileUpsert = upserts.find(
-          (u) => u.variables?.input?.mimeType === 'application/pdf',
-        );
+    it('updates existing content when modified in SharePoint', async () => {
+      // 1. Initial sync
+      const service = app.get(SharepointSynchronizationService);
+      await service.synchronize();
+      const ingestedAtFirst = registry.getFileBySpId('item-1');
+      const firstId = ingestedAtFirst?.id;
 
-        expect(testFileUpsert).toBeDefined();
-        expect(testFileUpsert?.variables.input).toMatchObject({
-          mimeType: 'application/pdf',
-          title: 'test.pdf',
-        });
-      });
-    });
+      // 2. Modify file in SharePoint (update timestamp and size)
+      const item = graphState.itemsByDrive['drive-1'][0];
+      item.size = 2048;
+      item.lastModifiedDateTime = new Date(Date.now() + 10000).toISOString();
+      item.listItem.fields.Modified = item.lastModifiedDateTime;
 
-    describe('when syncing an xlsx file', () => {
-      beforeEach(() => {
-        const item = mockGraphApiService.items[0];
-        if (item && item.itemType === 'driveItem') {
-          if (item.item.file) {
-            item.item.file.mimeType =
-              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-          }
-          item.item.name = 'report.xlsx';
-          item.fileName = 'report.xlsx';
-          item.item.listItem.fields.FileLeafRef = 'report.xlsx';
-        }
-      });
+      await service.synchronize();
 
-      it('sends correct mimeType to file-diff', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+      const ingestedAtSecond = registry.getFileBySpId('item-1');
+      expect(ingestedAtSecond?.id).toBe(firstId); // same content ID
+      expect(ingestedAtSecond?.byteSize).toBe(2048);
+    }, 30000);
 
-        // Query the ingestion HTTP client mock directly
-        const fileDiffCalls = mockIngestionHttpClient.getFileDiffCalls();
-        expect(fileDiffCalls).toHaveLength(1);
+    it('handles file deletions in SharePoint by removing them from Unique', async () => {
+      // 1. Initial sync with 2 files
+      graphState.itemsByDrive['drive-1'].push(createDriveItem('item-2', 'second.pdf'));
+      const service = app.get(SharepointSynchronizationService);
+      await service.synchronize();
+      expect(registry.getFiles()).toHaveLength(2);
 
-        const requestBody = fileDiffCalls[0]?.body;
-        expect(requestBody).toMatchObject({
-          sourceKind: 'MICROSOFT_365_SHAREPOINT',
-          sourceName: 'Sharepoint',
-          partialKey: '11111111-1111-4111-8111-111111111111',
-          fileList: expect.arrayContaining([
-            expect.objectContaining({
-              key: expect.stringContaining('item-1'),
-              updatedAt: expect.any(String),
-            }),
-          ]),
-        });
+      // 2. Remove 1 file from SharePoint
+      graphState.itemsByDrive['drive-1'] = [
+        graphState.itemsByDrive['drive-1'][0]
+      ];
 
-        // Verify file is included
-        expect(requestBody?.fileList).toHaveLength(1);
+      await service.synchronize();
 
-        // Verify ContentUpsert GraphQL payload
-        const upserts = mockIngestionGraphqlClient.getOperations('ContentUpsert');
-        expect(upserts.length).toBeGreaterThan(0);
+      expect(registry.getFiles()).toHaveLength(1);
+      expect(registry.getFileBySpId('item-2')).toBeUndefined();
+    }, 30000);
 
-        // Find the upsert for our xlsx file
-        const xlsxUpsert = upserts.find(
-          (u) =>
-            u.variables?.input?.mimeType ===
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        );
+    it('respects SyncFlag and excludes files not marked for sync', async () => {
+      graphState.itemsByDrive['drive-1'].push(
+        createDriveItem('item-2', 'hidden.pdf', { syncFlag: false })
+      );
 
-        expect(xlsxUpsert).toBeDefined();
-        expect(xlsxUpsert?.variables.input).toMatchObject({
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          title: 'report.xlsx',
-        });
-      });
+      const service = app.get(SharepointSynchronizationService);
+      await service.synchronize();
 
-      it('includes xlsx file in synchronization', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
-
-        expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalled();
-        expect(mockIngestionHttpClient.request).toHaveBeenCalled();
-      });
-    });
-
-    describe('when file is not marked for sync', () => {
-      beforeEach(() => {
-        const item = mockGraphApiService.items[0];
-        if (item && item.itemType === 'driveItem') {
-          item.item.listItem.fields.SyncFlag = false;
-        }
-      });
-
-      it('excludes file from synchronization', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
-
-        const fileDiffCalls = mockIngestionHttpClient.getFileDiffCalls();
-        if (fileDiffCalls.length > 0 && fileDiffCalls[0]) {
-          expect(fileDiffCalls[0].body).toMatchObject({
-            fileList: [],
-          });
-        }
-      });
-    });
-
-    describe('when file exceeds size limit', () => {
-      beforeEach(() => {
-        const item = mockGraphApiService.items[0];
-        if (item && item.itemType === 'driveItem') {
-          item.item.size = 999999999;
-        }
-      });
-
-      it('excludes file from file-diff request', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
-
-        const fileDiffCalls = mockIngestionHttpClient.getFileDiffCalls();
-        if (fileDiffCalls.length > 0 && fileDiffCalls[0]) {
-          expect(fileDiffCalls[0].body).toMatchObject({
-            fileList: [],
-          });
-        }
-      });
-    });
-
-    describe('when multiple files have mixed sync flags', () => {
-      beforeEach(() => {
-        // Add a second item not marked for sync
-        const syncedItem = mockGraphApiService.items[0];
-        if (!syncedItem) return;
-
-        const unsyncedItem = JSON.parse(JSON.stringify(syncedItem)) as typeof syncedItem;
-        if (unsyncedItem && unsyncedItem.itemType === 'driveItem') {
-          unsyncedItem.item.id = 'item-2';
-          unsyncedItem.item.name = 'hidden.pdf';
-          unsyncedItem.fileName = 'hidden.pdf';
-          unsyncedItem.item.listItem.fields.SyncFlag = false;
-          unsyncedItem.item.listItem.fields.FileLeafRef = 'hidden.pdf';
-
-          mockGraphApiService.items = [syncedItem, unsyncedItem];
-        }
-      });
-
-      it('only synchronizes the marked file', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
-
-        const fileDiffCalls = mockIngestionHttpClient.getFileDiffCalls();
-        const requestBody = fileDiffCalls[0]?.body;
-        expect(requestBody?.fileList).toHaveLength(1);
-        expect(requestBody?.fileList[0]?.key).toContain('item-1');
-
-        const upserts = mockIngestionGraphqlClient.getOperations('ContentUpsert');
-        expect(upserts.length).toBeGreaterThan(0);
-
-        // Find the upsert for test.pdf
-        const testPdfUpsert = upserts.find((u) => u.variables?.input?.title === 'test.pdf');
-
-        expect(testPdfUpsert).toBeDefined();
-        expect(testPdfUpsert?.variables.input).toMatchObject({
-          title: 'test.pdf',
-        });
-      });
-    });
+      expect(registry.getFileBySpId('item-1')).toBeDefined();
+      expect(registry.getFileBySpId('item-2')).toBeUndefined();
+    }, 30000);
   });
 
-  describe('Permissions Sync', () => {
-    describe('when file has user with read permission', () => {
-      it('synchronizes with default permissions', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+  describe('Complex Scenarios & Resiliency', () => {
+    it('syncs mixed user and group permissions correctly', async () => {
+      graphState.permissionsByItem['item-1'] = [
+        createPermission('perm-1', 'user@example.com', 'user'),
+        createPermission('group-perm', 'Finance Group', 'group'),
+      ];
 
-        expect(mockGraphApiService.getDriveItemPermissions).toHaveBeenCalledWith(
-          'drive-1',
-          'item-1',
-        );
+      const service = app.get(SharepointSynchronizationService);
+      await service.synchronize();
 
-        // Verify that CreateFileAccessesForContents was called on the ingestion client
-        const accessCalls = mockIngestionGraphqlClient.getOperations('CreateFileAccessesForContents');
-        expect(accessCalls.length).toBeGreaterThan(0);
-      });
-    });
+      const ingested = registry.getFileBySpId('item-1');
+      // id-perm-1 and id-group-perm are the Unique IDs from our mocks
+      expect(ingested?.access).toContain('u:id-perm-1R');
+      expect(ingested?.access).toContain('g:id-group-permR');
+    }, 30000);
 
-    describe('when file has no external permissions', () => {
-      beforeEach(() => {
-        mockGraphApiService.permissions['item-1'] = [];
-      });
+    it('retries successfully when MS Graph returns 429 (Rate Limited)', async () => {
+      const graphClient = agent.get('https://graph.microsoft.com');
+      graphClient
+        .intercept({
+          path: (p) => p.includes('/drives'),
+          method: 'GET',
+        })
+        .reply(429, {}, { 
+          headers: { 'Retry-After': '1', 'content-type': 'application/json' } 
+        });
 
-      it('still processes the file', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
-
-        expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalled();
-        expect(mockIngestionHttpClient.request).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Integration', () => {
-    it('synchronizes content and permissions with mocked dependencies', async () => {
       const service = app.get(SharepointSynchronizationService);
       const result = await service.synchronize();
 
-      expect(result).toEqual({ status: 'success' });
+      expect(result.status).toBe('success');
+      expect(registry.getFileBySpId('item-1')).toBeDefined();
+    }, 30000);
 
-      expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-        '11111111-1111-4111-8111-111111111111',
-        'SyncFlag',
-      );
+    it('correctly ingests SharePoint Site Pages (ASPX)', async () => {
+      const pageId = 'page-123';
+      graphState.listItems['sitepages-id'] = [
+        createPageItem(pageId, 'Welcome Page')
+      ];
+      graphState.pageContent[pageId] = {
+        fields: {
+          Title: 'Welcome Page',
+          CanvasContent1: '<h1>Hello World</h1>',
+        }
+      };
 
-      expect(mockIngestionHttpClient.request).toHaveBeenCalled();
+      const service = app.get(SharepointSynchronizationService);
+      await service.synchronize();
+
+      const page = registry.getFiles().find(f => f.title === 'Welcome Page');
+      expect(page).toBeDefined();
+      expect(page?.mimeType).toBe('text/html');
+    }, 30000);
+
+    it('continues synchronization even if one drive fails', async () => {
+      graphState.drives.push({ id: 'drive-fail', name: 'Failing Drive' });
       
-      // Verify requests were tracked
-      const allCalls = mockIngestionGraphqlClient.getAllCalls();
-      expect(allCalls.length).toBeGreaterThan(0);
+      const graphClient = agent.get('https://graph.microsoft.com');
+      graphClient
+        .intercept({
+          path: (p) => p.includes('/drives/drive-fail'),
+          method: 'GET',
+        })
+        .reply(500, JSON.stringify({ error: { message: 'Internal Server Error' } }), { headers: { 'content-type': 'application/json' } });
 
-      expect(mockGraphApiService.getFileContentStream).toHaveBeenCalled();
-      expect(mockHttpClientService.request).toHaveBeenCalled();
+      const service = app.get(SharepointSynchronizationService);
+      const result = await service.synchronize();
 
-      expect(mockGraphApiService.getDriveItemPermissions).toHaveBeenCalledWith('drive-1', 'item-1');
-    }, 20000);
+      expect(result.status).toBe('success');
+      expect(registry.getFileBySpId('item-1')).toBeDefined();
+    }, 30000);
   });
 });

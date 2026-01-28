@@ -61,6 +61,7 @@ export class ProcessingPipelineService {
       startTime,
       knowledgeBaseUrl: getItemUrl(pipelineItem),
       mimeType: this.resolveMimeType(pipelineItem),
+      fileSize: pipelineItem.itemType === 'driveItem' ? pipelineItem.item.size : undefined,
       targetScopeId: scopeId,
       fileStatus,
     };

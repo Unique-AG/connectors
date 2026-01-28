@@ -52,9 +52,8 @@ const clientSecretAuthConfig = z.object({
   mode: z.literal('client-secret').describe('Authentication mode to use for Microsoft APIs'),
   clientId: requiredStringSchema.describe('Azure AD application client ID'),
   clientSecret: z
-    .string()
-    .nonempty()
-    .transform((val) => new Redacted(val))
+    .union([z.string().nonempty(), z.instanceof(Redacted)])
+    .transform((val) => (val instanceof Redacted ? val : new Redacted(val)))
     .describe('Azure AD application client secret for Microsoft APIs'),
 });
 

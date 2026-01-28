@@ -1,7 +1,9 @@
 sharepoint:
   tenantId: 00000000-0000-0000-0000-000000000001
   auth:
-    mode: oidc
+    mode: client-secret
+    clientId: test-client-id
+    clientSecret: test-client-secret
   baseUrl: https://sharepoint.test.example.com
   graphApiRateLimitPerMinuteThousands: 1
   sitesSource: config_file
