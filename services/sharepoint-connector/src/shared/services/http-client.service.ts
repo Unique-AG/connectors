@@ -1,13 +1,14 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import { Agent, Dispatcher, interceptors } from 'undici';
+import { Dispatcher, interceptors } from 'undici';
+import { ProxyService } from '../../proxy';
 
 @Injectable()
 export class HttpClientService implements OnModuleDestroy {
   private readonly httpAgent: Dispatcher;
 
-  public constructor() {
-    const agent = new Agent();
-    this.httpAgent = agent.compose([interceptors.retry(), interceptors.redirect()]);
+  public constructor(private readonly proxyService: ProxyService) {
+    const baseDispatcher = this.proxyService.getDispatcher('external-only');
+    this.httpAgent = baseDispatcher.compose([interceptors.retry(), interceptors.redirect()]);
   }
 
   public async onModuleDestroy(): Promise<void> {
