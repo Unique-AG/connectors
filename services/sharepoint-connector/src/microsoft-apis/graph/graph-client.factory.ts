@@ -19,6 +19,7 @@ import {
   SPC_MS_GRAPH_API_SLOW_REQUESTS_TOTAL,
   SPC_MS_GRAPH_API_THROTTLE_EVENTS_TOTAL,
 } from '../../metrics';
+import { ProxyService } from '../../proxy';
 import { GraphAuthenticationService } from './middlewares/graph-authentication.service';
 import { MetricsMiddleware } from './middlewares/metrics.middleware';
 import { TokenRefreshMiddleware } from './middlewares/token-refresh.middleware';
@@ -30,6 +31,7 @@ export class GraphClientFactory {
   public constructor(
     private readonly graphAuthenticationService: GraphAuthenticationService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly proxyService: ProxyService,
     @Inject(SPC_MS_GRAPH_API_REQUEST_DURATION_SECONDS)
     private readonly spcGraphApiRequestDurationSeconds: Histogram,
     @Inject(SPC_MS_GRAPH_API_THROTTLE_EVENTS_TOTAL)
@@ -76,6 +78,12 @@ export class GraphClientFactory {
     const clientOptions: ClientOptions = {
       middleware: middlewares[0],
       debugLogging: false, // else the client will log requests without a level
+      // Node.js 18+ native fetch requires `dispatcher` for proxy support.
+      // SDK types are incomplete.
+      // See https://github.com/microsoftgraph/msgraph-sdk-javascript/issues/1646 for more details.
+      fetchOptions: {
+        dispatcher: this.proxyService.getDispatcher('always'),
+      } as ClientOptions['fetchOptions'],
     };
 
     this.logger.debug({
