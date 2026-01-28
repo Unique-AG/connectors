@@ -1,15 +1,7 @@
 import type { RequestDocument, Variables } from 'graphql-request';
 import { vi } from 'vitest';
 
-interface GraphQLCall {
-  operationName: string;
-  variables: Record<string, unknown>;
-  timestamp: number;
-}
-
 export class MockUniqueGraphqlClient {
-  private calls: GraphQLCall[] = [];
-
   // Mutable responses per operation (can be customized per test)
   public responses: Record<string, unknown> = {
     User: {
@@ -131,36 +123,17 @@ export class MockUniqueGraphqlClient {
     },
   };
 
-  public request = vi.fn().mockImplementation(async <T, V extends Variables = Variables>(
-    document: RequestDocument,
-    variables?: V,
-  ): Promise<T> => {
-    const operationName = this.extractOperationName(document);
-
-    this.calls.push({
-      operationName,
-      variables: (variables as Record<string, unknown>) || {},
-      timestamp: Date.now(),
-    });
-
-    return (this.responses[operationName] as T) || ({} as T);
-  });
-
-  public getOperation(operationName: string): GraphQLCall | undefined {
-    return this.calls.find((c) => c.operationName === operationName);
-  }
-
-  public getOperations(operationName?: string): GraphQLCall[] {
-    return operationName ? this.calls.filter((c) => c.operationName === operationName) : [...this.calls];
-  }
-
-  public getAllCalls(): GraphQLCall[] {
-    return [...this.calls];
-  }
-
-  public clear(): void {
-    this.calls = [];
-  }
+  public request = vi
+    .fn()
+    .mockImplementation(
+      async <T, V extends Variables = Variables>(
+        document: RequestDocument,
+        _variables?: V,
+      ): Promise<T> => {
+        const operationName = this.extractOperationName(document);
+        return (this.responses[operationName] as T) || ({} as T);
+      },
+    );
 
   private extractOperationName(document: RequestDocument): string {
     const docString = typeof document === 'string' ? document : document.toString();
