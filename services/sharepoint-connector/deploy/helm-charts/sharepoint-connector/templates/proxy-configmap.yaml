@@ -1,0 +1,28 @@
+{{- if .Values.connectorConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sharepoint-connector-proxy-config
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+data:
+  PROXY_AUTH_MODE: {{ .Values.connectorConfig.proxy.authMode | quote }}
+  {{- if ne .Values.connectorConfig.proxy.authMode "none" }}
+  PROXY_HOST: {{ .Values.connectorConfig.proxy.host | quote }}
+  PROXY_PORT: {{ .Values.connectorConfig.proxy.port | quote }}
+  PROXY_PROTOCOL: {{ .Values.connectorConfig.proxy.protocol | quote }}
+  {{- end }}
+  {{- if eq .Values.connectorConfig.proxy.authMode "basic" }}
+  PROXY_USERNAME: {{ .Values.connectorConfig.proxy.username | quote }}
+  {{- end }}
+  {{- if eq .Values.connectorConfig.proxy.authMode "tls" }}
+  PROXY_TLS_CERT_PATH: {{ .Values.connectorConfig.proxy.tlsCertPath | quote }}
+  PROXY_TLS_KEY_PATH: {{ .Values.connectorConfig.proxy.tlsKeyPath | quote }}
+  {{- end }}
+  {{- if .Values.connectorConfig.proxy.caBundlePath }}
+  PROXY_CA_BUNDLE_PATH: {{ .Values.connectorConfig.proxy.caBundlePath | quote }}
+  {{- end }}
+  {{- if .Values.connectorConfig.proxy.headers }}
+  PROXY_HEADERS: {{ .Values.connectorConfig.proxy.headers | quote }}
+  {{- end }}
+{{- end }}
