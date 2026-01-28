@@ -29,6 +29,12 @@ connector:
   #         secretKeyRef:
   #           name: sharepoint-connector-secret
   #           key: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
+  #     # For proxy basic auth password (required when proxy.authMode is 'basic')
+  #     - name: PROXY_PASSWORD
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: sharepoint-connector-secret
+  #           key: PROXY_PASSWORD
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
   image:
@@ -267,3 +273,29 @@ connectorConfig:
     maxFileSizeToIngestBytes: null
     # -- cron expression for the scheduled SharePoint scan interval default: every 15 minutes
     scanIntervalCron: "*/15 * * * *"
+
+  # -- HTTP proxy configuration for external API calls
+  # Required for environments where internet access is only available through a proxy
+  proxy:
+    # -- Proxy authentication mode
+    # none: proxy disabled
+    # basic: username/password authentication
+    # tls: TLS client certificate authentication
+    authMode: none
+    # -- Proxy server hostname (required for basic/tls modes)
+    # host: proxy.example.com
+    # -- Proxy server port (required for basic/tls modes)
+    # port: 8080
+    # -- Proxy protocol: http or https (required for basic/tls modes)
+    # protocol: http
+    # -- Basic auth username (required for basic mode)
+    # username: proxy-user
+    # password is loaded from a secret, see connector.envVars example for PROXY_PASSWORD
+    # -- Path to TLS client certificate (required for tls mode)
+    # tlsCertPath: /app/proxy-certs/client.crt
+    # -- Path to TLS client key (required for tls mode)
+    # tlsKeyPath: /app/proxy-certs/client.key
+    # -- Path to CA bundle for verifying proxy server certificate (optional)
+    # caBundlePath: /app/proxy-certs/ca.crt
+    # -- Optional JSON string of headers for CONNECT request
+    # headers: '{"X-Proxy-Header":"value"}'
