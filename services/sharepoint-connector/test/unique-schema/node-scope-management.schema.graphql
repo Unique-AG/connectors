@@ -1,0 +1,1706 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+"""List of possible assignments for a user"""
+enum Assignments {
+  SPACE_MANAGER
+}
+
+type AssistantAccess {
+  assistantId: String!
+  companyId: String
+  createdAt: DateTime!
+  createdBy: String
+  entityId: String!
+  entityType: AssistantAccessEntityType!
+  id: ID!
+  type: AssistantAccessType!
+  updatedAt: DateTime!
+}
+
+input AssistantAccessAssistantIdEntityIdTypeCompoundUniqueInput {
+  assistantId: String!
+  entityId: String!
+  type: AssistantAccessType!
+}
+
+input AssistantAccessCreateManyInput {
+  companyId: String
+  createdBy: String
+  entityId: String!
+  entityType: AssistantAccessEntityType!
+  id: String
+  type: AssistantAccessType!
+}
+
+enum AssistantAccessEntityType {
+  GROUP
+  USER
+}
+
+input AssistantAccessOrderByWithRelationInput {
+  assistantId: SortOrder
+  companyId: SortOrderInput
+  createdBy: SortOrderInput
+  entityId: SortOrder
+  entityType: SortOrder
+  id: SortOrder
+  type: SortOrder
+}
+
+enum AssistantAccessScalarFieldEnum {
+  assistantId
+  companyId
+  createdAt
+  createdBy
+  entityId
+  entityType
+  id
+  type
+  updatedAt
+}
+
+enum AssistantAccessType {
+  MANAGE
+  UPLOAD
+  USE
+}
+
+input AssistantAccessWhereInput {
+  AND: [AssistantAccessWhereInput!]
+  NOT: [AssistantAccessWhereInput!]
+  OR: [AssistantAccessWhereInput!]
+  assistantId: StringFilter
+  companyId: StringNullableFilter
+  createdBy: StringNullableFilter
+  entityId: StringFilter
+  entityType: EnumAssistantAccessEntityTypeFilter
+  id: StringFilter
+  type: EnumAssistantAccessTypeFilter
+}
+
+input AssistantAccessWhereUniqueInput {
+  AND: [AssistantAccessWhereInput!]
+  NOT: [AssistantAccessWhereInput!]
+  OR: [AssistantAccessWhereInput!]
+  assistantId: StringFilter
+  assistantId_entityId_type: AssistantAccessAssistantIdEntityIdTypeCompoundUniqueInput
+  companyId: StringNullableFilter
+  createdBy: StringNullableFilter
+  entityId: StringFilter
+  entityType: EnumAssistantAccessEntityTypeFilter
+  id: String
+  type: EnumAssistantAccessTypeFilter
+}
+
+input BoolFilter {
+  equals: Boolean
+  not: NestedBoolFilter
+}
+
+type Company {
+  ResourceAccess: [ResourceAccess!]
+  _count: CompanyCount!
+  createdAt: DateTime!
+  groupConfiguration: JSON!
+  id: ID!
+  name: String!
+  scimKeys: [ScimKey!]
+  updatedAt: DateTime!
+  users: [User!]
+}
+
+type CompanyCount {
+  ResourceAccess: Int!
+  scimKeys: Int!
+  users: Int!
+}
+
+input CompanyOrderByWithRelationInput {
+  ResourceAccess: ResourceAccessOrderByRelationAggregateInput
+  createdAt: SortOrder
+  groupConfiguration: SortOrder
+  id: SortOrder
+  name: SortOrder
+  scimKeys: ScimKeyOrderByRelationAggregateInput
+  updatedAt: SortOrder
+  users: UserOrderByRelationAggregateInput
+}
+
+input CompanyScalarRelationFilter {
+  is: CompanyWhereInput
+  isNot: CompanyWhereInput
+}
+
+input CompanyWhereInput {
+  AND: [CompanyWhereInput!]
+  NOT: [CompanyWhereInput!]
+  OR: [CompanyWhereInput!]
+  ResourceAccess: ResourceAccessListRelationFilter
+  createdAt: DateTimeFilter
+  groupConfiguration: JsonFilter
+  id: StringFilter
+  name: StringFilter
+  scimKeys: ScimKeyListRelationFilter
+  updatedAt: DateTimeFilter
+  users: UserListRelationFilter
+}
+
+input CsvConfig {
+  maxCols: Int
+  maxRows: Int
+}
+
+type CursorPaginatedScope {
+  cursor: String
+  hasMore: Boolean
+  scopes: [Scope!]!
+  totalCount: Float!
+}
+
+input CustomApiOptions {
+  apiIdentifier: String!
+  apiPayload: String
+  customisationType: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+input DateTimeFilter {
+  equals: DateTime
+  gt: DateTime
+  gte: DateTime
+  in: [DateTime!]
+  lt: DateTime
+  lte: DateTime
+  not: NestedDateTimeFilter
+  notIn: [DateTime!]
+}
+
+input DateTimeNullableFilter {
+  equals: DateTime
+  gt: DateTime
+  gte: DateTime
+  in: [DateTime!]
+  lt: DateTime
+  lte: DateTime
+  not: NestedDateTimeNullableFilter
+  notIn: [DateTime!]
+}
+
+type DeleteCompanyDataResponse {
+  message: String
+  status: Boolean!
+}
+
+input EnumAssistantAccessEntityTypeFilter {
+  equals: AssistantAccessEntityType
+  in: [AssistantAccessEntityType!]
+  not: NestedEnumAssistantAccessEntityTypeFilter
+  notIn: [AssistantAccessEntityType!]
+}
+
+input EnumAssistantAccessTypeFilter {
+  equals: AssistantAccessType
+  in: [AssistantAccessType!]
+  not: NestedEnumAssistantAccessTypeFilter
+  notIn: [AssistantAccessType!]
+}
+
+input EnumScopeAccessEntityTypeFilter {
+  equals: ScopeAccessEntityType
+  in: [ScopeAccessEntityType!]
+  not: NestedEnumScopeAccessEntityTypeFilter
+  notIn: [ScopeAccessEntityType!]
+}
+
+input EnumScopeAccessTypeFilter {
+  equals: ScopeAccessType
+  in: [ScopeAccessType!]
+  not: NestedEnumScopeAccessTypeFilter
+  notIn: [ScopeAccessType!]
+}
+
+input ExcelConfig {
+  headerColumns: [Int!]
+  headerRows: [Int!]
+  maxCols: Int
+  maxEmptyTableCols: Int
+  maxEmptyTableRows: Int
+  maxRows: Int
+  rowsPerChunk: Int
+  tableChunkTokenLimit: Int
+  tableFormat: ExcelTableFormat
+}
+
+enum ExcelTableFormat {
+  MARKDOWN
+  OBJECT
+}
+
+type FolderDeleteResult {
+  failReason: String!
+  id: String!
+  name: String!
+  path: String!
+}
+
+type FolderDeleteResultDto {
+  failedFolders: [FolderDeleteResult!]!
+  successFolders: [FolderDeleteResult!]!
+}
+
+type Group {
+  _count: GroupCount!
+  children: [Group!]
+  companyId: String!
+  configuration: JSON!
+  createdAt: DateTime!
+  createdBy: String
+  externalId: String
+  id: ID!
+  members: [Membership!]
+  name: String!
+  parent: Group
+  parentId: String
+  roles: [String!]
+  updatedAt: DateTime!
+}
+
+type GroupCount {
+  children: Int!
+  members: Int!
+}
+
+input GroupCreateInput {
+  children: GroupCreateNestedManyWithoutParentInput
+  configuration: JSON
+  createdBy: String
+  externalId: String
+  name: String!
+  parent: GroupCreateNestedOneWithoutChildrenInput
+  roles: [String!]
+}
+
+input GroupCreateManyParentInput {
+  configuration: JSON
+  createdBy: String
+  externalId: String
+  name: String!
+  roles: [String!]
+}
+
+input GroupCreateManyParentInputEnvelope {
+  data: [GroupCreateManyParentInput!]!
+  skipDuplicates: Boolean
+}
+
+input GroupCreateNestedManyWithoutParentInput {
+  connect: [GroupWhereUniqueInput!]
+  connectOrCreate: [GroupCreateOrConnectWithoutParentInput!]
+  create: [GroupCreateWithoutParentInput!]
+  createMany: GroupCreateManyParentInputEnvelope
+}
+
+input GroupCreateNestedOneWithoutChildrenInput {
+  connect: GroupWhereUniqueInput
+  connectOrCreate: GroupCreateOrConnectWithoutChildrenInput
+  create: GroupCreateWithoutChildrenInput
+}
+
+input GroupCreateOrConnectWithoutChildrenInput {
+  create: GroupCreateWithoutChildrenInput!
+  where: GroupWhereUniqueInput!
+}
+
+input GroupCreateOrConnectWithoutParentInput {
+  create: GroupCreateWithoutParentInput!
+  where: GroupWhereUniqueInput!
+}
+
+input GroupCreateWithoutChildrenInput {
+  configuration: JSON
+  createdBy: String
+  externalId: String
+  name: String!
+  parent: GroupCreateNestedOneWithoutChildrenInput
+  roles: [String!]
+}
+
+input GroupCreateWithoutParentInput {
+  children: GroupCreateNestedManyWithoutParentInput
+  configuration: JSON
+  createdBy: String
+  externalId: String
+  name: String!
+  roles: [String!]
+}
+
+input GroupListRelationFilter {
+  every: GroupWhereInput
+  none: GroupWhereInput
+  some: GroupWhereInput
+}
+
+type GroupMember {
+  id: ID!
+  name: String!
+}
+
+input GroupNullableScalarRelationFilter {
+  is: GroupWhereInput
+  isNot: GroupWhereInput
+}
+
+input GroupOrderByRelationAggregateInput {
+  _count: SortOrder
+}
+
+input GroupOrderByWithRelationInput {
+  children: GroupOrderByRelationAggregateInput
+  configuration: SortOrder
+  createdBy: SortOrderInput
+  externalId: SortOrderInput
+  name: SortOrder
+  parent: GroupOrderByWithRelationInput
+  parentId: SortOrderInput
+  roles: SortOrder
+}
+
+enum GroupScalarFieldEnum {
+  companyId
+  configuration
+  createdAt
+  createdBy
+  externalId
+  id
+  name
+  parentId
+  roles
+  updatedAt
+}
+
+input GroupScalarRelationFilter {
+  is: GroupWhereInput
+  isNot: GroupWhereInput
+}
+
+input GroupScalarWhereInput {
+  AND: [GroupScalarWhereInput!]
+  NOT: [GroupScalarWhereInput!]
+  OR: [GroupScalarWhereInput!]
+  configuration: JsonFilter
+  createdBy: StringNullableFilter
+  externalId: StringNullableFilter
+  name: StringFilter
+  parentId: StringNullableFilter
+  roles: StringNullableListFilter
+}
+
+type GroupSearchResult implements IMemberSearchResult {
+  groupMembersCount: Float
+  id: ID!
+  members: [GroupMember!]
+  name: String!
+  type: MemberSearchResultType!
+}
+
+input GroupUpdateInput {
+  children: GroupUpdateManyWithoutParentNestedInput
+  configuration: JSON
+  createdBy: String
+  externalId: String
+  name: String
+  parent: GroupUpdateOneWithoutChildrenNestedInput
+  roles: [String!]
+}
+
+input GroupUpdateManyMutationInput {
+  configuration: JSON
+  createdBy: String
+  externalId: String
+  name: String
+  roles: [String!]
+}
+
+input GroupUpdateManyWithWhereWithoutParentInput {
+  data: GroupUpdateManyMutationInput!
+  where: GroupScalarWhereInput!
+}
+
+input GroupUpdateManyWithoutParentNestedInput {
+  connect: [GroupWhereUniqueInput!]
+  connectOrCreate: [GroupCreateOrConnectWithoutParentInput!]
+  create: [GroupCreateWithoutParentInput!]
+  createMany: GroupCreateManyParentInputEnvelope
+  delete: [GroupWhereUniqueInput!]
+  deleteMany: [GroupScalarWhereInput!]
+  disconnect: [GroupWhereUniqueInput!]
+  set: [GroupWhereUniqueInput!]
+  update: [GroupUpdateWithWhereUniqueWithoutParentInput!]
+  updateMany: [GroupUpdateManyWithWhereWithoutParentInput!]
+  upsert: [GroupUpsertWithWhereUniqueWithoutParentInput!]
+}
+
+input GroupUpdateOneWithoutChildrenNestedInput {
+  connect: GroupWhereUniqueInput
+  connectOrCreate: GroupCreateOrConnectWithoutChildrenInput
+  create: GroupCreateWithoutChildrenInput
+  delete: GroupWhereInput
+  disconnect: GroupWhereInput
+  update: GroupUpdateToOneWithWhereWithoutChildrenInput
+  upsert: GroupUpsertWithoutChildrenInput
+}
+
+input GroupUpdateToOneWithWhereWithoutChildrenInput {
+  data: GroupUpdateWithoutChildrenInput!
+  where: GroupWhereInput
+}
+
+input GroupUpdateWithWhereUniqueWithoutParentInput {
+  data: GroupUpdateWithoutParentInput!
+  where: GroupWhereUniqueInput!
+}
+
+input GroupUpdateWithoutChildrenInput {
+  configuration: JSON
+  createdBy: String
+  externalId: String
+  name: String
+  parent: GroupUpdateOneWithoutChildrenNestedInput
+  roles: [String!]
+}
+
+input GroupUpdateWithoutParentInput {
+  children: GroupUpdateManyWithoutParentNestedInput
+  configuration: JSON
+  createdBy: String
+  externalId: String
+  name: String
+  roles: [String!]
+}
+
+input GroupUpsertWithWhereUniqueWithoutParentInput {
+  create: GroupCreateWithoutParentInput!
+  update: GroupUpdateWithoutParentInput!
+  where: GroupWhereUniqueInput!
+}
+
+input GroupUpsertWithoutChildrenInput {
+  create: GroupCreateWithoutChildrenInput!
+  update: GroupUpdateWithoutChildrenInput!
+  where: GroupWhereInput
+}
+
+input GroupWhereInput {
+  AND: [GroupWhereInput!]
+  NOT: [GroupWhereInput!]
+  OR: [GroupWhereInput!]
+  children: GroupListRelationFilter
+  companyId: StringFilter
+  configuration: JsonFilter
+  createdBy: StringNullableFilter
+  externalId: StringNullableFilter
+  id: StringFilter
+  members: MembershipListRelationFilter
+  name: StringFilter
+  parent: GroupNullableScalarRelationFilter
+  parentId: StringNullableFilter
+  roles: StringNullableListFilter
+}
+
+input GroupWhereUniqueInput {
+  AND: [GroupWhereInput!]
+  NOT: [GroupWhereInput!]
+  OR: [GroupWhereInput!]
+  children: GroupListRelationFilter
+  companyId: StringFilter
+  configuration: JsonFilter
+  createdBy: StringNullableFilter
+  externalId: StringNullableFilter
+  id: String
+  members: MembershipListRelationFilter
+  name: StringFilter
+  parent: GroupNullableScalarRelationFilter
+  parentId: StringNullableFilter
+  roles: StringNullableListFilter
+}
+
+type GroupWithMembersCount {
+  _count: GroupCount!
+  children: [Group!]
+  companyId: String!
+  configuration: JSON!
+  createdAt: DateTime!
+  createdBy: String
+  externalId: String
+  id: ID!
+  memberCount: Int!
+  members: [Membership!]
+  name: String!
+  parent: Group
+  parentId: String
+  roles: [String!]
+  updatedAt: DateTime!
+}
+
+interface IMemberSearchResult {
+  id: ID!
+  name: String!
+  type: MemberSearchResultType!
+}
+
+input IngestionConfig {
+  chunkMaxTokens: Int
+  chunkMaxTokensOnePager: Int
+  chunkMinTokens: Int
+  chunkStrategy: String
+  csvConfig: CsvConfig
+  customApiOptions: [CustomApiOptions!]
+  documentMinTokens: Int
+  excelConfig: ExcelConfig
+  excelReadMode: String
+  hideInChat: Boolean
+  jpgReadMode: String
+  metadata: JSON
+  metadataExtractionConfig: MetadataExtractionConfig
+  pdfReadMode: String
+  pptReadMode: String
+  shouldApplyToSubScopes: Boolean
+  uniqueIngestionMode: String
+  vttConfig: VttConfig
+  wordReadMode: String
+}
+
+input IntFilter {
+  equals: Int
+  gt: Int
+  gte: Int
+  in: [Int!]
+  lt: Int
+  lte: Int
+  not: NestedIntFilter
+  notIn: [Int!]
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+input JsonFilter {
+  array_contains: JSON
+  array_ends_with: JSON
+  array_starts_with: JSON
+  equals: JSON
+  gt: JSON
+  gte: JSON
+  lt: JSON
+  lte: JSON
+  mode: QueryMode
+  not: JSON
+  path: [String!]
+  string_contains: String
+  string_ends_with: String
+  string_starts_with: String
+}
+
+input JsonNullableFilter {
+  array_contains: JSON
+  array_ends_with: JSON
+  array_starts_with: JSON
+  equals: JSON
+  gt: JSON
+  gte: JSON
+  lt: JSON
+  lte: JSON
+  mode: QueryMode
+  not: JSON
+  path: [String!]
+  string_contains: String
+  string_ends_with: String
+  string_starts_with: String
+}
+
+type Me {
+  assignments: [Assignments!]!
+  user: User!
+}
+
+type MemberSearchResult {
+  groupMembersCount: Float
+  id: ID!
+  name: String!
+  type: MemberSearchResultType!
+}
+
+enum MemberSearchResultType {
+  GROUP
+  USER
+}
+
+type Membership {
+  createdAt: DateTime!
+  entityId: String!
+  group: Group!
+  groupId: String!
+  updatedAt: DateTime!
+}
+
+input MembershipEntityIdGroupIdCompoundUniqueInput {
+  entityId: String!
+  groupId: String!
+}
+
+input MembershipListRelationFilter {
+  every: MembershipWhereInput
+  none: MembershipWhereInput
+  some: MembershipWhereInput
+}
+
+input MembershipOrderByWithRelationInput {
+  entityId: SortOrder
+  group: GroupOrderByWithRelationInput
+  groupId: SortOrder
+}
+
+enum MembershipScalarFieldEnum {
+  createdAt
+  entityId
+  groupId
+  updatedAt
+}
+
+input MembershipWhereInput {
+  AND: [MembershipWhereInput!]
+  NOT: [MembershipWhereInput!]
+  OR: [MembershipWhereInput!]
+  entityId: StringFilter
+  group: GroupScalarRelationFilter
+  groupId: StringFilter
+}
+
+input MembershipWhereUniqueInput {
+  AND: [MembershipWhereInput!]
+  NOT: [MembershipWhereInput!]
+  OR: [MembershipWhereInput!]
+  entityId: StringFilter
+  entityId_groupId: MembershipEntityIdGroupIdCompoundUniqueInput
+  group: GroupScalarRelationFilter
+  groupId: StringFilter
+}
+
+input MetadataExtractionConfig {
+  enabled: Boolean!
+  languageModel: String
+  maxInputTokens: Int!
+  metadataSchema: JSON!
+}
+
+type Mutation {
+  addScopeAcesses(applyToSubScopes: Boolean!, scopeAccesses: [ScopeAccessDto!]!, scopeId: String!, skipUserCheck: Boolean): Scope! @deprecated(reason: "Use createScopeAccesses instead")
+  addSpaceManagerRole(access: SpaceManagerRoleType!, userId: String!): Boolean!
+  createAssistantAccess(accessType: String!, assistantId: String!, entityId: String!, entityType: String!): AssistantAccess!
+  createGroup(input: GroupCreateInput!): Group!
+  createManyAssistantAccessByAssistantId(assistantId: String!, data: [AssistantAccessCreateManyInput!]!, skipDuplicates: Boolean): Boolean!
+  createManyResourceAccessByResourceId(data: [ResourceAccessCreateManyInput!]!, resourceId: String!, skipDuplicates: Boolean): Boolean!
+  createMemberships(groupId: String!, userIds: [String!]!): [Membership!]!
+  createResourceAccess(accessType: ResourceAccessType!, entityId: String!, entityType: ResourceAccessEntityType!, resourceId: String!): ResourceAccess!
+  createScope(input: ScopeCreateInput!): Scope!
+  createScopeAccess(accessType: String!, applyToSubScopes: Boolean, entityId: String!, entityType: String!, scopeId: String!, skipUserCheck: Boolean): ScopeAccess! @deprecated(reason: "This mutation is deprecated. Use createScopeAccesses instead.")
+  createScopeAccesses(applyToSubScopes: Boolean, scopeAccesses: [ScopeAccessChangeDto!]!, scopeId: String!, skipFileAccessPropagation: Boolean, skipUserCheck: Boolean): Boolean!
+  createSubScope(inheritAccess: Boolean, name: String!, parentId: String): Scope!
+  deleteAllCompanyData(companyId: String!): DeleteCompanyDataResponse!
+  deleteAssistantAccess(accessType: String!, assistantId: String!, entityId: String!, entityType: String!): AssistantAccess!
+
+  """
+  Recursively deletes a folder and all its subfolders and contents. Returns arrays of successfully and unsuccessfully deleted folder IDs.
+  """
+  deleteFolder(
+    """
+    Recursively delete the folder, subfolders and their contents. Defaults to false
+    """
+    recursive: Boolean! = false
+    scopeId: String!
+  ): FolderDeleteResultDto!
+  deleteGroup(id: String!): Group!
+  deleteManyAssistantAccess(assistantAccessIds: [String!], assistantId: String!): Boolean!
+  deleteManyResourceAccess(resourceAccessIds: [String!], resourceId: String!): Boolean!
+
+  """Delete multiple memberships for a given user."""
+  deleteMemberships(groupIds: [String!]!, userId: String!): Boolean!
+  deleteResourceAccess(accessType: ResourceAccessType!, entityId: String!, entityType: ResourceAccessEntityType!, resourceId: String!): ResourceAccess!
+  deleteScope(scopeId: String!): Scope!
+  deleteScopeAccess(accessType: String!, applyToSubScopes: Boolean, entityId: String!, entityType: String!, scopeId: String!): ScopeAccess! @deprecated(reason: "This mutation is deprecated. Use deleteScopeAccesses instead.")
+  deleteScopeAccesses(applyToSubScopes: Boolean, scopeAccesses: [ScopeAccessChangeDto!]!, scopeId: String!, skipFileAccessPropagation: Boolean, skipUserCheck: Boolean): Boolean!
+  deleteScopesByExternalIds(externalIds: [String!]!, force: Boolean): [Scope!]!
+  generateScopesBasedOnPaths(inheritAccess: Boolean, paths: [String!]!): [Scope!]!
+  moveScope(newParentId: String, scopeId: String!): Scope!
+  removeScopeAcesses(applyToSubScopes: Boolean!, scopeAccesses: [ScopeAccessDto!]!, scopeId: String!, skipUserCheck: Boolean): Scope! @deprecated(reason: "Use deleteScopeAccesses instead")
+  renameScope(name: String!, scopeId: String!): Scope!
+  resetSetupForUsers(userIds: [String!]!): [User!]!
+  runNestingMigrationByExternalIds(basePath: String!): Boolean!
+  scimKeyCreate: ScimKeyCreateResponse!
+  scimKeyDelete(id: String!): ScimKey!
+  setScopeProperties(applyToSubScopes: Boolean!, properties: ScopeProperties!, scopeId: String!): Scope!
+  updateCompany(groupConfiguration: JSON!): Company!
+  updateGroup(id: String!, input: GroupUpdateInput!): Group!
+  updateGroupConfiguration(configuration: JSON!, groupId: String!): Group!
+  updateScope(id: String!, input: ScopeUpdateInput!): Scope!
+  updateUserConfiguration(userConfiguration: JSON!, userId: String!): User!
+  upsertScopeByExternalId(externalId: String!, name: String!, parentId: String, scopeAccess: [ScopeAccessDto!]): Scope!
+  upsertScopesByExternalIds(externalIds: [String!]!, names: [String!]!): [Scope!]!
+}
+
+input NestedBoolFilter {
+  equals: Boolean
+  not: NestedBoolFilter
+}
+
+input NestedDateTimeFilter {
+  equals: DateTime
+  gt: DateTime
+  gte: DateTime
+  in: [DateTime!]
+  lt: DateTime
+  lte: DateTime
+  not: NestedDateTimeFilter
+  notIn: [DateTime!]
+}
+
+input NestedDateTimeNullableFilter {
+  equals: DateTime
+  gt: DateTime
+  gte: DateTime
+  in: [DateTime!]
+  lt: DateTime
+  lte: DateTime
+  not: NestedDateTimeNullableFilter
+  notIn: [DateTime!]
+}
+
+input NestedEnumAssistantAccessEntityTypeFilter {
+  equals: AssistantAccessEntityType
+  in: [AssistantAccessEntityType!]
+  not: NestedEnumAssistantAccessEntityTypeFilter
+  notIn: [AssistantAccessEntityType!]
+}
+
+input NestedEnumAssistantAccessTypeFilter {
+  equals: AssistantAccessType
+  in: [AssistantAccessType!]
+  not: NestedEnumAssistantAccessTypeFilter
+  notIn: [AssistantAccessType!]
+}
+
+input NestedEnumScopeAccessEntityTypeFilter {
+  equals: ScopeAccessEntityType
+  in: [ScopeAccessEntityType!]
+  not: NestedEnumScopeAccessEntityTypeFilter
+  notIn: [ScopeAccessEntityType!]
+}
+
+input NestedEnumScopeAccessTypeFilter {
+  equals: ScopeAccessType
+  in: [ScopeAccessType!]
+  not: NestedEnumScopeAccessTypeFilter
+  notIn: [ScopeAccessType!]
+}
+
+input NestedIntFilter {
+  equals: Int
+  gt: Int
+  gte: Int
+  in: [Int!]
+  lt: Int
+  lte: Int
+  not: NestedIntFilter
+  notIn: [Int!]
+}
+
+input NestedStringFilter {
+  contains: String
+  endsWith: String
+  equals: String
+  gt: String
+  gte: String
+  in: [String!]
+  lt: String
+  lte: String
+  not: NestedStringFilter
+  notIn: [String!]
+  startsWith: String
+}
+
+input NestedStringNullableFilter {
+  contains: String
+  endsWith: String
+  equals: String
+  gt: String
+  gte: String
+  in: [String!]
+  lt: String
+  lte: String
+  not: NestedStringNullableFilter
+  notIn: [String!]
+  startsWith: String
+}
+
+enum NullsOrder {
+  first
+  last
+}
+
+type PaginatedScope {
+  nodes: [Scope!]
+  totalCount: Int!
+}
+
+type PaginatedUserGroups {
+  groups: [Group!]!
+  userId: String!
+}
+
+type PaginatedUsers {
+  nodes: [User!]
+  paginatedGroups: [PaginatedUserGroups!]!
+  totalCount: Int!
+}
+
+type Query {
+  allGroups(cursor: GroupWhereUniqueInput, distinct: [GroupScalarFieldEnum!], orderBy: [GroupOrderByWithRelationInput!], skip: Int, take: Int, where: GroupWhereInput): [Group!]!
+  allGroupsWithMembersCount(cursor: GroupWhereUniqueInput, distinct: [GroupScalarFieldEnum!], orderBy: [GroupOrderByWithRelationInput!], skip: Int, take: Int, where: GroupWhereInput): [GroupWithMembersCount!]!
+  findAssistantAccessesByUser(cursor: AssistantAccessWhereUniqueInput, distinct: [AssistantAccessScalarFieldEnum!], orderBy: [AssistantAccessOrderByWithRelationInput!], skip: Int, take: Int, where: AssistantAccessWhereInput): [AssistantAccess!]!
+  findManyAssistantAccessesByAssistantId(cursor: AssistantAccessWhereUniqueInput, distinct: [AssistantAccessScalarFieldEnum!], orderBy: [AssistantAccessOrderByWithRelationInput!], skip: Int, take: Int, where: AssistantAccessWhereInput): [AssistantAccess!]!
+  findManyAssistantAccessesByCompanyId(cursor: AssistantAccessWhereUniqueInput, distinct: [AssistantAccessScalarFieldEnum!], orderBy: [AssistantAccessOrderByWithRelationInput!], skip: Int, take: Int, where: AssistantAccessWhereInput): [AssistantAccess!]!
+  findManyUsersByCompanyId(cursor: UserWhereUniqueInput, distinct: [UserScalarFieldEnum!], orderBy: [UserOrderByWithRelationInput!], skip: Int, take: Int, where: UserWhereInput): [User!]!
+  findManyUsersById(userIds: [String!]!): [User!]!
+  findResourceAccessesByUser(cursor: ResourceAccessWhereUniqueInput, distinct: [ResourceAccessScalarFieldEnum!], orderBy: [ResourceAccessOrderByWithRelationInput!], skip: Int, take: Int, where: ResourceAccessWhereInput): [ResourceAccess!]!
+  folderIdPath(folderId: String!): String
+  folderNamePath(folderId: String!): String
+
+  """
+  Retrieves a hierarchical tree structure of folders. This query allows users to fetch a specified folder's child folders up to a certain depth, its parent folders up to a certain depth, and the folder itself. It supports filtering based on access type and allows specification of how many levels of child and parent folders to include in the result. The tree is returned as a flat array of folders, with the starting folder as the first element.
+  """
+  folderTree(
+    """The type of access used to filter folders. Optional."""
+    accessType: ScopeAccessType
+
+    """
+    The number of child folder levels to retrieve. Defaults to 1 if not specified. Max 2 levels.
+    """
+    childLevels: Int
+
+    """
+    The ID of the starting folder. If omitted, defaults to null and returns only top-level folders.
+    """
+    folderId: String
+
+    """
+    The number of parent folder levels to retrieve. Defaults to 0 if not specified. Max 8 levels.
+    """
+    parentLevels: Int
+  ): [Scope!]!
+
+  """
+  Retrieves a hierarchical tree structure of folders filtered by the assistant's scope rules and the folder's scope access.
+  """
+  folderTreeByAssistant(
+    """The type of access used to filter folders. Optional."""
+    accessType: ScopeAccessType
+
+    """The ID of the assistant for the rules to filter the folders."""
+    assistantId: String!
+
+    """
+    The ID of the starting folder. If omitted, defaults to null and returns only top-level folders.
+    """
+    folderId: String
+  ): [Scope!]!
+
+  """
+  Retrieves a hierarchical tree of folders using cursor-based pagination.
+  """
+  folderTreeCursorPaginated(
+    """
+    The number of child folder levels to retrieve. Defaults to 1 if not specified.
+    """
+    childLevels: Int
+
+    """Cursor for pagination; returns results after the given cursor."""
+    cursor: String
+
+    """
+    The ID of the starting folder. If omitted, defaults to null and returns only top-level folders.
+    """
+    folderId: String
+
+    """
+    The number of parent folder levels to retrieve. Defaults to 0 if not specified.
+    """
+    parentLevels: Int
+
+    """Number of items to take for pagination. Defaults to 50."""
+    take: Int
+  ): CursorPaginatedScope!
+  getAllCompanies: [Company!]!
+  getAllRoles: [RoleInfo!]!
+  getCompaniesById(companyIds: [String!]!): [Company!]!
+  getFolderInfo(folderPath: String, scopeId: String): Scope
+  getScopeAndSubscopes(accessType: String, depth: Float, scopeId: String): [Scope!]!
+  getUserGrants: [String!]!
+  getUserGrantsForUsers(userIds: [String!]!): [UserGrantsResult!]!
+  getUserPermissions: UserPermissionsModel!
+  getUserRoles(userId: String!): [RoleInfo!]!
+  groupsByCompany(cursor: GroupWhereUniqueInput, distinct: [GroupScalarFieldEnum!], orderBy: [GroupOrderByWithRelationInput!], skip: Int, take: Int, where: GroupWhereInput): [Group!]!
+  me: Me!
+  memberships(cursor: MembershipWhereUniqueInput, distinct: [MembershipScalarFieldEnum!], orderBy: [MembershipOrderByWithRelationInput!], skip: Int, take: Int, userId: String!, where: MembershipWhereInput): [Membership!]!
+  ownGroups: [Group!]!
+  ownScopes(accessType: String, externalId: String): [Scope!]!
+
+  """
+  Retrieves a paginated hierarchical tree structure of folders. This combines the folder tree functionality with pagination support for better performance with large folder structures.
+  """
+  paginatedFolderTree(
+    """The type of access used to filter folders. Optional."""
+    accessType: ScopeAccessType
+
+    """
+    The number of child folder levels to retrieve. Defaults to 1 if not specified. Max 2 levels.
+    """
+    childLevels: Int
+
+    """
+    The ID of the starting folder. If omitted, defaults to null and returns only top-level folders.
+    """
+    folderId: String
+
+    """
+    The number of parent folder levels to retrieve. Defaults to 0 if not specified. Max 8 levels.
+    """
+    parentLevels: Int
+
+    """Number of items to skip for pagination. Defaults to 0."""
+    skip: Int
+
+    """Number of items to take for pagination. Defaults to 50. Max 100."""
+    take: Int
+  ): PaginatedScope!
+  paginatedScope(cursor: ScopeWhereUniqueInput, distinct: [ScopeScalarFieldEnum!], orderBy: [ScopeOrderByWithRelationInput!], skip: Int, take: Int, where: ScopeWhereInput): PaginatedScope!
+  paginatedUsers(cursor: UserWhereUniqueInput, distinct: [UserScalarFieldEnum!], orderBy: [UserOrderByWithRelationInput!], skip: Int, take: Int, where: UserWhereInput): PaginatedUsers!
+  resourceAccessByResourceId(resourceId: String!): [ResourceAccess!]!
+  scimKeys: [ScimKey!]!
+  scope(id: String!): Scope
+  scopes(cursor: ScopeWhereUniqueInput, distinct: [ScopeScalarFieldEnum!], orderBy: [ScopeOrderByWithRelationInput!], skip: Int, take: Int, where: ScopeWhereInput): [Scope!]!
+  scopesByCompany(cursor: ScopeWhereUniqueInput, distinct: [ScopeScalarFieldEnum!], orderBy: [ScopeOrderByWithRelationInput!], skip: Int, take: Int, where: ScopeWhereInput): [Scope!]!
+  searchMembers(limit: Float = 10, memberIds: [String!], page: Float, searchText: String!): [MemberSearchResult!]!
+  searchMembersV2(limit: Float = 10, memberIds: [String!], page: Float, searchText: String!): [IMemberSearchResult!]!
+  spaceManagerVerify(assistantIds: [String!], userId: String!): Boolean!
+  userScopesByService(accessType: String!): [Scope!]!
+  users(cursor: UserWhereUniqueInput, distinct: [UserScalarFieldEnum!], orderBy: [UserOrderByWithRelationInput!], skip: Int, take: Int, where: UserWhereInput): [User!]!
+  verifyTargetUserHasRequiredRoles(accessType: String!, entityType: String!, skipUserCheck: Boolean, targetUserId: String!): Boolean!
+  verifyUserHasRequiredScopeManageAccess(accessType: String!, entityId: String!, entityType: String!, scopeId: String!, skipUserCheck: Boolean): Boolean!
+}
+
+enum QueryMode {
+  default
+  insensitive
+}
+
+type ResourceAccess {
+  company: Company!
+  companyId: String!
+  createdAt: DateTime!
+  createdBy: String!
+  createdByUser: User!
+  entityId: String!
+  entityType: String!
+  id: ID!
+  resourceId: String!
+  type: String!
+  updatedAt: DateTime!
+}
+
+input ResourceAccessCreateManyInput {
+  companyId: String!
+  createdBy: String!
+  entityId: String!
+  entityType: String!
+  id: String
+  type: String
+}
+
+"""access entity type of resources"""
+enum ResourceAccessEntityType {
+  GROUP
+  USER
+}
+
+input ResourceAccessListRelationFilter {
+  every: ResourceAccessWhereInput
+  none: ResourceAccessWhereInput
+  some: ResourceAccessWhereInput
+}
+
+input ResourceAccessOrderByRelationAggregateInput {
+  _count: SortOrder
+}
+
+input ResourceAccessOrderByWithRelationInput {
+  company: CompanyOrderByWithRelationInput
+  companyId: SortOrder
+  createdBy: SortOrder
+  createdByUser: UserOrderByWithRelationInput
+  entityId: SortOrder
+  entityType: SortOrder
+  id: SortOrder
+  resourceId: SortOrder
+  type: SortOrder
+}
+
+input ResourceAccessResourceIdEntityIdTypeCompoundUniqueInput {
+  entityId: String!
+  resourceId: String!
+  type: String!
+}
+
+enum ResourceAccessScalarFieldEnum {
+  companyId
+  createdAt
+  createdBy
+  entityId
+  entityType
+  id
+  resourceId
+  type
+  updatedAt
+}
+
+"""access type of resources"""
+enum ResourceAccessType {
+  MANAGE
+}
+
+input ResourceAccessWhereInput {
+  AND: [ResourceAccessWhereInput!]
+  NOT: [ResourceAccessWhereInput!]
+  OR: [ResourceAccessWhereInput!]
+  company: CompanyScalarRelationFilter
+  companyId: StringFilter
+  createdBy: StringFilter
+  createdByUser: UserScalarRelationFilter
+  entityId: StringFilter
+  entityType: StringFilter
+  id: StringFilter
+  resourceId: StringFilter
+  type: StringFilter
+}
+
+input ResourceAccessWhereUniqueInput {
+  AND: [ResourceAccessWhereInput!]
+  NOT: [ResourceAccessWhereInput!]
+  OR: [ResourceAccessWhereInput!]
+  company: CompanyScalarRelationFilter
+  companyId: StringFilter
+  createdBy: StringFilter
+  createdByUser: UserScalarRelationFilter
+  entityId: StringFilter
+  entityType: StringFilter
+  id: String
+  resourceId: StringFilter
+  resourceId_entityId_type: ResourceAccessResourceIdEntityIdTypeCompoundUniqueInput
+  type: StringFilter
+}
+
+type RoleInfo {
+  id: String!
+  name: String!
+}
+
+type ScimKey {
+  companyId: String!
+  createdAt: DateTime!
+  createdBy: String
+  encryptionKeyVersion: Int!
+  id: ID!
+  updatedAt: DateTime!
+}
+
+type ScimKeyCreateResponse {
+  id: String!
+  key: String!
+}
+
+input ScimKeyListRelationFilter {
+  every: ScimKeyWhereInput
+  none: ScimKeyWhereInput
+  some: ScimKeyWhereInput
+}
+
+input ScimKeyOrderByRelationAggregateInput {
+  _count: SortOrder
+}
+
+input ScimKeyWhereInput {
+  AND: [ScimKeyWhereInput!]
+  NOT: [ScimKeyWhereInput!]
+  OR: [ScimKeyWhereInput!]
+  companyId: StringFilter
+  createdAt: DateTimeFilter
+  createdBy: StringNullableFilter
+  encryptionKeyVersion: IntFilter
+  id: StringFilter
+  updatedAt: DateTimeFilter
+}
+
+type Scope {
+  _count: ScopeCount!
+  children: [Scope!]
+  companyId: String!
+  createdAt: DateTime!
+  createdBy: String
+  deleted: Boolean!
+  externalId: String
+  id: ID!
+  ingestionConfig: JSON
+  name: String!
+  parentId: String
+  parrentScope: Scope
+  scopeAccess: [ScopeAccess!]
+  updatedAt: DateTime!
+}
+
+type ScopeAccess {
+  companyId: String
+  createdAt: DateTime!
+  createdBy: String
+  entityId: String!
+  entityType: ScopeAccessEntityType!
+  scope: Scope!
+  scopeId: String!
+  type: ScopeAccessType!
+  updatedAt: DateTime!
+}
+
+input ScopeAccessChangeDto {
+  accessType: String!
+  createdBy: String
+  entityId: String!
+  entityType: String!
+}
+
+input ScopeAccessCreateManyScopeInput {
+  companyId: String
+  createdBy: String
+  entityId: String!
+  entityType: ScopeAccessEntityType!
+  type: ScopeAccessType!
+}
+
+input ScopeAccessCreateManyScopeInputEnvelope {
+  data: [ScopeAccessCreateManyScopeInput!]!
+  skipDuplicates: Boolean
+}
+
+input ScopeAccessCreateNestedManyWithoutScopeInput {
+  connect: [ScopeAccessWhereUniqueInput!]
+  connectOrCreate: [ScopeAccessCreateOrConnectWithoutScopeInput!]
+  create: [ScopeAccessCreateWithoutScopeInput!]
+  createMany: ScopeAccessCreateManyScopeInputEnvelope
+}
+
+input ScopeAccessCreateOrConnectWithoutScopeInput {
+  create: ScopeAccessCreateWithoutScopeInput!
+  where: ScopeAccessWhereUniqueInput!
+}
+
+input ScopeAccessCreateWithoutScopeInput {
+  companyId: String
+  createdBy: String
+  entityId: String!
+  entityType: ScopeAccessEntityType!
+  type: ScopeAccessType!
+}
+
+input ScopeAccessDto {
+  createdBy: String
+  entityId: String!
+  entityType: ScopeAccessEntityType!
+  type: ScopeAccessType!
+}
+
+enum ScopeAccessEntityType {
+  GROUP
+  USER
+}
+
+input ScopeAccessListRelationFilter {
+  every: ScopeAccessWhereInput
+  none: ScopeAccessWhereInput
+  some: ScopeAccessWhereInput
+}
+
+input ScopeAccessOrderByRelationAggregateInput {
+  _count: SortOrder
+}
+
+input ScopeAccessScalarWhereInput {
+  AND: [ScopeAccessScalarWhereInput!]
+  NOT: [ScopeAccessScalarWhereInput!]
+  OR: [ScopeAccessScalarWhereInput!]
+  companyId: StringNullableFilter
+  createdBy: StringNullableFilter
+  entityId: StringFilter
+  entityType: EnumScopeAccessEntityTypeFilter
+  scopeId: StringFilter
+  type: EnumScopeAccessTypeFilter
+}
+
+input ScopeAccessScopeIdEntityIdTypeCompoundUniqueInput {
+  entityId: String!
+  scopeId: String!
+  type: ScopeAccessType!
+}
+
+enum ScopeAccessType {
+  MANAGE
+  READ
+  WRITE
+}
+
+input ScopeAccessUpdateManyMutationInput {
+  companyId: String
+  createdBy: String
+  entityId: String
+  entityType: ScopeAccessEntityType
+  type: ScopeAccessType
+}
+
+input ScopeAccessUpdateManyWithWhereWithoutScopeInput {
+  data: ScopeAccessUpdateManyMutationInput!
+  where: ScopeAccessScalarWhereInput!
+}
+
+input ScopeAccessUpdateManyWithoutScopeNestedInput {
+  connect: [ScopeAccessWhereUniqueInput!]
+  connectOrCreate: [ScopeAccessCreateOrConnectWithoutScopeInput!]
+  create: [ScopeAccessCreateWithoutScopeInput!]
+  createMany: ScopeAccessCreateManyScopeInputEnvelope
+  delete: [ScopeAccessWhereUniqueInput!]
+  deleteMany: [ScopeAccessScalarWhereInput!]
+  disconnect: [ScopeAccessWhereUniqueInput!]
+  set: [ScopeAccessWhereUniqueInput!]
+  update: [ScopeAccessUpdateWithWhereUniqueWithoutScopeInput!]
+  updateMany: [ScopeAccessUpdateManyWithWhereWithoutScopeInput!]
+  upsert: [ScopeAccessUpsertWithWhereUniqueWithoutScopeInput!]
+}
+
+input ScopeAccessUpdateWithWhereUniqueWithoutScopeInput {
+  data: ScopeAccessUpdateWithoutScopeInput!
+  where: ScopeAccessWhereUniqueInput!
+}
+
+input ScopeAccessUpdateWithoutScopeInput {
+  companyId: String
+  createdBy: String
+  entityId: String
+  entityType: ScopeAccessEntityType
+  type: ScopeAccessType
+}
+
+input ScopeAccessUpsertWithWhereUniqueWithoutScopeInput {
+  create: ScopeAccessCreateWithoutScopeInput!
+  update: ScopeAccessUpdateWithoutScopeInput!
+  where: ScopeAccessWhereUniqueInput!
+}
+
+input ScopeAccessWhereInput {
+  AND: [ScopeAccessWhereInput!]
+  NOT: [ScopeAccessWhereInput!]
+  OR: [ScopeAccessWhereInput!]
+  companyId: StringNullableFilter
+  createdBy: StringNullableFilter
+  entityId: StringFilter
+  entityType: EnumScopeAccessEntityTypeFilter
+  scope: ScopeScalarRelationFilter
+  scopeId: StringFilter
+  type: EnumScopeAccessTypeFilter
+}
+
+input ScopeAccessWhereUniqueInput {
+  AND: [ScopeAccessWhereInput!]
+  NOT: [ScopeAccessWhereInput!]
+  OR: [ScopeAccessWhereInput!]
+  companyId: StringNullableFilter
+  createdBy: StringNullableFilter
+  entityId: StringFilter
+  entityType: EnumScopeAccessEntityTypeFilter
+  scope: ScopeScalarRelationFilter
+  scopeId: StringFilter
+  scopeId_entityId_type: ScopeAccessScopeIdEntityIdTypeCompoundUniqueInput
+  type: EnumScopeAccessTypeFilter
+}
+
+input ScopeCompanyIdExternalIdCompoundUniqueInput {
+  externalId: String!
+}
+
+type ScopeCount {
+  children: Int!
+  scopeAccess: Int!
+}
+
+input ScopeCreateInput {
+  createdBy: String
+  externalId: String
+  id: String
+  ingestionConfig: JSON
+  name: String!
+  parrentScope: ScopeCreateNestedOneWithoutChildrenInput
+  scopeAccess: ScopeAccessCreateNestedManyWithoutScopeInput
+}
+
+input ScopeCreateNestedOneWithoutChildrenInput {
+  connect: ScopeWhereUniqueInput
+  connectOrCreate: ScopeCreateOrConnectWithoutChildrenInput
+  create: ScopeCreateWithoutChildrenInput
+}
+
+input ScopeCreateOrConnectWithoutChildrenInput {
+  create: ScopeCreateWithoutChildrenInput!
+  where: ScopeWhereUniqueInput!
+}
+
+input ScopeCreateWithoutChildrenInput {
+  createdBy: String
+  externalId: String
+  id: String
+  ingestionConfig: JSON
+  name: String!
+  parrentScope: ScopeCreateNestedOneWithoutChildrenInput
+  scopeAccess: ScopeAccessCreateNestedManyWithoutScopeInput
+}
+
+input ScopeNullableScalarRelationFilter {
+  is: ScopeWhereInput
+  isNot: ScopeWhereInput
+}
+
+input ScopeOrderByWithRelationInput {
+  createdBy: SortOrderInput
+  externalId: SortOrderInput
+  id: SortOrder
+  ingestionConfig: SortOrderInput
+  name: SortOrder
+  parentId: SortOrderInput
+  parrentScope: ScopeOrderByWithRelationInput
+  scopeAccess: ScopeAccessOrderByRelationAggregateInput
+}
+
+input ScopeProperties {
+  ingestionConfig: IngestionConfig
+}
+
+enum ScopeScalarFieldEnum {
+  companyId
+  createdAt
+  createdBy
+  deleted
+  externalId
+  id
+  ingestionConfig
+  name
+  parentId
+  updatedAt
+}
+
+input ScopeScalarRelationFilter {
+  is: ScopeWhereInput
+  isNot: ScopeWhereInput
+}
+
+input ScopeUpdateInput {
+  createdBy: String
+  externalId: String
+  id: String
+  ingestionConfig: JSON
+  name: String
+  parrentScope: ScopeUpdateOneWithoutChildrenNestedInput
+  scopeAccess: ScopeAccessUpdateManyWithoutScopeNestedInput
+}
+
+input ScopeUpdateOneWithoutChildrenNestedInput {
+  connect: ScopeWhereUniqueInput
+  connectOrCreate: ScopeCreateOrConnectWithoutChildrenInput
+  create: ScopeCreateWithoutChildrenInput
+  delete: ScopeWhereInput
+  disconnect: ScopeWhereInput
+  update: ScopeUpdateToOneWithWhereWithoutChildrenInput
+  upsert: ScopeUpsertWithoutChildrenInput
+}
+
+input ScopeUpdateToOneWithWhereWithoutChildrenInput {
+  data: ScopeUpdateWithoutChildrenInput!
+  where: ScopeWhereInput
+}
+
+input ScopeUpdateWithoutChildrenInput {
+  createdBy: String
+  externalId: String
+  id: String
+  ingestionConfig: JSON
+  name: String
+  parrentScope: ScopeUpdateOneWithoutChildrenNestedInput
+  scopeAccess: ScopeAccessUpdateManyWithoutScopeNestedInput
+}
+
+input ScopeUpsertWithoutChildrenInput {
+  create: ScopeCreateWithoutChildrenInput!
+  update: ScopeUpdateWithoutChildrenInput!
+  where: ScopeWhereInput
+}
+
+input ScopeWhereInput {
+  AND: [ScopeWhereInput!]
+  NOT: [ScopeWhereInput!]
+  OR: [ScopeWhereInput!]
+  companyId: StringFilter
+  createdAt: DateTimeFilter
+  createdBy: StringNullableFilter
+  deleted: BoolFilter
+  externalId: StringNullableFilter
+  id: StringFilter
+  ingestionConfig: JsonNullableFilter
+  name: StringFilter
+  parentId: StringNullableFilter
+  parrentScope: ScopeNullableScalarRelationFilter
+  scopeAccess: ScopeAccessListRelationFilter
+  updatedAt: DateTimeFilter
+}
+
+input ScopeWhereUniqueInput {
+  AND: [ScopeWhereInput!]
+  NOT: [ScopeWhereInput!]
+  OR: [ScopeWhereInput!]
+  companyId: StringFilter
+  companyId_externalId: ScopeCompanyIdExternalIdCompoundUniqueInput
+  createdAt: DateTimeFilter
+  createdBy: StringNullableFilter
+  deleted: BoolFilter
+  externalId: StringNullableFilter
+  id: String
+  ingestionConfig: JsonNullableFilter
+  name: StringFilter
+  parentId: StringNullableFilter
+  parrentScope: ScopeNullableScalarRelationFilter
+  scopeAccess: ScopeAccessListRelationFilter
+  updatedAt: DateTimeFilter
+}
+
+enum SortOrder {
+  asc
+  desc
+}
+
+input SortOrderInput {
+  nulls: NullsOrder
+  sort: SortOrder!
+}
+
+"""Space manager role types that can be assigned"""
+enum SpaceManagerRoleType {
+  Space_Manager
+  Space_Owner
+}
+
+input StringFilter {
+  contains: String
+  endsWith: String
+  equals: String
+  gt: String
+  gte: String
+  in: [String!]
+  lt: String
+  lte: String
+  mode: QueryMode
+  not: NestedStringFilter
+  notIn: [String!]
+  startsWith: String
+}
+
+input StringNullableFilter {
+  contains: String
+  endsWith: String
+  equals: String
+  gt: String
+  gte: String
+  in: [String!]
+  lt: String
+  lte: String
+  mode: QueryMode
+  not: NestedStringNullableFilter
+  notIn: [String!]
+  startsWith: String
+}
+
+input StringNullableListFilter {
+  equals: [String!]
+  has: String
+  hasEvery: [String!]
+  hasSome: [String!]
+  isEmpty: Boolean
+}
+
+type UiPermissionsModel {
+  canAccessAppRepository: Boolean!
+  canAccessSpaceManagement: Boolean!
+  canAccessUserManagement: Boolean!
+  canListUsers: Boolean!
+  canManageGroup: Boolean!
+  canManageOwnSpace: Boolean!
+  canReadGroup: Boolean!
+  canReadUser: Boolean!
+}
+
+type User {
+  ResourceAccess: [ResourceAccess!]
+  _count: UserCount!
+  active: Boolean!
+  company: Company!
+  companyId: String!
+  createdAt: DateTime!
+  displayName: String
+  email: String!
+  externalId: String
+  firstName: String
+  id: ID!
+  lastName: String
+  setupDoneAt: DateTime
+  source: String
+  updatedAt: DateTime!
+  userConfiguration: JSON!
+  userMetadata: JSON!
+  userName: String
+}
+
+type UserCount {
+  ResourceAccess: Int!
+}
+
+type UserGrantsResult {
+  grants: [String!]!
+  userId: String!
+}
+
+input UserListRelationFilter {
+  every: UserWhereInput
+  none: UserWhereInput
+  some: UserWhereInput
+}
+
+input UserOrderByRelationAggregateInput {
+  _count: SortOrder
+}
+
+input UserOrderByWithRelationInput {
+  ResourceAccess: ResourceAccessOrderByRelationAggregateInput
+  active: SortOrder
+  company: CompanyOrderByWithRelationInput
+  companyId: SortOrder
+  createdAt: SortOrder
+  displayName: SortOrderInput
+  email: SortOrder
+  externalId: SortOrderInput
+  firstName: SortOrderInput
+  id: SortOrder
+  lastName: SortOrderInput
+  setupDoneAt: SortOrderInput
+  source: SortOrderInput
+  updatedAt: SortOrder
+  userConfiguration: SortOrder
+  userName: SortOrderInput
+}
+
+type UserPermissionsModel {
+  uiPermissions: UiPermissionsModel!
+}
+
+enum UserScalarFieldEnum {
+  active
+  companyId
+  createdAt
+  displayName
+  email
+  externalId
+  firstName
+  id
+  lastName
+  setupDoneAt
+  source
+  updatedAt
+  userConfiguration
+  userName
+}
+
+input UserScalarRelationFilter {
+  is: UserWhereInput
+  isNot: UserWhereInput
+}
+
+type UserSearchResult implements IMemberSearchResult {
+  id: ID!
+  name: String!
+  type: MemberSearchResultType!
+}
+
+input UserWhereInput {
+  AND: [UserWhereInput!]
+  NOT: [UserWhereInput!]
+  OR: [UserWhereInput!]
+  ResourceAccess: ResourceAccessListRelationFilter
+  active: BoolFilter
+  company: CompanyScalarRelationFilter
+  companyId: StringFilter
+  createdAt: DateTimeFilter
+  displayName: StringNullableFilter
+  email: StringFilter
+  externalId: StringNullableFilter
+  firstName: StringNullableFilter
+  id: StringFilter
+  lastName: StringNullableFilter
+  setupDoneAt: DateTimeNullableFilter
+  source: StringNullableFilter
+  updatedAt: DateTimeFilter
+  userConfiguration: JsonFilter
+  userName: StringNullableFilter
+}
+
+input UserWhereUniqueInput {
+  AND: [UserWhereInput!]
+  NOT: [UserWhereInput!]
+  OR: [UserWhereInput!]
+  ResourceAccess: ResourceAccessListRelationFilter
+  active: BoolFilter
+  company: CompanyScalarRelationFilter
+  companyId: StringFilter
+  createdAt: DateTimeFilter
+  displayName: StringNullableFilter
+  email: StringFilter
+  externalId: StringNullableFilter
+  firstName: StringNullableFilter
+  id: String
+  lastName: StringNullableFilter
+  setupDoneAt: DateTimeNullableFilter
+  source: StringNullableFilter
+  updatedAt: DateTimeFilter
+  userConfiguration: JsonFilter
+  userName: StringNullableFilter
+}
+
+input VttConfig {
+  languageModel: String
+}

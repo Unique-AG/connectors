@@ -1,13 +1,13 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMockSiteConfig } from '../../test/test-utils/mock-site-config';
 import type { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { createMockSiteConfig } from '../test-utils/mock-site-config';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';

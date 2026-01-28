@@ -1,0 +1,1535 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+input BoolFilter {
+  equals: Boolean
+  not: NestedBoolFilter
+}
+
+type Chunk {
+  companyId: String
+
+  """@DtoReadOnly"""
+  contentId: String!
+
+  """@DtoReadOnly"""
+  createdAt: DateTime!
+  createdBy: String
+  embedding: JSON
+  embeddingsFirst10: [Float!]!
+  endPage: Int
+  id: ID!
+  model: String
+  order: Int
+  startPage: Int
+
+  """@DtoReadOnly"""
+  text: String!
+
+  """@DtoReadOnly"""
+  updatedAt: DateTime!
+
+  """
+  @DtoReadOnly
+  @DtoEntityHidden
+  """
+  vectorId: String!
+}
+
+input ChunkCreateInput {
+  companyId: String
+  createdAt: DateTime
+  createdBy: String
+  embedding: JSON
+  endPage: Int
+  fingerprint: String!
+  id: String
+  model: String
+  order: Int
+  startPage: Int
+  text: String!
+  updatedAt: DateTime
+}
+
+input ChunkEmbeddingUpdateInput {
+  chunkId: String!
+  embedding: [Float!]!
+  model: String
+}
+
+input ChunkOrderByWithRelationInput {
+  companyId: SortOrderInput
+  contentId: SortOrder
+  createdAt: SortOrder
+  createdBy: SortOrderInput
+  embedding: SortOrderInput
+  endPage: SortOrderInput
+  fingerprint: SortOrder
+  id: SortOrder
+  model: SortOrderInput
+  order: SortOrderInput
+  startPage: SortOrderInput
+  text: SortOrder
+  updatedAt: SortOrder
+}
+
+enum ChunkScalarFieldEnum {
+  companyId
+  contentId
+  createdAt
+  createdBy
+  embedding
+  endPage
+  fingerprint
+  id
+  model
+  order
+  startPage
+  text
+  updatedAt
+  vectorId
+}
+
+input ChunkUpdateInput {
+  companyId: String
+  createdAt: DateTime
+  createdBy: String
+  embedding: JSON
+  endPage: Int
+  fingerprint: String
+  id: String
+  model: String
+  order: Int
+  startPage: Int
+  text: String
+  updatedAt: DateTime
+}
+
+input ChunkWhereInput {
+  AND: [ChunkWhereInput!]
+  NOT: [ChunkWhereInput!]
+  OR: [ChunkWhereInput!]
+  companyId: StringNullableFilter
+  contentId: StringFilter
+  createdAt: DateTimeFilter
+  createdBy: StringNullableFilter
+  embedding: JsonNullableFilter
+  endPage: IntNullableFilter
+  fingerprint: StringFilter
+  id: StringFilter
+  model: StringNullableFilter
+  order: IntNullableFilter
+  startPage: IntNullableFilter
+  text: StringFilter
+  updatedAt: DateTimeFilter
+}
+
+input ChunkWhereUniqueInput {
+  AND: [ChunkWhereInput!]
+  NOT: [ChunkWhereInput!]
+  OR: [ChunkWhereInput!]
+  companyId: StringNullableFilter
+  contentId: StringFilter
+  createdAt: DateTimeFilter
+  createdBy: StringNullableFilter
+  embedding: JsonNullableFilter
+  endPage: IntNullableFilter
+  fingerprint: StringFilter
+  id: String
+  model: StringNullableFilter
+  order: IntNullableFilter
+  startPage: IntNullableFilter
+  text: StringFilter
+  updatedAt: DateTimeFilter
+}
+
+type CompanyMeta {
+  collectionName: String!
+  companyId: ID!
+  embeddingDimension: Int
+  embeddingModel: String
+}
+
+type Content {
+  IngestionErrorAnalytics: [IngestionErrorAnalytics!]
+  IngestionStateHistory: [IngestionStateHistory!]
+  _count: ContentCount!
+  appliedIngestionConfig: JSON
+  byteSize: Int!
+
+  """
+  @DtoReadOnly
+  @DtoEntityHidden
+  """
+  chunks: [Chunk!]
+  companyId: String
+
+  """@DtoReadOnly"""
+  createdAt: DateTime!
+  createdBy: String
+
+  """@DtoReadOnly"""
+  deletedAt: DateTime
+  description: String
+
+  """@DtoReadOnly"""
+  expiredAt: DateTime
+
+  """@DtoReadOnly"""
+  expiresAt: DateTime
+  expiresInDays: Float
+  externalFileOwner: String
+  fileAccess: [String!]
+
+  """@DtoReadOnly"""
+  fileAccessState: JSON
+  id: ID!
+  ingestionConfig: JSON
+  ingestionProgress: Int!
+
+  """@DtoEntityHidden"""
+  ingestionState: IngestionState!
+
+  """@DtoEntityHidden"""
+  ingestionStateUpdatedAt: DateTime
+  internallyStoredAt: DateTime
+  key: String!
+
+  """@IsJSON"""
+  metadata: JSON
+  mimeType: String!
+
+  """@DtoReadOnly"""
+  ownerId: String!
+  ownerType: OwnerType!
+  pdfPreviewWriteUrl: String!
+  previewPdfFileName: String
+  readUrl: String!
+  sasUrl: String!
+
+  """
+  @DtoReadOnly
+  @DtoEntityHidden
+  """
+  source: Source!
+  title: String
+
+  """@DtoReadOnly"""
+  updatedAt: DateTime!
+
+  """@IsUrl"""
+  url: String
+  writeUrl: String!
+}
+
+type ContentCount {
+  IngestionErrorAnalytics: Int!
+  IngestionStateHistory: Int!
+  chunks: Int!
+}
+
+input ContentCreateInput {
+  IngestionErrorAnalytics: IngestionErrorAnalyticsCreateNestedManyWithoutContentInput
+  IngestionStateHistory: IngestionStateHistoryCreateNestedManyWithoutContentInput
+  byteSize: Int
+  companyId: String
+  createdAt: DateTime
+  createdBy: String
+  deletedAt: DateTime
+  description: String
+  expiredAt: DateTime
+  expiresAt: DateTime
+  externalFileOwner: String
+  fileAccess: [String!]
+  fileAccessState: JSON
+  id: String
+  ingestionConfig: JSON
+  ingestionProgress: Int
+  internallyStoredAt: DateTime
+  key: String!
+  metadata: JSON
+  mimeType: String!
+  ownerType: OwnerType!
+  title: String
+  updatedAt: DateTime
+  url: String
+}
+
+input ContentOrderByWithRelationInput {
+  IngestionErrorAnalytics: IngestionErrorAnalyticsOrderByRelationAggregateInput
+  IngestionStateHistory: IngestionStateHistoryOrderByRelationAggregateInput
+  byteSize: SortOrder
+  companyId: SortOrderInput
+  createdAt: SortOrder
+  createdBy: SortOrderInput
+  deletedAt: SortOrderInput
+  description: SortOrderInput
+  expiredAt: SortOrderInput
+  expiresAt: SortOrderInput
+  externalFileOwner: SortOrderInput
+  fileAccess: SortOrder
+  fileAccessState: SortOrderInput
+  id: SortOrder
+  ingestionConfig: SortOrderInput
+  ingestionProgress: SortOrder
+  internallyStoredAt: SortOrderInput
+  key: SortOrder
+  metadata: SortOrderInput
+  mimeType: SortOrder
+  ownerType: SortOrder
+  title: SortOrderInput
+  updatedAt: SortOrder
+  url: SortOrderInput
+}
+
+enum ContentScalarFieldEnum {
+  appliedIngestionConfig
+  byteSize
+  collectionName
+  companyId
+  createdAt
+  createdBy
+  deletedAt
+  description
+  expiredAt
+  expiresAt
+  externalFileOwner
+  fileAccess
+  fileAccessState
+  id
+  ingestionConfig
+  ingestionProgress
+  ingestionState
+  ingestionStateUpdatedAt
+  internallyStoredAt
+  key
+  metadata
+  mimeType
+  ownerId
+  ownerType
+  previewPdfFileName
+  sourceId
+  title
+  updatedAt
+  url
+  version
+}
+
+input ContentScalarRelationFilter {
+  is: ContentWhereInput
+  isNot: ContentWhereInput
+}
+
+type ContentTypeStatType {
+  contentType: String!
+  failures: Int!
+  success_rate_percent: Float!
+  total: Int!
+}
+
+input ContentUpdateInput {
+  IngestionErrorAnalytics: IngestionErrorAnalyticsUpdateManyWithoutContentNestedInput
+  IngestionStateHistory: IngestionStateHistoryUpdateManyWithoutContentNestedInput
+  byteSize: Int
+  companyId: String
+  createdAt: DateTime
+  createdBy: String
+  deletedAt: DateTime
+  description: String
+  expiredAt: DateTime
+  expiresAt: DateTime
+  externalFileOwner: String
+  fileAccess: [String!]
+  fileAccessState: JSON
+  id: String
+  ingestionConfig: JSON
+  ingestionProgress: Int
+  internallyStoredAt: DateTime
+  key: String
+  metadata: JSON
+  mimeType: String
+  ownerType: OwnerType
+  title: String
+  updatedAt: DateTime
+  url: String
+}
+
+input ContentWhereInput {
+  AND: [ContentWhereInput!]
+  IngestionErrorAnalytics: IngestionErrorAnalyticsListRelationFilter
+  IngestionStateHistory: IngestionStateHistoryListRelationFilter
+  NOT: [ContentWhereInput!]
+  OR: [ContentWhereInput!]
+  byteSize: IntFilter
+  companyId: StringNullableFilter
+  createdAt: DateTimeFilter
+  createdBy: StringNullableFilter
+  deletedAt: DateTimeNullableFilter
+  description: StringNullableFilter
+  expiredAt: DateTimeNullableFilter
+  expiresAt: DateTimeNullableFilter
+  externalFileOwner: StringNullableFilter
+  fileAccess: StringNullableListFilter
+  fileAccessState: JsonNullableFilter
+  id: StringFilter
+  ingestionConfig: JsonNullableFilter
+  ingestionProgress: IntFilter
+  ingestionState: EnumIngestionStateFilter
+  ingestionStateUpdatedAt: DateTimeNullableFilter
+  internallyStoredAt: DateTimeNullableFilter
+  key: StringFilter
+  metadata: JsonNullableFilter
+  mimeType: StringFilter
+  ownerId: StringFilter
+  ownerType: EnumOwnerTypeFilter
+  source: SourceScalarRelationFilter
+  title: StringNullableFilter
+  updatedAt: DateTimeFilter
+  url: StringNullableFilter
+}
+
+input ContentWhereUniqueInput {
+  AND: [ContentWhereInput!]
+  IngestionErrorAnalytics: IngestionErrorAnalyticsListRelationFilter
+  IngestionStateHistory: IngestionStateHistoryListRelationFilter
+  NOT: [ContentWhereInput!]
+  OR: [ContentWhereInput!]
+  byteSize: IntFilter
+  companyId: StringNullableFilter
+  createdAt: DateTimeFilter
+  createdBy: StringNullableFilter
+  deletedAt: DateTimeNullableFilter
+  description: StringNullableFilter
+  expiredAt: DateTimeNullableFilter
+  expiresAt: DateTimeNullableFilter
+  externalFileOwner: StringNullableFilter
+  fileAccess: StringNullableListFilter
+  fileAccessState: JsonNullableFilter
+  id: String
+  ingestionConfig: JsonNullableFilter
+  ingestionProgress: IntFilter
+  ingestionState: EnumIngestionStateFilter
+  ingestionStateUpdatedAt: DateTimeNullableFilter
+  internallyStoredAt: DateTimeNullableFilter
+  key: StringFilter
+  metadata: JsonNullableFilter
+  mimeType: StringFilter
+  ownerId: StringFilter
+  ownerType: EnumOwnerTypeFilter
+  source: SourceScalarRelationFilter
+  title: StringNullableFilter
+  updatedAt: DateTimeFilter
+  url: StringNullableFilter
+}
+
+type ContentWithTotalPages {
+  IngestionErrorAnalytics: [IngestionErrorAnalytics!]
+  IngestionStateHistory: [IngestionStateHistory!]
+  _count: ContentCount!
+  appliedIngestionConfig: JSON
+  byteSize: Int!
+
+  """
+  @DtoReadOnly
+  @DtoEntityHidden
+  """
+  chunks: [Chunk!]
+  companyId: String
+
+  """@DtoReadOnly"""
+  createdAt: DateTime!
+  createdBy: String
+
+  """@DtoReadOnly"""
+  deletedAt: DateTime
+  description: String
+
+  """@DtoReadOnly"""
+  expiredAt: DateTime
+
+  """@DtoReadOnly"""
+  expiresAt: DateTime
+  expiresInDays: Float
+  externalFileOwner: String
+  fileAccess: [String!]
+
+  """@DtoReadOnly"""
+  fileAccessState: JSON
+  id: ID!
+  ingestionConfig: JSON
+  ingestionProgress: Int!
+
+  """@DtoEntityHidden"""
+  ingestionState: IngestionState!
+
+  """@DtoEntityHidden"""
+  ingestionStateUpdatedAt: DateTime
+  internallyStoredAt: DateTime
+  key: String!
+
+  """@IsJSON"""
+  metadata: JSON
+  mimeType: String!
+
+  """@DtoReadOnly"""
+  ownerId: String!
+  ownerType: OwnerType!
+  pdfPreviewWriteUrl: String!
+  previewPdfFileName: String
+  readUrl: String!
+  sasUrl: String!
+
+  """
+  @DtoReadOnly
+  @DtoEntityHidden
+  """
+  source: Source!
+  title: String
+  totalPages: Int
+
+  """@DtoReadOnly"""
+  updatedAt: DateTime!
+
+  """@IsUrl"""
+  url: String
+  writeUrl: String!
+}
+
+type CursorPaginatedContentWithTotalPages {
+  hasMore: Boolean!
+  nextCursor: String
+  nodes: [ContentWithTotalPages!]
+  totalCount: Int!
+}
+
+type CursorPaginatedIngestionErrorAnalytics {
+  hasMore: Boolean!
+  nextCursor: String
+  nodes: [IngestionErrorAnalytics!]
+  totalCount: Int!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+input DateTimeFilter {
+  equals: DateTime
+  gt: DateTime
+  gte: DateTime
+  in: [DateTime!]
+  lt: DateTime
+  lte: DateTime
+  not: NestedDateTimeFilter
+  notIn: [DateTime!]
+}
+
+input DateTimeNullableFilter {
+  equals: DateTime
+  gt: DateTime
+  gte: DateTime
+  in: [DateTime!]
+  lt: DateTime
+  lte: DateTime
+  not: NestedDateTimeNullableFilter
+  notIn: [DateTime!]
+}
+
+input EnumIngestionStateFilter {
+  equals: IngestionState
+  in: [IngestionState!]
+  not: NestedEnumIngestionStateFilter
+  notIn: [IngestionState!]
+}
+
+input EnumIngestionStateNullableFilter {
+  equals: IngestionState
+  in: [IngestionState!]
+  not: NestedEnumIngestionStateNullableFilter
+  notIn: [IngestionState!]
+}
+
+input EnumOwnerTypeFilter {
+  equals: OwnerType
+  in: [OwnerType!]
+  not: NestedEnumOwnerTypeFilter
+  notIn: [OwnerType!]
+}
+
+input EnumSourceKindFilter {
+  equals: SourceKind
+  in: [SourceKind!]
+  not: NestedEnumSourceKindFilter
+  notIn: [SourceKind!]
+}
+
+type FailureCountType {
+  count: Int!
+  toState: String!
+}
+
+input FileAccessContentChangeDto {
+  accessType: String!
+  contentId: String!
+  entityId: String!
+  entityType: String!
+}
+
+input FileAccessPermissionDto {
+  accessType: String!
+  entityId: String!
+  entityType: String!
+}
+
+input FloatNullableFilter {
+  equals: Float
+  gt: Float
+  gte: Float
+  in: [Float!]
+  lt: Float
+  lte: Float
+  not: NestedFloatNullableFilter
+  notIn: [Float!]
+}
+
+type FolderIdsDto {
+  """@DtoReadOnly"""
+  ownerId: String!
+  ownerType: OwnerType!
+}
+
+type IngestionErrorAnalytics {
+  additionalData: JSON
+  businessPriority: String
+  companyId: String!
+  content: Content!
+  contentId: String!
+  createdAt: DateTime!
+  customerImpact: Boolean!
+  environment: String
+  errorCategory: String!
+  errorCode: String
+  errorContext: JSON!
+  errorFingerprint: String!
+  errorMessage: String!
+  errorSeverity: String!
+  errorType: String!
+  fromState: String
+  id: ID!
+  impactedContentCount: Int
+  isRetryable: Boolean!
+  occurredAt: DateTime!
+  resolution: String
+  resolvedAt: DateTime
+  retryCount: Int!
+  serviceVersion: String
+  stackTrace: JSON
+  toState: String!
+  totalDurationLost: Float
+  updatedAt: DateTime!
+}
+
+input IngestionErrorAnalyticsCreateManyContentInput {
+  additionalData: JSON
+  businessPriority: String
+  companyId: String!
+  createdAt: DateTime
+  customerImpact: Boolean
+  environment: String
+  errorCategory: String!
+  errorCode: String
+  errorContext: JSON!
+  errorFingerprint: String!
+  errorMessage: String!
+  errorSeverity: String!
+  errorType: String!
+  fromState: String
+  id: String
+  impactedContentCount: Int
+  isRetryable: Boolean
+  occurredAt: DateTime
+  resolution: String
+  resolvedAt: DateTime
+  retryCount: Int
+  serviceVersion: String
+  stackTrace: JSON
+  toState: String!
+  totalDurationLost: Float
+  updatedAt: DateTime
+}
+
+input IngestionErrorAnalyticsCreateManyContentInputEnvelope {
+  data: [IngestionErrorAnalyticsCreateManyContentInput!]!
+  skipDuplicates: Boolean
+}
+
+input IngestionErrorAnalyticsCreateNestedManyWithoutContentInput {
+  connect: [IngestionErrorAnalyticsWhereUniqueInput!]
+  connectOrCreate: [IngestionErrorAnalyticsCreateOrConnectWithoutContentInput!]
+  create: [IngestionErrorAnalyticsCreateWithoutContentInput!]
+  createMany: IngestionErrorAnalyticsCreateManyContentInputEnvelope
+}
+
+input IngestionErrorAnalyticsCreateOrConnectWithoutContentInput {
+  create: IngestionErrorAnalyticsCreateWithoutContentInput!
+  where: IngestionErrorAnalyticsWhereUniqueInput!
+}
+
+input IngestionErrorAnalyticsCreateWithoutContentInput {
+  additionalData: JSON
+  businessPriority: String
+  companyId: String!
+  createdAt: DateTime
+  customerImpact: Boolean
+  environment: String
+  errorCategory: String!
+  errorCode: String
+  errorContext: JSON!
+  errorFingerprint: String!
+  errorMessage: String!
+  errorSeverity: String!
+  errorType: String!
+  fromState: String
+  id: String
+  impactedContentCount: Int
+  isRetryable: Boolean
+  occurredAt: DateTime
+  resolution: String
+  resolvedAt: DateTime
+  retryCount: Int
+  serviceVersion: String
+  stackTrace: JSON
+  toState: String!
+  totalDurationLost: Float
+  updatedAt: DateTime
+}
+
+input IngestionErrorAnalyticsListRelationFilter {
+  every: IngestionErrorAnalyticsWhereInput
+  none: IngestionErrorAnalyticsWhereInput
+  some: IngestionErrorAnalyticsWhereInput
+}
+
+input IngestionErrorAnalyticsOrderByRelationAggregateInput {
+  _count: SortOrder
+}
+
+input IngestionErrorAnalyticsScalarWhereInput {
+  AND: [IngestionErrorAnalyticsScalarWhereInput!]
+  NOT: [IngestionErrorAnalyticsScalarWhereInput!]
+  OR: [IngestionErrorAnalyticsScalarWhereInput!]
+  additionalData: JsonNullableFilter
+  businessPriority: StringNullableFilter
+  companyId: StringFilter
+  contentId: StringFilter
+  createdAt: DateTimeFilter
+  customerImpact: BoolFilter
+  environment: StringNullableFilter
+  errorCategory: StringFilter
+  errorCode: StringNullableFilter
+  errorContext: JsonFilter
+  errorFingerprint: StringFilter
+  errorMessage: StringFilter
+  errorSeverity: StringFilter
+  errorType: StringFilter
+  fromState: StringNullableFilter
+  id: StringFilter
+  impactedContentCount: IntNullableFilter
+  isRetryable: BoolFilter
+  occurredAt: DateTimeFilter
+  resolution: StringNullableFilter
+  resolvedAt: DateTimeNullableFilter
+  retryCount: IntFilter
+  serviceVersion: StringNullableFilter
+  stackTrace: JsonNullableFilter
+  toState: StringFilter
+  totalDurationLost: FloatNullableFilter
+  updatedAt: DateTimeFilter
+}
+
+input IngestionErrorAnalyticsUpdateManyMutationInput {
+  additionalData: JSON
+  businessPriority: String
+  companyId: String
+  createdAt: DateTime
+  customerImpact: Boolean
+  environment: String
+  errorCategory: String
+  errorCode: String
+  errorContext: JSON
+  errorFingerprint: String
+  errorMessage: String
+  errorSeverity: String
+  errorType: String
+  fromState: String
+  id: String
+  impactedContentCount: Int
+  isRetryable: Boolean
+  occurredAt: DateTime
+  resolution: String
+  resolvedAt: DateTime
+  retryCount: Int
+  serviceVersion: String
+  stackTrace: JSON
+  toState: String
+  totalDurationLost: Float
+  updatedAt: DateTime
+}
+
+input IngestionErrorAnalyticsUpdateManyWithWhereWithoutContentInput {
+  data: IngestionErrorAnalyticsUpdateManyMutationInput!
+  where: IngestionErrorAnalyticsScalarWhereInput!
+}
+
+input IngestionErrorAnalyticsUpdateManyWithoutContentNestedInput {
+  connect: [IngestionErrorAnalyticsWhereUniqueInput!]
+  connectOrCreate: [IngestionErrorAnalyticsCreateOrConnectWithoutContentInput!]
+  create: [IngestionErrorAnalyticsCreateWithoutContentInput!]
+  createMany: IngestionErrorAnalyticsCreateManyContentInputEnvelope
+  delete: [IngestionErrorAnalyticsWhereUniqueInput!]
+  deleteMany: [IngestionErrorAnalyticsScalarWhereInput!]
+  disconnect: [IngestionErrorAnalyticsWhereUniqueInput!]
+  set: [IngestionErrorAnalyticsWhereUniqueInput!]
+  update: [IngestionErrorAnalyticsUpdateWithWhereUniqueWithoutContentInput!]
+  updateMany: [IngestionErrorAnalyticsUpdateManyWithWhereWithoutContentInput!]
+  upsert: [IngestionErrorAnalyticsUpsertWithWhereUniqueWithoutContentInput!]
+}
+
+input IngestionErrorAnalyticsUpdateWithWhereUniqueWithoutContentInput {
+  data: IngestionErrorAnalyticsUpdateWithoutContentInput!
+  where: IngestionErrorAnalyticsWhereUniqueInput!
+}
+
+input IngestionErrorAnalyticsUpdateWithoutContentInput {
+  additionalData: JSON
+  businessPriority: String
+  companyId: String
+  createdAt: DateTime
+  customerImpact: Boolean
+  environment: String
+  errorCategory: String
+  errorCode: String
+  errorContext: JSON
+  errorFingerprint: String
+  errorMessage: String
+  errorSeverity: String
+  errorType: String
+  fromState: String
+  id: String
+  impactedContentCount: Int
+  isRetryable: Boolean
+  occurredAt: DateTime
+  resolution: String
+  resolvedAt: DateTime
+  retryCount: Int
+  serviceVersion: String
+  stackTrace: JSON
+  toState: String
+  totalDurationLost: Float
+  updatedAt: DateTime
+}
+
+input IngestionErrorAnalyticsUpsertWithWhereUniqueWithoutContentInput {
+  create: IngestionErrorAnalyticsCreateWithoutContentInput!
+  update: IngestionErrorAnalyticsUpdateWithoutContentInput!
+  where: IngestionErrorAnalyticsWhereUniqueInput!
+}
+
+input IngestionErrorAnalyticsWhereInput {
+  AND: [IngestionErrorAnalyticsWhereInput!]
+  NOT: [IngestionErrorAnalyticsWhereInput!]
+  OR: [IngestionErrorAnalyticsWhereInput!]
+  additionalData: JsonNullableFilter
+  businessPriority: StringNullableFilter
+  companyId: StringFilter
+  content: ContentScalarRelationFilter
+  contentId: StringFilter
+  createdAt: DateTimeFilter
+  customerImpact: BoolFilter
+  environment: StringNullableFilter
+  errorCategory: StringFilter
+  errorCode: StringNullableFilter
+  errorContext: JsonFilter
+  errorFingerprint: StringFilter
+  errorMessage: StringFilter
+  errorSeverity: StringFilter
+  errorType: StringFilter
+  fromState: StringNullableFilter
+  id: StringFilter
+  impactedContentCount: IntNullableFilter
+  isRetryable: BoolFilter
+  occurredAt: DateTimeFilter
+  resolution: StringNullableFilter
+  resolvedAt: DateTimeNullableFilter
+  retryCount: IntFilter
+  serviceVersion: StringNullableFilter
+  stackTrace: JsonNullableFilter
+  toState: StringFilter
+  totalDurationLost: FloatNullableFilter
+  updatedAt: DateTimeFilter
+}
+
+input IngestionErrorAnalyticsWhereUniqueInput {
+  AND: [IngestionErrorAnalyticsWhereInput!]
+  NOT: [IngestionErrorAnalyticsWhereInput!]
+  OR: [IngestionErrorAnalyticsWhereInput!]
+  additionalData: JsonNullableFilter
+  businessPriority: StringNullableFilter
+  companyId: StringFilter
+  content: ContentScalarRelationFilter
+  contentId: StringFilter
+  createdAt: DateTimeFilter
+  customerImpact: BoolFilter
+  environment: StringNullableFilter
+  errorCategory: StringFilter
+  errorCode: StringNullableFilter
+  errorContext: JsonFilter
+  errorFingerprint: StringFilter
+  errorMessage: StringFilter
+  errorSeverity: StringFilter
+  errorType: StringFilter
+  fromState: StringNullableFilter
+  id: String
+  impactedContentCount: IntNullableFilter
+  isRetryable: BoolFilter
+  occurredAt: DateTimeFilter
+  resolution: StringNullableFilter
+  resolvedAt: DateTimeNullableFilter
+  retryCount: IntFilter
+  serviceVersion: StringNullableFilter
+  stackTrace: JsonNullableFilter
+  toState: StringFilter
+  totalDurationLost: FloatNullableFilter
+  updatedAt: DateTimeFilter
+}
+
+input IngestionMetricsFilterInput {
+  contentTypes: [String!]
+  excludeStates: [String!]
+
+  """ISO date-time; default NOW() - 30d"""
+  from: String
+  includeStates: [String!]
+
+  """ISO date-time; default NOW()"""
+  to: String
+}
+
+type IngestionMetricsType {
+  avg_duration_seconds: Float
+  failure_by_type: [FailureCountType!]!
+  failure_rate_percent: Float
+  median_duration_seconds: Float
+  p90_duration_seconds: Float
+  p95_duration_seconds: Float
+  success_rate_by_content_type: [ContentTypeStatType!]!
+  success_rate_percent: Float!
+  volume_over_time: [VolumePointType!]!
+}
+
+enum IngestionState {
+  CHECKING_INTEGRITY
+  FAILED
+  FAILED_CREATING_CHUNKS
+  FAILED_EMBEDDING
+  FAILED_GETTING_FILE
+  FAILED_IMAGE
+  FAILED_MALWARE_FOUND
+  FAILED_MALWARE_SCAN_TIMEOUT
+  FAILED_METADATA_VALIDATION
+  FAILED_PARSING
+  FAILED_REDELIVERED
+  FAILED_TABLE_LIMIT_EXCEEDED
+  FAILED_TIMEOUT
+  FAILED_TOO_LESS_CONTENT
+  FINISHED
+  INGESTION_CHUNKING
+  INGESTION_EMBEDDING
+  INGESTION_READING
+  MALWARE_SCANNING
+  METADATA_VALIDATION
+  QUEUED
+  REBUILDING_METADATA
+  RECREATING_VECETORDB_INDEX
+  RETRYING
+  RE_EMBEDDING
+  RE_INGESTING
+}
+
+type IngestionStateHistory {
+  content: Content!
+  contentId: String!
+  contentSize: Float
+  contentType: String
+  durationSeconds: Float
+  fromState: IngestionState
+  id: ID!
+  metadata: JSON!
+  toState: IngestionState!
+  transitionTime: DateTime!
+}
+
+input IngestionStateHistoryCreateManyContentInput {
+  contentSize: Float
+  contentType: String
+  durationSeconds: Float
+  fromState: IngestionState
+  id: String
+  metadata: JSON!
+  toState: IngestionState!
+  transitionTime: DateTime
+}
+
+input IngestionStateHistoryCreateManyContentInputEnvelope {
+  data: [IngestionStateHistoryCreateManyContentInput!]!
+  skipDuplicates: Boolean
+}
+
+input IngestionStateHistoryCreateNestedManyWithoutContentInput {
+  connect: [IngestionStateHistoryWhereUniqueInput!]
+  connectOrCreate: [IngestionStateHistoryCreateOrConnectWithoutContentInput!]
+  create: [IngestionStateHistoryCreateWithoutContentInput!]
+  createMany: IngestionStateHistoryCreateManyContentInputEnvelope
+}
+
+input IngestionStateHistoryCreateOrConnectWithoutContentInput {
+  create: IngestionStateHistoryCreateWithoutContentInput!
+  where: IngestionStateHistoryWhereUniqueInput!
+}
+
+input IngestionStateHistoryCreateWithoutContentInput {
+  contentSize: Float
+  contentType: String
+  durationSeconds: Float
+  fromState: IngestionState
+  id: String
+  metadata: JSON!
+  toState: IngestionState!
+  transitionTime: DateTime
+}
+
+input IngestionStateHistoryListRelationFilter {
+  every: IngestionStateHistoryWhereInput
+  none: IngestionStateHistoryWhereInput
+  some: IngestionStateHistoryWhereInput
+}
+
+input IngestionStateHistoryOrderByRelationAggregateInput {
+  _count: SortOrder
+}
+
+input IngestionStateHistoryScalarWhereInput {
+  AND: [IngestionStateHistoryScalarWhereInput!]
+  NOT: [IngestionStateHistoryScalarWhereInput!]
+  OR: [IngestionStateHistoryScalarWhereInput!]
+  contentId: StringFilter
+  contentSize: FloatNullableFilter
+  contentType: StringNullableFilter
+  durationSeconds: FloatNullableFilter
+  fromState: EnumIngestionStateNullableFilter
+  id: StringFilter
+  metadata: JsonFilter
+  toState: EnumIngestionStateFilter
+  transitionTime: DateTimeFilter
+}
+
+input IngestionStateHistoryUpdateManyMutationInput {
+  contentSize: Float
+  contentType: String
+  durationSeconds: Float
+  fromState: IngestionState
+  id: String
+  metadata: JSON
+  toState: IngestionState
+  transitionTime: DateTime
+}
+
+input IngestionStateHistoryUpdateManyWithWhereWithoutContentInput {
+  data: IngestionStateHistoryUpdateManyMutationInput!
+  where: IngestionStateHistoryScalarWhereInput!
+}
+
+input IngestionStateHistoryUpdateManyWithoutContentNestedInput {
+  connect: [IngestionStateHistoryWhereUniqueInput!]
+  connectOrCreate: [IngestionStateHistoryCreateOrConnectWithoutContentInput!]
+  create: [IngestionStateHistoryCreateWithoutContentInput!]
+  createMany: IngestionStateHistoryCreateManyContentInputEnvelope
+  delete: [IngestionStateHistoryWhereUniqueInput!]
+  deleteMany: [IngestionStateHistoryScalarWhereInput!]
+  disconnect: [IngestionStateHistoryWhereUniqueInput!]
+  set: [IngestionStateHistoryWhereUniqueInput!]
+  update: [IngestionStateHistoryUpdateWithWhereUniqueWithoutContentInput!]
+  updateMany: [IngestionStateHistoryUpdateManyWithWhereWithoutContentInput!]
+  upsert: [IngestionStateHistoryUpsertWithWhereUniqueWithoutContentInput!]
+}
+
+input IngestionStateHistoryUpdateWithWhereUniqueWithoutContentInput {
+  data: IngestionStateHistoryUpdateWithoutContentInput!
+  where: IngestionStateHistoryWhereUniqueInput!
+}
+
+input IngestionStateHistoryUpdateWithoutContentInput {
+  contentSize: Float
+  contentType: String
+  durationSeconds: Float
+  fromState: IngestionState
+  id: String
+  metadata: JSON
+  toState: IngestionState
+  transitionTime: DateTime
+}
+
+input IngestionStateHistoryUpsertWithWhereUniqueWithoutContentInput {
+  create: IngestionStateHistoryCreateWithoutContentInput!
+  update: IngestionStateHistoryUpdateWithoutContentInput!
+  where: IngestionStateHistoryWhereUniqueInput!
+}
+
+input IngestionStateHistoryWhereInput {
+  AND: [IngestionStateHistoryWhereInput!]
+  NOT: [IngestionStateHistoryWhereInput!]
+  OR: [IngestionStateHistoryWhereInput!]
+  content: ContentScalarRelationFilter
+  contentId: StringFilter
+  contentSize: FloatNullableFilter
+  contentType: StringNullableFilter
+  durationSeconds: FloatNullableFilter
+  fromState: EnumIngestionStateNullableFilter
+  id: StringFilter
+  metadata: JsonFilter
+  toState: EnumIngestionStateFilter
+  transitionTime: DateTimeFilter
+}
+
+input IngestionStateHistoryWhereUniqueInput {
+  AND: [IngestionStateHistoryWhereInput!]
+  NOT: [IngestionStateHistoryWhereInput!]
+  OR: [IngestionStateHistoryWhereInput!]
+  content: ContentScalarRelationFilter
+  contentId: StringFilter
+  contentSize: FloatNullableFilter
+  contentType: StringNullableFilter
+  durationSeconds: FloatNullableFilter
+  fromState: EnumIngestionStateNullableFilter
+  id: String
+  metadata: JsonFilter
+  toState: EnumIngestionStateFilter
+  transitionTime: DateTimeFilter
+}
+
+type IngestionUserStats {
+  contentCount: Int!
+  pageCount: Int!
+  userId: String!
+}
+
+input IntFilter {
+  equals: Int
+  gt: Int
+  gte: Int
+  in: [Int!]
+  lt: Int
+  lte: Int
+  not: NestedIntFilter
+  notIn: [Int!]
+}
+
+input IntNullableFilter {
+  equals: Int
+  gt: Int
+  gte: Int
+  in: [Int!]
+  lt: Int
+  lte: Int
+  not: NestedIntNullableFilter
+  notIn: [Int!]
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+input JsonFilter {
+  array_contains: JSON
+  array_ends_with: JSON
+  array_starts_with: JSON
+  equals: JSON
+  gt: JSON
+  gte: JSON
+  lt: JSON
+  lte: JSON
+  mode: QueryMode
+  not: JSON
+  path: [String!]
+  string_contains: String
+  string_ends_with: String
+  string_starts_with: String
+}
+
+input JsonNullableFilter {
+  array_contains: JSON
+  array_ends_with: JSON
+  array_starts_with: JSON
+  equals: JSON
+  gt: JSON
+  gte: JSON
+  lt: JSON
+  lte: JSON
+  mode: QueryMode
+  not: JSON
+  path: [String!]
+  string_contains: String
+  string_ends_with: String
+  string_starts_with: String
+}
+
+type Mutation {
+  checkVectorDataIntegrity(waitAfterRounds: Int = 40, waitInMs: Int = 250): Boolean!
+  chunkAddEmbeddingsInBatches(contentId: String!, embeddingUpdates: [ChunkEmbeddingUpdateInput!]!): Boolean!
+  chunkCreate(contentId: String!, input: ChunkCreateInput!): Chunk!
+  chunkCreateMany(contentId: String!, input: [ChunkCreateInput!]!): [Chunk!]!
+  chunkCreateManyWithEmbeddings(contentId: String!, input: [ChunkCreateInput!]!): [Chunk!]!
+  chunkDeleteByContent(id: String!): Boolean!
+  chunkUpdate(chunkId: String!, contentId: String!, input: ChunkUpdateInput!): Chunk!
+  companyMetaUpdate(embeddingDimension: Float, embeddingModel: String): CompanyMeta!
+  contentDelete(
+    """For OwnerType.CHAT contents, chatId is required"""
+    chatId: String
+    id: String!
+  ): Boolean!
+  contentDeleteByContentIds(contentIds: [String!]!): [Content!]!
+  contentDeleteByKey(baseUrl: String, key: String!, ownerType: String!, scopeId: String, url: String): Boolean!
+  contentDeleteByOwnerId(ownerIds: [String!]!, shouldSoftDeleteContent: Boolean): Boolean!
+  contentServiceUpdate(contentId: String!, input: ContentUpdateInput!, previewPdfFileName: String): Content!
+  contentUpdate(contentId: String!, input: ContentUpdateInput!, ownerId: String): Content!
+  contentUpdateMetadata(chatId: String, contentId: String!, metadata: JSON!): Content!
+  contentUpsert(baseUrl: String, chatId: String, fileUrl: String, input: ContentCreateInput!, scopeId: String, sourceKind: String, sourceName: String, sourceOwnerType: String, storeInternally: Boolean, text: String): Content!
+  contentUpsertByChat(chatId: String!, fileUrl: String, input: ContentCreateInput!, storeInternally: Boolean): Content!
+  createFileAccessesForContents(fileAccesses: [FileAccessContentChangeDto!]!, scopeId: String!): Boolean!
+  forceIngestionState(dryRun: Boolean = false, ingestionState: IngestionState!, where: ContentWhereInput): Float!
+  ingestionEventProcessor(contentId: String!, errorData: String, event: String!, userId: String): Content
+  markAllForRebuidingMetadata(where: ContentWhereInput): Boolean!
+  markAllForReindexing(where: ContentWhereInput): Boolean!
+  markAllForReingestion(where: ContentWhereInput): Boolean!
+  markAllForVectorDataIntegrityCheck(where: ContentWhereInput): Boolean!
+  markForReembedding(where: ContentWhereInput): Boolean!
+  moveContent(contentId: String!, newParentId: String!): Content!
+  reIndexVectorDB: Boolean!
+  rebuildMetadata(waitAfterRounds: Int = 40, waitInMs: Int = 250): Boolean!
+  reembedFiles(waitAfterRounds: Int = 40, waitInMs: Int = 250): Boolean!
+  reingestFiles(waitAfterRounds: Int = 40, waitInMs: Int = 250): Boolean!
+  removeFileAccessesForContents(fileAccesses: [FileAccessContentChangeDto!]!, scopeId: String!): Boolean!
+  retryFailedIngestion(contentIds: [String!], ownerIds: [String!]): RetryFailedIngestionResponse!
+  updateAllContentsFileAccessesByScope(changeType: String!, fileAccesses: [FileAccessPermissionDto!]!, scopeId: String!): Boolean!
+}
+
+input NestedBoolFilter {
+  equals: Boolean
+  not: NestedBoolFilter
+}
+
+input NestedDateTimeFilter {
+  equals: DateTime
+  gt: DateTime
+  gte: DateTime
+  in: [DateTime!]
+  lt: DateTime
+  lte: DateTime
+  not: NestedDateTimeFilter
+  notIn: [DateTime!]
+}
+
+input NestedDateTimeNullableFilter {
+  equals: DateTime
+  gt: DateTime
+  gte: DateTime
+  in: [DateTime!]
+  lt: DateTime
+  lte: DateTime
+  not: NestedDateTimeNullableFilter
+  notIn: [DateTime!]
+}
+
+input NestedEnumIngestionStateFilter {
+  equals: IngestionState
+  in: [IngestionState!]
+  not: NestedEnumIngestionStateFilter
+  notIn: [IngestionState!]
+}
+
+input NestedEnumIngestionStateNullableFilter {
+  equals: IngestionState
+  in: [IngestionState!]
+  not: NestedEnumIngestionStateNullableFilter
+  notIn: [IngestionState!]
+}
+
+input NestedEnumOwnerTypeFilter {
+  equals: OwnerType
+  in: [OwnerType!]
+  not: NestedEnumOwnerTypeFilter
+  notIn: [OwnerType!]
+}
+
+input NestedEnumSourceKindFilter {
+  equals: SourceKind
+  in: [SourceKind!]
+  not: NestedEnumSourceKindFilter
+  notIn: [SourceKind!]
+}
+
+input NestedFloatNullableFilter {
+  equals: Float
+  gt: Float
+  gte: Float
+  in: [Float!]
+  lt: Float
+  lte: Float
+  not: NestedFloatNullableFilter
+  notIn: [Float!]
+}
+
+input NestedIntFilter {
+  equals: Int
+  gt: Int
+  gte: Int
+  in: [Int!]
+  lt: Int
+  lte: Int
+  not: NestedIntFilter
+  notIn: [Int!]
+}
+
+input NestedIntNullableFilter {
+  equals: Int
+  gt: Int
+  gte: Int
+  in: [Int!]
+  lt: Int
+  lte: Int
+  not: NestedIntNullableFilter
+  notIn: [Int!]
+}
+
+input NestedStringFilter {
+  contains: String
+  endsWith: String
+  equals: String
+  gt: String
+  gte: String
+  in: [String!]
+  lt: String
+  lte: String
+  not: NestedStringFilter
+  notIn: [String!]
+  startsWith: String
+}
+
+input NestedStringNullableFilter {
+  contains: String
+  endsWith: String
+  equals: String
+  gt: String
+  gte: String
+  in: [String!]
+  lt: String
+  lte: String
+  not: NestedStringNullableFilter
+  notIn: [String!]
+  startsWith: String
+}
+
+enum NullsOrder {
+  first
+  last
+}
+
+type OversizedContent {
+  chunkid: String!
+  count: Float!
+  id: String!
+  key: String!
+}
+
+enum OwnerType {
+  CHAT
+  COMPANY
+  SCOPE
+  USER
+}
+
+type PaginatedContent {
+  contentContributors: [PaginatedContentContributor!]!
+  contentOwners: [PaginatedContentOwner!]!
+  nodes: [Content!]
+  totalCount: Int!
+}
+
+type PaginatedContentContributor {
+  contentId: String!
+  contributor: String!
+}
+
+type PaginatedContentOwner {
+  ownerId: String!
+  ownerName: String!
+}
+
+type Query {
+  chunk(chatId: String, contentId: String!, cursor: ChunkWhereUniqueInput, distinct: [ChunkScalarFieldEnum!], orderBy: [ChunkOrderByWithRelationInput!], skip: Int, take: Int, where: ChunkWhereInput): [Chunk!]!
+  chunkById(contentId: String!, id: String!): Chunk!
+  chunksByContentId(contentId: String!): [Chunk!]!
+  companyMeta: CompanyMeta!
+  content(accessType: String, chatId: String, cursor: ContentWhereUniqueInput, distinct: [ContentScalarFieldEnum!], includeDeletedContent: Boolean, includeFailedContent: Boolean, orderBy: [ContentOrderByWithRelationInput!], skip: Int, take: Int, where: ContentWhereInput): [Content!]!
+  contentByChat(accessType: String, chatId: String, includeFailedContent: Boolean = true): [Content!]!
+  contentByCompany(chatId: String, cursor: ContentWhereUniqueInput, distinct: [ContentScalarFieldEnum!], includeDeletedContent: Boolean, orderBy: [ContentOrderByWithRelationInput!], skip: Int, take: Int, where: ContentWhereInput): [Content!]!
+  contentById(accessType: String, chatId: String, contentIds: [String!]!, includeDeletedContent: Boolean, includeFailedContent: Boolean): [Content!]!
+  contentByUser(accessType: String, chatId: String, cursor: ContentWhereUniqueInput, distinct: [ContentScalarFieldEnum!], includeDeletedContent: Boolean, includeFailedContent: Boolean, orderBy: [ContentOrderByWithRelationInput!], skip: Int, take: Int, where: ContentWhereInput): [Content!]!
+  contentWithOversizedChunks(textLength: Float): [OversizedContent!]!
+  findScopesWithMatchingFileAccesses(scopeIds: [String!]!, userGroupIds: [String!]): [String!]!
+  getContentById(contentId: String!): Content!
+  getContentInfo(chatId: String, contentId: String, filePath: String): Content
+  getFolderIds(metadataFilter: JSON!): [FolderIdsDto!]!
+  ingestionAnalyticsByCompany(endDate: String!, startDate: String!): [IngestionUserStats!]!
+  ingestionMetrics(filter: IngestionMetricsFilterInput): IngestionMetricsType!
+  paginatedContent(accessType: String, chatId: String, cursor: ContentWhereUniqueInput, distinct: [ContentScalarFieldEnum!], orderBy: [ContentOrderByWithRelationInput!], skip: Int, take: Int, where: ContentWhereInput): PaginatedContent!
+  paginatedContentForRule(rule: JSON!, skip: Int, take: Int): PaginatedContent!
+  paginatedContentSystemFieldsByCompany(cursor: String, take: Int!, where: ContentWhereInput): CursorPaginatedContentWithTotalPages!
+  paginatedIngestionErrorAnalyticsByCompany(cursor: String, take: Int!, where: IngestionErrorAnalyticsWhereInput): CursorPaginatedIngestionErrorAnalytics!
+  statisticsIngestion(accessType: String, chatId: String, cursor: ContentWhereUniqueInput, distinct: [ContentScalarFieldEnum!], orderBy: [ContentOrderByWithRelationInput!], skip: Int, take: Int, where: ContentWhereInput): StatisticsIngestion!
+  statisticsIngestionAdmin(where: ContentWhereInput): StatisticsIngestion!
+}
+
+enum QueryMode {
+  default
+  insensitive
+}
+
+type RetryFailedIngestionResponse {
+  totalAffectedContents: Int!
+}
+
+enum SortOrder {
+  asc
+  desc
+}
+
+input SortOrderInput {
+  nulls: NullsOrder
+  sort: SortOrder!
+}
+
+type Source {
+  _count: SourceCount!
+  companyId: String
+
+  """@DtoReadOnly"""
+  createdAt: DateTime!
+  createdBy: String
+  id: ID!
+  kind: SourceKind!
+  name: String
+
+  """@DtoReadOnly"""
+  ownerId: String!
+
+  """@DtoReadOnly"""
+  ownerType: OwnerType!
+
+  """@DtoReadOnly"""
+  updatedAt: DateTime!
+}
+
+type SourceCount {
+  content: Int!
+}
+
+enum SourceKind {
+  ATLASSIAN_CONFLUENCE_CLOUD
+  ATLASSIAN_CONFLUENCE_ONPREM
+  FILE_DOWNLOAD
+  INTRANET
+  MICROSOFT_365_SHAREPOINT
+  UNIQUE_BLOB_STORAGE
+}
+
+input SourceScalarRelationFilter {
+  is: SourceWhereInput
+  isNot: SourceWhereInput
+}
+
+input SourceWhereInput {
+  AND: [SourceWhereInput!]
+  NOT: [SourceWhereInput!]
+  OR: [SourceWhereInput!]
+  companyId: StringNullableFilter
+  createdAt: DateTimeFilter
+  createdBy: StringNullableFilter
+  id: StringFilter
+  kind: EnumSourceKindFilter
+  name: StringNullableFilter
+  ownerType: EnumOwnerTypeFilter
+  updatedAt: DateTimeFilter
+}
+
+type StatisticsIngestion {
+  counts: JSON!
+}
+
+input StringFilter {
+  contains: String
+  endsWith: String
+  equals: String
+  gt: String
+  gte: String
+  in: [String!]
+  lt: String
+  lte: String
+  mode: QueryMode
+  not: NestedStringFilter
+  notIn: [String!]
+  startsWith: String
+}
+
+input StringNullableFilter {
+  contains: String
+  endsWith: String
+  equals: String
+  gt: String
+  gte: String
+  in: [String!]
+  lt: String
+  lte: String
+  mode: QueryMode
+  not: NestedStringNullableFilter
+  notIn: [String!]
+  startsWith: String
+}
+
+input StringNullableListFilter {
+  equals: [String!]
+  has: String
+  hasEvery: [String!]
+  hasSome: [String!]
+  isEmpty: Boolean
+}
+
+type UiPermissionsModel {
+  canAccessAppRepository: Boolean!
+  canAccessSpaceManagement: Boolean!
+  canAccessUserManagement: Boolean!
+  canListUsers: Boolean!
+  canManageGroup: Boolean!
+  canManageOwnSpace: Boolean!
+  canReadGroup: Boolean!
+  canReadUser: Boolean!
+}
+
+type VolumePointType {
+  """ISO date (YYYY-MM-DD)"""
+  day: String!
+  ingestions_started: Int!
+}

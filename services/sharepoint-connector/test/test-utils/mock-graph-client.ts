@@ -129,75 +129,93 @@ export class MockGraphClient {
  * Fluent API request builder that mimics Microsoft Graph Client's request API.
  */
 class MockGraphRequest {
+  // URL patterns for routing API requests
+  private static readonly URL_PATTERNS = {
+    SITE_LISTS: /\/sites\/[^/]+\/lists$/,
+    SITE_DRIVES: /\/sites\/[^/]+\/drives$/,
+    DRIVE_ITEMS: /\/drives\/[^/]+\/items\/[^/]+\/children$/,
+    LIST_ITEMS: /\/sites\/[^/]+\/lists\/[^/]+\/items$/,
+    DRIVE_ITEM_PERMISSIONS: /\/drives\/[^/]+\/items\/([^/]+)\/permissions$/,
+    LIST_ITEM_PERMISSIONS: /\/sites\/[^/]+\/lists\/[^/]+\/items\/([^/]+)\/permissions$/,
+    GROUP_MEMBERS: /\/groups\/[^/]+\/members$/,
+    GROUP_OWNERS: /\/groups\/[^/]+\/owners$/,
+    SITE_INFO: /\/sites\/[^/]+$/,
+    FILE_CONTENT: /\/drives\/[^/]+\/items\/([^/]+)\/content$/,
+  };
+
   public constructor(
     private url: string,
     private client: MockGraphClient,
   ) {}
 
-  public select(_fields: string) {
+  public select(_fields: string): this {
     return this;
   }
 
-  public top(_count: number) {
+  public top(_count: number): this {
     return this;
   }
 
-  public filter(_query: string) {
+  public filter(_query: string): this {
     return this;
   }
 
-  public expand(_fields: string) {
+  public expand(_fields: string): this {
     return this;
   }
 
-  public async get() {
+  public async get(): Promise<
+    { value: unknown[] } | { webUrl: string; displayName: string } | Readable
+  > {
     // Route based on URL pattern - simulates SharePoint API endpoints
 
     // Site lists: /sites/{siteId}/lists
-    if (this.url.match(/\/sites\/[^/]+\/lists$/)) {
+    if (this.url.match(MockGraphRequest.URL_PATTERNS.SITE_LISTS)) {
       return { value: this.client.siteLists };
     }
 
     // Site drives: /sites/{siteId}/drives
-    if (this.url.match(/\/sites\/[^/]+\/drives$/)) {
+    if (this.url.match(MockGraphRequest.URL_PATTERNS.SITE_DRIVES)) {
       return { value: this.client.drives };
     }
 
     // Drive items: /drives/{driveId}/items/{itemId}/children
-    if (this.url.match(/\/drives\/[^/]+\/items\/[^/]+\/children$/)) {
+    if (this.url.match(MockGraphRequest.URL_PATTERNS.DRIVE_ITEMS)) {
       return { value: this.client.driveItems };
     }
 
     // List items: /sites/{siteId}/lists/{listId}/items
-    if (this.url.match(/\/sites\/[^/]+\/lists\/[^/]+\/items$/)) {
+    if (this.url.match(MockGraphRequest.URL_PATTERNS.LIST_ITEMS)) {
       return { value: this.client.listItems };
     }
 
     // Drive item permissions: /drives/{driveId}/items/{itemId}/permissions
-    if (this.url.match(/\/drives\/[^/]+\/items\/([^/]+)\/permissions$/)) {
-      const itemId = this.url.match(/\/drives\/[^/]+\/items\/([^/]+)\/permissions$/)?.[1];
-      return { value: itemId ? this.client.permissions[itemId] || [] : [] };
+    const drivePermMatch = this.url.match(MockGraphRequest.URL_PATTERNS.DRIVE_ITEM_PERMISSIONS);
+    if (drivePermMatch?.[1]) {
+      const itemId = drivePermMatch[1];
+      return { value: this.client.permissions[itemId] || [] };
     }
 
     // List item permissions: /sites/{siteId}/lists/{listId}/items/{itemId}/permissions
-    if (this.url.match(/\/sites\/[^/]+\/lists\/[^/]+\/items\/([^/]+)\/permissions$/)) {
-      const itemId = this.url.match(/\/items\/([^/]+)\/permissions$/)?.[1];
-      return { value: itemId ? this.client.permissions[itemId] || [] : [] };
+    const listPermMatch = this.url.match(MockGraphRequest.URL_PATTERNS.LIST_ITEM_PERMISSIONS);
+    if (listPermMatch?.[1]) {
+      const itemId = listPermMatch[1];
+      return { value: this.client.permissions[itemId] || [] };
     }
 
     // Group members: /groups/{groupId}/members
-    if (this.url.match(/\/groups\/[^/]+\/members$/)) {
+    if (this.url.match(MockGraphRequest.URL_PATTERNS.GROUP_MEMBERS)) {
       return { value: this.client.groupMembers };
     }
 
     // Group owners: /groups/{groupId}/owners
-    if (this.url.match(/\/groups\/[^/]+\/owners$/)) {
+    if (this.url.match(MockGraphRequest.URL_PATTERNS.GROUP_OWNERS)) {
       return { value: this.client.groupOwners };
     }
 
     // Site info: /sites/{siteId}
     if (
-      this.url.match(/\/sites\/[^/]+$/) &&
+      this.url.match(MockGraphRequest.URL_PATTERNS.SITE_INFO) &&
       !this.url.includes('/lists') &&
       !this.url.includes('/drives')
     ) {
@@ -208,8 +226,9 @@ class MockGraphRequest {
     }
 
     // File content stream: /drives/{driveId}/items/{itemId}/content
-    if (this.url.match(/\/drives\/[^/]+\/items\/([^/]+)\/content$/)) {
-      const itemId = this.url.match(/\/drives\/[^/]+\/items\/([^/]+)\/content$/)?.[1];
+    const contentMatch = this.url.match(MockGraphRequest.URL_PATTERNS.FILE_CONTENT);
+    if (contentMatch) {
+      const itemId = contentMatch[1];
       if (itemId && this.client.fileContentStreams[itemId]) {
         return this.client.fileContentStreams[itemId];
       }
@@ -220,10 +239,11 @@ class MockGraphRequest {
     return { value: [] };
   }
 
-  public async getStream() {
+  public async getStream(): Promise<ReturnType<typeof Readable.toWeb>> {
     // Used for file content downloads - must return ReadableStream (web API)
-    if (this.url.match(/\/drives\/[^/]+\/items\/([^/]+)\/content$/)) {
-      const itemId = this.url.match(/\/drives\/[^/]+\/items\/([^/]+)\/content$/)?.[1];
+    const contentMatch = this.url.match(MockGraphRequest.URL_PATTERNS.FILE_CONTENT);
+    if (contentMatch) {
+      const itemId = contentMatch[1];
       if (itemId && this.client.fileContentStreams[itemId]) {
         // Convert Node.js Readable to web ReadableStream
         const readable = this.client.fileContentStreams[itemId];

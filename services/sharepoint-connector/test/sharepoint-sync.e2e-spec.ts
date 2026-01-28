@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import type { RequestDocument } from 'graphql-request';
+import type { RequestDocument, Variables } from 'graphql-request';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { GraphClientFactory } from '../src/microsoft-apis/graph/graph-client.factory';
@@ -17,21 +17,32 @@ import { MockGraphClient } from './test-utils/mock-graph-client';
 import { MockHttpClientService } from './test-utils/mock-http-client.service';
 import { MockIngestionHttpClient } from './test-utils/mock-ingestion-http.client';
 import { MockSharepointRestClientService } from './test-utils/mock-sharepoint-rest-client.service';
-import { MockUniqueGraphqlClient } from './test-utils/mock-unique-graphql.client';
+import {
+  createUniqueStatefulMock,
+  type UniqueStatefulMock,
+} from './test-utils/unique-stateful-mock';
 
 // Helper to extract operation name from GraphQL document
 function extractOperationName(document: RequestDocument): string {
-  const docString = typeof document === 'string' ? document : document.toString();
+  const docString =
+    typeof document === 'string'
+      ? document
+      : ((document as { loc?: { source?: { body?: string } } }).loc?.source?.body ??
+        document.toString());
   const match = docString.match(/(?:mutation|query)\s+(\w+)/);
   return match?.[1] || 'Unknown';
 }
 
 // Helper to get GraphQL operations by name from mock calls
-function getGraphQLOperations(mockClient: MockUniqueGraphqlClient, operationName?: string) {
+type GraphqlCall = [RequestDocument, Variables?];
+function getGraphQLOperations(
+  mockClient: { request: { mock: { calls: GraphqlCall[] } } },
+  operationName?: string,
+) {
   return mockClient.request.mock.calls
-    .map((call) => ({
-      operationName: extractOperationName(call[0]),
-      variables: call[1] || {},
+    .map(([document, variables]) => ({
+      operationName: extractOperationName(document),
+      variables: (variables ?? {}) as Variables,
     }))
     .filter((call) => !operationName || call.operationName === operationName);
 }
@@ -42,16 +53,18 @@ describe('SharePoint synchronization (e2e)', () => {
   let mockSharepointRestClientService: MockSharepointRestClientService;
   let mockHttpClientService: MockHttpClientService;
   let mockIngestionHttpClient: MockIngestionHttpClient;
-  let mockIngestionGraphqlClient: MockUniqueGraphqlClient;
-  let mockScopeGraphqlClient: MockUniqueGraphqlClient;
+  let uniqueMock: UniqueStatefulMock;
+  let mockIngestionGraphqlClient: UniqueStatefulMock['ingestionClient'];
+  let mockScopeGraphqlClient: UniqueStatefulMock['scopeManagementClient'];
 
   beforeEach(async () => {
     mockGraphClient = new MockGraphClient();
     mockSharepointRestClientService = new MockSharepointRestClientService();
     mockHttpClientService = new MockHttpClientService();
     mockIngestionHttpClient = new MockIngestionHttpClient();
-    mockIngestionGraphqlClient = new MockUniqueGraphqlClient();
-    mockScopeGraphqlClient = new MockUniqueGraphqlClient();
+    uniqueMock = createUniqueStatefulMock();
+    mockIngestionGraphqlClient = uniqueMock.ingestionClient;
+    mockScopeGraphqlClient = uniqueMock.scopeManagementClient;
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
