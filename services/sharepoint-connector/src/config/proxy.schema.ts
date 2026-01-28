@@ -49,5 +49,9 @@ export const ProxyConfigSchema = z.discriminatedUnion('authMode', [
 
 export const proxyConfig = registerConfig('proxy', ProxyConfigSchema);
 
-export type ProxyConfigType = ConfigType<typeof proxyConfig>;
+export type ProxyConfig = ConfigType<typeof proxyConfig>;
 export type ProxyConfigNamespaced = NamespacedConfigType<typeof proxyConfig>;
+
+export type BasicProxyConfig = Extract<ProxyConfig, { authMode: 'basic' }>;
+export type TlsProxyConfig = Extract<ProxyConfig, { authMode: 'tls' }>;
+export type NoneProxyConfig = Extract<ProxyConfig, { authMode: 'none' }>;
