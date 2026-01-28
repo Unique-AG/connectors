@@ -146,6 +146,10 @@ export class ProxyService implements OnModuleDestroy {
     return this.dispatcher;
   }
 
+  public getProxyConfig(): ProxyConfig {
+    return this.configService.get('proxy', { infer: true });
+  }
+
   public async onModuleDestroy(): Promise<void> {
     await this.dispatcher.close();
     await this.noProxyDispatcher.close();
@@ -263,7 +267,7 @@ git commit -m "feat(sharepoint-connector): register ProxyModule in AppModule"
 
 **Step 1: Inject ProxyService and use dispatcher**
 
-Replace the current implementation to use ProxyService:
+Note: This service composes interceptors on top of the base dispatcher. The composed dispatcher should be closed in `onModuleDestroy` - this does NOT close the underlying ProxyService dispatcher.
 
 ```typescript
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
@@ -280,6 +284,7 @@ export class HttpClientService implements OnModuleDestroy {
   }
 
   public async onModuleDestroy(): Promise<void> {
+    // Close the composed dispatcher (not the underlying ProxyService dispatcher)
     await this.httpAgent.close();
   }
 
@@ -312,61 +317,91 @@ git commit -m "feat(sharepoint-connector): use ProxyService in HttpClientService
 **Files:**
 - Modify: `services/sharepoint-connector/src/microsoft-apis/sharepoint-rest/sharepoint-rest-http.service.ts`
 
-**Step 1: Inject ProxyService and use dispatcher**
+**Step 1: Inject ProxyService, store origin, use dispatcher**
+
+Key changes:
+1. Inject `ProxyService`
+2. Store `origin` from config (previously bound to Client at construction)
+3. Add `origin` to each `request()` call (Agent/ProxyAgent are multi-origin)
+4. Keep `onModuleDestroy` - closes the composed dispatcher, not the underlying one
 
 Add import:
 ```typescript
 import { ProxyService } from '../../proxy';
 ```
 
-Update constructor to inject ProxyService and use it:
+Update class:
 
 ```typescript
-public constructor(
-  private readonly microsoftAuthenticationService: MicrosoftAuthenticationService,
-  private readonly configService: ConfigService<Config, true>,
-  private readonly proxyService: ProxyService,
-) {
-  this.shouldConcealLogs = shouldConcealLogs(this.configService);
+@Injectable()
+export class SharepointRestHttpService {
+  private readonly logger = new Logger(this.constructor.name);
+  private readonly client: Dispatcher;
+  private readonly origin: string;
+  private readonly shouldConcealLogs: boolean;
 
-  const interceptorsInCallingOrder = [
-    interceptors.redirect({
-      maxRedirections: 10,
-    }),
-    interceptors.retry({
-      maxRetries: 4,
-      minTimeout: 3_000,
-      methods: ['GET', 'POST'],
-      errorCodes: [
-        'ETIMEDOUT',
-        'ECONNRESET',
-        'ECONNREFUSED',
-        'ENOTFOUND',
-        'ENETDOWN',
-        'ENETUNREACH',
-        'EHOSTDOWN',
-        'EHOSTUNREACH',
-        'EPIPE',
-        'UND_ERR_SOCKET',
-      ],
-    }),
-    createTokenRefreshInterceptor(async () =>
-      this.microsoftAuthenticationService.getAccessToken('sharepoint-rest'),
-    ),
-    createLoggingInterceptor(this.shouldConcealLogs),
-  ];
+  public constructor(
+    private readonly microsoftAuthenticationService: MicrosoftAuthenticationService,
+    private readonly configService: ConfigService<Config, true>,
+    private readonly proxyService: ProxyService,
+  ) {
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.origin = this.configService.get('sharepoint.baseUrl', { infer: true });
 
-  const baseDispatcher = this.proxyService.getDispatcher('always');
-  this.client = baseDispatcher.compose(interceptorsInCallingOrder.reverse());
-}
+    const interceptorsInCallingOrder = [
+      interceptors.redirect({
+        maxRedirections: 10,
+      }),
+      interceptors.retry({
+        maxRetries: 4,
+        minTimeout: 3_000,
+        methods: ['GET', 'POST'],
+        errorCodes: [
+          'ETIMEDOUT',
+          'ECONNRESET',
+          'ECONNREFUSED',
+          'ENOTFOUND',
+          'ENETDOWN',
+          'ENETUNREACH',
+          'EHOSTDOWN',
+          'EHOSTUNREACH',
+          'EPIPE',
+          'UND_ERR_SOCKET',
+        ],
+      }),
+      createTokenRefreshInterceptor(async () =>
+        this.microsoftAuthenticationService.getAccessToken('sharepoint-rest'),
+      ),
+      createLoggingInterceptor(this.shouldConcealLogs),
+    ];
+
+    const baseDispatcher = this.proxyService.getDispatcher('always');
+    this.client = baseDispatcher.compose(interceptorsInCallingOrder.reverse());
+  }
 ```
 
-Remove the `Client` import from undici (no longer needed). Update the import to include what's needed:
+Update `requestSingle` method - add origin:
 ```typescript
-import { Dispatcher, interceptors } from 'undici';
+const { statusCode, body } = await this.client.request({
+  origin: this.origin,
+  method: 'GET',
+  path,
+  headers: { ... },
+});
 ```
 
-Remove the `sharePointBaseUrl` and `new Client(...)` code.
+Update `requestBatch` method - add origin:
+```typescript
+const { statusCode, body, headers } = await this.client.request({
+  origin: this.origin,
+  method: 'POST',
+  path,
+  headers: { ... },
+  body: requestBody,
+});
+```
+
+Remove `Client` from undici import (keep `Dispatcher, interceptors`).
 
 **Step 2: Commit**
 
@@ -382,14 +417,19 @@ git commit -m "feat(sharepoint-connector): use ProxyService in SharepointRestHtt
 **Files:**
 - Modify: `services/sharepoint-connector/src/unique-api/clients/ingestion-http.client.ts`
 
-**Step 1: Inject ProxyService and use dispatcher**
+**Step 1: Inject ProxyService, store origin, use dispatcher**
+
+Same pattern as SharepointRestHttpService:
+1. Inject `ProxyService`
+2. Store `origin` from config
+3. Add `origin` to each `request()` call
 
 Add import:
 ```typescript
 import { ProxyService } from '../../proxy';
 ```
 
-Update constructor to inject ProxyService:
+Update constructor:
 
 ```typescript
 public constructor(
@@ -402,6 +442,11 @@ public constructor(
   @Inject(SPC_UNIQUE_REST_API_SLOW_REQUESTS_TOTAL)
   private readonly spcUniqueApiSlowRequestsTotal: Counter,
 ) {
+  const ingestionUrl = new URL(
+    this.configService.get('unique.ingestionServiceBaseUrl', { infer: true }),
+  );
+  this.origin = `${ingestionUrl.protocol}//${ingestionUrl.host}`;
+
   const interceptorsInCallingOrder = [
     interceptors.redirect({
       maxRedirections: 10,
@@ -421,9 +466,24 @@ public constructor(
 }
 ```
 
-Remove `Client` from undici import, keep `Dispatcher, errors, interceptors`.
+Add `origin` field:
+```typescript
+private readonly origin: string;
+```
 
-Remove the `ingestionUrl` and `new Client(...)` code.
+Update `request` method - add origin:
+```typescript
+const result = await this.httpClient.request({
+  origin: this.origin,
+  ...options,
+  headers: {
+    ...options.headers,
+    ...(await this.getHeaders()),
+  },
+});
+```
+
+Remove `Client` from undici import (keep `Dispatcher, errors, interceptors`).
 
 **Step 2: Commit**
 
@@ -438,6 +498,7 @@ git commit -m "feat(sharepoint-connector): use ProxyService in IngestionHttpClie
 
 **Files:**
 - Modify: `services/sharepoint-connector/src/unique-api/clients/unique-graphql.client.ts`
+- Modify: `services/sharepoint-connector/src/unique-api/unique-api.module.ts`
 
 **Step 1: Add custom fetch with proxy dispatcher**
 
@@ -478,7 +539,39 @@ this.graphQlClient = new GraphQLClient(graphqlUrl, {
 
 **Step 2: Update factory provider in unique-api.module.ts**
 
-The UniqueGraphqlClient is created via factory providers. Find where INGESTION_CLIENT and SCOPE_MANAGEMENT_CLIENT are provided and add ProxyService to the inject array and pass it to the constructor.
+Find where `INGESTION_CLIENT` and `SCOPE_MANAGEMENT_CLIENT` are provided. Add `ProxyService` to the inject array and pass it to the constructor.
+
+Example:
+```typescript
+{
+  provide: INGESTION_CLIENT,
+  useFactory: (
+    uniqueAuthService: UniqueAuthService,
+    configService: ConfigService<Config, true>,
+    bottleneckFactory: BottleneckFactory,
+    proxyService: ProxyService,
+    spcUniqueApiRequestDurationSeconds: Histogram,
+    spcUniqueApiSlowRequestsTotal: Counter,
+  ) =>
+    new UniqueGraphqlClient(
+      'ingestion',
+      uniqueAuthService,
+      configService,
+      bottleneckFactory,
+      proxyService,
+      spcUniqueApiRequestDurationSeconds,
+      spcUniqueApiSlowRequestsTotal,
+    ),
+  inject: [
+    UniqueAuthService,
+    ConfigService,
+    BottleneckFactory,
+    ProxyService,
+    SPC_UNIQUE_API_REQUEST_DURATION_SECONDS,
+    SPC_UNIQUE_API_SLOW_REQUESTS_TOTAL,
+  ],
+},
+```
 
 **Step 3: Commit**
 
@@ -536,16 +629,17 @@ git commit -m "feat(sharepoint-connector): use ProxyService in GraphClientFactor
 ## Task 9: Update Microsoft Auth Strategies (MSAL)
 
 **Files:**
+- Create: `services/sharepoint-connector/src/microsoft-apis/auth/msal-proxy-config.ts`
+- Modify: `services/sharepoint-connector/src/microsoft-apis/auth/microsoft-authentication.service.ts`
 - Modify: `services/sharepoint-connector/src/microsoft-apis/auth/strategies/certificate-auth.strategy.ts`
 - Modify: `services/sharepoint-connector/src/microsoft-apis/auth/strategies/client-secret-auth.strategy.ts`
 
-MSAL supports custom network client via `system.networkClient` configuration. We need to create a custom network client that uses our ProxyService.
+MSAL supports custom network client via `system.networkClient` configuration.
 
 **Step 1: Create MSAL network client helper**
 
-Create: `services/sharepoint-connector/src/microsoft-apis/auth/msal-network-client.ts`
-
 ```typescript
+// services/sharepoint-connector/src/microsoft-apis/auth/msal-proxy-config.ts
 import { INetworkModule, NetworkRequestOptions, NetworkResponse } from '@azure/msal-node';
 import { Dispatcher, fetch as undiciFetch } from 'undici';
 
@@ -589,16 +683,17 @@ export class ProxiedMsalNetworkClient implements INetworkModule {
 }
 ```
 
-**Step 2: Update CertificateAuthStrategy**
+**Step 2: Update MicrosoftAuthenticationService**
 
-The strategy is instantiated directly in MicrosoftAuthenticationService, not via DI. We need to pass ProxyService through.
+The strategies are instantiated directly, not via DI. Pass dispatcher through.
 
-Update `MicrosoftAuthenticationService` constructor to inject ProxyService and pass dispatcher to strategies:
-
+Add import:
 ```typescript
-// In microsoft-authentication.service.ts
 import { ProxyService } from '../../proxy';
+```
 
+Update constructor:
+```typescript
 public constructor(
   private readonly configService: ConfigService<Config, true>,
   private readonly proxyService: ProxyService,
@@ -608,7 +703,7 @@ public constructor(
 
   switch (authMode) {
     case 'oidc':
-      this.strategy = new OidcAuthStrategy(configService, dispatcher);
+      this.strategy = new OidcAuthStrategy(configService, this.proxyService);
       break;
     case 'client-secret':
       this.strategy = new ClientSecretAuthStrategy(configService, dispatcher);
@@ -620,12 +715,16 @@ public constructor(
 }
 ```
 
-Update `CertificateAuthStrategy` constructor:
+**Step 3: Update CertificateAuthStrategy**
 
+Add imports:
 ```typescript
 import { Dispatcher } from 'undici';
-import { ProxiedMsalNetworkClient } from '../msal-network-client';
+import { ProxiedMsalNetworkClient } from '../msal-proxy-config';
+```
 
+Update constructor:
+```typescript
 public constructor(
   private readonly configService: ConfigService<Config, true>,
   private readonly dispatcher: Dispatcher,
@@ -650,13 +749,9 @@ public constructor(
 }
 ```
 
-**Step 3: Update ClientSecretAuthStrategy similarly**
+**Step 4: Update ClientSecretAuthStrategy similarly**
 
-Same pattern as CertificateAuthStrategy.
-
-**Step 4: Update AuthStrategy interface**
-
-Update `auth-strategy.interface.ts` if needed to reflect constructor signature changes.
+Same pattern - add dispatcher parameter and configure MSAL with ProxiedMsalNetworkClient.
 
 **Step 5: Commit**
 
@@ -672,33 +767,110 @@ git commit -m "feat(sharepoint-connector): use ProxyService in MSAL auth strateg
 **Files:**
 - Modify: `services/sharepoint-connector/src/microsoft-apis/auth/strategies/oidc-auth.strategy.ts`
 
-Azure Identity's `DefaultAzureCredential` doesn't directly support custom network clients in the same way as MSAL. However, it respects the `HTTPS_PROXY` environment variable by default.
+Azure Identity SDK has native `proxyOptions` support - cleaner than custom network client.
 
-For explicit proxy support, we can use the `authorityHost` and custom `httpClient` options, but this is more complex.
-
-**Option A (Simple):** Rely on `HTTPS_PROXY` env var for OIDC mode - document in Helm chart.
-
-**Option B (Explicit):** Use `@azure/core-rest-pipeline` to create custom HTTP client.
-
-**Step 1: For now, add dispatcher parameter for consistency but document limitation**
+**Step 1: Update OidcAuthStrategy to use proxyOptions**
 
 ```typescript
-public constructor(
-  private readonly configService: ConfigService<Config, true>,
-  private readonly dispatcher: Dispatcher,
-) {
-  // Note: Azure Identity SDK uses HTTPS_PROXY env var for proxy support
-  // The dispatcher parameter is accepted for interface consistency
-  // but Azure Identity doesn't support custom fetch dispatcher directly
-  // ...existing code...
+import assert from 'node:assert';
+import { DefaultAzureCredential } from '@azure/identity';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { z } from 'zod';
+import { Config } from '../../../config';
+import { ProxyConfig } from '../../../config/proxy.schema';
+import { ProxyService } from '../../../proxy';
+import { sanitizeError } from '../../../utils/normalize-error';
+import { TokenAcquisitionResult } from '../types';
+import { AuthStrategy } from './auth-strategy.interface';
+
+const TokenResponseSchema = z.object({
+  token: z.string().min(1),
+  expiresOnTimestamp: z.number().positive(),
+});
+
+@Injectable()
+export class OidcAuthStrategy implements AuthStrategy {
+  private readonly logger = new Logger(this.constructor.name);
+  private readonly credential: DefaultAzureCredential;
+
+  public constructor(
+    private readonly configService: ConfigService<Config, true>,
+    private readonly proxyService: ProxyService,
+  ) {
+    const sharePointConfig = this.configService.get('sharepoint', { infer: true });
+
+    assert.strictEqual(
+      sharePointConfig.auth.mode,
+      'oidc',
+      'OidcAuthStrategy called but authentication mode is not "oidc"',
+    );
+
+    const proxyConfig = this.proxyService.getProxyConfig();
+    const proxyOptions = this.buildProxyOptions(proxyConfig);
+
+    this.credential = new DefaultAzureCredential({
+      tenantId: sharePointConfig.tenantId,
+      ...(proxyOptions && { proxyOptions }),
+    });
+  }
+
+  public async acquireNewToken(scopes: string[]): Promise<TokenAcquisitionResult> {
+    this.logger.log('Acquiring new Graph API token using OIDC');
+
+    try {
+      const tokenResponse = await this.credential.getToken(scopes);
+      const validatedResponse = TokenResponseSchema.parse(tokenResponse);
+
+      return {
+        token: validatedResponse.token,
+        expiresAt: validatedResponse.expiresOnTimestamp,
+      };
+    } catch (error) {
+      this.logger.error({
+        msg: 'Failed to acquire Graph API token using OIDC',
+        error: sanitizeError(error),
+      });
+
+      throw error;
+    }
+  }
+
+  private buildProxyOptions(proxyConfig: ProxyConfig) {
+    if (proxyConfig.authMode === 'none') {
+      return undefined;
+    }
+
+    const baseOptions = {
+      host: `${proxyConfig.protocol}://${proxyConfig.host}`,
+      port: proxyConfig.port,
+    };
+
+    if (proxyConfig.authMode === 'basic') {
+      return {
+        ...baseOptions,
+        username: proxyConfig.username,
+        password: proxyConfig.password,
+      };
+    }
+
+    // For TLS mode, Azure Identity doesn't support client certs for proxy auth directly
+    // The TLS cert would be for authenticating TO the proxy, which is less common
+    // Fall back to basic proxy settings without auth
+    return baseOptions;
+  }
 }
 ```
 
-**Step 2: Commit**
+**Step 2: Update AuthStrategy interface if needed**
+
+Check if interface needs changes to accommodate different constructor signatures.
+
+**Step 3: Commit**
 
 ```bash
 git add services/sharepoint-connector/src/microsoft-apis/auth/strategies/oidc-auth.strategy.ts
-git commit -m "feat(sharepoint-connector): update OidcAuthStrategy for proxy compatibility"
+git commit -m "feat(sharepoint-connector): use native proxyOptions in OidcAuthStrategy"
 ```
 
 ---
@@ -710,7 +882,7 @@ git commit -m "feat(sharepoint-connector): update OidcAuthStrategy for proxy com
 
 **Step 1: Add proxy configuration section**
 
-Add after `processing` section:
+Add after `processing` section (inside `connectorConfig`):
 
 ```yaml
   # -- HTTP proxy configuration for external API calls
@@ -753,6 +925,8 @@ git commit -m "feat(sharepoint-connector): add proxy config to Helm values"
 
 **Step 1: Create ConfigMap template**
 
+Note: No `required` helpers - validation happens at app startup.
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -763,16 +937,16 @@ metadata:
 data:
   PROXY_AUTH_MODE: {{ .Values.connectorConfig.proxy.authMode | quote }}
   {{- if ne .Values.connectorConfig.proxy.authMode "none" }}
-  PROXY_HOST: {{ required "proxy.host is required when authMode is not none" .Values.connectorConfig.proxy.host | quote }}
-  PROXY_PORT: {{ required "proxy.port is required when authMode is not none" .Values.connectorConfig.proxy.port | quote }}
-  PROXY_PROTOCOL: {{ required "proxy.protocol is required when authMode is not none" .Values.connectorConfig.proxy.protocol | quote }}
+  PROXY_HOST: {{ .Values.connectorConfig.proxy.host | quote }}
+  PROXY_PORT: {{ .Values.connectorConfig.proxy.port | quote }}
+  PROXY_PROTOCOL: {{ .Values.connectorConfig.proxy.protocol | quote }}
   {{- end }}
   {{- if eq .Values.connectorConfig.proxy.authMode "basic" }}
-  PROXY_USERNAME: {{ required "proxy.username is required for basic auth mode" .Values.connectorConfig.proxy.username | quote }}
+  PROXY_USERNAME: {{ .Values.connectorConfig.proxy.username | quote }}
   {{- end }}
   {{- if eq .Values.connectorConfig.proxy.authMode "tls" }}
-  PROXY_TLS_CERT_PATH: {{ required "proxy.tlsCertPath is required for tls auth mode" .Values.connectorConfig.proxy.tlsCertPath | quote }}
-  PROXY_TLS_KEY_PATH: {{ required "proxy.tlsKeyPath is required for tls auth mode" .Values.connectorConfig.proxy.tlsKeyPath | quote }}
+  PROXY_TLS_CERT_PATH: {{ .Values.connectorConfig.proxy.tlsCertPath | quote }}
+  PROXY_TLS_KEY_PATH: {{ .Values.connectorConfig.proxy.tlsKeyPath | quote }}
   {{- end }}
   {{- if .Values.connectorConfig.proxy.caBundlePath }}
   PROXY_CA_BUNDLE_PATH: {{ .Values.connectorConfig.proxy.caBundlePath | quote }}
@@ -791,13 +965,15 @@ git commit -m "feat(sharepoint-connector): add proxy ConfigMap template"
 ## Task 13: Update Helm Chart - reference ConfigMap in deployment
 
 **Files:**
-- Modify: `services/sharepoint-connector/deploy/helm-charts/sharepoint-connector/templates/_helpers.tpl` or deployment template
+- Check: `services/sharepoint-connector/deploy/helm-charts/sharepoint-connector/templates/` for deployment template or helpers
 
 **Step 1: Add extraEnvCM reference**
 
-Check how existing ConfigMaps are referenced. Add `sharepoint-connector-proxy-config` to the list of ConfigMaps loaded as environment variables.
+Find how existing ConfigMaps are referenced. Add `sharepoint-connector-proxy-config` to the list of ConfigMaps loaded as environment variables.
 
-This may involve updating `connector.extraEnvCM` default or modifying the deployment template to always include the proxy ConfigMap.
+This may involve:
+- Updating `connector.extraEnvCM` default value
+- Or modifying the deployment template to always include the proxy ConfigMap
 
 **Step 2: Commit**
 
@@ -822,9 +998,12 @@ Run: `pnpm test --filter=@unique-ag/sharepoint-connector`
 For each failing test, add ProxyService mock:
 
 ```typescript
+import { Agent } from 'undici';
+
 // In test setup
 const mockProxyService = {
   getDispatcher: vi.fn().mockReturnValue(new Agent()),
+  getProxyConfig: vi.fn().mockReturnValue({ authMode: 'none' }),
 };
 
 // In TestBed setup
@@ -870,14 +1049,14 @@ git commit -m "fix(sharepoint-connector): address review feedback"
 | 2 | Create ProxyService |
 | 3 | Register ProxyModule in AppModule |
 | 4 | Update HttpClientService |
-| 5 | Update SharepointRestHttpService |
-| 6 | Update IngestionHttpClient |
+| 5 | Update SharepointRestHttpService (add origin to requests) |
+| 6 | Update IngestionHttpClient (add origin to requests) |
 | 7 | Update UniqueGraphqlClient |
 | 8 | Update GraphClientFactory |
-| 9 | Update MSAL auth strategies |
-| 10 | Update OidcAuthStrategy |
+| 9 | Update MSAL auth strategies (custom network client) |
+| 10 | Update OidcAuthStrategy (native proxyOptions) |
 | 11 | Update Helm values.yaml |
-| 12 | Create proxy ConfigMap template |
+| 12 | Create proxy ConfigMap template (no required helpers) |
 | 13 | Reference ConfigMap in deployment |
 | 14 | Fix existing tests |
 | 15 | Final verification |
