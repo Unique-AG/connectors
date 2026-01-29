@@ -14,6 +14,7 @@
       "!**/.github",
       "!**/.turbo",
       "!**/@generated",
+      "!**/test/unique-schema",
       "!**/coverage",
       "!**/drizzle",
       "!**/helm-charts/**/values.schema.json",

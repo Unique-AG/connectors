@@ -1,0 +1,16 @@
+{
+  "driveItem": {
+    "item-1": [
+      {
+        "id": "perm-1",
+        "grantedToV2": {
+          "user": {
+            "id": "graph-user-1",
+            "email": "user@example.com"
+          }
+        }
+      }
+    ]
+  },
+  "listItem": {}
+}
