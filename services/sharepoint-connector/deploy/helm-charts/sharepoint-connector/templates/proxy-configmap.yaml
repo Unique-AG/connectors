@@ -12,10 +12,10 @@ data:
   PROXY_PORT: {{ .Values.connectorConfig.proxy.port | quote }}
   PROXY_PROTOCOL: {{ .Values.connectorConfig.proxy.protocol | quote }}
   {{- end }}
-  {{- if eq .Values.connectorConfig.proxy.authMode "basic" }}
+  {{- if eq .Values.connectorConfig.proxy.authMode "username_password" }}
   PROXY_USERNAME: {{ .Values.connectorConfig.proxy.username | quote }}
   {{- end }}
-  {{- if eq .Values.connectorConfig.proxy.authMode "tls" }}
+  {{- if eq .Values.connectorConfig.proxy.authMode "ssl_tls" }}
   PROXY_SSL_CERT_PATH: {{ .Values.connectorConfig.proxy.sslCertPath | quote }}
   PROXY_SSL_KEY_PATH: {{ .Values.connectorConfig.proxy.sslKeyPath | quote }}
   {{- end }}

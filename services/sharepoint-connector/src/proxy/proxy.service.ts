@@ -18,12 +18,18 @@ export class ProxyService implements OnModuleDestroy {
   private readonly noProxyDispatcher: Dispatcher;
   private readonly isExternalMode: boolean;
 
+  private static readonly sharedTimeoutOptions = {
+    bodyTimeout: 60_000,
+    headersTimeout: 30_000,
+    connectTimeout: 15_000,
+  };
+
   public constructor(private readonly configService: ConfigService<Config, true>) {
     const proxyConfig = this.configService.get('proxy', { infer: true });
     const uniqueConfig = this.configService.get('unique', { infer: true });
 
     this.isExternalMode = uniqueConfig.serviceAuthMode === 'external';
-    this.noProxyDispatcher = new Agent();
+    this.noProxyDispatcher = new Agent(ProxyService.sharedTimeoutOptions);
     this.dispatcher = this.createDispatcher(proxyConfig);
 
     this.logger.log({
@@ -46,20 +52,14 @@ export class ProxyService implements OnModuleDestroy {
   }
 
   private createDispatcher(proxyConfig: ProxyConfig): Dispatcher {
-    const sharedOptions = {
-      bodyTimeout: 60_000,
-      headersTimeout: 30_000,
-      connectTimeout: 15_000,
-    };
-
     if (proxyConfig.authMode === 'none') {
-      return new Agent(sharedOptions);
+      return new Agent(ProxyService.sharedTimeoutOptions);
     }
 
     const proxyUrl = this.buildProxyUrl(proxyConfig);
     const proxyOptions: ProxyAgent.Options = {
       uri: proxyUrl,
-      ...sharedOptions,
+      ...ProxyService.sharedTimeoutOptions,
     };
 
     if (proxyConfig.authMode === 'username_password') {

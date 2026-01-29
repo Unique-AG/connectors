@@ -554,8 +554,8 @@
           "properties": {
             "authMode": {
               "type": "string",
-              "enum": ["none", "basic", "tls"],
-              "description": "Proxy authentication mode: none (no auth), basic (username/password), tls (client certificate)"
+              "enum": ["none", "username_password", "ssl_tls"],
+              "description": "Proxy authentication mode: none (no auth), username_password (username/password), ssl_tls (client certificate)"
             },
             "host": {
               "type": "string",
@@ -575,16 +575,16 @@
             },
             "username": {
               "type": "string",
-              "description": "Username for basic authentication (required when authMode is 'basic')"
+              "description": "Username for basic authentication (required when authMode is 'username_password')"
             },
             "sslCertPath": {
               "type": "string",
-              "description": "Path to SSL/TLS client certificate (required when authMode is 'tls')",
+              "description": "Path to SSL/TLS client certificate (required when authMode is 'ssl_tls')",
               "examples": ["/app/proxy-cert.pem"]
             },
             "sslKeyPath": {
               "type": "string",
-              "description": "Path to SSL/TLS client key (required when authMode is 'tls')",
+              "description": "Path to SSL/TLS client key (required when authMode is 'ssl_tls')",
               "examples": ["/app/proxy-key.pem"]
             },
             "sslCaBundlePath": {

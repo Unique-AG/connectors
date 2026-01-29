@@ -29,7 +29,7 @@ connector:
   #         secretKeyRef:
   #           name: sharepoint-connector-secret
   #           key: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
-  #     # For proxy basic auth password (required when proxy.authMode is 'basic')
+  #     # For proxy basic auth password (required when proxy.authMode is 'username_password')
   #     - name: PROXY_PASSWORD
   #       valueFrom:
   #         secretKeyRef:
@@ -282,21 +282,21 @@ connectorConfig:
   proxy:
     # -- Proxy authentication mode
     # none: proxy disabled
-    # basic: username/password authentication
-    # tls: TLS client certificate authentication
+    # username_password: username/password authentication
+    # ssl_tls: TLS client certificate authentication
     authMode: none
-    # -- Proxy server hostname (required for basic/tls modes)
+    # -- Proxy server hostname (required for username_password/ssl_tls modes)
     # host: proxy.example.com
-    # -- Proxy server port (required for basic/tls modes)
+    # -- Proxy server port (required for username_password/ssl_tls modes)
     # port: 8080
-    # -- Proxy protocol: http or https (required for basic/tls modes)
+    # -- Proxy protocol: http or https (required for username_password/ssl_tls modes)
     # protocol: http
-    # -- Basic auth username (required for basic mode)
+    # -- Basic auth username (required for username_password mode)
     # username: proxy-user
     # password is loaded from a secret, see connector.envVars example for PROXY_PASSWORD
-    # -- Path to SSL/TLS client certificate (required for tls mode)
+    # -- Path to SSL/TLS client certificate (required for ssl_tls mode)
     # sslCertPath: /app/proxy-certs/client.crt
-    # -- Path to SSL/TLS client key (required for tls mode)
+    # -- Path to SSL/TLS client key (required for ssl_tls mode)
     # sslKeyPath: /app/proxy-certs/client.key
     # -- Path to CA bundle for verifying proxy server certificate (optional)
     # sslCaBundlePath: /app/proxy-certs/ca.crt
