@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Redacted } from '../../utils/redacted';
 import { MicrosoftAuthenticationService } from './microsoft-authentication.service';
 import { ClientSecretAuthStrategy } from './strategies/client-secret-auth.strategy';
-import { OidcAuthStrategy } from './strategies/oidc-auth.strategy';
 import { AuthenticationScope } from './types';
 
 vi.mock('@azure/msal-node', () => ({
@@ -11,20 +10,22 @@ vi.mock('@azure/msal-node', () => ({
   })),
 }));
 
-vi.mock('@azure/identity', () => ({
-  DefaultAzureCredential: vi.fn().mockImplementation(() => ({
-    getToken: vi.fn(),
-  })),
-}));
-
 describe('MicrosoftAuthenticationService', () => {
   let mockConfigService: {
     get: ReturnType<typeof vi.fn>;
   };
+  let mockProxyService: {
+    getDispatcher: ReturnType<typeof vi.fn>;
+  };
+  let mockDispatcher: unknown;
 
   beforeEach(async () => {
     mockConfigService = {
       get: vi.fn(),
+    };
+    mockDispatcher = {};
+    mockProxyService = {
+      getDispatcher: vi.fn().mockReturnValue(mockDispatcher),
     };
   });
 
@@ -44,32 +45,15 @@ describe('MicrosoftAuthenticationService', () => {
       return undefined;
     });
 
-    const service = new MicrosoftAuthenticationService(mockConfigService as never);
+    const service = new MicrosoftAuthenticationService(
+      mockConfigService as never,
+      mockProxyService as never,
+    );
 
     expect(service).toBeDefined();
+    expect(mockProxyService.getDispatcher).toHaveBeenCalledWith({ mode: 'always' });
     // biome-ignore lint/suspicious/noExplicitAny: Access private property for testing
     expect((service as any).strategy).toBeInstanceOf(ClientSecretAuthStrategy);
-  });
-
-  it('uses OidcAuthStrategy when corresponding mode is selected', () => {
-    mockConfigService.get.mockImplementation((key: string) => {
-      if (key === 'sharepoint.auth.mode') return 'oidc';
-      if (key === 'sharepoint') {
-        return {
-          tenantId: 'tenant-123',
-          auth: {
-            mode: 'oidc',
-          },
-        };
-      }
-      return undefined;
-    });
-
-    const service = new MicrosoftAuthenticationService(mockConfigService as never);
-
-    expect(service).toBeDefined();
-    // biome-ignore lint/suspicious/noExplicitAny: Access private property for testing
-    expect((service as any).strategy).toBeInstanceOf(OidcAuthStrategy);
   });
 
   it('delegates getAccessToken to the selected strategy', async () => {
@@ -95,7 +79,10 @@ describe('MicrosoftAuthenticationService', () => {
       return undefined;
     });
 
-    const service = new MicrosoftAuthenticationService(mockConfigService as never);
+    const service = new MicrosoftAuthenticationService(
+      mockConfigService as never,
+      mockProxyService as never,
+    );
     // biome-ignore lint/suspicious/noExplicitAny: Override private property for testing
     (service as any).strategy = mockStrategy;
 

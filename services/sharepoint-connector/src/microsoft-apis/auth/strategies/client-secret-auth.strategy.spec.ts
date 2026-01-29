@@ -34,7 +34,9 @@ describe('ClientSecretAuthStrategy', () => {
     };
     vi.mocked(ConfidentialClientApplication).mockImplementation(() => mockMsalClient as never);
 
-    const { unit } = await TestBed.solitary(ClientSecretAuthStrategy)
+    const mockDispatcher = {};
+
+    const { unitRef } = await TestBed.solitary(ClientSecretAuthStrategy)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),
@@ -45,7 +47,10 @@ describe('ClientSecretAuthStrategy', () => {
       }))
       .compile();
 
-    strategy = unit;
+    // biome-ignore lint/suspicious/noExplicitAny: TestBed returns StubbedInstance, need cast for strategy constructor
+    const configService = unitRef.get(ConfigService) as any;
+    // biome-ignore lint/suspicious/noExplicitAny: Mock dispatcher for testing
+    strategy = new ClientSecretAuthStrategy(configService, mockDispatcher as any);
   });
 
   it('acquires a new token successfully', async () => {
@@ -88,11 +93,15 @@ describe('ClientSecretAuthStrategy', () => {
   });
 
   it('throws error when SharePoint configuration is missing', () => {
+    const mockDispatcher = {};
     expect(
       () =>
-        new ClientSecretAuthStrategy({
-          get: vi.fn(() => undefined),
-        } as never),
+        new ClientSecretAuthStrategy(
+          {
+            get: vi.fn(() => undefined),
+          } as never,
+          mockDispatcher as never,
+        ),
     ).toThrow();
   });
 });

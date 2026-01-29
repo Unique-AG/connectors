@@ -1,3 +1,4 @@
+import { ProxyConfigNamespaced } from './proxy.schema';
 import {
   AppConfigNamespaced,
   ProcessingConfigNamespaced,
@@ -8,4 +9,7 @@ import {
 export type Config = UniqueConfigNamespaced &
   ProcessingConfigNamespaced &
   SharepointConfigNamespaced &
-  AppConfigNamespaced;
+  AppConfigNamespaced &
+  ProxyConfigNamespaced;
+
+export * from './proxy.schema';

@@ -4,8 +4,10 @@ import { type Counter, type Histogram } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
+import { fetch as undiciFetch } from 'undici';
 import { Config } from '../../config';
 import { getHttpStatusCodeClass, getSlowRequestDurationBucket } from '../../metrics';
+import { ProxyService } from '../../proxy';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getErrorCodeFromGraphqlRequest } from '../../utils/graphql-error.util';
 import { sanitizeError } from '../../utils/normalize-error';
@@ -27,13 +29,27 @@ export class UniqueGraphqlClient {
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
     private readonly bottleneckFactory: BottleneckFactory,
+    private readonly proxyService: ProxyService,
     private readonly spcUniqueApiRequestDurationSeconds: Histogram,
     private readonly spcUniqueApiSlowRequestsTotal: Counter,
   ) {
     const uniqueConfig = this.configService.get('unique', { infer: true });
     const graphqlUrl = `${uniqueConfig[`${clientTarget}ServiceBaseUrl`]}/graphql`;
 
+    const dispatcher = this.proxyService.getDispatcher({ mode: 'for-external-only' });
+
     this.graphQlClient = new GraphQLClient(graphqlUrl, {
+      // graphql-request expects DOM fetch types, but we use undici's fetch to route through proxy.
+      // Type assertions are needed because: (1) DOM RequestInfo/URL differ from undici's URL types,
+      // (2) we add undici-specific `dispatcher` option not present in DOM RequestInit.
+      fetch: ((url: RequestInfo | URL, options?: RequestInit) =>
+        undiciFetch(
+          url as Parameters<typeof undiciFetch>[0],
+          {
+            ...options,
+            dispatcher,
+          } as Parameters<typeof undiciFetch>[1],
+        )) as typeof fetch,
       requestMiddleware: async (request) => {
         const additionalHeaders = await this.getAdditionalHeaders();
 

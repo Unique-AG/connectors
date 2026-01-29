@@ -23,29 +23,17 @@ describe('SharepointConfigSchema', () => {
       },
     ],
   };
+  const clientSecretAuth = {
+    mode: 'client-secret' as const,
+    clientId: 'client-id-123',
+    clientSecret: 'secret-123',
+  };
 
   describe('valid configurations', () => {
-    it('validates oidc auth mode configuration', () => {
-      const config = {
-        ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
-      };
-
-      expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
-      const result = SharepointConfigSchema.parse(config);
-      expect(result.auth.mode).toBe('oidc');
-    });
-
     it('validates client-secret auth mode configuration', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'client-secret' as const,
-          clientId: 'client-id-123',
-          clientSecret: 'secret-123',
-        },
+        auth: clientSecretAuth,
       };
 
       expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
@@ -94,9 +82,7 @@ describe('SharepointConfigSchema', () => {
     it('validates configuration with multiple sites', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sitesSource: 'config_file' as const,
         sites: [
           {
@@ -131,9 +117,7 @@ describe('SharepointConfigSchema', () => {
     it('validates sharepoint_list source configuration', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sitesSource: 'sharepoint_list' as const,
         sharepointList: {
           siteId: '87654321-4321-4321-8321-cba987654321',
@@ -155,9 +139,7 @@ describe('SharepointConfigSchema', () => {
     it('requires at least one site', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sitesSource: 'config_file' as const,
         sites: [],
       };
@@ -170,9 +152,7 @@ describe('SharepointConfigSchema', () => {
     it('validates siteId as UUID', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -187,9 +167,7 @@ describe('SharepointConfigSchema', () => {
     it('validates syncColumnName is string', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -204,9 +182,7 @@ describe('SharepointConfigSchema', () => {
     it('validates ingestionMode enum values', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -221,9 +197,7 @@ describe('SharepointConfigSchema', () => {
     it('validates scopeId is required', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             siteId: '87654321-4321-4321-4321-cba987654321',
@@ -241,9 +215,7 @@ describe('SharepointConfigSchema', () => {
     it('validates maxFilesToIngest is positive integer when provided', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -258,9 +230,7 @@ describe('SharepointConfigSchema', () => {
     it('rejects maxFilesToIngest when null', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -275,9 +245,7 @@ describe('SharepointConfigSchema', () => {
     it('rejects maxFilesToIngest when empty string', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -292,9 +260,7 @@ describe('SharepointConfigSchema', () => {
     it('rejects maxFilesToIngest when zero', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -309,9 +275,7 @@ describe('SharepointConfigSchema', () => {
     it('accepts maxFilesToIngest when undefined (omitted)', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -326,9 +290,7 @@ describe('SharepointConfigSchema', () => {
     it('accepts maxFilesToIngest when positive integer', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -348,9 +310,7 @@ describe('SharepointConfigSchema', () => {
     it('validates storeInternally enum values', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -365,9 +325,7 @@ describe('SharepointConfigSchema', () => {
     it('validates syncStatus enum values', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -382,9 +340,7 @@ describe('SharepointConfigSchema', () => {
     it('validates syncMode enum values', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             ...validBaseConfig.sites[0],
@@ -401,9 +357,7 @@ describe('SharepointConfigSchema', () => {
     it('applies default values for optional fields', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         sites: [
           {
             siteId: '87654321-4321-4321-8321-cba987654321',
@@ -438,9 +392,7 @@ describe('SharepointConfigSchema', () => {
       const config = {
         ...validBaseConfig,
         tenantId: '',
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
       };
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
@@ -449,9 +401,7 @@ describe('SharepointConfigSchema', () => {
     it('rejects invalid baseUrl format', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         baseUrl: 'not-a-url',
       };
 
@@ -461,9 +411,7 @@ describe('SharepointConfigSchema', () => {
     it('rejects baseUrl with trailing slash', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         baseUrl: 'https://company.sharepoint.com/',
       };
 
@@ -475,9 +423,7 @@ describe('SharepointConfigSchema', () => {
     it('rejects negative graphApiRateLimitPerMinuteThousands', () => {
       const config = {
         ...validBaseConfig,
-        auth: {
-          mode: 'oidc' as const,
-        },
+        auth: clientSecretAuth,
         graphApiRateLimitPerMinuteThousands: -1,
       };
 

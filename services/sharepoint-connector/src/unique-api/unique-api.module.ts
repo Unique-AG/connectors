@@ -7,6 +7,7 @@ import {
   SPC_UNIQUE_GRAPHQL_API_SLOW_REQUESTS_TOTAL,
 } from '../metrics';
 import { MetricsModule } from '../metrics/metrics.module';
+import { ProxyService } from '../proxy';
 import { BatchProcessorService } from '../shared/services/batch-processor.service';
 import { HttpClientService } from '../shared/services/http-client.service';
 import { BottleneckFactory } from '../utils/bottleneck.factory';
@@ -42,6 +43,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
         uniqueAuthService: UniqueAuthService,
         configService: ConfigService<Config, true>,
         bottleneckFactory: BottleneckFactory,
+        proxyService: ProxyService,
         spcUniqueGraphqlApiRequestDurationSeconds: Histogram,
         spcUniqueGraphqlApiSlowRequestsTotal: Counter,
       ) => {
@@ -50,6 +52,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
           uniqueAuthService,
           configService,
           bottleneckFactory,
+          proxyService,
           spcUniqueGraphqlApiRequestDurationSeconds,
           spcUniqueGraphqlApiSlowRequestsTotal,
         );
@@ -58,6 +61,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
         UniqueAuthService,
         ConfigService,
         BottleneckFactory,
+        ProxyService,
         SPC_UNIQUE_GRAPHQL_API_REQUEST_DURATION_SECONDS,
         SPC_UNIQUE_GRAPHQL_API_SLOW_REQUESTS_TOTAL,
       ],
@@ -68,6 +72,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
         uniqueAuthService: UniqueAuthService,
         configService: ConfigService<Config, true>,
         bottleneckFactory: BottleneckFactory,
+        proxyService: ProxyService,
         spcUniqueGraphqlApiRequestDurationSeconds: Histogram,
         spcUniqueGraphqlApiSlowRequestsTotal: Counter,
       ) => {
@@ -76,6 +81,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
           uniqueAuthService,
           configService,
           bottleneckFactory,
+          proxyService,
           spcUniqueGraphqlApiRequestDurationSeconds,
           spcUniqueGraphqlApiSlowRequestsTotal,
         );
@@ -84,6 +90,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
         UniqueAuthService,
         ConfigService,
         BottleneckFactory,
+        ProxyService,
         SPC_UNIQUE_GRAPHQL_API_REQUEST_DURATION_SECONDS,
         SPC_UNIQUE_GRAPHQL_API_SLOW_REQUESTS_TOTAL,
       ],

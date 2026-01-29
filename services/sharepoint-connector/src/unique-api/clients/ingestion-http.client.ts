@@ -1,8 +1,8 @@
-import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
-import { Client, Dispatcher, errors, interceptors } from 'undici';
+import { Dispatcher, errors, interceptors } from 'undici';
 import { Config } from '../../config';
 import {
   createApiMethodExtractor,
@@ -11,22 +11,25 @@ import {
   SPC_UNIQUE_REST_API_REQUEST_DURATION_SECONDS,
   SPC_UNIQUE_REST_API_SLOW_REQUESTS_TOTAL,
 } from '../../metrics';
+import { ProxyService } from '../../proxy';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { sanitizeError } from '../../utils/normalize-error';
 import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
 import { UniqueAuthService } from '../unique-auth.service';
 
 @Injectable()
-export class IngestionHttpClient implements OnModuleDestroy {
+export class IngestionHttpClient {
   private readonly logger = new Logger(this.constructor.name);
   private readonly limiter: Bottleneck;
   private readonly httpClient: Dispatcher;
   private readonly extractApiMethod: ReturnType<typeof createApiMethodExtractor>;
+  private readonly origin: string;
 
   public constructor(
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly configService: ConfigService<Config, true>,
     private readonly bottleneckFactory: BottleneckFactory,
+    private readonly proxyService: ProxyService,
     @Inject(SPC_UNIQUE_REST_API_REQUEST_DURATION_SECONDS)
     private readonly spcUniqueApiRequestDurationSeconds: Histogram,
     @Inject(SPC_UNIQUE_REST_API_SLOW_REQUESTS_TOTAL)
@@ -35,6 +38,8 @@ export class IngestionHttpClient implements OnModuleDestroy {
     const ingestionUrl = new URL(
       this.configService.get('unique.ingestionServiceBaseUrl', { infer: true }),
     );
+    this.origin = `${ingestionUrl.protocol}//${ingestionUrl.host}`;
+
     const interceptorsInCallingOrder = [
       interceptors.redirect({
         maxRedirections: 10,
@@ -56,12 +61,8 @@ export class IngestionHttpClient implements OnModuleDestroy {
       }),
     ];
 
-    const httpClient = new Client(`${ingestionUrl.protocol}//${ingestionUrl.host}`, {
-      bodyTimeout: 30_000,
-      headersTimeout: 30_000,
-      connectTimeout: 15_000,
-    });
-    this.httpClient = httpClient.compose(interceptorsInCallingOrder.reverse());
+    const baseDispatcher = this.proxyService.getDispatcher({ mode: 'for-external-only' });
+    this.httpClient = baseDispatcher.compose(interceptorsInCallingOrder.reverse());
 
     const apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
       infer: true,
@@ -89,10 +90,6 @@ export class IngestionHttpClient implements OnModuleDestroy {
     );
   }
 
-  public async onModuleDestroy(): Promise<void> {
-    await this.httpClient.close();
-  }
-
   public async request(
     options: Dispatcher.RequestOptions & { headers?: Record<string, string> },
   ): Promise<Dispatcher.ResponseData> {
@@ -103,6 +100,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
 
       try {
         const result = await this.httpClient.request({
+          origin: this.origin,
           ...options,
           headers: {
             ...options.headers,
