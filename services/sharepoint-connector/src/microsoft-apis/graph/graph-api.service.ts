@@ -59,7 +59,7 @@ export class GraphApiService {
   }
 
   public async getAllSiteItems(
-    siteId: Smeared<string>,
+    siteId: Smeared,
     syncColumnName: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const logPrefix = `[Site: ${siteId}]`;
@@ -99,7 +99,7 @@ export class GraphApiService {
   }
 
   public async getAllFilesForSite(
-    siteId: Smeared<string>,
+    siteId: Smeared,
     syncColumnName: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
@@ -178,7 +178,7 @@ export class GraphApiService {
   }
 
   public async getAspxPagesForSite(
-    siteId: Smeared<string>,
+    siteId: Smeared,
     syncColumnName: string,
   ): Promise<SharepointContentItem[]> {
     const logPrefix = `[Site: ${siteId}]`;
@@ -217,7 +217,7 @@ export class GraphApiService {
     }
   }
 
-  public async getSiteLists(siteId: Smeared<string> | string): Promise<List[]> {
+  public async getSiteLists(siteId: Smeared | string): Promise<List[]> {
     const logPrefix = `[Site: ${siteId}]`;
     const id = typeof siteId === 'string' ? siteId : siteId.value;
 
@@ -247,10 +247,7 @@ export class GraphApiService {
    * Fetch all columns for a specific SharePoint list.
    * Documentation: https://learn.microsoft.com/en-us/graph/api/list-list-columns
    */
-  public async getListColumns(
-    siteId: Smeared<string> | string,
-    listId: string,
-  ): Promise<ListColumn[]> {
+  public async getListColumns(siteId: Smeared | string, listId: string): Promise<ListColumn[]> {
     const logPrefix = `[Site: ${siteId}, List: ${listId}]`;
     const id = typeof siteId === 'string' ? siteId : siteId.value;
 
@@ -275,7 +272,7 @@ export class GraphApiService {
   }
 
   public async getListItems(
-    siteId: Smeared<string> | string,
+    siteId: Smeared | string,
     listId: string,
     options: { select?: string; expand?: string } = {},
   ): Promise<ListItem[]> {
@@ -297,7 +294,7 @@ export class GraphApiService {
   }
 
   public async getAspxListItems(
-    siteId: Smeared<string> | string,
+    siteId: Smeared | string,
     listId: string,
     syncColumnName: string,
     maxItemsToScan?: number,
@@ -350,7 +347,7 @@ export class GraphApiService {
   }
 
   public async getAspxPageContent(
-    siteId: Smeared<string> | string,
+    siteId: Smeared | string,
     listId: string,
     itemId: string,
   ): Promise<SitePageContent> {
@@ -438,7 +435,7 @@ export class GraphApiService {
     );
   }
 
-  public async getSiteWebUrl(siteId: Smeared<string>): Promise<string> {
+  public async getSiteWebUrl(siteId: Smeared): Promise<string> {
     try {
       const site = await this.makeRateLimitedRequest(() =>
         this.graphClient.api(`/sites/${siteId.value}`).select('webUrl').get(),
@@ -455,12 +452,12 @@ export class GraphApiService {
     }
   }
 
-  public async getSiteName(siteId: Smeared<string>): Promise<string> {
+  public async getSiteName(siteId: Smeared): Promise<string> {
     const siteWebUrl = await this.getSiteWebUrl(siteId);
     return siteWebUrl.split('/').pop() ?? assert.fail(`Site name not found for site ${siteId}`);
   }
 
-  private async getDrivesForSite(siteId: Smeared<string>): Promise<Drive[]> {
+  private async getDrivesForSite(siteId: Smeared): Promise<Drive[]> {
     const logPrefix = `[Site: ${siteId}]`;
     try {
       const allDrives = await this.paginateGraphApiRequest<Drive>(
@@ -484,7 +481,7 @@ export class GraphApiService {
   private async recursivelyFetchDriveItems(
     driveId: string,
     itemId: string,
-    siteId: Smeared<string>,
+    siteId: Smeared,
     driveName: string,
     syncColumnName: string,
     maxFiles?: number,

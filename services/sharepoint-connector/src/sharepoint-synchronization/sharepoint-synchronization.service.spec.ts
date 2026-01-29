@@ -7,7 +7,7 @@ import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
-import { Redacted } from '../utils/redacted';
+import { createSmeared, Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
@@ -87,7 +87,7 @@ describe('SharepointSynchronizationService', () => {
         },
       },
     },
-    siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+    siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
     driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     driveName: 'Documents',
     folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -103,12 +103,12 @@ describe('SharepointSynchronizationService', () => {
     mockSitesConfigurationService = {
       loadSitesConfiguration: vi.fn().mockResolvedValue([
         createMockSiteConfig({
-          siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+          siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
         }),
       ]),
       fetchSitesFromSharePointList: vi.fn().mockResolvedValue([
         createMockSiteConfig({
-          siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+          siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
         }),
       ]),
     };
@@ -144,7 +144,7 @@ describe('SharepointSynchronizationService', () => {
               sitesSource: 'config_file',
               sites: [
                 createMockSiteConfig({
-                  siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+                  siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
                 }),
               ],
             };
@@ -181,7 +181,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: expect.any(Redacted),
+          siteId: expect.any(Smeared),
           scopeId: 'scope-id',
         }),
         siteName: 'test-site-name',
@@ -199,7 +199,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: expect.any(Redacted),
+          siteId: expect.any(Smeared),
           scopeId: 'scope-id',
         }),
         siteName: 'test-site-name',
@@ -280,7 +280,7 @@ describe('SharepointSynchronizationService', () => {
 
     const mockSiteConfigs = [
       createMockSiteConfig({
-        siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+        siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
         syncMode: 'content_and_permissions',
       }),
     ];
@@ -322,7 +322,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
       context: expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: expect.any(Redacted),
+          siteId: expect.any(Smeared),
           scopeId: 'scope-id',
         }),
         siteName: 'test-site-name',
@@ -346,7 +346,7 @@ describe('SharepointSynchronizationService', () => {
     };
 
     const mockSiteConfigs = [
-      createMockSiteConfig({ siteId: new Redacted('bd9c85ee-998f-4665-9c44-577cf5a08a66') }),
+      createMockSiteConfig({ siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66') }),
     ];
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
@@ -447,7 +447,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -465,7 +465,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: expect.any(Redacted),
+          siteId: expect.any(Smeared),
         }),
       }),
     );
@@ -530,7 +530,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -548,7 +548,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: expect.any(Redacted),
+          siteId: expect.any(Smeared),
         }),
       }),
     );
@@ -613,7 +613,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -678,7 +678,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -743,7 +743,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -761,7 +761,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: expect.any(Redacted),
+          siteId: expect.any(Smeared),
         }),
       }),
     );
@@ -769,15 +769,15 @@ describe('SharepointSynchronizationService', () => {
 
   it('ensures unique scopeIds and logs errors for duplicates', async () => {
     const site1 = createMockSiteConfig({
-      siteId: new Redacted('site-1'),
+      siteId: createSmeared('site-1'),
       scopeId: 'duplicate-scope',
     });
     const site2 = createMockSiteConfig({
-      siteId: new Redacted('site-2'),
+      siteId: createSmeared('site-2'),
       scopeId: 'duplicate-scope',
     });
     const site3 = createMockSiteConfig({
-      siteId: new Redacted('site-3'),
+      siteId: createSmeared('site-3'),
       scopeId: 'unique-scope',
     });
 

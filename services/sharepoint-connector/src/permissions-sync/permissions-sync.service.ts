@@ -1,9 +1,7 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Histogram } from '@opentelemetry/api';
 import { filter, flat, indexBy, mapKeys, mapValues, pipe, prop, uniqueBy, values } from 'remeda';
-import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { SyncStep } from '../constants/sync-step.enum';
 import { SPC_PERMISSIONS_SYNC_DURATION_SECONDS } from '../metrics';
@@ -143,7 +141,7 @@ export class PermissionsSyncService {
   }
 
   private async fetchGroupsWithMembershipsForSite(
-    siteId: Smeared<string>,
+    siteId: Smeared,
     permissionsMap: PermissionsMap,
   ): Promise<SharePointGroupsMap> {
     const logPrefix = `[Site: ${siteId}]`;
@@ -169,7 +167,7 @@ export class PermissionsSyncService {
     );
   }
 
-  private async getUniqueGroupsMap(siteId: Smeared<string>): Promise<UniqueGroupsMap> {
+  private async getUniqueGroupsMap(siteId: Smeared): Promise<UniqueGroupsMap> {
     const groupExternalIdPrefix = getSharepointConnectorGroupExternalIdPrefix(siteId.value);
     return pipe(
       await this.uniqueGroupsService.listAllGroupsForSite(siteId),

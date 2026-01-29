@@ -1,11 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { chunk } from 'remeda';
-import { Config } from '../../config';
 import { getErrorCodeFromGraphqlRequest } from '../../utils/graphql-error.util';
-import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
-import { createSmeared, Smeared } from '../../utils/smeared';
+import type { Smeared } from '../../utils/smeared';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   ADD_ACCESSES_MUTATION,
@@ -46,7 +43,6 @@ export class UniqueFilesService {
 
   public constructor(
     @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
-    private readonly configService: ConfigService<Config, true>,
   ) {}
 
   public async moveFile(
@@ -83,7 +79,7 @@ export class UniqueFilesService {
     return result.contentDelete;
   }
 
-  public async deleteFilesBySiteId(siteId: Smeared<string>): Promise<number> {
+  public async deleteFilesBySiteId(siteId: Smeared): Promise<number> {
     const logPrefix = `[Site: ${siteId}]`;
     this.logger.log(`${logPrefix} Starting iterative file deletion`);
 
@@ -163,7 +159,7 @@ export class UniqueFilesService {
     return files;
   }
 
-  public async getFilesForSite(siteId: Smeared<string>): Promise<UniqueFile[]> {
+  public async getFilesForSite(siteId: Smeared): Promise<UniqueFile[]> {
     const logPrefix = `[Site: ${siteId}]`;
     this.logger.log(`${logPrefix} Fetching files`);
 
@@ -192,7 +188,7 @@ export class UniqueFilesService {
     return files;
   }
 
-  public async getFilesCountForSite(siteId: Smeared<string>): Promise<number> {
+  public async getFilesCountForSite(siteId: Smeared): Promise<number> {
     const logPrefix = `[Site: ${siteId}]`;
     this.logger.debug(`${logPrefix} Fetching files count`);
 

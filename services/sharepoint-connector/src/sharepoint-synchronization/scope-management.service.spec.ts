@@ -10,7 +10,7 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { Redacted } from '../utils/redacted';
+import { createSmeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
@@ -78,7 +78,7 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
         },
       },
     },
-    siteId: 'site-123',
+    siteId: createSmeared('site-123'),
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: `/${path}`,
@@ -110,7 +110,7 @@ describe('ScopeManagementService', () => {
     rootPath: '/test1',
     siteName: 'test-site',
     siteConfig: createMockSiteConfig({
-      siteId: new Redacted('site-123'),
+      siteId: createSmeared('site-123'),
       scopeId: 'root-scope-123',
     }),
   };

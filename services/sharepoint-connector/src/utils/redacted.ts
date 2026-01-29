@@ -21,6 +21,6 @@ export class Redacted<T> {
    * Always redacts; never discloses raw values.
    */
   public toJSON() {
-    return '[Redacted]';
+    return this.toString();
   }
 }

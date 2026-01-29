@@ -1,8 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { pick, prop } from 'remeda';
-import { Config } from '../../config';
-import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { Smeared } from '../../utils/smeared';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -37,10 +34,9 @@ export class UniqueGroupsService {
 
   public constructor(
     @Inject(SCOPE_MANAGEMENT_CLIENT) private readonly scopeManagementClient: UniqueGraphqlClient,
-    private readonly configService: ConfigService<Config, true>,
   ) {}
 
-  public async listAllGroupsForSite(siteId: Smeared<string>): Promise<UniqueGroupWithMembers[]> {
+  public async listAllGroupsForSite(siteId: Smeared): Promise<UniqueGroupWithMembers[]> {
     const logPrefix = `[Site: ${siteId}]`;
     const groupExternalIdPrefix = getSharepointConnectorGroupExternalIdPrefix(siteId.value);
     this.logger.log(`${logPrefix} Requesting all groups from Unique API`);
@@ -56,7 +52,7 @@ export class UniqueGroupsService {
       >(getListGroupsQuery(true), {
         where: {
           externalId: {
-            startsWith: getSharepointConnectorGroupExternalIdPrefix(siteId.value),
+            startsWith: groupExternalIdPrefix,
           },
         },
         skip,

@@ -1,9 +1,7 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
-import { Config } from '../config';
 import { getInheritanceSettings } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
@@ -13,7 +11,7 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { EXTERNAL_ID_PREFIX, redact } from '../utils/logging.util';
+import { EXTERNAL_ID_PREFIX } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
@@ -32,12 +30,11 @@ export class ScopeManagementService {
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
-    private readonly _configService: ConfigService<Config, true>,
   ) {}
 
   public async initializeRootScope(
     rootScopeId: string,
-    siteId: Smeared<string> | string,
+    siteId: Smeared | string,
     ingestionMode: IngestionMode,
   ): Promise<RootScopeInfo> {
     const id = typeof siteId === 'string' ? siteId : siteId.value;
@@ -149,7 +146,7 @@ export class ScopeManagementService {
     }
   }
 
-  private isValidScopeOwnership(rootScope: Scope, siteId: string | Smeared<string>): boolean {
+  private isValidScopeOwnership(rootScope: Scope, siteId: string | Smeared): boolean {
     if (!rootScope.externalId) {
       return true;
     }

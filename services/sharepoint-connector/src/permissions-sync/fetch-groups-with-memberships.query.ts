@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   chunk,
   filter,
@@ -20,7 +19,6 @@ import {
   values,
   zip,
 } from 'remeda';
-import { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { GroupMember } from '../microsoft-apis/graph/types/sharepoint.types';
 import {
@@ -66,7 +64,7 @@ export class FetchGroupsWithMembershipsQuery {
   // 3. Go through group permissions passed to the service and map them to
   //    SharepointGroupWithMembers using the built cache of group memberships.
   public async run(
-    siteId: Smeared<string>,
+    siteId: Smeared,
     groupPermissions: GroupMembership[],
   ): Promise<SharePointGroupsMap> {
     const logPrefix = `[Site: ${siteId}]`;

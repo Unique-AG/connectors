@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import {
   differenceWith,
@@ -13,7 +12,6 @@ import {
   partition,
   pipe,
 } from 'remeda';
-import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';

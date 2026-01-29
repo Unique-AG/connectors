@@ -1,9 +1,7 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import { length, mapValues } from 'remeda';
-import { Config } from '../config';
 import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
@@ -134,7 +132,7 @@ export class ContentSyncService {
 
   private async calculateDiffForSite(
     sharepointContentItems: SharepointContentItem[],
-    siteId: Smeared<string>,
+    siteId: Smeared,
   ): Promise<FileDiffResponse> {
     const fileDiffItems: FileDiffItem[] = sharepointContentItems.map(
       (sharepointContentItem: SharepointContentItem) => {
@@ -161,7 +159,7 @@ export class ContentSyncService {
   private async validateNoAccidentalFullDeletion(
     fileDiffItems: FileDiffItem[],
     fileDiffResult: FileDiffResponse,
-    siteId: Smeared<string>,
+    siteId: Smeared,
   ): Promise<void> {
     // If there are no files to be deleted, there's no point in checking further, we will surely not
     // perform full deletion.
@@ -217,10 +215,7 @@ export class ContentSyncService {
     }
   }
 
-  private async deleteRemovedFiles(
-    siteId: Smeared<string>,
-    deletedFileKeys: string[],
-  ): Promise<void> {
+  private async deleteRemovedFiles(siteId: Smeared, deletedFileKeys: string[]): Promise<void> {
     const logPrefix = `[Site: ${siteId}]`;
     let filesToDelete: UniqueFile[] = [];
     // Convert relative keys to full keys (with siteId prefix)

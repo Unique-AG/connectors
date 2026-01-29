@@ -1,8 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import { difference, filter, isNonNullish, map, pickBy, pipe } from 'remeda';
-import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
@@ -18,7 +16,7 @@ import {
 } from './types';
 
 interface Input {
-  siteId: Smeared<string>;
+  siteId: Smeared;
   sharePoint: {
     groupsMap: SharePointGroupsMap;
   };
@@ -76,7 +74,7 @@ export class SyncSharepointGroupsToUniqueCommand {
       const correspondingUniqueGroup = unique.groupsMap[sharePointGroup.id];
       if (!correspondingUniqueGroup) {
         const newUniqueGroup = await this.createUniqueGroup(
-          siteId,
+          siteId.value,
           siteName,
           sharePointGroup,
           unique.usersMap,

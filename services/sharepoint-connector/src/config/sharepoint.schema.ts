@@ -2,10 +2,12 @@ import { z } from 'zod';
 import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS } from '../constants/defaults.constants';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
-import { Redacted } from '../utils/redacted';
+import type { Redacted } from '../utils/redacted';
 import { createSmeared, Smeared } from '../utils/smeared';
 import {
   coercedPositiveNumberSchema,
+  redactedNonEmptyStringSchema,
+  redactedOptionalStringSchema,
   requiredStringSchema,
   urlWithoutTrailingSlashSchema,
 } from '../utils/zod.util';
@@ -51,33 +53,25 @@ const oidcAuthConfig = z.object({
 
 const clientSecretAuthConfig = z.object({
   mode: z.literal('client-secret').describe('Authentication mode to use for Microsoft APIs'),
-  clientId: requiredStringSchema
-    .transform((val) => new Redacted(val))
-    .describe('Azure AD application client ID'),
-  clientSecret: z
-    .string()
-    .nonempty()
-    .transform((val) => new Redacted(val))
-    .describe('Azure AD application client secret for Microsoft APIs'),
+  clientId: requiredStringSchema.describe('Azure AD application client ID'),
+  clientSecret: redactedNonEmptyStringSchema.describe(
+    'Azure AD application client secret for Microsoft APIs',
+  ),
 });
 
 const certificateAuthConfig = z
   .object({
     mode: z.literal('certificate').describe('Authentication mode to use for Microsoft APIs'),
-    clientId: requiredStringSchema
-      .transform((val) => new Redacted(val))
-      .describe('Azure AD application client ID'),
+    clientId: requiredStringSchema.describe('Azure AD application client ID'),
     thumbprintSha1: z
       .hex()
       .nonempty()
       .optional()
-      .transform((val) => (val ? new Redacted(val) : undefined))
       .describe('SHA1 thumbprint of the Azure AD application certificate'),
     thumbprintSha256: z
       .hex()
       .nonempty()
       .optional()
-      .transform((val) => (val ? new Redacted(val) : undefined))
       .describe('SHA256 thumbprint of the Azure AD application certificate'),
     privateKeyPath: z
       .string()
@@ -85,7 +79,7 @@ const certificateAuthConfig = z
       .describe(
         'Path to the private key file of the Azure AD application certificate in PEM format',
       ),
-    privateKeyPassword: z.instanceof(Redacted).optional(),
+    privateKeyPassword: redactedOptionalStringSchema,
   })
   .refine((config) => config.thumbprintSha1 || config.thumbprintSha256, {
     message:
@@ -217,12 +211,12 @@ export type SharepointConfig = (
   | {
       sitesSource: 'sharepoint_list';
       sharepointList: {
-        siteId: Smeared<string>;
+        siteId: Smeared;
         listId: string;
       };
     }
 ) & {
-  tenantId: Smeared<string>;
+  tenantId: Smeared;
   auth: AuthConfig & {
     privateKeyPassword?: Redacted<string>;
   };

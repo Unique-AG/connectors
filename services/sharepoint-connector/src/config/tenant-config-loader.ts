@@ -3,7 +3,6 @@ import { globSync, readFileSync } from 'node:fs';
 import { registerAs } from '@nestjs/config';
 import { load } from 'js-yaml';
 import { isPlainObject } from 'remeda';
-import { Redacted } from 'src/utils/redacted';
 import { z } from 'zod';
 import { type ProcessingConfig, ProcessingConfigSchema } from './processing.schema';
 import { type SharepointConfig, SharepointConfigSchema } from './sharepoint.schema';
@@ -64,21 +63,23 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
 }
 
 function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
-  // Type assertion for discriminated union
-  const typedConfig = config as TenantConfig;
+  // Config is still an unvalidated object here; schemas will do the final typing/transforms.
+  const typedConfig = config as unknown as {
+    sharepoint: { auth: { mode: string; privateKeyPassword?: unknown } };
+    unique: { serviceAuthMode: string; zitadelClientSecret?: unknown };
+  };
 
   // we throw an error if the object path is not defined
   if (
     process.env.SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD &&
     typedConfig.sharepoint.auth.mode === 'certificate'
   ) {
-    typedConfig.sharepoint.auth.privateKeyPassword = new Redacted(
-      process.env.SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD,
-    );
+    typedConfig.sharepoint.auth.privateKeyPassword =
+      process.env.SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD;
   }
 
   if (process.env.ZITADEL_CLIENT_SECRET && typedConfig.unique.serviceAuthMode === 'external') {
-    typedConfig.unique.zitadelClientSecret = new Redacted(process.env.ZITADEL_CLIENT_SECRET);
+    typedConfig.unique.zitadelClientSecret = process.env.ZITADEL_CLIENT_SECRET;
   }
 }
 

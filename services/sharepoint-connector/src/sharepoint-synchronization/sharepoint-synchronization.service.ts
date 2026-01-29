@@ -105,7 +105,7 @@ export class SharepointSynchronizationService {
         const siteSyncStartTime = Date.now();
 
         const result = await this.syncSite(siteConfig);
-        this.recordSiteMetric(siteSyncStartTime, siteConfig.siteId, result);
+        this.recordSiteMetric(siteSyncStartTime, siteConfig.siteId.toString(), result);
       }
 
       this.logger.log(

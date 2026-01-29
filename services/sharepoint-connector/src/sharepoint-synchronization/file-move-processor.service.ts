@@ -1,13 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
-import { Config } from '../config';
 import { SPC_FILE_MOVED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
 import { ScopeManagementService } from './scope-management.service';
@@ -26,7 +23,6 @@ export class FileMoveProcessor {
   public constructor(
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly scopeManagementService: ScopeManagementService,
-    private readonly configService: ConfigService<Config, true>,
     @Inject(SPC_FILE_MOVED_TOTAL) private readonly spcFileMovedTotal: Counter,
   ) {}
 
@@ -67,12 +63,12 @@ export class FileMoveProcessor {
         totalMoved++;
 
         this.spcFileMovedTotal.add(1, {
-          sp_site_id: siteId,
+          sp_site_id: siteId.toString(),
           result: 'success',
         });
       } catch (error) {
         this.spcFileMovedTotal.add(1, {
-          sp_site_id: siteId,
+          sp_site_id: siteId.toString(),
           result: 'failure',
         });
 

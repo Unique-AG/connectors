@@ -28,7 +28,7 @@ export class MetricsMiddleware implements Middleware {
   private nextMiddleware: Middleware | undefined;
   private readonly extractApiMethod: ReturnType<typeof createApiMethodExtractor>;
 
-  private readonly msTenantId: Smeared<string>;
+  private readonly msTenantId: Smeared;
 
   public constructor(
     private readonly spcGraphApiRequestDurationSeconds: Histogram,

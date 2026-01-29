@@ -24,17 +24,16 @@ export class FetchGraphPermissionsMapQuery {
 
   public constructor(private readonly graphApiService: GraphApiService) {}
 
-  public async run(siteId: Smeared<string>, items: AnySharepointItem[]): Promise<PermissionsMap> {
+  public async run(siteId: Smeared, items: AnySharepointItem[]): Promise<PermissionsMap> {
     const siteName = await this.graphApiService.getSiteName(siteId);
 
-    const logPrefix = `[Site: ${siteId}]`;
     const permissionsMap: PermissionsMap = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
       const permissionsFetcher: PermissionsFetcher = {
         driveItem: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
         listItem: () =>
-          this.graphApiService.getListItemPermissions(siteId, item.driveId, item.item.id),
+          this.graphApiService.getListItemPermissions(siteId.value, item.driveId, item.item.id),
         directory: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
       };
 

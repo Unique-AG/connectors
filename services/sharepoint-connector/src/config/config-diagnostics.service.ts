@@ -23,10 +23,6 @@ export class ConfigDiagnosticsService implements OnModuleInit {
     this.logAllConfigs();
   }
 
-  /**
-   * Logs all configuration namespaces.
-   * Can be called at startup or at the beginning of each sync.
-   */
   public logAllConfigs(): void {
     const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
       infer: true,
@@ -41,9 +37,6 @@ export class ConfigDiagnosticsService implements OnModuleInit {
     this.logConfig('Processing Config', this.configService.get('processing', { infer: true }));
   }
 
-  /**
-   * Logs a site-specific configuration at the beginning of a sync.
-   */
   public logSiteConfig(siteConfig: SiteConfig, label: string = 'Site Config'): void {
     const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
       infer: true,

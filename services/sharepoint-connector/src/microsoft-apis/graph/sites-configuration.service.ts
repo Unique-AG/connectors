@@ -110,10 +110,7 @@ export class SitesConfigurationService {
         ingestionMode: getFieldValue('ingestionMode'),
         scopeId: getFieldValue('uniqueScopeId'),
         // when unset sharepoint list item, maxFilesToIngest is set to 0
-        maxFilesToIngest: (() => {
-          const value = getFieldValue('maxFilesToIngest');
-          return value === 0 ? undefined : value;
-        })(),
+        maxFilesToIngest: getFieldValue('maxFilesToIngest') || undefined,
         storeInternally: getFieldValue('storeInternally'),
         syncStatus: getFieldValue('syncStatus'),
         syncMode: getFieldValue('syncMode'),

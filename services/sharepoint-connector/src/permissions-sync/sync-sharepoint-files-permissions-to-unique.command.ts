@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import {
   differenceWith,
@@ -12,12 +11,10 @@ import {
   partition,
   pipe,
 } from 'remeda';
-import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile, UniqueFileAccessInput } from '../unique-api/unique-files/unique-files.types';
-import { Smeared } from '../utils/smeared';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
