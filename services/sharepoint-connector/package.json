@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "build": "nest build",
-    "dev": "NODE_EXTRA_CA_CERTS=~/.mitmproxy/mitmproxy-ca-cert.pem nest start",
+    "dev": "nest start",
     "debug": "nest start --debug --watch",
     "db:generate": "echo \"No database for this server\"",
     "db:migrate": "echo \"No database for this server\"",
