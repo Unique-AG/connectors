@@ -51,7 +51,7 @@ describe('MicrosoftAuthenticationService', () => {
     );
 
     expect(service).toBeDefined();
-    expect(mockProxyService.getDispatcher).toHaveBeenCalledWith('always');
+    expect(mockProxyService.getDispatcher).toHaveBeenCalledWith({ mode: 'always' });
     // biome-ignore lint/suspicious/noExplicitAny: Access private property for testing
     expect((service as any).strategy).toBeInstanceOf(ClientSecretAuthStrategy);
   });

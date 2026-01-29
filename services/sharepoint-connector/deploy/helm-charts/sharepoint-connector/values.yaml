@@ -294,11 +294,11 @@ connectorConfig:
     # -- Basic auth username (required for basic mode)
     # username: proxy-user
     # password is loaded from a secret, see connector.envVars example for PROXY_PASSWORD
-    # -- Path to TLS client certificate (required for tls mode)
-    # tlsCertPath: /app/proxy-certs/client.crt
-    # -- Path to TLS client key (required for tls mode)
-    # tlsKeyPath: /app/proxy-certs/client.key
+    # -- Path to SSL/TLS client certificate (required for tls mode)
+    # sslCertPath: /app/proxy-certs/client.crt
+    # -- Path to SSL/TLS client key (required for tls mode)
+    # sslKeyPath: /app/proxy-certs/client.key
     # -- Path to CA bundle for verifying proxy server certificate (optional)
-    # caBundlePath: /app/proxy-certs/ca.crt
+    # sslCaBundlePath: /app/proxy-certs/ca.crt
     # -- Optional JSON string of headers for CONNECT request
     # headers: '{"X-Proxy-Header":"value"}'

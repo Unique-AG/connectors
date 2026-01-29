@@ -36,7 +36,7 @@ export class UniqueGraphqlClient {
     const uniqueConfig = this.configService.get('unique', { infer: true });
     const graphqlUrl = `${uniqueConfig[`${clientTarget}ServiceBaseUrl`]}/graphql`;
 
-    const dispatcher = this.proxyService.getDispatcher('external-only');
+    const dispatcher = this.proxyService.getDispatcher({ mode: 'for-external-only' });
 
     this.graphQlClient = new GraphQLClient(graphqlUrl, {
       // graphql-request expects DOM fetch types, but we use undici's fetch to route through proxy.

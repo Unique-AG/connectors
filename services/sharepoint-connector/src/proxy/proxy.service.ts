@@ -5,7 +5,11 @@ import { Agent, Dispatcher, ProxyAgent } from 'undici';
 import { Config } from '../config';
 import { BasicProxyConfig, ProxyConfig, TlsProxyConfig } from '../config/proxy.schema';
 
-export type ProxyMode = 'always' | 'external-only';
+export type ProxyMode = 'always' | 'for-external-only';
+
+export interface GetDispatcherOptions {
+  mode: ProxyMode;
+}
 
 @Injectable()
 export class ProxyService implements OnModuleDestroy {
@@ -29,8 +33,8 @@ export class ProxyService implements OnModuleDestroy {
     });
   }
 
-  public getDispatcher(mode: ProxyMode): Dispatcher {
-    if (mode === 'external-only' && !this.isExternalMode) {
+  public getDispatcher({ mode }: GetDispatcherOptions): Dispatcher {
+    if (mode === 'for-external-only' && !this.isExternalMode) {
       return this.noProxyDispatcher;
     }
     return this.dispatcher;
@@ -58,22 +62,23 @@ export class ProxyService implements OnModuleDestroy {
       ...sharedOptions,
     };
 
-    if (proxyConfig.authMode === 'basic') {
+    if (proxyConfig.authMode === 'username_password') {
       const credentials = Buffer.from(`${proxyConfig.username}:${proxyConfig.password}`).toString(
         'base64',
       );
       proxyOptions.token = `Basic ${credentials}`;
     }
 
-    if (proxyConfig.authMode === 'tls') {
-      proxyOptions.requestTls = {
-        cert: readFileSync(proxyConfig.tlsCertPath),
-        key: readFileSync(proxyConfig.tlsKeyPath),
-      };
+    if (proxyConfig.sslCaBundlePath) {
+      proxyOptions.proxyTls = { ca: readFileSync(proxyConfig.sslCaBundlePath) };
     }
 
-    if (proxyConfig.caBundlePath) {
-      proxyOptions.proxyTls = { ca: readFileSync(proxyConfig.caBundlePath) };
+    if (proxyConfig.authMode === 'ssl_tls') {
+      proxyOptions.proxyTls = {
+        ...(proxyOptions.proxyTls ?? {}),
+        cert: readFileSync(proxyConfig.sslCertPath),
+        key: readFileSync(proxyConfig.sslKeyPath),
+      };
     }
 
     if (proxyConfig.headers) {

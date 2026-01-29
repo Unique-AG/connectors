@@ -62,7 +62,7 @@ export class SharepointRestHttpService {
       ),
       createLoggingInterceptor(this.shouldConcealLogs),
     ];
-    const baseDispatcher = this.proxyService.getDispatcher('always');
+    const baseDispatcher = this.proxyService.getDispatcher({ mode: 'always' });
     this.client = baseDispatcher.compose(interceptorsInCallingOrder.reverse());
   }
 

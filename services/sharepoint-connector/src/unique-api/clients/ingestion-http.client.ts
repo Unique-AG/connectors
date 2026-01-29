@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
@@ -18,7 +18,7 @@ import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
 import { UniqueAuthService } from '../unique-auth.service';
 
 @Injectable()
-export class IngestionHttpClient implements OnModuleDestroy {
+export class IngestionHttpClient {
   private readonly logger = new Logger(this.constructor.name);
   private readonly limiter: Bottleneck;
   private readonly httpClient: Dispatcher;
@@ -61,7 +61,7 @@ export class IngestionHttpClient implements OnModuleDestroy {
       }),
     ];
 
-    const baseDispatcher = this.proxyService.getDispatcher('external-only');
+    const baseDispatcher = this.proxyService.getDispatcher({ mode: 'for-external-only' });
     this.httpClient = baseDispatcher.compose(interceptorsInCallingOrder.reverse());
 
     const apiRateLimitPerMinute = this.configService.get('unique.apiRateLimitPerMinute', {
@@ -88,10 +88,6 @@ export class IngestionHttpClient implements OnModuleDestroy {
       },
       'Ingestion HTTP',
     );
-  }
-
-  public async onModuleDestroy(): Promise<void> {
-    await this.httpClient.close();
   }
 
   public async request(

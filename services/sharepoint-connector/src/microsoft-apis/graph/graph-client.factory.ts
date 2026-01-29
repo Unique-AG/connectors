@@ -82,7 +82,7 @@ export class GraphClientFactory {
       // SDK types are incomplete.
       // See https://github.com/microsoftgraph/msgraph-sdk-javascript/issues/1646 for more details.
       fetchOptions: {
-        dispatcher: this.proxyService.getDispatcher('always'),
+        dispatcher: this.proxyService.getDispatcher({ mode: 'always' }),
       } as ClientOptions['fetchOptions'],
     };
 

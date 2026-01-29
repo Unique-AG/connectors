@@ -36,7 +36,7 @@ export class MicrosoftAuthenticationService {
       ],
     };
 
-    const dispatcher = this.proxyService.getDispatcher('always');
+    const dispatcher = this.proxyService.getDispatcher({ mode: 'always' });
     const authMode = this.configService.get('sharepoint.auth.mode', { infer: true });
     switch (authMode) {
       case 'client-secret':

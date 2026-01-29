@@ -577,17 +577,17 @@
               "type": "string",
               "description": "Username for basic authentication (required when authMode is 'basic')"
             },
-            "tlsCertPath": {
+            "sslCertPath": {
               "type": "string",
-              "description": "Path to TLS client certificate (required when authMode is 'tls')",
+              "description": "Path to SSL/TLS client certificate (required when authMode is 'tls')",
               "examples": ["/app/proxy-cert.pem"]
             },
-            "tlsKeyPath": {
+            "sslKeyPath": {
               "type": "string",
-              "description": "Path to TLS client key (required when authMode is 'tls')",
+              "description": "Path to SSL/TLS client key (required when authMode is 'tls')",
               "examples": ["/app/proxy-key.pem"]
             },
-            "caBundlePath": {
+            "sslCaBundlePath": {
               "type": "string",
               "description": "Path to CA bundle for proxy server certificate verification",
               "examples": ["/app/proxy-ca.pem"]

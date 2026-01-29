@@ -16,11 +16,11 @@ data:
   PROXY_USERNAME: {{ .Values.connectorConfig.proxy.username | quote }}
   {{- end }}
   {{- if eq .Values.connectorConfig.proxy.authMode "tls" }}
-  PROXY_TLS_CERT_PATH: {{ .Values.connectorConfig.proxy.tlsCertPath | quote }}
-  PROXY_TLS_KEY_PATH: {{ .Values.connectorConfig.proxy.tlsKeyPath | quote }}
+  PROXY_SSL_CERT_PATH: {{ .Values.connectorConfig.proxy.sslCertPath | quote }}
+  PROXY_SSL_KEY_PATH: {{ .Values.connectorConfig.proxy.sslKeyPath | quote }}
   {{- end }}
-  {{- if .Values.connectorConfig.proxy.caBundlePath }}
-  PROXY_CA_BUNDLE_PATH: {{ .Values.connectorConfig.proxy.caBundlePath | quote }}
+  {{- if .Values.connectorConfig.proxy.sslCaBundlePath }}
+  PROXY_SSL_CA_BUNDLE_PATH: {{ .Values.connectorConfig.proxy.sslCaBundlePath | quote }}
   {{- end }}
   {{- if .Values.connectorConfig.proxy.headers }}
   PROXY_HEADERS: {{ .Values.connectorConfig.proxy.headers | quote }}
