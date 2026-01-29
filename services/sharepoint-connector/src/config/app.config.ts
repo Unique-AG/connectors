@@ -37,10 +37,10 @@ export const AppConfigSchema = z
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
     logsDiagnosticsConfigEmitPolicy: z
-      .enum(['on_startup', 'per_sync', 'both', 'none'])
+      .enum(['on_startup', 'per_sync', 'on_startup_and_per_sync', 'none'])
       .prefault('per_sync')
       .describe(
-        'Controls when configuration is logged. on_startup: log once on start, per_sync: log at the beginning of each site sync, both: log on startup and per sync, none: disable logging.',
+        'Controls when configuration is logged. on_startup: log once on start, per_sync: log at the beginning of each site sync, on_startup_and_per_sync: log on startup and per sync, none: disable logging.',
       ),
     tenantConfigPathPattern: requiredStringSchema.describe(
       'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/tenant-configs/*-tenant-config.yaml)',

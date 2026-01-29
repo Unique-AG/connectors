@@ -269,7 +269,7 @@ export class SharepointSynchronizationService {
     const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
       infer: true,
     });
-    if (emitPolicy === 'per_sync' || emitPolicy === 'both') {
+    if (emitPolicy === 'per_sync' || emitPolicy === 'on_startup_and_per_sync') {
       this.logger.log(`${logPrefix} Configuration for this sync:`);
       this.configDiagnosticsService.logSiteConfig(siteConfig, `${logPrefix} Site Config`);
       this.configDiagnosticsService.logConfig(

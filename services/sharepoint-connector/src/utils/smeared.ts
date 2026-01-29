@@ -4,7 +4,7 @@ import {
 } from '../config/app.config';
 import { smear } from './logging.util';
 
-export class Smeared<T extends string = string> {
+export class Smeared<T = string> {
   private readonly _value: T;
   private readonly _active: boolean;
 
@@ -34,6 +34,6 @@ export function isSmearingActiveFromEnv(): boolean {
   return process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] !== LogsDiagnosticDataPolicy.DISCLOSE;
 }
 
-export function createSmeared<T extends string = string>(value: T): Smeared<T> {
+export function createSmeared<T = string>(value: T): Smeared<T> {
   return new Smeared(value, isSmearingActiveFromEnv());
 }
