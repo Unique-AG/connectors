@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import type { RequestDocument, Variables } from 'graphql-request';
+import type { RequestDocument } from 'graphql-request';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { GraphClientFactory } from '../src/microsoft-apis/graph/graph-client.factory';
@@ -13,6 +13,10 @@ import {
   INGESTION_CLIENT,
   SCOPE_MANAGEMENT_CLIENT,
 } from '../src/unique-api/clients/unique-graphql.client';
+import type { ContentUpsertMutationInput } from '../src/unique-api/unique-file-ingestion/unique-file-ingestion.consts';
+import type { AddAccessesMutationInput } from '../src/unique-api/unique-files/unique-files.consts';
+import { baseState, type ScenarioState } from './test-state/base-state';
+import { applyScenarioState } from './test-state/load-state';
 import { MockGraphClient } from './test-utils/mock-graph-client';
 import { MockHttpClientService } from './test-utils/mock-http-client.service';
 import { MockIngestionHttpClient } from './test-utils/mock-ingestion-http.client';
@@ -34,15 +38,17 @@ function extractOperationName(document: RequestDocument): string {
 }
 
 // Helper to get GraphQL operations by name from mock calls
-type GraphqlCall = [RequestDocument, Variables?];
-function getGraphQLOperations(
-  mockClient: { request: { mock: { calls: GraphqlCall[] } } },
+type GraphqlCall<TVariables extends object> = [RequestDocument, TVariables?];
+function getGraphQLOperations<TVariables extends object = Record<string, unknown>>(
+  mockClient: { request: { mock: { calls: unknown[][] } } },
   operationName?: string,
 ) {
-  return mockClient.request.mock.calls
+  const calls = mockClient.request.mock.calls as unknown as Array<GraphqlCall<TVariables>>;
+
+  return calls
     .map(([document, variables]) => ({
       operationName: extractOperationName(document),
-      variables: (variables ?? {}) as Variables,
+      variables: (variables ?? ({} as TVariables)) as TVariables,
     }))
     .filter((call) => !operationName || call.operationName === operationName);
 }
@@ -106,14 +112,28 @@ describe('SharePoint synchronization (e2e)', () => {
     mockScopeGraphqlClient.request.mockClear();
   });
 
+  function cloneBaseState(): ScenarioState {
+    return structuredClone(baseState);
+  }
+
+  async function runSynchronisation(state: ScenarioState): Promise<{ status: string }> {
+    // Build the entire scenario state explicitly in the test body (see `test brainsstorm.md`).
+    applyScenarioState({ graphClient: mockGraphClient, uniqueMock, state });
+
+    const service = app.get(SharepointSynchronizationService);
+    return await service.synchronize();
+  }
+
   describe('Content Ingestion', () => {
     describe('when syncing a pdf file', () => {
       it('sends correct mimeType to ContentUpsert', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+        await runSynchronisation(cloneBaseState());
 
         // Query the ingestion GraphQL client mock directly
-        const upserts = getGraphQLOperations(mockIngestionGraphqlClient, 'ContentUpsert');
+        const upserts = getGraphQLOperations<ContentUpsertMutationInput>(
+          mockIngestionGraphqlClient,
+          'ContentUpsert',
+        );
         expect(upserts.length).toBeGreaterThan(0);
 
         // Find the upsert for our test file
@@ -130,20 +150,16 @@ describe('SharePoint synchronization (e2e)', () => {
     });
 
     describe('when syncing an xlsx file', () => {
-      beforeEach(() => {
-        const item = mockGraphClient.driveItems[0];
-        if (item?.file) {
-          item.file.mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-          item.name = 'report.xlsx';
-          if (item.listItem?.fields) {
-            item.listItem.fields.FileLeafRef = 'report.xlsx';
-          }
-        }
-      });
-
       it('sends correct mimeType to file-diff', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+        const state = cloneBaseState();
+        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
+        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
+          drive.content[0].mock.mimeType =
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          drive.content[0].mock.name = 'report.xlsx';
+        }
+
+        await runSynchronisation(state);
 
         // Verify the request was called
         expect(mockIngestionHttpClient.request).toHaveBeenCalled();
@@ -169,7 +185,10 @@ describe('SharePoint synchronization (e2e)', () => {
         expect(requestBody.fileList).toHaveLength(1);
 
         // Verify ContentUpsert GraphQL payload
-        const upserts = getGraphQLOperations(mockIngestionGraphqlClient, 'ContentUpsert');
+        const upserts = getGraphQLOperations<ContentUpsertMutationInput>(
+          mockIngestionGraphqlClient,
+          'ContentUpsert',
+        );
         expect(upserts.length).toBeGreaterThan(0);
 
         // Find the upsert for our xlsx file
@@ -187,24 +206,29 @@ describe('SharePoint synchronization (e2e)', () => {
       });
 
       it('includes xlsx file in synchronization', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+        const state = cloneBaseState();
+        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
+        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
+          drive.content[0].mock.mimeType =
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          drive.content[0].mock.name = 'report.xlsx';
+        }
+
+        await runSynchronisation(state);
 
         expect(mockIngestionHttpClient.request).toHaveBeenCalled();
       });
     });
 
     describe('when file is not marked for sync', () => {
-      beforeEach(() => {
-        const item = mockGraphClient.driveItems[0];
-        if (item?.listItem?.fields) {
-          item.listItem.fields.SyncFlag = false;
-        }
-      });
-
       it('excludes file from synchronization', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+        const state = cloneBaseState();
+        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
+        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
+          drive.content[0].mock.syncFlag = false;
+        }
+
+        await runSynchronisation(state);
 
         // Check if request was called, and if so verify empty fileList
         if (mockIngestionHttpClient.request.mock.calls.length > 0) {
@@ -218,16 +242,14 @@ describe('SharePoint synchronization (e2e)', () => {
     });
 
     describe('when file exceeds size limit', () => {
-      beforeEach(() => {
-        const item = mockGraphClient.driveItems[0];
-        if (item) {
-          item.size = 999999999;
-        }
-      });
-
       it('excludes file from file-diff request', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+        const state = cloneBaseState();
+        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
+        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
+          drive.content[0].mock.size = 999999999;
+        }
+
+        await runSynchronisation(state);
 
         // Check if request was called, and if so verify empty fileList
         if (mockIngestionHttpClient.request.mock.calls.length > 0) {
@@ -241,25 +263,19 @@ describe('SharePoint synchronization (e2e)', () => {
     });
 
     describe('when multiple files have mixed sync flags', () => {
-      beforeEach(() => {
-        // Add a second item not marked for sync
-        const syncedItem = mockGraphClient.driveItems[0];
-        if (!syncedItem) return;
-
-        const unsyncedItem = JSON.parse(JSON.stringify(syncedItem));
-        unsyncedItem.id = 'item-2';
-        unsyncedItem.name = 'hidden.pdf';
-        if (unsyncedItem.listItem?.fields) {
-          unsyncedItem.listItem.fields.SyncFlag = false;
-          unsyncedItem.listItem.fields.FileLeafRef = 'hidden.pdf';
+      it('only synchronizes the marked file', async () => {
+        const state = cloneBaseState();
+        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
+        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
+          const hidden = structuredClone(drive.content[0]);
+          hidden.mock.id = 'item-2';
+          hidden.mock.name = 'hidden.pdf';
+          hidden.mock.syncFlag = false;
+          hidden.permissions = [];
+          drive.content = [drive.content[0], hidden];
         }
 
-        mockGraphClient.driveItems = [syncedItem, unsyncedItem];
-      });
-
-      it('only synchronizes the marked file', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+        await runSynchronisation(state);
 
         // Verify the request was called and parse request body
         expect(mockIngestionHttpClient.request).toHaveBeenCalled();
@@ -269,7 +285,10 @@ describe('SharePoint synchronization (e2e)', () => {
         expect(requestBody.fileList).toHaveLength(1);
         expect(requestBody.fileList[0]?.key).toContain('item-1');
 
-        const upserts = getGraphQLOperations(mockIngestionGraphqlClient, 'ContentUpsert');
+        const upserts = getGraphQLOperations<ContentUpsertMutationInput>(
+          mockIngestionGraphqlClient,
+          'ContentUpsert',
+        );
         expect(upserts.length).toBeGreaterThan(0);
 
         // Find the upsert for test.pdf
@@ -286,11 +305,10 @@ describe('SharePoint synchronization (e2e)', () => {
   describe('Permissions Sync', () => {
     describe('when file has user with read permission', () => {
       it('synchronizes with default permissions', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+        await runSynchronisation(cloneBaseState());
 
         // Verify that CreateFileAccessesForContents was called on the ingestion client
-        const accessCalls = getGraphQLOperations(
+        const accessCalls = getGraphQLOperations<AddAccessesMutationInput>(
           mockIngestionGraphqlClient,
           'CreateFileAccessesForContents',
         );
@@ -299,13 +317,14 @@ describe('SharePoint synchronization (e2e)', () => {
     });
 
     describe('when file has no external permissions', () => {
-      beforeEach(() => {
-        mockGraphClient.permissions['item-1'] = [];
-      });
-
       it('still processes the file', async () => {
-        const service = app.get(SharepointSynchronizationService);
-        await service.synchronize();
+        const state = cloneBaseState();
+        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
+        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
+          drive.content[0].permissions = [];
+        }
+
+        await runSynchronisation(state);
 
         expect(mockIngestionHttpClient.request).toHaveBeenCalled();
       });
@@ -314,9 +333,10 @@ describe('SharePoint synchronization (e2e)', () => {
 
   describe('Integration', () => {
     it('synchronizes content and permissions with mocked dependencies', async () => {
-      const service = app.get(SharepointSynchronizationService);
-      const result = await service.synchronize();
+      const result = await runSynchronisation(cloneBaseState());
 
+      // synchronize() returns { status: 'success' } on success
+      // (we assert downstream effects instead of relying on return plumbing here)
       expect(result).toEqual({ status: 'success' });
 
       expect(mockIngestionHttpClient.request).toHaveBeenCalled();
