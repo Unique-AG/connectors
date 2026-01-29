@@ -10,6 +10,7 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
+import { createSmeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
@@ -77,7 +78,7 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
         },
       },
     },
-    siteId: 'site-123',
+    siteId: createSmeared('site-123'),
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: `/${path}`,
@@ -108,7 +109,10 @@ describe('ScopeManagementService', () => {
     serviceUserId: 'user-123',
     rootPath: '/test1',
     siteName: 'test-site',
-    siteConfig: createMockSiteConfig({ siteId: 'site-123', scopeId: 'root-scope-123' }),
+    siteConfig: createMockSiteConfig({
+      siteId: createSmeared('site-123'),
+      scopeId: 'root-scope-123',
+    }),
   };
 
   type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };
@@ -229,9 +233,7 @@ describe('ScopeManagementService', () => {
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', 'spc:site:site-123');
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Claimed root scope root-scope-123 with externalId: spc:site:site-123',
-        ),
+        expect.stringMatching(/Claimed root scope root-scope-123 with externalId: .*/),
       );
     });
 
@@ -604,9 +606,7 @@ describe('ScopeManagementService', () => {
 
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
-        expect.stringMatching(
-          /^Updated scope scope-1 with externalId: spc:unknown:site-123\/test1-/,
-        ),
+        expect.stringMatching(/^Updated scope scope-1 with externalId: .*/),
       );
     });
 

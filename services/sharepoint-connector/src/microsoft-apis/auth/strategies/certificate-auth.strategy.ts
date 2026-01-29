@@ -38,7 +38,7 @@ export class CertificateAuthStrategy implements AuthStrategy {
     if (privateKeyPassword) {
       const privateKeyObject = crypto.createPrivateKey({
         key: privateKeyRaw,
-        passphrase: privateKeyPassword,
+        passphrase: privateKeyPassword.value,
         format: 'pem',
       });
       privateKey = privateKeyObject.export({ format: 'pem', type: 'pkcs8' }).toString();
@@ -48,8 +48,8 @@ export class CertificateAuthStrategy implements AuthStrategy {
 
     const msalConfig: Configuration = {
       auth: {
-        clientId,
-        authority: `https://login.microsoftonline.com/${tenantId}`,
+        clientId: clientId,
+        authority: `https://login.microsoftonline.com/${tenantId.value}`,
         clientCertificate: {
           privateKey,
           ...(thumbprintSha256 ? { thumbprintSha256 } : { thumbprint }),

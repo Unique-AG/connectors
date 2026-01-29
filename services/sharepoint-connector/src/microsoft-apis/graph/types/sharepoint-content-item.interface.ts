@@ -1,7 +1,8 @@
+import type { Smeared } from '../../../utils/smeared';
 import { DriveItem, ListItem } from './sharepoint.types';
 
 interface BaseItem {
-  siteId: string;
+  siteId: Smeared;
   driveId: string;
   driveName: string;
   folderPath: string;

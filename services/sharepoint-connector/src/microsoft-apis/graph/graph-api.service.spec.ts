@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSmeared } from '../../utils/smeared';
 import { FileFilterService } from './file-filter.service';
 import { GraphApiService } from './graph-api.service';
 import { GraphClientFactory } from './graph-client.factory';
@@ -177,7 +178,7 @@ describe('GraphApiService', () => {
           },
         },
       },
-      siteId: 'site-1',
+      siteId: createSmeared('site-1'),
       driveId: 'drive-1',
       driveName: 'Documents',
       folderPath: '/',
@@ -211,12 +212,18 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(createSmeared('site-1'), 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
+        createSmeared('site-1'),
+        'TestColumn',
+      );
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
+        createSmeared('site-1'),
+        'TestColumn',
+      );
     });
 
     it('skips drives without IDs', async () => {
@@ -226,12 +233,18 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(createSmeared('site-1'), 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
+        createSmeared('site-1'),
+        'TestColumn',
+      );
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
+        createSmeared('site-1'),
+        'TestColumn',
+      );
     });
 
     it('handles pagination correctly', async () => {
@@ -248,12 +261,18 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(createSmeared('site-1'), 'TestColumn');
 
       expect(result.items).toHaveLength(2);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
+        createSmeared('site-1'),
+        'TestColumn',
+      );
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
+        createSmeared('site-1'),
+        'TestColumn',
+      );
     });
 
     it('filters out non-syncable files', async () => {
@@ -267,7 +286,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(createSmeared('site-1'), 'TestColumn');
 
       expect(result.items).toHaveLength(0);
       expect(result.directories).toHaveLength(0);
@@ -280,12 +299,18 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(createSmeared('site-1'), 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
+        createSmeared('site-1'),
+        'TestColumn',
+      );
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
+        createSmeared('site-1'),
+        'TestColumn',
+      );
     });
 
     it('counts total files vs syncable files', async () => {
@@ -301,7 +326,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(createSmeared('site-1'), 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
