@@ -13,17 +13,11 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import {
-  EXTERNAL_ID_PREFIX,
-  redact,
-  shouldConcealLogs,
-  smear,
-  smearExternalId,
-  smearPath,
-} from '../utils/logging.util';
+import { EXTERNAL_ID_PREFIX, redact } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
+import { createSmeared, Smeared } from '../utils/smeared';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 export interface RootScopeInfo {
@@ -34,21 +28,19 @@ export interface RootScopeInfo {
 @Injectable()
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
-    private readonly configService: ConfigService<Config, true>,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+    private readonly _configService: ConfigService<Config, true>,
+  ) {}
 
   public async initializeRootScope(
     rootScopeId: string,
-    siteId: string,
+    siteId: Smeared<string> | string,
     ingestionMode: IngestionMode,
   ): Promise<RootScopeInfo> {
+    const id = typeof siteId === 'string' ? siteId : siteId.value;
     const userId = await this.uniqueUsersService.getCurrentUserId();
     assert.ok(userId, 'User ID must be available');
     const logPrefix = `[RootScopeId: ${rootScopeId}]`;
@@ -64,20 +56,20 @@ export class ScopeManagementService {
     const rootScope = await this.uniqueScopesService.getScopeById(rootScopeId);
     assert.ok(rootScope, `Root scope with ID ${rootScopeId} not found`);
 
-    const isValid = this.isValidScopeOwnership(rootScope, siteId);
+    const isValid = this.isValidScopeOwnership(rootScope, id);
     if (!isValid) {
-      const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
+      const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${id}`;
       throw new Error(
-        `Root scope ${rootScopeId} is owned by a different site. Expected externalId "${
-          this.shouldConcealLogs ? smearExternalId(expectedExternalId) : expectedExternalId
-        }" but got "${
-          this.shouldConcealLogs ? smearExternalId(rootScope.externalId) : rootScope.externalId
-        }". This scope cannot be synced by this site.`,
+        `Root scope ${rootScopeId} is owned by a different site. Expected externalId "${createSmeared(
+          expectedExternalId,
+        )}" but got "${createSmeared(
+          rootScope.externalId || '',
+        )}". This scope cannot be synced by this site.`,
       );
     }
 
     if (!rootScope.externalId) {
-      const externalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
+      const externalId = `${EXTERNAL_ID_PREFIX}site:${id}`;
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           rootScopeId,
@@ -85,9 +77,9 @@ export class ScopeManagementService {
         );
         rootScope.externalId = updatedScope.externalId;
         this.logger.debug(
-          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${
-            this.shouldConcealLogs ? smearExternalId(externalId) : externalId
-          }`,
+          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${createSmeared(
+            externalId,
+          )}`,
         );
       } catch (error) {
         this.logger.warn({
@@ -119,7 +111,7 @@ export class ScopeManagementService {
     }
 
     const rootPath = `/${pathSegments.join('/')}`;
-    this.logger.log(`Resolved root path: ${this.shouldConcealLogs ? redact(rootPath) : rootPath}`);
+    this.logger.log(`Resolved root path: ${createSmeared(rootPath)}`);
 
     return { serviceUserId: userId, rootPath };
   }
@@ -143,7 +135,7 @@ export class ScopeManagementService {
           failedFolders: result.failedFolders.map((f) => ({
             id: f.id,
             name: f.name,
-            path: this.shouldConcealLogs ? redact(f.path) : f.path,
+            path: createSmeared(f.path),
             reason: f.failReason,
           })),
         });
@@ -157,12 +149,13 @@ export class ScopeManagementService {
     }
   }
 
-  private isValidScopeOwnership(rootScope: Scope, siteId: string): boolean {
+  private isValidScopeOwnership(rootScope: Scope, siteId: string | Smeared<string>): boolean {
     if (!rootScope.externalId) {
       return true;
     }
 
-    const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
+    const id = typeof siteId === 'string' ? siteId : siteId.value;
+    const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${id}`;
     return rootScope.externalId === expectedExternalId;
   }
 
@@ -208,9 +201,7 @@ export class ScopeManagementService {
     const segments = trimmedPath.split('/').filter((segment) => segment.length > 0);
 
     if (segments.length === 0) {
-      this.logger.warn(
-        `Path has no valid segments: ${this.shouldConcealLogs ? redact(path) : path}`,
-      );
+      this.logger.warn(`Path has no valid segments: ${createSmeared(path)}`);
       return [];
     }
 
@@ -225,7 +216,7 @@ export class ScopeManagementService {
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<ScopeWithPath[]> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId.value) : context.siteConfig.siteId.value}]`;
+    const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
 
     const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
@@ -276,7 +267,7 @@ export class ScopeManagementService {
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<void> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId.value) : context.siteConfig.siteId.value}]`;
+    const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
     const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
     // Site pages is a special collection we fetch for ASPX pages, but has no folders.
     pathToExternalIdMap[`${context.rootPath}/SitePages`] =
@@ -303,10 +294,7 @@ export class ScopeManagementService {
        */
       let externalId = pathToExternalIdMap[path];
       if (isNullish(externalId)) {
-        this.logger.warn(
-          `${logPrefix} No external ID found for path ` +
-            `${this.shouldConcealLogs ? smearPath(path) : path}`,
-        );
+        this.logger.warn(`${logPrefix} No external ID found for path ${createSmeared(path)}`);
         externalId = `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId.value}/${scope.name}-${randomUUID()}`;
       }
 
@@ -317,9 +305,7 @@ export class ScopeManagementService {
         );
         scope.externalId = updatedScope.externalId;
         this.logger.debug(
-          `Updated scope ${scope.id} with externalId: ${
-            this.shouldConcealLogs ? smearExternalId(externalId) : externalId
-          }`,
+          `Updated scope ${scope.id} with externalId: ${createSmeared(externalId)}`,
         );
       } catch (error) {
         this.logger.warn({
@@ -359,7 +345,7 @@ export class ScopeManagementService {
     scopes: ScopeWithPath[],
     context: SharepointSyncContext,
   ): Map<string, string> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(context.siteConfig.siteId.value) : context.siteConfig.siteId.value}]`;
+    const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
     const itemIdToScopeIdMap = new Map<string, string>();
 
     if (scopes.length === 0) {
@@ -386,7 +372,7 @@ export class ScopeManagementService {
         itemIdToScopeIdMap.set(itemId, scopeId);
       } else {
         this.logger.warn(
-          `${logPrefix} Scope not found in cache for path: ${this.shouldConcealLogs ? redact(scopePath) : scopePath}`,
+          `${logPrefix} Scope not found in cache for path: ${createSmeared(scopePath)}`,
         );
       }
     }
@@ -416,9 +402,7 @@ export class ScopeManagementService {
     // Find scope with this path.
     const scope = scopes.find((scope) => scope.path === scopePath);
     if (!scope?.id) {
-      this.logger.warn(
-        `Scope not found for path: ${this.shouldConcealLogs ? redact(scopePath) : scopePath}`,
-      );
+      this.logger.warn(`Scope not found for path: ${createSmeared(scopePath)}`);
       return undefined;
     }
     return scope.id;

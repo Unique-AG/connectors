@@ -331,7 +331,7 @@ describe('ContentSyncService', () => {
       });
 
       await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
-        '[Site: test-site-123]  Too many files to ingest: 3. Limit is 2. Aborting sync.',
+        /\[Site: \[Redacted\]\]\s+Too many files to ingest: 3\. Limit is 2\. Aborting sync\./,
       );
     });
 
@@ -456,7 +456,7 @@ describe('ContentSyncService', () => {
       vi.spyOn(configService, 'get').mockImplementation(() => null);
 
       await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
-        '[Site: site-id] File diff declares all 2 files stored in Unique as to be deleted. Aborting sync to prevent accidental full deletion.',
+        /\[Site: \[Redacted\]\] File diff declares all 2 files stored in Unique as to be deleted\. Aborting sync to prevent accidental full deletion\./,
       );
     });
 
@@ -480,7 +480,7 @@ describe('ContentSyncService', () => {
       vi.spyOn(configService, 'get').mockImplementation(() => null);
 
       await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
-        '[Site: site-id] We submitted 0 files to the file diff and that would result in all 2 files being deleted. Aborting sync to prevent accidental full deletion.',
+        /\[Site: \[Redacted\]\] We submitted 0 files to the file diff and that would result in all 2 files being deleted\. Aborting sync to prevent accidental full deletion\./,
       );
     });
 

@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { Config } from '../../config';
 import { ConfigDiagnosticsService } from '../../config/config-diagnostics.service';
 import { SiteConfigSchema } from '../../config/sharepoint.schema';
-import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { normalizeError, sanitizeError } from '../../utils/normalize-error';
+import { createSmeared } from '../../utils/smeared';
 import { GraphApiService } from './graph-api.service';
 import { ListColumn, ListItem } from './types/sharepoint.types';
 
@@ -14,15 +14,12 @@ type SiteConfig = z.infer<typeof SiteConfigSchema>;
 @Injectable()
 export class SitesConfigurationService {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly graphApiService: GraphApiService,
     private readonly configService: ConfigService<Config, true>,
     private readonly configDiagnosticsService: ConfigDiagnosticsService,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   /**
    * Loads site configurations from the specified source (config file or SharePoint list).
@@ -59,9 +56,10 @@ export class SitesConfigurationService {
     listId: string;
   }): Promise<SiteConfig[]> {
     const { siteId, listId } = sharepointList;
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
 
-    this.logger.debug(`Fetching sites configuration from site: ${logSiteId}, list: ${listId}`);
+    this.logger.debug(
+      `Fetching sites configuration from site: ${createSmeared(siteId)}, list: ${listId}`,
+    );
 
     const [listItems, columns] = await Promise.all([
       this.graphApiService.getListItems(siteId, listId, { expand: 'fields' }),

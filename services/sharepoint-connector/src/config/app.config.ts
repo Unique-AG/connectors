@@ -6,6 +6,13 @@ import { requiredStringSchema } from '../utils/zod.util';
 // App Configuration
 // ==========================================
 
+export const LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME = 'LOGS_DIAGNOSTICS_DATA_POLICY';
+
+export enum LogsDiagnosticDataPolicy {
+  CONCEAL = 'conceal',
+  DISCLOSE = 'disclose',
+}
+
 export const AppConfigSchema = z
   .object({
     nodeEnv: z
@@ -24,16 +31,16 @@ export const AppConfigSchema = z
       .prefault('info')
       .describe('The log level at which the services outputs (pino)'),
     logsDiagnosticsDataPolicy: z
-      .enum(['conceal', 'disclose'])
-      .prefault('conceal')
+      .nativeEnum(LogsDiagnosticDataPolicy)
+      .prefault(LogsDiagnosticDataPolicy.CONCEAL)
       .describe(
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
     logsDiagnosticsConfigEmitPolicy: z
-      .enum(['on_startup', 'none'])
-      .prefault('on_startup')
+      .enum(['on_startup', 'per_sync', 'both', 'none'])
+      .prefault('per_sync')
       .describe(
-        'Controls whether the configuration is logged on startup. on_startup: log once on start, none: disable logging.',
+        'Controls when configuration is logged. on_startup: log once on start, per_sync: log at the beginning of each site sync, both: log on startup and per sync, none: disable logging.',
       ),
     tenantConfigPathPattern: requiredStringSchema.describe(
       'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/tenant-configs/*-tenant-config.yaml)',

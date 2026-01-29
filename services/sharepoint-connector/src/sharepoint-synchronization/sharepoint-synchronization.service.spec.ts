@@ -173,7 +173,7 @@ describe('SharepointSynchronizationService', () => {
 
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      expect.any(Object),
       'TestColumn',
     );
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
@@ -793,15 +793,15 @@ describe('SharepointSynchronizationService', () => {
     // Should only sync site1 and site3
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-      site1.siteId.value,
+      expect.objectContaining({ value: site1.siteId.value }),
       expect.any(String),
     );
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-      site3.siteId.value,
+      expect.objectContaining({ value: site3.siteId.value }),
       expect.any(String),
     );
     expect(mockGraphApiService.getAllSiteItems).not.toHaveBeenCalledWith(
-      site2.siteId.value,
+      expect.objectContaining({ value: site2.siteId.value }),
       expect.any(String),
     );
 

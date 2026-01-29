@@ -16,7 +16,7 @@ import {
   ContentMetadata,
   ContentRegistrationRequest,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
-import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../../utils/logging.util';
+import { concealIngestionKey, redact, shouldConcealLogs } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
@@ -116,9 +116,7 @@ export class ContentRegistrationStep implements IPipelineStep {
         correlationId: context.correlationId,
         itemId: context.pipelineItem.item.id,
         driveId: context.pipelineItem.driveId,
-        siteId: this.shouldConcealLogs
-          ? smear(context.pipelineItem.siteId)
-          : context.pipelineItem.siteId,
+        siteId: context.pipelineItem.siteId,
         error: sanitizeError(error),
       });
       throw error;

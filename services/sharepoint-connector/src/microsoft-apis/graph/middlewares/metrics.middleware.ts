@@ -18,6 +18,7 @@ import {
   shouldConcealLogs,
   smearSiteIdFromPath,
 } from '../../../utils/logging.util';
+import type { Smeared } from '../../../utils/smeared';
 import { elapsedMilliseconds, elapsedSeconds } from '../../../utils/timing.util';
 import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.types';
 
@@ -27,7 +28,7 @@ export class MetricsMiddleware implements Middleware {
   private nextMiddleware: Middleware | undefined;
   private readonly extractApiMethod: ReturnType<typeof createApiMethodExtractor>;
 
-  private readonly msTenantId: string;
+  private readonly msTenantId: Smeared<string>;
 
   public constructor(
     private readonly spcGraphApiRequestDurationSeconds: Histogram,
@@ -67,7 +68,7 @@ export class MetricsMiddleware implements Middleware {
       const statusClass = getHttpStatusCodeClass(context.response?.status || 0);
 
       this.spcGraphApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
-        ms_tenant_id: this.msTenantId,
+        ms_tenant_id: this.msTenantId.toString(),
         api_method: apiMethod,
         result: 'success',
         http_status_class: statusClass,
@@ -85,7 +86,7 @@ export class MetricsMiddleware implements Middleware {
         const policy = this.getThrottlePolicy(context.response);
 
         this.spcGraphApiThrottleEventsTotal.add(1, {
-          ms_tenant_id: this.msTenantId,
+          ms_tenant_id: this.msTenantId.toString(),
           api_method: apiMethod,
           policy,
         });
@@ -104,7 +105,7 @@ export class MetricsMiddleware implements Middleware {
       const slowRequestDurationBucket = getSlowRequestDurationBucket(duration);
       if (slowRequestDurationBucket) {
         this.spcGraphApiSlowRequestsTotal.add(1, {
-          ms_tenant_id: this.msTenantId,
+          ms_tenant_id: this.msTenantId.toString(),
           api_method: apiMethod,
           duration_bucket: slowRequestDurationBucket,
         });
@@ -123,7 +124,7 @@ export class MetricsMiddleware implements Middleware {
       const duration = elapsedMilliseconds(startTime);
 
       this.spcGraphApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
-        ms_tenant_id: this.msTenantId,
+        ms_tenant_id: this.msTenantId.toString(),
         api_method: apiMethod,
         result: 'error',
         http_status_class: statusClass,
@@ -132,7 +133,7 @@ export class MetricsMiddleware implements Middleware {
       const slowRequestDurationBucket = getSlowRequestDurationBucket(duration);
       if (slowRequestDurationBucket) {
         this.spcGraphApiSlowRequestsTotal.add(1, {
-          ms_tenant_id: this.msTenantId,
+          ms_tenant_id: this.msTenantId.toString(),
           api_method: apiMethod,
           duration_bucket: slowRequestDurationBucket,
         });

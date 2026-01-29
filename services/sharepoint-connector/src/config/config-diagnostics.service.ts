@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { Redacted } from '../utils/redacted';
 import type { Config } from './index';
+import type { SiteConfig } from './sharepoint.schema';
 
 @Injectable()
 export class ConfigDiagnosticsService implements OnModuleInit {
@@ -20,13 +20,14 @@ export class ConfigDiagnosticsService implements OnModuleInit {
     }
 
     this.logger.log('Emitting configuration on startup:');
-    this.logConfig('App Config', this.configService.get('app', { infer: true }));
-    this.logConfig('SharePoint Config', this.configService.get('sharepoint', { infer: true }));
-    this.logConfig('Unique Config', this.configService.get('unique', { infer: true }));
-    this.logConfig('Processing Config', this.configService.get('processing', { infer: true }));
+    this.logAllConfigs();
   }
 
-  public logConfig(name: string, value: unknown) {
+  /**
+   * Logs all configuration namespaces.
+   * Can be called at startup or at the beginning of each sync.
+   */
+  public logAllConfigs(): void {
     const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
       infer: true,
     });
@@ -34,37 +35,30 @@ export class ConfigDiagnosticsService implements OnModuleInit {
       return;
     }
 
-    const filteredValue = filterRedactedFields(value);
+    this.logConfig('App Config', this.configService.get('app', { infer: true }));
+    this.logConfig('SharePoint Config', this.configService.get('sharepoint', { infer: true }));
+    this.logConfig('Unique Config', this.configService.get('unique', { infer: true }));
+    this.logConfig('Processing Config', this.configService.get('processing', { infer: true }));
+  }
+
+  /**
+   * Logs a site-specific configuration at the beginning of a sync.
+   */
+  public logSiteConfig(siteConfig: SiteConfig, label: string = 'Site Config'): void {
+    const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
+      infer: true,
+    });
+    if (emitPolicy === 'none') {
+      return;
+    }
+
+    this.logConfig(label, siteConfig);
+  }
+
+  public logConfig(name: string, value: unknown) {
     this.logger.log({
       msg: `Configuration: ${name}`,
-      config: filteredValue,
+      config: value,
     });
   }
-}
-
-/**
- * Recursively filters out Redacted fields from an object or array.
- * Useful for logging configuration without revealing secret field names.
- */
-export function filterRedactedFields(value: unknown): unknown {
-  if (value instanceof Redacted) {
-    return undefined;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map(filterRedactedFields).filter((item) => item !== undefined);
-  }
-
-  if (value !== null && typeof value === 'object') {
-    const filtered: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      const filteredVal = filterRedactedFields(val);
-      if (filteredVal !== undefined) {
-        filtered[key] = filteredVal;
-      }
-    }
-    return filtered;
-  }
-
-  return value;
 }

@@ -3,6 +3,7 @@ import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS } from '../constants/defa
 import { IngestionMode } from '../constants/ingestion.constants';
 import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import { Redacted } from '../utils/redacted';
+import { createSmeared, Smeared } from '../utils/smeared';
 import {
   coercedPositiveNumberSchema,
   requiredStringSchema,
@@ -108,7 +109,7 @@ export const SiteConfigSchema = z.object({
     .string()
     .trim()
     .pipe(z.uuidv4())
-    .transform((val) => new Redacted(val))
+    .transform((val) => createSmeared(val))
     .describe('SharePoint site ID'),
   syncColumnName: z
     .string()
@@ -180,7 +181,7 @@ const dynamicSitesConfig = z.object({
   sharepointList: z
     .object({
       siteId: requiredStringSchema
-        .transform((val) => new Redacted(val))
+        .transform((val) => createSmeared(val))
         .describe('SharePoint site ID containing the configuration list'),
       listId: requiredStringSchema.describe('GUID of the SharePoint configuration list'),
     })
@@ -189,7 +190,7 @@ const dynamicSitesConfig = z.object({
 
 const sharepointBaseConfig = z.object({
   tenantId: requiredStringSchema
-    .transform((val) => new Redacted(val))
+    .transform((val) => createSmeared(val))
     .describe('Azure AD tenant ID'),
   auth: AuthConfigSchema.describe('Authentication configuration for Microsoft APIs'),
   graphApiRateLimitPerMinuteThousands: coercedPositiveNumberSchema
@@ -216,12 +217,12 @@ export type SharepointConfig = (
   | {
       sitesSource: 'sharepoint_list';
       sharepointList: {
-        siteId: Redacted<string>;
+        siteId: Smeared<string>;
         listId: string;
       };
     }
 ) & {
-  tenantId: Redacted<string>;
+  tenantId: Smeared<string>;
   auth: AuthConfig & {
     privateKeyPassword?: Redacted<string>;
   };

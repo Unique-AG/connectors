@@ -15,9 +15,9 @@ import type {
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
+import type { Smeared } from '../utils/smeared';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { ScopeManagementService } from './scope-management.service';
@@ -26,10 +26,8 @@ import type { SharepointSyncContext } from './sharepoint-sync-context.interface'
 @Injectable()
 export class ContentSyncService {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
-    private readonly configService: ConfigService<Config, true>,
     private readonly orchestrator: ItemProcessingOrchestratorService,
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly uniqueFilesService: UniqueFilesService,
@@ -37,9 +35,7 @@ export class ContentSyncService {
     private readonly scopeManagementService: ScopeManagementService,
     @Inject(SPC_FILE_DIFF_EVENTS_TOTAL) private readonly spcFileDiffEventsTotal: Counter,
     @Inject(SPC_FILE_DELETED_TOTAL) private readonly spcFileDeletedTotal: Counter,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async syncContentForSite(
     items: SharepointContentItem[],
@@ -47,33 +43,32 @@ export class ContentSyncService {
     context: SharepointSyncContext,
   ): Promise<void> {
     const { siteId } = context.siteConfig;
-    const logSiteId = this.shouldConcealLogs ? smear(siteId.value) : siteId.value;
-    const logPrefix = `[Site: ${logSiteId}] `;
+    const logPrefix = `[Site: ${siteId}] `;
     const processStartTime = Date.now();
 
-    const diffResult = await this.calculateDiffForSite(items, siteId.value);
+    const diffResult = await this.calculateDiffForSite(items, siteId);
 
     if (diffResult.newFiles.length > 0) {
       this.spcFileDiffEventsTotal.add(diffResult.newFiles.length, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         diff_result_type: 'new',
       });
     }
     if (diffResult.updatedFiles.length > 0) {
       this.spcFileDiffEventsTotal.add(diffResult.updatedFiles.length, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         diff_result_type: 'updated',
       });
     }
     if (diffResult.movedFiles.length > 0) {
       this.spcFileDiffEventsTotal.add(diffResult.movedFiles.length, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         diff_result_type: 'moved',
       });
     }
     if (diffResult.deletedFiles.length > 0) {
       this.spcFileDiffEventsTotal.add(diffResult.deletedFiles.length, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         diff_result_type: 'deleted',
       });
     }
@@ -84,7 +79,7 @@ export class ContentSyncService {
 
     // 1. Delete removed files first
     if (diffResult.deletedFiles.length > 0) {
-      await this.deleteRemovedFiles(siteId.value, diffResult.deletedFiles);
+      await this.deleteRemovedFiles(siteId, diffResult.deletedFiles);
     }
 
     // 2. Handle moved files (update scopes)
@@ -139,7 +134,7 @@ export class ContentSyncService {
 
   private async calculateDiffForSite(
     sharepointContentItems: SharepointContentItem[],
-    siteId: string,
+    siteId: Smeared<string>,
   ): Promise<FileDiffResponse> {
     const fileDiffItems: FileDiffItem[] = sharepointContentItems.map(
       (sharepointContentItem: SharepointContentItem) => {
@@ -155,7 +150,7 @@ export class ContentSyncService {
 
     const fileDiffResult = await this.uniqueFileIngestionService.performFileDiff(
       fileDiffItems,
-      siteId,
+      siteId.toString(),
     );
 
     await this.validateNoAccidentalFullDeletion(fileDiffItems, fileDiffResult, siteId);
@@ -166,7 +161,7 @@ export class ContentSyncService {
   private async validateNoAccidentalFullDeletion(
     fileDiffItems: FileDiffItem[],
     fileDiffResult: FileDiffResponse,
-    siteId: string,
+    siteId: Smeared<string>,
   ): Promise<void> {
     // If there are no files to be deleted, there's no point in checking further, we will surely not
     // perform full deletion.
@@ -174,8 +169,7 @@ export class ContentSyncService {
       return;
     }
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
+    const logPrefix = `[Site: ${siteId}]`;
 
     // If the file diff indicated we should delete all files by having submitted no files to the
     // diff, it most probably means that we have some kind of bug in fetching the files from
@@ -188,7 +182,7 @@ export class ContentSyncService {
           `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files as to ` +
           `be deleted. Aborting sync to prevent accidental full deletion. If you wish to delete ` +
           `all files, add a dummy file to the site and mark it for synchronization.`,
-        siteId: logSiteId,
+        siteId,
         itemsLength: fileDiffItems.length,
         fileDiffResultCounts: mapValues(fileDiffResult, length()),
       });
@@ -212,7 +206,7 @@ export class ContentSyncService {
           `stored in Unique as to be deleted. Aborting sync to prevent accidental full deletion. ` +
           `If you wish to delete all files, add a dummy file to the site and mark it for ` +
           `synchronization.`,
-        siteId: logSiteId,
+        siteId,
         totalFilesForSiteInUnique,
         fileDiffResultCounts: mapValues(fileDiffResult, length()),
       });
@@ -223,9 +217,11 @@ export class ContentSyncService {
     }
   }
 
-  private async deleteRemovedFiles(siteId: string, deletedFileKeys: string[]): Promise<void> {
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
+  private async deleteRemovedFiles(
+    siteId: Smeared<string>,
+    deletedFileKeys: string[],
+  ): Promise<void> {
+    const logPrefix = `[Site: ${siteId}]`;
     let filesToDelete: UniqueFile[] = [];
     // Convert relative keys to full keys (with siteId prefix)
     const fullKeys = deletedFileKeys.map((key) => `${siteId}/${key}`);
@@ -250,12 +246,12 @@ export class ContentSyncService {
         totalDeleted++;
 
         this.spcFileDeletedTotal.add(1, {
-          sp_site_id: logSiteId,
+          sp_site_id: siteId.value,
           result: 'success',
         });
       } catch (error) {
         this.spcFileDeletedTotal.add(1, {
-          sp_site_id: logSiteId,
+          sp_site_id: siteId.value,
           result: 'failure',
         });
 

@@ -21,7 +21,6 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import { isAncestorOfRootPath, normalizeSlashes } from '../utils/paths.util';
 import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
@@ -43,25 +42,20 @@ interface Input {
 @Injectable()
 export class SyncSharepointFolderPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueGroupsService: UniqueGroupsService,
-    private readonly configService: ConfigService<Config, true>,
     @Inject(SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL)
     private readonly spcFolderPermissionsSyncTotal: Counter,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId } = context.siteConfig;
     const { rootPath, serviceUserId } = context;
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId.value) : siteId.value;
-    const logPrefix = `[Site: ${logSiteId}]`;
+    const logPrefix = `[Site: ${siteId}]`;
 
     const rootGroup = await this.uniqueGroupsService.getRootGroup();
     if (!rootGroup) {
@@ -131,13 +125,13 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
     if (totalScopeAccessesAdded > 0) {
       this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesAdded, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         operation: 'added',
       });
     }
     if (totalScopeAccessesRemoved > 0) {
       this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesRemoved, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         operation: 'removed',
       });
     }
@@ -227,9 +221,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
     if (this.isTopFolder(folder.path, rootPath)) {
       this.logger.debug(
-        `${logPrefix} Using root group permission for top folder at path ${
-          this.shouldConcealLogs ? redact(folder.path) : folder.path
-        }`,
+        `${logPrefix} Using root group permission for top folder at path ${folder.path}`,
       );
       return [
         {
@@ -243,9 +235,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const sharePointDirectory = sharePoint.directoriesPathMap[folder.path];
 
     if (isNullish(sharePointDirectory)) {
-      this.logger.warn(
-        `${logPrefix} No SharePoint directory found for path ${this.shouldConcealLogs ? redact(folder.path) : folder.path}`,
-      );
+      this.logger.warn(`${logPrefix} No SharePoint directory found for path ${folder.path}`);
       return null;
     }
 
@@ -253,11 +243,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const sharePointPermissions = sharePoint.permissionsMap[sharePointDirectoryKey];
     if (isNullish(sharePointPermissions)) {
       this.logger.warn(
-        `${logPrefix} No SharePoint permissions found for key ${
-          this.shouldConcealLogs
-            ? concealIngestionKey(sharePointDirectoryKey)
-            : sharePointDirectoryKey
-        }`,
+        `${logPrefix} No SharePoint permissions found for key ${sharePointDirectoryKey}`,
       );
       return null;
     }

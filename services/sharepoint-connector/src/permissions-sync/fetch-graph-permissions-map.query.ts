@@ -7,6 +7,7 @@ import {
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { buildIngestionItemKey } from '../utils/sharepoint.util';
+import { Smeared } from '../utils/smeared';
 import { Membership } from './types';
 import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './utils';
 
@@ -23,9 +24,10 @@ export class FetchGraphPermissionsMapQuery {
 
   public constructor(private readonly graphApiService: GraphApiService) {}
 
-  public async run(siteId: string, items: AnySharepointItem[]): Promise<PermissionsMap> {
+  public async run(siteId: Smeared<string>, items: AnySharepointItem[]): Promise<PermissionsMap> {
     const siteName = await this.graphApiService.getSiteName(siteId);
 
+    const logPrefix = `[Site: ${siteId}]`;
     const permissionsMap: PermissionsMap = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
