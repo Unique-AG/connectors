@@ -11,6 +11,7 @@ import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.s
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
+import { RootScopeMigrationService } from './root-scope-migration.service';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -170,12 +171,14 @@ describe('ScopeManagementService', () => {
     let createScopeAccessesMock: ReturnType<typeof vi.fn>;
     let getCurrentUserIdMock: ReturnType<typeof vi.fn>;
     let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+    let migrateIfNeededMock: ReturnType<typeof vi.fn>;
 
     beforeEach(async () => {
       getScopeByIdMock = vi.fn();
       createScopeAccessesMock = vi.fn();
       getCurrentUserIdMock = vi.fn().mockResolvedValue('user-123');
       updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
+      migrateIfNeededMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
 
       const configService = {
         get: vi.fn((key: string) => {
@@ -196,6 +199,11 @@ describe('ScopeManagementService', () => {
         .impl((stubFn) => ({
           ...stubFn(),
           getCurrentUserId: getCurrentUserIdMock,
+        }))
+        .mock<RootScopeMigrationService>(RootScopeMigrationService)
+        .impl((stubFn) => ({
+          ...stubFn(),
+          migrateIfNeeded: migrateIfNeededMock,
         }))
         .mock<ConfigService<Config, true>>(ConfigService)
         .impl(() => configService as unknown as ConfigService<Config, true>)
@@ -226,6 +234,7 @@ describe('ScopeManagementService', () => {
 
       await service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat);
 
+      expect(migrateIfNeededMock).toHaveBeenCalledWith('root-scope-123', 'site-123');
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', 'spc:site:site-123');
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
@@ -233,6 +242,25 @@ describe('ScopeManagementService', () => {
           'Claimed root scope root-scope-123 with externalId: spc:site:site-123',
         ),
       );
+    });
+
+    it('throws when root scope migration fails', async () => {
+      getScopeByIdMock.mockResolvedValueOnce({
+        id: 'root-scope-123',
+        name: 'test1',
+        externalId: null,
+        parentId: null,
+      });
+      migrateIfNeededMock.mockResolvedValueOnce({
+        status: 'migration_failed',
+        error: 'Failed to move child scopes',
+      });
+
+      await expect(
+        service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat),
+      ).rejects.toThrow('Root scope migration failed: Failed to move child scopes');
+
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
     });
 
     it('skips claiming if externalId is already set to the correct site', async () => {
