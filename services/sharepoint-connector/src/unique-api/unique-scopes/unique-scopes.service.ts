@@ -89,6 +89,25 @@ export class UniqueScopesService {
     return result.updateScope;
   }
 
+  public async updateScopeParent(
+    scopeId: string,
+    newParentId: string,
+  ): Promise<{ id: string; parentId: string | null }> {
+    const result = await this.scopeManagementClient.request<
+      UpdateScopeMutationResult,
+      UpdateScopeMutationInput
+    >(UPDATE_SCOPE_MUTATION, {
+      id: scopeId,
+      input: {
+        parrentScope: {
+          connect: { id: newParentId },
+        },
+      },
+    });
+
+    return result.updateScope;
+  }
+
   public async createScopeAccesses(
     scopeId: string,
     scopeAccesses: ScopeAccess[],
