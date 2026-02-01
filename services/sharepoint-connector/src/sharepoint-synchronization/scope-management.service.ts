@@ -24,6 +24,7 @@ import {
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
+import { RootScopeMigrationService } from './root-scope-migration.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 export interface RootScopeInfo {
@@ -40,6 +41,7 @@ export class ScopeManagementService {
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly rootScopeMigrationService: RootScopeMigrationService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
@@ -77,6 +79,14 @@ export class ScopeManagementService {
     }
 
     if (!rootScope.externalId) {
+      const migrationResult = await this.rootScopeMigrationService.migrateIfNeeded(
+        rootScopeId,
+        siteId,
+      );
+      if (migrationResult.status === 'migration_failed') {
+        throw new Error(`Root scope migration failed: ${migrationResult.error}`);
+      }
+
       const externalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
