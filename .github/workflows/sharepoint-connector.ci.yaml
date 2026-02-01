@@ -23,7 +23,7 @@ jobs:
   check_chart:
     runs-on: ubuntu-latest # TODO: can we use singularity here?
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0 # we need the main branch as well
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # 4.3.1
@@ -89,7 +89,7 @@ jobs:
   check_terraform:
     runs-on: ubuntu-latest # TODO: can we use singularity here?
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # 3.1.2
         with:
           terraform_version: 1.13.4
