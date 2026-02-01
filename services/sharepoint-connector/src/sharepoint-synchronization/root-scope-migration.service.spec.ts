@@ -372,15 +372,19 @@ describe('RootScopeMigrationService', () => {
         const concealedService = unit;
         const debugMock = vi.fn();
         Object.defineProperty(concealedService, 'logger', {
-          value: { debug: debugMock, log: vi.fn(), error: vi.fn(), warn: vi.fn(), verbose: vi.fn() },
+          value: {
+            debug: debugMock,
+            log: vi.fn(),
+            error: vi.fn(),
+            warn: vi.fn(),
+            verbose: vi.fn(),
+          },
           writable: true,
         });
 
         await concealedService.migrateIfNeeded('new-root-123', 'site-456');
 
-        expect(debugMock).toHaveBeenCalledWith(
-          expect.stringMatching(/\[Migration: \*+-\d+\]/),
-        );
+        expect(debugMock).toHaveBeenCalledWith(expect.stringMatching(/\[Migration: \*+-\d+\]/));
       });
     });
   });
