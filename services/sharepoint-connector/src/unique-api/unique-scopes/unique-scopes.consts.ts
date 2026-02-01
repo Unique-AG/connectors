@@ -106,6 +106,9 @@ export interface PaginatedScopeQueryInput {
     parentId?: {
       equals: string;
     } | null;
+    externalId?: {
+      equals: string;
+    };
   };
 }
 

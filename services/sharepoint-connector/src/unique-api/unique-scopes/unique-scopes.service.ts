@@ -152,6 +152,21 @@ export class UniqueScopesService {
     return result.paginatedScope.nodes[0] ?? null;
   }
 
+  public async getScopeByExternalId(externalId: string): Promise<Scope | null> {
+    const result = await this.scopeManagementClient.request<
+      PaginatedScopeQueryResult,
+      PaginatedScopeQueryInput
+    >(PAGINATED_SCOPE_QUERY, {
+      skip: 0,
+      take: 1,
+      where: {
+        externalId: { equals: externalId },
+      },
+    });
+
+    return result.paginatedScope.nodes[0] ?? null;
+  }
+
   public async listChildrenScopes(parentId: string): Promise<Scope[]> {
     const logPrefix = `[ParentId: ${parentId}]`;
     this.logger.debug(`${logPrefix} Fetching children scopes from Unique API`);
