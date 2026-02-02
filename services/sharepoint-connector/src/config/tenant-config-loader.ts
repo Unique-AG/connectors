@@ -64,9 +64,9 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
 
 function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
   // Config is still an unvalidated object here; schemas will do the final typing/transforms.
-  const typedConfig = config as unknown as {
-    sharepoint: { auth: { mode: string; privateKeyPassword?: unknown } };
-    unique: { serviceAuthMode: string; zitadelClientSecret?: unknown };
+  const typedConfig = config as {
+    sharepoint: { auth: { mode: string; privateKeyPassword?: string } };
+    unique: { serviceAuthMode: string; zitadelClientSecret?: string };
   };
 
   // we throw an error if the object path is not defined
