@@ -3,6 +3,7 @@ import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
+import { createSmeared } from '../../utils/smeared';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
 import { INGESTION_CLIENT } from '../clients/unique-graphql.client';
 import { CONTENT_UPSERT_MUTATION } from './unique-file-ingestion.consts';
@@ -164,7 +165,7 @@ describe('UniqueFileIngestionService', () => {
         },
       ];
 
-      await unit.performFileDiff(fileList, 'partial-key');
+      await unit.performFileDiff(fileList, createSmeared('partial-key'));
 
       expect(capturedPath).toBe('/ingestion/v2/content/file-diff');
       expect(mockHttpClient.request).toHaveBeenCalledWith(
@@ -223,7 +224,7 @@ describe('UniqueFileIngestionService', () => {
         },
       ];
 
-      await unit.performFileDiff(fileList, 'partial-key');
+      await unit.performFileDiff(fileList, createSmeared('partial-key'));
 
       expect(capturedPath).toBe('/v2/content/file-diff');
       expect(mockHttpClient.request).toHaveBeenCalledWith(

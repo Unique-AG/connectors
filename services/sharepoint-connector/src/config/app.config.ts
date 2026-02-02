@@ -6,8 +6,6 @@ import { requiredStringSchema } from '../utils/zod.util';
 // App Configuration
 // ==========================================
 
-export const LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME = 'LOGS_DIAGNOSTICS_DATA_POLICY';
-
 export enum LogsDiagnosticDataPolicy {
   CONCEAL = 'conceal',
   DISCLOSE = 'disclose',

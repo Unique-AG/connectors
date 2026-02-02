@@ -148,7 +148,7 @@ export class ContentSyncService {
 
     const fileDiffResult = await this.uniqueFileIngestionService.performFileDiff(
       fileDiffItems,
-      siteId.toString(),
+      siteId,
     );
 
     await this.validateNoAccidentalFullDeletion(fileDiffItems, fileDiffResult, siteId);
@@ -219,7 +219,7 @@ export class ContentSyncService {
     const logPrefix = `[Site: ${siteId}]`;
     let filesToDelete: UniqueFile[] = [];
     // Convert relative keys to full keys (with siteId prefix)
-    const fullKeys = deletedFileKeys.map((key) => `${siteId}/${key}`);
+    const fullKeys = deletedFileKeys.map((key) => `${siteId.value}/${key}`);
 
     try {
       // Get content that matches the exact keys
@@ -241,12 +241,12 @@ export class ContentSyncService {
         totalDeleted++;
 
         this.spcFileDeletedTotal.add(1, {
-          sp_site_id: siteId.value,
+          sp_site_id: siteId.toString(),
           result: 'success',
         });
       } catch (error) {
         this.spcFileDeletedTotal.add(1, {
-          sp_site_id: siteId.value,
+          sp_site_id: siteId.toString(),
           result: 'failure',
         });
 

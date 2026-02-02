@@ -24,13 +24,6 @@ export class ConfigDiagnosticsService implements OnModuleInit {
   }
 
   public logAllConfigs(): void {
-    const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
-      infer: true,
-    });
-    if (emitPolicy === 'none') {
-      return;
-    }
-
     this.logConfig('App Config', this.configService.get('app', { infer: true }));
     this.logConfig('SharePoint Config', this.configService.get('sharepoint', { infer: true }));
     this.logConfig('Unique Config', this.configService.get('unique', { infer: true }));
@@ -38,6 +31,10 @@ export class ConfigDiagnosticsService implements OnModuleInit {
   }
 
   public logSiteConfig(siteConfig: SiteConfig, label: string = 'Site Config'): void {
+    this.logConfig(label, siteConfig);
+  }
+
+  public logConfig(name: string, value: unknown) {
     const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
       infer: true,
     });
@@ -45,10 +42,6 @@ export class ConfigDiagnosticsService implements OnModuleInit {
       return;
     }
 
-    this.logConfig(label, siteConfig);
-  }
-
-  public logConfig(name: string, value: unknown) {
     this.logger.log({
       msg: `Configuration: ${name}`,
       config: value,

@@ -74,7 +74,7 @@ export class SyncSharepointGroupsToUniqueCommand {
       const correspondingUniqueGroup = unique.groupsMap[sharePointGroup.id];
       if (!correspondingUniqueGroup) {
         const newUniqueGroup = await this.createUniqueGroup(
-          siteId.value,
+          siteId,
           siteName,
           sharePointGroup,
           unique.usersMap,
@@ -155,7 +155,7 @@ export class SyncSharepointGroupsToUniqueCommand {
   }
 
   private async createUniqueGroup(
-    siteId: string,
+    siteId: Smeared,
     siteName: string,
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
@@ -168,7 +168,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
     const uniqueGroup = await this.uniqueGroupsService.createGroup({
       name: getUniqueGroupName(siteName, sharePointGroup.displayName),
-      externalId: getSharepointConnectorGroupExternalId(siteId, sharePointGroup.id),
+      externalId: getSharepointConnectorGroupExternalId(siteId.value, sharePointGroup.id),
     });
 
     await this.uniqueGroupsService.addGroupMembers(uniqueGroup.id, memberIds);

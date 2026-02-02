@@ -399,12 +399,12 @@ export class GraphApiService {
   }
 
   public async getListItemPermissions(
-    siteId: string,
+    siteId: Smeared,
     listId: string,
     itemId: string,
   ): Promise<SimplePermission[]> {
     return await this.paginateGraphApiRequest<SimplePermission>(
-      `/sites/${siteId}/lists/${listId}/items/${itemId}/permissions`,
+      `/sites/${siteId.value}/lists/${listId}/items/${itemId}/permissions`,
       (url) =>
         this.graphClient
           .api(url)

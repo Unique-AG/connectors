@@ -95,7 +95,7 @@ export class UniqueFilesService {
         take: CONTENT_BATCH_SIZE,
         where: {
           key: {
-            startsWith: `${siteId}/`,
+            startsWith: `${siteId.value}/`,
           },
         },
       });
@@ -176,7 +176,7 @@ export class UniqueFilesService {
         take: CONTENT_BATCH_SIZE,
         where: {
           key: {
-            startsWith: `${siteId}/`,
+            startsWith: `${siteId.value}/`,
           },
         },
       });
@@ -198,7 +198,7 @@ export class UniqueFilesService {
     >(PAGINATED_CONTENT_COUNT_QUERY, {
       where: {
         key: {
-          startsWith: `${siteId}/`,
+          startsWith: `${siteId.value}/`,
         },
       },
     });

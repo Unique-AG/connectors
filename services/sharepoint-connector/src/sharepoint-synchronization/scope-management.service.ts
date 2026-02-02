@@ -34,10 +34,9 @@ export class ScopeManagementService {
 
   public async initializeRootScope(
     rootScopeId: string,
-    siteId: Smeared | string,
+    siteId: Smeared,
     ingestionMode: IngestionMode,
   ): Promise<RootScopeInfo> {
-    const id = typeof siteId === 'string' ? siteId : siteId.value;
     const userId = await this.uniqueUsersService.getCurrentUserId();
     assert.ok(userId, 'User ID must be available');
     const logPrefix = `[RootScopeId: ${rootScopeId}]`;
@@ -53,20 +52,15 @@ export class ScopeManagementService {
     const rootScope = await this.uniqueScopesService.getScopeById(rootScopeId);
     assert.ok(rootScope, `Root scope with ID ${rootScopeId} not found`);
 
-    const isValid = this.isValidScopeOwnership(rootScope, id);
+    const isValid = this.isValidScopeOwnership(rootScope, siteId);
     if (!isValid) {
-      const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${id}`;
       throw new Error(
-        `Root scope ${rootScopeId} is owned by a different site. Expected externalId "${createSmeared(
-          expectedExternalId,
-        )}" but got "${createSmeared(
-          rootScope.externalId || '',
-        )}". This scope cannot be synced by this site.`,
+        `Root scope ${rootScopeId} is owned by a different site. This scope cannot be synced by this site.`,
       );
     }
 
     if (!rootScope.externalId) {
-      const externalId = `${EXTERNAL_ID_PREFIX}site:${id}`;
+      const externalId = `${EXTERNAL_ID_PREFIX}site:${siteId.value}`;
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           rootScopeId,
@@ -74,13 +68,11 @@ export class ScopeManagementService {
         );
         rootScope.externalId = updatedScope.externalId;
         this.logger.debug(
-          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${createSmeared(
-            externalId,
-          )}`,
+          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${EXTERNAL_ID_PREFIX}site:${siteId}`,
         );
       } catch (error) {
         this.logger.warn({
-          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${externalId}`,
+          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${EXTERNAL_ID_PREFIX}site:${siteId}`,
           error: sanitizeError(error),
         });
       }
@@ -146,13 +138,12 @@ export class ScopeManagementService {
     }
   }
 
-  private isValidScopeOwnership(rootScope: Scope, siteId: string | Smeared): boolean {
+  private isValidScopeOwnership(rootScope: Scope, siteId: Smeared): boolean {
     if (!rootScope.externalId) {
       return true;
     }
 
-    const id = typeof siteId === 'string' ? siteId : siteId.value;
-    const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${id}`;
+    const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId.value}`;
     return rootScope.externalId === expectedExternalId;
   }
 
@@ -328,10 +319,10 @@ export class ScopeManagementService {
       const pathWithoutRoot = path.substring(rootPath.length);
       const segments = pathWithoutRoot.split('/').filter(Boolean);
       pathToExternalIdMap[path] =
-        `${EXTERNAL_ID_PREFIX}folder:${directory.siteId}/${directory.item.id}`;
+        `${EXTERNAL_ID_PREFIX}folder:${directory.siteId.value}/${directory.item.id}`;
       // siteName is now stripped, so first segment is already the drive
       pathToExternalIdMap[`${rootPath}/${segments[0]}`] ??=
-        `${EXTERNAL_ID_PREFIX}drive:${directory.siteId}/${directory.driveId}`;
+        `${EXTERNAL_ID_PREFIX}drive:${directory.siteId.value}/${directory.driveId}`;
     }
 
     return pathToExternalIdMap;

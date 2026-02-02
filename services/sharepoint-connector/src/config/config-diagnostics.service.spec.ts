@@ -48,16 +48,13 @@ describe('ConfigDiagnosticsService', () => {
       });
     });
 
-    it('always logs configuration regardless of emit policy', () => {
+    it('skips logging when emit policy is none', () => {
       vi.spyOn(configService, 'get').mockReturnValue('none');
 
       const config = { foo: 'bar' };
       service.logConfig('Test', config);
 
-      expect(loggerSpy).toHaveBeenCalledWith({
-        msg: 'Configuration: Test',
-        config: { foo: 'bar' },
-      });
+      expect(loggerSpy).not.toHaveBeenCalled();
     });
 
     it('logs configuration as-is with Redacted fields serialized via toJSON', () => {

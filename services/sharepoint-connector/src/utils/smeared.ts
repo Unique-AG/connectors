@@ -1,7 +1,4 @@
-import {
-  LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME,
-  LogsDiagnosticDataPolicy,
-} from '../config/app.config';
+import { LogsDiagnosticDataPolicy } from '../config/app.config';
 import { smear } from './logging.util';
 
 /**
@@ -16,24 +13,13 @@ import { smear } from './logging.util';
  * api.fetchSite(siteId.value); // Always uses the real value
  */
 export class Smeared {
-  private readonly _value: string;
-  private readonly _active: boolean;
-
-  public constructor(value: string, active: boolean) {
-    this._value = value;
-    this._active = active;
-  }
-
-  public get value(): string {
-    return this._value;
-  }
-
-  public get active(): boolean {
-    return this._active;
-  }
+  public constructor(
+    public readonly value: string,
+    public readonly active: boolean,
+  ) {}
 
   public toString(): string {
-    return this._active ? smear(this._value) : this._value;
+    return this.active ? smear(this.value) : this.value;
   }
 
   public toJSON(): string {
@@ -41,10 +27,10 @@ export class Smeared {
   }
 }
 
-export function isSmearingActiveFromEnv(): boolean {
-  return process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] !== LogsDiagnosticDataPolicy.DISCLOSE;
+export function isSmearingActive(): boolean {
+  return process.env.LOGS_DIAGNOSTICS_DATA_POLICY !== LogsDiagnosticDataPolicy.DISCLOSE;
 }
 
 export function createSmeared(value: string): Smeared {
-  return new Smeared(value, isSmearingActiveFromEnv());
+  return new Smeared(value, isSmearingActive());
 }

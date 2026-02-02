@@ -33,7 +33,7 @@ export class FetchGraphPermissionsMapQuery {
       const permissionsFetcher: PermissionsFetcher = {
         driveItem: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
         listItem: () =>
-          this.graphApiService.getListItemPermissions(siteId.value, item.driveId, item.item.id),
+          this.graphApiService.getListItemPermissions(siteId, item.driveId, item.item.id),
         directory: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
       };
 

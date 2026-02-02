@@ -228,7 +228,11 @@ describe('ScopeManagementService', () => {
         parentId: null,
       });
 
-      await service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat);
+      await service.initializeRootScope(
+        'root-scope-123',
+        createSmeared('site-123'),
+        IngestionMode.Flat,
+      );
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', 'spc:site:site-123');
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
@@ -245,7 +249,11 @@ describe('ScopeManagementService', () => {
         parentId: null,
       });
 
-      await service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat);
+      await service.initializeRootScope(
+        'root-scope-123',
+        createSmeared('site-123'),
+        IngestionMode.Flat,
+      );
 
       expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
     });
@@ -259,7 +267,11 @@ describe('ScopeManagementService', () => {
       });
 
       await expect(
-        service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat),
+        service.initializeRootScope(
+          'root-scope-123',
+          createSmeared('site-123'),
+          IngestionMode.Flat,
+        ),
       ).rejects.toThrow(/is owned by a different site/);
 
       expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
@@ -282,7 +294,7 @@ describe('ScopeManagementService', () => {
 
       const result = await service.initializeRootScope(
         'root-scope-123',
-        'site-123',
+        createSmeared('site-123'),
         IngestionMode.Flat,
       );
 

@@ -20,6 +20,7 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
+import type { Smeared } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
@@ -105,7 +106,7 @@ export class SharepointSynchronizationService {
         const siteSyncStartTime = Date.now();
 
         const result = await this.syncSite(siteConfig);
-        this.recordSiteMetric(siteSyncStartTime, siteConfig.siteId.toString(), result);
+        this.recordSiteMetric(siteSyncStartTime, siteConfig.siteId, result);
       }
 
       this.logger.log(
@@ -139,10 +140,10 @@ export class SharepointSynchronizationService {
     });
   }
 
-  private recordSiteMetric(startTime: number, logSiteId: string, result: SiteSyncResult): void {
+  private recordSiteMetric(startTime: number, siteId: Smeared, result: SiteSyncResult): void {
     this.spcSyncDurationSeconds.record(elapsedSeconds(startTime), {
       sync_type: 'site',
-      sp_site_id: logSiteId,
+      sp_site_id: siteId.toString(),
       result: result.status,
       ...(result.status === 'failure' && { failure_step: result.step }),
       ...(result.status === 'skipped' && { skip_reason: result.reason }),

@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME,
-  LogsDiagnosticDataPolicy,
-} from '../config/app.config';
-import { createSmeared, isSmearingActiveFromEnv, Smeared } from './smeared';
+import { LogsDiagnosticDataPolicy } from '../config/app.config';
+import { createSmeared, isSmearingActive, Smeared } from './smeared';
 
 describe('Smeared', () => {
   describe('constructor and getters', () => {
@@ -108,11 +105,11 @@ describe('Smeared', () => {
   describe('createSmeared() factory', () => {
     beforeEach(() => {
       // Reset environment variable before each test
-      delete process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME];
+      delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
     });
 
     it('creates instance with active=true when env is CONCEAL', () => {
-      process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] = LogsDiagnosticDataPolicy.CONCEAL;
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.CONCEAL;
 
       const smeared = createSmeared('test-value');
 
@@ -121,7 +118,7 @@ describe('Smeared', () => {
     });
 
     it('creates instance with active=false when env is DISCLOSE', () => {
-      process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] = LogsDiagnosticDataPolicy.DISCLOSE;
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.DISCLOSE;
 
       const smeared = createSmeared('test-value');
 
@@ -130,7 +127,7 @@ describe('Smeared', () => {
     });
 
     it('creates instance with active=true when env is not set', () => {
-      delete process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME];
+      delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
 
       const smeared = createSmeared('test-value');
 
@@ -139,7 +136,7 @@ describe('Smeared', () => {
     });
 
     it('creates instance with active=true when env is invalid value', () => {
-      process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] = 'invalid-value';
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = 'invalid-value';
 
       const smeared = createSmeared('test-value');
 
@@ -149,37 +146,37 @@ describe('Smeared', () => {
 
   describe('isSmearingActiveFromEnv() helper', () => {
     beforeEach(() => {
-      delete process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME];
+      delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
     });
 
     it('returns true when env is CONCEAL', () => {
-      process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] = LogsDiagnosticDataPolicy.CONCEAL;
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.CONCEAL;
 
-      expect(isSmearingActiveFromEnv()).toBe(true);
+      expect(isSmearingActive()).toBe(true);
     });
 
     it('returns false when env is DISCLOSE', () => {
-      process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] = LogsDiagnosticDataPolicy.DISCLOSE;
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.DISCLOSE;
 
-      expect(isSmearingActiveFromEnv()).toBe(false);
+      expect(isSmearingActive()).toBe(false);
     });
 
     it('returns true when env is not set', () => {
-      delete process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME];
+      delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
 
-      expect(isSmearingActiveFromEnv()).toBe(true);
+      expect(isSmearingActive()).toBe(true);
     });
 
     it('returns true when env is invalid value', () => {
-      process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] = 'invalid-value';
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = 'invalid-value';
 
-      expect(isSmearingActiveFromEnv()).toBe(true);
+      expect(isSmearingActive()).toBe(true);
     });
   });
 
   describe('integration tests', () => {
     it('prevents accidental logging of PII in production mode', () => {
-      process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] = LogsDiagnosticDataPolicy.CONCEAL;
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.CONCEAL;
 
       const siteId = createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66');
       const logMessage = `Processing site ${siteId}`;
@@ -189,7 +186,7 @@ describe('Smeared', () => {
     });
 
     it('allows debugging with raw values in development mode', () => {
-      process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] = LogsDiagnosticDataPolicy.DISCLOSE;
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.DISCLOSE;
 
       const siteId = createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66');
       const logMessage = `Processing site ${siteId}`;
@@ -198,7 +195,7 @@ describe('Smeared', () => {
     });
 
     it('works with nested objects in structured logging', () => {
-      process.env[LOGS_DIAGNOSTICS_DATA_POLICY_ENV_NAME] = LogsDiagnosticDataPolicy.CONCEAL;
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.CONCEAL;
 
       const context = {
         siteId: createSmeared('bd9c85ee-998f-4665-9c44'),

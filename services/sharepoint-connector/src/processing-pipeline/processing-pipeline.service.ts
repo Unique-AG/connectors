@@ -71,7 +71,7 @@ export class ProcessingPipelineService {
         await this.executeWithTimeout(step, context);
 
         this.spcIngestionFileProcessedTotal.add(1, {
-          sp_site_id: siteId.value,
+          sp_site_id: siteId.toString(),
           step_name: toSnakeCase(step.stepName),
           file_state: fileStatus,
           result: 'success',
@@ -85,7 +85,7 @@ export class ProcessingPipelineService {
         const isTimeout = 'isTimeout' in normalizedError && Boolean(normalizedError.isTimeout);
 
         this.spcIngestionFileProcessedTotal.add(1, {
-          sp_site_id: siteId.value,
+          sp_site_id: siteId.toString(),
           step_name: toSnakeCase(step.stepName),
           file_state: fileStatus,
           result: isTimeout ? 'timeout' : 'failure',
