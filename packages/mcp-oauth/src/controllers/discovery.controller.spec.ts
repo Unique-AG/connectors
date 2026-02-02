@@ -1,5 +1,5 @@
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OAUTH_ENDPOINTS } from '../constants/oauth.constants';
 import {
   MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN,
@@ -22,6 +22,9 @@ describe('DiscoveryController', () => {
       resource: 'https://mcp.example.com',
       clientId: 'test-client',
       clientSecret: 'test-secret',
+      accessTokenFormat: 'opaque',
+      jwtSigningKeyProvider: vi.fn(),
+      idTokenExpiresIn: 3600,
       protectedResourceMetadata: {
         scopesSupported: ['offline_access', 'mcp:read', 'mcp:write'],
         bearerMethodsSupported: ['header', 'body'],
@@ -48,6 +51,8 @@ describe('DiscoveryController', () => {
         opTosUri: 'https://example.com/oauth-tos',
         tokenEndpointAuthSigningAlgValuesSupported: ['HS256'],
         dpopSigningAlgValuesSupported: ['RS256', 'ES256'],
+        idTokenSigningAlgValuesSupported: ['HS256'],
+        subjectTypesSupported: ['public'],
       },
       // biome-ignore lint/suspicious/noExplicitAny: Mock for testing
       encryptionService: {} as any,
@@ -154,6 +159,8 @@ describe('DiscoveryController', () => {
           opPolicyUri: undefined,
           opTosUri: undefined,
           dpopSigningAlgValuesSupported: undefined,
+          idTokenSigningAlgValuesSupported: ['HS256'],
+          subjectTypesSupported: ['public'],
         },
       };
 

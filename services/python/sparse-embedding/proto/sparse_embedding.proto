@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package sparse_embedding;
+
+service SparseEmbeddingService {
+  rpc embedQuery(EmbedQueryRequest) returns (EmbedQueryResponse);
+}
+
+message EmbedQueryRequest {
+  string query = 1;
+}
+
+message SparseVector {
+  repeated int32 indices = 1;
+  repeated float values = 2;
+}
+
+message EmbedQueryResponse {
+  SparseVector sparseVector = 1;
+}
+

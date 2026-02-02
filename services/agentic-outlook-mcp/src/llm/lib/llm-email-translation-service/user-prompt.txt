@@ -1,0 +1,10 @@
+Translate the following subject and body to English. If it is already in English, return it unchanged:
+
+Subject: {{SUBJECT}}
+Body: {{BODY}}
+
+Output:
+{
+  "translated_subject": "string",
+  "translated_body": "string"
+}

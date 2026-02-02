@@ -1,6 +1,7 @@
 export * from './constants/oauth.constants';
 export * from './controllers/client.controller';
 export * from './controllers/discovery.controller';
+export * from './controllers/jwks.controller';
 export * from './controllers/oauth.controller';
 export * from './controllers/token.controller';
 export { type IntrospectionResponse, IntrospectRequestDto } from './dtos/introspect-request.dto';
@@ -35,6 +36,9 @@ export {
   OAUTH_STORE_TOKEN,
 } from './mcp-oauth.module-definition';
 export * from './services/client.service';
+export * from './services/id-token.service';
+export * from './services/jwks.service';
+export * from './services/jwt-access-token.service';
 export * from './services/mcp-oauth.service';
 export { OAuthStrategyService, type PassportUser } from './services/oauth-strategy.service';
 export * from './services/opaque-token.service';

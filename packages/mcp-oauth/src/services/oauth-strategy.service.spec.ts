@@ -28,6 +28,9 @@ describe('OAuthStrategyService', () => {
       resource: 'http://localhost:3000/mcp',
       clientId: 'test-client',
       clientSecret: 'test-secret',
+      accessTokenFormat: 'opaque',
+      jwtSigningKeyProvider: vi.fn(),
+      idTokenExpiresIn: 3600,
       protectedResourceMetadata: {
         scopesSupported: ['offline_access'],
         bearerMethodsSupported: ['header'],
@@ -40,6 +43,8 @@ describe('OAuthStrategyService', () => {
         tokenEndpointAuthMethodsSupported: ['client_secret_basic', 'client_secret_post', 'none'],
         scopesSupported: ['offline_access'],
         codeChallengeMethodsSupported: ['plain', 'S256'],
+        idTokenSigningAlgValuesSupported: ['HS256'],
+        subjectTypesSupported: ['public'],
       },
       encryptionService: vi.fn(),
       oauthStore: vi.fn(),
@@ -77,7 +82,7 @@ describe('OAuthStrategyService', () => {
         serverUrl: 'http://localhost:3000',
         clientId: 'test-client',
         clientSecret: 'test-secret',
-        callbackPath: '/auth/callback',
+        callbackPath: '/oauth/callback',
       });
       expect(mockStrategy).toHaveBeenCalled();
       expect(passport.use).toHaveBeenCalledWith(STRATEGY_NAME, expect.any(Object));

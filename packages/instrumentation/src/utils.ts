@@ -6,7 +6,7 @@ const createErrorHandler = (name: string, parentSpan: Span, error: unknown) => {
     context: parentSpan.spanContext(),
   };
 
-  trace.getTracer('default').startActiveSpan(name, { links: [parentLink] }, (span) => {
+  trace.getTracer('default').startActiveSpan(name, { root: true, links: [parentLink] }, (span) => {
     console.error(`[${name}] unhandled or uncaught error\n%o`, error);
     if (error instanceof Error) span.recordException(error);
     const message = error instanceof Error ? error.message : new String(error).toString();
@@ -26,10 +26,12 @@ const createErrorHandler = (name: string, parentSpan: Span, error: unknown) => {
  * @returns Promise that resolves when the function completes
  */
 export async function runWithInstrumentation(fn: () => Promise<void>, name = 'unknown') {
-  await trace.getTracer('default').startActiveSpan(name, async (span) => {
+  console.log('Running with instrumentation', name);
+  await trace.getTracer('default').startActiveSpan(name, { root: true }, async (span) => {
     const handler = (error: unknown) => createErrorHandler(name, span, error);
     process.addListener('unhandledRejection', handler);
     process.addListener('uncaughtException', handler);
+
     addCleanupListener(() => {
       process.removeListener('unhandledRejection', handler);
       process.removeListener('uncaughtException', handler);
@@ -38,6 +40,10 @@ export async function runWithInstrumentation(fn: () => Promise<void>, name = 'un
     let exitCode = 0;
     try {
       await fn();
+      span.setStatus({
+        code: SpanStatusCode.OK,
+      });
+      span.end();
     } catch (error) {
       console.error(`[${name}] execution error\n%o`, error);
       // biome-ignore lint/suspicious/noExplicitAny: We have a safe fallback for exitCode
@@ -50,8 +56,6 @@ export async function runWithInstrumentation(fn: () => Promise<void>, name = 'un
       });
       span.end();
       await exitAfterCleanup(exitCode);
-    } finally {
-      span.end();
     }
   });
 }

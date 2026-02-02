@@ -1,0 +1,18 @@
+export const OTEL_ATTRIBUTES = {
+  USER_ID: 'app.user.id',
+  OUTLOOK_FOLDER: 'outlook.folder',
+  OUTLOOK_LIMIT: 'outlook.limit',
+  MESSAGE_ID: 'outlook.message.id',
+  RECIPIENT_COUNT: 'outlook.recipients.count',
+  HAS_ATTACHMENTS: 'outlook.message.has_attachments',
+  BODY_FORMAT: 'outlook.message.body_format',
+  PERMANENT_DELETE: 'outlook.delete.permanent',
+  DESTINATION_FOLDER: 'outlook.move.destination_folder',
+  SEARCH_QUERY: 'outlook.search.query',
+  IS_HTML: 'outlook.mail.is_html',
+  INCLUDE_ATTACHMENTS: 'outlook.message.include_attachments',
+  MSGRAPH_ENDPOINT: 'msgraph.endpoint',
+  MSGRAPH_METHOD: 'msgraph.method',
+  MSGRAPH_STATUS_CLASS: 'msgraph.status_class',
+  MSGRAPH_THROTTLE_POLICY: 'msgraph.throttle.policy',
+};

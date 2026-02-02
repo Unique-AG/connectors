@@ -1,0 +1,307 @@
+# Port Map
+# 9001 - postgres
+# 9003 - otel-lgtm
+# 9004 - otel-lgtm
+# 9007 - langfuse-worker
+# 9008 - langfuse-web
+# 9010 - rabbitmq
+# 9012 - litellm
+# 9013 - qdrant rest
+# 9014 - qdrant grpc
+# 9015 - temporal
+name: connectors-monorepo
+services:
+  traefik:
+    image: traefik:v3.6.2
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - 80:80
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik.rule=Host(`traefik.localhost`)
+      - traefik.http.routers.traefik.service=api@internal
+
+  postgres:
+    image: postgres:17
+    restart: always
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - 9001:5432
+    environment:
+      PSQL_HISTFILE: /root/log/.psql_history
+      POSTGRES_PASSWORD: postgres
+    command: ["postgres", "-c", "wal_level=logical"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: '10s'
+      timeout: '30s'
+      retries: 5
+      start_period: '20s'
+
+  redis:
+    image: redis:8-alpine
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    restart: always
+    hostname: rabbit1
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    ports:
+      - 9010:5672
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.rabbitmq.rule=Host(`rabbitmq.localhost`)
+      - traefik.http.services.rabbitmq.loadbalancer.server.port=15672
+
+  powersync:
+    profiles: ["agentic-outlook-mcp"] # To run this profile `docker-compose --profile agentic-outlook-mcp up -d`
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    image: journeyapps/powersync-service:1.15.7
+    command: ["start", "-r", "unified"]
+    volumes:
+      - ../../services/agentic-outlook-mcp/powersync/config.yaml:/config/config.yaml
+      - ../../services/agentic-outlook-mcp/powersync/sync_rules.yaml:/config/sync_rules.yaml
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/config.yaml
+    ports:
+      - 9009:8080
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.powersync.rule=Host(`powersync.localhost`)
+      - traefik.http.services.powersync.loadbalancer.server.port=8080
+
+  litellm:
+    profiles: ["agentic-outlook-mcp"] # To run this profile `docker-compose --profile agentic-outlook-mcp up -d`
+    image: ghcr.io/berriai/litellm-database:main-v1.78.5-nightly
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4444
+      LITELLM_MODE: "DEVELOPMENT"
+      LITELLM_MASTER_KEY: "sk-1234"
+      LITELLM_SALT_KEY: "sk-1234"
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/litellm"
+      REDIS_URL: "redis://redis:6379/7"
+      ANTHROPHIC_API_KEY: "${ANTHROPHIC_API_KEY}" # To inject this API key run `docker-compose --profile agentic-outlook-mcp up -d --env-file services/agentic-outlook-mcp/.env up -d`
+      VOYAGE_API_KEY: "${VOYAGE_API_KEY}" # To inject this API key run `docker-compose --profile agentic-outlook-mcp up -d --env-file services/agentic-outlook-mcp/.env up -d`
+      TOGETHERAI_API_KEY: "${TOGETHERAI_API_KEY}" # To inject this API key run `docker-compose --profile agentic-outlook-mcp up -d --env-file services/agentic-outlook-mcp/.env up -d`
+      OPENAI_API_KEY: "${OPENAI_API_KEY}" # To inject this API key run `docker-compose --profile agentic-outlook-mcp up -d --env-file services/agentic-outlook-mcp/.env up -d`
+    ports:
+      - 9012:4444
+    volumes:
+      - ../../services/agentic-outlook-mcp/litellm/config.yaml:/etc/litellm/config.yaml
+    command: "--config /etc/litellm/config.yaml --detailed_debug"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.litellm.rule=Host(`litellm.localhost`)
+      - traefik.http.services.litellm.loadbalancer.server.port=4444
+
+  otel-lgtm:
+    image: grafana/otel-lgtm
+    restart: always
+    ports:
+      - '9003:4317'
+      - '9004:4318'
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.grafana.rule=Host(`grafana.localhost`)
+      - traefik.http.routers.grafana.service=grafana
+      - traefik.http.services.grafana.loadbalancer.server.port=3000
+      - traefik.http.routers.otlp.rule=Host(`otlp.localhost`)
+      - traefik.http.routers.otlp.service=otlp
+      - traefik.http.services.otlp.loadbalancer.server.port=4318
+
+  minio:
+    image: minio/minio
+    restart: always
+    entrypoint: sh
+    # create the 'langfuse' bucket before starting the service
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    volumes:
+      - minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+      start_period: 1s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.minio.rule=Host(`minio.localhost`)
+      - traefik.http.routers.minio.service=minio
+      - traefik.http.services.minio.loadbalancer.server.port=9000
+      - traefik.http.routers.minio-console.rule=Host(`minio-console.localhost`)
+      - traefik.http.routers.minio-console.service=minio-console
+      - traefik.http.services.minio-console.loadbalancer.server.port=9001
+
+  clickhouse:
+    image: clickhouse/clickhouse-server
+    restart: always
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3.120
+    restart: always
+    depends_on: &langfuse-depends-on
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - 9007:3030
+    environment: &langfuse-worker-env
+      NEXTAUTH_URL: http://langfuse.localhost
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/langfuse
+      SALT: "12345678"
+      ENCRYPTION_KEY: "a77fd5b995975c2252899f21e6fd0cd7d346c01ef3300a11eff75f9a33c045c1"
+      TELEMETRY_ENABLED: false
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: true
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: false
+      LANGFUSE_USE_AZURE_BLOB: false
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: true
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: true
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      LANGFUSE_S3_BATCH_EXPORT_ENABLED: false
+      LANGFUSE_S3_BATCH_EXPORT_BUCKET: langfuse
+      LANGFUSE_S3_BATCH_EXPORT_PREFIX: exports/
+      LANGFUSE_S3_BATCH_EXPORT_REGION: auto
+      LANGFUSE_S3_BATCH_EXPORT_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_BATCH_EXPORT_EXTERNAL_ENDPOINT: http://minio.localhost
+      LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE: true
+      REDIS_CONNECTION_STRING: redis://redis:6379/1
+
+  langfuse-web:
+    image: docker.io/langfuse/langfuse:3.120
+    restart: always
+    depends_on: *langfuse-depends-on
+    ports:
+      - 9008:3000
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.langfuse-web.rule=Host(`langfuse.localhost`)
+      - traefik.http.services.langfuse-web.loadbalancer.server.port=3000
+    environment:
+      <<: *langfuse-worker-env
+      NEXTAUTH_SECRET: mysecret
+      LANGFUSE_INIT_ORG_ID: unique
+      LANGFUSE_INIT_ORG_NAME: Unique
+      LANGFUSE_INIT_PROJECT_ID: local
+      LANGFUSE_INIT_PROJECT_NAME: Local
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-1234567890
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-1234567890
+      LANGFUSE_INIT_USER_EMAIL: admin@example.com
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: RootPassword1!
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.5
+    volumes:
+      - qdrant:/qdrant/storage
+    restart: always
+    ports:
+      - 9013:6333
+      - 9014:6334
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.qdrant.rule=Host(`qdrant.localhost`)
+      - traefik.http.routers.qdrant.service=qdrant
+      - traefik.http.services.qdrant.loadbalancer.server.port=6333
+
+  temporal:
+    depends_on:
+      - postgres
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres
+      - POSTGRES_SEEDS=postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    image: temporalio/auto-setup:1.29.1
+    ports:
+      - 7233:7233
+    volumes:
+      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
+
+  temporal-ui:
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://temporal.localhost
+    image: temporalio/ui:2.34.0
+    ports:
+      - 9015:8080
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.temporal-ui.rule=Host(`temporal.localhost`)
+      - traefik.http.routers.temporal-ui.service=temporal-ui
+      - traefik.http.services.temporal-ui.loadbalancer.server.port=8080
+
+volumes:
+  postgres:
+  rabbitmq:
+  redis:
+  minio:
+  qdrant:
+  clickhouse_data:
+  clickhouse_logs:

@@ -1,0 +1,16 @@
+[project]
+name = "sparse-embedding"
+version = "0.1.0"
+description = "Sparse Embedding Service"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastembed>=0.7.2",
+    "grpcio>=1.68.1",
+    "grpcio-tools>=1.68.1",
+    "pydantic>=2.12.4",
+    "pydantic-settings>=2.12.0",
+    "python-dotenv>=1.0.0",
+    "temporalio>=1.19.0",
+    "tokenizers>=0.22.1",
+]

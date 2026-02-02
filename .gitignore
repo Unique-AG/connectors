@@ -32,6 +32,12 @@ build
 dist
 *.tsbuildinfo
 
+# Python
+__pycache__
+*_pb2.py
+*_pb2.pyi
+*_pb2_grpc.py
+
 # Debug
 npm-debug.log*
 yarn-debug.log*

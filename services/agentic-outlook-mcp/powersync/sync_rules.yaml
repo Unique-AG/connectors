@@ -1,0 +1,70 @@
+# yaml-language-server: $schema=https://unpkg.com/@powersync/service-sync-rules@latest/schema/sync_rules.json
+
+# Note that changes to this file are not watched.
+# The service needs to be restarted for changes to take effect.
+
+# !Important: If you change the sync rules, you need to adjust the frontend drizzle schema and the batch dto table enum!
+
+bucket_definitions: 
+  user_data:
+    parameters: SELECT request.jwt() ->> 'user_profile_id' AS user_profile_id
+    data:
+      - SELECT
+          id,
+          provider,
+          provider_user_id,
+          username,
+          email,
+          display_name,
+          avatar_url,
+          sync_activated_at,
+          sync_deactivated_at,
+          sync_last_synced_at,
+          created_at,
+          updated_at
+        FROM user_profiles
+        WHERE user_profiles.id = bucket.user_profile_id
+      
+      - SELECT
+          id,
+          name,
+          original_name,
+          folder_id,
+          parent_folder_id,
+          child_folder_count,
+          total_item_count,
+          subscription_id,
+          activated_at,
+          deactivated_at,
+          last_synced_at,
+          user_profile_id,
+          created_at,
+          updated_at
+        FROM folders
+        WHERE folders.user_profile_id = bucket.user_profile_id
+      
+      - SELECT 
+          id,
+          message_id,
+          conversation_id,
+          "from",
+          subject,
+          preview,
+          body_html,
+          processed_body,
+          translated_body,
+          translated_subject,
+          summarized_body,
+          thread_summary,
+          is_read,
+          has_attachments,
+          received_at,
+          ingestion_last_error,
+          ingestion_last_attempt_at,
+          ingestion_completed_at,
+          user_profile_id,
+          folder_id,
+          created_at,
+          updated_at
+        FROM emails
+        WHERE emails.user_profile_id = bucket.user_profile_id

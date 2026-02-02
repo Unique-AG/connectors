@@ -1,0 +1,41 @@
+model_list:
+  - model_name: claude-haiku-4-5-20251001
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: "os.environ/ANTHROPHIC_API_KEY"
+      max_tokens: 64000
+  - model_name: claude-sonnet-4-5-20250929
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5-20250929
+      api_key: "os.environ/ANTHROPHIC_API_KEY"
+      max_tokens: 64000
+  - model_name: claude-opus-4-1-20250805
+    litellm_params:
+      model: anthropic/claude-opus-4-1-20250805
+      api_key: "os.environ/ANTHROPHIC_API_KEY"
+      max_tokens: 32000
+  - model_name: voyage-context-3
+    litellm_params:
+      model: voyage/voyage-context-3
+      api_key: "os.environ/VOYAGE_API_KEY"
+  - model_name: openai-gpt-oss-120b
+    litellm_params:
+      model: together_ai/openai/gpt-oss-120b
+      api_key: "os.environ/TOGETHERAI_API_KEY"
+      max_tokens: 30000
+
+general_settings:
+  store_model_in_db: true
+  store_prompts_in_spend_logs: true
+
+litellm_settings:
+  cache: True
+  cache_params:
+    type: redis
+    namespace: "litellm.caching.caching"
+  redact_messages_in_exceptions: True
+  request_timeout: 600
+
+
+
+  

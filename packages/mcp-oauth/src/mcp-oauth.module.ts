@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { seconds, ThrottlerModule } from '@nestjs/throttler';
 import { ClientController } from './controllers/client.controller';
 import { DiscoveryController } from './controllers/discovery.controller';
+import { JWKSController } from './controllers/jwks.controller';
 import { OAuthController } from './controllers/oauth.controller';
 import { TokenController } from './controllers/token.controller';
 import { OAuthExceptionFilter } from './filters/oauth-exception.filter';
@@ -21,6 +22,9 @@ import {
   OAUTH_STORE_TOKEN,
 } from './mcp-oauth.module-definition';
 import { ClientService } from './services/client.service';
+import { IDTokenService } from './services/id-token.service';
+import { JWKSService } from './services/jwks.service';
+import { JWTAccessTokenService } from './services/jwt-access-token.service';
 import { McpOAuthService } from './services/mcp-oauth.service';
 import { MetricService } from './services/metric.service';
 import { OAuthStrategyService } from './services/oauth-strategy.service';
@@ -73,6 +77,9 @@ export class McpOAuthModule extends ConfigurableModuleClass {
       },
       McpOAuthService,
       ClientService,
+      IDTokenService,
+      JWKSService,
+      JWTAccessTokenService,
       OpaqueTokenService,
       OAuthStrategyService,
       MetricService,
@@ -129,7 +136,13 @@ export class McpOAuthModule extends ConfigurableModuleClass {
           ],
         }),
       ],
-      controllers: [DiscoveryController, ClientController, OAuthController, TokenController],
+      controllers: [
+        DiscoveryController,
+        JWKSController,
+        ClientController,
+        OAuthController,
+        TokenController,
+      ],
       providers: [...(baseModule.providers || []), ...providers],
       exports: [
         OpaqueTokenService,

@@ -49,6 +49,9 @@ describe('OAuthController', () => {
       resource: 'https://mcp.example.com',
       clientId: 'test-client',
       clientSecret: 'test-secret',
+      accessTokenFormat: 'opaque',
+      jwtSigningKeyProvider: vi.fn(),
+      idTokenExpiresIn: 3600,
       // biome-ignore lint/suspicious/noExplicitAny: Mock for testing
       protectedResourceMetadata: {} as any,
       // biome-ignore lint/suspicious/noExplicitAny: Mock for testing

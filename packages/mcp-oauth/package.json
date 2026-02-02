@@ -19,9 +19,11 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@golevelup/nestjs-rabbitmq": "^6.0.2",
     "@nestjs/schedule": "^6.0.0",
     "@nestjs/throttler": "^6.4.0",
     "bcrypt": "^6.0.0",
+    "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.2",
     "nestjs-zod": "^5.0.1",
     "reflect-metadata": "^0.2.2",
