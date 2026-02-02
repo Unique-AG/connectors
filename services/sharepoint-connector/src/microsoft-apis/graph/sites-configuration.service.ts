@@ -5,7 +5,7 @@ import { Config } from '../../config';
 import { ConfigDiagnosticsService } from '../../config/config-diagnostics.service';
 import { SiteConfigSchema } from '../../config/sharepoint.schema';
 import { normalizeError, sanitizeError } from '../../utils/normalize-error';
-import { createSmeared } from '../../utils/smeared';
+import { Smeared } from '../../utils/smeared';
 import { GraphApiService } from './graph-api.service';
 import { ListColumn, ListItem } from './types/sharepoint.types';
 
@@ -38,7 +38,7 @@ export class SitesConfigurationService {
 
     this.logger.debug('Loading sites configuration from SharePoint list');
     const sites = await this.fetchSitesFromSharePointList({
-      siteId: sharepointConfig.sharepointList.siteId.value,
+      siteId: sharepointConfig.sharepointList.siteId,
       listId: sharepointConfig.sharepointList.listId,
     });
     this.configDiagnosticsService.logConfig('Loaded SharePoint Sites Configurations', sites);
@@ -52,14 +52,12 @@ export class SitesConfigurationService {
    * 2. Transform the list items to SiteConfig and validate with Zod
    */
   public async fetchSitesFromSharePointList(sharepointList: {
-    siteId: string;
+    siteId: Smeared;
     listId: string;
   }): Promise<SiteConfig[]> {
     const { siteId, listId } = sharepointList;
 
-    this.logger.debug(
-      `Fetching sites configuration from site: ${createSmeared(siteId)}, list: ${listId}`,
-    );
+    this.logger.debug(`Fetching sites configuration from site: ${siteId}, list: ${listId}`);
 
     const [listItems, columns] = await Promise.all([
       this.graphApiService.getListItems(siteId, listId, { expand: 'fields' }),

@@ -10,7 +10,7 @@ import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
 import { sanitizeError } from '../../utils/normalize-error';
-import { createSmeared, Smeared } from '../../utils/smeared';
+import { Smeared } from '../../utils/smeared';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
 import {
