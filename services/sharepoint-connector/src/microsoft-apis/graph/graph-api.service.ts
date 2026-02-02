@@ -217,12 +217,11 @@ export class GraphApiService {
     }
   }
 
-  public async getSiteLists(siteId: Smeared | string): Promise<List[]> {
+  public async getSiteLists(siteId: Smeared): Promise<List[]> {
     const logPrefix = `[Site: ${siteId}]`;
-    const id = typeof siteId === 'string' ? siteId : siteId.value;
 
     try {
-      const allLists = await this.paginateGraphApiRequest<List>(`/sites/${id}/lists`, (url) =>
+      const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId.value}/lists`, (url) =>
         this.graphClient
           .api(url)
           .select('system,name,id,displayName')
@@ -247,13 +246,12 @@ export class GraphApiService {
    * Fetch all columns for a specific SharePoint list.
    * Documentation: https://learn.microsoft.com/en-us/graph/api/list-list-columns
    */
-  public async getListColumns(siteId: Smeared | string, listId: string): Promise<ListColumn[]> {
+  public async getListColumns(siteId: Smeared, listId: string): Promise<ListColumn[]> {
     const logPrefix = `[Site: ${siteId}, List: ${listId}]`;
-    const id = typeof siteId === 'string' ? siteId : siteId.value;
 
     try {
       const columns = await this.paginateGraphApiRequest<ListColumn>(
-        `/sites/${id}/lists/${listId}/columns`,
+        `/sites/${siteId.value}/lists/${listId}/columns`,
         (url) => this.graphClient.api(url).select('id,name,displayName').get(),
       );
 
@@ -272,14 +270,13 @@ export class GraphApiService {
   }
 
   public async getListItems(
-    siteId: Smeared | string,
+    siteId: Smeared,
     listId: string,
     options: { select?: string; expand?: string } = {},
   ): Promise<ListItem[]> {
     const { select, expand } = options;
-    const id = typeof siteId === 'string' ? siteId : siteId.value;
     return await this.paginateGraphApiRequest<ListItem>(
-      `/sites/${id}/lists/${listId}/items`,
+      `/sites/${siteId.value}/lists/${listId}/items`,
       (url) => {
         let requestBuilder = this.graphClient.api(url);
         if (select) {
@@ -294,7 +291,7 @@ export class GraphApiService {
   }
 
   public async getAspxListItems(
-    siteId: Smeared | string,
+    siteId: Smeared,
     listId: string,
     syncColumnName: string,
     maxItemsToScan?: number,
@@ -316,7 +313,7 @@ export class GraphApiService {
         const aspxSharepointContentItem: SharepointContentItem = {
           itemType: 'listItem',
           item,
-          siteId: typeof siteId === 'string' ? createSmeared(siteId) : siteId,
+          siteId,
           driveId: listId,
           driveName: 'SitePages',
           folderPath: item.webUrl,
@@ -347,18 +344,17 @@ export class GraphApiService {
   }
 
   public async getAspxPageContent(
-    siteId: Smeared | string,
+    siteId: Smeared,
     listId: string,
     itemId: string,
   ): Promise<SitePageContent> {
     const logPrefix = `[Site: ${siteId}, Item: ${itemId}]`;
     this.logger.debug(`${logPrefix} Fetching site page content from list ${listId}`);
-    const id = typeof siteId === 'string' ? siteId : siteId.value;
 
     try {
       const response = await this.makeRateLimitedRequest<ListItemDetailsResponse>(() =>
         this.graphClient
-          .api(`/sites/${id}/lists/${listId}/items/${itemId}`)
+          .api(`/sites/${siteId.value}/lists/${listId}/items/${itemId}`)
           .select('id')
           .expand('fields($select=CanvasContent1,WikiField,Title)')
           .get(),
