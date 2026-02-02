@@ -1,9 +1,8 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Histogram } from '@opentelemetry/api';
 import { entries, groupBy } from 'remeda';
-import { Config } from '../config';
+import { ConfigEmitPolicy } from '../config/app.config';
 import { ConfigDiagnosticsService } from '../config/config-diagnostics.service';
 import type { SiteConfig } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
@@ -42,7 +41,6 @@ export class SharepointSynchronizationService {
   private isScanning = false;
 
   public constructor(
-    private readonly configService: ConfigService<Config, true>,
     private readonly graphApiService: GraphApiService,
     private readonly sitesConfigurationService: SitesConfigurationService,
     private readonly contentSyncService: ContentSyncService,
@@ -266,17 +264,8 @@ export class SharepointSynchronizationService {
     let scopes: ScopeWithPath[] | null = null;
     const siteStartTime = Date.now();
 
-    // Log configuration at the beginning of each sync
-    const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
-      infer: true,
-    });
-    if (emitPolicy === 'per_sync' || emitPolicy === 'on_startup_and_per_sync') {
-      this.logger.log(`${logPrefix} Configuration for this sync:`);
-      this.configDiagnosticsService.logSiteConfig(siteConfig, `${logPrefix} Site Config`);
-      this.configDiagnosticsService.logConfig(
-        `${logPrefix} App Config`,
-        this.configService.get('app', { infer: true }),
-      );
+    if (this.configDiagnosticsService.shouldLogConfig(ConfigEmitPolicy.PER_SYNC)) {
+      this.configDiagnosticsService.logConfig(`${logPrefix} Site Config`, siteConfig);
     }
 
     const initResult = await this.initializeSiteContext(siteConfig, logPrefix);

@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigEmitPolicy, type ConfigEmitPolicyType } from './app.config';
 import type { Config } from './index';
-import type { SiteConfig } from './sharepoint.schema';
 
 @Injectable()
 export class ConfigDiagnosticsService implements OnModuleInit {
@@ -12,39 +12,26 @@ export class ConfigDiagnosticsService implements OnModuleInit {
   public async onModuleInit() {
     await ConfigModule.envVariablesLoaded;
 
-    const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
-      infer: true,
-    });
-    if (emitPolicy === 'none') {
+    if (!this.shouldLogConfig(ConfigEmitPolicy.ON_STARTUP)) {
       return;
     }
-
-    this.logger.log('Emitting configuration on startup:');
-    this.logAllConfigs();
-  }
-
-  public logAllConfigs(): void {
     this.logConfig('App Config', this.configService.get('app', { infer: true }));
     this.logConfig('SharePoint Config', this.configService.get('sharepoint', { infer: true }));
     this.logConfig('Unique Config', this.configService.get('unique', { infer: true }));
     this.logConfig('Processing Config', this.configService.get('processing', { infer: true }));
   }
 
-  public logSiteConfig(siteConfig: SiteConfig, label: string = 'Site Config'): void {
-    this.logConfig(label, siteConfig);
-  }
-
-  public logConfig(name: string, value: unknown) {
+  public shouldLogConfig(configEmitPolicy: ConfigEmitPolicyType): boolean {
     const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
       infer: true,
     });
-    if (emitPolicy === 'none') {
-      return;
-    }
+    return emitPolicy !== 'none' && emitPolicy.includes(configEmitPolicy);
+  }
 
+  public logConfig(name: string, config: object) {
     this.logger.log({
-      msg: `Configuration: ${name}`,
-      config: value,
+      msg: `ConfigDiagnosticsService: ${name}`,
+      config,
     });
   }
 }
