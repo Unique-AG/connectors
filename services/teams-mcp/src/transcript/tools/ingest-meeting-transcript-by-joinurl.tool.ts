@@ -12,7 +12,7 @@ import {
 } from '../transcript.dtos';
 import { TranscriptCreatedService } from '../transcript-created.service';
 
-const IngestMeetingTranscriptInputSchema = z.object({
+const IngestMeetingTranscriptByJoinUrlInputSchema = z.object({
   joinWebUrl: z.string().url().describe('The Microsoft Teams meeting join URL'),
 });
 
@@ -38,7 +38,7 @@ const MeetingSummarySchema = z.object({
   participantCount: z.number(),
 });
 
-const IngestMeetingTranscriptOutputSchema = z.object({
+const IngestMeetingTranscriptByJoinUrlOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   meeting: MeetingSummarySchema.nullable(),
@@ -61,7 +61,7 @@ function toMeetingSummary(meeting: Meeting): z.infer<typeof MeetingSummarySchema
 }
 
 @Injectable()
-export class IngestMeetingTranscriptTool {
+export class IngestMeetingTranscriptByJoinUrlTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
@@ -71,14 +71,14 @@ export class IngestMeetingTranscriptTool {
   ) {}
 
   @Tool({
-    name: 'ingest_meeting_transcript',
-    title: 'Ingest Meeting Transcript',
+    name: 'ingest_meeting_transcript_by_joinurl',
+    title: 'Ingest Meeting Transcript by Join URL',
     description:
       'Given a Microsoft Teams meeting link (joinWebUrl), fetches all transcripts for that meeting and ingests them into the knowledge base.',
-    parameters: IngestMeetingTranscriptInputSchema,
-    outputSchema: IngestMeetingTranscriptOutputSchema,
+    parameters: IngestMeetingTranscriptByJoinUrlInputSchema,
+    outputSchema: IngestMeetingTranscriptByJoinUrlOutputSchema,
     annotations: {
-      title: 'Ingest Meeting Transcript',
+      title: 'Ingest Meeting Transcript by Join URL',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: true,
@@ -91,8 +91,8 @@ export class IngestMeetingTranscriptTool {
     },
   })
   @Span()
-  public async ingestMeetingTranscript(
-    input: z.infer<typeof IngestMeetingTranscriptInputSchema>,
+  public async ingestMeetingTranscriptByJoinUrl(
+    input: z.infer<typeof IngestMeetingTranscriptByJoinUrlInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {

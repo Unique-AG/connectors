@@ -10,8 +10,8 @@ import { UniqueService } from '~/unique/unique.service';
 import {
   CalendarEventCollection,
   CreatedEventDto,
-  type Meeting,
-  type Transcript,
+  Meeting,
+  Transcript,
   TranscriptResourceSchema,
 } from './transcript.dtos';
 
