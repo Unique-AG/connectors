@@ -49,7 +49,7 @@ export class CertificateAuthStrategy implements AuthStrategy {
     const msalConfig: Configuration = {
       auth: {
         clientId,
-        authority: `https://login.microsoftonline.com/${tenantId.value}`,
+        authority: `https://login.microsoftonline.com/${tenantId}`,
         clientCertificate: {
           privateKey,
           ...(thumbprintSha256 ? { thumbprintSha256 } : { thumbprint }),

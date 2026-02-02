@@ -27,7 +27,7 @@ export class OidcAuthStrategy implements AuthStrategy {
       'OidcAuthStrategy called but authentication mode is not "oidc"',
     );
 
-    this.credential = new DefaultAzureCredential({ tenantId: sharePointConfig.tenantId.value });
+    this.credential = new DefaultAzureCredential({ tenantId: sharePointConfig.tenantId });
   }
 
   public async acquireNewToken(scopes: string[]): Promise<TokenAcquisitionResult> {

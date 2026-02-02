@@ -221,12 +221,14 @@ export class GraphApiService {
     const logPrefix = `[Site: ${siteId}]`;
 
     try {
-      const allLists = await this.paginateGraphApiRequest<List>(`/sites/${siteId.value}/lists`, (url) =>
-        this.graphClient
-          .api(url)
-          .select('system,name,id,displayName')
-          .top(GRAPH_API_PAGE_SIZE)
-          .get(),
+      const allLists = await this.paginateGraphApiRequest<List>(
+        `/sites/${siteId.value}/lists`,
+        (url) =>
+          this.graphClient
+            .api(url)
+            .select('system,name,id,displayName')
+            .top(GRAPH_API_PAGE_SIZE)
+            .get(),
       );
 
       this.logger.log(`${logPrefix} Found ${allLists.length} lists`);

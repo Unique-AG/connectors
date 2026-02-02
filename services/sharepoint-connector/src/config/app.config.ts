@@ -10,8 +10,6 @@ export const LogsDiagnosticDataPolicy = {
   CONCEAL: 'conceal',
   DISCLOSE: 'disclose',
 } as const;
-export type LogsDiagnosticDataPolicyType =
-  (typeof LogsDiagnosticDataPolicy)[keyof typeof LogsDiagnosticDataPolicy];
 
 export const ConfigEmitPolicy = {
   ON_STARTUP: 'on_startup',

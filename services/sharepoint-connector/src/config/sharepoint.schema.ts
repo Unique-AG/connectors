@@ -183,9 +183,7 @@ const dynamicSitesConfig = z.object({
 });
 
 const sharepointBaseConfig = z.object({
-  tenantId: requiredStringSchema
-    .transform((val) => createSmeared(val))
-    .describe('Azure AD tenant ID'),
+  tenantId: requiredStringSchema.describe('Azure AD tenant ID'),
   auth: AuthConfigSchema.describe('Authentication configuration for Microsoft APIs'),
   graphApiRateLimitPerMinuteThousands: coercedPositiveNumberSchema
     .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS)
@@ -201,7 +199,6 @@ export const SharepointConfigSchema = sharepointBaseConfig.and(
 );
 
 export type StaticSitesConfig = z.infer<typeof staticSitesConfig>;
-export type DynamicSitesConfig = z.infer<typeof dynamicSitesConfig>;
 
 export type SharepointConfig = (
   | {
@@ -216,7 +213,7 @@ export type SharepointConfig = (
       };
     }
 ) & {
-  tenantId: Smeared;
+  tenantId: string;
   auth: AuthConfig & {
     privateKeyPassword?: Redacted<string>;
   };
