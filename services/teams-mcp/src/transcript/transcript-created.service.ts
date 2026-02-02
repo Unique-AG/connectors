@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
+import type { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
@@ -7,7 +8,13 @@ import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UniqueService } from '~/unique/unique.service';
-import { CreatedEventDto, Meeting, Transcript, TranscriptResourceSchema } from './transcript.dtos';
+import {
+  CalendarEventCollection,
+  CreatedEventDto,
+  type Meeting,
+  type Transcript,
+  TranscriptResourceSchema,
+} from './transcript.dtos';
 
 @Injectable()
 export class TranscriptCreatedService {
@@ -143,7 +150,71 @@ export class TranscriptCreatedService {
     );
     assert.ok(vttStream, 'expected a vtt transcript body');
 
-    span?.addEvent('transcript processing completed');
+    await this.fetchVttAndIngest(client, `/users/${userId}`, meeting, transcript, vttStream);
+  }
+
+  /**
+   * Fetches calendar event to determine recurrence, then ingests the transcript into Unique.
+   *
+   * @param client - Authenticated Microsoft Graph client
+   * @param apiPrefix - API path prefix (e.g. `/users/{userId}` or `/me`)
+   * @param meeting - Parsed meeting object
+   * @param transcript - Parsed transcript metadata
+   * @param vttStream - VTT content stream (if already fetched). When not provided, fetches it from Graph API.
+   */
+  @Span()
+  public async fetchVttAndIngest(
+    client: Client,
+    apiPrefix: string,
+    meeting: Meeting,
+    transcript: Transcript,
+    vttStream?: ReadableStream<Uint8Array<ArrayBuffer>>,
+  ): Promise<void> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('meeting_id', meeting.id);
+    span?.setAttribute('transcript_id', transcript.id);
+
+    if (!vttStream) {
+      vttStream = await client
+        .api(`${apiPrefix}/onlineMeetings/${meeting.id}/transcripts/${transcript.id}/content`)
+        .header('Accept', 'text/vtt')
+        .getStream();
+      assert.ok(vttStream, 'expected a vtt transcript body');
+    }
+
+    // Query events within the meeting time window, then match by threadId client-side
+    // (filtering by onlineMeeting properties is not supported by the Graph API)
+    const calendarEvents = await client
+      .api(`${apiPrefix}/calendarView`)
+      .query({
+        startDateTime: meeting.startDateTime.toISOString(),
+        endDateTime: meeting.endDateTime.toISOString(),
+      })
+      .get()
+      .then(CalendarEventCollection.parseAsync);
+
+    const calendarEvent = calendarEvents.value.find((e) => e.threadId === meeting.threadId);
+    const isRecurring =
+      calendarEvent?.type === 'occurrence' ||
+      calendarEvent?.type === 'exception' ||
+      calendarEvent?.type === 'seriesMaster' ||
+      !!calendarEvent?.seriesMasterId;
+
+    span?.setAttribute('is_recurring', isRecurring);
+    span?.setAttribute('calendar_event_type', calendarEvent?.type ?? 'unknown');
+    span?.setAttribute('has_calendar_event', !!calendarEvent);
+    this.logger.debug(
+      {
+        type: calendarEvent?.type,
+        calendarEventId: calendarEvent?.id,
+        eventType: calendarEvent?.type,
+        seriesMasterId: calendarEvent?.seriesMasterId,
+        isRecurring,
+      },
+      'Determined meeting recurrence status from calendar event',
+    );
+
+    span?.addEvent('transcript processing completed', { isRecurring });
 
     await this.unique.ingestTranscript(
       {
