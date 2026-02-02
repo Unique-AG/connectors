@@ -234,10 +234,7 @@ describe('ScopeManagementService', () => {
         IngestionMode.Flat,
       );
 
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'root-scope-123',
-        expect.any(Smeared),
-      );
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', expect.any(Smeared));
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
         expect.stringMatching(/Claimed root scope root-scope-123 with externalId: .*/),
@@ -539,14 +536,8 @@ describe('ScopeManagementService', () => {
       );
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-1',
-        expect.any(Smeared),
-      );
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-2',
-        expect.any(Smeared),
-      );
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-1', expect.any(Smeared));
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', expect.any(Smeared));
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].warn).toHaveBeenCalledWith(
         expect.stringContaining('No external ID found for path'),
@@ -593,10 +584,7 @@ describe('ScopeManagementService', () => {
       // Root (/) is an ancestor of /test1, so it is skipped.
       // ChildScope (/test1/ChildScope) gets fallback externalId.
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-2',
-        expect.any(Smeared),
-      );
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', expect.any(Smeared));
     });
 
     it('logs debug message when updating externalId', async () => {
