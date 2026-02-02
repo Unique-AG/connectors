@@ -60,7 +60,7 @@ export class ScopeManagementService {
     }
 
     if (!rootScope.externalId) {
-      const externalId = `${EXTERNAL_ID_PREFIX}site:${siteId.value}`;
+      const externalId = createSmeared(`${EXTERNAL_ID_PREFIX}site:${siteId.value}`);
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           rootScopeId,
@@ -289,7 +289,7 @@ export class ScopeManagementService {
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           scope.id,
-          externalId,
+          createSmeared(externalId),
         );
         scope.externalId = updatedScope.externalId;
         this.logger.debug(

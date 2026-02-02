@@ -7,7 +7,7 @@ import {
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { createSmeared } from '../utils/smeared';
+import { Smeared } from '../utils/smeared';
 import { FetchGraphPermissionsMapQuery } from './fetch-graph-permissions-map.query';
 
 describe('FetchGraphPermissionsMapQuery', () => {
@@ -77,7 +77,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
         },
       },
     },
-    siteId: createSmeared(mockSiteId),
+    siteId: new Smeared(mockSiteId, false),
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: '/test',
@@ -128,7 +128,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(createSmeared(mockSiteId), items);
+      await query.run(new Smeared(mockSiteId, false), items);
 
       expect(loggerWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('No parsable permissions for permission perm-unparseable'),
@@ -169,7 +169,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(createSmeared(mockSiteId), items);
+      await query.run(new Smeared(mockSiteId, false), items);
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-user-data'),
@@ -202,7 +202,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(createSmeared(mockSiteId), items);
+      await query.run(new Smeared(mockSiteId, false), items);
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-siteuser-data'),
@@ -249,7 +249,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(createSmeared(mockSiteId), items);
+      await query.run(new Smeared(mockSiteId, false), items);
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-multiple-nulls'),
@@ -295,7 +295,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(createSmeared(mockSiteId), items);
+      await query.run(new Smeared(mockSiteId, false), items);
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-structure-check'),

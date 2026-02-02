@@ -7,7 +7,7 @@ import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
-import { createSmeared, Smeared } from '../utils/smeared';
+import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
@@ -87,7 +87,7 @@ describe('SharepointSynchronizationService', () => {
         },
       },
     },
-    siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+    siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
     driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     driveName: 'Documents',
     folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -103,12 +103,12 @@ describe('SharepointSynchronizationService', () => {
     mockSitesConfigurationService = {
       loadSitesConfiguration: vi.fn().mockResolvedValue([
         createMockSiteConfig({
-          siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+          siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
         }),
       ]),
       fetchSitesFromSharePointList: vi.fn().mockResolvedValue([
         createMockSiteConfig({
-          siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+          siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
         }),
       ]),
     };
@@ -144,7 +144,7 @@ describe('SharepointSynchronizationService', () => {
               sitesSource: 'config_file',
               sites: [
                 createMockSiteConfig({
-                  siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+                  siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
                 }),
               ],
             };
@@ -280,7 +280,7 @@ describe('SharepointSynchronizationService', () => {
 
     const mockSiteConfigs = [
       createMockSiteConfig({
-        siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+        siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
         syncMode: 'content_and_permissions',
       }),
     ];
@@ -346,7 +346,7 @@ describe('SharepointSynchronizationService', () => {
     };
 
     const mockSiteConfigs = [
-      createMockSiteConfig({ siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66') }),
+      createMockSiteConfig({ siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false) }),
     ];
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
@@ -447,7 +447,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -530,7 +530,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -613,7 +613,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -678,7 +678,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -743,7 +743,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -769,15 +769,15 @@ describe('SharepointSynchronizationService', () => {
 
   it('ensures unique scopeIds and logs errors for duplicates', async () => {
     const site1 = createMockSiteConfig({
-      siteId: createSmeared('site-1'),
+      siteId: new Smeared('site-1', false),
       scopeId: 'duplicate-scope',
     });
     const site2 = createMockSiteConfig({
-      siteId: createSmeared('site-2'),
+      siteId: new Smeared('site-2', false),
       scopeId: 'duplicate-scope',
     });
     const site3 = createMockSiteConfig({
-      siteId: createSmeared('site-3'),
+      siteId: new Smeared('site-3', false),
       scopeId: 'unique-scope',
     });
 

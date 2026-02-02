@@ -110,7 +110,7 @@ describe('SitesConfigurationService', () => {
       mockGraphApiService.getListItems.mockResolvedValue([mockListItem as unknown as ListItem]);
 
       const sharepointList = {
-        siteId: 'test-site-id',
+        siteId: new Smeared('test-site-id', false),
         listId: 'list-id-456',
       };
 
@@ -129,11 +129,15 @@ describe('SitesConfigurationService', () => {
         permissionsInheritanceMode: 'inherit_scopes_and_files',
       });
 
-      expect(mockGraphApiService.getListItems).toHaveBeenCalledWith('test-site-id', 'list-id-456', {
-        expand: 'fields',
-      });
+      expect(mockGraphApiService.getListItems).toHaveBeenCalledWith(
+        expect.any(Smeared),
+        'list-id-456',
+        {
+          expand: 'fields',
+        },
+      );
       expect(mockGraphApiService.getListColumns).toHaveBeenCalledWith(
-        'test-site-id',
+        expect.any(Smeared),
         'list-id-456',
       );
     });

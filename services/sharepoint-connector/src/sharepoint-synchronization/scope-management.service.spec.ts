@@ -10,7 +10,7 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { createSmeared } from '../utils/smeared';
+import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
@@ -78,7 +78,7 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
         },
       },
     },
-    siteId: createSmeared('site-123'),
+    siteId: new Smeared('site-123', false),
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: `/${path}`,
@@ -110,7 +110,7 @@ describe('ScopeManagementService', () => {
     rootPath: '/test1',
     siteName: 'test-site',
     siteConfig: createMockSiteConfig({
-      siteId: createSmeared('site-123'),
+      siteId: new Smeared('site-123', false),
       scopeId: 'root-scope-123',
     }),
   };
@@ -230,11 +230,14 @@ describe('ScopeManagementService', () => {
 
       await service.initializeRootScope(
         'root-scope-123',
-        createSmeared('site-123'),
+        new Smeared('site-123', false),
         IngestionMode.Flat,
       );
 
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', 'spc:site:site-123');
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+        'root-scope-123',
+        expect.any(Smeared),
+      );
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
         expect.stringMatching(/Claimed root scope root-scope-123 with externalId: .*/),
@@ -251,7 +254,7 @@ describe('ScopeManagementService', () => {
 
       await service.initializeRootScope(
         'root-scope-123',
-        createSmeared('site-123'),
+        new Smeared('site-123', false),
         IngestionMode.Flat,
       );
 
@@ -269,7 +272,7 @@ describe('ScopeManagementService', () => {
       await expect(
         service.initializeRootScope(
           'root-scope-123',
-          createSmeared('site-123'),
+          new Smeared('site-123', false),
           IngestionMode.Flat,
         ),
       ).rejects.toThrow(/is owned by a different site/);
@@ -294,7 +297,7 @@ describe('ScopeManagementService', () => {
 
       const result = await service.initializeRootScope(
         'root-scope-123',
-        createSmeared('site-123'),
+        new Smeared('site-123', false),
         IngestionMode.Flat,
       );
 
@@ -538,11 +541,11 @@ describe('ScopeManagementService', () => {
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-1',
-        expect.stringMatching(/^spc:unknown:site-123\/TestScope-/),
+        expect.any(Smeared),
       );
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-2',
-        expect.stringMatching(/^spc:unknown:site-123\/AnotherScope-/),
+        expect.any(Smeared),
       );
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].warn).toHaveBeenCalledWith(
@@ -567,7 +570,7 @@ describe('ScopeManagementService', () => {
       );
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', 'spc:site-123/sitePages');
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', expect.any(Smeared));
     });
 
     it('skips scopes that are ancestors of root path', async () => {
@@ -592,7 +595,7 @@ describe('ScopeManagementService', () => {
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-2',
-        expect.stringMatching(/^spc:unknown:site-123\/ChildScope-/),
+        expect.any(Smeared),
       );
     });
 

@@ -6,7 +6,7 @@ import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 import { getSharepointConnectorGroupExternalId } from '../unique-api/unique-groups/unique-groups.utils';
-import { Smeared } from '../utils/smeared';
+import { createSmeared, Smeared } from '../utils/smeared';
 import {
   GroupDistinctId,
   SharePointGroupsMap,
@@ -66,9 +66,9 @@ export class SyncSharepointGroupsToUniqueCommand {
     };
 
     for (const sharePointGroup of sharePointGroups) {
-      const groupLogPrefix = `[Group: ${sharePointGroup.id}]`;
+      const groupLogPrefix = `[Group: ${createSmeared(sharePointGroup.id)}]`;
       this.logger.debug(
-        `${groupLogPrefix} Syncing sharepoint group ${sharePointGroup.displayName}`,
+        `${groupLogPrefix} Syncing sharepoint group ${createSmeared(sharePointGroup.displayName)}`,
       );
 
       const correspondingUniqueGroup = unique.groupsMap[sharePointGroup.id];

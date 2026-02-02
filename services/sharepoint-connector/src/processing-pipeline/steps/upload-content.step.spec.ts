@@ -8,7 +8,7 @@ import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import type { DriveItem, ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { HttpClientService } from '../../shared/services/http-client.service';
 import { UniqueFilesService } from '../../unique-api/unique-files/unique-files.service';
-import { createSmeared } from '../../utils/smeared';
+import { Smeared } from '../../utils/smeared';
 import { createMockSiteConfig } from '../../utils/test-utils/mock-site-config';
 import type { ProcessingContext } from '../types/processing-context';
 import { UploadContentStep } from './upload-content.step';
@@ -120,7 +120,7 @@ describe('UploadContentStep', () => {
     pipelineItem: {
       itemType: 'driveItem' as const,
       item: mockDriveItem,
-      siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -148,7 +148,7 @@ describe('UploadContentStep', () => {
     pipelineItem: {
       itemType: 'listItem' as const,
       item: mockListItem,
-      siteId: createSmeared('site-1'),
+      siteId: new Smeared('site-1', false),
       driveId: 'drive-1',
       driveName: 'SitePages',
       folderPath: '/',

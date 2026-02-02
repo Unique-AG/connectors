@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from './sharepoint.util';
-import { createSmeared } from './smeared';
+import { Smeared } from './smeared';
 
 function createDriveItem(listItemWebUrl: string, itemWebUrl?: string): AnySharepointItem {
   return {
     itemType: 'driveItem',
-    siteId: createSmeared('site123'),
+    siteId: new Smeared('site123', false),
     driveId: 'drive123',
     driveName: 'Shared Documents',
     folderPath: '/path/to/file',
@@ -30,7 +30,7 @@ function createDriveItem(listItemWebUrl: string, itemWebUrl?: string): AnySharep
 function createListItem(webUrl: string): AnySharepointItem {
   return {
     itemType: 'listItem',
-    siteId: createSmeared('site456'),
+    siteId: new Smeared('site456', false),
     driveId: 'drive456',
     driveName: 'SitePages',
     folderPath: '/news',
@@ -48,7 +48,7 @@ function createListItem(webUrl: string): AnySharepointItem {
 function createDirectoryItem(webUrl: string): AnySharepointItem {
   return {
     itemType: 'directory',
-    siteId: createSmeared('site789'),
+    siteId: new Smeared('site789', false),
     driveId: 'drive789',
     driveName: 'Shared Documents',
     folderPath: '/2024/Q1',

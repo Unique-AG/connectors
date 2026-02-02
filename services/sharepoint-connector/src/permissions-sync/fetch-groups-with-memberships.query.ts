@@ -54,9 +54,9 @@ export class FetchGroupsWithMembershipsQuery {
   public constructor(
     private readonly graphApiService: GraphApiService,
     private readonly sharepointRestClientService: SharepointRestClientService,
-    configService: ConfigService<Config, true>,
+    private readonly configService: ConfigService<Config, true>,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(configService);
+    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   // For given list of group permissions from files/lists, fetch all the present sharepoint group

@@ -5,7 +5,7 @@ import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
-import { createSmeared } from '../utils/smeared';
+import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ProcessingPipelineService } from './processing-pipeline.service';
 import { AspxProcessingStep } from './steps/aspx-processing.step';
@@ -85,7 +85,7 @@ describe('ProcessingPipelineService', () => {
         },
       },
     },
-    siteId: createSmeared('bd9c85ee-998f-4665-9c44-577cf5a08a66'),
+    siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
     driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     driveName: 'Documents',
     folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
