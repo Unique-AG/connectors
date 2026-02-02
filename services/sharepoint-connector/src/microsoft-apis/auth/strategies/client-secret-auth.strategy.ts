@@ -26,7 +26,7 @@ export class ClientSecretAuthStrategy implements AuthStrategy {
 
     const msalConfig: Configuration = {
       auth: {
-        clientId: clientId,
+        clientId,
         authority: `https://login.microsoftonline.com/${tenantId.value}`,
         clientSecret: clientSecret.value,
       },
