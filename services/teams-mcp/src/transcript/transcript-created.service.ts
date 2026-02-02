@@ -149,20 +149,13 @@ export class TranscriptCreatedService {
     );
     assert.ok(vttStream, 'expected a vtt transcript body');
 
-    await this.fetchVttAndIngest(
-      subscription.userProfileId,
-      `/users/${userId}`,
-      meeting,
-      transcript,
-      vttStream,
-    );
+    await this.fetchVttAndIngest(subscription.userProfileId, meeting, transcript, vttStream);
   }
 
   /**
    * Fetches calendar event to determine recurrence, then ingests the transcript into Unique.
    *
    * @param userProfileId - User profile ID used to create an authenticated Graph client
-   * @param apiPrefix - API path prefix (e.g. `/users/{userId}` or `/me`)
    * @param meeting - Parsed meeting object
    * @param transcript - Parsed transcript metadata
    * @param vttStream - VTT content stream (if already fetched). When not provided, fetches it from Graph API.
@@ -170,7 +163,6 @@ export class TranscriptCreatedService {
   @Span()
   public async fetchVttAndIngest(
     userProfileId: string,
-    apiPrefix: string,
     meeting: Meeting,
     transcript: Transcript,
     vttStream?: ReadableStream<Uint8Array<ArrayBuffer>>,
@@ -184,7 +176,7 @@ export class TranscriptCreatedService {
 
     if (!vttStream) {
       vttStream = await client
-        .api(`${apiPrefix}/onlineMeetings/${meeting.id}/transcripts/${transcript.id}/content`)
+        .api(`/me/onlineMeetings/${meeting.id}/transcripts/${transcript.id}/content`)
         .header('Accept', 'text/vtt')
         .getStream();
       assert.ok(vttStream, 'expected a vtt transcript body');
@@ -193,7 +185,7 @@ export class TranscriptCreatedService {
     // Query events within the meeting time window, then match by threadId client-side
     // (filtering by onlineMeeting properties is not supported by the Graph API)
     const calendarEvents = await client
-      .api(`${apiPrefix}/calendarView`)
+      .api('/me/calendarView')
       .query({
         startDateTime: meeting.startDateTime.toISOString(),
         endDateTime: meeting.endDateTime.toISOString(),

@@ -199,12 +199,7 @@ export class IngestMeetingTranscriptTool {
     transcript: Transcript,
   ): Promise<IngestedTranscript> {
     try {
-      await this.transcriptCreatedService.fetchVttAndIngest(
-        userProfileId,
-        '/me',
-        meeting,
-        transcript,
-      );
+      await this.transcriptCreatedService.fetchVttAndIngest(userProfileId, meeting, transcript);
 
       this.logger.log(
         { transcriptId: transcript.id, meetingId: meeting.id },
