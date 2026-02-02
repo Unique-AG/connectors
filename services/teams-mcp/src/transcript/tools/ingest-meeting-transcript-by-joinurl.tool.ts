@@ -16,16 +16,35 @@ const IngestMeetingTranscriptByJoinUrlInputSchema = z.object({
   joinWebUrl: z.string().url().describe('The Microsoft Teams meeting join URL'),
 });
 
-const IngestedTranscriptSchema = z.object({
+const MeetingSummarySchema = z.custom<Meeting>().transform((m) => ({
+  id: m.id,
+  subject: m.subject ?? 'Untitled Meeting',
+  startDateTime: m.startDateTime.toISOString(),
+  endDateTime: m.endDateTime.toISOString(),
+  organizer: {
+    id: m.participants.organizer.identity.user.id,
+    displayName: m.participants.organizer.identity.user.displayName ?? null,
+    email: m.participants.organizer.upn,
+  },
+  participantCount: m.participants.attendees.length,
+}));
+
+const IngestedTranscriptSchema = z.custom<Transcript>().transform((t) => ({
+  id: t.id,
+  createdDateTime: t.createdDateTime.toISOString(),
+  endDateTime: t.endDateTime.toISOString(),
+}));
+
+const IngestedTranscriptResultSchema = z.object({
   id: z.string(),
   createdDateTime: z.string(),
   endDateTime: z.string(),
   status: z.enum(['ingested', 'failed']),
   error: z.string().optional(),
 });
-type IngestedTranscript = z.infer<typeof IngestedTranscriptSchema>;
+type IngestedTranscriptResult = z.infer<typeof IngestedTranscriptResultSchema>;
 
-const MeetingSummarySchema = z.object({
+const MeetingSummaryOutputSchema = z.object({
   id: z.string(),
   subject: z.string(),
   startDateTime: z.string(),
@@ -41,24 +60,9 @@ const MeetingSummarySchema = z.object({
 const IngestMeetingTranscriptByJoinUrlOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
-  meeting: MeetingSummarySchema.nullable(),
-  transcripts: z.array(IngestedTranscriptSchema),
+  meeting: MeetingSummaryOutputSchema.nullable(),
+  transcripts: z.array(IngestedTranscriptResultSchema),
 });
-
-function toMeetingSummary(meeting: Meeting): z.infer<typeof MeetingSummarySchema> {
-  return {
-    id: meeting.id,
-    subject: meeting.subject ?? 'Untitled Meeting',
-    startDateTime: meeting.startDateTime.toISOString(),
-    endDateTime: meeting.endDateTime.toISOString(),
-    organizer: {
-      id: meeting.participants.organizer.identity.user.id,
-      displayName: meeting.participants.organizer.identity.user.displayName ?? null,
-      email: meeting.participants.organizer.upn,
-    },
-    participantCount: meeting.participants.attendees.length,
-  };
-}
 
 @Injectable()
 export class IngestMeetingTranscriptByJoinUrlTool {
@@ -103,8 +107,11 @@ export class IngestMeetingTranscriptByJoinUrlTool {
     span?.setAttribute('user_profile_id', userProfileId);
     span?.setAttribute('join_web_url', input.joinWebUrl);
 
+    this.logger.log({ joinWebUrl: input.joinWebUrl }, 'Starting transcript ingestion by join URL');
+
     const meeting = await this.findMeetingByJoinUrl(userProfileId, input.joinWebUrl);
     if (!meeting) {
+      this.logger.warn({ joinWebUrl: input.joinWebUrl }, 'No meeting found for provided join URL');
       return {
         success: false,
         message:
@@ -114,28 +121,48 @@ export class IngestMeetingTranscriptByJoinUrlTool {
       };
     }
 
+    const summary = MeetingSummarySchema.parse(meeting);
+
     span?.setAttribute('meeting_id', meeting.id);
+    this.logger.log(
+      { meetingId: meeting.id, subject: meeting.subject },
+      'Found meeting, listing transcripts',
+    );
 
     const transcripts = await this.listTranscripts(userProfileId, meeting.id);
     if (transcripts.length === 0) {
+      this.logger.log({ meetingId: meeting.id }, 'Meeting found but no transcripts available');
       return {
         success: true,
         message: 'Meeting found but no transcripts are available for this meeting.',
-        meeting: toMeetingSummary(meeting),
+        meeting: summary,
         transcripts: [],
       };
     }
 
     span?.setAttribute('transcript_count', transcripts.length);
+    this.logger.log(
+      { meetingId: meeting.id, transcriptCount: transcripts.length },
+      'Found transcripts, starting ingestion',
+    );
 
     // TODO: Use MCP elicitation to let the user pick which transcript when multiple exist
     const results = await this.ingestTranscripts(userProfileId, meeting, transcripts);
     const ingestedCount = results.filter((r) => r.status === 'ingested').length;
+    const failedCount = results.filter((r) => r.status === 'failed').length;
+
+    span?.setAttribute('ingested_count', ingestedCount);
+    span?.setAttribute('failed_count', failedCount);
+
+    this.logger.log(
+      { meetingId: meeting.id, ingestedCount, failedCount, totalCount: results.length },
+      'Completed transcript ingestion',
+    );
 
     return {
       success: ingestedCount > 0,
       message: `Ingested ${ingestedCount} of ${results.length} transcript(s) for meeting "${meeting.subject ?? 'Untitled Meeting'}".`,
-      meeting: toMeetingSummary(meeting),
+      meeting: summary,
       transcripts: results,
     };
   }
@@ -144,7 +171,7 @@ export class IngestMeetingTranscriptByJoinUrlTool {
     userProfileId: string,
     joinWebUrl: string,
   ): Promise<Meeting | null> {
-    this.logger.debug({ joinWebUrl }, 'Looking up meeting by join URL');
+    this.logger.debug({ joinWebUrl }, 'Looking up meeting by join URL via Graph API');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client
@@ -156,16 +183,19 @@ export class IngestMeetingTranscriptByJoinUrlTool {
     const meeting = collection.value.at(0) ?? null;
 
     if (!meeting) {
-      this.logger.warn({ joinWebUrl }, 'No meeting found for the provided join URL');
+      this.logger.debug({ joinWebUrl }, 'No meeting matched the join URL');
     } else {
-      this.logger.debug({ meetingId: meeting.id, subject: meeting.subject }, 'Found meeting');
+      this.logger.debug(
+        { meetingId: meeting.id, subject: meeting.subject },
+        'Resolved meeting from join URL',
+      );
     }
 
     return meeting;
   }
 
   private async listTranscripts(userProfileId: string, meetingId: string): Promise<Transcript[]> {
-    this.logger.debug({ meetingId }, 'Listing transcripts for meeting');
+    this.logger.debug({ meetingId }, 'Fetching transcript list from Graph API');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client.api(`/me/onlineMeetings/${meetingId}/transcripts`).get();
@@ -173,7 +203,7 @@ export class IngestMeetingTranscriptByJoinUrlTool {
 
     this.logger.debug(
       { meetingId, transcriptCount: collection.value.length },
-      'Found transcripts for meeting',
+      'Retrieved transcript list',
     );
 
     return collection.value;
@@ -183,8 +213,8 @@ export class IngestMeetingTranscriptByJoinUrlTool {
     userProfileId: string,
     meeting: Meeting,
     transcripts: Transcript[],
-  ): Promise<IngestedTranscript[]> {
-    const results: IngestedTranscript[] = [];
+  ): Promise<IngestedTranscriptResult[]> {
+    const results: IngestedTranscriptResult[] = [];
 
     for (const transcript of transcripts) {
       results.push(await this.ingestSingleTranscript(userProfileId, meeting, transcript));
@@ -197,8 +227,15 @@ export class IngestMeetingTranscriptByJoinUrlTool {
     userProfileId: string,
     meeting: Meeting,
     transcript: Transcript,
-  ): Promise<IngestedTranscript> {
+  ): Promise<IngestedTranscriptResult> {
+    const base = IngestedTranscriptSchema.parse(transcript);
+
     try {
+      this.logger.debug(
+        { transcriptId: transcript.id, meetingId: meeting.id },
+        'Ingesting transcript',
+      );
+
       await this.transcriptCreatedService.fetchVttAndIngest(userProfileId, meeting, transcript);
 
       this.logger.log(
@@ -206,12 +243,7 @@ export class IngestMeetingTranscriptByJoinUrlTool {
         'Successfully ingested transcript',
       );
 
-      return {
-        id: transcript.id,
-        createdDateTime: transcript.createdDateTime.toISOString(),
-        endDateTime: transcript.endDateTime.toISOString(),
-        status: 'ingested',
-      };
+      return { ...base, status: 'ingested' };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -219,13 +251,7 @@ export class IngestMeetingTranscriptByJoinUrlTool {
         'Failed to ingest transcript',
       );
 
-      return {
-        id: transcript.id,
-        createdDateTime: transcript.createdDateTime.toISOString(),
-        endDateTime: transcript.endDateTime.toISOString(),
-        status: 'failed',
-        error: errorMessage,
-      };
+      return { ...base, status: 'failed', error: errorMessage };
     }
   }
 }

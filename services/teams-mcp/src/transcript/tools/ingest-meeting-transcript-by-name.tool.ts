@@ -30,16 +30,35 @@ const IngestMeetingTranscriptByNameInputSchema = z.object({
     .describe('End of search range (ISO 8601). Defaults to end of today UTC.'),
 });
 
-const IngestedTranscriptSchema = z.object({
+const MeetingSummarySchema = z.custom<Meeting>().transform((m) => ({
+  id: m.id,
+  subject: m.subject ?? 'Untitled Meeting',
+  startDateTime: m.startDateTime.toISOString(),
+  endDateTime: m.endDateTime.toISOString(),
+  organizer: {
+    id: m.participants.organizer.identity.user.id,
+    displayName: m.participants.organizer.identity.user.displayName ?? null,
+    email: m.participants.organizer.upn,
+  },
+  participantCount: m.participants.attendees.length,
+}));
+
+const IngestedTranscriptSchema = z.custom<Transcript>().transform((t) => ({
+  id: t.id,
+  createdDateTime: t.createdDateTime.toISOString(),
+  endDateTime: t.endDateTime.toISOString(),
+}));
+
+const IngestedTranscriptResultSchema = z.object({
   id: z.string(),
   createdDateTime: z.string(),
   endDateTime: z.string(),
   status: z.enum(['ingested', 'failed']),
   error: z.string().optional(),
 });
-type IngestedTranscript = z.infer<typeof IngestedTranscriptSchema>;
+type IngestedTranscriptResult = z.infer<typeof IngestedTranscriptResultSchema>;
 
-const MeetingSummarySchema = z.object({
+const MeetingSummaryOutputSchema = z.object({
   id: z.string(),
   subject: z.string(),
   startDateTime: z.string(),
@@ -53,8 +72,8 @@ const MeetingSummarySchema = z.object({
 });
 
 const MeetingResultSchema = z.object({
-  meeting: MeetingSummarySchema,
-  transcripts: z.array(IngestedTranscriptSchema),
+  meeting: MeetingSummaryOutputSchema,
+  transcripts: z.array(IngestedTranscriptResultSchema),
 });
 type MeetingResult = z.infer<typeof MeetingResultSchema>;
 
@@ -76,21 +95,6 @@ function todayEndUTC(): string {
   return new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999),
   ).toISOString();
-}
-
-function toMeetingSummary(meeting: Meeting): z.infer<typeof MeetingSummarySchema> {
-  return {
-    id: meeting.id,
-    subject: meeting.subject ?? 'Untitled Meeting',
-    startDateTime: meeting.startDateTime.toISOString(),
-    endDateTime: meeting.endDateTime.toISOString(),
-    organizer: {
-      id: meeting.participants.organizer.identity.user.id,
-      displayName: meeting.participants.organizer.identity.user.displayName ?? null,
-      email: meeting.participants.organizer.upn,
-    },
-    participantCount: meeting.participants.attendees.length,
-  };
 }
 
 @Injectable()
@@ -142,6 +146,11 @@ export class IngestMeetingTranscriptByNameTool {
     span?.setAttribute('start_date_time', startDateTime);
     span?.setAttribute('end_date_time', endDateTime);
 
+    this.logger.log(
+      { subject: input.subject, startDateTime, endDateTime },
+      'Starting transcript ingestion by meeting name',
+    );
+
     const calendarEvents = await this.searchCalendarEvents(
       userProfileId,
       startDateTime,
@@ -150,6 +159,10 @@ export class IngestMeetingTranscriptByNameTool {
 
     const matchingEvents = this.filterBySubject(calendarEvents, input.subject);
     if (matchingEvents.length === 0) {
+      this.logger.warn(
+        { subject: input.subject, startDateTime, endDateTime, totalEvents: calendarEvents.length },
+        'No meetings matching subject found in date range',
+      );
       return {
         success: false,
         message: `No meetings matching "${input.subject}" found between ${startDateTime} and ${endDateTime}.`,
@@ -158,6 +171,10 @@ export class IngestMeetingTranscriptByNameTool {
     }
 
     span?.setAttribute('matching_events_count', matchingEvents.length);
+    this.logger.log(
+      { matchingCount: matchingEvents.length, subject: input.subject },
+      'Found matching calendar events, resolving online meetings',
+    );
 
     const meetingResults: MeetingResult[] = [];
 
@@ -166,23 +183,59 @@ export class IngestMeetingTranscriptByNameTool {
       if (!joinUrl) continue;
 
       const meeting = await this.findMeetingByJoinUrl(userProfileId, joinUrl);
-      if (!meeting) continue;
-
-      const transcripts = await this.listTranscripts(userProfileId, meeting.id);
-      if (transcripts.length === 0) {
-        meetingResults.push({ meeting: toMeetingSummary(meeting), transcripts: [] });
+      if (!meeting) {
+        this.logger.warn(
+          { joinUrl, eventSubject: event.subject },
+          'Could not resolve online meeting from calendar event join URL',
+        );
         continue;
       }
 
+      const summary = MeetingSummarySchema.parse(meeting);
+
+      const transcripts = await this.listTranscripts(userProfileId, meeting.id);
+      if (transcripts.length === 0) {
+        this.logger.debug(
+          { meetingId: meeting.id, subject: meeting.subject },
+          'No transcripts available for meeting',
+        );
+        meetingResults.push({ meeting: summary, transcripts: [] });
+        continue;
+      }
+
+      this.logger.log(
+        { meetingId: meeting.id, subject: meeting.subject, transcriptCount: transcripts.length },
+        'Found transcripts, starting ingestion',
+      );
+
       const results = await this.ingestTranscripts(userProfileId, meeting, transcripts);
-      meetingResults.push({ meeting: toMeetingSummary(meeting), transcripts: results });
+      meetingResults.push({ meeting: summary, transcripts: results });
     }
 
     const totalIngested = meetingResults.reduce(
       (sum, r) => sum + r.transcripts.filter((t) => t.status === 'ingested').length,
       0,
     );
+    const totalFailed = meetingResults.reduce(
+      (sum, r) => sum + r.transcripts.filter((t) => t.status === 'failed').length,
+      0,
+    );
     const totalTranscripts = meetingResults.reduce((sum, r) => sum + r.transcripts.length, 0);
+
+    span?.setAttribute('total_meetings', meetingResults.length);
+    span?.setAttribute('total_ingested', totalIngested);
+    span?.setAttribute('total_failed', totalFailed);
+
+    this.logger.log(
+      {
+        subject: input.subject,
+        meetingCount: meetingResults.length,
+        totalIngested,
+        totalFailed,
+        totalTranscripts,
+      },
+      'Completed transcript ingestion by name',
+    );
 
     return {
       success: totalIngested > 0,
@@ -196,7 +249,7 @@ export class IngestMeetingTranscriptByNameTool {
     startDateTime: string,
     endDateTime: string,
   ): Promise<CalendarEvent[]> {
-    this.logger.debug({ startDateTime, endDateTime }, 'Searching calendar events');
+    this.logger.debug({ startDateTime, endDateTime }, 'Querying calendar view from Graph API');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client
@@ -219,7 +272,7 @@ export class IngestMeetingTranscriptByNameTool {
 
     this.logger.debug(
       { search, totalEvents: events.length, matchingEvents: matching.length },
-      'Filtered calendar events by subject',
+      'Filtered calendar events by subject and online meeting presence',
     );
 
     return matching;
@@ -229,7 +282,7 @@ export class IngestMeetingTranscriptByNameTool {
     userProfileId: string,
     joinWebUrl: string,
   ): Promise<Meeting | null> {
-    this.logger.debug({ joinWebUrl }, 'Looking up meeting by join URL');
+    this.logger.debug({ joinWebUrl }, 'Looking up meeting by join URL via Graph API');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client
@@ -238,11 +291,22 @@ export class IngestMeetingTranscriptByNameTool {
       .get();
 
     const collection = await MeetingCollection.parseAsync(response);
-    return collection.value.at(0) ?? null;
+    const meeting = collection.value.at(0) ?? null;
+
+    if (!meeting) {
+      this.logger.debug({ joinWebUrl }, 'No meeting matched the join URL');
+    } else {
+      this.logger.debug(
+        { meetingId: meeting.id, subject: meeting.subject },
+        'Resolved meeting from join URL',
+      );
+    }
+
+    return meeting;
   }
 
   private async listTranscripts(userProfileId: string, meetingId: string): Promise<Transcript[]> {
-    this.logger.debug({ meetingId }, 'Listing transcripts for meeting');
+    this.logger.debug({ meetingId }, 'Fetching transcript list from Graph API');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client.api(`/me/onlineMeetings/${meetingId}/transcripts`).get();
@@ -250,7 +314,7 @@ export class IngestMeetingTranscriptByNameTool {
 
     this.logger.debug(
       { meetingId, transcriptCount: collection.value.length },
-      'Found transcripts for meeting',
+      'Retrieved transcript list',
     );
 
     return collection.value;
@@ -260,8 +324,8 @@ export class IngestMeetingTranscriptByNameTool {
     userProfileId: string,
     meeting: Meeting,
     transcripts: Transcript[],
-  ): Promise<IngestedTranscript[]> {
-    const results: IngestedTranscript[] = [];
+  ): Promise<IngestedTranscriptResult[]> {
+    const results: IngestedTranscriptResult[] = [];
 
     for (const transcript of transcripts) {
       results.push(await this.ingestSingleTranscript(userProfileId, meeting, transcript));
@@ -274,8 +338,15 @@ export class IngestMeetingTranscriptByNameTool {
     userProfileId: string,
     meeting: Meeting,
     transcript: Transcript,
-  ): Promise<IngestedTranscript> {
+  ): Promise<IngestedTranscriptResult> {
+    const base = IngestedTranscriptSchema.parse(transcript);
+
     try {
+      this.logger.debug(
+        { transcriptId: transcript.id, meetingId: meeting.id },
+        'Ingesting transcript',
+      );
+
       await this.transcriptCreatedService.fetchVttAndIngest(userProfileId, meeting, transcript);
 
       this.logger.log(
@@ -283,12 +354,7 @@ export class IngestMeetingTranscriptByNameTool {
         'Successfully ingested transcript',
       );
 
-      return {
-        id: transcript.id,
-        createdDateTime: transcript.createdDateTime.toISOString(),
-        endDateTime: transcript.endDateTime.toISOString(),
-        status: 'ingested',
-      };
+      return { ...base, status: 'ingested' };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -296,13 +362,7 @@ export class IngestMeetingTranscriptByNameTool {
         'Failed to ingest transcript',
       );
 
-      return {
-        id: transcript.id,
-        createdDateTime: transcript.createdDateTime.toISOString(),
-        endDateTime: transcript.endDateTime.toISOString(),
-        status: 'failed',
-        error: errorMessage,
-      };
+      return { ...base, status: 'failed', error: errorMessage };
     }
   }
 }
