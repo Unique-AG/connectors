@@ -83,12 +83,6 @@ function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
   }
 }
 
-/**
- * Helper to register tenant config sections. They are already validated in loadTenantConfig.
- */
-const registerTenantSection = (key: keyof TenantConfig) =>
-  registerAs(key as string, () => getTenantConfig()[key] as Record<string, unknown>);
-
 // ==========================================
 // Tenant Configuration
 // ==========================================
@@ -102,9 +96,9 @@ const TenantConfigSchema = z.object({
 type TenantConfig = z.infer<typeof TenantConfigSchema>;
 
 // --- Tenant Configs (From File) ---
-export const sharepointConfig = registerTenantSection('sharepoint');
-export const uniqueConfig = registerTenantSection('unique');
-export const processingConfig = registerTenantSection('processing');
+export const sharepointConfig = registerAs('sharepoint', () => getTenantConfig().sharepoint);
+export const uniqueConfig = registerAs('unique', () => getTenantConfig().unique);
+export const processingConfig = registerAs('processing', () => getTenantConfig().processing);
 
 export interface SharepointConfigNamespaced {
   sharepoint: SharepointConfig;
