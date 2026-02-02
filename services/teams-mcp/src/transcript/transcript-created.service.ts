@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
-import type { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
@@ -150,13 +149,19 @@ export class TranscriptCreatedService {
     );
     assert.ok(vttStream, 'expected a vtt transcript body');
 
-    await this.fetchVttAndIngest(client, `/users/${userId}`, meeting, transcript, vttStream);
+    await this.fetchVttAndIngest(
+      subscription.userProfileId,
+      `/users/${userId}`,
+      meeting,
+      transcript,
+      vttStream,
+    );
   }
 
   /**
    * Fetches calendar event to determine recurrence, then ingests the transcript into Unique.
    *
-   * @param client - Authenticated Microsoft Graph client
+   * @param userProfileId - User profile ID used to create an authenticated Graph client
    * @param apiPrefix - API path prefix (e.g. `/users/{userId}` or `/me`)
    * @param meeting - Parsed meeting object
    * @param transcript - Parsed transcript metadata
@@ -164,7 +169,7 @@ export class TranscriptCreatedService {
    */
   @Span()
   public async fetchVttAndIngest(
-    client: Client,
+    userProfileId: string,
     apiPrefix: string,
     meeting: Meeting,
     transcript: Transcript,
@@ -173,6 +178,9 @@ export class TranscriptCreatedService {
     const span = this.trace.getSpan();
     span?.setAttribute('meeting_id', meeting.id);
     span?.setAttribute('transcript_id', transcript.id);
+    span?.setAttribute('user_profile_id', userProfileId);
+
+    const client = this.graphClientFactory.createClientForUser(userProfileId);
 
     if (!vttStream) {
       vttStream = await client

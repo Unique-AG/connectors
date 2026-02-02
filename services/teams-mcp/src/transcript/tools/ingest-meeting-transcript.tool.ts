@@ -1,6 +1,5 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import type { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
@@ -104,9 +103,7 @@ export class IngestMeetingTranscriptTool {
     span?.setAttribute('user_profile_id', userProfileId);
     span?.setAttribute('join_web_url', input.joinWebUrl);
 
-    const client = this.graphClientFactory.createClientForUser(userProfileId);
-
-    const meeting = await this.findMeetingByJoinUrl(client, input.joinWebUrl);
+    const meeting = await this.findMeetingByJoinUrl(userProfileId, input.joinWebUrl);
     if (!meeting) {
       return {
         success: false,
@@ -119,7 +116,7 @@ export class IngestMeetingTranscriptTool {
 
     span?.setAttribute('meeting_id', meeting.id);
 
-    const transcripts = await this.listTranscripts(client, meeting.id);
+    const transcripts = await this.listTranscripts(userProfileId, meeting.id);
     if (transcripts.length === 0) {
       return {
         success: true,
@@ -132,7 +129,7 @@ export class IngestMeetingTranscriptTool {
     span?.setAttribute('transcript_count', transcripts.length);
 
     // TODO: Use MCP elicitation to let the user pick which transcript when multiple exist
-    const results = await this.ingestTranscripts(client, meeting, transcripts);
+    const results = await this.ingestTranscripts(userProfileId, meeting, transcripts);
     const ingestedCount = results.filter((r) => r.status === 'ingested').length;
 
     return {
@@ -143,9 +140,13 @@ export class IngestMeetingTranscriptTool {
     };
   }
 
-  private async findMeetingByJoinUrl(client: Client, joinWebUrl: string): Promise<Meeting | null> {
+  private async findMeetingByJoinUrl(
+    userProfileId: string,
+    joinWebUrl: string,
+  ): Promise<Meeting | null> {
     this.logger.debug({ joinWebUrl }, 'Looking up meeting by join URL');
 
+    const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client
       .api('/me/onlineMeetings')
       .filter(`JoinWebUrl eq '${joinWebUrl}'`)
@@ -163,9 +164,10 @@ export class IngestMeetingTranscriptTool {
     return meeting;
   }
 
-  private async listTranscripts(client: Client, meetingId: string): Promise<Transcript[]> {
+  private async listTranscripts(userProfileId: string, meetingId: string): Promise<Transcript[]> {
     this.logger.debug({ meetingId }, 'Listing transcripts for meeting');
 
+    const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client.api(`/me/onlineMeetings/${meetingId}/transcripts`).get();
     const collection = await TranscriptCollection.parseAsync(response);
 
@@ -178,26 +180,31 @@ export class IngestMeetingTranscriptTool {
   }
 
   private async ingestTranscripts(
-    client: Client,
+    userProfileId: string,
     meeting: Meeting,
     transcripts: Transcript[],
   ): Promise<IngestedTranscript[]> {
     const results: IngestedTranscript[] = [];
 
     for (const transcript of transcripts) {
-      results.push(await this.ingestSingleTranscript(client, meeting, transcript));
+      results.push(await this.ingestSingleTranscript(userProfileId, meeting, transcript));
     }
 
     return results;
   }
 
   private async ingestSingleTranscript(
-    client: Client,
+    userProfileId: string,
     meeting: Meeting,
     transcript: Transcript,
   ): Promise<IngestedTranscript> {
     try {
-      await this.transcriptCreatedService.fetchVttAndIngest(client, '/me', meeting, transcript);
+      await this.transcriptCreatedService.fetchVttAndIngest(
+        userProfileId,
+        '/me',
+        meeting,
+        transcript,
+      );
 
       this.logger.log(
         { transcriptId: transcript.id, meetingId: meeting.id },
