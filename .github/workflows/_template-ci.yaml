@@ -11,10 +11,6 @@ on:
         description: "Path to the service directory (e.g., services/factset-mcp)"
         required: true
         type: string
-      orm:
-        description: "ORM in use (e.g., prisma, drizzle, none)"
-        type: string
-        default: "prisma"
 
 concurrency:
   group: _template-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -30,6 +26,20 @@ jobs:
       SERVICE_PATH: ${{ inputs.service-path }}
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      # Detect ORM from conventional config files:
+      #   - drizzle.config.ts → drizzle
+      #   - prisma/schema.prisma → prisma
+      #   - neither → none
+      - name: Detect ORM
+        run: |
+          if [ -f "${{ env.SERVICE_PATH }}/drizzle.config.ts" ]; then
+            echo "ORM=drizzle" >> $GITHUB_ENV
+          elif [ -f "${{ env.SERVICE_PATH }}/prisma/schema.prisma" ]; then
+            echo "ORM=prisma" >> $GITHUB_ENV
+          else
+            echo "ORM=none" >> $GITHUB_ENV
+          fi
 
       - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
@@ -64,12 +74,12 @@ jobs:
 
       - name: Generate Prisma client
         working-directory: ${{ env.SERVICE_PATH }}
-        if: ${{ inputs.orm == 'prisma' }}
+        if: env.ORM == 'prisma'
         run: pnpm db:generate
 
       - name: Check Drizzle migrations
         working-directory: ${{ env.SERVICE_PATH }}
-        if: ${{ inputs.orm == 'drizzle' }}
+        if: env.ORM == 'drizzle'
         run: pnpm db:check
 
       - name: Run codegen
