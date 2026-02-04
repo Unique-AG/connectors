@@ -23,15 +23,15 @@ export class GetTopFolderPermissionsQuery {
 
   public run(input: Input): Map<string, GroupMembership[]> {
     const { items, directories, permissionsMap, rootPath } = input;
+    const allItems: AnySharepointItem[] = [...items, ...directories];
 
-    const topFolders = this.identifyTopFolders(directories, rootPath);
+    const topFolders = this.identifyTopFolders(allItems, rootPath);
     const result = new Map<string, GroupMembership[]>();
 
     for (const topFolderPath of topFolders) {
       const aggregatedGroups = this.aggregateGroupPermissions(
         topFolderPath,
-        items,
-        directories,
+        allItems,
         permissionsMap,
         rootPath,
       );
@@ -41,12 +41,12 @@ export class GetTopFolderPermissionsQuery {
     return result;
   }
 
-  private identifyTopFolders(directories: SharepointDirectoryItem[], rootPath: string): string[] {
+  private identifyTopFolders(items: AnySharepointItem[], rootPath: string): string[] {
     const normalizedRootPath = `/${normalizeSlashes(rootPath)}`;
 
     return pipe(
-      directories,
-      map((directory) => getUniquePathFromItem(directory, rootPath)),
+      items,
+      map((item) => getUniquePathFromItem(item, rootPath)),
       filter((folderPath) => isTopFolder(folderPath, rootPath)),
       (paths) => [normalizedRootPath, ...paths],
       unique(),
@@ -55,15 +55,13 @@ export class GetTopFolderPermissionsQuery {
 
   private aggregateGroupPermissions(
     topFolderPath: string,
-    items: SharepointContentItem[],
-    directories: SharepointDirectoryItem[],
+    items: AnySharepointItem[],
     permissionsMap: Record<string, Membership[]>,
     rootPath: string,
   ): GroupMembership[] {
     const groupsMap = new Map<string, GroupMembership>();
-    const allItems: AnySharepointItem[] = [...items, ...directories];
 
-    for (const item of allItems) {
+    for (const item of items) {
       const itemPath = getUniquePathFromItem(item, rootPath);
 
       if (!this.isDescendantOf(itemPath, topFolderPath)) {
