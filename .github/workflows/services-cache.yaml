@@ -43,17 +43,7 @@ jobs:
       fail-fast: false
       matrix:
         service: ${{ fromJson(needs.build-matrix.outputs.services) }}
-        include:
-          - service: factset-mcp
-            dockerfile: ./Dockerfile
-          - service: outlook-mcp
-            dockerfile: services/outlook-mcp/deploy/Dockerfile
-          - service: sharepoint-connector
-            dockerfile: services/sharepoint-connector/deploy/Dockerfile
-          - service: teams-mcp
-            dockerfile: services/teams-mcp/deploy/Dockerfile
     uses: ./.github/workflows/_template-cache.yaml
     with:
       service-name: ${{ matrix.service }}
       service-path: services/${{ matrix.service }}
-      dockerfile: ${{ matrix.dockerfile }}
