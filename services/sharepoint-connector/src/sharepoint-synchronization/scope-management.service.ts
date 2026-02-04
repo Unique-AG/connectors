@@ -82,12 +82,10 @@ export class ScopeManagementService {
     let currentScope: Scope = rootScope;
 
     while (currentScope.parentId) {
-      // Grant READ and WRITE permissions first before accessing the parent scope. Otherwise we will
-      // not get it via `getScopeById` call. And without WRITE permission we will not be able to
-      // create the scope accesses for the parent scope.
+      // Grant READ permission first before accessing the parent scope. Otherwise we will not get it
+      // via `getScopeById` call.
       await this.uniqueScopesService.createScopeAccesses(currentScope.parentId, [
         { type: 'READ', entityId: userId, entityType: 'USER' },
-        { type: 'WRITE', entityId: userId, entityType: 'USER' },
       ]);
 
       const parent = await this.uniqueScopesService.getScopeById(currentScope.parentId);
