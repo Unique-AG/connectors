@@ -43,7 +43,7 @@ describe('AspxProcessingStep', () => {
       siteConfig: createMockSiteConfig(),
       siteName: new Smeared('test-site', false),
       serviceUserId: 'user-1',
-      rootPath: '/Root',
+      rootPath: new Smeared('/Root', false),
     },
     correlationId: 'c1',
     startTime: new Date(),

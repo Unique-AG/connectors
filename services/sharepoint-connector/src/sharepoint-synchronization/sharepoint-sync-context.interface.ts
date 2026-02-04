@@ -6,5 +6,5 @@ export interface SharepointSyncContext {
   siteName: Smeared;
   serviceUserId: string;
   /** Resolved path of the root scope (e.g. "/Root/Project") */
-  rootPath: string;
+  rootPath: Smeared;
 }

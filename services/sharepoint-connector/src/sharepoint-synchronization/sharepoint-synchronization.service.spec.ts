@@ -124,7 +124,7 @@ describe('SharepointSynchronizationService', () => {
     mockScopeManagementService = {
       initializeRootScope: vi.fn().mockResolvedValue({
         serviceUserId: 'user-123',
-        rootPath: '/test-root',
+        rootPath: new Smeared('/test-root', false),
       }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
       deleteRootScopeRecursively: vi.fn().mockResolvedValue(undefined),
@@ -184,11 +184,15 @@ describe('SharepointSynchronizationService', () => {
           siteId: expect.any(Smeared),
           scopeId: 'scope-id',
         }),
-        siteName: 'test-site-name',
-        rootPath: '/test-root',
+        siteName: expect.any(Smeared),
+        rootPath: expect.any(Smeared),
         serviceUserId: 'user-123',
       }),
     );
+
+    const context = vi.mocked(mockContentSyncService.syncContentForSite).mock.calls[0]?.[2];
+    expect(context?.siteName.value).toBe('test-site-name');
+    expect(context?.rootPath.value).toBe('/test-root');
   });
 
   it('delegates content synchronization to ContentSyncService', async () => {
@@ -202,11 +206,15 @@ describe('SharepointSynchronizationService', () => {
           siteId: expect.any(Smeared),
           scopeId: 'scope-id',
         }),
-        siteName: 'test-site-name',
-        rootPath: '/test-root',
+        siteName: expect.any(Smeared),
+        rootPath: expect.any(Smeared),
         serviceUserId: 'user-123',
       }),
     );
+
+    const context = vi.mocked(mockContentSyncService.syncContentForSite).mock.calls[0]?.[2];
+    expect(context?.siteName.value).toBe('test-site-name');
+    expect(context?.rootPath.value).toBe('/test-root');
   });
 
   it('skips site when no items found', async () => {
@@ -325,13 +333,18 @@ describe('SharepointSynchronizationService', () => {
           siteId: expect.any(Smeared),
           scopeId: 'scope-id',
         }),
-        siteName: 'test-site-name',
-        rootPath: '/test-root',
+        siteName: expect.any(Smeared),
+        rootPath: expect.any(Smeared),
         serviceUserId: 'user-123',
       }),
       sharePoint: { items: [mockFile], directories: [] },
       unique: { folders: null },
     });
+
+    const permissionsCall = vi.mocked(mockPermissionsSyncService.syncPermissionsForSite).mock
+      .calls[0]?.[0];
+    expect(permissionsCall?.context.siteName.value).toBe('test-site-name');
+    expect(permissionsCall?.context.rootPath.value).toBe('/test-root');
   });
 
   it('skips permissions sync when disabled', async () => {

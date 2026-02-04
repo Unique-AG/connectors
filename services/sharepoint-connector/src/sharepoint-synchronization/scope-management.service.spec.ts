@@ -107,7 +107,7 @@ describe('ScopeManagementService', () => {
 
   const mockContext: SharepointSyncContext = {
     serviceUserId: 'user-123',
-    rootPath: '/test1',
+    rootPath: new Smeared('/test1', false),
     siteName: new Smeared('test-site', false),
     siteConfig: createMockSiteConfig({
       siteId: new Smeared('site-123', false),
@@ -298,7 +298,9 @@ describe('ScopeManagementService', () => {
         IngestionMode.Flat,
       );
 
-      expect(result).toEqual({ serviceUserId: 'user-123', rootPath: '/Root/test1' });
+      expect(result.serviceUserId).toBe('user-123');
+      expect(result.rootPath).toBeInstanceOf(Smeared);
+      expect(result.rootPath.value).toBe('/Root/test1');
       expect(createScopeAccessesMock).toHaveBeenCalledWith('root-scope-123', expect.any(Array));
       expect(createScopeAccessesMock).toHaveBeenCalledWith('parent-1', expect.any(Array));
     });

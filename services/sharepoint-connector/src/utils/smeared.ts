@@ -34,3 +34,7 @@ export function isSmearingActive(): boolean {
 export function createSmeared(value: string): Smeared {
   return new Smeared(value, isSmearingActive());
 }
+
+export function smearPath(path: Smeared) {
+  return path.value.split('/').map(createSmeared).join('/');
+}

@@ -15,12 +15,12 @@ import { EXTERNAL_ID_PREFIX } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
-import { createSmeared, Smeared } from '../utils/smeared';
+import { createSmeared, Smeared, smearPath } from '../utils/smeared';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 export interface RootScopeInfo {
   serviceUserId: string;
-  rootPath: string;
+  rootPath: Smeared;
 }
 
 @Injectable()
@@ -99,8 +99,8 @@ export class ScopeManagementService {
       currentScope = parent;
     }
 
-    const rootPath = `/${pathSegments.join('/')}`;
-    this.logger.log(`Resolved root path: ${createSmeared(rootPath)}`);
+    const rootPath = createSmeared(`/${pathSegments.join('/')}`);
+    this.logger.log(`Resolved root path: ${smearPath(rootPath)}`);
 
     return { serviceUserId: userId, rootPath };
   }
@@ -149,7 +149,7 @@ export class ScopeManagementService {
 
   private buildItemIdToScopePathMap(
     items: SharepointContentItem[],
-    rootPath: string,
+    rootPath: Smeared,
   ): Map<string, string> {
     const itemIdToScopePathMap = new Map<string, string>();
 
@@ -258,7 +258,7 @@ export class ScopeManagementService {
     const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
     const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
     // Site pages is a special collection we fetch for ASPX pages, but has no folders.
-    pathToExternalIdMap[`${context.rootPath}/SitePages`] =
+    pathToExternalIdMap[`${context.rootPath.value}/SitePages`] =
       `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId.value}/sitePages`;
 
     for (const [index, scope] of scopes.entries()) {
@@ -269,7 +269,7 @@ export class ScopeManagementService {
       const path = paths[index] ?? '';
 
       // Skip setting external ID for scopes that are ancestors of the root ingestion folder
-      if (isAncestorOfRootPath(path, context.rootPath)) {
+      if (isAncestorOfRootPath(path, context.rootPath.value)) {
         this.logger.debug(
           `${logPrefix} Skipping externalId update for scope ${scope.id} because it is ancestor ` +
             `to the ingestion root scope`,
@@ -306,22 +306,22 @@ export class ScopeManagementService {
 
   private buildPathToExternalIdMap(
     directories: SharepointDirectoryItem[],
-    rootPath: string,
+    rootPath: Smeared,
   ): Record<string, string> {
     const pathToExternalIdMap: Record<string, string> = {};
 
     for (const directory of directories) {
       const path = getUniquePathFromItem(directory, rootPath);
-      if (isAncestorOfRootPath(path, rootPath) || path === rootPath) {
+      if (isAncestorOfRootPath(path, rootPath.value) || path === rootPath.value) {
         continue;
       }
 
-      const pathWithoutRoot = path.substring(rootPath.length);
+      const pathWithoutRoot = path.substring(rootPath.value.length);
       const segments = pathWithoutRoot.split('/').filter(Boolean);
       pathToExternalIdMap[path] =
         `${EXTERNAL_ID_PREFIX}folder:${directory.siteId.value}/${directory.item.id}`;
       // siteName is now stripped, so first segment is already the drive
-      pathToExternalIdMap[`${rootPath}/${segments[0]}`] ??=
+      pathToExternalIdMap[`${rootPath.value}/${segments[0]}`] ??=
         `${EXTERNAL_ID_PREFIX}drive:${directory.siteId.value}/${directory.driveId}`;
     }
 

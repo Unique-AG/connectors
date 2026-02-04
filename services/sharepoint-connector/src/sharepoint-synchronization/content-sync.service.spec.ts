@@ -114,7 +114,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
@@ -150,7 +150,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
@@ -186,7 +186,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
@@ -215,7 +215,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
@@ -260,7 +260,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
@@ -309,7 +309,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: {
           ...mockSiteConfig,
@@ -357,7 +357,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
@@ -398,7 +398,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
@@ -439,7 +439,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
@@ -465,7 +465,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
@@ -498,7 +498,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
@@ -532,7 +532,7 @@ describe('ContentSyncService', () => {
       const scopes = [] as ScopeWithPath[];
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
-        rootPath: '/root',
+        rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };

@@ -145,7 +145,7 @@ describe('ProcessingPipelineService', () => {
     siteConfig: createMockSiteConfig(),
     siteName: new Smeared('test-site', false),
     serviceUserId: 'test-user-id',
-    rootPath: '/Root',
+    rootPath: new Smeared('/Root', false),
   };
 
   it('processes file through all pipeline steps successfully', async () => {

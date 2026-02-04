@@ -21,6 +21,7 @@ import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.s
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { isAncestorOfRootPath, normalizeSlashes } from '../utils/paths.util';
 import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
+import type { Smeared } from '../utils/smeared';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -67,7 +68,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     );
 
     const uniqueFoldersToProcess = unique.folders.filter(
-      (folder) => !isAncestorOfRootPath(folder.path, rootPath),
+      (folder) => !isAncestorOfRootPath(folder.path, rootPath.value),
     );
 
     this.logger.log(
@@ -99,7 +100,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
           groupsMap: unique.groupsMap,
           usersMap: unique.usersMap,
         },
-        rootPath,
+        rootPath: rootPath.value,
       });
 
       if (isNullish(sharePointScopeAccesses)) {
@@ -137,7 +138,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
   private getSharePointDirectoriesPathMap(
     directories: SharepointDirectoryItem[],
-    rootPath: string,
+    rootPath: Smeared,
   ): Record<string, SharepointDirectoryItem> {
     return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootPath));
   }

@@ -101,7 +101,7 @@ describe('ItemProcessingOrchestratorService', () => {
     siteConfig: createMockSiteConfig(),
     siteName: new Smeared('test-site', false),
     serviceUserId: 'test-user-id',
-    rootPath: '/Root',
+    rootPath: new Smeared('/Root', false),
   };
 
   it('processes all provided files', async () => {
