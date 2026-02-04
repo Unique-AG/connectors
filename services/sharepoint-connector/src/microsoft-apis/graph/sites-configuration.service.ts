@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 import { Config } from '../../config';
-import { ConfigDiagnosticsService } from '../../config/config-diagnostics.service';
 import { SiteConfigSchema } from '../../config/sharepoint.schema';
 import { normalizeError, sanitizeError } from '../../utils/normalize-error';
 import { Smeared } from '../../utils/smeared';
@@ -18,7 +17,6 @@ export class SitesConfigurationService {
   public constructor(
     private readonly graphApiService: GraphApiService,
     private readonly configService: ConfigService<Config, true>,
-    private readonly configDiagnosticsService: ConfigDiagnosticsService,
   ) {}
 
   /**
@@ -29,10 +27,6 @@ export class SitesConfigurationService {
 
     if (sharepointConfig.sitesSource === 'config_file') {
       this.logger.log('Loading sites configuration from YAML file');
-      this.configDiagnosticsService.logConfig(
-        'Loaded SharePoint Sites Configurations',
-        sharepointConfig.sites,
-      );
       return sharepointConfig.sites;
     }
 
@@ -41,7 +35,6 @@ export class SitesConfigurationService {
       siteId: sharepointConfig.sharepointList.siteId,
       listId: sharepointConfig.sharepointList.listId,
     });
-    this.configDiagnosticsService.logConfig('Loaded SharePoint Sites Configurations', sites);
     return sites;
   }
 
