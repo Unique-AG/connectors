@@ -5,8 +5,8 @@
 [settings]
 # Allow multiple scopes (e.g., feat(teams-mcp,mcp-oauth): ...)
 multi-scope = true
-# Always require a scope in commit messages
-require-scope = true
+# Do not require a scope in commit messages
+require-scope = false
 # Scope must be defined in [scopes] section
 defined-scope = true
 # Files must match the scope's glob patterns
