@@ -22,6 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Builds a JSON array of service names to fan out into parallel cache warming jobs.
+      # On manual dispatch with specific services, uses the comma-separated input.
+      # Otherwise (scheduled or "all"), auto-discovers services from the services/ directory.
       - name: Build service matrix
         id: matrix
         env:
@@ -36,6 +39,8 @@ jobs:
           fi
           echo "services=$services" >> "$GITHUB_OUTPUT"
 
+  # Fans out into one job per service using the reusable cache template.
+  # Dockerfile paths are derived from the convention: services/<name>/deploy/Dockerfile
   cache:
     name: ${{ matrix.service }}
     needs: build-matrix

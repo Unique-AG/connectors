@@ -45,6 +45,12 @@ jobs:
             packages:
               - 'packages/**'
 
+      # Builds a JSON array of service names to fan out into parallel CI matrix jobs.
+      # Handles three scenarios:
+      #   1. workflow_dispatch: uses user input (comma-separated list or "all"), validates against existing services/
+      #   2. PR with service changes: extracts unique service names from changed file paths
+      #   3. PR with only package changes: runs all services since packages are shared dependencies
+      # If none of the above match, outputs an empty array so the CI job is skipped.
       - name: Build service matrix
         id: build-matrix
         env:
@@ -77,7 +83,7 @@ jobs:
           elif [ "$SERVICES_CHANGED" = "true" ]; then
             services=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
           elif [ "$PACKAGES_CHANGED" = "true" ]; then
-            # If only packages changed, run CI for all services that depend on them
+            # Packages are shared dependencies — run CI for all services to catch breakage
             services=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
           else
             services='[]'
@@ -85,6 +91,9 @@ jobs:
           echo "services=$services" >> "$GITHUB_OUTPUT"
           echo "Services to validate: $services"
 
+  # Fans out into one job per affected service using the reusable CI template.
+  # The `include` block maps each service to its ORM so the template can run
+  # the appropriate migration/generation steps (e.g. prisma generate, drizzle-kit).
   ci:
     name: ${{ matrix.service }}
     needs: detect-changes
