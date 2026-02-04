@@ -1,7 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Redacted } from '../../utils/redacted';
 import { Smeared } from '../../utils/smeared';
 import { GraphApiService } from './graph-api.service';
 import { SitesConfigurationService } from './sites-configuration.service';
@@ -32,7 +31,7 @@ describe('SitesConfigurationService', () => {
               sitesSource: 'config_file',
               sites: [
                 {
-                  siteId: new Redacted('12345678-1234-4234-8123-123456789abc'),
+                  siteId: new Smeared('12345678-1234-4234-8123-123456789abc', false),
                   syncColumnName: 'TestColumn',
                   ingestionMode: 'recursive',
                   scopeId: 'scope_test',
@@ -59,7 +58,7 @@ describe('SitesConfigurationService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
-        siteId: expect.any(Redacted),
+        siteId: expect.any(Smeared),
         syncColumnName: 'TestColumn',
         ingestionMode: 'recursive',
         scopeId: 'scope_test',
