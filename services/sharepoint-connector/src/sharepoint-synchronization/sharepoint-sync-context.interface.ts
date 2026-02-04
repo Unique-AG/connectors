@@ -1,5 +1,5 @@
 import type { SiteConfig } from '../config/sharepoint.schema';
-import {Smeared} from "../utils/smeared";
+import { Smeared } from '../utils/smeared';
 
 export interface SharepointSyncContext {
   siteConfig: SiteConfig;

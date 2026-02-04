@@ -42,7 +42,7 @@ describe('ContentRegistrationStep', () => {
   const createMockContext = (): ProcessingContext => ({
     syncContext: {
       siteConfig: createMockSiteConfig(),
-      siteName: 'test-site',
+      siteName: new Smeared('test-site', false),
       serviceUserId: 'user-1',
       rootPath: '/Root',
     },

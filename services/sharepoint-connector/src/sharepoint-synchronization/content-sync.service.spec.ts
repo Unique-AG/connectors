@@ -115,7 +115,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
@@ -151,7 +151,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
@@ -187,7 +187,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
@@ -216,7 +216,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
@@ -261,7 +261,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
@@ -310,7 +310,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: {
           ...mockSiteConfig,
           siteId: new Smeared('test-site-123', false),
@@ -358,7 +358,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
@@ -399,7 +399,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
@@ -440,7 +440,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
@@ -466,7 +466,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
@@ -499,7 +499,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 
@@ -533,7 +533,7 @@ describe('ContentSyncService', () => {
       const context: SharepointSyncContext = {
         serviceUserId: 'user-123',
         rootPath: '/root',
-        siteName: 'test-site',
+        siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
       };
 

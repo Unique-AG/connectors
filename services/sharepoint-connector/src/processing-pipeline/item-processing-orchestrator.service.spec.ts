@@ -99,7 +99,7 @@ describe('ItemProcessingOrchestratorService', () => {
 
   const mockSyncContext: SharepointSyncContext = {
     siteConfig: createMockSiteConfig(),
-    siteName: 'test-site',
+    siteName: new Smeared('test-site', false),
     serviceUserId: 'test-user-id',
     rootPath: '/Root',
   };

@@ -108,7 +108,7 @@ describe('ScopeManagementService', () => {
   const mockContext: SharepointSyncContext = {
     serviceUserId: 'user-123',
     rootPath: '/test1',
-    siteName: 'test-site',
+    siteName: new Smeared('test-site', false),
     siteConfig: createMockSiteConfig({
       siteId: new Smeared('site-123', false),
       scopeId: 'root-scope-123',
