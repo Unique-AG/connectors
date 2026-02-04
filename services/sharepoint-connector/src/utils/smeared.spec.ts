@@ -144,7 +144,7 @@ describe('Smeared', () => {
     });
   });
 
-  describe('isSmearingActiveFromEnv() helper', () => {
+  describe('isSmearingActive() helper', () => {
     beforeEach(() => {
       delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
     });

@@ -143,8 +143,8 @@ export class ScopeManagementService {
       return true;
     }
 
-    const expectedExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId.value}`;
-    return rootScope.externalId === expectedExternalId;
+    const expectedExternalId = createSmeared(`${EXTERNAL_ID_PREFIX}site:${siteId.value}`);
+    return rootScope.externalId === expectedExternalId.value;
   }
 
   private buildItemIdToScopePathMap(
