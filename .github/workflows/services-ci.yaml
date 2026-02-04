@@ -45,17 +45,12 @@ jobs:
             packages:
               - 'packages/**'
 
-      # Builds a JSON array of {service, orm} objects to fan out into parallel CI matrix jobs.
+      # Builds a JSON array of service names to fan out into parallel CI matrix jobs.
       # Handles three scenarios:
       #   1. workflow_dispatch: uses user input (comma-separated list or "all"), validates against existing services/
       #   2. PR with service changes: extracts unique service names from changed file paths
       #   3. PR with only package changes: runs all services since packages are shared dependencies
       # If none of the above match, outputs an empty array so the CI job is skipped.
-      #
-      # ORM is detected per service by checking for conventional config files:
-      #   - drizzle.config.ts → drizzle
-      #   - prisma/schema.prisma → prisma
-      #   - neither → none
       - name: Build service matrix
         id: build-matrix
         env:
@@ -69,53 +64,34 @@ jobs:
             available=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
             if [ "$INPUT_SERVICES" = "all" ]; then
-              service_names=$available
+              services=$(echo "$available" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             else
               IFS=',' read -ra requested <<< "$INPUT_SERVICES"
-              service_names=""
+              valid=()
               for service in "${requested[@]}"; do
                 service=$(echo "$service" | xargs)
                 if echo "$available" | grep -qx "$service"; then
-                  service_names+="$service"$'\n'
+                  valid+=("$service")
                 else
                   echo "::error::Unknown service: $service"
                   echo "Available services: $available"
                   exit 1
                 fi
               done
+              services=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             fi
           elif [ "$SERVICES_CHANGED" = "true" ]; then
-            service_names=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u)
+            services=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
           elif [ "$PACKAGES_CHANGED" = "true" ]; then
             # Packages are shared dependencies — run CI for all services to catch breakage
-            service_names=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+            services=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
           else
-            echo "services=[]" >> "$GITHUB_OUTPUT"
-            exit 0
+            services='[]'
           fi
-
-          matrix="["
-          first=true
-          for name in $service_names; do
-            [ -z "$name" ] && continue
-            if [ -f "services/$name/drizzle.config.ts" ]; then
-              orm="drizzle"
-            elif [ -f "services/$name/prisma/schema.prisma" ]; then
-              orm="prisma"
-            else
-              orm="none"
-            fi
-            $first || matrix+=","
-            matrix+="{\"service\":\"$name\",\"orm\":\"$orm\"}"
-            first=false
-          done
-          matrix+="]"
-
-          echo "services=$matrix" >> "$GITHUB_OUTPUT"
-          echo "Services to validate: $matrix"
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+          echo "Services to validate: $services"
 
   # Fans out into one job per affected service using the reusable CI template.
-  # ORM type is detected automatically in the build-matrix step above.
   ci:
     name: ${{ matrix.service }}
     needs: detect-changes
@@ -123,9 +99,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJson(needs.detect-changes.outputs.services) }}
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
     uses: ./.github/workflows/_template-ci.yaml
     with:
       service-name: ${{ matrix.service }}
       service-path: services/${{ matrix.service }}
-      orm: ${{ matrix.orm }}
