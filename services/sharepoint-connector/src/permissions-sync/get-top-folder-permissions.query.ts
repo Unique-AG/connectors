@@ -6,7 +6,11 @@ import {
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { normalizeSlashes } from '../utils/paths.util';
-import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
+import {
+  buildIngestionItemKey,
+  getUniqueParentPathFromItem,
+  getUniquePathFromItem,
+} from '../utils/sharepoint.util';
 import { GroupMembership, Membership } from './types';
 import { groupDistinctId, isTopFolder } from './utils';
 
@@ -46,7 +50,9 @@ export class GetTopFolderPermissionsQuery {
 
     return pipe(
       items,
-      map((item) => getUniquePathFromItem(item, rootPath)),
+      // We get the parent path of all the items, to be sure we catch the library folders the items
+      // are in.
+      map((item) => getUniqueParentPathFromItem(item, rootPath)),
       filter((folderPath) => isTopFolder(folderPath, rootPath)),
       (paths) => [normalizedRootPath, ...paths],
       unique(),

@@ -193,8 +193,29 @@ describe('GetTopFolderPermissionsQuery', () => {
       rootPath,
     });
 
-    expect(result.get('/TestSite')).toContainEqual(group);
-    expect(result.get('/TestSite/Documents')).toContainEqual(group);
+    expect(result.get('/TestSite')).toEqual([group]);
+    expect(result.get('/TestSite/Documents')).toEqual([group]);
+  });
+
+  it('includes library folder when only subfolders exist', () => {
+    const subFolder = createMockDirectory(
+      'subfolder',
+      'https://tenant.sharepoint.com/sites/TestSite/Documents/Sub',
+    );
+    const group = createSiteGroupMembership('group-dir', 'Directory Group');
+
+    const permissionsMap = {
+      [`${mockSiteId}/${subFolder.item.id}`]: [group],
+    };
+
+    const result = query.run({
+      items: [],
+      directories: [subFolder],
+      permissionsMap,
+      rootPath,
+    });
+
+    expect(result.get('/TestSite/Documents')).toEqual([group]);
   });
 
   it('filters out user permissions and only includes groups', () => {
@@ -263,10 +284,8 @@ describe('GetTopFolderPermissionsQuery', () => {
       rootPath,
     });
 
-    expect(result.get('/TestSite/Documents')).toContainEqual(docsGroup);
-    expect(result.get('/TestSite/Documents')).not.toContainEqual(sharedGroup);
-    expect(result.get('/TestSite/Shared')).toContainEqual(sharedGroup);
-    expect(result.get('/TestSite/Shared')).not.toContainEqual(docsGroup);
+    expect(result.get('/TestSite/Documents')).toEqual([docsGroup]);
+    expect(result.get('/TestSite/Shared')).toEqual([sharedGroup]);
   });
 
   it('returns empty permissions for empty site', () => {
