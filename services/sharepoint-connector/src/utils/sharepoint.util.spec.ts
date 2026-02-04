@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { getUniqueParentPathFromItem, getUniquePathFromItem } from './sharepoint.util';
+import {
+  buildIngestionItemKey,
+  getUniqueParentPathFromItem,
+  getUniquePathFromItem,
+} from './sharepoint.util';
 import { Smeared } from './smeared';
 
 function createDriveItem(listItemWebUrl: string, itemWebUrl?: string): AnySharepointItem {
@@ -330,5 +334,19 @@ describe('getUniquePathFromItem', () => {
     const result = getUniquePathFromItem(item, new Smeared('Project///Scope//Test', false));
 
     expect(result).toBe('/Project/Scope/Test/Documents/file.pdf');
+  });
+});
+
+describe('buildIngestionItemKey', () => {
+  it('uses the raw siteId value instead of the smeared string', () => {
+    const siteId = 'bd9c85ee-998f-4665-9c44-73b6f2f3c3c1';
+    const item = createDriveItem(
+      'https://tenant.sharepoint.com/sites/TestSite/Shared%20Documents/Folder/document.pdf',
+    );
+    item.siteId = new Smeared(siteId, true);
+
+    const result = buildIngestionItemKey(item);
+
+    expect(result).toBe(`${siteId}/file123`);
   });
 });

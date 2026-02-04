@@ -33,7 +33,7 @@ export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): 
  * Builds a unique hierarchical key for ingestion.
  */
 export function buildIngestionItemKey(sharepointContentItem: AnySharepointItem): string {
-  return `${sharepointContentItem.siteId}/${sharepointContentItem.item.id}`;
+  return `${sharepointContentItem.siteId.value}/${sharepointContentItem.item.id}`;
 }
 
 /**

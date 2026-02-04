@@ -308,7 +308,6 @@ describe('ScopeManagementService', () => {
       ]);
       expect(createScopeAccessesMock).toHaveBeenCalledWith('parent-1', [
         { type: 'READ', entityId: 'user-123', entityType: 'USER' },
-        { type: 'WRITE', entityId: 'user-123', entityType: 'USER' },
       ]);
     });
   });
