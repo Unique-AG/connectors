@@ -1,0 +1,214 @@
+server:
+  deployment:
+    metadata:
+      annotations:
+        reloader.stakater.com/auto: "true"
+  hooks:
+    migration:
+      enabled: true
+      command: |
+        pnpm run db:migrate
+  env:
+    LOG_LEVEL: info
+    MAX_HEAP_MB: 1920
+    NODE_ENV: production
+    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+    OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
+    OTEL_METRICS_EXPORTER: "prometheus"
+  # -- Environment variables from secrets (required secrets listed at bottom of file)
+  # @see https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars
+  envVars: []
+  # -- ConfigMap(s) to load environment variables from (must match release name + '-config')
+  extraEnvCM:
+    - outlook-fat-mcp-config
+  image:
+    repository: ghcr.io/unique-ag/connectors/services/outlook-fat-mcp
+    tag: 0.1.0 # x-release-please-version
+  ports:
+    application: 51345
+    metrics: 51346
+  networkPolicy:
+    enabled: true
+    policyTypes:
+      # - Egress # We can not yet leverage egress policies as Kubernetes flavor policies do not support FQDN and MS Graph IP-Addresses are not easily deterministic
+      - Ingress
+    egress: null
+    ingress:
+      - from:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/managed-by: prometheus-operator
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: system
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/name: gateway
+                app.kubernetes.io/instance: kong
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: system
+  resources:
+    # Resources are granted generously as the service for now is a singleton
+    limits:
+      memory: 2048Mi
+    requests:
+      cpu: 1
+      memory: 1984Mi
+  routes:
+    paths:
+      default:
+        enabled: false
+  volumes:
+    - name: tmp
+      emptyDir:
+        sizeLimit: 20Gi
+  volumeMounts:
+    - name: tmp
+      mountPath: /tmp
+
+# -- Ingress configuration
+# MCP servers need to be hosted on their own domain. With Kong as current controller, it is easier to use
+# ingress than http routes to obtain 'wildcard' domains.
+ingress:
+  # -- Enable ingress resource creation
+  enabled: false
+  # -- Ingress class name (e.g., nginx, traefik)
+  ingressClassName: kong
+  # -- Additional labels for the ingress resource
+  additionalLabels: {}
+  # -- Annotations for the ingress resource
+  annotations:
+    konghq.com/plugins: unique-route-metrics
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  # -- Ingress hosts configuration
+  hosts: []
+    # - host: teams.mcp.example.com
+    #   paths:
+    #     - path: /
+    #       pathType: Prefix
+    #       # serviceName: custom-service  # optional, defaults to chart fullname
+    #       # servicePort: http            # optional, defaults to "http"
+  # -- TLS configuration for the ingress
+  tls: []
+    # - secretName: outlook-fat-mcp-tls
+    #   hosts:
+    #     - teams.mcp.example.com
+
+# -- Grafana dashboard configuration
+grafana:
+  dashboard:
+    # -- Enable Grafana dashboard ConfigMap creation
+    enabled: true
+    # -- Grafana folder where the dashboard will be placed
+    folder: mcp-servers
+
+# -- Prometheus alerting rules configuration
+alerts:
+  # -- Enable PrometheusRule resource creation
+  enabled: true
+  # -- Default alert definitions
+  defaultAlerts:
+    # -- Enable GraphQL API error rate alerts
+    graphql:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # OutlookFatMcpGraphQLErrors: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # OutlookFatMcpGraphQLErrors:
+        #   for: "15s"
+        #   severity: "critical"
+        #   threshold: 0.05
+    # -- Enable Unique REST API error rate alerts
+    uniqueApi:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # OutlookFatMcpUniqueAPIErrors: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # OutlookFatMcpUniqueAPIErrors:
+        #   for: "15s"
+        #   severity: "critical"
+        #   threshold: 0.05
+    # -- Additional labels to add to all default alerts
+    additionalLabels: {}
+      # environment: production
+      # team: backend
+
+# -- Configuration for the deployed Outlook Fat MCP Server, will be mapped to environment variables
+# Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
+mcpConfig:
+  # -- if disabled, server.extraEnvCM must be set to []
+  enabled: true
+
+  # -- Application configuration
+  app:
+    # -- The URL of the MCP Server. Used for OAuth callbacks.
+    # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
+    # example: https://teams.mcp.unique.app
+    selfUrl: unset_default_value
+
+  # -- Microsoft Graph API configuration
+  microsoft:
+    # -- The client ID of the Microsoft App Registration
+    # example: 12345678-1234-1234-1234-123456789012
+    clientId: unset_default_value
+    # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions.
+    # Optional - defaults to SELF_URL if not provided.
+    # example: https://teams.mcp.unique.app
+    # publicWebhookUrl: ""
+    # clientSecret is loaded from a secret, see server.envVars
+    # webhookSecret is loaded from a secret, see server.envVars
+
+  # -- Unique API configuration
+  unique:
+    # -- Authentication mode for Unique API services
+    # possible values: cluster_local, external
+    # cluster_local: communicates using in-cluster URLs with service headers
+    # external: communicates using external URLs with app key authentication
+    serviceAuthMode: cluster_local
+    # -- Extra headers to send with requests to Unique API services (JSON string)
+    # For cluster_local mode: '{"x-company-id": "...", "x-user-id": "..."}'
+    serviceExtraHeaders: {}
+    # For external mode:
+    # serviceExtraHeaders:
+    #   authorization: "Bearer ..."
+    #   x-app-id: "..."
+    #   x-user-id: "..."
+    #   x-company-id: "..."
+
+    # -- The Public API URL
+    # example: https://gateway.unique.app/public/chat/
+    # example: http://node-chat.finance-gpt:8092/public/
+    apiBaseUrl: unset_default_value
+    # -- The Public API version to use
+    apiVersion: "2023-12-06"
+    # -- The root scope path where to upload transcripts
+    rootScopePath: Outlook-Fat-MCP
+    # -- Concurrency limit for fetching users when resolving scope accesses
+    userFetchConcurrency: 5
+
+    # -- Base URL for Unique ingestion service (cluster_local mode only)
+    # example: http://node-ingestion.finance-gpt:8091
+    ingestionServiceBaseUrl: unset_default_value
+
+  # -- Authentication configuration for the MCP server
+  auth:
+    # -- Access token expiration time in seconds
+    accessTokenExpiresInSeconds: 60
+    # -- Refresh token expiration time in seconds (default: 30 days)
+    refreshTokenExpiresInSeconds: 2592000
+    # hmacSecret is loaded from a secret, see server.envVars
+
+  # Note: The following secrets must be provided via server.envVars:
+  # - DATABASE_URL: PostgreSQL connection string
+  # - AMQP (choose one):
+  #   - AMQP_URL: Full AMQP/RabbitMQ connection URL (contains credentials)
+  #   - AMQP_*: AMQP individual fields (username, password, host, port, vhost)
+  # - MICROSOFT_CLIENT_SECRET: Microsoft App Registration client secret
+  # - MICROSOFT_WEBHOOK_SECRET: 128 character random string for webhook validation
+  # - AUTH_HMAC_SECRET: Secret key for signing HMAC tokens
+  # - ENCRYPTION_KEY: 32-byte (256-bit) secret for AES-256-GCM encryption (hex or base64)
