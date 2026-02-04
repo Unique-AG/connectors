@@ -16,18 +16,19 @@ export function normalizeMsGroupId(groupId: string): string {
   return groupId.replace(new RegExp(`${OWNERS_SUFFIX}$`), '');
 }
 
-// We're removing the root scope part, in case it has any slashes, to make it predictable.
-// Then we can check if the remaining part has at most 1 level, because it indicates it is
-// the drive level.
-// Example: /RootScope/Drive/Folder -> Drive/Folder -> 2 levels -> false
-// Example: /RootScope/Drive -> Drive -> 1 level -> true
-// Top folders don't have permissions fetched from SharePoint, so we use root group permission
-// instead.
-// The actual root path will not have replacement working for them because of no trailing slash,
-// so we handle it separately.
+// Determines if a path is a "top folder" (site or library level).
+// Top folders use aggregated group permissions from their descendants instead of direct
+// SharePoint permissions.
+// Example: /RootScope/Drive/Folder -> Drive/Folder -> 2 levels -> false (regular folder)
+// Example: /RootScope/Drive -> Drive -> 1 level -> true (library)
+// Example: /RootScope -> true (site)
 export function isTopFolder(path: string, rootPath: string): boolean {
+  // The actual root path will not have replacement working for them because of no trailing slash,
+  // so we handle it separately.
   if (path === rootPath) {
     return true;
   }
+  // We're removing the root scope part, in case it has any slashes, to make it predictable. Then we
+  // check if the remaining part has at most 1 level, because it indicates it is the drive level.
   return path.replace(`/${normalizeSlashes(rootPath)}/`, '').split('/').length <= 1;
 }

@@ -15,10 +15,7 @@ describe('GetTopFolderPermissionsQuery', () => {
   const mockSiteId = 'site-123';
   const rootPath = 'TestSite';
 
-  const createMockFile = (
-    id: string,
-    webUrl: string,
-  ): SharepointContentItem => ({
+  const createMockFile = (id: string, webUrl: string): SharepointContentItem => ({
     itemType: 'driveItem',
     siteId: mockSiteId,
     driveId: 'drive-1',
@@ -42,7 +39,10 @@ describe('GetTopFolderPermissionsQuery', () => {
         path: '/drive/root:/test',
         siteId: mockSiteId,
       },
-      file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', hashes: { quickXorHash: 'hash-1' } },
+      file: {
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        hashes: { quickXorHash: 'hash-1' },
+      },
       listItem: {
         '@odata.etag': 'etag-2',
         id: `list-item-${id}`,
@@ -67,10 +67,7 @@ describe('GetTopFolderPermissionsQuery', () => {
     },
   });
 
-  const createMockDirectory = (
-    id: string,
-    webUrl: string,
-  ): SharepointDirectoryItem => ({
+  const createMockDirectory = (id: string, webUrl: string): SharepointDirectoryItem => ({
     itemType: 'directory',
     siteId: mockSiteId,
     driveId: 'drive-1',
@@ -228,7 +225,7 @@ describe('GetTopFolderPermissionsQuery', () => {
     expect(sitePermissions).toEqual([group]);
     // We need to type cast to string because in type system `user` is never returned, but we want
     // to be sure anyway.
-    expect(sitePermissions?.some((p) => p.type as string === 'user')).toBe(false);
+    expect(sitePermissions?.some((p) => (p.type as string) === 'user')).toBe(false);
   });
 
   it('library scope only includes its descendants', () => {
@@ -341,7 +338,9 @@ describe('GetTopFolderPermissionsQuery', () => {
 
     expect(result.get('/TestSite')).toEqual([]);
     expect(loggerWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining(`No SharePoint permissions found for item with key ${mockSiteId}/orphan-file`),
+      expect.stringContaining(
+        `No SharePoint permissions found for item with key ${mockSiteId}/orphan-file`,
+      ),
     );
   });
 });
