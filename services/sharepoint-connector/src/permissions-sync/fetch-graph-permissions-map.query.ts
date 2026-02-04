@@ -49,7 +49,7 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSharePointPermissionsToOurPermissions(
     simplePermissions: SimplePermission[],
-    siteName: string,
+    siteName: Smeared,
     itemId: string,
   ): Permission[] {
     return simplePermissions.flatMap((permission) => {
@@ -114,7 +114,7 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSharePointIdentitySetToOurPermission(
     simpleIdentitySet: SimpleIdentitySet,
-    siteName: string,
+    siteName: Smeared,
   ): Permission | null {
     if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
       const groupId = normalizeMsGroupId(simpleIdentitySet.group.id);
@@ -142,7 +142,7 @@ export class FetchGraphPermissionsMapQuery {
     if (isNonNullish(simpleIdentitySet.siteGroup)) {
       return {
         type: 'siteGroup',
-        id: `${siteName}|${simpleIdentitySet.siteGroup.id}`,
+        id: `${siteName.value}|${simpleIdentitySet.siteGroup.id}`,
         name: simpleIdentitySet.siteGroup.displayName,
       };
     }

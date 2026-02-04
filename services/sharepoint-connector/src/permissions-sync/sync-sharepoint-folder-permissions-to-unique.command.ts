@@ -21,7 +21,7 @@ import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.s
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { isAncestorOfRootPath, normalizeSlashes } from '../utils/paths.util';
 import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
-import type { Smeared } from '../utils/smeared';
+import { createSmeared, type Smeared } from '../utils/smeared';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -217,10 +217,11 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   }): ScopeAccess[] | null {
     const { logPrefix, sharePoint, unique, rootPath } = input;
     const { folder, rootGroup } = unique;
+    const logPath = createSmeared(folder.path);
 
     if (this.isTopFolder(folder.path, rootPath)) {
       this.logger.debug(
-        `${logPrefix} Using root group permission for top folder at path ${folder.path}`,
+        `${logPrefix} Using root group permission for top folder at path ${logPath}`,
       );
       return [
         {
@@ -234,12 +235,12 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const sharePointDirectory = sharePoint.directoriesPathMap[folder.path];
 
     if (isNullish(sharePointDirectory)) {
-      this.logger.warn(`${logPrefix} No SharePoint directory found for path ${folder.path}`);
+      this.logger.warn(`${logPrefix} No SharePoint directory found for path ${logPath}`);
       return null;
     }
 
-    const sharePointDirectoryKey = buildIngestionItemKey(sharePointDirectory);
-    const sharePointPermissions = sharePoint.permissionsMap[sharePointDirectoryKey];
+    const sharePointDirectoryKey = createSmeared(buildIngestionItemKey(sharePointDirectory));
+    const sharePointPermissions = sharePoint.permissionsMap[sharePointDirectoryKey.value];
     if (isNullish(sharePointPermissions)) {
       this.logger.warn(
         `${logPrefix} No SharePoint permissions found for key ${sharePointDirectoryKey}`,

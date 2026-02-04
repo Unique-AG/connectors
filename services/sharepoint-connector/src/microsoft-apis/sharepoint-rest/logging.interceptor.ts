@@ -1,7 +1,7 @@
 import type { IncomingHttpHeaders } from 'node:http';
 import { Logger } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
-import { redactSiteNameFromPath } from '../../utils/logging.util';
+import { smearSiteNameFromPath } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
 
 export function createLoggingInterceptor(
@@ -17,7 +17,7 @@ export function createLoggingInterceptor(
       logger.debug({
         msg: 'SharePoint REST request started',
         method,
-        path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
+        path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
       });
 
       let statusCode: number | undefined;
@@ -58,7 +58,7 @@ export function createLoggingInterceptor(
           logger.error({
             msg: 'SharePoint REST request failed with error',
             method,
-            path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
+            path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
             error: sanitizeError(error),
             duration,
           });
@@ -84,7 +84,7 @@ export function createLoggingInterceptor(
             logger.debug({
               msg: 'SharePoint REST request completed',
               method,
-              path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
+              path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
               statusCode,
               duration,
             });
@@ -93,7 +93,7 @@ export function createLoggingInterceptor(
             logger.error({
               msg: 'SharePoint REST request failed with server error',
               method,
-              path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
+              path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
               statusCode,
               duration,
               errorBody,
@@ -103,7 +103,7 @@ export function createLoggingInterceptor(
             logger.warn({
               msg: 'SharePoint REST request failed with client error',
               method,
-              path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
+              path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
               statusCode,
               duration,
               errorBody,
@@ -112,7 +112,7 @@ export function createLoggingInterceptor(
             logger.warn({
               msg: 'SharePoint REST request completed with unexpected status code',
               method,
-              path: shouldConcealLogs ? redactSiteNameFromPath(path) : path,
+              path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
               statusCode,
               duration,
             });

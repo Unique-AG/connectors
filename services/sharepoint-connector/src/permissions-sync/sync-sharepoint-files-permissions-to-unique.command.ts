@@ -15,6 +15,7 @@ import { SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile, UniqueFileAccessInput } from '../unique-api/unique-files/unique-files.types';
+import { createSmeared } from '../utils/smeared';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -62,9 +63,8 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
       const permissions = sharePoint.permissionsMap[uniqueFile.key];
 
       if (isNullish(permissions)) {
-        this.logger.warn(
-          `${loopLogPrefix} No SharePoint permissions found for key ${uniqueFile.key}`,
-        );
+        const logKey = createSmeared(uniqueFile.key);
+        this.logger.warn(`${loopLogPrefix} No SharePoint permissions found for key ${logKey}`);
         continue;
       }
 

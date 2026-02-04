@@ -97,7 +97,7 @@ describe('SharepointSynchronizationService', () => {
   beforeEach(async () => {
     mockGraphApiService = {
       getAllSiteItems: vi.fn().mockResolvedValue({ items: [mockFile], directories: [] }),
-      getSiteName: vi.fn().mockResolvedValue('test-site-name'),
+      getSiteName: vi.fn().mockResolvedValue(new Smeared('test-site-name', false)),
     };
 
     mockSitesConfigurationService = {

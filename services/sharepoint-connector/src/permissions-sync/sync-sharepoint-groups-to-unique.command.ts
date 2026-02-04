@@ -156,7 +156,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
   private async createUniqueGroup(
     siteId: Smeared,
-    siteName: string,
+    siteName: Smeared,
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
   ): Promise<UniqueGroupWithMembers | null> {
@@ -179,7 +179,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
   private async syncExistingUniqueGroup(
     uniqueGroup: UniqueGroupWithMembers,
-    siteName: string,
+    siteName: Smeared,
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
   ): Promise<[groupUpdated: boolean, UniqueGroupWithMembers | null]> {
@@ -228,8 +228,8 @@ export class SyncSharepointGroupsToUniqueCommand {
   }
 }
 
-function getUniqueGroupName(siteName: string, sharePointGroupName: string): string {
-  return `[SPC-${siteName}] ${sharePointGroupName}`;
+function getUniqueGroupName(siteName: Smeared, sharePointGroupName: string): string {
+  return `[SPC-${siteName.value}] ${sharePointGroupName}`;
 }
 
 function getUniqueMemberIds(

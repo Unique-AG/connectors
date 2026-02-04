@@ -19,7 +19,7 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
-import { createSmeared, Smeared } from '../utils/smeared';
+import type { Smeared } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
@@ -238,7 +238,7 @@ export class SharepointSynchronizationService {
       return { failureStep: SyncStep.RootScopeInit };
     }
 
-    let siteName: string;
+    let siteName: Smeared;
     try {
       siteName = await this.graphApiService.getSiteName(siteConfig.siteId);
     } catch (error) {
@@ -252,7 +252,7 @@ export class SharepointSynchronizationService {
     return {
       context: {
         siteConfig,
-        siteName: createSmeared(siteName),
+        siteName,
         serviceUserId: baseContext.serviceUserId,
         rootPath: baseContext.rootPath,
       },
