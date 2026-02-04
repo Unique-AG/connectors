@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-beta.13](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.12...sharepoint-connector@2.0.0-beta.13) (2026-01-28)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** give write access to the root scope to fix issue where we fail to create scopes due to missing access ([#240](https://github.com/Unique-AG/connectors/issues/240)) ([1753561](https://github.com/Unique-AG/connectors/commit/1753561f39217a64ca3a98a807552f29dc9c195e))
+
 ## [2.0.0-beta.12](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.11...sharepoint-connector@2.0.0-beta.12) (2026-01-22)
 
 

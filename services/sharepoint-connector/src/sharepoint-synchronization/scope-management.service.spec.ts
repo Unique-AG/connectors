@@ -301,8 +301,15 @@ describe('ScopeManagementService', () => {
       expect(result.serviceUserId).toBe('user-123');
       expect(result.rootPath).toBeInstanceOf(Smeared);
       expect(result.rootPath.value).toBe('/Root/test1');
-      expect(createScopeAccessesMock).toHaveBeenCalledWith('root-scope-123', expect.any(Array));
-      expect(createScopeAccessesMock).toHaveBeenCalledWith('parent-1', expect.any(Array));
+      expect(createScopeAccessesMock).toHaveBeenCalledWith('root-scope-123', [
+        { type: 'MANAGE', entityId: 'user-123', entityType: 'USER' },
+        { type: 'READ', entityId: 'user-123', entityType: 'USER' },
+        { type: 'WRITE', entityId: 'user-123', entityType: 'USER' },
+      ]);
+      expect(createScopeAccessesMock).toHaveBeenCalledWith('parent-1', [
+        { type: 'READ', entityId: 'user-123', entityType: 'USER' },
+        { type: 'WRITE', entityId: 'user-123', entityType: 'USER' },
+      ]);
     });
   });
 
