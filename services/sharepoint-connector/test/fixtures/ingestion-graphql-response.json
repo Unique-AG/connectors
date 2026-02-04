@@ -1,0 +1,35 @@
+{
+  "data": {
+    "contentUpsert": {
+      "id": "unique-content-1",
+      "key": "11111111-1111-4111-8111-111111111111/item-1",
+      "title": "test.pdf",
+      "byteSize": 1234,
+      "mimeType": "application/pdf",
+      "ownerType": "Scope",
+      "ownerId": "scope_root_1",
+      "writeUrl": "https://upload.test.example.com/upload?key=test-key",
+      "readUrl": "https://read.test.example.com/file/test-key",
+      "createdAt": "2025-01-01T00:00:00Z",
+      "internallyStoredAt": null,
+      "source": {
+        "kind": "MICROSOFT_365_SHAREPOINT",
+        "name": "Sharepoint"
+      }
+    },
+    "paginatedContent": {
+      "nodes": [
+        {
+          "id": "unique-content-1",
+          "fileAccess": ["u:unique-user-1R", "u:unique-user-1W", "u:unique-user-1M"],
+          "key": "11111111-1111-4111-8111-111111111111/item-1",
+          "ownerType": "Scope",
+          "ownerId": "scope_root_1"
+        }
+      ],
+      "totalCount": 1
+    },
+    "createFileAccessesForContents": true,
+    "removeFileAccessesForContents": true
+  }
+}
