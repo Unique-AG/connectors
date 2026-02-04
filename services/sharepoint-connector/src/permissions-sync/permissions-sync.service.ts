@@ -20,6 +20,8 @@ import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery, PermissionsMap } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
+import { GetRegularFolderPermissionsQuery } from './get-regular-folder-permissions.query';
+import { GetTopFolderPermissionsQuery } from './get-top-folder-permissions.query';
 import { SyncSharepointFilesPermissionsToUniqueCommand } from './sync-sharepoint-files-permissions-to-unique.command';
 import { SyncSharepointFolderPermissionsToUniqueCommand } from './sync-sharepoint-folder-permissions-to-unique.command';
 import { SyncSharepointGroupsToUniqueCommand } from './sync-sharepoint-groups-to-unique.command';
@@ -46,6 +48,8 @@ export class PermissionsSyncService {
   public constructor(
     private readonly fetchGraphPermissionsMapQuery: FetchGraphPermissionsMapQuery,
     private readonly fetchGroupsWithMembershipsQuery: FetchGroupsWithMembershipsQuery,
+    private readonly getRegularFolderPermissionsQuery: GetRegularFolderPermissionsQuery,
+    private readonly getTopFolderPermissionsQuery: GetTopFolderPermissionsQuery,
     private readonly syncSharepointGroupsToUniqueCommand: SyncSharepointGroupsToUniqueCommand,
     private readonly syncSharepointFilesPermissionsToUniqueCommand: SyncSharepointFilesPermissionsToUniqueCommand,
     private readonly syncSharepointFolderPermissionsToUniqueCommand: SyncSharepointFolderPermissionsToUniqueCommand,
@@ -120,9 +124,25 @@ export class PermissionsSyncService {
       if (ingestionMode === IngestionMode.Recursive) {
         currentStep = SyncStep.FolderPermissionsSync;
         assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
+
+        const regularFolderPermissions = this.getRegularFolderPermissionsQuery.run({
+          directories: sharePoint.directories,
+          permissionsMap,
+          rootPath: context.rootPath,
+        });
+
+        const topFolderPermissions = this.getTopFolderPermissionsQuery.run({
+          items: sharePoint.items,
+          directories: sharePoint.directories,
+          permissionsMap,
+          rootPath: context.rootPath,
+        });
+
         await this.syncSharepointFolderPermissionsToUniqueCommand.run({
           context,
-          sharePoint: { directories: sharePoint.directories, permissionsMap },
+          sharePoint: {
+            folderPermissions: new Map([...regularFolderPermissions, ...topFolderPermissions]),
+          },
           unique: {
             folders: unique.folders,
             groupsMap: updatedUniqueGroupsMap,
