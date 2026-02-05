@@ -1,7 +1,21 @@
+from typing import Literal
 from urllib.parse import quote_plus
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+AppEnv = Literal["development", "production", "test"]
+LogLevel = Literal["fatal", "error", "warn", "info", "debug", "trace", "silent"]
+DiagnosticsDataPolicy = Literal["conceal", "disclose"]
+
+
+class AppConfig(BaseSettings):
+    model_config = SettingsConfigDict()
+
+    app_env: AppEnv = "production"
+    port: int = Field(default=9542, ge=0, le=65535)
+    log_level: LogLevel = "info"
+    logs_diagnostics_data_policy: DiagnosticsDataPolicy = "conceal"
 
 
 class DatabaseConfig(BaseSettings):
