@@ -110,12 +110,12 @@ export class FindTranscriptsTool {
     const filter = this.buildMetadataFilter(rootScopePath, input);
     this.logger.debug({ filter }, 'metadata filter');
 
-    const contents = await this.contentService.findByMetadata(filter, {
+    const result = await this.contentService.findByMetadata(filter, {
       skip: input.skip,
       take: input.take,
     });
 
-    const transcripts = contents.map((content) => {
+    const transcripts = result.contents.map((content) => {
       const metadata = content.metadata;
       return {
         id: content.id,
@@ -136,10 +136,10 @@ export class FindTranscriptsTool {
 
     return {
       transcripts,
-      total: transcripts.length,
+      total: result.total,
       message:
-        transcripts.length > 0
-          ? `Found ${transcripts.length} transcript(s) matching your criteria.`
+        result.total > 0
+          ? `Found ${result.total} transcript(s) matching your criteria.`
           : 'No transcripts found matching your criteria.',
     };
   }
@@ -164,28 +164,25 @@ export class FindTranscriptsTool {
       });
     }
 
-    if (input.dateFrom && input.dateTo) {
+    if (input.dateFrom) {
+      const dateFromNormalized = input.dateFrom.includes('T')
+        ? input.dateFrom
+        : `${input.dateFrom}T00:00:00.000Z`;
       conditions.push({
         path: ['metadata', 'date'],
         operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
-        value: input.dateFrom,
+        value: dateFromNormalized,
       });
+    }
+
+    if (input.dateTo) {
+      const dateToNormalized = input.dateTo.includes('T')
+        ? input.dateTo
+        : `${input.dateTo}T23:59:59.999Z`;
       conditions.push({
         path: ['metadata', 'date'],
         operator: UniqueQLOperator.LESS_THAN_OR_EQUAL,
-        value: input.dateTo,
-      });
-    } else if (input.dateFrom) {
-      conditions.push({
-        path: ['metadata', 'date'],
-        operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
-        value: input.dateFrom,
-      });
-    } else if (input.dateTo) {
-      conditions.push({
-        path: ['metadata', 'date'],
-        operator: UniqueQLOperator.LESS_THAN_OR_EQUAL,
-        value: input.dateTo,
+        value: dateToNormalized,
       });
     }
 
