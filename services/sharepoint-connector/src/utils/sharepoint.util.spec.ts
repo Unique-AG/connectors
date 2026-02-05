@@ -81,7 +81,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('MyScope', false));
 
-    expect(result).toBe("/MyScope/Shared Documents/lorand's files/acer-pdf");
+    expect(result.value).toBe("/MyScope/Shared Documents/lorand's files/acer-pdf");
   });
 
   it('returns parent path for driveItem falling back to item.webUrl when listItem.webUrl is missing', () => {
@@ -92,7 +92,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('EngineeringScope', false));
 
-    expect(result).toBe('/EngineeringScope/Documents/project/docs');
+    expect(result.value).toBe('/EngineeringScope/Documents/project/docs');
   });
 
   it('returns parent path for listItem', () => {
@@ -102,7 +102,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('MarketingScope', false));
 
-    expect(result).toBe('/MarketingScope/SitePages');
+    expect(result.value).toBe('/MarketingScope/SitePages');
   });
 
   it('returns parent path for directory item', () => {
@@ -112,7 +112,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('TeamScope', false));
 
-    expect(result).toBe('/TeamScope/Shared Documents/2024');
+    expect(result.value).toBe('/TeamScope/Shared Documents/2024');
   });
 
   it('handles root-level item returning drive path', () => {
@@ -122,7 +122,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('ProjectScope', false));
 
-    expect(result).toBe('/ProjectScope/Documents');
+    expect(result.value).toBe('/ProjectScope/Documents');
   });
 
   it('handles URLs with special characters and encoding', () => {
@@ -132,7 +132,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('TestScope', false));
 
-    expect(result).toBe('/TestScope/Shared Documents/folder with spaces/sub-folder');
+    expect(result.value).toBe('/TestScope/Shared Documents/folder with spaces/sub-folder');
   });
 
   it('throws error when rootScopeName is empty', () => {
@@ -152,7 +152,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('DeepScope', false));
 
-    expect(result).toBe('/DeepScope/Documents/level1/level2/level3/level4');
+    expect(result.value).toBe('/DeepScope/Documents/level1/level2/level3/level4');
   });
 
   it('handles rootPath with trailing slash', () => {
@@ -160,7 +160,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('ProjectScope/', false));
 
-    expect(result).toBe('/ProjectScope/Documents');
+    expect(result.value).toBe('/ProjectScope/Documents');
   });
 
   it('handles rootPath with leading slash', () => {
@@ -168,7 +168,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('/ProjectScope', false));
 
-    expect(result).toBe('/ProjectScope/Documents');
+    expect(result.value).toBe('/ProjectScope/Documents');
   });
 
   it('handles rootPath with both leading and trailing slashes', () => {
@@ -176,7 +176,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('/ProjectScope/', false));
 
-    expect(result).toBe('/ProjectScope/Documents');
+    expect(result.value).toBe('/ProjectScope/Documents');
   });
 
   it('handles rootPath with multiple consecutive slashes', () => {
@@ -184,7 +184,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('Project//Scope', false));
 
-    expect(result).toBe('/Project/Scope/Documents');
+    expect(result.value).toBe('/Project/Scope/Documents');
   });
 
   it('handles rootPath with multiple slashes at start and end', () => {
@@ -192,7 +192,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('///ProjectScope///', false));
 
-    expect(result).toBe('/ProjectScope/Documents');
+    expect(result.value).toBe('/ProjectScope/Documents');
   });
 
   it('handles rootPath with multiple slashes in the middle', () => {
@@ -200,7 +200,7 @@ describe('getUniqueParentPathFromItem', () => {
 
     const result = getUniqueParentPathFromItem(item, new Smeared('Project///Scope//Test', false));
 
-    expect(result).toBe('/Project/Scope/Test/Documents');
+    expect(result.value).toBe('/Project/Scope/Test/Documents');
   });
 });
 

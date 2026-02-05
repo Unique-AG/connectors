@@ -167,7 +167,7 @@ export class ScopeManagementService {
 
     for (const item of items) {
       const scopePath = getUniqueParentPathFromItem(item, rootPath);
-      itemIdToScopePathMap.set(item.item.id, scopePath);
+      itemIdToScopePathMap.set(item.item.id, scopePath.value);
     }
 
     return itemIdToScopePathMap;
@@ -400,9 +400,9 @@ export class ScopeManagementService {
     const scopePath = getUniqueParentPathFromItem(item, context.rootPath);
 
     // Find scope with this path.
-    const scope = scopes.find((scope) => scope.path === scopePath);
+    const scope = scopes.find((scope) => scope.path === scopePath.value);
     if (!scope?.id) {
-      this.logger.warn(`Scope not found for path: ${createSmeared(scopePath)}`);
+      this.logger.warn(`Scope not found for path: ${scopePath}`);
       return undefined;
     }
     return scope.id;

@@ -23,7 +23,7 @@ import {
   UpdateGroupMutationInput,
   UpdateGroupMutationResult,
 } from './unique-groups.consts';
-import { UniqueGroup, UniqueGroupWithMembers } from './unique-groups.types';
+import { UniqueGroupWithMembers } from './unique-groups.types';
 import { getSharepointConnectorGroupExternalIdPrefix } from './unique-groups.utils';
 
 const BATCH_SIZE = 100;
@@ -69,25 +69,6 @@ export class UniqueGroupsService {
     } while (batchCount === BATCH_SIZE);
 
     return groups;
-  }
-
-  public async getRootGroup(): Promise<UniqueGroup | null> {
-    this.logger.log('Requesting root group from Unique API');
-
-    const result = await this.scopeManagementClient.request<
-      ListGroupsQueryResult<false>,
-      ListGroupsQueryInput
-    >(getListGroupsQuery(false), {
-      skip: 0,
-      take: 1,
-      where: {
-        name: {
-          equals: 'Root Group',
-        },
-      },
-    });
-
-    return result.listGroups[0] ?? null;
   }
 
   public async createGroup(

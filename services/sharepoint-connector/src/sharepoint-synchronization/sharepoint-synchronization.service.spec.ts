@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
@@ -135,22 +134,6 @@ describe('SharepointSynchronizationService', () => {
     };
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: vi.fn((key: string) => {
-          if (key === 'sharepoint')
-            return {
-              sitesSource: 'config_file',
-              sites: [
-                createMockSiteConfig({
-                  siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
-                }),
-              ],
-            };
-          return undefined;
-        }),
-      }))
       .mock(GraphApiService)
       .impl(() => mockGraphApiService)
       .mock(SitesConfigurationService)
@@ -294,18 +277,6 @@ describe('SharepointSynchronizationService', () => {
     ];
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: vi.fn((key: string) => {
-          if (key === 'sharepoint')
-            return {
-              sitesSource: 'config_file',
-              sites: mockSiteConfigs,
-            };
-          return undefined;
-        }),
-      }))
       .mock(GraphApiService)
       .impl(() => ({
         ...mockGraphApiService,
@@ -363,18 +334,6 @@ describe('SharepointSynchronizationService', () => {
     ];
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: vi.fn((key: string) => {
-          if (key === 'sharepoint')
-            return {
-              sitesSource: 'config_file',
-              sites: mockSiteConfigs,
-            };
-          return undefined;
-        }),
-      }))
       .mock(GraphApiService)
       .impl(() => ({
         ...mockGraphApiService,

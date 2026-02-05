@@ -75,12 +75,12 @@ export function getUniquePathFromItem(item: AnySharepointItem, rootPath: Smeared
   return createSmeared(`/${normalizeSlashes(rootPath.value)}${uniquePath}`);
 }
 
-export function getUniqueParentPathFromItem(item: AnySharepointItem, rootPath: Smeared): string {
+export function getUniqueParentPathFromItem(item: AnySharepointItem, rootPath: Smeared): Smeared {
   assert.ok(rootPath.value, 'rootPath cannot be empty');
   const fileUrl = extractFileUrl(item);
   const uniqueParentPath = getRelativeUniqueParentPathFromUrl(fileUrl);
 
-  return `/${normalizeSlashes(rootPath.value)}${uniqueParentPath}`;
+  return createSmeared(`/${normalizeSlashes(rootPath.value)}${uniqueParentPath}`);
 }
 
 function extractFileUrl(item: AnySharepointItem): string {
