@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { chunk, identity } from 'remeda';
-import { Client, Dispatcher, interceptors } from 'undici';
+import { Dispatcher, interceptors } from 'undici';
 import { Config } from '../../config';
+import { ProxyService } from '../../proxy';
 import { shouldConcealLogs } from '../../utils/logging.util';
 import type { Smeared } from '../../utils/smeared';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
@@ -18,18 +19,15 @@ export class SharepointRestHttpService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly client: Dispatcher;
   private readonly shouldConcealLogs: boolean;
+  private readonly origin: string;
 
   public constructor(
     private readonly microsoftAuthenticationService: MicrosoftAuthenticationService,
     private readonly configService: ConfigService<Config, true>,
+    private readonly proxyService: ProxyService,
   ) {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
-    const sharePointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
-    const httpClient = new Client(sharePointBaseUrl, {
-      bodyTimeout: 60_000,
-      headersTimeout: 30_000,
-      connectTimeout: 15_000,
-    });
+    this.origin = this.configService.get('sharepoint.baseUrl', { infer: true });
 
     // TODO: Add metrics middleware once we start implementing proper metrics
     const interceptorsInCallingOrder = [
@@ -65,7 +63,8 @@ export class SharepointRestHttpService {
       ),
       createLoggingInterceptor(this.shouldConcealLogs),
     ];
-    this.client = httpClient.compose(interceptorsInCallingOrder.reverse());
+    const baseDispatcher = this.proxyService.getDispatcher({ mode: 'always' });
+    this.client = baseDispatcher.compose(interceptorsInCallingOrder.reverse());
   }
 
   // Call a single SharePoint REST API endpoint and gives back the body as a JSON object.
@@ -74,6 +73,7 @@ export class SharepointRestHttpService {
     const cleanedApiPath = apiPath.startsWith('/') ? apiPath.slice(1) : apiPath;
     const path = `/sites/${siteName.value}/_api/${cleanedApiPath}`;
     const { statusCode, body } = await this.client.request({
+      origin: this.origin,
       method: 'GET',
       path,
       headers: {
@@ -131,6 +131,7 @@ export class SharepointRestHttpService {
 
       const requestStartTime = Date.now();
       const { statusCode, body, headers } = await this.client.request({
+        origin: this.origin,
         method: 'POST',
         path,
         headers: {

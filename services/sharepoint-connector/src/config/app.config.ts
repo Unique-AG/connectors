@@ -55,8 +55,6 @@ export const AppConfigSchema = z
     isDev: c.nodeEnv === 'development',
   }));
 
-export type AppConfigFromSchema = z.infer<typeof AppConfigSchema>;
-
 export const appConfig = registerConfig('app', AppConfigSchema, {
   whitelistKeys: new Set([
     'LOG_LEVEL',
