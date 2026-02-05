@@ -12,12 +12,14 @@ const FindTranscriptsInputSchema = z.object({
   subject: z.string().optional().describe('Filter by meeting subject (partial match)'),
   dateFrom: z
     .string()
+    .datetime()
     .optional()
-    .describe('Filter transcripts from this date (ISO date string, e.g., 2024-01-15)'),
+    .describe('Filter transcripts from this datetime (ISO 8601, e.g., 2024-01-15T00:00:00.000Z)'),
   dateTo: z
     .string()
+    .datetime()
     .optional()
-    .describe('Filter transcripts until this date (ISO date string, e.g., 2024-01-31)'),
+    .describe('Filter transcripts until this datetime (ISO 8601, e.g., 2024-01-31T23:59:59.999Z)'),
   participant: z
     .string()
     .optional()
@@ -165,24 +167,18 @@ export class FindTranscriptsTool {
     }
 
     if (input.dateFrom) {
-      const dateFromNormalized = input.dateFrom.includes('T')
-        ? input.dateFrom
-        : `${input.dateFrom}T00:00:00.000Z`;
       conditions.push({
         path: ['metadata', 'date'],
         operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
-        value: dateFromNormalized,
+        value: input.dateFrom,
       });
     }
 
     if (input.dateTo) {
-      const dateToNormalized = input.dateTo.includes('T')
-        ? input.dateTo
-        : `${input.dateTo}T23:59:59.999Z`;
       conditions.push({
         path: ['metadata', 'date'],
         operator: UniqueQLOperator.LESS_THAN_OR_EQUAL,
-        value: dateToNormalized,
+        value: input.dateTo,
       });
     }
 
