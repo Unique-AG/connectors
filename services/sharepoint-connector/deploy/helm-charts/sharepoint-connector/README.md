@@ -71,6 +71,7 @@ spec:
 | alerts.defaultAlerts.uniqueApi.disabled | object | `{}` | Disable specific alerts by setting them to true |
 | alerts.enabled | bool | `false` | Enable PrometheusRule resource creation |
 | connector.deployment.metadata.annotations."reloader.stakater.com/auto" | string | `"true"` |  |
+| connector.env.LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY | string | `"[\"on_startup\",\"per_sync\"]"` |  |
 | connector.env.LOGS_DIAGNOSTICS_DATA_POLICY | string | `"conceal"` |  |
 | connector.env.LOG_LEVEL | string | `"info"` |  |
 | connector.env.MAX_FILE_SIZE_BYTES | string | `"209715200"` |  |
@@ -83,7 +84,7 @@ spec:
 | connector.envVars | list | `[]` | Environment variables from secrets. Example for loading secrets (uncomment and customize as needed):   envVars:     # For Zitadel authentication (required when authMode is 'external')     - name: ZITADEL_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: sharepoint-connector-secret           key: ZITADEL_CLIENT_SECRET     # For encrypted certificate private key (optional, only if key is password-protected)     - name: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD       valueFrom:         secretKeyRef:           name: sharepoint-connector-secret           key: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD     # For proxy basic auth password (required when proxy.authMode is 'username_password')     - name: PROXY_PASSWORD       valueFrom:         secretKeyRef:           name: sharepoint-connector-secret           key: PROXY_PASSWORD See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options. |
 | connector.extraEnvCM | list | `["sharepoint-connector-proxy-config"]` | List of ConfigMaps to load as environment variables |
 | connector.image.repository | string | `"ghcr.io/unique-ag/connectors/services/sharepoint-connector"` |  |
-| connector.image.tag | string | `"2.0.0-beta.13"` |  |
+| connector.image.tag | string | `"2.0.0"` |  |
 | connector.ports.application | int | `51345` |  |
 | connector.ports.metrics | int | `51346` |  |
 | connector.resources.limits.memory | string | `"2048Mi"` |  |
