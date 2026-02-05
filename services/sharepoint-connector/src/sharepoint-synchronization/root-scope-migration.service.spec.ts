@@ -1,35 +1,21 @@
-import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Config } from '../config';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { Smeared } from '../utils/smeared';
 import { RootScopeMigrationService } from './root-scope-migration.service';
 
 describe('RootScopeMigrationService', () => {
-  type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };
-
   let service: RootScopeMigrationService;
   let getScopeByExternalIdMock: ReturnType<typeof vi.fn>;
   let listChildrenScopesMock: ReturnType<typeof vi.fn>;
   let updateScopeParentMock: ReturnType<typeof vi.fn>;
   let deleteScopeMock: ReturnType<typeof vi.fn>;
-  let configServiceMock: ConfigServiceMock;
 
   beforeEach(async () => {
     getScopeByExternalIdMock = vi.fn();
     listChildrenScopesMock = vi.fn();
     updateScopeParentMock = vi.fn();
     deleteScopeMock = vi.fn();
-
-    configServiceMock = {
-      get: vi.fn((key: string) => {
-        if (key === 'app.logsDiagnosticsDataPolicy') {
-          return 'show';
-        }
-        return undefined;
-      }),
-    } as unknown as ConfigServiceMock;
 
     const { unit } = await TestBed.solitary(RootScopeMigrationService)
       .mock<UniqueScopesService>(UniqueScopesService)
@@ -40,8 +26,6 @@ describe('RootScopeMigrationService', () => {
         updateScopeParent: updateScopeParentMock,
         deleteScope: deleteScopeMock,
       }))
-      .mock<ConfigService<Config, true>>(ConfigService)
-      .impl(() => configServiceMock)
       .compile();
 
     service = unit;
