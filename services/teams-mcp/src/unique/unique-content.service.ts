@@ -1,0 +1,151 @@
+import assert from 'node:assert';
+import { Injectable, Logger } from '@nestjs/common';
+import { Span, TraceService } from 'nestjs-otel';
+import {
+  type ContentInfoItem,
+  type MetadataFilter,
+  type PublicContentInfosRequest,
+  PublicContentInfosRequestSchema,
+  type PublicContentInfosResult,
+  PublicContentInfosResultSchema,
+  type PublicContentUpsertRequest,
+  PublicContentUpsertRequestSchema,
+  type PublicContentUpsertResult,
+  PublicContentUpsertResultSchema,
+} from './unique.dtos';
+import { UniqueApiClient } from './unique-api.client';
+
+@Injectable()
+export class UniqueContentService {
+  private readonly logger = new Logger(UniqueContentService.name);
+
+  public constructor(
+    private readonly api: UniqueApiClient,
+    private readonly trace: TraceService,
+  ) {}
+
+  @Span()
+  public async upsertContent(
+    content: PublicContentUpsertRequest,
+  ): Promise<PublicContentUpsertResult> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('scope_id', content.scopeId ?? '');
+    span?.setAttribute('content_key', content.input.key);
+    span?.setAttribute('mime_type', content.input.mimeType);
+    span?.setAttribute('store_internally', content.storeInternally);
+    span?.setAttribute('has_file_url', !!content.fileUrl);
+
+    const payload = PublicContentUpsertRequestSchema.encode(content);
+
+    this.logger.debug(
+      {
+        scopeId: content.scopeId,
+        contentKey: content.input.key,
+        mimeType: content.input.mimeType,
+        storeInternally: content.storeInternally,
+        hasFileUrl: !!content.fileUrl,
+      },
+      'Creating or updating content record in Unique system',
+    );
+
+    const body = await this.api.post('content/upsert', payload);
+    const result = PublicContentUpsertResultSchema.parse(body);
+
+    this.logger.log(
+      {
+        scopeId: content.scopeId,
+        contentKey: content.input.key,
+        mimeType: content.input.mimeType,
+        hasWriteUrl: !!result.writeUrl,
+        hasReadUrl: !!result.readUrl,
+      },
+      'Successfully created or updated content record in Unique system',
+    );
+
+    return result;
+  }
+
+  @Span()
+  public async uploadToStorage(
+    writeUrl: string,
+    content: ReadableStream<Uint8Array<ArrayBuffer>>,
+    mime: string,
+  ): Promise<void> {
+    const span = this.trace.getSpan();
+
+    const urlObj = new URL(writeUrl);
+    const storageEndpoint = urlObj.origin;
+    span?.setAttribute('storage_endpoint', storageEndpoint);
+
+    this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
+
+    const response = await fetch(writeUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': mime,
+        'x-ms-blob-type': 'BlockBlob',
+      },
+      body: content,
+      // @ts-expect-error: nodejs fetch requires `half` for streaming uploads
+      duplex: 'half',
+    });
+
+    if (!response.ok) {
+      span?.setAttribute('error', true);
+      span?.setAttribute('http_status', response.status);
+      this.logger.error(
+        { status: response.status, storageEndpoint },
+        'Unique storage system rejected content upload with error',
+      );
+      assert.fail(`Unique storage upload failed: ${response.status}`);
+    }
+
+    span?.setAttribute('http_status', response.status);
+    this.logger.debug({ storageEndpoint }, 'Successfully completed content upload to storage');
+  }
+
+  @Span()
+  public async getContentInfos(
+    request: PublicContentInfosRequest,
+  ): Promise<PublicContentInfosResult> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('skip', request.skip ?? 0);
+    span?.setAttribute('take', request.take ?? 50);
+    span?.setAttribute('has_filter', !!request.metadataFilter);
+
+    const payload = PublicContentInfosRequestSchema.encode(request);
+
+    this.logger.debug(
+      { skip: request.skip, take: request.take, hasFilter: !!request.metadataFilter },
+      'Querying content information from Unique system',
+    );
+
+    const body = await this.api.post('content/infos', payload);
+    const result = PublicContentInfosResultSchema.parse(body);
+
+    span?.setAttribute('result_count', result.contents.length);
+    span?.setAttribute('total', result.total ?? result.contents.length);
+
+    this.logger.debug(
+      { resultCount: result.contents.length, total: result.total },
+      'Successfully retrieved content information from Unique system',
+    );
+
+    return result;
+  }
+
+  @Span()
+  public async findByMetadata(
+    filter: MetadataFilter,
+    options?: { skip?: number; take?: number },
+  ): Promise<ContentInfoItem[]> {
+    const request: PublicContentInfosRequest = {
+      skip: options?.skip ?? 0,
+      take: options?.take ?? 50,
+      metadataFilter: filter,
+    };
+
+    const result = await this.getContentInfos(request);
+    return result.contents;
+  }
+}
