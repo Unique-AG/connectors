@@ -129,7 +129,7 @@ describe('SharepointConfigSchema', () => {
       const result = SharepointConfigSchema.parse(config);
       expect(result.sitesSource).toBe('sharepoint_list');
       if (result.sitesSource === 'sharepoint_list') {
-        expect(result.sharepointList.siteId).toBe('87654321-4321-4321-8321-cba987654321');
+        expect(result.sharepointList.siteId.value).toBe('87654321-4321-4321-8321-cba987654321');
         expect(result.sharepointList.listId).toBe('87654321-4321-4321-8321-cba987654321');
       }
     });

@@ -6,6 +6,7 @@ import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
+import { Smeared } from '../../utils/smeared';
 import { createMockSiteConfig } from '../../utils/test-utils/mock-site-config';
 import type { ProcessingContext } from '../types/processing-context';
 import { ContentRegistrationStep } from './content-registration.step';
@@ -41,9 +42,9 @@ describe('ContentRegistrationStep', () => {
   const createMockContext = (): ProcessingContext => ({
     syncContext: {
       siteConfig: createMockSiteConfig(),
-      siteName: 'test-site',
+      siteName: new Smeared('test-site', false),
       serviceUserId: 'user-1',
-      rootPath: '/Root',
+      rootPath: new Smeared('/Root', false),
     },
     correlationId: 'c1',
     startTime: new Date(),
@@ -54,7 +55,7 @@ describe('ContentRegistrationStep', () => {
     pipelineItem: {
       itemType: 'listItem',
       item: createMockListItem(),
-      siteId: 'site',
+      siteId: new Smeared('site', false),
       driveId: 'drive',
       driveName: 'Documents',
       folderPath: '/test',

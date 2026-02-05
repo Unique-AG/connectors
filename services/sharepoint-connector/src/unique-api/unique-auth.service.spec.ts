@@ -8,9 +8,9 @@ import { UniqueAuthService } from './unique-auth.service';
 const MOCK_UNIQUE_CONFIG = Object.freeze({
   serviceAuthMode: 'external' as const,
   zitadelOauthTokenUrl: 'https://auth.example.com/oauth/token',
-  zitadelClientId: 'client',
+  zitadelClientId: new Redacted('client'),
   zitadelClientSecret: new Redacted('secret'),
-  zitadelProjectId: 'proj-123',
+  zitadelProjectId: new Redacted('proj-123'),
   zitadelServiceExtraHeaders: {},
   ingestionMode: 'flat' as const,
   scopeId: 'scope-1',
@@ -66,6 +66,7 @@ describe('UniqueAuthService', () => {
         headers: expect.objectContaining({
           'Content-Type': 'application/x-www-form-urlencoded',
         }),
+        body: expect.stringContaining('proj-123'),
       }),
     );
   });

@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   chunk,
   filter,
@@ -20,7 +19,6 @@ import {
   values,
   zip,
 } from 'remeda';
-import { Config } from '../config';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { GroupMember } from '../microsoft-apis/graph/types/sharepoint.types';
 import {
@@ -28,8 +26,8 @@ import {
   SharepointRestClientService,
   SiteGroupMembership,
 } from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
-import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
+import { createSmeared, type Smeared } from '../utils/smeared';
 import type {
   GroupDistinctId,
   GroupMembership,
@@ -48,15 +46,11 @@ import {
 @Injectable()
 export class FetchGroupsWithMembershipsQuery {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly graphApiService: GraphApiService,
     private readonly sharepointRestClientService: SharepointRestClientService,
-    private readonly configService: ConfigService<Config, true>,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   // For given list of group permissions from files/lists, fetch all the present sharepoint group
   // members from SharePoint and Graph APIs. Result is a map from GroupDistinctId to
@@ -70,10 +64,10 @@ export class FetchGroupsWithMembershipsQuery {
   // 3. Go through group permissions passed to the service and map them to
   //    SharepointGroupWithMembers using the built cache of group memberships.
   public async run(
-    siteId: string,
+    siteId: Smeared,
     groupPermissions: GroupMembership[],
   ): Promise<SharePointGroupsMap> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${siteId}]`;
     const uniqueGroupPermissions = uniqueBy(groupPermissions, groupDistinctId);
 
     this.logger.log(
@@ -235,7 +229,7 @@ export class FetchGroupsWithMembershipsQuery {
 
         if (error.statusCode === 404) {
           this.logger.warn(
-            `Group ${this.shouldConcealLogs ? redact(group.id) : group.id} not found (404) - likely deleted from Entra ID but still ` +
+            `Group ${createSmeared(group.id)} not found (404) - likely deleted from Entra ID but still ` +
               `referenced in SharePoint permissions. Treating as empty membership.`,
           );
           return [];
@@ -243,7 +237,7 @@ export class FetchGroupsWithMembershipsQuery {
 
         this.logger.error({
           msg: `${logPrefix} Failed to fetch memberships for group`,
-          groupId: this.shouldConcealLogs ? redact(group.id) : group.id,
+          groupId: createSmeared(group.id),
           error: sanitizeError(error),
         });
         throw error;
@@ -274,13 +268,18 @@ export class FetchGroupsWithMembershipsQuery {
   // ===== Helper methods for fetching groups from SharePoint REST API =====
 
   private async fetchSiteGroupsMembershipsMap(
-    siteName: string,
+    siteName: Smeared,
     siteGroupIds: string[],
   ): Promise<Record<GroupDistinctId, Membership[]>> {
     return pipe(
       await this.sharepointRestClientService.getSiteGroupsMemberships(siteName, siteGroupIds),
       // We need to add site name to the id to make it unique across all sites.
-      mapKeys((id) => groupDistinctId({ type: 'siteGroup', id: `${siteName}|${id}` })),
+      mapKeys((id) =>
+        groupDistinctId({
+          type: 'siteGroup',
+          id: `${siteName.value}|${id}`,
+        }),
+      ),
       mapValues(map(this.mapRestApiMembershipToGroupMembership.bind(this))),
       mapValues(filter(isNonNullish)),
     );

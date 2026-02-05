@@ -1,9 +1,10 @@
 import type { SiteConfig } from '../../config/sharepoint.schema';
 import { IngestionMode } from '../../constants/ingestion.constants';
 import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
+import { createSmeared } from '../smeared';
 
 export const createMockSiteConfig = (overrides?: Partial<SiteConfig>): SiteConfig => ({
-  siteId: 'site-id',
+  siteId: createSmeared('site-id'),
   syncColumnName: 'TestColumn',
   ingestionMode: IngestionMode.Flat,
   scopeId: 'scope-id',

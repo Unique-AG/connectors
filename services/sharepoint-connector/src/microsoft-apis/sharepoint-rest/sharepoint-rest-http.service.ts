@@ -6,7 +6,8 @@ import { chunk, identity } from 'remeda';
 import { Dispatcher, interceptors } from 'undici';
 import { Config } from '../../config';
 import { ProxyService } from '../../proxy';
-import { redact, shouldConcealLogs } from '../../utils/logging.util';
+import { shouldConcealLogs } from '../../utils/logging.util';
+import type { Smeared } from '../../utils/smeared';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { createLoggingInterceptor } from './logging.interceptor';
 import { createTokenRefreshInterceptor } from './token-refresh.interceptor';
@@ -67,10 +68,10 @@ export class SharepointRestHttpService {
   }
 
   // Call a single SharePoint REST API endpoint and gives back the body as a JSON object.
-  public async requestSingle<T>(siteName: string, apiPath: string): Promise<T> {
+  public async requestSingle<T>(siteName: Smeared, apiPath: string): Promise<T> {
     const token = await this.microsoftAuthenticationService.getAccessToken('sharepoint-rest');
     const cleanedApiPath = apiPath.startsWith('/') ? apiPath.slice(1) : apiPath;
-    const path = `/sites/${siteName}/_api/${cleanedApiPath}`;
+    const path = `/sites/${siteName.value}/_api/${cleanedApiPath}`;
     const { statusCode, body } = await this.client.request({
       origin: this.origin,
       method: 'GET',
@@ -84,7 +85,7 @@ export class SharepointRestHttpService {
 
     assert.ok(
       200 <= statusCode && statusCode < 300,
-      `Failed to request SharePoint endpoint ${this.shouldConcealLogs ? path.replace(siteName, redact(siteName)) : path}: ${statusCode}`,
+      `Failed to request SharePoint endpoint ${path.replace(siteName.value, `${siteName}`)}: ${statusCode}`,
     );
 
     return body.json() as Promise<T>;
@@ -94,14 +95,14 @@ export class SharepointRestHttpService {
   // 20 requests at a time.
   // It is built to typings-wise support multiple calls to the same endpoint, mixing responses is
   // not possible to type.
-  public async requestBatch<T>(siteName: string, apiPaths: string[]): Promise<T[]> {
+  public async requestBatch<T>(siteName: Smeared, apiPaths: string[]): Promise<T[]> {
     const token = await this.microsoftAuthenticationService.getAccessToken('sharepoint-rest');
     const responses: T[] = [];
     const chunkedApiPaths = chunk(apiPaths, BATCH_SIZE);
 
     this.logger.debug({
       msg: 'Starting SharePoint batch request',
-      siteName: this.shouldConcealLogs ? redact(siteName) : siteName,
+      siteName,
       totalPaths: apiPaths.length,
       batchChunks: chunkedApiPaths.length,
     });
@@ -110,12 +111,12 @@ export class SharepointRestHttpService {
       const boundary = `batch_${randomUUID()}`;
       const fullApiPaths = apiPathsChunk
         .map((apiPath) => (apiPath.startsWith('/') ? apiPath.slice(1) : apiPath))
-        .map((apiPath) => `/sites/${siteName}/_api/web/${apiPath}`);
+        .map((apiPath) => `/sites/${siteName.value}/_api/web/${apiPath}`);
       const batchItems = fullApiPaths.map((apiPath) => this.buildBatchItem(apiPath, boundary));
 
-      const redactedApiPaths = this.shouldConcealLogs
-        ? fullApiPaths.map((path) => path.replace(siteName, redact(siteName)))
-        : fullApiPaths;
+      const redactedApiPaths = fullApiPaths.map((path) =>
+        path.replace(siteName.value, `${siteName}`),
+      );
 
       this.logger.debug({
         msg: 'Executing batch chunk',
@@ -126,7 +127,7 @@ export class SharepointRestHttpService {
       });
 
       const requestBody = `${batchItems.join('\r\n\r\n')}\r\n--${boundary}--\r\n`;
-      const path = `/sites/${siteName}/_api/$batch`;
+      const path = `/sites/${siteName.value}/_api/$batch`;
 
       const requestStartTime = Date.now();
       const { statusCode, body, headers } = await this.client.request({
@@ -144,9 +145,7 @@ export class SharepointRestHttpService {
       const isSuccess = 200 <= statusCode && statusCode < 300;
 
       if (!isSuccess) {
-        const redactedPath = this.shouldConcealLogs
-          ? path.replace(siteName, redact(siteName))
-          : path;
+        const redactedPath = path.replace(siteName.value, `${siteName}`);
 
         const errorBody = await body.text();
         this.logger.error({

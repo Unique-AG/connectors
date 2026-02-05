@@ -6,22 +6,35 @@ concurrency:
 
 on:
   pull_request:
+    types: [opened, edited, synchronize]
     branches:
       - main
 
 jobs:
   conventional-pr-title:
     runs-on: ubuntu-latest
-    name: Validate PR title against conventional commit format
+    name: Validate PR title and scope
+    # Skip automated PRs (release-please, dependabot) and urgent PRs by label
+    if: "!contains(github.event.pull_request.labels.*.name, 'autorelease: pending') && !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') && !contains(github.event.pull_request.labels.*.name, 'dependencies') && !contains(github.event.pull_request.labels.*.name, 'skip-validation')"
     permissions:
       pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.number }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
-      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 #v6.1.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          # See https://github.com/amannn/action-semantic-pull-request#configuration for all configuration options
-          requireScope: true
+      - uses: actions/checkout@v6
+
+      - uses: cachix/install-nix-action@v30
+
+      - name: Validate PR title
+        run: |
+          FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
+
+          if ! OUTPUT=$(echo "$PR_TITLE" | nix shell github:proventuslabs/scriptorium#cz --command cz lint --paths "$FILES" 2>&1); then
+            echo "::error title=Invalid PR Title::$OUTPUT"
+            exit 1
+          fi
 
   gatekeeper:
     runs-on: ubuntu-latest
