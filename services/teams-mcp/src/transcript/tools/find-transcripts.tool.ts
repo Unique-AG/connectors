@@ -74,7 +74,7 @@ export class FindTranscriptsTool {
     _meta: {
       'unique.app/icon': 'search',
       'unique.app/system-prompt':
-        'Use this tool to search for meeting transcripts. You can filter by subject, date range, or participant name/email. All filters are optional and can be combined.',
+        'Use this tool to search for meeting transcripts that were previously ingested in knowledge base. You can filter by subject, date range, or participant name/email. All filters are optional and can be combined.',
     },
   })
   @Span()
@@ -108,6 +108,7 @@ export class FindTranscriptsTool {
 
     const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
     const filter = this.buildMetadataFilter(rootScopePath, input);
+    this.logger.debug({ filter }, 'metadata filter');
 
     const contents = await this.contentService.findByMetadata(filter, {
       skip: input.skip,
@@ -115,13 +116,13 @@ export class FindTranscriptsTool {
     });
 
     const transcripts = contents.map((content) => {
-      const metadata = content.metadata as Record<string, unknown> | null;
+      const metadata = content.metadata;
       return {
         id: content.id,
         title: content.title,
-        date: (metadata?.date as string | null) ?? null,
-        participantNames: (metadata?.participant_names as string | null) ?? null,
-        participantEmails: (metadata?.participant_emails as string | null) ?? null,
+        date: metadata?.date,
+        participantNames: metadata?.participant_names,
+        participantEmails: metadata?.participant_emails,
         readUrl: content.readUrl ?? null,
       };
     });
@@ -151,7 +152,7 @@ export class FindTranscriptsTool {
       {
         path: ['folderIdPath'],
         operator: UniqueQLOperator.CONTAINS,
-        value: `/${rootScopePath}/`,
+        value: `uniquepathid://${rootScopePath}`,
       },
     ];
 
