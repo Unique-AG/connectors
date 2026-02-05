@@ -38,7 +38,7 @@ export class CertificateAuthStrategy implements AuthStrategy {
     if (privateKeyPassword) {
       const privateKeyObject = crypto.createPrivateKey({
         key: privateKeyRaw,
-        passphrase: privateKeyPassword,
+        passphrase: privateKeyPassword.value,
         format: 'pem',
       });
       privateKey = privateKeyObject.export({ format: 'pem', type: 'pkcs8' }).toString();

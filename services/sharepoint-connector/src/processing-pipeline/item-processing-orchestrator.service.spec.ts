@@ -3,6 +3,7 @@ import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
+import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ItemProcessingOrchestratorService } from './item-processing-orchestrator.service';
 import { ProcessingPipelineService } from './processing-pipeline.service';
@@ -68,7 +69,7 @@ describe('ItemProcessingOrchestratorService', () => {
         },
       },
     },
-    siteId,
+    siteId: new Smeared(siteId, false),
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: '/test/folder',
@@ -98,9 +99,9 @@ describe('ItemProcessingOrchestratorService', () => {
 
   const mockSyncContext: SharepointSyncContext = {
     siteConfig: createMockSiteConfig(),
-    siteName: 'test-site',
+    siteName: new Smeared('test-site', false),
     serviceUserId: 'test-user-id',
-    rootPath: '/Root',
+    rootPath: new Smeared('/Root', false),
   };
 
   it('processes all provided files', async () => {

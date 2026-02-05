@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import {
   differenceWith,
@@ -13,7 +12,6 @@ import {
   partition,
   pipe,
 } from 'remeda';
-import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
@@ -21,9 +19,9 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import { isAncestorOfRootPath, normalizeSlashes } from '../utils/paths.util';
 import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
+import { createSmeared, type Smeared } from '../utils/smeared';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -43,25 +41,20 @@ interface Input {
 @Injectable()
 export class SyncSharepointFolderPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueGroupsService: UniqueGroupsService,
-    private readonly configService: ConfigService<Config, true>,
     @Inject(SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL)
     private readonly spcFolderPermissionsSyncTotal: Counter,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId } = context.siteConfig;
     const { rootPath, serviceUserId } = context;
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
+    const logPrefix = `[Site: ${siteId}]`;
 
     const rootGroup = await this.uniqueGroupsService.getRootGroup();
     if (!rootGroup) {
@@ -75,7 +68,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     );
 
     const uniqueFoldersToProcess = unique.folders.filter(
-      (folder) => !isAncestorOfRootPath(folder.path, rootPath),
+      (folder) => !isAncestorOfRootPath(folder.path, rootPath.value),
     );
 
     this.logger.log(
@@ -107,7 +100,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
           groupsMap: unique.groupsMap,
           usersMap: unique.usersMap,
         },
-        rootPath,
+        rootPath: rootPath.value,
       });
 
       if (isNullish(sharePointScopeAccesses)) {
@@ -131,13 +124,13 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
     if (totalScopeAccessesAdded > 0) {
       this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesAdded, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         operation: 'added',
       });
     }
     if (totalScopeAccessesRemoved > 0) {
       this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesRemoved, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         operation: 'removed',
       });
     }
@@ -145,9 +138,9 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
   private getSharePointDirectoriesPathMap(
     directories: SharepointDirectoryItem[],
-    rootPath: string,
+    rootPath: Smeared,
   ): Record<string, SharepointDirectoryItem> {
-    return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootPath));
+    return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootPath).value);
   }
 
   private isTopFolder(path: string, rootPath: string): boolean {
@@ -224,12 +217,11 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
   }): ScopeAccess[] | null {
     const { logPrefix, sharePoint, unique, rootPath } = input;
     const { folder, rootGroup } = unique;
+    const logPath = createSmeared(folder.path);
 
     if (this.isTopFolder(folder.path, rootPath)) {
       this.logger.debug(
-        `${logPrefix} Using root group permission for top folder at path ${
-          this.shouldConcealLogs ? redact(folder.path) : folder.path
-        }`,
+        `${logPrefix} Using root group permission for top folder at path ${logPath}`,
       );
       return [
         {
@@ -243,21 +235,15 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     const sharePointDirectory = sharePoint.directoriesPathMap[folder.path];
 
     if (isNullish(sharePointDirectory)) {
-      this.logger.warn(
-        `${logPrefix} No SharePoint directory found for path ${this.shouldConcealLogs ? redact(folder.path) : folder.path}`,
-      );
+      this.logger.warn(`${logPrefix} No SharePoint directory found for path ${logPath}`);
       return null;
     }
 
-    const sharePointDirectoryKey = buildIngestionItemKey(sharePointDirectory);
-    const sharePointPermissions = sharePoint.permissionsMap[sharePointDirectoryKey];
+    const sharePointDirectoryKey = createSmeared(buildIngestionItemKey(sharePointDirectory));
+    const sharePointPermissions = sharePoint.permissionsMap[sharePointDirectoryKey.value];
     if (isNullish(sharePointPermissions)) {
       this.logger.warn(
-        `${logPrefix} No SharePoint permissions found for key ${
-          this.shouldConcealLogs
-            ? concealIngestionKey(sharePointDirectoryKey)
-            : sharePointDirectoryKey
-        }`,
+        `${logPrefix} No SharePoint permissions found for key ${sharePointDirectoryKey}`,
       );
       return null;
     }

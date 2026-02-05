@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { fromEntries, map, pipe, prop, zip } from 'remeda';
+import type { Smeared } from '../../utils/smeared';
 import { SharepointRestHttpService } from './sharepoint-rest-http.service';
 
 @Injectable()
@@ -7,7 +8,7 @@ export class SharepointRestClientService {
   public constructor(private readonly sharepointRestHttpService: SharepointRestHttpService) {}
 
   public async getSiteGroupsMemberships(
-    siteName: string,
+    siteName: Smeared,
     siteGroupIds: string[],
   ): Promise<Record<string, SiteGroupMembership[]>> {
     const responses = await this.sharepointRestHttpService.requestBatch<{

@@ -1,8 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { pick, prop } from 'remeda';
-import { Config } from '../../config';
-import { shouldConcealLogs, smear } from '../../utils/logging.util';
+import { Smeared } from '../../utils/smeared';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   ADD_GROUP_MEMBERS_MUTATION,
@@ -33,17 +31,14 @@ const BATCH_SIZE = 100;
 @Injectable()
 export class UniqueGroupsService {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     @Inject(SCOPE_MANAGEMENT_CLIENT) private readonly scopeManagementClient: UniqueGraphqlClient,
-    private readonly configService: ConfigService<Config, true>,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
-  public async listAllGroupsForSite(siteId: string): Promise<UniqueGroupWithMembers[]> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+  public async listAllGroupsForSite(siteId: Smeared): Promise<UniqueGroupWithMembers[]> {
+    const logPrefix = `[Site: ${siteId}]`;
+    const groupExternalIdPrefix = getSharepointConnectorGroupExternalIdPrefix(siteId.value);
     this.logger.log(`${logPrefix} Requesting all groups from Unique API`);
 
     let skip = 0;
@@ -57,7 +52,7 @@ export class UniqueGroupsService {
       >(getListGroupsQuery(true), {
         where: {
           externalId: {
-            startsWith: getSharepointConnectorGroupExternalIdPrefix(siteId),
+            startsWith: groupExternalIdPrefix,
           },
         },
         skip,

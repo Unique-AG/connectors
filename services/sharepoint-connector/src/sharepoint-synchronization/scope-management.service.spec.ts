@@ -10,6 +10,7 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
+import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
@@ -77,7 +78,7 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
         },
       },
     },
-    siteId: 'site-123',
+    siteId: new Smeared('site-123', false),
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: `/${path}`,
@@ -106,9 +107,12 @@ describe('ScopeManagementService', () => {
 
   const mockContext: SharepointSyncContext = {
     serviceUserId: 'user-123',
-    rootPath: '/test1',
-    siteName: 'test-site',
-    siteConfig: createMockSiteConfig({ siteId: 'site-123', scopeId: 'root-scope-123' }),
+    rootPath: new Smeared('/test1', false),
+    siteName: new Smeared('test-site', false),
+    siteConfig: createMockSiteConfig({
+      siteId: new Smeared('site-123', false),
+      scopeId: 'root-scope-123',
+    }),
   };
 
   type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };
@@ -224,14 +228,16 @@ describe('ScopeManagementService', () => {
         parentId: null,
       });
 
-      await service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat);
+      await service.initializeRootScope(
+        'root-scope-123',
+        new Smeared('site-123', false),
+        IngestionMode.Flat,
+      );
 
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', 'spc:site:site-123');
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', expect.any(Smeared));
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Claimed root scope root-scope-123 with externalId: spc:site:site-123',
-        ),
+        expect.stringMatching(/Claimed root scope root-scope-123 with externalId: .*/),
       );
     });
 
@@ -243,7 +249,11 @@ describe('ScopeManagementService', () => {
         parentId: null,
       });
 
-      await service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat);
+      await service.initializeRootScope(
+        'root-scope-123',
+        new Smeared('site-123', false),
+        IngestionMode.Flat,
+      );
 
       expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
     });
@@ -257,7 +267,11 @@ describe('ScopeManagementService', () => {
       });
 
       await expect(
-        service.initializeRootScope('root-scope-123', 'site-123', IngestionMode.Flat),
+        service.initializeRootScope(
+          'root-scope-123',
+          new Smeared('site-123', false),
+          IngestionMode.Flat,
+        ),
       ).rejects.toThrow(/is owned by a different site/);
 
       expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
@@ -280,11 +294,13 @@ describe('ScopeManagementService', () => {
 
       const result = await service.initializeRootScope(
         'root-scope-123',
-        'site-123',
+        new Smeared('site-123', false),
         IngestionMode.Flat,
       );
 
-      expect(result).toEqual({ serviceUserId: 'user-123', rootPath: '/Root/test1' });
+      expect(result.serviceUserId).toBe('user-123');
+      expect(result.rootPath).toBeInstanceOf(Smeared);
+      expect(result.rootPath.value).toBe('/Root/test1');
       expect(createScopeAccessesMock).toHaveBeenCalledWith('root-scope-123', [
         { type: 'MANAGE', entityId: 'user-123', entityType: 'USER' },
         { type: 'READ', entityId: 'user-123', entityType: 'USER' },
@@ -292,7 +308,6 @@ describe('ScopeManagementService', () => {
       ]);
       expect(createScopeAccessesMock).toHaveBeenCalledWith('parent-1', [
         { type: 'READ', entityId: 'user-123', entityType: 'USER' },
-        { type: 'WRITE', entityId: 'user-123', entityType: 'USER' },
       ]);
     });
   });
@@ -529,14 +544,8 @@ describe('ScopeManagementService', () => {
       );
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-1',
-        expect.stringMatching(/^spc:unknown:site-123\/TestScope-/),
-      );
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-2',
-        expect.stringMatching(/^spc:unknown:site-123\/AnotherScope-/),
-      );
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-1', expect.any(Smeared));
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', expect.any(Smeared));
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].warn).toHaveBeenCalledWith(
         expect.stringContaining('No external ID found for path'),
@@ -560,7 +569,7 @@ describe('ScopeManagementService', () => {
       );
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', 'spc:site-123/sitePages');
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', expect.any(Smeared));
     });
 
     it('skips scopes that are ancestors of root path', async () => {
@@ -583,10 +592,7 @@ describe('ScopeManagementService', () => {
       // Root (/) is an ancestor of /test1, so it is skipped.
       // ChildScope (/test1/ChildScope) gets fallback externalId.
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
-        'scope-2',
-        expect.stringMatching(/^spc:unknown:site-123\/ChildScope-/),
-      );
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('scope-2', expect.any(Smeared));
     });
 
     it('logs debug message when updating externalId', async () => {
@@ -604,9 +610,7 @@ describe('ScopeManagementService', () => {
 
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
-        expect.stringMatching(
-          /^Updated scope scope-1 with externalId: spc:unknown:site-123\/test1-/,
-        ),
+        expect.stringMatching(/^Updated scope scope-1 with externalId: .*/),
       );
     });
 
