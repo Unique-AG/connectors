@@ -20,6 +20,9 @@ coverage
 # Vercel
 .vercel
 
+# Python
+__pycache__
+
 # Editors
 .vscode
 .idea
