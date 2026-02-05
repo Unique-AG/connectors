@@ -44,7 +44,7 @@ connector:
     - sharepoint-connector-proxy-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
-    tag: 2.0.0-beta.13 # x-release-please-version
+    tag: 2.0.0 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
