@@ -2,7 +2,11 @@ import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs
 import { isEmptyish } from 'remeda';
 import { z } from 'zod';
 import { parseJsonEnvironmentVariable } from '../utils/config.util';
-import { coercedPositiveIntSchema, requiredStringSchema } from '../utils/zod.util';
+import {
+  coercedPositiveIntSchema,
+  redactedNonEmptyStringSchema,
+  requiredStringSchema,
+} from '../utils/zod.util';
 
 // ==========================================
 // Proxy Configuration
@@ -38,7 +42,7 @@ const basicProxyConfigSchema = z.object({
   authMode: z.literal('username_password').describe('Basic authentication'),
   ...baseProxyFields,
   username: requiredStringSchema.describe('Proxy username'),
-  password: requiredStringSchema.describe('Proxy password'),
+  password: redactedNonEmptyStringSchema.describe('Proxy password'),
 });
 
 const tlsProxyConfigSchema = z.object({

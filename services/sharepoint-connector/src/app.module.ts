@@ -7,7 +7,7 @@ import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { ConfigDiagnosticsModule } from './config/config-diagnostics.module';
-import { proxyConfig } from './config/proxy.schema';
+import { proxyConfig } from './config/proxy.config';
 import {
   AppConfig,
   appConfig,

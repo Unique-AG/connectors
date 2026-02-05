@@ -3,7 +3,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Agent, Dispatcher, ProxyAgent } from 'undici';
 import { Config } from '../config';
-import { BasicProxyConfig, ProxyConfig, TlsProxyConfig } from '../config/proxy.schema';
+import { BasicProxyConfig, ProxyConfig, TlsProxyConfig } from '../config/proxy.config';
 
 export type ProxyMode = 'always' | 'for-external-only';
 
@@ -63,9 +63,9 @@ export class ProxyService implements OnModuleDestroy {
     };
 
     if (proxyConfig.authMode === 'username_password') {
-      const credentials = Buffer.from(`${proxyConfig.username}:${proxyConfig.password}`).toString(
-        'base64',
-      );
+      const credentials = Buffer.from(
+        `${proxyConfig.username}:${proxyConfig.password.value}`,
+      ).toString('base64');
       proxyOptions.token = `Basic ${credentials}`;
     }
 

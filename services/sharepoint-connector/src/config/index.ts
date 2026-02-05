@@ -1,4 +1,4 @@
-import { ProxyConfigNamespaced } from './proxy.schema';
+import { ProxyConfigNamespaced } from './proxy.config';
 import {
   AppConfigNamespaced,
   ProcessingConfigNamespaced,
@@ -12,4 +12,4 @@ export type Config = UniqueConfigNamespaced &
   AppConfigNamespaced &
   ProxyConfigNamespaced;
 
-export * from './proxy.schema';
+export * from './proxy.config';
