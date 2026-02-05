@@ -119,3 +119,113 @@ class TestDatabaseConfig:
         config = DatabaseConfig()
 
         assert config.url == "postgresql+psycopg://user:pass@host:5432/db"
+
+
+class TestRabbitConfig:
+    """Test RabbitMQ configuration URL building behavior."""
+
+    def test_builds_url_from_individual_parts(self, monkeypatch):
+        """When individual RabbitMQ settings are provided, builds AMQP URL."""
+        monkeypatch.setenv("RABBITMQ_HOST", "rabbithost")
+        monkeypatch.setenv("RABBITMQ_PORT", "5673")
+        monkeypatch.setenv("RABBITMQ_USER", "rabbituser")
+        monkeypatch.setenv("RABBITMQ_PASSWORD", "rabbitpass")
+        monkeypatch.setenv("RABBITMQ_VHOST", "myvhost")
+
+        from edgar_mcp.config import RabbitConfig
+
+        config = RabbitConfig()
+
+        assert config.url == "amqp://rabbituser:rabbitpass@rabbithost:5673/myvhost"
+
+    def test_uses_provided_url_directly(self, monkeypatch):
+        """When RABBITMQ_URL is provided, uses it directly."""
+        monkeypatch.setenv("RABBITMQ_URL", "amqp://custom:url@host:5672/")
+
+        from edgar_mcp.config import RabbitConfig
+
+        config = RabbitConfig()
+
+        assert config.url == "amqp://custom:url@host:5672/"
+
+    def test_raises_when_no_url_and_missing_parts(self, monkeypatch):
+        """When neither URL nor all required parts provided, raises error."""
+        monkeypatch.delenv("RABBITMQ_URL", raising=False)
+        monkeypatch.delenv("RABBITMQ_HOST", raising=False)
+        monkeypatch.delenv("RABBITMQ_USER", raising=False)
+        monkeypatch.delenv("RABBITMQ_PASSWORD", raising=False)
+
+        from edgar_mcp.config import RabbitConfig
+
+        with pytest.raises(ValueError, match="RABBITMQ_URL not set; missing required fields:"):
+            RabbitConfig()
+
+    def test_url_encodes_special_characters(self, monkeypatch):
+        """URL encoding handles special characters in password."""
+        monkeypatch.setenv("RABBITMQ_HOST", "localhost")
+        monkeypatch.setenv("RABBITMQ_USER", "user@domain")
+        monkeypatch.setenv("RABBITMQ_PASSWORD", "p@ss:w/rd")
+
+        from edgar_mcp.config import RabbitConfig
+
+        config = RabbitConfig()
+        assert "user%40domain" in config.url
+        assert "p%40ss%3Aw%2Frd" in config.url
+
+    def test_handles_root_vhost(self, monkeypatch):
+        """Root vhost '/' is handled correctly in URL."""
+        monkeypatch.setenv("RABBITMQ_HOST", "localhost")
+        monkeypatch.setenv("RABBITMQ_USER", "guest")
+        monkeypatch.setenv("RABBITMQ_PASSWORD", "guest")
+        monkeypatch.setenv("RABBITMQ_VHOST", "/")
+
+        from edgar_mcp.config import RabbitConfig
+
+        config = RabbitConfig()
+
+        assert config.url == "amqp://guest:guest@localhost:5672/"
+
+    def test_raises_when_url_is_not_amqp(self, monkeypatch):
+        """When RABBITMQ_URL is not an AMQP URL, raises error."""
+        monkeypatch.setenv("RABBITMQ_URL", "http://not-amqp@host:5672/")
+
+        from edgar_mcp.config import RabbitConfig
+
+        with pytest.raises(ValueError, match="RABBITMQ_URL must be an AMQP connection string"):
+            RabbitConfig()
+
+    def test_uses_default_port_when_not_specified(self, monkeypatch):
+        """Default port 5672 is used when RABBITMQ_PORT not set."""
+        monkeypatch.setenv("RABBITMQ_HOST", "rabbithost")
+        monkeypatch.delenv("RABBITMQ_PORT", raising=False)
+        monkeypatch.setenv("RABBITMQ_USER", "user")
+        monkeypatch.setenv("RABBITMQ_PASSWORD", "pass")
+
+        from edgar_mcp.config import RabbitConfig
+
+        config = RabbitConfig()
+
+        assert ":5672/" in config.url
+
+    def test_uses_default_vhost_when_not_specified(self, monkeypatch):
+        """Default vhost '/' is used when RABBITMQ_VHOST not set."""
+        monkeypatch.setenv("RABBITMQ_HOST", "localhost")
+        monkeypatch.setenv("RABBITMQ_USER", "guest")
+        monkeypatch.setenv("RABBITMQ_PASSWORD", "guest")
+        monkeypatch.delenv("RABBITMQ_VHOST", raising=False)
+
+        from edgar_mcp.config import RabbitConfig
+
+        config = RabbitConfig()
+
+        assert config.url == "amqp://guest:guest@localhost:5672/"
+
+    def test_accepts_amqps_scheme(self, monkeypatch):
+        """AMQPS (TLS) URLs are accepted."""
+        monkeypatch.setenv("RABBITMQ_URL", "amqps://user:pass@host:5671/")
+
+        from edgar_mcp.config import RabbitConfig
+
+        config = RabbitConfig()
+
+        assert config.url == "amqps://user:pass@host:5671/"
