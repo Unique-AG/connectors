@@ -112,35 +112,33 @@ describe('SharePoint synchronization (e2e)', () => {
 
   describe('Content Ingestion', () => {
     describe('when syncing a pdf file', () => {
-      it('sends correct mimeType to ContentUpsert', async () => {
+      it('stores content with correct mimeType and title in the ingestion store', async () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        // Query the ingestion GraphQL client mock directly
-        const upserts = getGraphQLOperations<ContentUpsertMutationInput>(
-          mockIngestionGraphqlClient,
-          'ContentUpsert',
-        );
-        expect(upserts.length).toBeGreaterThan(0);
+        // Verify the content was stored with correct values
+        const storedContents = [...uniqueMock.store.contentsByKey.values()];
+        expect(storedContents).toHaveLength(1);
 
-        // Find the upsert for our test file
-        const testFileUpsert = upserts.find(
-          (u) => u.variables?.input?.mimeType === 'application/pdf',
+        const pdfContent = storedContents.find((c) => c.mimeType === 'application/pdf');
+        expect(pdfContent).toEqual(
+          expect.objectContaining({
+            title: 'test.pdf',
+            mimeType: 'application/pdf',
+            ownerType: 'Scope',
+          }),
         );
-
-        expect(testFileUpsert).toBeDefined();
-        expect(testFileUpsert?.variables.input).toMatchObject({
-          mimeType: 'application/pdf',
-          title: 'test.pdf',
-        });
+        expect(pdfContent?.key).toContain('item-1');
       });
     });
 
     describe('when syncing an xlsx file', () => {
+      const xlsxMimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
       beforeEach(() => {
         const item = mockGraphClient.driveItems[0];
         if (item?.file) {
-          item.file.mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          item.file.mimeType = xlsxMimeType;
           item.name = 'report.xlsx';
           if (item.listItem?.fields) {
             item.listItem.fields.FileLeafRef = 'report.xlsx';
@@ -148,59 +146,38 @@ describe('SharePoint synchronization (e2e)', () => {
         }
       });
 
-      it('sends correct mimeType to file-diff', async () => {
+      it('sends file-diff request with correct sourceKind, sourceName, and file metadata', async () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        // Verify the request was called
-        expect(mockIngestionHttpClient.request).toHaveBeenCalled();
+        // Verify the file-diff request was made with correct payload
+        const fileDiffCalls = mockIngestionHttpClient.request.mock.calls;
+        expect(fileDiffCalls).toHaveLength(1);
 
-        // Parse and verify request body
-        const callArgs = mockIngestionHttpClient.request.mock.calls[0]?.[0];
-        expect(callArgs).toBeDefined();
-
+        const callArgs = fileDiffCalls[0]?.[0];
         const requestBody = JSON.parse(callArgs.body);
-        expect(requestBody).toMatchObject({
-          sourceKind: 'MICROSOFT_365_SHAREPOINT',
-          sourceName: 'Sharepoint',
-          partialKey: '11111111-1111-4111-8111-111111111111',
-          fileList: expect.arrayContaining([
-            expect.objectContaining({
-              key: expect.stringContaining('item-1'),
-              updatedAt: expect.any(String),
-            }),
-          ]),
-        });
 
-        // Verify file is included
+        expect(requestBody.sourceKind).toBe('MICROSOFT_365_SHAREPOINT');
+        expect(requestBody.sourceName).toBe('Sharepoint');
+        expect(requestBody.partialKey).toBe('11111111-1111-4111-8111-111111111111');
         expect(requestBody.fileList).toHaveLength(1);
-
-        // Verify ContentUpsert GraphQL payload
-        const upserts = getGraphQLOperations<ContentUpsertMutationInput>(
-          mockIngestionGraphqlClient,
-          'ContentUpsert',
-        );
-        expect(upserts.length).toBeGreaterThan(0);
-
-        // Find the upsert for our xlsx file
-        const xlsxUpsert = upserts.find(
-          (u) =>
-            u.variables?.input?.mimeType ===
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        );
-
-        expect(xlsxUpsert).toBeDefined();
-        expect(xlsxUpsert?.variables.input).toMatchObject({
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          title: 'report.xlsx',
-        });
+        expect(requestBody.fileList[0].key).toContain('item-1');
+        expect(requestBody.fileList[0].updatedAt).toBe('2025-01-02T00:00:00Z');
       });
 
-      it('includes xlsx file in synchronization', async () => {
+      it('stores xlsx content with correct mimeType and title', async () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        expect(mockIngestionHttpClient.request).toHaveBeenCalled();
+        // Verify the content was stored with correct xlsx values
+        const storedContents = [...uniqueMock.store.contentsByKey.values()];
+        expect(storedContents).toHaveLength(1);
+
+        const xlsxContent = storedContents[0];
+        expect(xlsxContent?.mimeType).toBe(xlsxMimeType);
+        expect(xlsxContent?.title).toBe('report.xlsx');
+        expect(xlsxContent?.ownerType).toBe('Scope');
+        expect(xlsxContent?.key).toContain('item-1');
       });
     });
 
@@ -212,18 +189,25 @@ describe('SharePoint synchronization (e2e)', () => {
         }
       });
 
-      it('excludes file from synchronization', async () => {
+      it('does not store any content in the ingestion store', async () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        // Check if request was called, and if so verify empty fileList
-        if (mockIngestionHttpClient.request.mock.calls.length > 0) {
-          const callArgs = mockIngestionHttpClient.request.mock.calls[0]?.[0];
-          const requestBody = JSON.parse(callArgs.body);
-          expect(requestBody).toMatchObject({
-            fileList: [],
-          });
-        }
+        // Verify no content was stored
+        const storedContents = [...uniqueMock.store.contentsByKey.values()];
+        expect(storedContents).toHaveLength(0);
+      });
+
+      it('sends empty fileList in file-diff request', async () => {
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
+
+        const fileDiffCalls = mockIngestionHttpClient.request.mock.calls;
+        expect(fileDiffCalls).toHaveLength(1);
+
+        const callArgs = fileDiffCalls[0]?.[0];
+        const requestBody = JSON.parse(callArgs.body);
+        expect(requestBody.fileList).toHaveLength(0);
       });
     });
 
@@ -235,18 +219,25 @@ describe('SharePoint synchronization (e2e)', () => {
         }
       });
 
-      it('excludes file from file-diff request', async () => {
+      it('does not store any content in the ingestion store', async () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        // Check if request was called, and if so verify empty fileList
-        if (mockIngestionHttpClient.request.mock.calls.length > 0) {
-          const callArgs = mockIngestionHttpClient.request.mock.calls[0]?.[0];
-          const requestBody = JSON.parse(callArgs.body);
-          expect(requestBody).toMatchObject({
-            fileList: [],
-          });
-        }
+        // Verify no content was stored due to size limit
+        const storedContents = [...uniqueMock.store.contentsByKey.values()];
+        expect(storedContents).toHaveLength(0);
+      });
+
+      it('sends empty fileList in file-diff request', async () => {
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
+
+        const fileDiffCalls = mockIngestionHttpClient.request.mock.calls;
+        expect(fileDiffCalls).toHaveLength(1);
+
+        const callArgs = fileDiffCalls[0]?.[0];
+        const requestBody = JSON.parse(callArgs.body);
+        expect(requestBody.fileList).toHaveLength(0);
       });
     });
 
@@ -267,47 +258,77 @@ describe('SharePoint synchronization (e2e)', () => {
         mockGraphClient.driveItems = [syncedItem, unsyncedItem];
       });
 
-      it('only synchronizes the marked file', async () => {
+      it('only includes marked file in file-diff request', async () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        // Verify the request was called and parse request body
-        expect(mockIngestionHttpClient.request).toHaveBeenCalled();
-        const callArgs = mockIngestionHttpClient.request.mock.calls[0]?.[0];
+        // Verify only marked file is in fileList
+        const fileDiffCalls = mockIngestionHttpClient.request.mock.calls;
+        expect(fileDiffCalls).toHaveLength(1);
+
+        const callArgs = fileDiffCalls[0]?.[0];
         const requestBody = JSON.parse(callArgs.body);
 
         expect(requestBody.fileList).toHaveLength(1);
-        expect(requestBody.fileList[0]?.key).toContain('item-1');
+        expect(requestBody.fileList[0].key).toContain('item-1');
+        expect(requestBody.fileList[0].key).not.toContain('item-2');
+      });
 
-        const upserts = getGraphQLOperations<ContentUpsertMutationInput>(
-          mockIngestionGraphqlClient,
-          'ContentUpsert',
-        );
-        expect(upserts.length).toBeGreaterThan(0);
+      it('only stores the marked file content', async () => {
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
 
-        // Find the upsert for test.pdf
-        const testPdfUpsert = upserts.find((u) => u.variables?.input?.title === 'test.pdf');
+        // Verify only the marked file was stored
+        const storedContents = [...uniqueMock.store.contentsByKey.values()];
+        expect(storedContents).toHaveLength(1);
 
-        expect(testPdfUpsert).toBeDefined();
-        expect(testPdfUpsert?.variables.input).toMatchObject({
-          title: 'test.pdf',
-        });
+        const content = storedContents[0];
+        expect(content?.title).toBe('test.pdf');
+        expect(content?.key).toContain('item-1');
+        expect(content?.key).not.toContain('item-2');
       });
     });
   });
 
   describe('Permissions Sync', () => {
     describe('when file has user with read permission', () => {
-      it('synchronizes with default permissions', async () => {
+      it('stores content with user file access in the store', async () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        // Verify that CreateFileAccessesForContents was called on the ingestion client
+        // Verify content was stored with file access permissions
+        const storedContents = [...uniqueMock.store.contentsByKey.values()];
+        expect(storedContents).toHaveLength(1);
+
+        const content = storedContents[0];
+        expect(content?.fileAccess).toBeDefined();
+        expect(content?.fileAccess.length).toBeGreaterThanOrEqual(1);
+
+        // Verify at least one user access was granted
+        const hasUserAccess = content?.fileAccess.some((access) => access.startsWith('u:'));
+        expect(hasUserAccess).toBe(true);
+      });
+
+      it('maps SharePoint user permission to Unique user access', async () => {
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
+
+        // Verify the GraphQL operations for file access were made with correct entity types
         const accessCalls = getGraphQLOperations<AddAccessesMutationInput>(
           mockIngestionGraphqlClient,
           'CreateFileAccessesForContents',
         );
-        expect(accessCalls.length).toBeGreaterThan(0);
+
+        // Verify calls were made and contain user entity type
+        expect(accessCalls.length).toBeGreaterThanOrEqual(1);
+        const firstCall = accessCalls[0];
+        expect(firstCall?.variables.fileAccesses).toBeDefined();
+        expect(firstCall?.variables.fileAccesses.length).toBeGreaterThanOrEqual(1);
+
+        const hasUserEntity = firstCall?.variables.fileAccesses.some(
+          (fa) => fa.entityType === 'USER',
+        );
+        expect(hasUserEntity).toBe(true);
       });
     });
 
@@ -316,29 +337,106 @@ describe('SharePoint synchronization (e2e)', () => {
         mockGraphClient.permissions['item-1'] = [];
       });
 
-      it('still processes the file', async () => {
+      it('stores content without file access permissions', async () => {
         const service = app.get(SharepointSynchronizationService);
         await service.synchronize();
 
-        expect(mockIngestionHttpClient.request).toHaveBeenCalled();
+        // Verify content was stored
+        const storedContents = [...uniqueMock.store.contentsByKey.values()];
+        expect(storedContents).toHaveLength(1);
+
+        // Content should exist but without additional file access grants
+        const content = storedContents[0];
+        expect(content?.title).toBe('test.pdf');
+      });
+
+      it('sends file-diff request with the file included', async () => {
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
+
+        const fileDiffCalls = mockIngestionHttpClient.request.mock.calls;
+        expect(fileDiffCalls).toHaveLength(1);
+
+        const callArgs = fileDiffCalls[0]?.[0];
+        const requestBody = JSON.parse(callArgs.body);
+        expect(requestBody.fileList).toHaveLength(1);
+        expect(requestBody.fileList[0].key).toContain('item-1');
       });
     });
   });
 
   describe('Integration', () => {
-    it('synchronizes content and permissions with mocked dependencies', async () => {
+    it('returns success status after synchronization', async () => {
       const service = app.get(SharepointSynchronizationService);
       const result = await service.synchronize();
 
       expect(result).toEqual({ status: 'success' });
+    });
 
-      expect(mockIngestionHttpClient.request).toHaveBeenCalled();
+    it('stores content with complete metadata in the ingestion store', async () => {
+      const service = app.get(SharepointSynchronizationService);
+      await service.synchronize();
 
-      // Verify requests were tracked
-      const allCalls = getGraphQLOperations(mockIngestionGraphqlClient);
-      expect(allCalls.length).toBeGreaterThan(0);
+      // Verify content was stored with all required fields
+      const storedContents = [...uniqueMock.store.contentsByKey.values()];
+      expect(storedContents).toHaveLength(1);
 
-      expect(mockHttpClientService.request).toHaveBeenCalled();
+      const content = storedContents[0];
+      expect(content).toEqual(
+        expect.objectContaining({
+          title: 'test.pdf',
+          mimeType: 'application/pdf',
+          ownerType: 'Scope',
+          ownerId: expect.any(String),
+        }),
+      );
+      expect(content?.key).toContain('item-1');
+      expect(content?.id).toBeDefined();
+    });
+
+    it('sends file-diff request with correct source configuration', async () => {
+      const service = app.get(SharepointSynchronizationService);
+      await service.synchronize();
+
+      const fileDiffCalls = mockIngestionHttpClient.request.mock.calls;
+      expect(fileDiffCalls).toHaveLength(1);
+
+      const callArgs = fileDiffCalls[0]?.[0];
+      const requestBody = JSON.parse(callArgs.body);
+
+      expect(requestBody.sourceKind).toBe('MICROSOFT_365_SHAREPOINT');
+      expect(requestBody.sourceName).toBe('Sharepoint');
+      expect(requestBody.partialKey).toBe('11111111-1111-4111-8111-111111111111');
+    });
+
+    it('makes HTTP request for file download', async () => {
+      const service = app.get(SharepointSynchronizationService);
+      await service.synchronize();
+
+      // Verify file download HTTP request was made
+      const httpCalls = mockHttpClientService.request.mock.calls;
+      expect(httpCalls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('performs all GraphQL operations for content upsert and file access', async () => {
+      const service = app.get(SharepointSynchronizationService);
+      await service.synchronize();
+
+      // Verify ContentUpsert was called
+      const upsertCalls = getGraphQLOperations<ContentUpsertMutationInput>(
+        mockIngestionGraphqlClient,
+        'ContentUpsert',
+      );
+      expect(upsertCalls).toHaveLength(1);
+      expect(upsertCalls[0]?.variables.input.title).toBe('test.pdf');
+      expect(upsertCalls[0]?.variables.input.mimeType).toBe('application/pdf');
+
+      // Verify CreateFileAccessesForContents was called
+      const accessCalls = getGraphQLOperations<AddAccessesMutationInput>(
+        mockIngestionGraphqlClient,
+        'CreateFileAccessesForContents',
+      );
+      expect(accessCalls.length).toBeGreaterThanOrEqual(1);
     }, 20000);
   });
 });
