@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { filter, isNullish, map, pipe, unique } from 'remeda';
+import { filter, isNullish, map, pipe, prop, uniqueBy } from 'remeda';
 import {
   AnySharepointItem,
   SharepointContentItem,
@@ -56,7 +56,7 @@ export class GetTopFolderPermissionsQuery {
       map((item) => getUniqueParentPathFromItem(item, rootPath)),
       filter((folderPath) => isTopFolder(folderPath, rootPath)),
       (paths) => [normalizedRootPath, ...paths],
-      unique(),
+      uniqueBy(prop('value')),
     );
   }
 
