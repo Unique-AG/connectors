@@ -138,7 +138,7 @@ export class UniqueContentService {
   public async findByMetadata(
     filter: MetadataFilter,
     options?: { skip?: number; take?: number },
-  ): Promise<ContentInfoItem[]> {
+  ): Promise<{ contents: ContentInfoItem[]; total: number }> {
     const request: PublicContentInfosRequest = {
       skip: options?.skip ?? 0,
       take: options?.take ?? 50,
@@ -146,6 +146,9 @@ export class UniqueContentService {
     };
 
     const result = await this.getContentInfos(request);
-    return result.contents;
+    return {
+      contents: result.contents,
+      total: result.total ?? result.contents.length,
+    };
   }
 }
