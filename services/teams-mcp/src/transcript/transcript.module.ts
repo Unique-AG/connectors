@@ -6,6 +6,7 @@ import { SubscriptionCreateService } from './subscription-create.service';
 import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscription-remove.service';
 import {
+  FindTranscriptsTool,
   StartKbIntegrationTool,
   StopKbIntegrationTool,
   VerifyKbIntegrationStatusTool,
@@ -28,6 +29,8 @@ import { TranscriptUtilsService } from './transcript-utils.service';
     VerifyKbIntegrationStatusTool,
     StartKbIntegrationTool,
     StopKbIntegrationTool,
+    // Transcript Search Tool
+    FindTranscriptsTool,
   ],
   controllers: [TranscriptController],
 })

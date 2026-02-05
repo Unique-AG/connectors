@@ -182,3 +182,75 @@ export const PublicContentUpsertResultSchema = z.object({
 export type PublicContentUpsertResult = z.infer<typeof PublicContentUpsertResultSchema>;
 
 // !SECTION - ContentUpsert endpoint types
+
+// SECTION - ContentInfos endpoint types (UniqueQL)
+
+export enum UniqueQLOperator {
+  EQUALS = 'equals',
+  NOT_EQUALS = 'notEquals',
+  GREATER_THAN = 'greaterThan',
+  GREATER_THAN_OR_EQUAL = 'greaterThanOrEqual',
+  LESS_THAN = 'lessThan',
+  LESS_THAN_OR_EQUAL = 'lessThanOrEqual',
+  IN = 'in',
+  NOT_IN = 'notIn',
+  CONTAINS = 'contains',
+  NOT_CONTAINS = 'notContains',
+  IS_NULL = 'isNull',
+  IS_NOT_NULL = 'isNotNull',
+  IS_EMPTY = 'isEmpty',
+  IS_NOT_EMPTY = 'isNotEmpty',
+  NESTED = 'nested',
+}
+
+export const UniqueQLConditionSchema = z.object({
+  path: z.array(z.string()),
+  operator: z.enum(UniqueQLOperator),
+  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
+});
+export type UniqueQLCondition = z.infer<typeof UniqueQLConditionSchema>;
+
+type MetadataFilterInput =
+  | UniqueQLCondition
+  | { and: MetadataFilterInput[] }
+  | { or: MetadataFilterInput[] };
+
+export const MetadataFilterSchema: z.ZodType<MetadataFilterInput> = z.union([
+  UniqueQLConditionSchema,
+  z.object({ and: z.lazy(() => z.array(MetadataFilterSchema)) }),
+  z.object({ or: z.lazy(() => z.array(MetadataFilterSchema)) }),
+]);
+export type MetadataFilter = z.infer<typeof MetadataFilterSchema>;
+
+export const PublicContentInfosRequestSchema = z.object({
+  metadataFilter: MetadataFilterSchema.optional(),
+  skip: z.number().int().min(0).default(0),
+  take: z.number().int().min(1).max(250).default(50),
+});
+export type PublicContentInfosRequest = z.infer<typeof PublicContentInfosRequestSchema>;
+
+export const ContentInfoItemSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  title: z.string().nullable(),
+  description: z.string().nullable().optional(),
+  mimeType: z.string().nullable(),
+  url: z.string().nullable().optional(),
+  ownerId: z.string().nullable().optional(),
+  parentId: z.string().nullable().optional(),
+  folderIdPath: z.string().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+  readUrl: z.string().nullable().optional(),
+  createdAt: z.iso.datetime().optional(),
+  updatedAt: z.iso.datetime().optional(),
+});
+export type ContentInfoItem = z.infer<typeof ContentInfoItemSchema>;
+
+export const PublicContentInfosResultSchema = z.object({
+  contents: z.array(ContentInfoItemSchema),
+  total: z.number().optional(),
+  object: z.literal('contents').optional(),
+});
+export type PublicContentInfosResult = z.infer<typeof PublicContentInfosResultSchema>;
+
+// !SECTION - ContentInfos endpoint types
