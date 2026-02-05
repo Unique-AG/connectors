@@ -314,13 +314,13 @@ export class ScopeManagementService {
 
     for (const directory of directories) {
       const path = getUniquePathFromItem(directory, rootPath);
-      if (isAncestorOfRootPath(path, rootPath.value) || path === rootPath.value) {
+      if (isAncestorOfRootPath(path.value, rootPath.value) || path.value === rootPath.value) {
         continue;
       }
 
-      const pathWithoutRoot = path.substring(rootPath.value.length);
+      const pathWithoutRoot = path.value.substring(rootPath.value.length);
       const segments = pathWithoutRoot.split('/').filter(Boolean);
-      pathToExternalIdMap[path] =
+      pathToExternalIdMap[path.value] =
         `${EXTERNAL_ID_PREFIX}folder:${directory.siteId.value}/${directory.item.id}`;
       // siteName is now stripped, so first segment is already the drive
       pathToExternalIdMap[`${rootPath.value}/${segments[0]}`] ??=

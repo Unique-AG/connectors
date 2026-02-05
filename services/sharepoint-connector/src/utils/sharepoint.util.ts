@@ -4,7 +4,7 @@ import type {
   SharepointContentItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { normalizeSlashes } from './paths.util';
-import type { Smeared } from './smeared';
+import { createSmeared, type Smeared } from './smeared';
 
 /**
  * Gets the web URL for a SharePoint item with ?web=1 parameter.
@@ -67,12 +67,12 @@ function getRelativeUniqueParentPathFromUrl(url: string): string {
   return '';
 }
 
-export function getUniquePathFromItem(item: AnySharepointItem, rootPath: Smeared): string {
+export function getUniquePathFromItem(item: AnySharepointItem, rootPath: Smeared): Smeared {
   assert.ok(rootPath.value, 'rootPath cannot be empty');
   const fileUrl = extractFileUrl(item);
   const uniquePath = getRelativeUniquePathFromUrl(fileUrl);
 
-  return `/${normalizeSlashes(rootPath.value)}${uniquePath}`;
+  return createSmeared(`/${normalizeSlashes(rootPath.value)}${uniquePath}`);
 }
 
 export function getUniqueParentPathFromItem(item: AnySharepointItem, rootPath: Smeared): string {

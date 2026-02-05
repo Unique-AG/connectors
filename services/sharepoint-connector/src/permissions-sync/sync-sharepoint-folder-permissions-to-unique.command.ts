@@ -140,7 +140,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     directories: SharepointDirectoryItem[],
     rootPath: Smeared,
   ): Record<string, SharepointDirectoryItem> {
-    return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootPath));
+    return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootPath).value);
   }
 
   private isTopFolder(path: string, rootPath: string): boolean {

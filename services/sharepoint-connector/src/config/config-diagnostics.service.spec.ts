@@ -42,7 +42,7 @@ describe('ConfigDiagnosticsService', () => {
       service.logConfig('Test', config);
 
       expect(loggerSpy).toHaveBeenCalledWith({
-        msg: 'ConfigDiagnosticsService: Test',
+        msg: 'Test',
         config: { foo: 'bar' },
       });
     });
@@ -61,7 +61,7 @@ describe('ConfigDiagnosticsService', () => {
       service.logConfig('Test', config);
 
       expect(loggerSpy).toHaveBeenCalledWith({
-        msg: 'ConfigDiagnosticsService: Test',
+        msg: 'Test',
         config: {
           public: 'info',
           secret: new Redacted('sensitive'),
