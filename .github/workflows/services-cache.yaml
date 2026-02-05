@@ -1,0 +1,54 @@
+name: "Services Cache Warming"
+
+on:
+  schedule:
+    - cron: "0 5 * * 1-5" # Weekdays at 5 AM UTC
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Services to warm cache for (comma-separated or "all")'
+        required: true
+        default: "all"
+
+permissions:
+  contents: read
+
+jobs:
+  build-matrix:
+    name: Build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.matrix.outputs.services }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Builds a JSON array of service names to fan out into parallel cache warming jobs.
+      # On manual dispatch with specific services, uses the comma-separated input.
+      # Otherwise (scheduled or "all"), auto-discovers services from the services/ directory.
+      - name: Build service matrix
+        id: matrix
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SERVICES: ${{ github.event.inputs.services }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_SERVICES" != "all" ]; then
+            IFS=',' read -ra requested <<< "$INPUT_SERVICES"
+            services=$(printf '%s\n' "${requested[@]}" | xargs -n1 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          else
+            services=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          fi
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+
+  # Fans out into one job per service using the reusable cache template.
+  # Dockerfile paths are derived from the convention: services/<name>/deploy/Dockerfile
+  cache:
+    name: ${{ matrix.service }}
+    needs: build-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.build-matrix.outputs.services) }}
+    uses: ./.github/workflows/_template-cache.yaml
+    with:
+      service-name: ${{ matrix.service }}
+      service-path: services/${{ matrix.service }}
