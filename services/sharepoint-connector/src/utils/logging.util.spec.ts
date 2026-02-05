@@ -2,66 +2,13 @@ import { ConfigService } from '@nestjs/config';
 import { describe, expect, it } from 'vitest';
 import type { Config } from '../config';
 import {
-  concealIngestionKey,
-  redact,
-  redactSiteNameFromPath,
   shouldConcealLogs,
   smear,
-  smearExternalId,
-  smearPath,
   smearSiteIdFromPath,
+  smearSiteNameFromPath,
 } from './logging.util';
 
 describe('logging utilities', () => {
-  describe('redact', () => {
-    it('returns __erroneous__ for null input', () => {
-      expect(redact(null)).toBe('__erroneous__');
-    });
-
-    it('returns __erroneous__ for undefined input', () => {
-      expect(redact(undefined)).toBe('__erroneous__');
-    });
-
-    it('returns [Redacted] for empty string', () => {
-      expect(redact('')).toBe('[Redacted]');
-    });
-
-    it('returns [Redacted] for very short strings that would reveal too much', () => {
-      expect(redact('a')).toBe('[Redacted]');
-      expect(redact('ab')).toBe('[Redacted]');
-      expect(redact('abc')).toBe('[Redacted]');
-      expect(redact('abcd')).toBe('[Redacted]');
-      expect(redact('abcde')).toBe('[Redacted]');
-      expect(redact('abcdef')).toBe('[Redacted]');
-    });
-
-    it('returns [Redacted] for "grove" - the specific case mentioned', () => {
-      expect(redact('grove')).toBe('[Redacted]');
-    });
-
-    it('returns [Redacted] for "hello"', () => {
-      expect(redact('hello')).toBe('[Redacted]');
-    });
-
-    it('partially redacts longer strings with meaningful middle content', () => {
-      expect(redact('abcdefg')).toBe('ab[Redacted]fg');
-      expect(redact('abcdefgh')).toBe('ab[Redacted]gh');
-      expect(redact('abcdefghi')).toBe('ab[Redacted]hi');
-    });
-
-    it('works with custom ends parameter', () => {
-      expect(redact('grove', 1)).toBe('g[Redacted]e');
-      expect(redact('very-long-string', 3)).toBe('ver[Redacted]ing');
-    });
-
-    it('returns [Redacted] for strings too short with custom ends', () => {
-      expect(redact('ab', 1)).toBe('[Redacted]'); // middle length = 2-2 = 0 < 3
-      expect(redact('abc', 1)).toBe('[Redacted]'); // middle length = 3-2 = 1 < 3
-      expect(redact('abcd', 1)).toBe('[Redacted]'); // middle length = 4-2 = 2 < 3
-      expect(redact('abcde', 1)).toBe('a[Redacted]e'); // middle length = 5-2 = 3 >= 3
-    });
-  });
-
   describe('smear', () => {
     it('returns __erroneous__ for null input', () => {
       expect(smear(null)).toBe('__erroneous__');
@@ -99,35 +46,35 @@ describe('logging utilities', () => {
     });
   });
 
-  describe('redactSiteNameFromPath', () => {
-    it('redacts site names in REST API paths', () => {
-      expect(redactSiteNameFromPath('/sites/my-site/_api/web/lists')).toBe(
-        '/sites/my[Redacted]te/_api/web/lists',
+  describe('smearSiteNameFromPath', () => {
+    it('smears site names in REST API paths', () => {
+      expect(smearSiteNameFromPath('/sites/my-site/_api/web/lists')).toBe(
+        '/sites/**-site/_api/web/lists',
       );
-      expect(redactSiteNameFromPath('/sites/anotherSite/Documents')).toBe(
-        '/sites/an[Redacted]te/Documents',
+      expect(smearSiteNameFromPath('/sites/anotherSite/Documents')).toBe(
+        '/sites/*******Site/Documents',
       );
     });
 
     it('leaves GUID-like site names untouched (handled by smearSiteIdFromPath)', () => {
       const guidPath = '/sites/a1b2c3d4-e5f6-7890-abcd-ef1234567890/_api/web';
-      expect(redactSiteNameFromPath(guidPath)).toBe(guidPath);
+      expect(smearSiteNameFromPath(guidPath)).toBe(guidPath);
     });
 
     it('handles multiple site names in path', () => {
-      expect(redactSiteNameFromPath('/sites/site1/subsite/site2/page')).toBe(
-        '/sites/[Redacted]/subsite/site2/page',
+      expect(smearSiteNameFromPath('/sites/site1/subsite/site2/page')).toBe(
+        '/sites/[Smeared]/subsite/site2/page',
       );
     });
 
     it('handles paths without site names', () => {
-      expect(redactSiteNameFromPath('/_api/web/lists')).toBe('/_api/web/lists');
-      expect(redactSiteNameFromPath('/graph/me')).toBe('/graph/me');
+      expect(smearSiteNameFromPath('/_api/web/lists')).toBe('/_api/web/lists');
+      expect(smearSiteNameFromPath('/graph/me')).toBe('/graph/me');
     });
 
     it('handles edge cases', () => {
-      expect(redactSiteNameFromPath('/sites//_api/web')).toBe('/sites//_api/web');
-      expect(redactSiteNameFromPath('/sites/a/_api/web')).toBe('/sites/[Redacted]/_api/web');
+      expect(smearSiteNameFromPath('/sites//_api/web')).toBe('/sites//_api/web');
+      expect(smearSiteNameFromPath('/sites/a/_api/web')).toBe('/sites/[Smeared]/_api/web');
     });
   });
 
@@ -147,7 +94,7 @@ describe('logging utilities', () => {
       );
     });
 
-    it('leaves non-GUID site names untouched (handled by redactSiteNameFromPath)', () => {
+    it('leaves non-GUID site names untouched (handled by smearSiteNameFromPath)', () => {
       const siteNamePath = '/sites/my-site/_api/web';
       expect(smearSiteIdFromPath(siteNamePath)).toBe(siteNamePath);
     });
@@ -171,125 +118,6 @@ describe('logging utilities', () => {
       expect(smearSiteIdFromPath('/sites/not-a-guid/_api/web')).toBe('/sites/not-a-guid/_api/web');
       expect(smearSiteIdFromPath('/sites/123-456-789/_api/web')).toBe(
         '/sites/123-456-789/_api/web',
-      );
-    });
-  });
-
-  describe('concealIngestionKey', () => {
-    it('smeares siteId in standard ingestion key format', () => {
-      expect(concealIngestionKey('a1b2c3d4-e5f6-7890-abcd-ef1234567890/item123')).toBe(
-        '********-****-****-****-********7890/item123',
-      );
-      expect(concealIngestionKey('site-guid/folder1/folder2/file.pdf')).toBe(
-        '****-guid/folder1/folder2/file.pdf',
-      );
-    });
-
-    it('handles ingestion keys with only siteId', () => {
-      expect(concealIngestionKey('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBe(
-        '********-****-****-****-********7890',
-      );
-    });
-
-    it('smeares entire key if format is unexpected', () => {
-      expect(concealIngestionKey('not-a-standard-format')).toBe('***-*-********-**rmat');
-      expect(concealIngestionKey('')).toBe('[Smeared]');
-      expect(concealIngestionKey('short')).toBe('[Smeared]');
-    });
-
-    it('handles edge cases', () => {
-      expect(concealIngestionKey('/item123')).toBe('/***m123'); // Empty siteId
-      expect(concealIngestionKey('siteId/')).toBe('[Smeared]/'); // Empty item path
-      expect(concealIngestionKey('/')).toBe('[Smeared]'); // Just separator
-    });
-
-    it('handles complex paths', () => {
-      expect(
-        concealIngestionKey('a1b2c3d4-e5f6-7890-abcd-ef1234567890/folder/subfolder/file.txt'),
-      ).toBe('********-****-****-****-********7890/folder/subfolder/file.txt');
-    });
-  });
-
-  describe('smearExternalId', () => {
-    it('returns __erroneous__ for null or undefined input', () => {
-      expect(smearExternalId(null)).toBe('__erroneous__');
-      expect(smearExternalId(undefined)).toBe('__erroneous__');
-    });
-
-    it('smears the entire string if it does not start with spc:', () => {
-      const externalId = 'otherid12345678';
-      const result = smearExternalId(externalId);
-      expect(result).toMatch(/^\*+5678$/);
-    });
-
-    it('smears the entire string if it starts with spc: but has no second colon and no slash', () => {
-      const externalId = 'spc12345678';
-      const result = smearExternalId(externalId);
-      expect(result).toMatch(/^\*+5678$/);
-    });
-
-    it('preserves prefix and smears ID part for site external IDs', () => {
-      const externalId = 'spc:site:site12345678';
-      const result = smearExternalId(externalId);
-      // site12345678 (len 12) -> ********5678 (8 stars + 4 chars)
-      expect(result).toBe('spc:site:********5678');
-    });
-
-    it('preserves prefix and uses smearPath for folder external IDs with slashes', () => {
-      const externalId = 'spc:folder:site123/folder456';
-      const result = smearExternalId(externalId);
-      // smearPath('site123/folder456') -> /***e123/*****r456
-      // substring(1) removes leading /
-      expect(result).toBe('spc:folder:***e123/*****r456');
-    });
-
-    it('handles drive external IDs correctly', () => {
-      const externalId = 'spc:drive:site123/drive789';
-      const result = smearExternalId(externalId);
-      // site123 -> ***e123, drive789 -> ****e789
-      expect(result).toBe('spc:drive:***e123/****e789');
-    });
-
-    it('handles sitePages special case correctly', () => {
-      // In ScopeManagementService: `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId}/sitePages`
-      const externalId = 'spc:site123/sitePages';
-      const result = smearExternalId(externalId);
-      // site123 -> ***e123, sitePages -> *****ages
-      expect(result).toBe('spc:***e123/*****ages');
-    });
-
-    it('handles unknown external IDs correctly', () => {
-      // In ScopeManagementService: `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId}/${scope.name}-${randomUUID()}`
-      const externalId = 'spc:unknown:site123/MyFolder-uuid123';
-      const result = smearExternalId(externalId);
-      // site123 -> ***e123, MyFolder-uuid123 -> ********-***d123
-      expect(result).toBe('spc:unknown:***e123/********-***d123');
-    });
-  });
-
-  describe('smearPath', () => {
-    it('handles paths starting with slash', () => {
-      // normalizeSlashes removes leading/trailing slashes
-      // smearPath prepends one back
-      // /a/b/c -> a/b/c -> [Smeared]/[Smeared]/[Smeared] -> /[Smeared]/[Smeared]/[Smeared]
-      expect(smearPath('/a/b/c', 1)).toBe('/[Smeared]/[Smeared]/[Smeared]');
-    });
-
-    it('handles paths NOT starting with slash', () => {
-      // a/b/c -> a/b/c -> [Smeared]/[Smeared]/[Smeared] -> /[Smeared]/[Smeared]/[Smeared]
-      expect(smearPath('a/b/c', 1)).toBe('/[Smeared]/[Smeared]/[Smeared]');
-    });
-
-    it('handles empty path', () => {
-      expect(smearPath('')).toBe('/[Smeared]');
-    });
-
-    it('honors addLeadingSlash option', () => {
-      expect(smearPath('a/b/c', 1, { addLeadingSlash: false })).toBe(
-        '[Smeared]/[Smeared]/[Smeared]',
-      );
-      expect(smearPath('a/b/c', 1, { addLeadingSlash: true })).toBe(
-        '/[Smeared]/[Smeared]/[Smeared]',
       );
     });
   });

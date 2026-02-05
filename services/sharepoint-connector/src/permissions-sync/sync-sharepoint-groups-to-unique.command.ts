@@ -1,14 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import { difference, filter, isNonNullish, map, pickBy, pipe } from 'remeda';
-import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 import { getSharepointConnectorGroupExternalId } from '../unique-api/unique-groups/unique-groups.utils';
-import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
+import { createSmeared, Smeared } from '../utils/smeared';
 import {
   GroupDistinctId,
   SharePointGroupsMap,
@@ -18,7 +16,7 @@ import {
 } from './types';
 
 interface Input {
-  siteId: string;
+  siteId: Smeared;
   sharePoint: {
     groupsMap: SharePointGroupsMap;
   };
@@ -38,23 +36,18 @@ interface Output {
 @Injectable()
 export class SyncSharepointGroupsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly graphApiService: GraphApiService,
-    private readonly configService: ConfigService<Config, true>,
     @Inject(SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL)
     private readonly spcPermissionsSyncGroupOperationsTotal: Counter,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async run(input: Input): Promise<Output> {
     const { siteId, sharePoint, unique } = input;
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
+    const logPrefix = `[Site: ${siteId}]`;
 
     const siteName = await this.graphApiService.getSiteName(siteId);
     const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
@@ -73,9 +66,9 @@ export class SyncSharepointGroupsToUniqueCommand {
     };
 
     for (const sharePointGroup of sharePointGroups) {
-      const groupLogPrefix = `[Group: ${this.shouldConcealLogs ? redact(sharePointGroup.id) : sharePointGroup.id}]`;
+      const groupLogPrefix = `[Group: ${sharePointGroup.id}]`;
       this.logger.debug(
-        `${groupLogPrefix} Syncing sharepoint group ${this.shouldConcealLogs ? redact(sharePointGroup.displayName) : sharePointGroup.displayName}`,
+        `${groupLogPrefix} Syncing sharepoint group ${createSmeared(sharePointGroup.displayName)}`,
       );
 
       const correspondingUniqueGroup = unique.groupsMap[sharePointGroup.id];
@@ -150,7 +143,10 @@ export class SyncSharepointGroupsToUniqueCommand {
 
     const syncStatsEntries = Object.entries(groupsSyncStats).filter(([_, count]) => count > 0);
     for (const [operation, count] of syncStatsEntries) {
-      this.spcPermissionsSyncGroupOperationsTotal.add(count, { sp_site_id: logSiteId, operation });
+      this.spcPermissionsSyncGroupOperationsTotal.add(count, {
+        sp_site_id: siteId.toString(),
+        operation,
+      });
     }
 
     return {
@@ -159,8 +155,8 @@ export class SyncSharepointGroupsToUniqueCommand {
   }
 
   private async createUniqueGroup(
-    siteId: string,
-    siteName: string,
+    siteId: Smeared,
+    siteName: Smeared,
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
   ): Promise<UniqueGroupWithMembers | null> {
@@ -172,7 +168,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
     const uniqueGroup = await this.uniqueGroupsService.createGroup({
       name: getUniqueGroupName(siteName, sharePointGroup.displayName),
-      externalId: getSharepointConnectorGroupExternalId(siteId, sharePointGroup.id),
+      externalId: getSharepointConnectorGroupExternalId(siteId.value, sharePointGroup.id),
     });
 
     await this.uniqueGroupsService.addGroupMembers(uniqueGroup.id, memberIds);
@@ -183,7 +179,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
   private async syncExistingUniqueGroup(
     uniqueGroup: UniqueGroupWithMembers,
-    siteName: string,
+    siteName: Smeared,
     sharePointGroup: SharepointGroupWithMembers,
     uniqueUsersMap: UniqueUsersMap,
   ): Promise<[groupUpdated: boolean, UniqueGroupWithMembers | null]> {
@@ -232,8 +228,8 @@ export class SyncSharepointGroupsToUniqueCommand {
   }
 }
 
-function getUniqueGroupName(siteName: string, sharePointGroupName: string): string {
-  return `[SPC-${siteName}] ${sharePointGroupName}`;
+function getUniqueGroupName(siteName: Smeared, sharePointGroupName: string): string {
+  return `[SPC-${siteName.value}] ${sharePointGroupName}`;
 }
 
 function getUniqueMemberIds(

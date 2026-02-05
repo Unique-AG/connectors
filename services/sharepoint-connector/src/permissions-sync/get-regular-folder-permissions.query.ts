@@ -2,13 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { isNullish } from 'remeda';
 import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
+import { Smeared } from '../utils/smeared';
 import { Membership } from './types';
 import { isTopFolder } from './utils';
 
 interface Input {
   directories: SharepointDirectoryItem[];
   permissionsMap: Record<string, Membership[]>;
-  rootPath: string;
+  rootPath: Smeared;
 }
 
 @Injectable()
@@ -37,7 +38,7 @@ export class GetRegularFolderPermissionsQuery {
         continue;
       }
 
-      result.set(folderPath, permissions);
+      result.set(folderPath.value, permissions);
     }
 
     return result;

@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { Smeared } from '../utils/smeared';
 import { GetRegularFolderPermissionsQuery } from './get-regular-folder-permissions.query';
 import type { Membership } from './types';
 
@@ -10,11 +11,11 @@ describe('GetRegularFolderPermissionsQuery', () => {
   let loggerWarnSpy: ReturnType<typeof vi.fn>;
 
   const mockSiteId = 'site-123';
-  const rootPath = 'TestSite';
+  const rootPath = new Smeared('TestSite', false);
 
   const createMockDirectory = (id: string, webUrl: string): SharepointDirectoryItem => ({
     itemType: 'directory',
-    siteId: mockSiteId,
+    siteId: new Smeared(mockSiteId, false),
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: '/test',

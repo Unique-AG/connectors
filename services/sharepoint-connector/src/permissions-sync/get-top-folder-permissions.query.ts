@@ -11,6 +11,7 @@ import {
   getUniqueParentPathFromItem,
   getUniquePathFromItem,
 } from '../utils/sharepoint.util';
+import { createSmeared, Smeared } from '../utils/smeared';
 import { GroupMembership, Membership } from './types';
 import { groupDistinctId, isTopFolder } from './utils';
 
@@ -18,7 +19,7 @@ interface Input {
   items: SharepointContentItem[];
   directories: SharepointDirectoryItem[];
   permissionsMap: Record<string, Membership[]>;
-  rootPath: string;
+  rootPath: Smeared;
 }
 
 @Injectable()
@@ -39,14 +40,14 @@ export class GetTopFolderPermissionsQuery {
         permissionsMap,
         rootPath,
       );
-      result.set(topFolderPath, aggregatedGroups);
+      result.set(topFolderPath.value, aggregatedGroups);
     }
 
     return result;
   }
 
-  private identifyTopFolders(items: AnySharepointItem[], rootPath: string): string[] {
-    const normalizedRootPath = `/${normalizeSlashes(rootPath)}`;
+  private identifyTopFolders(items: AnySharepointItem[], rootPath: Smeared): Smeared[] {
+    const normalizedRootPath = createSmeared(`/${normalizeSlashes(rootPath.value)}`);
 
     return pipe(
       items,
@@ -60,10 +61,10 @@ export class GetTopFolderPermissionsQuery {
   }
 
   private aggregateGroupPermissions(
-    topFolderPath: string,
+    topFolderPath: Smeared,
     items: AnySharepointItem[],
     permissionsMap: Record<string, Membership[]>,
-    rootPath: string,
+    rootPath: Smeared,
   ): GroupMembership[] {
     const groupsMap = new Map<string, GroupMembership>();
 
@@ -97,7 +98,9 @@ export class GetTopFolderPermissionsQuery {
     return Array.from(groupsMap.values());
   }
 
-  private isDescendantOf(itemPath: string, topFolderPath: string): boolean {
-    return itemPath === topFolderPath || itemPath.startsWith(`${topFolderPath}/`);
+  private isDescendantOf(itemPath: Smeared, topFolderPath: Smeared): boolean {
+    return (
+      itemPath.value === topFolderPath.value || itemPath.value.startsWith(`${topFolderPath.value}/`)
+    );
   }
 }

@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import {
   differenceWith,
@@ -12,13 +11,12 @@ import {
   partition,
   pipe,
 } from 'remeda';
-import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { redact, shouldConcealLogs, smear } from '../utils/logging.util';
 import { isAncestorOfRootPath } from '../utils/paths.util';
+import { createSmeared } from '../utils/smeared';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -37,27 +35,22 @@ interface Input {
 @Injectable()
 export class SyncSharepointFolderPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
-    private readonly configService: ConfigService<Config, true>,
     @Inject(SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL)
     private readonly spcFolderPermissionsSyncTotal: Counter,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId } = context.siteConfig;
     const { rootPath, serviceUserId } = context;
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
+    const logPrefix = `[Site: ${siteId}]`;
 
     const uniqueFoldersToProcess = unique.folders.filter(
-      (folder) => !isAncestorOfRootPath(folder.path, rootPath),
+      (folder) => !isAncestorOfRootPath(folder.path, rootPath.value),
     );
 
     this.logger.log(
@@ -81,9 +74,7 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
       if (isNullish(permissions)) {
         this.logger.warn(
-          `${loopLogPrefix} No permissions found for path ${
-            this.shouldConcealLogs ? redact(uniqueFolder.path) : uniqueFolder.path
-          }`,
+          `${loopLogPrefix} No permissions found for path ${createSmeared(uniqueFolder.path)}`,
         );
         continue;
       }
@@ -111,13 +102,13 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
     if (totalScopeAccessesAdded > 0) {
       this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesAdded, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         operation: 'added',
       });
     }
     if (totalScopeAccessesRemoved > 0) {
       this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesRemoved, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         operation: 'removed',
       });
     }

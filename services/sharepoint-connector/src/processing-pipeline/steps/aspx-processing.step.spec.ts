@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import type { ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
+import { Smeared } from '../../utils/smeared';
 import { createMockSiteConfig } from '../../utils/test-utils/mock-site-config';
 import type { ProcessingContext } from '../types/processing-context';
 import { AspxProcessingStep } from './aspx-processing.step';
@@ -40,9 +41,9 @@ describe('AspxProcessingStep', () => {
   const mockContext: ProcessingContext = {
     syncContext: {
       siteConfig: createMockSiteConfig(),
-      siteName: 'test-site',
+      siteName: new Smeared('test-site', false),
       serviceUserId: 'user-1',
-      rootPath: '/Root',
+      rootPath: new Smeared('/Root', false),
     },
     correlationId: 'c1',
     startTime: new Date(),
@@ -53,7 +54,7 @@ describe('AspxProcessingStep', () => {
     pipelineItem: {
       itemType: 'listItem' as const,
       item: mockListItem,
-      siteId: 'site-1',
+      siteId: new Smeared('site-1', false),
       driveId: 'drive-1',
       driveName: 'SitePages',
       folderPath: '/',
@@ -107,7 +108,11 @@ describe('AspxProcessingStep', () => {
     it('fetches ASPX content and returns context with HTML content', async () => {
       const result = await step.execute(mockContext);
 
-      expect(mockApiService.getAspxPageContent).toHaveBeenCalledWith('site-1', 'drive-1', 'f1');
+      expect(mockApiService.getAspxPageContent).toHaveBeenCalledWith(
+        expect.objectContaining({ value: 'site-1' }),
+        'drive-1',
+        'f1',
+      );
       expect(result.mimeType).toBe('text/html');
       expect(result.htmlContent).toBeDefined();
       expect(result.htmlContent).toContain('<h2>Test Page</h2>');

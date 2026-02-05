@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Smeared } from 'src/utils/smeared';
 import { Config } from '../../config';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
@@ -101,7 +102,7 @@ export class UniqueFileIngestionService {
 
   public async performFileDiff(
     fileList: FileDiffItem[],
-    partialKey: string,
+    partialKey: Smeared,
   ): Promise<FileDiffResponse> {
     const ingestionUrl = new URL(
       this.configService.get('unique.ingestionServiceBaseUrl', { infer: true }),
@@ -111,7 +112,7 @@ export class UniqueFileIngestionService {
     const fileDiffPath = `${pathPrefix}/v2/content/file-diff`;
 
     const diffRequest: FileDiffRequest = {
-      partialKey,
+      partialKey: partialKey.value,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       fileList,

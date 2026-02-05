@@ -5,6 +5,7 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { Smeared } from '../utils/smeared';
 import { GetTopFolderPermissionsQuery } from './get-top-folder-permissions.query';
 import type { GroupMembership, Membership } from './types';
 
@@ -13,11 +14,11 @@ describe('GetTopFolderPermissionsQuery', () => {
   let loggerWarnSpy: ReturnType<typeof vi.fn>;
 
   const mockSiteId = 'site-123';
-  const rootPath = 'TestSite';
+  const rootPath = new Smeared('TestSite', false);
 
   const createMockFile = (id: string, webUrl: string): SharepointContentItem => ({
     itemType: 'driveItem',
-    siteId: mockSiteId,
+    siteId: new Smeared(mockSiteId, false),
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: '/test',
@@ -69,7 +70,7 @@ describe('GetTopFolderPermissionsQuery', () => {
 
   const createMockDirectory = (id: string, webUrl: string): SharepointDirectoryItem => ({
     itemType: 'directory',
-    siteId: mockSiteId,
+    siteId: new Smeared(mockSiteId, false),
     driveId: 'drive-1',
     driveName: 'Documents',
     folderPath: '/test',
