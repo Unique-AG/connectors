@@ -25,6 +25,14 @@ coverage/
 # Vercel
 .vercel
 
+# Python
+__pycache__
+
+# Editors
+.vscode
+.idea
+.cursor
+
 # Build Outputs
 .next/
 out/
