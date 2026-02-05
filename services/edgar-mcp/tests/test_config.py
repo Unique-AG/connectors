@@ -1,6 +1,69 @@
 import pytest
 
 
+class TestAppConfig:
+    """Test application configuration behavior."""
+
+    def test_loads_from_env_vars(self, monkeypatch):
+        """Loads settings from env vars."""
+        monkeypatch.setenv("APP_ENV", "development")
+        monkeypatch.setenv("PORT", "8080")
+        monkeypatch.setenv("LOG_LEVEL", "debug")
+        monkeypatch.setenv("LOGS_DIAGNOSTICS_DATA_POLICY", "disclose")
+
+        from edgar_mcp.config import AppConfig
+
+        config = AppConfig()
+
+        assert config.app_env == "development"
+        assert config.port == 8080
+        assert config.log_level == "debug"
+        assert config.logs_diagnostics_data_policy == "disclose"
+
+    def test_uses_defaults(self, monkeypatch):
+        """Uses sensible defaults when env vars not set."""
+        monkeypatch.delenv("APP_ENV", raising=False)
+        monkeypatch.delenv("PORT", raising=False)
+        monkeypatch.delenv("LOG_LEVEL", raising=False)
+        monkeypatch.delenv("LOGS_DIAGNOSTICS_DATA_POLICY", raising=False)
+
+        from edgar_mcp.config import AppConfig
+
+        config = AppConfig()
+
+        assert config.app_env == "production"
+        assert config.port == 9542
+        assert config.log_level == "info"
+        assert config.logs_diagnostics_data_policy == "conceal"
+
+    def test_rejects_invalid_app_env(self, monkeypatch):
+        """Invalid app_env value is rejected."""
+        monkeypatch.setenv("APP_ENV", "staging")
+
+        from edgar_mcp.config import AppConfig
+
+        with pytest.raises(ValueError):
+            AppConfig()
+
+    def test_rejects_invalid_log_level(self, monkeypatch):
+        """Invalid log_level value is rejected."""
+        monkeypatch.setenv("LOG_LEVEL", "verbose")
+
+        from edgar_mcp.config import AppConfig
+
+        with pytest.raises(ValueError):
+            AppConfig()
+
+    def test_rejects_invalid_port(self, monkeypatch):
+        """Port outside valid range is rejected."""
+        monkeypatch.setenv("PORT", "70000")
+
+        from edgar_mcp.config import AppConfig
+
+        with pytest.raises(ValueError):
+            AppConfig()
+
+
 class TestDatabaseConfig:
     """Test database configuration URL building behavior."""
 
