@@ -5,7 +5,7 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppEnv = Literal["development", "production", "test"]
-LogLevel = Literal["fatal", "error", "warn", "info", "debug", "trace", "silent"]
+LogLevel = Literal["fatal", "error", "warn", "info", "debug"]
 DiagnosticsDataPolicy = Literal["conceal", "disclose"]
 
 
