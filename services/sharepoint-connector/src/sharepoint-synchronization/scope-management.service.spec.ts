@@ -1,7 +1,5 @@
-import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
@@ -115,11 +113,8 @@ describe('ScopeManagementService', () => {
     }),
   };
 
-  type ConfigServiceMock = ConfigService<Config, true> & { get: ReturnType<typeof vi.fn> };
-
   let service: ScopeManagementService;
   let createScopesMock: ReturnType<typeof vi.fn>;
-  let configServiceMock: ConfigServiceMock;
 
   beforeEach(async () => {
     createScopesMock = vi.fn().mockResolvedValue(
@@ -131,23 +126,12 @@ describe('ScopeManagementService', () => {
       })),
     );
 
-    configServiceMock = {
-      get: vi.fn((key: string) => {
-        if (key === 'app.logsDiagnosticsDataPolicy') {
-          return 'conceal';
-        }
-        return undefined;
-      }),
-    } as unknown as ConfigServiceMock;
-
     const { unit } = await TestBed.solitary(ScopeManagementService)
       .mock<UniqueScopesService>(UniqueScopesService)
       .impl((stubFn) => ({
         ...stubFn(),
         createScopesBasedOnPaths: createScopesMock,
       }))
-      .mock<ConfigService<Config, true>>(ConfigService)
-      .impl(() => configServiceMock)
       .compile();
 
     service = unit;
@@ -181,13 +165,6 @@ describe('ScopeManagementService', () => {
       getCurrentUserIdMock = vi.fn().mockResolvedValue('user-123');
       updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
 
-      const configService = {
-        get: vi.fn((key: string) => {
-          if (key === 'app.logsDiagnosticsDataPolicy') return 'show';
-          return undefined;
-        }),
-      };
-
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
         .impl((stubFn) => ({
@@ -201,8 +178,6 @@ describe('ScopeManagementService', () => {
           ...stubFn(),
           getCurrentUserId: getCurrentUserIdMock,
         }))
-        .mock<ConfigService<Config, true>>(ConfigService)
-        .impl(() => configService as unknown as ConfigService<Config, true>)
         .compile();
 
       service = unit;
@@ -495,21 +470,12 @@ describe('ScopeManagementService', () => {
     beforeEach(async () => {
       updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
 
-      const configService = {
-        get: vi.fn((key: string) => {
-          if (key === 'app.logsDiagnosticsDataPolicy') return 'show'; // Don't conceal logs for this test
-          return undefined;
-        }),
-      };
-
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
         .impl((stubFn) => ({
           ...stubFn(),
           updateScopeExternalId: updateScopeExternalIdMock,
         }))
-        .mock<ConfigService<Config, true>>(ConfigService)
-        .impl(() => configService as unknown as ConfigService<Config, true>)
         .compile();
 
       service = unit;
