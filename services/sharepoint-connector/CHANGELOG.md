@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.0.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.13...sharepoint-connector@2.0.0) (2026-02-05)
+
+
+### Features
+
+* **sharepoint-connector:** add HTTP proxy support ([#242](https://github.com/Unique-AG/connectors/issues/242)) ([cc852fc](https://github.com/Unique-AG/connectors/commit/cc852fcb19d62774b7779a46a9f3075b89c9d5bc))
+* **sharepoint-connector:** aggregate group permissions for site and library scopes ([#249](https://github.com/Unique-AG/connectors/issues/249)) ([1c96175](https://github.com/Unique-AG/connectors/commit/1c96175297ff32fcbe06f9b6750f019433b746d4))
+* **sharepoint-connector:** detect and migrate scopes when root scope ID changes ([#246](https://github.com/Unique-AG/connectors/issues/246)) ([5d2dbe3](https://github.com/Unique-AG/connectors/commit/5d2dbe3e487f0efb549fb67a19759815d4ca9d6b))
+* **sharepoint-connector:** Implement Non-Secret Configuration Emission for SharePoint Connector ([#237](https://github.com/Unique-AG/connectors/issues/237)) ([5eb9e4e](https://github.com/Unique-AG/connectors/commit/5eb9e4e7f1741c3381b30ccb33320b4fb7565035))
+
+
+### Miscellaneous Chores
+
+* **sharepoint-connector:** officially release SPC 2.0.0 ([#257](https://github.com/Unique-AG/connectors/issues/257)) ([987552f](https://github.com/Unique-AG/connectors/commit/987552f29b3fe6957ae51ca81d89b7e724756200))
+
 ## [2.0.0-beta.13](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.12...sharepoint-connector@2.0.0-beta.13) (2026-01-28)
 
 
