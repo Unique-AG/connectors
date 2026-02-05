@@ -246,11 +246,16 @@ export const ContentInfoItemSchema = z.object({
 });
 export type ContentInfoItem = z.infer<typeof ContentInfoItemSchema>;
 
-export const PublicContentInfosResultSchema = z.object({
-  contents: z.array(ContentInfoItemSchema),
-  total: z.number().optional(),
-  object: z.literal('contents').optional(),
-});
-export type PublicContentInfosResult = z.infer<typeof PublicContentInfosResultSchema>;
+export const PublicContentInfosResultSchema = z
+  .object({
+    contentInfos: z.array(ContentInfoItemSchema),
+    totalCount: z.number().optional(),
+    object: z.literal('content-infos').optional(),
+  })
+  .transform((data) => ({
+    contents: data.contentInfos,
+    total: data.totalCount,
+  }));
+export type PublicContentInfosResult = z.output<typeof PublicContentInfosResultSchema>;
 
 // !SECTION - ContentInfos endpoint types
