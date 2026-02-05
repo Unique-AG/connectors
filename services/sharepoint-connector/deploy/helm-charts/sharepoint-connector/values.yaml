@@ -279,7 +279,7 @@ connectorConfig:
 
 # -- HTTP proxy configuration for external API calls
 # Required for environments where internet access is only available through a proxy.
-# Users preferring setting all variables by hand disable the enabled flag and remove 
+# Users preferring setting all variables by hand disable the enabled flag and remove
 # sharepoint-connector-proxy-config from connector.extraEnvCM.
 proxyConfig:
   # -- if disabled, sharepoint-connector-proxy-config must be removed from connector.extraEnvCM.
