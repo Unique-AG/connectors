@@ -90,18 +90,18 @@ export class FindTranscriptsTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('filter.subject', input.subject ?? '');
-    span?.setAttribute('filter.date_from', input.dateFrom ?? '');
-    span?.setAttribute('filter.date_to', input.dateTo ?? '');
-    span?.setAttribute('filter.participant', input.participant ?? '');
+    span?.setAttribute('filter.has_subject', !!input.subject);
+    span?.setAttribute('filter.has_date_from', !!input.dateFrom);
+    span?.setAttribute('filter.has_date_to', !!input.dateTo);
+    span?.setAttribute('filter.has_participant', !!input.participant);
 
     this.logger.debug(
       {
         userProfileId,
-        subject: input.subject,
-        dateFrom: input.dateFrom,
-        dateTo: input.dateTo,
-        participant: input.participant,
+        hasSubject: !!input.subject,
+        hasDateFrom: !!input.dateFrom,
+        hasDateTo: !!input.dateTo,
+        hasParticipant: !!input.participant,
         skip: input.skip,
         take: input.take,
       },
@@ -122,9 +122,9 @@ export class FindTranscriptsTool {
       return {
         id: content.id,
         title: content.title,
-        date: metadata?.date,
-        participantNames: metadata?.participant_names,
-        participantEmails: metadata?.participant_emails,
+        date: (metadata?.date as string | undefined) ?? null,
+        participantNames: (metadata?.participant_names as string | undefined) ?? null,
+        participantEmails: (metadata?.participant_emails as string | undefined) ?? null,
         readUrl: content.readUrl ?? null,
       };
     });

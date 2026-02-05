@@ -38,8 +38,8 @@ export class UniqueUserService {
       try {
         const result = PublicUsersResultSchema.parse(await this.api.get('users', params));
         return result.users.at(0) ?? null;
-      } catch {
-        this.logger.warn({ email }, 'Failed to locate user in Unique system');
+      } catch (err) {
+        this.logger.warn({ err }, 'Failed to locate user in Unique system');
         return null;
       }
     };
