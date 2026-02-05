@@ -12,6 +12,7 @@ import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.ty
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
+import { RootScopeMigrationService } from './root-scope-migration.service';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -174,12 +175,14 @@ describe('ScopeManagementService', () => {
     let createScopeAccessesMock: ReturnType<typeof vi.fn>;
     let getCurrentUserIdMock: ReturnType<typeof vi.fn>;
     let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+    let migrateIfNeededMock: ReturnType<typeof vi.fn>;
 
     beforeEach(async () => {
       getScopeByIdMock = vi.fn();
       createScopeAccessesMock = vi.fn();
       getCurrentUserIdMock = vi.fn().mockResolvedValue('user-123');
       updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
+      migrateIfNeededMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
 
       const configService = {
         get: vi.fn((key: string) => {
@@ -200,6 +203,11 @@ describe('ScopeManagementService', () => {
         .impl((stubFn) => ({
           ...stubFn(),
           getCurrentUserId: getCurrentUserIdMock,
+        }))
+        .mock<RootScopeMigrationService>(RootScopeMigrationService)
+        .impl((stubFn) => ({
+          ...stubFn(),
+          migrateIfNeeded: migrateIfNeededMock,
         }))
         .mock<ConfigService<Config, true>>(ConfigService)
         .impl(() => configService as unknown as ConfigService<Config, true>)
@@ -228,17 +236,40 @@ describe('ScopeManagementService', () => {
         parentId: null,
       });
 
-      await service.initializeRootScope(
-        'root-scope-123',
-        new Smeared('site-123', false),
-        IngestionMode.Flat,
-      );
+      const siteId = new Smeared('site-123', false);
+      // As we do not patch env variable, Smeared external id constructed inside will be active.
+      const externalId = new Smeared(`spc:site:${siteId.value}`, true);
+      await service.initializeRootScope('root-scope-123', siteId, IngestionMode.Flat);
 
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', expect.any(Smeared));
+      expect(migrateIfNeededMock).toHaveBeenCalledWith('root-scope-123', siteId);
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', externalId);
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
         expect.stringMatching(/Claimed root scope root-scope-123 with externalId: .*/),
       );
+    });
+
+    it('throws when root scope migration fails', async () => {
+      getScopeByIdMock.mockResolvedValueOnce({
+        id: 'root-scope-123',
+        name: 'test1',
+        externalId: null,
+        parentId: null,
+      });
+      migrateIfNeededMock.mockResolvedValueOnce({
+        status: 'migration_failed',
+        error: 'Failed to move child scopes',
+      });
+
+      await expect(
+        service.initializeRootScope(
+          'root-scope-123',
+          new Smeared('site-123', false),
+          IngestionMode.Flat,
+        ),
+      ).rejects.toThrow('Root scope migration failed: Failed to move child scopes');
+
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
     });
 
     it('skips claiming if externalId is already set to the correct site', async () => {

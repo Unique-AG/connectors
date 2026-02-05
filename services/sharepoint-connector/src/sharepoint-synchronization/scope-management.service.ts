@@ -16,6 +16,7 @@ import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
+import { RootScopeMigrationService } from './root-scope-migration.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 const buildSiteExternalId = (siteId: Smeared) =>
@@ -33,6 +34,7 @@ export class ScopeManagementService {
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
+    private readonly rootScopeMigrationService: RootScopeMigrationService,
   ) {}
 
   public async initializeRootScope(
@@ -62,6 +64,14 @@ export class ScopeManagementService {
     );
 
     if (!rootScope.externalId) {
+      const migrationResult = await this.rootScopeMigrationService.migrateIfNeeded(
+        rootScopeId,
+        siteId,
+      );
+      if (migrationResult.status === 'migration_failed') {
+        throw new Error(`Root scope migration failed: ${migrationResult.error}`);
+      }
+
       const externalId = buildSiteExternalId(siteId);
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
@@ -112,7 +122,7 @@ export class ScopeManagementService {
     this.logger.log(`${logPrefix} Deleting root scope recursively`);
 
     try {
-      const result = await this.uniqueScopesService.deleteScopeRecursively(scopeId);
+      const result = await this.uniqueScopesService.deleteScope(scopeId, { recursive: true });
 
       if (result.successFolders.length > 0) {
         this.logger.log(
