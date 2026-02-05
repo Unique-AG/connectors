@@ -45,9 +45,6 @@
       ]
     },
     "services/sharepoint-connector": {
-      "prerelease": true,
-      "prerelease-type": "beta",
-      "versioning": "prerelease",
       "extra-files": [
         {
           "type": "yaml",
