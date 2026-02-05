@@ -7,6 +7,7 @@ import { ProcessingPipelineModule } from '../processing-pipeline/processing-pipe
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
+import { RootScopeMigrationService } from './root-scope-migration.service';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 
@@ -23,6 +24,7 @@ import { SharepointSynchronizationService } from './sharepoint-synchronization.s
     SharepointSynchronizationService,
     ContentSyncService,
     FileMoveProcessor,
+    RootScopeMigrationService,
     ScopeManagementService,
   ],
   exports: [SharepointSynchronizationService],
