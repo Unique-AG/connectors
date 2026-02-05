@@ -15,8 +15,6 @@ import {
 } from '../src/unique-api/clients/unique-graphql.client';
 import type { ContentUpsertMutationInput } from '../src/unique-api/unique-file-ingestion/unique-file-ingestion.consts';
 import type { AddAccessesMutationInput } from '../src/unique-api/unique-files/unique-files.consts';
-import { baseState, type ScenarioState } from './test-state/base-state';
-import { applyScenarioState } from './test-state/load-state';
 import { MockGraphClient } from './test-utils/mock-graph-client';
 import { MockHttpClientService } from './test-utils/mock-http-client.service';
 import { MockIngestionHttpClient } from './test-utils/mock-ingestion-http.client';
@@ -112,22 +110,11 @@ describe('SharePoint synchronization (e2e)', () => {
     mockScopeGraphqlClient.request.mockClear();
   });
 
-  function cloneBaseState(): ScenarioState {
-    return structuredClone(baseState);
-  }
-
-  async function runSynchronisation(state: ScenarioState): Promise<{ status: string }> {
-    // Build the entire scenario state explicitly in the test body (see `test brainsstorm.md`).
-    applyScenarioState({ graphClient: mockGraphClient, uniqueMock, state });
-
-    const service = app.get(SharepointSynchronizationService);
-    return await service.synchronize();
-  }
-
   describe('Content Ingestion', () => {
     describe('when syncing a pdf file', () => {
       it('sends correct mimeType to ContentUpsert', async () => {
-        await runSynchronisation(cloneBaseState());
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
 
         // Query the ingestion GraphQL client mock directly
         const upserts = getGraphQLOperations<ContentUpsertMutationInput>(
@@ -150,16 +137,20 @@ describe('SharePoint synchronization (e2e)', () => {
     });
 
     describe('when syncing an xlsx file', () => {
-      it('sends correct mimeType to file-diff', async () => {
-        const state = cloneBaseState();
-        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
-        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
-          drive.content[0].mock.mimeType =
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-          drive.content[0].mock.name = 'report.xlsx';
+      beforeEach(() => {
+        const item = mockGraphClient.driveItems[0];
+        if (item?.file) {
+          item.file.mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          item.name = 'report.xlsx';
+          if (item.listItem?.fields) {
+            item.listItem.fields.FileLeafRef = 'report.xlsx';
+          }
         }
+      });
 
-        await runSynchronisation(state);
+      it('sends correct mimeType to file-diff', async () => {
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
 
         // Verify the request was called
         expect(mockIngestionHttpClient.request).toHaveBeenCalled();
@@ -206,29 +197,24 @@ describe('SharePoint synchronization (e2e)', () => {
       });
 
       it('includes xlsx file in synchronization', async () => {
-        const state = cloneBaseState();
-        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
-        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
-          drive.content[0].mock.mimeType =
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-          drive.content[0].mock.name = 'report.xlsx';
-        }
-
-        await runSynchronisation(state);
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
 
         expect(mockIngestionHttpClient.request).toHaveBeenCalled();
       });
     });
 
     describe('when file is not marked for sync', () => {
-      it('excludes file from synchronization', async () => {
-        const state = cloneBaseState();
-        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
-        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
-          drive.content[0].mock.syncFlag = false;
+      beforeEach(() => {
+        const item = mockGraphClient.driveItems[0];
+        if (item?.listItem?.fields) {
+          item.listItem.fields.SyncFlag = false;
         }
+      });
 
-        await runSynchronisation(state);
+      it('excludes file from synchronization', async () => {
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
 
         // Check if request was called, and if so verify empty fileList
         if (mockIngestionHttpClient.request.mock.calls.length > 0) {
@@ -242,14 +228,16 @@ describe('SharePoint synchronization (e2e)', () => {
     });
 
     describe('when file exceeds size limit', () => {
-      it('excludes file from file-diff request', async () => {
-        const state = cloneBaseState();
-        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
-        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
-          drive.content[0].mock.size = 999999999;
+      beforeEach(() => {
+        const item = mockGraphClient.driveItems[0];
+        if (item) {
+          item.size = 999999999;
         }
+      });
 
-        await runSynchronisation(state);
+      it('excludes file from file-diff request', async () => {
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
 
         // Check if request was called, and if so verify empty fileList
         if (mockIngestionHttpClient.request.mock.calls.length > 0) {
@@ -263,19 +251,25 @@ describe('SharePoint synchronization (e2e)', () => {
     });
 
     describe('when multiple files have mixed sync flags', () => {
-      it('only synchronizes the marked file', async () => {
-        const state = cloneBaseState();
-        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
-        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
-          const hidden = structuredClone(drive.content[0]);
-          hidden.mock.id = 'item-2';
-          hidden.mock.name = 'hidden.pdf';
-          hidden.mock.syncFlag = false;
-          hidden.permissions = [];
-          drive.content = [drive.content[0], hidden];
+      beforeEach(() => {
+        // Add a second item not marked for sync
+        const syncedItem = mockGraphClient.driveItems[0];
+        if (!syncedItem) return;
+
+        const unsyncedItem = JSON.parse(JSON.stringify(syncedItem));
+        unsyncedItem.id = 'item-2';
+        unsyncedItem.name = 'hidden.pdf';
+        if (unsyncedItem.listItem?.fields) {
+          unsyncedItem.listItem.fields.SyncFlag = false;
+          unsyncedItem.listItem.fields.FileLeafRef = 'hidden.pdf';
         }
 
-        await runSynchronisation(state);
+        mockGraphClient.driveItems = [syncedItem, unsyncedItem];
+      });
+
+      it('only synchronizes the marked file', async () => {
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
 
         // Verify the request was called and parse request body
         expect(mockIngestionHttpClient.request).toHaveBeenCalled();
@@ -305,7 +299,8 @@ describe('SharePoint synchronization (e2e)', () => {
   describe('Permissions Sync', () => {
     describe('when file has user with read permission', () => {
       it('synchronizes with default permissions', async () => {
-        await runSynchronisation(cloneBaseState());
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
 
         // Verify that CreateFileAccessesForContents was called on the ingestion client
         const accessCalls = getGraphQLOperations<AddAccessesMutationInput>(
@@ -317,14 +312,13 @@ describe('SharePoint synchronization (e2e)', () => {
     });
 
     describe('when file has no external permissions', () => {
-      it('still processes the file', async () => {
-        const state = cloneBaseState();
-        const drive = state.sharepoint.libraries.find((l) => l.type === 'drive');
-        if (drive?.type === 'drive' && drive.content[0]?.type === 'file') {
-          drive.content[0].permissions = [];
-        }
+      beforeEach(() => {
+        mockGraphClient.permissions['item-1'] = [];
+      });
 
-        await runSynchronisation(state);
+      it('still processes the file', async () => {
+        const service = app.get(SharepointSynchronizationService);
+        await service.synchronize();
 
         expect(mockIngestionHttpClient.request).toHaveBeenCalled();
       });
@@ -333,10 +327,9 @@ describe('SharePoint synchronization (e2e)', () => {
 
   describe('Integration', () => {
     it('synchronizes content and permissions with mocked dependencies', async () => {
-      const result = await runSynchronisation(cloneBaseState());
+      const service = app.get(SharepointSynchronizationService);
+      const result = await service.synchronize();
 
-      // synchronize() returns { status: 'success' } on success
-      // (we assert downstream effects instead of relying on return plumbing here)
       expect(result).toEqual({ status: 'success' });
 
       expect(mockIngestionHttpClient.request).toHaveBeenCalled();
