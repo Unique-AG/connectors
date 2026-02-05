@@ -72,6 +72,7 @@ spec:
 | alerts.enabled | bool | `false` | Enable PrometheusRule resource creation |
 | connector.deployment.metadata.annotations."reloader.stakater.com/auto" | string | `"true"` |  |
 | connector.env.LOGS_DIAGNOSTICS_DATA_POLICY | string | `"conceal"` |  |
+| connector.env.LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY | string | `"["on_startup","per_sync"]"` | Controls when configuration is logged. Use JSON array string of triggers: on_startup, per_sync. Use `"none"` to disable. |
 | connector.env.LOG_LEVEL | string | `"info"` |  |
 | connector.env.MAX_FILE_SIZE_BYTES | string | `"209715200"` |  |
 | connector.env.MAX_HEAP_MB | int | `1920` |  |
