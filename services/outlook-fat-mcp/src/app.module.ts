@@ -25,6 +25,7 @@ import {
   appConfig,
   authConfig,
   databaseConfig,
+  emailSyncConfig,
   type EncryptionConfig,
   encryptionConfig,
   type MicrosoftConfigNamespaced,
@@ -32,6 +33,7 @@ import {
   uniqueConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
+import { EmailSyncModule } from './email-sync/email-sync.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
@@ -48,6 +50,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         appConfig,
         authConfig,
         databaseConfig,
+        emailSyncConfig,
         encryptionConfig,
         microsoftConfig,
         uniqueConfig,
@@ -136,6 +139,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     MsGraphModule,
     AMQPModule,
     TranscriptModule,
+    EmailSyncModule,
   ],
   controllers: [ManifestController],
   providers: [
