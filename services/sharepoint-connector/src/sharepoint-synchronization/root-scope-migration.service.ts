@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Config } from '../config';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
-import { EXTERNAL_ID_PREFIX, shouldConcealLogs, smear } from '../utils/logging.util';
+import { EXTERNAL_ID_PREFIX } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
 
@@ -14,14 +12,8 @@ export type MigrationResult =
 @Injectable()
 export class RootScopeMigrationService {
   private readonly logger = new Logger(RootScopeMigrationService.name);
-  private readonly shouldConcealLogs: boolean;
 
-  public constructor(
-    private readonly uniqueScopesService: UniqueScopesService,
-    private readonly configService: ConfigService<Config, true>,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  public constructor(private readonly uniqueScopesService: UniqueScopesService) {}
 
   public async migrateIfNeeded(newRootScopeId: string, siteId: Smeared): Promise<MigrationResult> {
     const externalId = `${EXTERNAL_ID_PREFIX}site:${siteId.value}`;
@@ -70,21 +62,7 @@ export class RootScopeMigrationService {
       }
 
       this.logger.log(`${logPrefix} Deleting old root scope ${oldRoot.id}`);
-      const result = await this.uniqueScopesService.deleteScopeRecursively(oldRoot.id);
-
-      if (result.successFolders.length > 0) {
-        if (result.successFolders.length > 1) {
-          const deletedFolders = result.successFolders.map((f) =>
-            this.shouldConcealLogs ? smear(f.name) : f.name,
-          );
-          this.logger.warn(
-            `${logPrefix} Successfully deleted old root scope and ` +
-              `${result.successFolders.length - 1} child folders: ${deletedFolders.join(', ')}`,
-          );
-        } else {
-          this.logger.log(`${logPrefix} Successfully deleted old root scope`);
-        }
-      }
+      const result = await this.uniqueScopesService.deleteScope(oldRoot.id);
 
       if (result.failedFolders.length > 0) {
         this.logger.warn({

@@ -122,7 +122,7 @@ export class ScopeManagementService {
     this.logger.log(`${logPrefix} Deleting root scope recursively`);
 
     try {
-      const result = await this.uniqueScopesService.deleteScopeRecursively(scopeId);
+      const result = await this.uniqueScopesService.deleteScope(scopeId, { recursive: true });
 
       if (result.successFolders.length > 0) {
         this.logger.log(

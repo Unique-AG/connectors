@@ -216,17 +216,19 @@ export class UniqueScopesService {
     return scopes;
   }
 
-  public async deleteScopeRecursively(
+  public async deleteScope(
     scopeId: string,
+    options: { recursive?: boolean } = {},
   ): Promise<DeleteFolderMutationResult['deleteFolder']> {
-    this.logger.debug(`Deleting scope recursively: ${scopeId}`);
+    const { recursive = false } = options;
+    this.logger.debug(`Deleting scope: ${scopeId} (recursive: ${recursive})`);
 
     const result = await this.scopeManagementClient.request<
       DeleteFolderMutationResult,
       DeleteFolderMutationInput
     >(DELETE_FOLDER_MUTATION, {
       scopeId,
-      recursive: true,
+      recursive,
     });
 
     this.logger.debug(

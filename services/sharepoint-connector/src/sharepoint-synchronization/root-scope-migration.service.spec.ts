@@ -13,14 +13,14 @@ describe('RootScopeMigrationService', () => {
   let getScopeByExternalIdMock: ReturnType<typeof vi.fn>;
   let listChildrenScopesMock: ReturnType<typeof vi.fn>;
   let updateScopeParentMock: ReturnType<typeof vi.fn>;
-  let deleteScopeRecursivelyMock: ReturnType<typeof vi.fn>;
+  let deleteScopeMock: ReturnType<typeof vi.fn>;
   let configServiceMock: ConfigServiceMock;
 
   beforeEach(async () => {
     getScopeByExternalIdMock = vi.fn();
     listChildrenScopesMock = vi.fn();
     updateScopeParentMock = vi.fn();
-    deleteScopeRecursivelyMock = vi.fn();
+    deleteScopeMock = vi.fn();
 
     configServiceMock = {
       get: vi.fn((key: string) => {
@@ -38,7 +38,7 @@ describe('RootScopeMigrationService', () => {
         getScopeByExternalId: getScopeByExternalIdMock,
         listChildrenScopes: listChildrenScopesMock,
         updateScopeParent: updateScopeParentMock,
-        deleteScopeRecursively: deleteScopeRecursivelyMock,
+        deleteScope: deleteScopeMock,
       }))
       .mock<ConfigService<Config, true>>(ConfigService)
       .impl(() => configServiceMock)
@@ -105,7 +105,7 @@ describe('RootScopeMigrationService', () => {
           { id: 'child-1', name: 'Child1', parentId: 'old-root-123' },
         ]);
         updateScopeParentMock.mockResolvedValue({ id: 'child-1', parentId: 'new-root-123' });
-        deleteScopeRecursivelyMock.mockResolvedValue({
+        deleteScopeMock.mockResolvedValue({
           successFolders: [{ id: 'old-root-123', name: 'OldSiteRoot', path: '/OldSiteRoot' }],
           failedFolders: [],
         });
@@ -134,7 +134,7 @@ describe('RootScopeMigrationService', () => {
           { id: 'child-3', name: 'Folder3', parentId: 'old-root-123' },
         ]);
         updateScopeParentMock.mockResolvedValue({ id: 'child-id', parentId: 'new-root-123' });
-        deleteScopeRecursivelyMock.mockResolvedValue({
+        deleteScopeMock.mockResolvedValue({
           successFolders: [{ id: 'old-root-123', name: 'OldSiteRoot', path: '/OldSiteRoot' }],
           failedFolders: [],
         });
@@ -149,7 +149,7 @@ describe('RootScopeMigrationService', () => {
         expect(updateScopeParentMock).toHaveBeenCalledWith('child-1', 'new-root-123');
         expect(updateScopeParentMock).toHaveBeenCalledWith('child-2', 'new-root-123');
         expect(updateScopeParentMock).toHaveBeenCalledWith('child-3', 'new-root-123');
-        expect(deleteScopeRecursivelyMock).toHaveBeenCalledWith('old-root-123');
+        expect(deleteScopeMock).toHaveBeenCalledWith('old-root-123');
       });
 
       it('deletes empty old root when no children exist (partial migration resume)', async () => {
@@ -160,7 +160,7 @@ describe('RootScopeMigrationService', () => {
           parentId: null,
         });
         listChildrenScopesMock.mockResolvedValue([]);
-        deleteScopeRecursivelyMock.mockResolvedValue({
+        deleteScopeMock.mockResolvedValue({
           successFolders: [{ id: 'old-root-123', name: 'OldSiteRoot', path: '/OldSiteRoot' }],
           failedFolders: [],
         });
@@ -172,35 +172,7 @@ describe('RootScopeMigrationService', () => {
 
         expect(result).toEqual({ status: 'migration_completed' });
         expect(updateScopeParentMock).not.toHaveBeenCalled();
-        expect(deleteScopeRecursivelyMock).toHaveBeenCalledWith('old-root-123');
-      });
-
-      it('logs warning when old root deletion also removes leftover children', async () => {
-        getScopeByExternalIdMock.mockResolvedValue({
-          id: 'old-root-123',
-          name: 'OldSiteRoot',
-          externalId: 'spc:site:site-456',
-          parentId: null,
-        });
-        listChildrenScopesMock.mockResolvedValue([]);
-        deleteScopeRecursivelyMock.mockResolvedValue({
-          successFolders: [
-            { id: 'old-root-123', name: 'OldSiteRoot', path: '/OldSiteRoot' },
-            { id: 'leftover-child', name: 'LeftoverChild', path: '/OldSiteRoot/LeftoverChild' },
-          ],
-          failedFolders: [],
-        });
-
-        const result = await service.migrateIfNeeded(
-          'new-root-123',
-          new Smeared('site-456', false),
-        );
-
-        expect(result).toEqual({ status: 'migration_completed' });
-        // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-        expect(service['logger'].warn).toHaveBeenCalledWith(
-          expect.stringContaining('Successfully deleted old root scope and 1 child folders'),
-        );
+        expect(deleteScopeMock).toHaveBeenCalledWith('old-root-123');
       });
     });
 
@@ -229,7 +201,7 @@ describe('RootScopeMigrationService', () => {
           status: 'migration_failed',
           error: 'Failed to move 1/2 child scopes to new root',
         });
-        expect(deleteScopeRecursivelyMock).not.toHaveBeenCalled();
+        expect(deleteScopeMock).not.toHaveBeenCalled();
       });
 
       it('attempts to move all children even when some fail', async () => {
@@ -296,7 +268,7 @@ describe('RootScopeMigrationService', () => {
           parentId: null,
         });
         listChildrenScopesMock.mockResolvedValue([]);
-        deleteScopeRecursivelyMock.mockResolvedValue({
+        deleteScopeMock.mockResolvedValue({
           successFolders: [],
           failedFolders: [
             {
@@ -357,7 +329,7 @@ describe('RootScopeMigrationService', () => {
         });
       });
 
-      it('returns migration_failed when deleteScopeRecursively throws', async () => {
+      it('returns migration_failed when deleteScope throws', async () => {
         getScopeByExternalIdMock.mockResolvedValue({
           id: 'old-root-123',
           name: 'OldSiteRoot',
@@ -365,7 +337,7 @@ describe('RootScopeMigrationService', () => {
           parentId: null,
         });
         listChildrenScopesMock.mockResolvedValue([]);
-        deleteScopeRecursivelyMock.mockRejectedValue(new Error('Delete operation failed'));
+        deleteScopeMock.mockRejectedValue(new Error('Delete operation failed'));
 
         const result = await service.migrateIfNeeded(
           'new-root-123',
