@@ -15,6 +15,13 @@
       "when": 1763374174433,
       "tag": "0001_tiny_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770302850303,
+      "tag": "0002_tearful_paibok",
+      "breakpoints": true
     }
   ]
 }

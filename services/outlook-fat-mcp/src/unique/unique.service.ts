@@ -169,6 +169,136 @@ export class UniqueService {
     );
   }
 
+  @Span()
+  public async ingestEmail(
+    email: {
+      subject: string;
+      senderEmail: string;
+      senderName: string;
+      recipients: string[];
+      receivedAt: Date;
+      sentAt?: Date;
+      ownerEmail: string;
+    },
+    content: { id: string; content: Uint8Array; byteSize: number },
+  ): Promise<string | undefined> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('email_id', content.id);
+    span?.setAttribute('sender_email', email.senderEmail);
+    span?.setAttribute('recipient_count', email.recipients.length);
+
+    this.logger.log(
+      {
+        emailId: content.id,
+        subject: email.subject,
+        senderEmail: email.senderEmail,
+      },
+      'Beginning processing of email for ingestion',
+    );
+
+    const owner = await this.fetchUserForScopeAccess(email.ownerEmail);
+
+    if (!owner) {
+      span?.addEvent('owner_not_found');
+      this.logger.warn(
+        { ownerEmail: email.ownerEmail },
+        'Cannot proceed: email owner account not found in Unique system',
+      );
+      return undefined;
+    }
+
+    const { parentPath, childPath } = this.mapEmailToScopePaths(
+      email.ownerEmail,
+      email.subject,
+      email.receivedAt,
+    );
+
+    const parentScope = await this.createScope(parentPath, false);
+    span?.setAttribute('parent_scope_id', parentScope.id);
+
+    const accesses: PublicScopeAccessSchema[] = [
+      {
+        entityId: owner.id,
+        entityType: ScopeAccessEntityType.User,
+        type: ScopeAccessType.Write,
+      },
+      {
+        entityId: owner.id,
+        entityType: ScopeAccessEntityType.User,
+        type: ScopeAccessType.Read,
+      },
+      {
+        entityId: owner.id,
+        entityType: ScopeAccessEntityType.User,
+        type: ScopeAccessType.Manage,
+      },
+    ];
+    await this.addScopeAccesses(parentScope.id, accesses);
+
+    const childScope = await this.createScope(childPath, true);
+    span?.setAttribute('child_scope_id', childScope.id);
+
+    this.logger.log(
+      { emailId: content.id, scopeId: childScope.id },
+      'Beginning email upload to Unique system',
+    );
+
+    const emailUpload = await this.upsertContent({
+      storeInternally: true,
+      scopeId: childScope.id,
+      input: {
+        key: content.id,
+        mimeType: 'message/rfc822',
+        title: `${email.subject || 'No Subject'}.eml`,
+        byteSize: content.byteSize,
+        metadata: {
+          date: email.receivedAt.toISOString(),
+          sender_email: email.senderEmail,
+          sender_name: email.senderName,
+          recipients: email.recipients.join(', '),
+        },
+      },
+    });
+
+    const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(content.content.buffer) as Uint8Array<ArrayBuffer>);
+        controller.close();
+      },
+    });
+
+    await this.uploadToStorage(emailUpload.writeUrl, stream, 'message/rfc822');
+
+    await this.upsertContent({
+      storeInternally: true,
+      scopeId: childScope.id,
+      fileUrl: emailUpload.readUrl,
+      input: {
+        key: content.id,
+        mimeType: 'message/rfc822',
+        title: `${email.subject || 'No Subject'}.eml`,
+      },
+    });
+
+    span?.addEvent('ingestion_completed', {
+      emailId: content.id,
+      parentScopeId: parentScope.id,
+      childScopeId: childScope.id,
+    });
+
+    this.logger.log(
+      {
+        emailId: content.id,
+        parentScopeId: parentScope.id,
+        childScopeId: childScope.id,
+        uniqueContentId: emailUpload.id,
+      },
+      'Successfully completed email ingestion process',
+    );
+
+    return emailUpload.id;
+  }
+
   // !SECTION: Public API
 
   // SECTION: Unique API Methods
@@ -494,6 +624,21 @@ export class UniqueService {
     const meetingSubject = subject || 'Untitled Meeting';
     const parentPath = `/${rootScopePath}/${meetingSubject}`;
     const childPath = `${parentPath}/${formattedDate}`;
+    return { parentPath, childPath };
+  }
+
+  private mapEmailToScopePaths(
+    ownerEmail: string,
+    subject: string,
+    receivedAt: Date,
+  ): { parentPath: string; childPath: string } {
+    const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
+    // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
+    const formattedDate = receivedAt.toISOString().split('T').at(0)!;
+    const emailSubject = subject || 'No Subject';
+    const sanitizedSubject = emailSubject.replace(/[<>:"/\\|?*]/g, '_').substring(0, 100);
+    const parentPath = `/${rootScopePath}/Emails/${ownerEmail}/${formattedDate}`;
+    const childPath = `${parentPath}/${sanitizedSubject}`;
     return { parentPath, childPath };
   }
 
