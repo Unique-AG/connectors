@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { isNullish } from 'remeda';
+import { Smeared } from 'src/utils/smeared';
 import { BatchProcessorService } from '../../shared/services/batch-processor.service';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -76,14 +77,14 @@ export class UniqueScopesService {
 
   public async updateScopeExternalId(
     scopeId: string,
-    externalId: string,
+    externalId: Smeared,
   ): Promise<{ id: string; externalId: string | null }> {
     const result = await this.scopeManagementClient.request<
       UpdateScopeMutationResult,
       UpdateScopeMutationInput
     >(UPDATE_SCOPE_MUTATION, {
       id: scopeId,
-      input: { externalId },
+      input: { externalId: externalId.value },
     });
 
     return result.updateScope;

@@ -2,8 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
-import { EXTERNAL_ID_PREFIX, shouldConcealLogs, smear, smearPath } from '../utils/logging.util';
+import { EXTERNAL_ID_PREFIX, shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
+import { createSmeared, Smeared, smearPath } from '../utils/smeared';
 
 export type MigrationResult =
   | { status: 'no_migration_needed' }
@@ -22,9 +23,9 @@ export class RootScopeMigrationService {
     this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
-  public async migrateIfNeeded(newRootScopeId: string, siteId: string): Promise<MigrationResult> {
-    const externalId = `${EXTERNAL_ID_PREFIX}site:${siteId}`;
-    const logPrefix = `[Migration: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+  public async migrateIfNeeded(newRootScopeId: string, siteId: Smeared): Promise<MigrationResult> {
+    const externalId = `${EXTERNAL_ID_PREFIX}site:${siteId.value}`;
+    const logPrefix = `[Migration: ${siteId}]`;
 
     try {
       const oldRoot = await this.uniqueScopesService.getScopeByExternalId(externalId);
@@ -90,8 +91,8 @@ export class RootScopeMigrationService {
           msg: `${logPrefix} Failed to delete old root due to ${result.failedFolders.length} folders`,
           failedFolders: result.failedFolders.map((f) => ({
             id: f.id,
-            name: this.shouldConcealLogs ? smear(f.name) : f.name,
-            path: this.shouldConcealLogs ? smearPath(f.path) : f.path,
+            name: createSmeared(f.name),
+            path: smearPath(createSmeared(f.path)),
             reason: f.failReason,
           })),
         });

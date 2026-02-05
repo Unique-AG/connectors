@@ -8,8 +8,8 @@ import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { HttpClientService } from '../../shared/services/http-client.service';
 import { UniqueFilesService } from '../../unique-api/unique-files/unique-files.service';
-import { redact, shouldConcealLogs, smear } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
+import { createSmeared } from '../../utils/smeared';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
 import type { IPipelineStep } from './pipeline-step.interface';
@@ -18,16 +18,13 @@ import type { IPipelineStep } from './pipeline-step.interface';
 export class UploadContentStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.UploadContent;
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly httpClientService: HttpClientService,
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly apiService: GraphApiService,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
     const stepStartTime = Date.now();
@@ -55,9 +52,7 @@ export class UploadContentStep implements IPipelineStep {
         correlationId: context.correlationId,
         itemId: context.pipelineItem.item.id,
         driveId: context.pipelineItem.driveId,
-        siteId: this.shouldConcealLogs
-          ? smear(context.pipelineItem.siteId)
-          : context.pipelineItem.siteId,
+        siteId: context.pipelineItem.siteId,
         error: sanitizeError(error),
       });
       throw error;
@@ -65,7 +60,7 @@ export class UploadContentStep implements IPipelineStep {
   }
 
   public async cleanup(context: ProcessingContext): Promise<void> {
-    const logPrefix = `[CorrelationId: ${context.correlationId}, Site: ${this.shouldConcealLogs ? smear(context.pipelineItem.siteId) : context.pipelineItem.siteId}]`;
+    const logPrefix = `[CorrelationId: ${context.correlationId}, Site: ${context.pipelineItem.siteId}]`;
 
     if (!context.uploadSucceeded && context.uniqueContentId) {
       try {
@@ -121,10 +116,8 @@ export class UploadContentStep implements IPipelineStep {
       correlationId: context.correlationId,
       fileId: context.pipelineItem.item.id,
       driveId: context.pipelineItem.driveId,
-      siteId: this.shouldConcealLogs
-        ? smear(context.pipelineItem.siteId)
-        : context.pipelineItem.siteId,
-      uploadUrl: this.shouldConcealLogs ? redact(context.uploadUrl) : context.uploadUrl,
+      siteId: context.pipelineItem.siteId,
+      uploadUrl: createSmeared(context.uploadUrl),
       mimeType: context.mimeType,
     });
 

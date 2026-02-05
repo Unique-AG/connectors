@@ -3,6 +3,7 @@ import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '../config';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
+import { Smeared } from '../utils/smeared';
 import { RootScopeMigrationService } from './root-scope-migration.service';
 
 describe('RootScopeMigrationService', () => {
@@ -66,7 +67,10 @@ describe('RootScopeMigrationService', () => {
       it('returns no_migration_needed when no old root exists', async () => {
         getScopeByExternalIdMock.mockResolvedValue(null);
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({ status: 'no_migration_needed' });
         expect(getScopeByExternalIdMock).toHaveBeenCalledWith('spc:site:site-456');
@@ -81,7 +85,10 @@ describe('RootScopeMigrationService', () => {
           parentId: null,
         });
 
-        const result = await service.migrateIfNeeded('same-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'same-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({ status: 'no_migration_needed' });
         expect(listChildrenScopesMock).not.toHaveBeenCalled();
@@ -103,7 +110,10 @@ describe('RootScopeMigrationService', () => {
           failedFolders: [],
         });
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({ status: 'migration_completed' });
         expect(listChildrenScopesMock).toHaveBeenCalledWith('old-root-123');
@@ -129,7 +139,10 @@ describe('RootScopeMigrationService', () => {
           failedFolders: [],
         });
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({ status: 'migration_completed' });
         expect(updateScopeParentMock).toHaveBeenCalledTimes(3);
@@ -152,7 +165,10 @@ describe('RootScopeMigrationService', () => {
           failedFolders: [],
         });
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({ status: 'migration_completed' });
         expect(updateScopeParentMock).not.toHaveBeenCalled();
@@ -175,7 +191,10 @@ describe('RootScopeMigrationService', () => {
           failedFolders: [],
         });
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({ status: 'migration_completed' });
         // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
@@ -201,7 +220,10 @@ describe('RootScopeMigrationService', () => {
           .mockResolvedValueOnce({ id: 'child-1', parentId: 'new-root-123' })
           .mockRejectedValueOnce(new Error('API error'));
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({
           status: 'migration_failed',
@@ -227,7 +249,10 @@ describe('RootScopeMigrationService', () => {
           .mockResolvedValueOnce({ id: 'child-2', parentId: 'new-root-123' })
           .mockRejectedValueOnce(new Error('API error'));
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(updateScopeParentMock).toHaveBeenCalledTimes(3);
         expect(updateScopeParentMock).toHaveBeenNthCalledWith(1, 'child-1', 'new-root-123');
@@ -252,7 +277,10 @@ describe('RootScopeMigrationService', () => {
         ]);
         updateScopeParentMock.mockRejectedValue(new Error('API error'));
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({
           status: 'migration_failed',
@@ -280,7 +308,10 @@ describe('RootScopeMigrationService', () => {
           ],
         });
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({
           status: 'migration_failed',
@@ -291,7 +322,10 @@ describe('RootScopeMigrationService', () => {
       it('returns migration_failed when getScopeByExternalId throws', async () => {
         getScopeByExternalIdMock.mockRejectedValue(new Error('Network error'));
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({
           status: 'migration_failed',
@@ -312,7 +346,10 @@ describe('RootScopeMigrationService', () => {
         });
         listChildrenScopesMock.mockRejectedValue(new Error('Failed to list children'));
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({
           status: 'migration_failed',
@@ -330,7 +367,10 @@ describe('RootScopeMigrationService', () => {
         listChildrenScopesMock.mockResolvedValue([]);
         deleteScopeRecursivelyMock.mockRejectedValue(new Error('Delete operation failed'));
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({
           status: 'migration_failed',
@@ -341,50 +381,15 @@ describe('RootScopeMigrationService', () => {
       it('converts non-Error objects to string in error result', async () => {
         getScopeByExternalIdMock.mockRejectedValue('string error');
 
-        const result = await service.migrateIfNeeded('new-root-123', 'site-456');
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
 
         expect(result).toEqual({
           status: 'migration_failed',
           error: 'string error',
         });
-      });
-    });
-
-    describe('logging behavior', () => {
-      it('conceals site id in logs when configured', async () => {
-        configServiceMock.get = vi.fn((key: string) => {
-          if (key === 'app.logsDiagnosticsDataPolicy') {
-            return 'conceal';
-          }
-          return undefined;
-        });
-
-        const { unit } = await TestBed.solitary(RootScopeMigrationService)
-          .mock<UniqueScopesService>(UniqueScopesService)
-          .impl((stubFn) => ({
-            ...stubFn(),
-            getScopeByExternalId: vi.fn().mockResolvedValue(null),
-          }))
-          .mock<ConfigService<Config, true>>(ConfigService)
-          .impl(() => configServiceMock)
-          .compile();
-
-        const concealedService = unit;
-        const debugMock = vi.fn();
-        Object.defineProperty(concealedService, 'logger', {
-          value: {
-            debug: debugMock,
-            log: vi.fn(),
-            error: vi.fn(),
-            warn: vi.fn(),
-            verbose: vi.fn(),
-          },
-          writable: true,
-        });
-
-        await concealedService.migrateIfNeeded('new-root-123', 'site-456');
-
-        expect(debugMock).toHaveBeenCalledWith(expect.stringMatching(/\[Migration: \*+-\d+\]/));
       });
     });
   });
