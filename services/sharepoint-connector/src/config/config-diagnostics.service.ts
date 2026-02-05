@@ -28,9 +28,9 @@ export class ConfigDiagnosticsService implements OnModuleInit {
     return emitPolicy !== 'none' && emitPolicy.includes(configEmitPolicy);
   }
 
-  public logConfig(name: string, config: object) {
+  public logConfig(msg: string, config: object) {
     this.logger.log({
-      msg: `ConfigDiagnosticsService: ${name}`,
+      msg,
       config,
     });
   }

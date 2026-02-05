@@ -42,7 +42,7 @@ export const AppConfigSchema = z
       ),
     logsDiagnosticsConfigEmitPolicy: z
       .union([z.literal('none'), z.array(z.enum(ConfigEmitPolicy))])
-      .prefault([ConfigEmitPolicy.ON_STARTUP])
+      .prefault([ConfigEmitPolicy.ON_STARTUP, ConfigEmitPolicy.PER_SYNC])
       .describe(
         'Controls when configuration is logged. Array of triggers: on_startup logs once on start, per_sync logs at each site sync. Use "none" to disable.',
       ),

@@ -66,7 +66,7 @@ export class SyncSharepointGroupsToUniqueCommand {
     };
 
     for (const sharePointGroup of sharePointGroups) {
-      const groupLogPrefix = `[Group: ${createSmeared(sharePointGroup.id)}]`;
+      const groupLogPrefix = `[Group: ${sharePointGroup.id}]`;
       this.logger.debug(
         `${groupLogPrefix} Syncing sharepoint group ${createSmeared(sharePointGroup.displayName)}`,
       );

@@ -18,6 +18,9 @@ import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sha
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
+const buildSiteExternalId = (siteId: Smeared) =>
+  createSmeared(`${EXTERNAL_ID_PREFIX}site:${siteId.value}`);
+
 export interface RootScopeInfo {
   serviceUserId: string;
   rootPath: Smeared;
@@ -53,14 +56,13 @@ export class ScopeManagementService {
     assert.ok(rootScope, `Root scope with ID ${rootScopeId} not found`);
 
     const isValid = this.isValidScopeOwnership(rootScope, siteId);
-    if (!isValid) {
-      throw new Error(
-        `Root scope ${rootScopeId} is owned by a different site. This scope cannot be synced by this site.`,
-      );
-    }
+    assert.ok(
+      isValid,
+      `Root scope ${rootScopeId} is owned by a different site. This scope cannot be synced by this site.`,
+    );
 
     if (!rootScope.externalId) {
-      const externalId = createSmeared(`${EXTERNAL_ID_PREFIX}site:${siteId.value}`);
+      const externalId = buildSiteExternalId(siteId);
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           rootScopeId,
@@ -68,11 +70,11 @@ export class ScopeManagementService {
         );
         rootScope.externalId = updatedScope.externalId;
         this.logger.debug(
-          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${EXTERNAL_ID_PREFIX}site:${siteId}`,
+          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${buildSiteExternalId(siteId)}`,
         );
       } catch (error) {
         this.logger.warn({
-          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${EXTERNAL_ID_PREFIX}site:${siteId}`,
+          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${buildSiteExternalId(siteId)}`,
           error: sanitizeError(error),
         });
       }
@@ -143,7 +145,7 @@ export class ScopeManagementService {
       return true;
     }
 
-    const expectedExternalId = createSmeared(`${EXTERNAL_ID_PREFIX}site:${siteId.value}`);
+    const expectedExternalId = buildSiteExternalId(siteId);
     return rootScope.externalId === expectedExternalId.value;
   }
 

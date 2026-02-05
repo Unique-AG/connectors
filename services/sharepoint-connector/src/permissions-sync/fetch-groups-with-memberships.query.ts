@@ -228,9 +228,8 @@ export class FetchGroupsWithMembershipsQuery {
         assert.ok(group, `Missing group at index ${index} in chunk`);
 
         if (error.statusCode === 404) {
-          const logGroupId = createSmeared(group.id);
           this.logger.warn(
-            `Group ${logGroupId} not found (404) - likely deleted from Entra ID but still ` +
+            `Group ${createSmeared(group.id)} not found (404) - likely deleted from Entra ID but still ` +
               `referenced in SharePoint permissions. Treating as empty membership.`,
           );
           return [];
