@@ -1,0 +1,82 @@
+{{- if .Values.connectorConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: confluence-connector-tenant-config
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+data:
+  default-tenant-config.yaml: |
+    # Confluence Configuration
+    confluence:
+      instanceType: {{ .Values.connectorConfig.confluence.instanceType | quote }}
+      baseUrl: {{ .Values.connectorConfig.confluence.baseUrl | quote }}
+      auth:
+        mode: {{ .Values.connectorConfig.confluence.auth.mode | quote }}
+        {{- if .Values.connectorConfig.confluence.auth.email }}
+        email: {{ .Values.connectorConfig.confluence.auth.email | quote }}
+        {{- end }}
+        {{- if .Values.connectorConfig.confluence.auth.username }}
+        username: {{ .Values.connectorConfig.confluence.auth.username | quote }}
+        {{- end }}
+        # apiToken/token/password is loaded from environment variable (secret)
+      {{- if .Values.connectorConfig.confluence.apiRateLimitPerMinute }}
+      apiRateLimitPerMinute: {{ .Values.connectorConfig.confluence.apiRateLimitPerMinute }}
+      {{- end }}
+      {{- if .Values.connectorConfig.confluence.ingestSingleLabel }}
+      ingestSingleLabel: {{ .Values.connectorConfig.confluence.ingestSingleLabel | quote }}
+      {{- end }}
+      {{- if .Values.connectorConfig.confluence.ingestAllLabel }}
+      ingestAllLabel: {{ .Values.connectorConfig.confluence.ingestAllLabel | quote }}
+      {{- end }}
+      {{- if .Values.connectorConfig.confluence.labels }}
+      labels:
+        {{- range .Values.connectorConfig.confluence.labels }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.connectorConfig.confluence.spaces }}
+      spaces:
+        {{- range .Values.connectorConfig.confluence.spaces }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- end }}
+    # Unique API Configuration
+    unique:
+      serviceAuthMode: {{ .Values.connectorConfig.unique.authMode | quote }}
+      {{- if eq .Values.connectorConfig.unique.authMode "cluster_local" }}
+      serviceExtraHeaders:
+        {{- range $key, $value := .Values.connectorConfig.unique.serviceExtraHeaders }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if eq .Values.connectorConfig.unique.authMode "external" }}
+      zitadelOauthTokenUrl: {{ .Values.connectorConfig.unique.zitadel.oauthTokenUrl | quote }}
+      zitadelProjectId: {{ .Values.connectorConfig.unique.zitadel.projectId | quote }}
+      zitadelClientId: {{ .Values.connectorConfig.unique.zitadel.clientId | quote }}
+      # zitadelClientSecret is loaded from environment variable (secret)
+      {{- end }}
+      ingestionServiceBaseUrl: {{ .Values.connectorConfig.unique.ingestionServiceBaseUrl | quote }}
+      scopeManagementServiceBaseUrl: {{ .Values.connectorConfig.unique.scopeManagementServiceBaseUrl | quote }}
+      {{- if .Values.connectorConfig.unique.apiRateLimitPerMinute }}
+      apiRateLimitPerMinute: {{ .Values.connectorConfig.unique.apiRateLimitPerMinute }}
+      {{- end }}
+      {{- if .Values.connectorConfig.unique.ingestionConfig }}
+      ingestionConfig:
+        {{- toYaml .Values.connectorConfig.unique.ingestionConfig | nindent 8 }}
+      {{- end }}
+    # Processing Configuration
+    processing:
+      {{- if .Values.connectorConfig.processing.stepTimeoutSeconds }}
+      stepTimeoutSeconds: {{ .Values.connectorConfig.processing.stepTimeoutSeconds }}
+      {{- end }}
+      {{- if .Values.connectorConfig.processing.concurrency }}
+      concurrency: {{ .Values.connectorConfig.processing.concurrency }}
+      {{- end }}
+      {{- if .Values.connectorConfig.processing.scanIntervalCron }}
+      scanIntervalCron: {{ .Values.connectorConfig.processing.scanIntervalCron | quote }}
+      {{- end }}
+      {{- if .Values.connectorConfig.processing.maxPagesToScan }}
+      maxPagesToScan: {{ .Values.connectorConfig.processing.maxPagesToScan }}
+      {{- end }}
+{{- end }}

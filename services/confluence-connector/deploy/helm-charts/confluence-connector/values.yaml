@@ -110,21 +110,27 @@ connectorConfig:
   # connector.volumeMounts
   enabled: true
   confluence:
-    # -- Confluence instance type: cloud or datacenter
+    # -- Confluence instance type: cloud or onprem
     instanceType: cloud
     # -- base url of the Confluence instance
     # example (cloud): https://acme.atlassian.net/wiki
-    # example (datacenter): https://confluence.acme.com
+    # example (onprem): https://confluence.acme.com
     baseUrl: unset_default_value
     auth:
       # -- authentication mode
-      # possible values: api_token (for cloud), personal_access_token (for datacenter), oauth2
+      # possible values: api_token (for cloud), pat (for on-prem PAT), basic (for on-prem username/password)
       mode: api_token
-      # -- username for API token auth (usually email for cloud)
-      # username: user@example.com
-      # -- API token or Personal Access Token (loaded from secret via envVars)
-      # For cloud: API token from https://id.atlassian.com/manage-profile/security/api-tokens
-      # For datacenter: Personal Access Token from user settings
+      # -- email for API token auth (cloud)
+      # email: user@example.com
+      # -- username for basic auth (on-prem)
+      # username: user
+      # apiToken/token/password is loaded from a secret, see connector.envVars
+    # -- Number of Confluence API requests allowed per minute
+    apiRateLimitPerMinute: 100
+    # -- Label to trigger single-page sync
+    ingestSingleLabel: ai-ingest
+    # -- Label to trigger full sync of all labeled pages
+    ingestAllLabel: ai-ingest-all
     # -- Labels to filter content for ingestion
     # labels:
     #   - "unique-ingest"
@@ -173,19 +179,11 @@ connectorConfig:
       # clientSecret is loaded from a secret, see connector.envVars
 
   processing:
-    # -- timeout in seconds for a file processing step before it will stop and skip processing the file
+    # -- timeout in seconds for a page processing step before it will stop and skip processing the page
     stepTimeoutSeconds: 300
-    # -- how many files you want to submit for ingestion into Unique at once
+    # -- how many pages you want to submit for ingestion into Unique at once
     concurrency: 1
-    # -- list of allowed MIME types for files to sync
-    allowedMimeTypes:
-      - application/pdf
-      - text/plain
-      - text/html
-      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
-      - application/vnd.ms-excel
-      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-      - application/vnd.openxmlformats-officedocument.presentationml.presentation
-    maxFileSizeToIngestBytes: null
     # -- cron expression for the scheduled Confluence scan interval default: every 15 minutes
     scanIntervalCron: "*/15 * * * *"
+    # -- maximum number of pages to scan per run (null/empty for unlimited, useful for testing)
+    # maxPagesToScan: 100

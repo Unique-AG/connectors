@@ -4,7 +4,28 @@ import {
   DEFAULT_INGEST_ALL_LABEL,
   DEFAULT_INGEST_SINGLE_LABEL,
 } from '../constants/defaults.constants';
-import { coercedPositiveIntSchema, urlWithoutTrailingSlashSchema } from '../utils/zod.util';
+import {
+  coercedPositiveIntSchema,
+  redactedNonEmptyStringSchema,
+  urlWithoutTrailingSlashSchema,
+} from '../utils/zod.util';
+
+const cloudApiTokenAuth = z.object({
+  mode: z.literal('api_token'),
+  email: z.string().email(),
+  apiToken: redactedNonEmptyStringSchema,
+});
+
+const onpremPatAuth = z.object({
+  mode: z.literal('pat'),
+  token: redactedNonEmptyStringSchema,
+});
+
+const onpremBasicAuth = z.object({
+  mode: z.literal('basic'),
+  username: z.string(),
+  password: redactedNonEmptyStringSchema,
+});
 
 export const ConfluenceConfigSchema = z.object({
   instanceType: z
@@ -14,10 +35,7 @@ export const ConfluenceConfigSchema = z.object({
     'Base URL of the Confluence instance',
     'baseUrl must not end with a trailing slash',
   ),
-  auth: z
-    .object({})
-    .passthrough()
-    .describe('Authentication configuration (placeholder - will be detailed in future tickets)'),
+  auth: z.discriminatedUnion('mode', [cloudApiTokenAuth, onpremPatAuth, onpremBasicAuth]),
   apiRateLimitPerMinute: coercedPositiveIntSchema
     .prefault(DEFAULT_CONFLUENCE_API_RATE_LIMIT_PER_MINUTE)
     .describe('Number of Confluence API requests allowed per minute'),

@@ -139,8 +139,8 @@
           "properties": {
             "instanceType": {
               "type": "string",
-              "enum": ["cloud", "datacenter"],
-              "description": "Confluence instance type: cloud or datacenter"
+              "enum": ["cloud", "onprem"],
+              "description": "Confluence instance type: cloud or on-premises"
             },
             "baseUrl": {
               "type": "string",
@@ -154,15 +154,31 @@
               "properties": {
                 "mode": {
                   "type": "string",
-                  "description": "Authentication mode",
-                  "enum": ["api_token", "personal_access_token", "oauth2"]
+                  "description": "Authentication mode: api_token (cloud), pat (on-prem PAT), basic (on-prem username/password)",
+                  "enum": ["api_token", "pat", "basic"]
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Email address for API token authentication (cloud)"
                 },
                 "username": {
                   "type": "string",
-                  "description": "Username for API token auth (usually email for cloud)"
+                  "description": "Username for basic authentication (on-prem)"
                 }
               },
               "additionalProperties": false
+            },
+            "apiRateLimitPerMinute": {
+              "type": "integer",
+              "description": "Number of Confluence API requests allowed per minute"
+            },
+            "ingestSingleLabel": {
+              "type": "string",
+              "description": "Label to trigger single-page sync"
+            },
+            "ingestAllLabel": {
+              "type": "string",
+              "description": "Label to trigger full sync of all labeled pages"
             },
             "labels": {
               "type": "array",
@@ -227,7 +243,7 @@
             },
             "ingestionConfig": {
               "type": "object",
-              "description": "JSON string of config to pass when submitting file for ingestion",
+              "description": "Config object to pass when submitting content for ingestion",
               "examples": [
                 {
                   "uniqueIngestionMode": "INGESTION",
@@ -263,48 +279,24 @@
         },
         "processing": {
           "type": "object",
-          "description": "Files processing configuration",
-          "required": [
-            "allowedMimeTypes",
-            "concurrency"
-          ],
+          "description": "Page processing configuration",
           "properties": {
-            "allowedMimeTypes": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "examples": [
-                  "application/pdf",
-                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                ]
-              },
-              "description": "List of allowed MIME types for file processing",
-              "examples": [
-                [
-                  "application/pdf",
-                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                ]
-              ]
+            "stepTimeoutSeconds": {
+              "type": "integer",
+              "description": "Timeout in seconds for page processing steps"
             },
             "concurrency": {
               "type": "integer",
-              "description": "Number of concurrent processing operations"
-            },
-            "stepTimeoutSeconds": {
-              "type": "integer",
-              "description": "Timeout in seconds for processing steps"
-            },
-            "maxFileSizeToIngestBytes": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "description": "Maximum file size in bytes to ingest"
+              "description": "Number of concurrent page processing operations"
             },
             "scanIntervalCron": {
               "type": "string",
-              "description": "Cron expression for the scheduled Confluence scan interval",
+              "description": "Cron expression for the scheduled page scan interval",
               "examples": ["*/15 * * * *"]
+            },
+            "maxPagesToScan": {
+              "type": ["integer", "null"],
+              "description": "Maximum number of pages to scan (for testing). Unlimited if not set"
             }
           },
           "additionalProperties": false
