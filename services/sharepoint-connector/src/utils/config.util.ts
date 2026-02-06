@@ -35,3 +35,12 @@ export const parseCommaSeparatedArray = (value: unknown): string[] => {
 
   assert.fail('Expected a comma-separated string or array');
 };
+
+export const parseJsonOrPassthrough = (val: unknown): unknown => {
+  if (typeof val !== 'string') return val;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return val;
+  }
+};
