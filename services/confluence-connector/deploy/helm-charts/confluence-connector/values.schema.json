@@ -1,0 +1,317 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "connector": {
+      "type": "object",
+      "description": "Configuration for the backend-service dependency",
+      "properties": {
+        "env": {
+          "type": "object",
+          "description": "Environment variables for the connector",
+          "properties": {
+            "LOGS_DIAGNOSTICS_DATA_POLICY": {
+              "type": "string",
+              "enum": ["conceal", "disclose"],
+              "description": "Controls whether sensitive data like space names and IDs are logged in full or redacted",
+              "default": "conceal"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "grafana": {
+      "type": "object",
+      "description": "Grafana dashboard configuration",
+      "properties": {
+        "dashboard": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Grafana dashboard creation"
+            },
+            "folder": {
+              "type": "string",
+              "description": "Grafana folder name for the dashboard"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "alerts": {
+      "type": "object",
+      "description": "Prometheus alerting rules configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable Prometheus alerting rules",
+          "default": false
+        },
+        "defaultAlerts": {
+          "type": "object",
+          "description": "Default alert configurations",
+          "properties": {
+            "uniqueApi": {
+              "type": "object",
+              "description": "Configuration for Unique REST API error alerts",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable Unique REST API error rate alerts",
+                  "default": true
+                },
+                "disabled": {
+                  "type": "object",
+                  "description": "Disable specific alerts by setting them to true",
+                  "properties": {
+                    "ConfluenceConnectorUniqueAPIErrors": {
+                      "type": "boolean",
+                      "description": "Disable the ConfluenceConnectorUniqueAPIErrors alert"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "customRules": {
+                  "type": "object",
+                  "description": "Override alert rules with custom values",
+                  "properties": {
+                    "ConfluenceConnectorUniqueAPIErrors": {
+                      "type": "object",
+                      "description": "Custom configuration for ConfluenceConnectorUniqueAPIErrors alert",
+                      "properties": {
+                        "threshold": {
+                          "type": "number",
+                          "description": "Error rate threshold (0.01 = 1% error rate)",
+                          "default": 0.01
+                        },
+                        "for": {
+                          "type": "string",
+                          "description": "Duration the condition must be true before firing",
+                          "default": "30s"
+                        },
+                        "severity": {
+                          "type": "string",
+                          "enum": ["critical", "warning", "info"],
+                          "description": "Alert severity",
+                          "default": "warning"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "additionalLabels": {
+              "type": "object",
+              "description": "Additional labels to add to all alerts and the PrometheusRule"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "connectorConfig": {
+      "type": "object",
+      "description": "Confluence connector configuration",
+      "required": ["enabled", "confluence", "unique", "processing"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to use the connector config."
+        },
+        "confluence": {
+          "type": "object",
+          "description": "Confluence configuration",
+          "required": [
+            "instanceType",
+            "baseUrl",
+            "auth"
+          ],
+          "properties": {
+            "instanceType": {
+              "type": "string",
+              "enum": ["cloud", "datacenter"],
+              "description": "Confluence instance type: cloud or datacenter"
+            },
+            "baseUrl": {
+              "type": "string",
+              "description": "Confluence base URL",
+              "examples": ["https://acme.atlassian.net/wiki", "https://confluence.acme.com"]
+            },
+            "auth": {
+              "type": "object",
+              "description": "Confluence authentication configuration",
+              "required": ["mode"],
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "description": "Authentication mode",
+                  "enum": ["api_token", "personal_access_token", "oauth2"]
+                },
+                "username": {
+                  "type": "string",
+                  "description": "Username for API token auth (usually email for cloud)"
+                }
+              },
+              "additionalProperties": false
+            },
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Labels to filter content for ingestion"
+            },
+            "spaces": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Space keys to sync (if empty, syncs all accessible spaces)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "unique": {
+          "type": "object",
+          "description": "Unique platform configuration",
+          "required": [
+            "ingestionServiceBaseUrl",
+            "scopeManagementServiceBaseUrl",
+            "authMode"
+          ],
+          "properties": {
+            "ingestionServiceBaseUrl": {
+              "type": "string",
+              "description": "Base URL for the ingestion service",
+              "examples": [
+                "http://node-ingestion.finance-gpt:8091",
+                "https://api.unique.app/ingestion"
+              ]
+            },
+            "scopeManagementServiceBaseUrl": {
+              "type": "string",
+              "description": "Base URL for the scope management service",
+              "examples": [
+                "http://node-scope-management.finance-gpt:8094",
+                "https://api.unique.app/scope-management"
+              ]
+            },
+            "apiRateLimitPerMinute": {
+              "type": "integer",
+              "description": "Number of Unique API requests allowed per minute"
+            },
+            "authMode": {
+              "type": "string",
+              "enum": ["cluster_local", "external"],
+              "description": "Communication mode for the Unique Services. cluster_local: communicates using in-cluster URLs and requires serviceExtraHeaders with x-company-id and x-user-id. external: communicates using external URLs and requires authentication via Zitadel."
+            },
+            "serviceExtraHeaders": {
+              "type": "object",
+              "description": "HTTP extra headers for ingestion API requests. Required when authMode is cluster_local. Must contain x-company-id and x-user-id headers.",
+              "examples": [
+                {
+                  "x-company-id": "123456789101112131",
+                  "x-user-id": "123456789101112131"
+                }
+              ]
+            },
+            "ingestionConfig": {
+              "type": "object",
+              "description": "JSON string of config to pass when submitting file for ingestion",
+              "examples": [
+                {
+                  "uniqueIngestionMode": "INGESTION",
+                  "customProperty": "value"
+                }
+              ]
+            },
+            "zitadel": {
+              "type": "object",
+              "description": "Zitadel authentication configuration (required when authMode is external)",
+              "required": ["clientId", "oauthTokenUrl", "projectId"],
+              "properties": {
+                "clientId": {
+                  "type": "string",
+                  "description": "Zitadel client ID",
+                  "examples": ["confluence-connector@idp.unique.app"]
+                },
+                "oauthTokenUrl": {
+                  "type": "string",
+                  "description": "Zitadel OAuth token URL",
+                  "examples": ["https://idp.unique.app/oauth/v2/token"]
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Zitadel project ID",
+                  "examples": ["123456789101112131"]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "processing": {
+          "type": "object",
+          "description": "Files processing configuration",
+          "required": [
+            "allowedMimeTypes",
+            "concurrency"
+          ],
+          "properties": {
+            "allowedMimeTypes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "examples": [
+                  "application/pdf",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ]
+              },
+              "description": "List of allowed MIME types for file processing",
+              "examples": [
+                [
+                  "application/pdf",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ]
+              ]
+            },
+            "concurrency": {
+              "type": "integer",
+              "description": "Number of concurrent processing operations"
+            },
+            "stepTimeoutSeconds": {
+              "type": "integer",
+              "description": "Timeout in seconds for processing steps"
+            },
+            "maxFileSizeToIngestBytes": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Maximum file size in bytes to ingest"
+            },
+            "scanIntervalCron": {
+              "type": "string",
+              "description": "Cron expression for the scheduled Confluence scan interval",
+              "examples": ["*/15 * * * *"]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
