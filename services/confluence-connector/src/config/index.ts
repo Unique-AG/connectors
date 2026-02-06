@@ -1,8 +1,13 @@
-import { AppConfigNamespaced } from './app.config';
+import {
+  AppConfigNamespaced,
+  ConfluenceConfigNamespaced,
+  ProcessingConfigNamespaced,
+  UniqueConfigNamespaced,
+} from './tenant-config-loader';
 
-export type Config = AppConfigNamespaced;
+export type Config = ConfluenceConfigNamespaced &
+  UniqueConfigNamespaced &
+  ProcessingConfigNamespaced &
+  AppConfigNamespaced;
 
-export * from './app.config';
-export * from './confluence.schema';
-export * from './processing.schema';
-export * from './unique.schema';
+export * from './tenant-config-loader';
