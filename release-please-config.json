@@ -87,7 +87,7 @@
     },
     "services/confluence-connector": {
       "prerelease": true,
-      "prerelease-type": "beta",
+      "prerelease-type": "alpha",
       "versioning": "prerelease",
       "extra-files": [
         {
