@@ -1,11 +1,9 @@
 import assert from 'node:assert';
 import { globSync, readFileSync } from 'node:fs';
-
 import { registerAs } from '@nestjs/config';
 import { load } from 'js-yaml';
 import { isPlainObject } from 'remeda';
 import { z } from 'zod';
-
 import { type ConfluenceConfig, ConfluenceConfigSchema } from './confluence.schema';
 import { type ProcessingConfig, ProcessingConfigSchema } from './processing.schema';
 import { type UniqueConfig, UniqueConfigSchema } from './unique.schema';
@@ -34,16 +32,22 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
     `Multiple tenant configuration files found matching pattern '${pathPattern}': ${files.join(', ')}. Only one tenant config file is supported for now.`,
   );
   const configPath =
-    files[0] ?? assert.fail(`No tenant configuration files found matching pattern '${pathPattern}'`);
+    files[0] ??
+    assert.fail(`No tenant configuration files found matching pattern '${pathPattern}'`);
   try {
     const fileContent = readFileSync(configPath, 'utf-8');
     const config = load(fileContent);
-    assert.ok(isPlainObject(config), `Invalid tenant config: expected a plain object, got ${typeof config}`);
+    assert.ok(
+      isPlainObject(config),
+      `Invalid tenant config: expected a plain object, got ${typeof config}`,
+    );
     injectSecretsFromEnvironment(config);
     return TenantConfigSchema.parse(config);
   } catch (error) {
     if (error instanceof Error) {
-      throw new Error(`Failed to load or validate tenant config from ${configPath}: ${error.message}`);
+      throw new Error(
+        `Failed to load or validate tenant config from ${configPath}: ${error.message}`,
+      );
     }
     throw error;
   }
@@ -83,6 +87,12 @@ export const confluenceConfig = registerAs('confluence', () => getTenantConfig()
 export const uniqueConfig = registerAs('unique', () => getTenantConfig().unique);
 export const processingConfig = registerAs('processing', () => getTenantConfig().processing);
 
-export interface ConfluenceConfigNamespaced { confluence: ConfluenceConfig; }
-export interface UniqueConfigNamespaced { unique: UniqueConfig; }
-export interface ProcessingConfigNamespaced { processing: ProcessingConfig; }
+export interface ConfluenceConfigNamespaced {
+  confluence: ConfluenceConfig;
+}
+export interface UniqueConfigNamespaced {
+  unique: UniqueConfig;
+}
+export interface ProcessingConfigNamespaced {
+  processing: ProcessingConfig;
+}

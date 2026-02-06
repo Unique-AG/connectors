@@ -9,7 +9,9 @@ import { coercedPositiveIntSchema } from '../utils/zod.util';
 export const ProcessingConfigSchema = z.object({
   stepTimeoutSeconds: coercedPositiveIntSchema
     .prefault(DEFAULT_STEP_TIMEOUT_SECONDS)
-    .describe('Sets a time limit for a page processing step before it will stop and skip processing the page'),
+    .describe(
+      'Sets a time limit for a page processing step before it will stop and skip processing the page',
+    ),
   concurrency: coercedPositiveIntSchema
     .prefault(DEFAULT_PROCESSING_CONCURRENCY)
     .describe('Sets the concurrency of how many pages you want to ingest into unique at once'),
