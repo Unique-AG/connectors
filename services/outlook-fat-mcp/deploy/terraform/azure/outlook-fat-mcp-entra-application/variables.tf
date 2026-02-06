@@ -48,7 +48,7 @@ variable "confidential_clients" {
     It is strongly recommended to tie one secret to exactly one workload identity.
     Zero-downtime rotation is currently not supported, rotating the counter will result in a downtime as long as the
     affected workload does not pickup the new secret and gets eventually restarted.
-    The end date is mandatory on purpose to foster teams awareness of secret rotation and expiration.
+    The end date is mandatory on purpose to foster outlook awareness of secret rotation and expiration.
   EOT
   type = map(object({
     client_secret = object({

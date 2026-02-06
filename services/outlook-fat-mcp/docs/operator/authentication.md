@@ -3,7 +3,7 @@
 
 ## Overview
 
-The Teams MCP Server requires a Microsoft Entra ID (formerly Azure AD) app registration with delegated permissions to access Microsoft Graph API on behalf of users.
+The Outlook MCP Server requires a Microsoft Entra ID (formerly Azure AD) app registration with delegated permissions to access Microsoft Graph API on behalf of users.
 
 For technical details about the OAuth flow and why client credentials are required, see:
 
@@ -21,12 +21,12 @@ Use the provided Terraform module:
 module "outlook_fat_mcp_app" {
   source = "./deploy/terraform/azure/outlook-fat-mcp-entra-application"
 
-  display_name     = "Teams MCP Server"
+  display_name     = "Outlook MCP Server"
   sign_in_audience = "AzureADMyOrg"  # Single tenant
-  notes            = "MCP server for Teams transcript capture"
+  notes            = "MCP server for Outlook transcript capture"
 
   redirect_uris = [
-    "https://teams.mcp.example.com/auth/callback"
+    "https://outlook.mcp.example.com/auth/callback"
   ]
 
   confidential_clients = {
@@ -51,9 +51,9 @@ module "outlook_fat_mcp_app" {
 
 2. **Configure Basic Settings**
 
-   - **Name**: Teams MCP Server
+   - **Name**: Outlook MCP Server
    - **Supported account types**: Accounts in this organizational directory only
-   - **Redirect URI**: Web - `https://teams.mcp.example.com/auth/callback`
+   - **Redirect URI**: Web - `https://outlook.mcp.example.com/auth/callback`
 
 3. **Add API Permissions**
 
@@ -103,7 +103,7 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 
 ## Understanding Microsoft Consent Flows
 
-**This is standard Microsoft behavior, not Teams MCP specific.** All Microsoft 365 apps use the same consent model.
+**This is standard Microsoft behavior, not Outlook MCP specific.** All Microsoft 365 apps use the same consent model.
 
 ### Standard Microsoft Consent Process
 
@@ -145,7 +145,7 @@ https://<your-domain>/auth/callback
 
 Examples:
 
-- Production: `https://teams.mcp.example.com/auth/callback`
+- Production: `https://outlook.mcp.example.com/auth/callback`
 - Development: `http://localhost:<port>/auth/callback`
 
 **Multiple redirect URIs** can be configured for different environments.

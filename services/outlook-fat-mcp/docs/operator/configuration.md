@@ -106,11 +106,11 @@ mcpConfig:
   enabled: true
 
   app:
-    selfUrl: https://teams.mcp.example.com
+    selfUrl: https://outlook.mcp.example.com
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
-    # publicWebhookUrl: https://teams.mcp.example.com  # optional
+    # publicWebhookUrl: https://outlook.mcp.example.com  # optional
 
   unique:
     serviceAuthMode: cluster_local
@@ -180,7 +180,7 @@ mcpConfig:
 
 ### Why a Zitadel Service Account is Required
 
-The Teams MCP Server requires a Zitadel service account to authenticate with the Unique Public API. This service account is used to:
+The Outlook MCP Server requires a Zitadel service account to authenticate with the Unique Public API. This service account is used to:
 
 1. **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants
 2. **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts
@@ -200,7 +200,7 @@ The service account credentials are passed via the `x-company-id` and `x-user-id
 
    - Go to **Service Accounts** in the organization settings
    - Click **New Service Account**
-   - Provide a descriptive name (e.g., "Teams MCP Server Service Account")
+   - Provide a descriptive name (e.g., "Outlook MCP Server Service Account")
    - Set appropriate permissions for the service account
 
 3. **Note the Service Account Details**

@@ -171,7 +171,7 @@
     },
     "mcpConfig": {
       "type": "object",
-      "description": "Configuration for the Teams MCP Server, will be mapped to environment variables",
+      "description": "Configuration for the Outlook MCP Server, will be mapped to environment variables",
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -183,7 +183,7 @@
           "properties": {
             "selfUrl": {
               "type": "string",
-              "description": "The URL of the MCP Server. Used for OAuth callbacks. Example: https://teams.mcp.unique.app"
+              "description": "The URL of the MCP Server. Used for OAuth callbacks. Example: https://outlook.mcp.unique.app"
             }
           },
           "required": ["selfUrl"]
@@ -198,7 +198,7 @@
             },
             "publicWebhookUrl": {
               "type": "string",
-              "description": "The public webhook URL reachable from external network for Microsoft Graph subscriptions. Optional - defaults to SELF_URL if not provided. Example: https://teams.mcp.unique.app/webhooks"
+              "description": "The public webhook URL reachable from external network for Microsoft Graph subscriptions. Optional - defaults to SELF_URL if not provided. Example: https://outlook.mcp.unique.app/webhooks"
             }
           },
           "required": ["clientId"]

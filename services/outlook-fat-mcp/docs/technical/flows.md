@@ -51,31 +51,31 @@ sequenceDiagram
     autonumber
     actor User
     participant MCPClient as MCP Client
-    participant TeamsMCP as Teams MCP Server
+    participant OutlookMCP as Outlook MCP Server
     participant EntraID as Microsoft Entra ID
     participant MSGraph as Microsoft Graph API
     participant DB as PostgreSQL
 
     User->>MCPClient: Connect to MCP server
-    MCPClient->>TeamsMCP: GET /mcp
-    TeamsMCP->>MCPClient: Redirect to Microsoft login
+    MCPClient->>OutlookMCP: GET /mcp
+    OutlookMCP->>MCPClient: Redirect to Microsoft login
     MCPClient->>EntraID: OAuth authorization request
     EntraID->>User: Show consent screen
     User->>EntraID: Grant permissions
-    EntraID->>TeamsMCP: Redirect with auth code
-    TeamsMCP->>EntraID: Exchange code for tokens<br/>(using CLIENT_SECRET)
-    EntraID->>TeamsMCP: Microsoft access + refresh tokens
-    Note over TeamsMCP: Microsoft tokens NEVER sent to client<br/>Encrypted and stored on server only
-    TeamsMCP->>DB: Store encrypted Microsoft tokens
-    TeamsMCP->>MCPClient: Issue opaque JWT tokens<br/>(MCP access + refresh tokens)
+    EntraID->>OutlookMCP: Redirect with auth code
+    OutlookMCP->>EntraID: Exchange code for tokens<br/>(using CLIENT_SECRET)
+    EntraID->>OutlookMCP: Microsoft access + refresh tokens
+    Note over OutlookMCP: Microsoft tokens NEVER sent to client<br/>Encrypted and stored on server only
+    OutlookMCP->>DB: Store encrypted Microsoft tokens
+    OutlookMCP->>MCPClient: Issue opaque JWT tokens<br/>(MCP access + refresh tokens)
 
     Note over User,MCPClient: User starts KB integration via tool
     User->>MCPClient: Call start_kb_integration tool
-    MCPClient->>TeamsMCP: Tool invocation
-    TeamsMCP->>MSGraph: POST /subscriptions<br/>(using Microsoft access token)
-    MSGraph->>TeamsMCP: Subscription created (ID, expiry)
-    TeamsMCP->>DB: Store subscription record
-    TeamsMCP->>MCPClient: Success response
+    MCPClient->>OutlookMCP: Tool invocation
+    OutlookMCP->>MSGraph: POST /subscriptions<br/>(using Microsoft access token)
+    MSGraph->>OutlookMCP: Subscription created (ID, expiry)
+    OutlookMCP->>DB: Store subscription record
+    OutlookMCP->>MCPClient: Success response
 
     Note over TeamsMCP: Now listening for meeting transcripts
 ```
@@ -92,7 +92,7 @@ The following sequence shows the complete Microsoft OAuth authentication flow wi
 sequenceDiagram
     participant User
     participant Client as MCP Client
-    participant TeamsMCP as Teams MCP Server
+    participant TeamsMCP as Outlook MCP Server
     participant EntraID as Microsoft Entra ID
     participant GraphAPI as Microsoft Graph API
 
@@ -115,7 +115,7 @@ sequenceDiagram
     Note over TeamsMCP: Server uses Microsoft tokens internally
     
     TeamsMCP->>GraphAPI: 10. API calls with Microsoft access token
-    GraphAPI->>TeamsMCP: 11. Teams transcript data
+    GraphAPI->>TeamsMCP: 11. Outlook transcript data
 ```
 
 ## Microsoft Token Refresh Flow
@@ -182,7 +182,7 @@ stateDiagram-v2
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 sequenceDiagram
     autonumber
-    participant TeamsMCP as Teams MCP Server
+    participant TeamsMCP as Outlook MCP Server
     participant RabbitMQ
     participant MSGraph as Microsoft Graph API
     participant DB as PostgreSQL

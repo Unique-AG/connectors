@@ -83,7 +83,7 @@ server:
 
 mcpConfig:
   app:
-    selfUrl: https://teams.mcp.example.com
+    selfUrl: https://outlook.mcp.example.com
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"

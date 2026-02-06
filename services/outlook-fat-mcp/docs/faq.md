@@ -5,7 +5,7 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Teams MCP Server is a connector-style MCP server, not a traditional MCP server. Unlike traditional MCP servers that provide tools, prompts, resources, or other interactive capabilities, this server operates automatically in the background once connected.
+**Answer:** The Outlook MCP Server is a connector-style MCP server, not a traditional MCP server. Unlike traditional MCP servers that provide tools, prompts, resources, or other interactive capabilities, this server operates automatically in the background once connected.
 
 **What it does:**
 
@@ -42,7 +42,7 @@ This is a data ingestion connector that uses the MCP protocol for authentication
 
 ### Why do I need admin consent?
 
-**Answer:** `OnlineMeetingTranscript.Read.All` requires admin consent because it accesses sensitive meeting content. This is a Microsoft requirement, not a Teams MCP requirement.
+**Answer:** `OnlineMeetingTranscript.Read.All` requires admin consent because it accesses sensitive meeting content. This is a Microsoft requirement, not a Outlook MCP requirement.
 
 **What to do:**
 
@@ -101,7 +101,7 @@ The `CLIENT_ID` enables Microsoft to verify application identity, enforce permis
 - **Delegated:** Acts on behalf of the signed-in user, only accesses data that user can access
 - **Application:** Acts as the application itself, requires admin-configured policies per user
 
-Teams MCP uses delegated permissions for self-service user connections.
+Outlook MCP uses delegated permissions for self-service user connections.
 
 **See also:** [Why Delegated (Not Application) Permissions](./technical/permissions.md#why-delegated-not-application-permissions)
 
@@ -116,7 +116,7 @@ Teams MCP uses delegated permissions for self-service user connections.
 
 ### Why can't I use multiple app registrations?
 
-**Answer:** Each Teams MCP deployment uses one Microsoft Entra ID app registration. The app can be configured as multi-tenant to serve users from multiple organizations, but you don't need separate app registrations per tenant.
+**Answer:** Each Outlook MCP deployment uses one Microsoft Entra ID app registration. The app can be configured as multi-tenant to serve users from multiple organizations, but you don't need separate app registrations per tenant.
 
 **Single App Registration Architecture:**
 
@@ -136,11 +136,11 @@ This design uses a single OAuth application that can serve users across multiple
 
 ### Why do I need a Zitadel service account?
 
-**Answer:** The Teams MCP Server requires a Zitadel service account to authenticate with the Unique Public API and perform operations on behalf of the server.
+**Answer:** The Outlook MCP Server requires a Zitadel service account to authenticate with the Unique Public API and perform operations on behalf of the server.
 
 **What the service account is used for:**
 
-- **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants from Microsoft Teams
+- **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants from Microsoft Outlook
 - **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts
 - **Set access permissions** - Grant appropriate read/write permissions to meeting organizers and participants based on their role in the meeting
 - **Upload transcript data** - Ingest transcript content (VTT files) into the Unique knowledge base
@@ -317,7 +317,7 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 
 ### Why do subscriptions expire?
 
-**Answer:** Microsoft Graph subscriptions expire after a maximum of 3 days. Teams MCP automatically renews subscriptions before they expire (default: 3 AM UTC daily). This ensures token validity is checked consistently.
+**Answer:** Microsoft Graph subscriptions expire after a maximum of 3 days. Outlook MCP automatically renews subscriptions before they expire (default: 3 AM UTC daily). This ensures token validity is checked consistently.
 
 **See also:** [Subscription Lifecycle](./technical/flows.md#subscription-lifecycle)
 

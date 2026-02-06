@@ -15,7 +15,7 @@
 
 ## Overview
 
-The Outlook Fat MCP Server is a cloud-native application that automatically captures meeting transcripts from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
+The Outlook Fat MCP Server is a cloud-native application that automatically captures meeting transcripts from Microsoft Outlook and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
 **Note:** This is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction or tool calls.
 
@@ -23,7 +23,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ## Quick Summary
 
-**What it does:** Automatically captures meeting transcripts from Microsoft Teams and ingests them into Unique's AI knowledge base with participant-based access controls
+**What it does:** Automatically captures meeting transcripts from Microsoft Outlook and ingests them into Unique's AI knowledge base with participant-based access controls
 
 **Deployment:** Kubernetes-based NestJS microservice
 
@@ -33,18 +33,18 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ## Requirements
 
-### Microsoft 365 / Teams
+### Microsoft 365 / Outlook
 
 | Requirement | Details |
 |-------------|---------|
-| **Microsoft Teams** | Active tenant with transcription enabled for meetings |
+| **Microsoft Outlook** | Active tenant with transcription enabled for meetings |
 | **Microsoft Entra ID** | Tenant with Application Administrator rights for app registration |
-| **License** | Microsoft 365 license with Teams meeting transcription capabilities |
+| **License** | Microsoft 365 license with Outlook meeting transcription capabilities |
 
 **Prerequisites:**
 
 - Access to Microsoft Entra ID for app registration
-- Microsoft Teams meetings with transcription enabled by policy
+- Microsoft Outlook meetings with transcription enabled by policy
 - Users must be able to consent to delegated permissions (or admin consent granted)
 
 ### Permissions
@@ -141,7 +141,7 @@ flowchart TB
         Storage["Knowledge Base"]
     end
 
-    User["Teams User"] --> EntraID
+    User["Outlook User"] --> EntraID
     EntraID --> OAuth
     OAuth --> PostgreSQL
 
@@ -236,7 +236,7 @@ See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow
    - Grant required permissions
 
 2. **Automatic Processing** (Ongoing)
-   - Attend Microsoft Teams meetings with transcription enabled
+   - Attend Microsoft Outlook meetings with transcription enabled
    - Meeting ends and transcript becomes available
    - Outlook Fat MCP automatically receives webhook notification
    - Transcript captured and uploaded

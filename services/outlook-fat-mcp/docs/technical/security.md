@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 1802993676 -->
 <!-- confluence-space-key: PUBDOC -->
 
-This document describes the security architecture, cryptographic decisions, and threat model for the Teams MCP Server.
+This document describes the security architecture, cryptographic decisions, and threat model for the Outlook MCP Server.
 
 ## Security Layers
 
@@ -90,7 +90,7 @@ The MCP OAuth implementation follows [OAuth 2.1](https://oauth.net/2.1/) with ma
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Server as Teams MCP
+    participant Server as Outlook MCP
     participant Entra as Microsoft Entra ID
 
     Note over Client: Generate code_verifier (random)
@@ -164,7 +164,7 @@ Microsoft Graph webhooks are validated using `clientState`:
 ```mermaid
 sequenceDiagram
     participant Graph as Microsoft Graph
-    participant Server as Teams MCP
+    participant Server as Outlook MCP
 
     Note over Server: On subscription create
     Server->>Graph: POST /subscriptions<br/>clientState = MICROSOFT_WEBHOOK_SECRET

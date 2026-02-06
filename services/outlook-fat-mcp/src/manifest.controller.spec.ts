@@ -10,7 +10,8 @@ describe('ManifestController', () => {
 
     expect(result).toMatchObject({
       name: '@unique-ag/outlook-fat-mcp',
-      description: 'Outlook Fat MCP Server - Microsoft Graph integration for Model Context Protocol',
+      description:
+        'Outlook Fat MCP Server - Microsoft Graph integration for Model Context Protocol',
       type: 'mcp-server',
       endpoints: {
         mcp: '/mcp',
@@ -27,7 +28,8 @@ describe('ManifestController', () => {
         'RESTful API endpoints',
       ],
       documentation: {
-        readme: 'https://github.com/Unique-AG/connectors/blob/main/services/outlook-fat-mcp/README.md',
+        readme:
+          'https://github.com/Unique-AG/connectors/blob/main/services/outlook-fat-mcp/README.md',
         mcp: 'https://modelcontextprotocol.io/',
       },
       timestamp: expect.any(String),

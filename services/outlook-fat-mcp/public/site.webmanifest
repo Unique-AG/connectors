@@ -1,7 +1,7 @@
 {
-  "name": "Teams MCP Server",
-  "short_name": "Teams MCP",
-  "description": "Model Context Protocol server for Microsoft Teams integration",
+  "name": "Outlook MCP Server",
+  "short_name": "Outlook MCP",
+  "description": "Model Context Protocol server for Microsoft Outlook integration",
   "icons": [
     {
       "src": "/icons/favicon-32x32.png",

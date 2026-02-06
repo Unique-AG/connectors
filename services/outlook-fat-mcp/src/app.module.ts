@@ -35,7 +35,6 @@ import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.modul
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
-import { TranscriptModule } from './transcript/transcript.module';
 import { GraphErrorFilter } from './utils/graph-error.filter';
 
 @Module({
@@ -104,7 +103,9 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         provider: MicrosoftOAuthProvider,
 
         clientId: configService.get('microsoft.clientId', { infer: true }),
-        clientSecret: configService.get('microsoft.clientSecret', { infer: true }).value,
+        clientSecret: configService.get('microsoft.clientSecret', {
+          infer: true,
+        }).value,
         hmacSecret: configService.get('auth.hmacSecret', { infer: true }).value,
 
         serverUrl: configService.get('app.selfUrl', { infer: true }).toString().slice(0, -1),
@@ -135,7 +136,6 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     MsGraphModule,
     AMQPModule,
-    TranscriptModule,
   ],
   controllers: [ManifestController],
   providers: [

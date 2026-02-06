@@ -15,14 +15,14 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 
 ## Understanding Consent Requirements
 
-**This is standard Microsoft behavior, not Teams MCP specific.** All Microsoft 365 apps use the same consent model.
+**This is standard Microsoft behavior, not Outlook MCP specific.** All Microsoft 365 apps use the same consent model.
 
 ### Standard Microsoft Consent Process
 
 1. **Admin adds the app and grants admin-required permissions**
 
    - Organization-wide OR per-user
-   - For Teams MCP: `OnlineMeetingTranscript.Read.All` requires admin consent
+   - For Outlook MCP: `OnlineMeetingTranscript.Read.All` requires admin consent
 
 2. **Admin approval workflow (if tenant has it enabled)**
 

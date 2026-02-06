@@ -3,9 +3,9 @@
 
 ## Overview
 
-This section contains detailed technical documentation for developers and architects working with the Teams MCP Server.
+This section contains detailed technical documentation for developers and architects working with the Outlook MCP Server.
 
-**Note:** The Teams MCP Server is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base in the background.
+**Note:** The Outlook MCP Server is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base in the background.
 
 ## Documentation
 

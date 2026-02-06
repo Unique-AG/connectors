@@ -83,7 +83,7 @@ ingress:
     # cert-manager.io/cluster-issuer: letsencrypt-prod
   # -- Ingress hosts configuration
   hosts: []
-    # - host: teams.mcp.example.com
+    # - host: outlook.mcp.example.com
     #   paths:
     #     - path: /
     #       pathType: Prefix
@@ -93,7 +93,7 @@ ingress:
   tls: []
     # - secretName: outlook-fat-mcp-tls
     #   hosts:
-    #     - teams.mcp.example.com
+    #     - outlook.mcp.example.com
 
 # -- Grafana dashboard configuration
 grafana:
@@ -148,7 +148,7 @@ mcpConfig:
   app:
     # -- The URL of the MCP Server. Used for OAuth callbacks.
     # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
-    # example: https://teams.mcp.unique.app
+    # example: https://outlook.mcp.unique.app
     selfUrl: unset_default_value
 
   # -- Microsoft Graph API configuration
@@ -158,7 +158,7 @@ mcpConfig:
     clientId: unset_default_value
     # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions.
     # Optional - defaults to SELF_URL if not provided.
-    # example: https://teams.mcp.unique.app
+    # example: https://outlook.mcp.unique.app
     # publicWebhookUrl: ""
     # clientSecret is loaded from a secret, see server.envVars
     # webhookSecret is loaded from a secret, see server.envVars

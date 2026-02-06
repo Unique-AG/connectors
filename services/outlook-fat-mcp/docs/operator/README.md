@@ -3,11 +3,11 @@
 
 ## Overview
 
-This guide provides IT operators with the technical information needed to deploy, configure, and maintain the Teams MCP Server.
+This guide provides IT operators with the technical information needed to deploy, configure, and maintain the Outlook MCP Server.
 
-**Note:** The Teams MCP Server is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once users connect, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction.
+**Note:** The Outlook MCP Server is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once users connect, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction.
 
-For end-user and administrator documentation, see the [Teams MCP Overview](../README.md).
+For end-user and administrator documentation, see the [Outlook MCP Overview](../README.md).
 
 ## Documentation
 
@@ -30,7 +30,7 @@ flowchart TB
 
     subgraph K8s["Kubernetes Cluster"]
         Kong["Kong Gateway"]
-        TeamsMCP["Teams MCP Pod"]
+        OutlookMCP["Outlook MCP Pod"]
         RabbitMQ["RabbitMQ"]
         PostgreSQL["PostgreSQL"]
     end
@@ -41,14 +41,14 @@ flowchart TB
 
     EntraID --> Kong
     MSGraph -->|"Webhooks"| Kong
-    Kong --> TeamsMCP
-    TeamsMCP --> RabbitMQ
-    TeamsMCP --> MSGraph
-    TeamsMCP --> UniqueAPI
-    TeamsMCP --> PostgreSQL
+    Kong --> OutlookMCP
+    OutlookMCP --> RabbitMQ
+    OutlookMCP --> MSGraph
+    OutlookMCP --> UniqueAPI
+    OutlookMCP --> PostgreSQL
 ```
 
-The Teams MCP Server runs as a **single pod** that handles both API requests and background processing via RabbitMQ consumers.
+The Outlook MCP Server runs as a **single pod** that handles both API requests and background processing via RabbitMQ consumers.
 
 ## Infrastructure Requirements
 

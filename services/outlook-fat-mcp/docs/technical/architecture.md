@@ -1,11 +1,12 @@
 <!-- confluence-page-id: 1802502170 -->
 <!-- confluence-space-key: PUBDOC -->
 
-The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Teams meetings with the Unique platform through the Model Context Protocol (MCP). It captures meeting transcripts from Microsoft Teams and ingests them into Unique with proper access controls.
+The Outlook MCP Server is a NestJS-based microservice that integrates Microsoft Outlook elmails with the Unique platform through the Model Context Protocol (MCP).
 
 **Core Capabilities:**
 
-- Captures Microsoft Teams meeting transcripts in real-time
+- Sync emails from Outlook
+- Allow user to send emails
 - Manages webhook subscriptions to Microsoft Graph API for notifications
 - Handles OAuth2 authentication with Microsoft Entra ID
 - Ingests content into the Unique platform with participant-based access controls
@@ -17,13 +18,13 @@ The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Te
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
 flowchart TB
     subgraph External["External Services"]
-        User["Teams User"]
+        User["Outlook User"]
         EntraID["Microsoft Entra ID"]
         MSGraph["Microsoft Graph"]
         Unique["Unique Platform"]
     end
 
-    subgraph TeamsMCP["Teams MCP Server"]
+    subgraph OutlookMCP["Outlook MCP Server"]
         OAuth["OAuth Module"]
         API["REST API"]
         Processor["Transcript Processor"]
@@ -207,7 +208,7 @@ Enables asynchronous processing of webhook notifications. See [FAQ - Why use Rab
 
 ## Authentication Architecture
 
-The Teams MCP service handles **two layers of authentication**:
+The Outlook MCP service handles **two layers of authentication**:
 
 1. **MCP OAuth** - Authentication between MCP clients and this server
 2. **Microsoft OAuth** - Authentication with Microsoft Entra ID for Graph API access
@@ -219,7 +220,7 @@ flowchart TB
         Graph["Microsoft Graph API"]
     end
 
-    subgraph TeamsMCP["Teams MCP Server"]
+    subgraph OutlookMCP["Outlook MCP Server"]
         API["API Layer"]
         TokenStore["Token Store"]
     end
@@ -292,7 +293,7 @@ Without proper app registration, Microsoft Graph API will reject all authenticat
 | Federated Identity | **No** | Only works with Client Credentials flow |
 | Multiple App Registrations | **No** | Each MCP server deployment uses one Entra ID app registration |
 
-The Teams MCP service requires **delegated permissions** to access user-specific resources. Client Credentials flow only supports application permissions, which would require tenant admins to create Application Access Policies via PowerShell—impractical for self-service MCP connections.
+The Outlook MCP service requires **delegated permissions** to access user-specific resources. Client Credentials flow only supports application permissions, which would require tenant admins to create Application Access Policies via PowerShell—impractical for self-service MCP connections.
 
 **See also:**
 
