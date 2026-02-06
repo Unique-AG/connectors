@@ -1,11 +1,11 @@
-<!-- confluence-page-id: 1801683279 -->
+<!-- confluence-page-id: -1 -->
 <!-- confluence-space-key: PUBDOC -->
 
 ## Overview
 
 This guide provides IT operators with the technical information needed to deploy, configure, and maintain the Outlook MCP Server.
 
-**Note:** The Outlook MCP Server is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once users connect, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction.
+**Note:** The Outlook MCP Server is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once users connect, it automatically ingests emails into the Unique knowledge base without requiring any additional interaction.
 
 For end-user and administrator documentation, see the [Outlook MCP Overview](../README.md).
 
@@ -87,4 +87,4 @@ The Outlook MCP Server runs as a **single pod** that handles both API requests a
 
    - [ ] OAuth flow works end-to-end
    - [ ] Webhook endpoint accessible from Microsoft
-   - [ ] Test transcript captured successfully
+   - [ ] Test email captured successfully

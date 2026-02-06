@@ -1,4 +1,4 @@
-<!-- confluence-page-id: 1803026436 -->
+<!-- confluence-page-id: -1 -->
 <!-- confluence-space-key: PUBDOC -->
 
 ## Overview
@@ -23,7 +23,7 @@ module "outlook_fat_mcp_app" {
 
   display_name     = "Outlook MCP Server"
   sign_in_audience = "AzureADMyOrg"  # Single tenant
-  notes            = "MCP server for Outlook transcript capture"
+  notes            = "MCP server for Outlook email capture"
 
   redirect_uris = [
     "https://outlook.mcp.example.com/auth/callback"
@@ -64,17 +64,13 @@ module "outlook_fat_mcp_app" {
    | Permission | Type | Admin Consent |
    |------------|------|---------------|
    | `User.Read` | Delegated | No |
-   | `Calendars.Read` | Delegated | No |
-   | `OnlineMeetings.Read` | Delegated | No |
-   | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** |
-   | `offline_access` | Delegated | No |
+   | `Mail.Read` | Delegated | No |
+   | `Mail.ReadBasic` | Delegated | **Yes** |
+   | `Mail.ReadWrite` | Delegated | **Yes** |
 
 4. **Grant Admin Consent**
 
-   - Click "Grant admin consent for [Tenant]"
-   - Confirm the action
-   
-   **Important**: Admin consent is required for `OnlineMeetingTranscript.Read.All` permission. Without admin consent, users will see an error when trying to connect. See [Understanding Admin Consent](#understanding-admin-consent-and-user-consent) below for details.
+   - No admin consent should be needed
 
 5. **Create Client Secret**
 
@@ -96,10 +92,9 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 **Required:**
 
 - `User.Read` - Read user profile
-- `Calendars.Read` - Read calendar events (for recurring meeting detection)
-- `OnlineMeetings.Read` - Read meeting details
-- `OnlineMeetingTranscript.Read.All` - Read transcripts (admin consent required)
-- `offline_access` - Obtain refresh tokens
+- `Mail.Read` - Read email content
+- `Mail.ReadBasic` - Read basic email info
+- `Mail.ReadWrite` - Send emails
 
 ## Understanding Microsoft Consent Flows
 
@@ -107,17 +102,7 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 
 ### Standard Microsoft Consent Process
 
-1. **Admin grants consent** for permissions requiring admin approval (`OnlineMeetingTranscript.Read.All`)
-
-   - Organization-wide OR per-user
-2. **Admin approval workflow** (if enabled in tenant) - users request approval
-3. **User consent** (always required for delegated permissions, even after admin consent)
-
-**How to grant admin consent:**
-
-1. Azure Portal → App Registration → API permissions
-2. Click "Grant admin consent for [Your Organization]"
-3. Or use [admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) for per-user approval
+1. **User consent** (always required for delegated permissions, even after admin consent)
 
 **Microsoft Documentation:**
 

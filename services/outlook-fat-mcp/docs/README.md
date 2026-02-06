@@ -1,4 +1,4 @@
-<!-- confluence-page-id: 1802633229 -->
+<!-- confluence-page-id: -1 -->
 <!-- confluence-space-key: PUBDOC -->
 
 !!! danger "Pre-Release Disclaimer"
@@ -15,21 +15,19 @@
 
 ## Overview
 
-The Outlook Fat MCP Server is a cloud-native application that automatically captures meeting transcripts from Microsoft Outlook and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
-
-**Note:** This is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction or tool calls.
+The Outlook Fat MCP Server is a cloud-native application that automatically captures emails from Microsoft Outlook and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
 ## Quick Summary
 
-**What it does:** Automatically captures meeting transcripts from Microsoft Outlook and ingests them into Unique's AI knowledge base with participant-based access controls
+**What it does:** Automatically captures emails from Microsoft Outlook and ingests them into Unique's AI knowledge base with participant-based access controls
 
 **Deployment:** Kubernetes-based NestJS microservice
 
 **Authentication:** Uses delegated OAuth2 with Microsoft Entra ID (user signs in and consents)
 
-**Processing:** Real-time webhook-driven (notifications received immediately when transcripts are available)
+**Processing:** Real-time webhook-driven (notifications received immediately when emails are recieved / updated / deleted)
 
 ## Requirements
 
@@ -37,14 +35,13 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 | Requirement | Details |
 |-------------|---------|
-| **Microsoft Outlook** | Active tenant with transcription enabled for meetings |
+| **Microsoft Outlook** | Active tenant with Outlook |
 | **Microsoft Entra ID** | Tenant with Application Administrator rights for app registration |
-| **License** | Microsoft 365 license with Outlook meeting transcription capabilities |
+| **License** | Microsoft 365 license with Outlook |
 
 **Prerequisites:**
 
 - Access to Microsoft Entra ID for app registration
-- Microsoft Outlook meetings with transcription enabled by policy
 - Users must be able to consent to delegated permissions (or admin consent granted)
 
 ### Permissions
@@ -54,9 +51,9 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | Permission | Type | Admin Consent | Required |
 |------------|------|---------------|----------|
 | `User.Read` | Delegated | No | Yes |
-| `OnlineMeetings.Read` | Delegated | No | Yes |
-| `OnlineMeetingTranscript.Read.All` | Delegated | Yes | Yes |
-| `offline_access` | Delegated | No | Yes |
+| `Mail.Read` | Delegated | No | Yes |
+| `Mail.ReadBasic` | Delegated | No | Yes |
+| `Mail.ReadWrite` | Delegated | No | Yes |
 
 For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md#least-privilege-justification).
 
@@ -64,16 +61,14 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 
 ### Core Capabilities
 
-**Real-time Transcript Capture**
+**Real-time Email Capture**
 
 - Webhook-based notifications from [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview)
-- Automatic capture when meeting transcripts become available
-- VTT format transcript content ingested into Unique
+- Automatic capture when emails are received / updated / deleted
+- The .eml file is ingested using Unique injestion
 
 **Participant-Based Access Control**
 
-- Meeting organizer receives **write + read** access in Unique
-- Meeting participants receive **read** access in Unique
 - Users resolved by email or username in Unique platform
 
 **Self-Service User Connection**
@@ -128,7 +123,7 @@ flowchart TB
     subgraph OutlookFatMCP["Outlook Fat MCP Server"]
         API["REST API"]
         OAuth["OAuth Module"]
-        Processor["Transcript Processor"]
+        Processor["Email Processor"]
     end
 
     subgraph Infrastructure["Infrastructure"]
@@ -180,53 +175,18 @@ sequenceDiagram
     OutlookFatMCP->>DB: Store encrypted tokens
     OutlookFatMCP->>MCPClient: Opaque JWT for auth
 
-    Note over User,MCPClient: User starts KB integration via tool
-    User->>MCPClient: Call start_kb_integration tool
+    Note over User,MCPClient: User starts email injestion via tool
+    User->>MCPClient: Call start_email_integration tool
     MCPClient->>OutlookFatMCP: Tool invocation
     OutlookFatMCP->>MSGraph: POST /subscriptions
     MSGraph->>OutlookFatMCP: Subscription created (ID, expiry)
     OutlookFatMCP->>DB: Store subscription record
     OutlookFatMCP->>MCPClient: Success response
 
-    Note over OutlookFatMCP: Now listening for meeting transcripts
+    Note over OutlookFatMCP: Now listening for emails
 ```
 
 See [User Connection Flow](./technical/flows.md#user-connection-flow) for additional details.
-
-### Transcript Processing Flow
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Graph as Microsoft Graph
-    participant API as Webhook Controller
-    participant Queue as RabbitMQ
-    participant Processor as Transcript Processor
-    participant Unique as Unique Platform
-
-    Note over Graph: Meeting transcript available
-    Graph->>API: POST /transcript/notification
-    API->>API: Validate clientState
-    API->>Queue: Enqueue notification
-    API->>Graph: 202 Accepted
-
-    Queue->>Processor: Process transcript event
-
-    par Fetch meeting data
-        Processor->>Graph: GET meeting details
-        Graph->>Processor: Meeting + participants
-    and Fetch transcript
-        Processor->>Graph: GET transcript content
-        Graph->>Processor: VTT content
-    end
-
-    Processor->>Unique: Resolve participants
-    Processor->>Unique: Create scope (folder)
-    Processor->>Unique: Set access permissions
-    Processor->>Unique: Upload transcript
-```
-
-See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow) for additional details.
 
 ### User Workflow
 
@@ -236,15 +196,11 @@ See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow
    - Grant required permissions
 
 2. **Automatic Processing** (Ongoing)
-   - Attend Microsoft Outlook meetings with transcription enabled
-   - Meeting ends and transcript becomes available
-   - Outlook Fat MCP automatically receives webhook notification
-   - Transcript captured and uploaded
-
+   - Outlook Fat MCP automatically receives webhook notification when email change
+   
 3. **Access in Unique** (Ongoing)
-   - Meeting content available in Unique knowledge base
-   - Organizer has write + read access
-   - Participants have read access
+   - Emails content available in Unique knowledge base
+   - Inbox owner has write + read access
    - Content searchable and queryable via Unique AI
 
 ## Limitations and Constraints
@@ -256,7 +212,6 @@ See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow
 | **Delegated permissions only** | Requires user sign-in; application-only access would need admin-configured policies per user |
 | **No certificate auth** | Certificate auth only works with Client Credentials flow, incompatible with delegated permissions |
 | **Single app registration** | Each MCP server deployment uses one Entra ID app registration (multi-tenant capable) |
-| **Admin consent required** | `OnlineMeetingTranscript.Read.All` needs admin approval |
 
 See [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture) for details.
 
@@ -279,9 +234,6 @@ See [Authentication Architecture - Single App Registration Architecture](./techn
 
 ### Not Supported
 
-- **Real-time transcription**: Only processes completed transcripts, not live captions
-- **Meeting creation**: Read-only access; cannot create or modify meetings
-- **Selective meeting capture**: All meetings with transcription enabled are captured
 - **Token introspection**: Tokens validated locally with short TTLs for performance
 
 ### Single App Registration Architecture
@@ -337,7 +289,7 @@ Planned enhancements will be documented here.
 
 - [Technical Reference](./technical/README.md) - Architecture, flows, and design decisions
   - [Architecture](./technical/architecture.md) - System components and infrastructure
-  - [Flows](./technical/flows.md) - User connection, subscription lifecycle, transcript processing
+  - [Flows](./technical/flows.md) - User connection, subscription lifecycle, email processing
   - [Permissions](./technical/permissions.md) - Microsoft Graph permissions with justification
   - [Security](./technical/security.md) - Encryption, authentication, and threat model
 

@@ -1,4 +1,4 @@
-<!-- confluence-page-id: 1802502170 -->
+<!-- confluence-page-id: -1 -->
 <!-- confluence-space-key: PUBDOC -->
 
 The Outlook MCP Server is a NestJS-based microservice that integrates Microsoft Outlook elmails with the Unique platform through the Model Context Protocol (MCP).
@@ -27,7 +27,7 @@ flowchart TB
     subgraph OutlookMCP["Outlook MCP Server"]
         OAuth["OAuth Module"]
         API["REST API"]
-        Processor["Transcript Processor"]
+        Processor["Emails Processor"]
         GraphClient["Graph Client"]
     end
 
@@ -60,7 +60,7 @@ flowchart TB
         AuthModule["OAuth Provider<br/>Token Store"]
     end
 
-    subgraph Transcript["Transcript Module"]
+    subgraph Emails["Emails Module"]
         Webhook["Webhook Controller"]
         Services["Subscription & Processing Services"]
     end

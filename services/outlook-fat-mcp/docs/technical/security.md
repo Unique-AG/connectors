@@ -1,4 +1,4 @@
-<!-- confluence-page-id: 1802993676 -->
+<!-- confluence-page-id: -1 -->
 <!-- confluence-space-key: PUBDOC -->
 
 This document describes the security architecture, cryptographic decisions, and threat model for the Outlook MCP Server.

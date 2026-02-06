@@ -1,4 +1,4 @@
-<!-- confluence-page-id: 1802371115 -->
+<!-- confluence-page-id: -1 -->
 <!-- confluence-space-key: PUBDOC -->
 
 This guide walks through setting up the Outlook MCP Server for local development and testing.
@@ -175,8 +175,7 @@ This URL is used when creating Microsoft Graph subscriptions.
 1. Ensure dev tunnel is running
 2. Complete OAuth flow to create a user
 3. The system automatically creates a Microsoft Graph subscription
-4. Hold a Outlook meeting with transcription enabled
-5. After the meeting, check logs for webhook notifications
+4. Send an email to Outlook to see if sync is working
 
 ### Database Inspection
 

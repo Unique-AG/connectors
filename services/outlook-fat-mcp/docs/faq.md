@@ -1,4 +1,4 @@
-<!-- confluence-page-id: 1801846803 -->
+<!-- confluence-page-id: -1 -->
 <!-- confluence-space-key: PUBDOC -->
 
 ## General
@@ -9,10 +9,10 @@
 
 **What it does:**
 
-- Once a user connects their Microsoft account, the connector automatically ingests meeting transcripts into the Unique knowledge base
-- It does not expose any MCP tools, prompts, or resources
-- It does not require any tool calls or additional interaction after the initial connection
-- It operates continuously in the background, processing transcripts as they become available
+- Once a user connects their Microsoft account, the connector automatically ingests emails into the Unique knowledge base
+- It does not expose the following MCP tools
+  - Sync All emails created after date x
+- It operates continuously in the background, processing emails as they become available
 
 **What it does not do:**
 
@@ -25,40 +25,20 @@
 
 - Uses MCP OAuth for user authentication and connection
 - Does not implement MCP tools, prompts, or resources
-- Operates as a background service that automatically ingests transcripts
+- Operates as a background service that automatically ingests emails
 - Processes webhook notifications from Microsoft Graph API
 - Ingests content into Unique knowledge base without requiring tool calls
 
 **Design rationale:**
 
 - The connector model allows for automatic, continuous data ingestion
-- Users connect once and transcripts are automatically captured
+- Users connect once and emails are automatically captured
 - No need for interactive tool calls or resource browsing
 - Simplifies the user experience by removing the need for ongoing interaction
 
 This is a data ingestion connector that uses the MCP protocol for authentication and connection management, but functions as a background service rather than an interactive MCP server.
 
 ## Authentication & Permissions
-
-### Why do I need admin consent?
-
-**Answer:** `OnlineMeetingTranscript.Read.All` requires admin consent because it accesses sensitive meeting content. This is a Microsoft requirement, not a Outlook MCP requirement.
-
-**What to do:**
-
-1. Go to Azure Portal → App Registration → API permissions
-2. Click "Grant admin consent for [Your Organization]"
-3. Users can then connect and grant their own consent
-
-**See also:** [Understanding Admin Consent](./operator/authentication.md#understanding-microsoft-consent-flows)
-
-### Why do users still need to consent after admin consent?
-
-**Answer:** This is standard Microsoft behavior for delegated permissions. Even after admin consent, each user must individually consent because delegated permissions act on behalf of the signed-in user. This ensures users are aware of what data the app can access.
-
-**This is not a bug** - it's how Microsoft OAuth works for all Microsoft 365 apps.
-
-**See also:** [Understanding Consent Requirements](./technical/permissions.md#understanding-consent-requirements)
 
 ### What is the "login flicker" when users reconnect?
 
@@ -140,16 +120,16 @@ This design uses a single OAuth application that can serve users across multiple
 
 **What the service account is used for:**
 
-- **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants from Microsoft Outlook
-- **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts
-- **Set access permissions** - Grant appropriate read/write permissions to meeting organizers and participants based on their role in the meeting
-- **Upload transcript data** - Ingest transcript content (VTT files) into the Unique knowledge base
+- **Retrieve matching user information** - Look up users in Unique by email or username to resolve email from Microsoft Outlook
+- **Create scopes (folders)** - Create organizational folders in Unique for storing emails
+- **Set access permissions** - Grant appropriate read/write permissions to emails to that user in unique
+- **Upload email data** - Ingest email content (.eml) into the Unique knowledge base
 
 **How it works:**
 
 - The service account credentials are passed via the `x-company-id` and `x-user-id` headers in all API requests to the Unique Public API
 - This ensures proper access control and authorization for all operations
-- The service account must be created in the Zitadel organization where you want to ingest transcripts
+- The service account must be created in the Zitadel organization where you want to ingest emails
 
 **How to create:**
 
@@ -212,7 +192,7 @@ https://<your-domain>/auth/callback
 
 > **Note:** Automated rotation might be part of a future release.
 
-If rotation becomes necessary, it would require manually deleting all subscriptions and having all users reconnect, which may miss transcripts created during the gap.
+If rotation becomes necessary, it would require manually deleting all subscriptions and having all users reconnect, which may miss emails created during the gap.
 
 **See also:** [MICROSOFT_WEBHOOK_SECRET Rotation](./technical/security.md#rotation-procedures)
 
@@ -262,7 +242,7 @@ Hashing reduces attack surface (no decryption key needed for MCP tokens), while 
 
 ### Why are subscriptions renewed instead of recreated?
 
-**Answer:** The biggest reason is that recreation may miss transcripts. Microsoft Graph only sends notifications for transcripts created while a subscription is active. When recreating a subscription (DELETE + POST), there's a gap where no subscription exists. Any transcripts created during that gap will never generate notifications—those transcripts are lost forever.
+**Answer:** The biggest reason is that recreation may miss emails. Microsoft Graph only sends notifications for emails created while a subscription is active. When recreating a subscription (DELETE + POST), there's a gap where no subscription exists. Any emails created during that gap will never generate notifications—those emails are lost forever.
 
 Renewal (PATCH) keeps the subscription continuously active, eliminating this gap. Additionally, renewal is more efficient than recreation—it preserves the subscription ID and reduces API calls. Renewal happens automatically before expiration (default: 3 AM UTC daily) to ensure token validity is checked consistently.
 
@@ -330,30 +310,25 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 
 **See also:** [Subscription Lifecycle](./technical/flows.md#subscription-lifecycle)
 
-### Why aren't transcripts appearing in Unique?
+### Why aren't emails appearing in Unique?
 
-**Answer:** Check the following:
+**Answer:** The emails are stored in a hidden folder and users cannot access that hidden file:
 
-1. **User has active subscription** - Verify the user successfully connected and subscription was created
-2. **Webhook notifications received** - Check if Microsoft is sending notifications
-3. **RabbitMQ queue processing** - Verify messages are being processed
-4. **No processing errors** - Check logs for any failures during transcript processing
-
-**See also:** [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow)
+**See also:** [Emails Processing Flow](./technical/flows.md#email-processing-flow)
 
 ## Webhooks & Processing
 
 ### Why use RabbitMQ for webhook processing?
 
-**Answer:** Microsoft requires webhook endpoints to respond within **10 seconds**, or it considers the delivery failed and retries. However, processing transcript notifications involves database lookups, multiple Microsoft Graph API calls, user resolution, and content ingestion, which can take **30+ seconds**.
+**Answer:** Microsoft requires webhook endpoints to respond within **10 seconds**, or it considers the delivery failed and retries. However, processing email notifications involves database lookups, multiple Microsoft Graph API calls, user resolution, and content ingestion, which can take **30+ seconds**.
 
 RabbitMQ decouples webhook reception from processing:
 
 - **Webhook Controller** receives the notification, validates it, publishes to RabbitMQ, and returns `202 Accepted` immediately
 - **RabbitMQ** durably stores the message until a consumer processes it
-- **Transcript Service** consumes messages and performs the slow processing asynchronously
+- **Email Service** consumes messages and performs the slow processing asynchronously
 
-This ensures we meet Microsoft's strict timeout requirements while processing transcripts reliably.
+This ensures we meet Microsoft's strict timeout requirements while processing emails reliably.
 
 **Benefits:**
 
@@ -502,7 +477,7 @@ This ensures we meet Microsoft's strict timeout requirements while processing tr
 
 - [Architecture](./technical/architecture.md) - System components and infrastructure
 - [Security](./technical/security.md) - Encryption, authentication, and threat model
-- [Flows](./technical/flows.md) - User connection, subscription lifecycle, transcript processing
+- [Flows](./technical/flows.md) - User connection, subscription lifecycle, email processing
 - [Permissions](./technical/permissions.md) - Required scopes and least-privilege justification
 - [Operator Guide](./operator/README.md) - Deployment and operations
 
