@@ -1,5 +1,6 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
+import { parseJsonOrPassthrough } from '../utils/config.util';
 import { requiredStringSchema } from '../utils/zod.util';
 
 // ==========================================
@@ -41,7 +42,10 @@ export const AppConfigSchema = z
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
     logsDiagnosticsConfigEmitPolicy: z
-      .union([z.literal('none'), z.array(z.enum(ConfigEmitPolicy))])
+      .preprocess(
+        parseJsonOrPassthrough,
+        z.union([z.literal('none'), z.array(z.enum(ConfigEmitPolicy)).nonempty()]),
+      )
       .prefault([ConfigEmitPolicy.ON_STARTUP, ConfigEmitPolicy.PER_SYNC])
       .describe(
         'Controls when configuration is logged. Array of triggers: on_startup logs once on start, per_sync logs at each site sync. Use "none" to disable.',
