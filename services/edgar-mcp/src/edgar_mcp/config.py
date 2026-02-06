@@ -1,8 +1,11 @@
+from importlib.metadata import version as pkg_version
 from typing import Literal
 from urllib.parse import quote_plus
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PKG_VERSION = pkg_version("edgar-mcp")
 
 AppEnv = Literal["development", "production", "test"]
 LogLevel = Literal["fatal", "error", "warn", "info", "debug"]
@@ -13,6 +16,7 @@ class AppConfig(BaseSettings):
     model_config = SettingsConfigDict()
 
     app_env: AppEnv = "production"
+    version: str = PKG_VERSION
     port: int = Field(default=9542, ge=0, le=65535)
     log_level: LogLevel = "info"
     logs_diagnostics_data_policy: DiagnosticsDataPolicy = "conceal"
