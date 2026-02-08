@@ -165,9 +165,12 @@ class TestQueueMessageFlow:
             await asyncio.wait_for(done.wait(), timeout=5.0)
 
             assert events == [
-                (0, "start"), (0, "end"),
-                (1, "start"), (1, "end"),
-                (2, "start"), (2, "end"),
+                (0, "start"),
+                (0, "end"),
+                (1, "start"),
+                (1, "end"),
+                (2, "start"),
+                (2, "end"),
             ]
         finally:
             await consumer.stop()

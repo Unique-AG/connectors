@@ -13,10 +13,12 @@ from edgar_mcp.config import AppConfig
 
 def configure_metrics(app_config: AppConfig) -> MeterProvider:
     """Configure OpenTelemetry metrics with Prometheus exporter."""
-    resource = Resource.create({
-        SERVICE_NAME: "edgar-mcp",
-        SERVICE_VERSION: app_config.version,
-    })
+    resource = Resource.create(
+        {
+            SERVICE_NAME: "edgar-mcp",
+            SERVICE_VERSION: app_config.version,
+        }
+    )
 
     reader = PrometheusMetricReader()
     provider = MeterProvider(resource=resource, metric_readers=[reader])

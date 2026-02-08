@@ -100,9 +100,8 @@ mcp_app = mcp.http_app(path="/")
 @asynccontextmanager
 async def combined_lifespan(app: FastAPI):
     """Combine app lifespan with FastMCP lifespan."""
-    async with app_lifespan(app):
-        async with mcp_app.lifespan(app):
-            yield
+    async with app_lifespan(app), mcp_app.lifespan(app):
+        yield
 
 
 app = FastAPI(
