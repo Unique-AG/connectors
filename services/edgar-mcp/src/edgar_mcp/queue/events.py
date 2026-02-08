@@ -9,6 +9,7 @@ EVENT_SOURCE = "/edgar-mcp"
 
 PING_EVENT_TYPE = "com.unique-ag.edgar-mcp.ping"
 
+
 class PingData(BaseModel):
     """Test event payload used for health checks and connectivity verification."""
 
@@ -24,10 +25,12 @@ class PingEvent(BaseModel):
 
 SECOND_TEST_EVENT_TYPE = "com.unique-ag.edgar-mcp.second-test"
 
+
 class SecondTestData(BaseModel):
     """Test event payload used for health checks and connectivity verification."""
 
     which: int = 2
+
 
 class SecondTestEvent(BaseModel):
     type: Literal[SECOND_TEST_EVENT_TYPE] = SECOND_TEST_EVENT_TYPE

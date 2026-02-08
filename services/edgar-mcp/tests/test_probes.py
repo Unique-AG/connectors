@@ -34,9 +34,7 @@ def make_client():
     ) -> TestClient:
         app = FastAPI()
         config = AppConfig(**config_kwargs)
-        app.include_router(
-            create_probe_router(config, session_factory, rabbitmq_connection)
-        )
+        app.include_router(create_probe_router(config, session_factory, rabbitmq_connection))
         return TestClient(app)
 
     return _make

@@ -36,9 +36,7 @@ class DatabaseConfig(BaseSettings):
     def build_url(self) -> "DatabaseConfig":
         if self.url is not None:
             if not self.url.startswith(("postgresql://", "postgresql+")):
-                raise ValueError(
-                    f"DB_URL must be a PostgreSQL connection string (postgresql://...)"
-                )
+                raise ValueError("DB_URL must be a PostgreSQL connection string (postgresql://...)")
             if self.url.startswith("postgresql://"):
                 self.url = self.url.replace("postgresql://", "postgresql+asyncpg://", 1)
             return self
@@ -54,9 +52,7 @@ class DatabaseConfig(BaseSettings):
             if val is None
         ]
         if missing:
-            raise ValueError(
-                f"DB_URL not set; missing required fields: {', '.join(missing)}"
-            )
+            raise ValueError(f"DB_URL not set; missing required fields: {', '.join(missing)}")
         self.url = (
             f"postgresql+asyncpg://{quote_plus(self.user)}:{quote_plus(self.password)}"
             f"@{self.host}:{self.port}/{self.name}"
@@ -86,7 +82,7 @@ class RabbitConfig(BaseSettings):
         if self.url is not None:
             if not self.url.startswith(("amqp://", "amqps://")):
                 raise ValueError(
-                    f"RABBITMQ_URL must be an AMQP connection string (amqp://... or amqps://...)"
+                    "RABBITMQ_URL must be an AMQP connection string (amqp://... or amqps://...)"
                 )
             return self
 
@@ -100,9 +96,7 @@ class RabbitConfig(BaseSettings):
             if val is None
         ]
         if missing:
-            raise ValueError(
-                f"RABBITMQ_URL not set; missing required fields: {', '.join(missing)}"
-            )
+            raise ValueError(f"RABBITMQ_URL not set; missing required fields: {', '.join(missing)}")
         self.url = (
             f"amqp://{quote_plus(self.user)}:{quote_plus(self.password)}"
             f"@{self.host}:{self.port}/{self.vhost.lstrip('/')}"

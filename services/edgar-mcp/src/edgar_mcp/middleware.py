@@ -18,8 +18,6 @@ class TraceContextMiddleware(BaseHTTPMiddleware):
         ctx = span.get_span_context()
         if ctx.is_valid:
             # 32-character zero-padded hex string
-            structlog.contextvars.bind_contextvars(
-                trace_id=format(ctx.trace_id, "032x")
-            )
+            structlog.contextvars.bind_contextvars(trace_id=format(ctx.trace_id, "032x"))
 
         return await call_next(request)
