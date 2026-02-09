@@ -16,6 +16,7 @@ export type GraphRecipient = z.infer<typeof GraphRecipient>;
 
 export const GraphEmail = z.object({
   id: z.string(),
+  internetMessageId: z.string().nullable(),
   subject: z.string().nullable(),
   from: GraphRecipient.nullable(),
   toRecipients: z.array(GraphRecipient),
@@ -37,6 +38,7 @@ export type GraphMailFolder = z.infer<typeof GraphMailFolder>;
 
 export const GRAPH_EMAIL_SELECT_FIELDS = [
   'id',
+  'internetMessageId',
   'subject',
   'from',
   'toRecipients',
