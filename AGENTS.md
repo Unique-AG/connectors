@@ -3,20 +3,22 @@
 ## General
 
 - Don't write coauthoring or mention claude
-- Use pnpm scripts from the root with filters
+- Use pnpm scripts from the root with filters for TypeScript services
+- Python services are excluded from the pnpm workspace and turbo; use `uv` directly inside the service directory
 
 ## Project Structure
 
-This is a pnpm monorepo with turbo for build orchestration.
+This is a pnpm monorepo with turbo for build orchestration (TypeScript) and uv-managed Python services.
 
 ```
-services/           # Deployable services
-  factset-mcp/
-  outlook-mcp/
-  sharepoint-connector/
-  teams-mcp/
+services/                  # Deployable services
+  factset-mcp/             # TypeScript (NestJS)
+  outlook-mcp/             # TypeScript (NestJS)
+  sharepoint-connector/    # TypeScript (NestJS)
+  teams-mcp/               # TypeScript (NestJS)
+  edgar-mcp/               # Python (FastMCP)
 
-packages/           # Shared libraries
+packages/                  # Shared TypeScript libraries
   aes-gcm-encryption/
   instrumentation/
   logger/
@@ -25,24 +27,22 @@ packages/           # Shared libraries
   probe/
 ```
 
-## Code Comments
+## General Code Guidelines
 
 - Only add comments for complex algorithms, unexpected behavior, or non-obvious business logic
-- Add JSDoc comments only for complex methods with multiple parameters or intricate logic
 - Avoid obvious comments that just restate what the code does
+- Add export only when what you are exporting is actually used in another file
+- Don't create README files for generated code
 
-## Code Style
+## TypeScript Code Style
 
+- Add JSDoc comments only for complex methods with multiple parameters or intricate logic
 - Avoid the use of `any`. Always use proper types or `unknown` with a type guard.
 - When `any` is absolutely necessary (e.g., testing private methods, untyped third-party libraries), add a biome-ignore comment with explanation:
   ```typescript
   // biome-ignore lint/suspicious/noExplicitAny: Mock override private method
   vi.spyOn(service as any, 'validatePKCE').mockReturnValue(true);
   ```
-- Add export only when what you are exporting is actually used in another file
-
-## Import Ordering
-
 - Follow this import order:
   1. Node.js built-in modules (e.g., `import { createHmac } from 'node:crypto'`)
   2. External packages (e.g., `import { UnauthorizedException } from '@nestjs/common'`)
@@ -51,11 +51,19 @@ packages/           # Shared libraries
 - Group related imports together
 - Order imports alphabetically within each group when practical
 
-## Generated Files
+## Python Code Style
 
-- Don't create README files for generated code
+- Follow ruff defaults for linting and formatting (configured in `pyproject.toml`)
+- Use type hints for function signatures; the project must pass `basedpyright` with zero warnings
+- Type checking is configured via `pyproject.toml` in each Python service root
+- Follow this import order (enforced by ruff `I` rules):
+  1. Standard library modules
+  2. Third-party packages
+  3. Local modules
 
 ## Common Commands
+
+### TypeScript Services
 
 ```bash
 # Development
@@ -71,6 +79,27 @@ pnpm test:e2e --filter=@unique-ag/<svc>   # Run e2e tests
 pnpm style                                # Check with biome
 pnpm style:fix                            # Fix with biome
 pnpm check-types                          # TypeScript check
+```
+
+### Python Services
+
+Run commands from within the service directory (e.g. `services/edgar-mcp`).
+
+```bash
+# Setup
+uv sync                                 # Create venv and install dependencies
+
+# Development
+uv run python -m edgar_mcp.main         # Start service
+
+# Testing
+uv run pytest                           # Run tests
+
+# Code quality
+uv run ruff check                       # Lint
+uv run ruff check --fix                 # Lint and fix
+uv run ruff format                      # Format
+uv run basedpyright                     # Type check (zero warnings)
 ```
 
 ## Pull Requests
@@ -106,6 +135,7 @@ Keep concise - ends up in commit history. No "Test plan" sections.
 | `outlook-mcp` | `services/outlook-mcp/**` |
 | `sharepoint-connector` | `services/sharepoint-connector/**` |
 | `teams-mcp` | `services/teams-mcp/**` |
+| `edgar-mcp` | `services/edgar-mcp/**` |
 | `aes-gcm-encryption` | `packages/aes-gcm-encryption/**` |
 | `instrumentation` | `packages/instrumentation/**` |
 | `logger` | `packages/logger/**` |
@@ -114,7 +144,7 @@ Keep concise - ends up in commit history. No "Test plan" sections.
 | `probe` | `packages/probe/**` |
 | `ci` | `.github/**` |
 | `main` | Root files (`*`, `.*`) |
-| `deps` | `**/package.json`, `pnpm-lock.yaml` |
+| `deps` | `**/package.json`, `pnpm-lock.yaml`, `**/pyproject.toml`, `**/uv.lock` |
 
 ### Multi-Scope
 
@@ -141,11 +171,19 @@ Deploy folders contain:
 
 Before creating a PR, verify:
 
+### TypeScript
+
 - [ ] **Tests pass** - `pnpm test --filter=@unique-ag/<package>`
 - [ ] **Types check** - `pnpm check-types`
 - [ ] **Style passes** - `pnpm style` (or `pnpm style:fix`)
 
-If applicable:
+### Python
+
+- [ ] **Tests pass** - `uv run pytest`
+- [ ] **Types check** - `uv run basedpyright` (must produce zero warnings)
+- [ ] **Style passes** - `uv run ruff check` and `uv run ruff format --check`
+
+### General (if applicable)
 
 - [ ] **Docs updated** - Update `services/<name>/docs/` for user-facing changes
 - [ ] **Helm values.schema.json** - Update when changing helm chart values
