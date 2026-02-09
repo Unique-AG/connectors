@@ -30,6 +30,8 @@ jobs:
       "services/confluence-connector--version": ${{ steps.release.outputs['services/confluence-connector--version'] }}
       "services/outlook-semantic-mcp--release_created": ${{ steps.release.outputs['services/outlook-semantic-mcp--release_created'] }}
       "services/outlook-semantic-mcp--version": ${{ steps.release.outputs['services/outlook-semantic-mcp--version'] }}
+      "services/edgar-mcp--release_created": ${{ steps.release.outputs['services/edgar-mcp--release_created'] }}
+      "services/edgar-mcp--version": ${{ steps.release.outputs['services/edgar-mcp--version'] }}
 
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
@@ -87,3 +89,12 @@ jobs:
       service-name: outlook-semantic-mcp
       service-version: ${{ needs.release-please.outputs['services/outlook-semantic-mcp--version'] }}
       dockerfile: services/outlook-semantic-mcp/deploy/Dockerfile
+
+  release-edgar-mcp:
+    needs: release-please
+    if: ${{ needs.release-please.outputs['services/edgar-mcp--release_created'] == 'true' }}
+    uses: ./.github/workflows/_template-cd.yaml
+    with:
+      service-name: edgar-mcp
+      service-version: ${{ needs.release-please.outputs['services/edgar-mcp--version'] }}
+      dockerfile: services/edgar-mcp/deploy/Dockerfile

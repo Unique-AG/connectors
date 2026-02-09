@@ -27,6 +27,7 @@
       ]
     },
     "services/teams-mcp": {
+      "release-type": "node",
       "prerelease": true,
       "versioning": "prerelease",
       "extra-files": [
@@ -102,6 +103,11 @@
           "path": "deploy/helm-charts/confluence-connector/values.yaml"
         }
       ]
+    },
+    "services/edgar-mcp": {
+      "release-type": "python",
+      "prerelease": true,
+      "versioning": "prerelease"
     }
   }
 }

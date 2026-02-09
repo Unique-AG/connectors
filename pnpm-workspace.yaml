@@ -1,5 +1,6 @@
 packages:
   - services/*
+  - !services/edgar-mcp
   - packages/*
 
 injectWorkspacePackages: true
