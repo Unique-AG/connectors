@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "server": {
+      "type": "object",
+      "description": "Configuration for the backend-service dependency",
+      "additionalProperties": true
+    },
+    "ingress": {
+      "type": "object",
+      "description": "Ingress configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable ingress resource creation",
+          "default": false
+        },
+        "ingressClassName": {
+          "type": "string",
+          "description": "Ingress class name (e.g., nginx, traefik)"
+        },
+        "additionalLabels": {
+          "type": "object",
+          "description": "Additional labels for the ingress resource",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Annotations for the ingress resource",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "hosts": {
+          "type": "array",
+          "description": "Ingress hosts configuration",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "Hostname for this ingress rule"
+              },
+              "paths": {
+                "type": "array",
+                "description": "Paths for this host",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "description": "Path to match"
+                    },
+                    "pathType": {
+                      "type": "string",
+                      "enum": ["Exact", "Prefix", "ImplementationSpecific"],
+                      "description": "Path type for matching",
+                      "default": "ImplementationSpecific"
+                    },
+                    "serviceName": {
+                      "type": "string",
+                      "description": "Backend service name (defaults to chart fullname)"
+                    },
+                    "servicePort": {
+                      "type": "string",
+                      "description": "Backend service port name (defaults to 'http')"
+                    }
+                  },
+                  "required": ["path"]
+                }
+              }
+            },
+            "required": ["host", "paths"]
+          }
+        },
+        "tls": {
+          "type": "array",
+          "description": "TLS configuration for the ingress",
+          "items": {
+            "type": "object",
+            "properties": {
+              "secretName": {
+                "type": "string",
+                "description": "Name of the TLS secret"
+              },
+              "hosts": {
+                "type": "array",
+                "description": "Hosts covered by this TLS configuration",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["secretName", "hosts"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "grafana": {
+      "type": "object",
+      "description": "Grafana dashboard configuration",
+      "properties": {
+        "dashboard": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Grafana dashboard creation"
+            },
+            "folder": {
+              "type": "string",
+              "description": "Grafana folder name for the dashboard"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "alerts": {
+      "type": "object",
+      "description": "Prometheus alerting rules configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable PrometheusRule resource creation"
+        },
+        "defaultAlerts": {
+          "type": "object",
+          "description": "Default alert definitions",
+          "properties": {
+            "graphql": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "disabled": {
+                  "type": "object"
+                },
+                "customRules": {
+                  "type": "object"
+                }
+              }
+            },
+            "uniqueApi": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "disabled": {
+                  "type": "object"
+                },
+                "customRules": {
+                  "type": "object"
+                }
+              }
+            },
+            "additionalLabels": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "mcpConfig": {
+      "type": "object",
+      "description": "Configuration for the Outlook MCP Server, will be mapped to environment variables",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "If disabled, server.extraEnvCM must be set to []"
+        },
+        "app": {
+          "type": "object",
+          "description": "Application configuration",
+          "properties": {
+            "selfUrl": {
+              "type": "string",
+              "description": "The URL of the MCP Server. Used for OAuth callbacks. Example: https://outlook.mcp.unique.app"
+            }
+          },
+          "required": ["selfUrl"]
+        },
+        "microsoft": {
+          "type": "object",
+          "description": "Microsoft Graph API configuration",
+          "properties": {
+            "clientId": {
+              "type": "string",
+              "description": "The client ID of the Microsoft App Registration"
+            },
+            "publicWebhookUrl": {
+              "type": "string",
+              "description": "The public webhook URL reachable from external network for Microsoft Graph subscriptions. Optional - defaults to SELF_URL if not provided. Example: https://outlook.mcp.unique.app/webhooks"
+            }
+          },
+          "required": ["clientId"]
+        },
+        "unique": {
+          "type": "object",
+          "description": "Unique API configuration",
+          "properties": {
+            "serviceAuthMode": {
+              "type": "string",
+              "enum": ["cluster_local", "external"],
+              "description": "Authentication mode for Unique API services: cluster_local for in-cluster, external for app key"
+            },
+            "apiBaseUrl": {
+              "type": "string",
+              "description": "The Public API URL. Example: https://api.unique.app"
+            },
+            "apiVersion": {
+              "type": "string",
+              "description": "The Public API version to use",
+              "default": "2023-12-06"
+            },
+            "rootScopePath": {
+              "type": "string",
+              "description": "The root scope path where to upload transcripts",
+              "default": "outlook-semantic-mcp"
+            },
+            "serviceExtraHeaders": {
+              "type": "object",
+              "description": "Extra HTTP headers for cluster_local mode (requires x-company-id, x-user-id, x-service-id)",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "ingestionServiceBaseUrl": {
+              "type": "string",
+              "description": "Base URL for Unique ingestion service (cluster_local mode). Example: http://node-ingestion.namespace:8091"
+            },
+            "userFetchConcurrency": {
+              "type": "integer",
+              "description": "Concurrency limit for fetching users when resolving scope accesses",
+              "default": 5
+            },
+            "appKey": {
+              "type": "string",
+              "description": "API key of a Chat App (external mode, loaded from secret)"
+            },
+            "appId": {
+              "type": "string",
+              "description": "App ID of the Chat App (external mode)"
+            },
+            "authUserId": {
+              "type": "string",
+              "description": "User ID of a Zitadel Service User (external mode)"
+            },
+            "authCompanyId": {
+              "type": "string",
+              "description": "Organisation ID where the Zitadel Service User is created (external mode)"
+            }
+          },
+          "required": ["serviceAuthMode", "apiBaseUrl"]
+        },
+        "auth": {
+          "type": "object",
+          "description": "Authentication configuration for the MCP server",
+          "properties": {
+            "accessTokenExpiresInSeconds": {
+              "type": "integer",
+              "description": "Access token expiration time in seconds",
+              "default": 60
+            },
+            "refreshTokenExpiresInSeconds": {
+              "type": "integer",
+              "description": "Refresh token expiration time in seconds",
+              "default": 2592000
+            }
+          }
+        }
+      },
+      "required": ["app", "microsoft", "unique"]
+    }
+  },
+  "additionalProperties": false
+}

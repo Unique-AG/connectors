@@ -1,0 +1,11 @@
+apiVersion: v2
+name: outlook-semantic-mcp
+description: An experimental MCP server for Outlook leveraging the Microsoft Graph API.
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+dependencies:
+  - alias: server
+    name: backend-service
+    repository: oci://ghcr.io/unique-ag/helm-charts
+    version: ~8.2.0

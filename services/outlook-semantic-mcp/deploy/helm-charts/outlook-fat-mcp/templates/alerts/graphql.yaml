@@ -1,0 +1,47 @@
+{{- if and .Values.alerts.defaultAlerts .Values.alerts.defaultAlerts.graphql .Values.alerts.defaultAlerts.graphql.enabled .Values.alerts.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1") }}
+
+{{- $fullName := include "chart.fullname" . -}}
+{{- $labels := include "chart.labels" . -}}
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $fullName }}-graphql-alerts
+  labels:
+    {{- $labels | nindent 4 }}
+    role: alert-rules
+    alertGroup: outlook-semantic-mcp
+    {{- with .Values.alerts.defaultAlerts.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: {{ $fullName }}-graphql
+      rules:
+        {{- if not (dig "OutlookFatMcpGraphQLErrors" false (.Values.alerts.defaultAlerts.graphql.disabled | default dict)) }}
+        - alert: OutlookFatMcpGraphQLErrors
+          annotations:
+            summary: "Outlook Fat MCP GraphQL API errors detected"
+            description: "The Outlook Fat MCP server is experiencing GraphQL API errors (4xx/5xx responses). Current error rate: {{ "{{ $value | humanizePercentage }}" }}."
+            runbook: |
+              1. Inspect application logs for specific error messages
+              2. Check for recent deployments or configuration changes
+              3. Verify network connectivity between MCP server and GraphQL API
+              4. Verify authentication credentials and token validity
+              5. Check for rate limiting or throttling issues
+          expr: |
+            (
+              sum(rate(outlook_fat_mcp_unique_graphql_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+              /
+              sum(rate(outlook_fat_mcp_unique_graphql_api_request_duration_seconds_count[5m]))
+            ) > {{ dig "OutlookFatMcpGraphQLErrors" "threshold" 0.01 (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
+          for: {{ dig "OutlookFatMcpGraphQLErrors" "for" "30s" (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
+          labels:
+            severity: {{ dig "OutlookFatMcpGraphQLErrors" "severity" "warning" (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
+            alertGroup: outlook-semantic-mcp
+            {{- with .Values.alerts.defaultAlerts.additionalLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        {{- end }}
+{{- end }}
+
