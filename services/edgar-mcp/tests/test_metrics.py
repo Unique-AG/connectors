@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 class TestMetricsEndpoint:
     """Test Prometheus metrics exposure via ASGI middleware."""
 
-    def test_exposes_metrics_endpoint(self):
+    def test_exposes_metrics_endpoint(self) -> None:
         """GET /metrics returns Prometheus format metrics."""
         from edgar_mcp.config import AppConfig
         from edgar_mcp.metrics import configure_metrics, create_metrics_app
@@ -23,7 +23,7 @@ class TestMetricsEndpoint:
         assert "# HELP" in response.text
         assert "# TYPE" in response.text
 
-    def test_includes_custom_metrics(self):
+    def test_includes_custom_metrics(self) -> None:
         """Custom metrics appear in /metrics output."""
         from edgar_mcp.config import AppConfig
         from edgar_mcp.metrics import configure_metrics, create_metrics_app, get_meter

@@ -9,7 +9,7 @@ import pytest
 class TestLogging:
     """Test logging output format behavior."""
 
-    def test_outputs_json_in_production(self, monkeypatch: pytest.MonkeyPatch):
+    def test_outputs_json_in_production(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """In production environment, logs output as NDJSON."""
         monkeypatch.setenv("APP_ENV", "production")
         monkeypatch.setenv("LOG_LEVEL", "info")
@@ -33,7 +33,7 @@ class TestLogging:
         assert log_entry["extra_field"] == "value"
         assert "time" in log_entry
 
-    def test_outputs_readable_in_development(self, monkeypatch: pytest.MonkeyPatch):
+    def test_outputs_readable_in_development(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """In development environment, logs are human-readable."""
         monkeypatch.setenv("APP_ENV", "development")
         monkeypatch.setenv("LOG_LEVEL", "info")
@@ -57,7 +57,7 @@ class TestLogging:
         # Should contain the message
         assert "test message" in output
 
-    def test_logger_binds_name(self, monkeypatch: pytest.MonkeyPatch):
+    def test_logger_binds_name(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """get_logger with name binds it to all log entries."""
         monkeypatch.setenv("APP_ENV", "production")
         monkeypatch.setenv("LOG_LEVEL", "info")
@@ -77,7 +77,7 @@ class TestLogging:
 
         assert log_entry["logger"] == "my_component"
 
-    def test_respects_log_level(self, monkeypatch: pytest.MonkeyPatch):
+    def test_respects_log_level(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Log messages below configured level are filtered."""
         monkeypatch.setenv("APP_ENV", "production")
         monkeypatch.setenv("LOG_LEVEL", "warn")
@@ -101,7 +101,7 @@ class TestLogging:
         assert log_entry["event"] == "warning message"
         assert log_entry["level"] == "warning"
 
-    def test_logger_without_name_has_no_logger_key(self, monkeypatch: pytest.MonkeyPatch):
+    def test_logger_without_name_has_no_logger_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """get_logger without name doesn't add logger key."""
         monkeypatch.setenv("APP_ENV", "production")
         monkeypatch.setenv("LOG_LEVEL", "info")
