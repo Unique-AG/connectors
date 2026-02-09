@@ -7,7 +7,10 @@ import {
   urlWithoutTrailingSlashSchema,
 } from '../utils/zod.util';
 
-const SMEARED_HEADER_KEYS = new Map<string, boolean>([['x-company-id', true], ['x-user-id', true]]);
+const SMEARED_HEADER_KEYS = new Map<string, boolean>([
+  ['x-company-id', true],
+  ['x-user-id', true],
+]);
 
 const clusterLocalConfig = z.object({
   serviceAuthMode: z
