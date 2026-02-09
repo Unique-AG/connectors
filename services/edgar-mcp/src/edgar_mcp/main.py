@@ -9,7 +9,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
 from edgar_mcp.api.probes import create_probe_router
-from edgar_mcp.config import AppConfig, DatabaseConfig, RabbitConfig
+from edgar_mcp.config import AppConfig, DatabaseConfig, RabbitMqConfig
 from edgar_mcp.db.engine import create_engine, create_session_factory
 from edgar_mcp.logging import configure_logging, get_logger
 from edgar_mcp.metrics import configure_metrics, create_metrics_app
@@ -22,7 +22,7 @@ load_dotenv()
 
 app_config = AppConfig()
 db_config = DatabaseConfig()
-rabbit_config = RabbitConfig()
+rabbit_mq_config = RabbitMqConfig()
 
 configure_logging(app_config)
 
@@ -54,7 +54,7 @@ async def app_lifespan(app: FastAPI):
     AioPikaInstrumentor().instrument()
 
     # Initialize RabbitMQ
-    app.state.rabbitmq_connection = await create_connection(rabbit_config)
+    app.state.rabbitmq_connection = await create_connection(rabbit_mq_config)
     app.state.rabbitmq_channel = await create_channel(app.state.rabbitmq_connection)
     logger.info("RabbitMQ connected")
 

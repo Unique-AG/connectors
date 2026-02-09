@@ -70,7 +70,7 @@ class DatabaseConfig(BaseSettings):
         return self.url
 
 
-class RabbitConfig(BaseSettings):
+class RabbitMqConfig(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="RABBITMQ_")
 
     url: str | None = None
@@ -81,7 +81,7 @@ class RabbitConfig(BaseSettings):
     vhost: str = "/"
 
     @model_validator(mode="after")
-    def build_url(self) -> "RabbitConfig":
+    def build_url(self) -> "RabbitMqConfig":
         if self.url is not None:
             if not self.url.startswith(("amqp://", "amqps://")):
                 raise ValueError(
