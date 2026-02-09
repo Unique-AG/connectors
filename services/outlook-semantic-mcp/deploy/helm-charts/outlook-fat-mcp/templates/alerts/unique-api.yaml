@@ -30,9 +30,9 @@ spec:
               4. Verify service user settings and permissions within Unique
           expr: |
             (
-              sum(rate(outlook_fat_mcp_unique_rest_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+              sum(rate(outlook_semantic_mcp_unique_rest_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
               /
-              sum(rate(outlook_fat_mcp_unique_rest_api_request_duration_seconds_count[5m]))
+              sum(rate(outlook_semantic_mcp_unique_rest_api_request_duration_seconds_count[5m]))
             ) > {{ dig "OutlookFatMcpUniqueAPIErrors" "threshold" 0.01 (.Values.alerts.defaultAlerts.uniqueApi.customRules | default dict) }}
           for: {{ dig "OutlookFatMcpUniqueAPIErrors" "for" "30s" (.Values.alerts.defaultAlerts.uniqueApi.customRules | default dict) }}
           labels:

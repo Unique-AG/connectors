@@ -18,7 +18,7 @@ For technical details about the OAuth flow and why client credentials are requir
 Use the provided Terraform module:
 
 ```hcl
-module "outlook_fat_mcp_app" {
+module "outlook_semantic_mcp_app" {
   source = "./deploy/terraform/azure/outlook-semantic-mcp-entra-application"
 
   display_name     = "Outlook MCP Server"

@@ -31,9 +31,9 @@ spec:
               5. Check for rate limiting or throttling issues
           expr: |
             (
-              sum(rate(outlook_fat_mcp_unique_graphql_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+              sum(rate(outlook_semantic_mcp_unique_graphql_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
               /
-              sum(rate(outlook_fat_mcp_unique_graphql_api_request_duration_seconds_count[5m]))
+              sum(rate(outlook_semantic_mcp_unique_graphql_api_request_duration_seconds_count[5m]))
             ) > {{ dig "OutlookFatMcpGraphQLErrors" "threshold" 0.01 (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
           for: {{ dig "OutlookFatMcpGraphQLErrors" "for" "30s" (.Values.alerts.defaultAlerts.graphql.customRules | default dict) }}
           labels:

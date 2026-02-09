@@ -16,7 +16,7 @@ locals {
   ])
 }
 
-resource "azuread_application" "outlook_fat_mcp" {
+resource "azuread_application" "outlook_semantic_mcp" {
   display_name     = var.display_name
   sign_in_audience = var.sign_in_audience
   notes            = var.notes
@@ -44,7 +44,7 @@ resource "azuread_application" "outlook_fat_mcp" {
 resource "azuread_application_password" "client_secret" {
   for_each = var.confidential_clients
 
-  application_id = azuread_application.outlook_fat_mcp.id
+  application_id = azuread_application.outlook_semantic_mcp.id
   display_name   = coalesce(each.value.client_secret.explicit_name, each.key)
   end_date       = each.value.client_secret.end_date
 
@@ -63,10 +63,10 @@ resource "azurerm_key_vault_secret" "kv_client_secret" {
   expiration_date = each.value.client_secret.end_date
 }
 
-resource "azuread_service_principal" "outlook_fat_mcp" {
+resource "azuread_service_principal" "outlook_semantic_mcp" {
   count = var.service_principal_configuration != null ? 1 : 0
 
-  client_id    = azuread_application.outlook_fat_mcp.client_id
+  client_id    = azuread_application.outlook_semantic_mcp.client_id
   use_existing = true
   notes        = var.service_principal_configuration.notes != null ? var.service_principal_configuration.notes : var.notes
 }
@@ -74,14 +74,14 @@ resource "azuread_service_principal" "outlook_fat_mcp" {
 resource "time_sleep" "wait_for_graph_propagation" {
   count = var.service_principal_configuration != null ? 1 : 0
 
-  depends_on      = [azuread_application.outlook_fat_mcp, azuread_service_principal.outlook_fat_mcp]
+  depends_on      = [azuread_application.outlook_semantic_mcp, azuread_service_principal.outlook_semantic_mcp]
   create_duration = "15s"
 }
 
-resource "azuread_service_principal_delegated_permission_grant" "outlook_fat_mcp_graph" {
+resource "azuread_service_principal_delegated_permission_grant" "outlook_semantic_mcp_graph" {
   count = var.service_principal_configuration != null ? 1 : 0
 
-  service_principal_object_id          = azuread_service_principal.outlook_fat_mcp[0].object_id
+  service_principal_object_id          = azuread_service_principal.outlook_semantic_mcp[0].object_id
   resource_service_principal_object_id = azuread_service_principal.msgraph.object_id
   claim_values                         = local.graph_scopes
 

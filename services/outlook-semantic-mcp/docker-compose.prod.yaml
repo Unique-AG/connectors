@@ -6,7 +6,7 @@ services:
       dockerfile: ./services/outlook-semantic-mcp/deploy/Dockerfile
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/outlook_fat_mcp?schema=public
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/outlook_semantic_mcp?schema=public
     command: ["pnpm", "run", "db:migrate"]
     depends_on:
       postgres:
@@ -28,7 +28,7 @@ services:
       - PORT=3000
       - SELF_URL=http://localhost:3000
       # Database configuration
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/outlook_fat_mcp?schema=public
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/outlook_semantic_mcp?schema=public
       # AMQP configuration
       - AMQP_URL=amqp://rabbitmq:rabbitmq@rabbitmq:5672
       # Microsoft configuration (from .env or environment)
@@ -61,7 +61,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=outlook_fat_mcp
+      - POSTGRES_DB=outlook_semantic_mcp
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:

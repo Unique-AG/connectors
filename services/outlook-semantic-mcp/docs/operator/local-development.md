@@ -83,7 +83,7 @@ cp .env.example .env
 SELF_URL=http://localhost:<port>
 
 # Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/outlook_fat_mcp
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/outlook_semantic_mcp
 
 # RabbitMQ
 AMQP_URL=amqp://guest:guest@localhost:5672

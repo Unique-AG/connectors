@@ -52,7 +52,7 @@ metadata:
   namespace: outlook-semantic-mcp
 type: Opaque
 stringData:
-  DATABASE_URL: "postgresql://user:password@host:5432/outlook_fat_mcp"
+  DATABASE_URL: "postgresql://user:password@host:5432/outlook_semantic_mcp"
   AMQP_URL: "amqp://user:password@rabbitmq:5672/outlook-semantic-mcp"
   MICROSOFT_CLIENT_SECRET: "<from-entra-app-registration>"
   MICROSOFT_WEBHOOK_SECRET: "<128-char-random-string>"
