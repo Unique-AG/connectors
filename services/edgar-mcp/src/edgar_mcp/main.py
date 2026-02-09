@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -82,7 +83,7 @@ async def app_lifespan(app: FastAPI):
     logger.info("Shutdown complete")
 
 
-async def _safe_shutdown(name: str, fn) -> None:
+async def _safe_shutdown(name: str, fn: Callable[[], Awaitable[None]]) -> None:
     try:
         await fn()
     except Exception as e:

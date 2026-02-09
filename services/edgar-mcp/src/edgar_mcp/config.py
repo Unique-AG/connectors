@@ -1,5 +1,5 @@
 from importlib.metadata import version as pkg_version
-from typing import Literal
+from typing import ClassVar, Literal
 from urllib.parse import quote_plus
 
 from pydantic import Field, model_validator
@@ -13,7 +13,7 @@ DiagnosticsDataPolicy = Literal["conceal", "disclose"]
 
 
 class AppConfig(BaseSettings):
-    model_config = SettingsConfigDict()
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict()
 
     app_env: AppEnv = "production"
     version: str = PKG_VERSION
@@ -23,7 +23,7 @@ class AppConfig(BaseSettings):
 
 
 class DatabaseConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="DB_")
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="DB_")
 
     url: str | None = None
     host: str | None = None
@@ -53,6 +53,9 @@ class DatabaseConfig(BaseSettings):
         ]
         if missing:
             raise ValueError(f"DB_URL not set; missing required fields: {', '.join(missing)}")
+
+        assert self.user is not None
+        assert self.password is not None
         self.url = (
             f"postgresql+asyncpg://{quote_plus(self.user)}:{quote_plus(self.password)}"
             f"@{self.host}:{self.port}/{self.name}"
@@ -68,7 +71,7 @@ class DatabaseConfig(BaseSettings):
 
 
 class RabbitConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="RABBITMQ_")
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="RABBITMQ_")
 
     url: str | None = None
     host: str | None = None
@@ -97,6 +100,9 @@ class RabbitConfig(BaseSettings):
         ]
         if missing:
             raise ValueError(f"RABBITMQ_URL not set; missing required fields: {', '.join(missing)}")
+
+        assert self.user is not None
+        assert self.password is not None
         self.url = (
             f"amqp://{quote_plus(self.user)}:{quote_plus(self.password)}"
             f"@{self.host}:{self.port}/{self.vhost.lstrip('/')}"

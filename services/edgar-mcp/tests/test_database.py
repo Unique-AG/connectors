@@ -1,17 +1,24 @@
+from collections.abc import AsyncGenerator, Generator
+
 import pytest
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from testcontainers.postgres import PostgresContainer
+
+type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 
 @pytest.fixture(scope="module")
-def postgres_container():
+def postgres_container() -> Generator[PostgresContainer]:
     """Start a PostgreSQL container for testing."""
     with PostgresContainer("postgres:16-alpine") as postgres:
         yield postgres
 
 
 @pytest.fixture
-async def db(postgres_container):
+async def db(
+    postgres_container: PostgresContainer,
+) -> AsyncGenerator[DatabaseFixture]:
     """Create engine and session factory, dispose on cleanup."""
     from edgar_mcp.config import DatabaseConfig
     from edgar_mcp.db.engine import create_engine, create_session_factory
@@ -28,7 +35,7 @@ class TestDatabaseConnection:
     """Test database connection behavior."""
 
     @pytest.mark.asyncio
-    async def test_can_connect_and_query(self, db):
+    async def test_can_connect_and_query(self, db: DatabaseFixture) -> None:
         """Engine can connect to PostgreSQL and execute queries."""
         _, factory = db
 
@@ -37,7 +44,7 @@ class TestDatabaseConnection:
             assert result.scalar() == 1
 
     @pytest.mark.asyncio
-    async def test_session_commits_on_success(self, db):
+    async def test_session_commits_on_success(self, db: DatabaseFixture) -> None:
         """Session commits changes when context exits normally."""
         from edgar_mcp.db.engine import get_session
 
@@ -55,6 +62,7 @@ class TestDatabaseConnection:
                 result = await session.execute(text("SELECT id FROM test_commit"))
                 row = result.fetchone()
 
+            assert row is not None
             assert row[0] == 42
         finally:
             async with factory() as session:
@@ -62,7 +70,7 @@ class TestDatabaseConnection:
                 await session.commit()
 
     @pytest.mark.asyncio
-    async def test_session_rolls_back_on_error(self, db):
+    async def test_session_rolls_back_on_error(self, db: DatabaseFixture) -> None:
         """Session rolls back changes when an exception occurs."""
         from edgar_mcp.db.engine import get_session
 

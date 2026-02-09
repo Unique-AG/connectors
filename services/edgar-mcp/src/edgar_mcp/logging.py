@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 import structlog
 from structlog.typing import Processor
@@ -39,9 +40,10 @@ def configure_logging(config: AppConfig) -> None:
     )
 
 
-def get_logger(name: str | None = None) -> structlog.BoundLogger:
+def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     """Get a logger instance, optionally with a bound name."""
-    logger = structlog.get_logger()
+    # By default get_logger is Any type, so we have to cast it explicitly
+    logger = cast(structlog.stdlib.BoundLogger, structlog.get_logger())
     if name:
         logger = logger.bind(logger=name)
     return logger

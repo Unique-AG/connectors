@@ -1,3 +1,5 @@
+from typing import Literal, TypedDict
+
 from aio_pika.abc import AbstractRobustConnection
 from fastapi import APIRouter, Response, status
 from sqlalchemy import text
@@ -9,6 +11,18 @@ from edgar_mcp.logging import get_logger
 logger = get_logger("probes")
 
 
+class ProbeResponse(TypedDict):
+    version: str
+
+
+HealthChecks = dict[str, Literal["ok", "error"]]
+
+
+class HealthResponse(TypedDict):
+    status: Literal["healthy", "unhealthy"]
+    checks: HealthChecks
+
+
 def create_probe_router(
     config: AppConfig,
     session_factory: async_sessionmaker[AsyncSession] | None = None,
@@ -18,14 +32,14 @@ def create_probe_router(
     router = APIRouter(tags=["Monitoring"])
 
     @router.get("/probe", include_in_schema=False)
-    async def probe() -> dict:
+    async def probe() -> ProbeResponse:  # pyright: ignore[reportUnusedFunction]
         """Liveness probe - returns version."""
         return {"version": config.version}
 
     @router.get("/health", include_in_schema=False)
-    async def health(response: Response) -> dict:
+    async def health(response: Response) -> HealthResponse:  # pyright: ignore[reportUnusedFunction]
         """Readiness probe - checks dependencies."""
-        checks: dict[str, str] = {}
+        checks: HealthChecks = {}
         healthy = True
 
         # Check PostgreSQL
