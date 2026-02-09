@@ -12,6 +12,9 @@ on:
       - "**/services/confluence-connector/**"
       - .github/workflows/confluence-connector.ci.yaml
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     uses: ./.github/workflows/_template-ci.yaml
