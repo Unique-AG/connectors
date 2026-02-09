@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AppConfigSchema, ConfigEmitPolicy } from './app.config';
+import { AppConfigSchema, ConfigEmitEvent } from './app.config';
 
 describe('AppConfigSchema', () => {
   const validConfig = {
@@ -14,7 +14,10 @@ describe('AppConfigSchema', () => {
       expect(result.port).toBe(9542);
       expect(result.logLevel).toBe('info');
       expect(result.logsDiagnosticsDataPolicy).toBe('conceal');
-      expect(result.logsDiagnosticsConfigEmitPolicy).toEqual(['on_startup', 'per_sync']);
+      expect(result.logsDiagnosticsConfigEmitPolicy).toEqual({
+        emit: 'on',
+        events: ['on_startup', 'per_sync'],
+      });
       expect(result.isDev).toBe(false);
     });
   });
@@ -98,65 +101,104 @@ describe('AppConfigSchema', () => {
   });
 
   describe('logsDiagnosticsConfigEmitPolicy', () => {
-    it('parses JSON array string with both triggers', () => {
+    it('parses JSON object string with both events', () => {
       const result = AppConfigSchema.parse({
         ...validConfig,
-        logsDiagnosticsConfigEmitPolicy: '["on_startup","per_sync"]',
+        logsDiagnosticsConfigEmitPolicy: '{"emit":"on","events":["on_startup","per_sync"]}',
       });
 
-      expect(result.logsDiagnosticsConfigEmitPolicy).toEqual(['on_startup', 'per_sync']);
+      expect(result.logsDiagnosticsConfigEmitPolicy).toEqual({
+        emit: 'on',
+        events: ['on_startup', 'per_sync'],
+      });
     });
 
-    it('parses JSON array string with single trigger', () => {
+    it('parses JSON object string with single event', () => {
       const result = AppConfigSchema.parse({
         ...validConfig,
-        logsDiagnosticsConfigEmitPolicy: '["on_startup"]',
+        logsDiagnosticsConfigEmitPolicy: '{"emit":"on","events":["on_startup"]}',
       });
 
-      expect(result.logsDiagnosticsConfigEmitPolicy).toEqual(['on_startup']);
+      expect(result.logsDiagnosticsConfigEmitPolicy).toEqual({
+        emit: 'on',
+        events: ['on_startup'],
+      });
     });
 
-    it('accepts the "none" literal string', () => {
+    it('parses JSON object string with emit off', () => {
       const result = AppConfigSchema.parse({
         ...validConfig,
-        logsDiagnosticsConfigEmitPolicy: 'none',
+        logsDiagnosticsConfigEmitPolicy: '{"emit":"off"}',
       });
 
-      expect(result.logsDiagnosticsConfigEmitPolicy).toBe('none');
+      expect(result.logsDiagnosticsConfigEmitPolicy).toEqual({ emit: 'off' });
     });
 
-    it('accepts a native array value', () => {
-      const result = AppConfigSchema.parse({
-        ...validConfig,
-        logsDiagnosticsConfigEmitPolicy: [ConfigEmitPolicy.PER_SYNC],
-      });
-
-      expect(result.logsDiagnosticsConfigEmitPolicy).toEqual(['per_sync']);
-    });
-
-    it('rejects invalid enum values in JSON array string', () => {
+    it('rejects empty events array when emit is on', () => {
       expect(() =>
         AppConfigSchema.parse({
           ...validConfig,
-          logsDiagnosticsConfigEmitPolicy: '["invalid_trigger"]',
+          logsDiagnosticsConfigEmitPolicy: '{"emit":"on","events":[]}',
         }),
       ).toThrow();
     });
 
-    it('rejects an unrecognized plain string', () => {
+    it('rejects missing events when emit is on', () => {
       expect(() =>
         AppConfigSchema.parse({
           ...validConfig,
-          logsDiagnosticsConfigEmitPolicy: 'invalid',
+          logsDiagnosticsConfigEmitPolicy: '{"emit":"on"}',
         }),
       ).toThrow();
     });
 
-    it('rejects an empty array', () => {
+    it('accepts a native object value', () => {
+      const result = AppConfigSchema.parse({
+        ...validConfig,
+        logsDiagnosticsConfigEmitPolicy: {
+          emit: 'on',
+          events: [ConfigEmitEvent.PER_SYNC],
+        },
+      });
+
+      expect(result.logsDiagnosticsConfigEmitPolicy).toEqual({
+        emit: 'on',
+        events: ['per_sync'],
+      });
+    });
+
+    it('rejects invalid enum values in events array', () => {
       expect(() =>
         AppConfigSchema.parse({
           ...validConfig,
-          logsDiagnosticsConfigEmitPolicy: '[]',
+          logsDiagnosticsConfigEmitPolicy: '{"emit":"on","events":["invalid"]}',
+        }),
+      ).toThrow();
+    });
+
+    it('rejects an invalid emit value', () => {
+      expect(() =>
+        AppConfigSchema.parse({
+          ...validConfig,
+          logsDiagnosticsConfigEmitPolicy: '{"emit":"maybe"}',
+        }),
+      ).toThrow();
+    });
+
+    it('rejects old format "none" string', () => {
+      expect(() =>
+        AppConfigSchema.parse({
+          ...validConfig,
+          logsDiagnosticsConfigEmitPolicy: 'none',
+        }),
+      ).toThrow();
+    });
+
+    it('rejects old format JSON array string', () => {
+      expect(() =>
+        AppConfigSchema.parse({
+          ...validConfig,
+          logsDiagnosticsConfigEmitPolicy: '["on_startup"]',
         }),
       ).toThrow();
     });

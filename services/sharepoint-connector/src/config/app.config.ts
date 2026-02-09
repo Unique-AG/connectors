@@ -12,11 +12,13 @@ export const LogsDiagnosticDataPolicy = {
   DISCLOSE: 'disclose',
 } as const;
 
-export const ConfigEmitPolicy = {
+export const ConfigEmitEvent = {
   ON_STARTUP: 'on_startup',
   PER_SYNC: 'per_sync',
 } as const;
-export type ConfigEmitPolicyType = (typeof ConfigEmitPolicy)[keyof typeof ConfigEmitPolicy];
+export type ConfigEmitEventType = (typeof ConfigEmitEvent)[keyof typeof ConfigEmitEvent];
+
+const allConfigEmitEvents = [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.PER_SYNC] as const;
 
 export const AppConfigSchema = z
   .object({
@@ -44,11 +46,19 @@ export const AppConfigSchema = z
     logsDiagnosticsConfigEmitPolicy: z
       .preprocess(
         parseJsonOrPassthrough,
-        z.union([z.literal('none'), z.array(z.enum(ConfigEmitPolicy)).nonempty()]),
+        z.discriminatedUnion('emit', [
+          z.object({
+            emit: z.literal('on'),
+            events: z.array(z.enum(ConfigEmitEvent)).nonempty(),
+          }),
+          z.object({
+            emit: z.literal('off'),
+          }),
+        ]),
       )
-      .prefault([ConfigEmitPolicy.ON_STARTUP, ConfigEmitPolicy.PER_SYNC])
+      .prefault({ emit: 'on' as const, events: [...allConfigEmitEvents] })
       .describe(
-        'Controls when configuration is logged. Array of triggers: on_startup logs once on start, per_sync logs at each site sync. Use "none" to disable.',
+        'Controls when configuration is logged. Object with emit: "on"/"off". When "on", events array is required and must contain at least one of: on_startup, per_sync.',
       ),
     tenantConfigPathPattern: requiredStringSchema.describe(
       'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/tenant-configs/*-tenant-config.yaml)',

@@ -18,8 +18,8 @@
             },
             "LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY": {
               "type": "string",
-              "description": "Controls when configuration is logged. Use JSON array string of triggers: on_startup, per_sync. Use \"none\" to disable.",
-              "default": "[\"on_startup\",\"per_sync\"]"
+              "description": "Controls when configuration is logged. JSON object with emit: \"on\"/\"off\". When \"on\", requires non-empty events array (on_startup, per_sync). Use {\"emit\":\"off\"} to disable.",
+              "default": "{\"emit\":\"on\",\"events\":[\"on_startup\",\"per_sync\"]}"
             }
           },
           "additionalProperties": true
