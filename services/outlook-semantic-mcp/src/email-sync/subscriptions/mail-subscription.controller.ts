@@ -1,4 +1,6 @@
+import assert from 'node:assert';
 import {
+  AmqpConnection,
   defaultNackErrorHandler,
   RabbitPayload,
   RabbitSubscribe,
@@ -19,11 +21,17 @@ import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { normalizeError } from '~/utils/normalize-error';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
+import { EmailSyncService } from '../sync/email-sync.service';
 import {
+  ChangeEventDto,
   ChangeNotificationCollectionDto,
+  CreatedEventDto,
+  DeletedEventDto,
   LifecycleChangeNotificationCollectionDto,
   LifecycleEventDto,
+  UpdatedEventDto,
 } from './subscription.dtos';
+import { change } from './subscription.events';
 import { SubscriptionCreateService } from './subscription-create.service';
 import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscription-remove.service';
@@ -34,6 +42,8 @@ export class MailSubscriptionController {
   private readonly logger = new Logger(MailSubscriptionController.name);
 
   public constructor(
+    private readonly amqp: AmqpConnection,
+    private readonly emailSync: EmailSyncService,
     private readonly subscriptionCreate: SubscriptionCreateService,
     private readonly subscriptionReauthorize: SubscriptionReauthorizeService,
     private readonly subscriptionRemove: SubscriptionRemoveService,
@@ -149,21 +159,11 @@ export class MailSubscriptionController {
         return isTrusted;
       })
       .map((notification) => {
-        switch (notification.changeType) {
-          case 'created': {
-            // TOOD: Implement subscription created and full sync
-            return null;
-          }
-
-          default: {
-            span?.addEvent('change notification unsupported', { type: notification.changeType });
-            this.logger.warn(
-              { changeNotification: notification, changeType: notification.changeType },
-              'Discarding change notification with unsupported change type',
-            );
-            return null;
-          }
-        }
+        return this.enqueueChangeNotification(
+          notification.changeType,
+          notification.subscriptionId,
+          notification.resource,
+        );
       })
       // REVIEW: we could just leave the `null` values and then filter on `fulfilled` + `null` to see how many discarded
       .filter((v) => v !== null);
@@ -232,5 +232,73 @@ export class MailSubscriptionController {
         );
         break;
     }
+  }
+
+  @RabbitSubscribe({
+    exchange: MAIN_EXCHANGE.name,
+    queue: 'unique.outlook-semantic-mcp.mail.change-notifications',
+    routingKey: ['unique.outlook-semantic-mcp.mail.change-notification.*'],
+    createQueueIfNotExists: true,
+    queueOptions: {
+      deadLetterExchange: DEAD_EXCHANGE.name,
+    },
+    errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
+  })
+  public async onChangeNotification(@RabbitPayload() payload: unknown) {
+    const event = await ChangeEventDto.parseAsync(payload);
+    this.logger.log({ eventType: event.type }, 'Processing change event from message queue');
+
+    return this.emailSync.syncEmail(event.resource, event.subscriptionId);
+  }
+
+  private async enqueueChangeNotification(
+    changeType: string,
+    subscriptionId: string,
+    resource: string,
+  ): Promise<void> {
+    let payload: { type: string };
+
+    switch (changeType) {
+      case 'created': {
+        payload = await CreatedEventDto.encodeAsync({
+          subscriptionId,
+          resource,
+          type: change.CreatedEvent.type,
+        });
+        break;
+      }
+      case 'updated': {
+        payload = await UpdatedEventDto.encodeAsync({
+          subscriptionId,
+          resource,
+          type: change.UpdatedEvent.type,
+        });
+        break;
+      }
+      case 'deleted': {
+        payload = await DeletedEventDto.encodeAsync({
+          subscriptionId,
+          resource,
+          type: change.DeletedEvent.type,
+        });
+        break;
+      }
+      default: {
+        this.logger.warn(
+          { changeType },
+          'Discarding change notification with unsupported change type',
+        );
+        return;
+      }
+    }
+
+    const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
+
+    this.logger.debug(
+      { exchangeName: MAIN_EXCHANGE.name, eventType: payload.type, published },
+      'Publishing change notification event to message queue',
+    );
+
+    assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
   }
 }

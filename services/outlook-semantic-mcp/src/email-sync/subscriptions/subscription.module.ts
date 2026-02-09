@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DrizzleModule } from '~/drizzle/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueModule } from '~/unique/unique.module';
+import { EmailSyncService } from '../sync/email-sync.service';
 import { MailSubscriptionController } from './mail-subscription.controller';
 import { SubscriptionCreateService } from './subscription-create.service';
 import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
@@ -16,6 +17,7 @@ import {
 @Module({
   imports: [DrizzleModule, MsGraphModule, UniqueModule],
   providers: [
+    EmailSyncService,
     MailSubscriptionUtilsService,
     SubscriptionCreateService,
     SubscriptionReauthorizeService,
