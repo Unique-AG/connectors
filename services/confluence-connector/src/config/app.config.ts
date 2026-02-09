@@ -1,6 +1,11 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
 
+export const LogsDiagnosticDataPolicy = {
+  CONCEAL: 'conceal',
+  DISCLOSE: 'disclose',
+} as const;
+
 export const AppConfigSchema = z
   .object({
     nodeEnv: z
@@ -18,6 +23,12 @@ export const AppConfigSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .prefault('info')
       .describe('The log level at which the services outputs (pino)'),
+    logsDiagnosticsDataPolicy: z
+      .enum(LogsDiagnosticDataPolicy)
+      .prefault(LogsDiagnosticDataPolicy.CONCEAL)
+      .describe(
+        'Controls whether sensitive data e.g. emails, usernames, etc. are logged in full or smeared',
+      ),
   })
   .transform((c) => ({
     ...c,
@@ -25,7 +36,7 @@ export const AppConfigSchema = z
   }));
 
 export const appConfig = registerConfig('app', AppConfigSchema, {
-  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV']),
+  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'LOGS_DIAGNOSTICS_DATA_POLICY']),
 });
 
 export type AppConfig = ConfigType<typeof appConfig>;

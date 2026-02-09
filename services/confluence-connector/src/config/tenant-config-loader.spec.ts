@@ -6,6 +6,13 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
 }));
 
+function expectSmeared(val: unknown, rawValue: string) {
+  expect(val).toHaveProperty('value', rawValue);
+  expect(val).toHaveProperty('active');
+  expect(val).toHaveProperty('toString');
+  expect(val).toHaveProperty('toJSON');
+}
+
 const CONFIG_PATH = '/config/tenant.yaml';
 
 const baseProcessingConfig = {
@@ -48,6 +55,7 @@ describe('tenant-config-loader', () => {
     'CONFLUENCE_PAT',
     'CONFLUENCE_PASSWORD',
     'ZITADEL_CLIENT_SECRET',
+    'LOGS_DIAGNOSTICS_DATA_POLICY',
   ] as const;
 
   const envBackup: Record<string, string | undefined> = {};
@@ -117,9 +125,15 @@ describe('tenant-config-loader', () => {
         typeof result.confluence.auth,
         { mode: 'api_token' }
       >;
-      expect(auth.email).toBe('user@acme.com');
+      expectSmeared(auth.email, 'user@acme.com');
       expect(auth.apiToken.value).toBe('env-api-token');
       expect(result.unique.serviceAuthMode).toBe('cluster_local');
+      const unique = result.unique as Extract<
+        typeof result.unique,
+        { serviceAuthMode: 'cluster_local' }
+      >;
+      expectSmeared(unique.serviceExtraHeaders['x-company-id'], 'test-company');
+      expectSmeared(unique.serviceExtraHeaders['x-user-id'], 'test-user');
       expect(result.processing.concurrency).toBe(1);
     });
 
@@ -175,7 +189,7 @@ describe('tenant-config-loader', () => {
         typeof result.confluence.auth,
         { mode: 'basic' }
       >;
-      expect(auth.username).toBe('admin');
+      expectSmeared(auth.username, 'admin');
       expect(auth.password.value).toBe('env-password');
     });
   });

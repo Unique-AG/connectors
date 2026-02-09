@@ -4,6 +4,7 @@ import {
   DEFAULT_INGEST_ALL_LABEL,
   DEFAULT_INGEST_SINGLE_LABEL,
 } from '../constants/defaults.constants';
+import { createSmeared } from '../utils/smeared';
 import {
   coercedPositiveIntSchema,
   redactedNonEmptyStringSchema,
@@ -12,7 +13,10 @@ import {
 
 const cloudApiTokenAuth = z.object({
   mode: z.literal('api_token'),
-  email: z.string().email(),
+  email: z
+    .string()
+    .email()
+    .transform((val) => createSmeared(val)),
   apiToken: redactedNonEmptyStringSchema,
 });
 
@@ -23,7 +27,7 @@ const onpremPatAuth = z.object({
 
 const onpremBasicAuth = z.object({
   mode: z.literal('basic'),
-  username: z.string(),
+  username: z.string().transform((val) => createSmeared(val)),
   password: redactedNonEmptyStringSchema,
 });
 
