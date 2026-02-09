@@ -198,7 +198,7 @@ export class SubscriptionCreateService {
     );
 
     const payload = await CreateSubscriptionRequestSchema.encodeAsync({
-      changeType: ['created'],
+      changeType: ['created', 'updated', 'deleted'],
       notificationUrl,
       lifecycleNotificationUrl,
       clientState: webhookSecret,
@@ -227,7 +227,7 @@ export class SubscriptionCreateService {
     );
 
     const client = this.graphClientFactory.createClientForUser(userProfileId.toString());
-    const graphResponse = (await client.api('/subscriptions').post(payload)) as unknown;
+    const graphResponse = (await client.api('/subscriptions').header("Prefer", 'IdType="ImmutableId"').post(payload)) as unknown;
     const graphSubscription = await Subscription.parseAsync(graphResponse);
 
     span?.setAttribute('graph_subscription.id', graphSubscription.id);
