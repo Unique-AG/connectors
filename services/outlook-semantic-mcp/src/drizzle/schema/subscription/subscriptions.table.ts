@@ -4,7 +4,7 @@ import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 
-export const subscriptionInternalType = pgEnum('subscription_internal_type', ['transcript']);
+export const subscriptionInternalType = pgEnum('subscription_internal_type', ['mail_monitoring']);
 
 export const subscriptions = pgTable(
   'subscriptions',

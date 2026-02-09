@@ -75,7 +75,7 @@ export class SubscriptionReauthorizeService {
 
     const subscription = await this.db.query.subscriptions.findFirst({
       where: and(
-        eq(subscriptions.internalType, 'transcript'),
+        eq(subscriptions.internalType, 'mail_monitoring'),
         eq(subscriptions.subscriptionId, subscriptionId),
       ),
     });
@@ -142,7 +142,7 @@ export class SubscriptionReauthorizeService {
       })
       .where(
         and(
-          eq(subscriptions.internalType, 'transcript'),
+          eq(subscriptions.internalType, 'mail_monitoring'),
           eq(subscriptions.subscriptionId, subscriptionId),
           eq(subscriptions.userProfileId, subscription.userProfileId),
         ),

@@ -88,7 +88,7 @@ export class SubscriptionCreateService {
 
     const existingSubscription = await this.db.query.subscriptions.findFirst({
       where: and(
-        eq(subscriptions.internalType, 'transcript'),
+        eq(subscriptions.internalType, 'mail_monitoring'),
         eq(subscriptions.userProfileId, userProfileId.toString()),
       ),
     });
@@ -243,7 +243,7 @@ export class SubscriptionCreateService {
     const newManagedSubscriptions = await this.db
       .insert(subscriptions)
       .values({
-        internalType: 'transcript',
+        internalType: 'mail_monitoring',
         expiresAt: graphSubscription.expirationDateTime,
         userProfileId: userProfileId.toString(),
         subscriptionId: graphSubscription.id,
