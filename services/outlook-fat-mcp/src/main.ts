@@ -24,11 +24,16 @@ async function bootstrap() {
 
   const config = app.get<AppConfig>(appConfig.KEY);
   await app.listen(config.port, () =>
-    logger.log(
-      `Outlook Fat MCP server successfully started and listening on http://localhost:${config.port}`,
-      'Bootstrap',
-    ),
+    {
+      console.log(`Outlook Fat MCP server successfully started and listening on http://localhost:${config.port}`,
+        'Bootstrap',)
+      logger.log(
+        `Outlook Fat MCP server successfully started and listening on http://localhost:${config.port}`,
+        'Bootstrap',
+      )
+    },
   );
+  console.log(`HERE ${config.port}`);
 }
 
 initOpenTelemetry({

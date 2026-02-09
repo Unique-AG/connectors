@@ -36,6 +36,7 @@ import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
 import { GraphErrorFilter } from './utils/graph-error.filter';
+import { SubscriptionModule } from './email-sync/subscriptions/subscription.module';
 
 @Module({
   imports: [
@@ -136,6 +137,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     MsGraphModule,
     AMQPModule,
+    SubscriptionModule,
   ],
   controllers: [ManifestController],
   providers: [
