@@ -1,14 +1,17 @@
 import asyncio
+from collections.abc import Generator
 
 import pytest
 from aio_pika import Message, connect_robust
 from pydantic import ValidationError
+from testcontainers.rabbitmq import RabbitMqContainer
 
 from edgar_mcp.queue.connection import create_channel
 from edgar_mcp.queue.consumer import Consumer
 from edgar_mcp.queue.events import (
     EVENT_SOURCE,
-    PING_EVENT_TYPE,
+    EdgarEvent,
+    EventType,
     PingData,
     PingEvent,
     create_event,
@@ -20,15 +23,15 @@ from edgar_mcp.queue.publisher import Publisher
 class TestEvents:
     """Unit tests for events.py."""
 
-    def test_create_event_wraps_in_cloud_event(self):
+    def test_create_event_wraps_in_cloud_event(self) -> None:
         ping = PingEvent(data=PingData(message="hello"))
         cloud_event = create_event(ping)
 
-        assert cloud_event["type"] == PING_EVENT_TYPE
+        assert cloud_event["type"] == EventType.PING
         assert cloud_event["source"] == EVENT_SOURCE
         assert cloud_event.data == {"message": "hello"}
 
-    def test_parse_event_data_roundtrips(self):
+    def test_parse_event_data_roundtrips(self) -> None:
         original = PingEvent(data=PingData(message="roundtrip"))
         cloud_event = create_event(original)
 
@@ -38,7 +41,7 @@ class TestEvents:
         assert parsed.type == original.type
         assert parsed.data.message == "roundtrip"
 
-    def test_parse_event_data_rejects_unknown_type(self):
+    def test_parse_event_data_rejects_unknown_type(self) -> None:
         from cloudevents.pydantic import CloudEvent
 
         cloud_event = CloudEvent(
@@ -52,14 +55,12 @@ class TestEvents:
 
 
 @pytest.fixture(scope="module")
-def rabbitmq_container():
-    from testcontainers.rabbitmq import RabbitMqContainer
-
+def rabbitmq_container() -> Generator[RabbitMqContainer]:
     with RabbitMqContainer("rabbitmq:3-alpine") as rabbitmq:
         yield rabbitmq
 
 
-def _amqp_url(container) -> str:
+def _amqp_url(container: RabbitMqContainer) -> str:
     host = container.get_container_host_ip()
     port = container.get_exposed_port(container.port)
     return f"amqp://{container.username}:{container.password}@{host}:{port}/{container.vhost}"
@@ -69,8 +70,11 @@ class TestQueueMessageFlow:
     """Integration tests using testcontainers RabbitMQ."""
 
     @pytest.mark.asyncio
-    async def test_publish_and_consume_cloud_event(self, rabbitmq_container):
+    async def test_publish_and_consume_cloud_event(
+        self, rabbitmq_container: RabbitMqContainer
+    ) -> None:
         connection = await connect_robust(_amqp_url(rabbitmq_container))
+        consumer: Consumer | None = None
         try:
             pub_channel = await create_channel(connection)
             publisher = Publisher(pub_channel, "test-publish-consume")
@@ -82,8 +86,11 @@ class TestQueueMessageFlow:
 
             received: asyncio.Future[PingEvent] = asyncio.get_running_loop().create_future()
 
-            async def handler(event):
-                received.set_result(event)
+            async def handler(event: EdgarEvent) -> None:
+                if event.type == EventType.PING:
+                    received.set_result(event)
+                else:
+                    raise ValueError(f"Unknown event type: {event.type}")
 
             await consumer.start(handler)
 
@@ -95,12 +102,16 @@ class TestQueueMessageFlow:
             assert isinstance(result, PingEvent)
             assert result.data.message == "integration"
         finally:
-            await consumer.stop()
+            if consumer is not None:
+                await consumer.stop()
             await connection.close()
 
     @pytest.mark.asyncio
-    async def test_consumer_nacks_invalid_cloud_event(self, rabbitmq_container):
+    async def test_consumer_nacks_invalid_cloud_event(
+        self, rabbitmq_container: RabbitMqContainer
+    ) -> None:
         connection = await connect_robust(_amqp_url(rabbitmq_container))
+        consumer: Consumer | None = None
         try:
             queue_name = "test-nack-invalid"
 
@@ -110,7 +121,7 @@ class TestQueueMessageFlow:
 
             handler_called = asyncio.Event()
 
-            async def handler(event):
+            async def handler(_event: EdgarEvent) -> None:
                 handler_called.set()
 
             await consumer.start(handler)
@@ -129,12 +140,16 @@ class TestQueueMessageFlow:
             queue_state = await pub_channel.declare_queue(queue_name, passive=True)
             assert queue_state.declaration_result.message_count == 0
         finally:
-            await consumer.stop()
+            if consumer is not None:
+                await consumer.stop()
             await connection.close()
 
     @pytest.mark.asyncio
-    async def test_consumer_processes_events_sequentially(self, rabbitmq_container):
+    async def test_consumer_processes_events_sequentially(
+        self, rabbitmq_container: RabbitMqContainer
+    ) -> None:
         connection = await connect_robust(_amqp_url(rabbitmq_container))
+        consumer: Consumer | None = None
         try:
             queue_name = "test-sequential"
 
@@ -152,8 +167,12 @@ class TestQueueMessageFlow:
             events: list[tuple[int, str]] = []
             done = asyncio.Event()
 
-            async def handler(event):
-                idx = int(event.data.message)
+            async def handler(event: EdgarEvent) -> None:
+                if event.type == EventType.PING:
+                    idx = int(event.data.message)
+                else:
+                    raise ValueError(f"Unknown event type: {event.type}")
+
                 events.append((idx, "start"))
                 await asyncio.sleep(0.1)
                 events.append((idx, "end"))
@@ -173,5 +192,6 @@ class TestQueueMessageFlow:
                 (2, "end"),
             ]
         finally:
-            await consumer.stop()
+            if consumer is not None:
+                await consumer.stop()
             await connection.close()

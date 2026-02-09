@@ -1,14 +1,17 @@
+from typing import override
+
 import structlog
 from opentelemetry import trace
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 
 
 class TraceContextMiddleware(BaseHTTPMiddleware):
-    EXCLUDED_PATHS = {"/probe", "/health", "/metrics"}
+    EXCLUDED_PATHS: list[str] = ["/probe", "/health", "/metrics"]
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    @override
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.url.path in self.EXCLUDED_PATHS:
             return await call_next(request)
 

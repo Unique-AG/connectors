@@ -4,7 +4,7 @@ import pytest
 class TestAppConfig:
     """Test application configuration behavior."""
 
-    def test_loads_from_env_vars(self, monkeypatch):
+    def test_loads_from_env_vars(self, monkeypatch: pytest.MonkeyPatch):
         """Loads settings from env vars."""
         monkeypatch.setenv("APP_ENV", "development")
         monkeypatch.setenv("PORT", "8080")
@@ -20,7 +20,7 @@ class TestAppConfig:
         assert config.log_level == "debug"
         assert config.logs_diagnostics_data_policy == "disclose"
 
-    def test_uses_defaults(self, monkeypatch):
+    def test_uses_defaults(self, monkeypatch: pytest.MonkeyPatch):
         """Uses sensible defaults when env vars not set."""
         monkeypatch.delenv("APP_ENV", raising=False)
         monkeypatch.delenv("PORT", raising=False)
@@ -36,7 +36,7 @@ class TestAppConfig:
         assert config.log_level == "info"
         assert config.logs_diagnostics_data_policy == "conceal"
 
-    def test_rejects_invalid_app_env(self, monkeypatch):
+    def test_rejects_invalid_app_env(self, monkeypatch: pytest.MonkeyPatch):
         """Invalid app_env value is rejected."""
         monkeypatch.setenv("APP_ENV", "staging")
 
@@ -45,7 +45,7 @@ class TestAppConfig:
         with pytest.raises(ValueError):
             AppConfig()
 
-    def test_rejects_invalid_log_level(self, monkeypatch):
+    def test_rejects_invalid_log_level(self, monkeypatch: pytest.MonkeyPatch):
         """Invalid log_level value is rejected."""
         monkeypatch.setenv("LOG_LEVEL", "verbose")
 
@@ -54,7 +54,7 @@ class TestAppConfig:
         with pytest.raises(ValueError):
             AppConfig()
 
-    def test_rejects_invalid_port(self, monkeypatch):
+    def test_rejects_invalid_port(self, monkeypatch: pytest.MonkeyPatch):
         """Port outside valid range is rejected."""
         monkeypatch.setenv("PORT", "70000")
 
@@ -67,7 +67,7 @@ class TestAppConfig:
 class TestDatabaseConfig:
     """Test database configuration URL building behavior."""
 
-    def test_builds_url_from_individual_parts(self, monkeypatch):
+    def test_builds_url_from_individual_parts(self, monkeypatch: pytest.MonkeyPatch):
         """When individual DB settings are provided, builds asyncpg URL."""
         monkeypatch.setenv("DB_HOST", "dbhost")
         monkeypatch.setenv("DB_PORT", "5433")
@@ -81,7 +81,7 @@ class TestDatabaseConfig:
 
         assert config.url == "postgresql+asyncpg://testuser:testpass@dbhost:5433/testdb"
 
-    def test_uses_provided_url_directly(self, monkeypatch):
+    def test_uses_provided_url_directly(self, monkeypatch: pytest.MonkeyPatch):
         """When DB_URL is provided, uses it directly."""
         monkeypatch.setenv("DB_URL", "postgresql+asyncpg://user:pass@host:5432/db")
 
@@ -91,7 +91,7 @@ class TestDatabaseConfig:
 
         assert config.url == "postgresql+asyncpg://user:pass@host:5432/db"
 
-    def test_adds_asyncpg_driver_if_missing(self, monkeypatch):
+    def test_adds_asyncpg_driver_if_missing(self, monkeypatch: pytest.MonkeyPatch):
         """When URL uses postgresql:// without driver, adds +asyncpg."""
         monkeypatch.setenv("DB_URL", "postgresql://user:pass@host:5432/db")
 
@@ -101,7 +101,7 @@ class TestDatabaseConfig:
 
         assert config.url == "postgresql+asyncpg://user:pass@host:5432/db"
 
-    def test_raises_when_no_url_and_no_password(self, monkeypatch):
+    def test_raises_when_no_url_and_no_password(self, monkeypatch: pytest.MonkeyPatch):
         """When neither URL nor password provided, raises error."""
         monkeypatch.delenv("DB_URL", raising=False)
         monkeypatch.delenv("DB_PASSWORD", raising=False)
@@ -114,7 +114,7 @@ class TestDatabaseConfig:
         with pytest.raises(ValueError, match="DB_URL not set; missing required fields:"):
             DatabaseConfig()
 
-    def test_raises_when_partial_config(self, monkeypatch):
+    def test_raises_when_partial_config(self, monkeypatch: pytest.MonkeyPatch):
         """When only some individual parts provided, raises error."""
         monkeypatch.delenv("DB_URL", raising=False)
         monkeypatch.setenv("DB_HOST", "localhost")
@@ -127,7 +127,7 @@ class TestDatabaseConfig:
         with pytest.raises(ValueError, match="DB_URL not set; missing required fields:"):
             DatabaseConfig()
 
-    def test_url_encodes_special_characters(self, monkeypatch):
+    def test_url_encodes_special_characters(self, monkeypatch: pytest.MonkeyPatch):
         """URL encoding handles special characters in password."""
         monkeypatch.setenv("DB_HOST", "localhost")
         monkeypatch.setenv("DB_USER", "user@domain")
@@ -137,10 +137,11 @@ class TestDatabaseConfig:
         from edgar_mcp.config import DatabaseConfig
 
         config = DatabaseConfig()
+        assert config.url is not None
         assert "user%40domain" in config.url
         assert "p%40ss%3Aw%2Frd" in config.url
 
-    def test_uses_default_port_when_not_specified(self, monkeypatch):
+    def test_uses_default_port_when_not_specified(self, monkeypatch: pytest.MonkeyPatch):
         """Default port 5432 is used when DB_PORT not set."""
         monkeypatch.setenv("DB_HOST", "dbhost")
         monkeypatch.delenv("DB_PORT", raising=False)
@@ -152,9 +153,10 @@ class TestDatabaseConfig:
 
         config = DatabaseConfig()
 
+        assert config.url is not None
         assert ":5432/" in config.url
 
-    def test_preserves_asyncpg_driver_if_already_present(self, monkeypatch):
+    def test_preserves_asyncpg_driver_if_already_present(self, monkeypatch: pytest.MonkeyPatch):
         """URL with +asyncpg already present is not modified."""
         monkeypatch.setenv("DB_URL", "postgresql+asyncpg://user:pass@host:5432/db")
 
@@ -164,7 +166,7 @@ class TestDatabaseConfig:
 
         assert config.url == "postgresql+asyncpg://user:pass@host:5432/db"
 
-    def test_raises_when_url_is_not_postgres(self, monkeypatch):
+    def test_raises_when_url_is_not_postgres(self, monkeypatch: pytest.MonkeyPatch):
         """When DB_URL is not a PostgreSQL URL, raises error."""
         monkeypatch.setenv("DB_URL", "mysql://user:pass@host:3306/db")
 
@@ -173,7 +175,7 @@ class TestDatabaseConfig:
         with pytest.raises(ValueError, match="DB_URL must be a PostgreSQL connection string"):
             DatabaseConfig()
 
-    def test_accepts_other_postgres_drivers(self, monkeypatch):
+    def test_accepts_other_postgres_drivers(self, monkeypatch: pytest.MonkeyPatch):
         """URLs with other PostgreSQL drivers like psycopg are accepted."""
         monkeypatch.setenv("DB_URL", "postgresql+psycopg://user:pass@host:5432/db")
 
@@ -187,7 +189,7 @@ class TestDatabaseConfig:
 class TestRabbitConfig:
     """Test RabbitMQ configuration URL building behavior."""
 
-    def test_builds_url_from_individual_parts(self, monkeypatch):
+    def test_builds_url_from_individual_parts(self, monkeypatch: pytest.MonkeyPatch):
         """When individual RabbitMQ settings are provided, builds AMQP URL."""
         monkeypatch.setenv("RABBITMQ_HOST", "rabbithost")
         monkeypatch.setenv("RABBITMQ_PORT", "5673")
@@ -201,7 +203,7 @@ class TestRabbitConfig:
 
         assert config.url == "amqp://rabbituser:rabbitpass@rabbithost:5673/myvhost"
 
-    def test_uses_provided_url_directly(self, monkeypatch):
+    def test_uses_provided_url_directly(self, monkeypatch: pytest.MonkeyPatch):
         """When RABBITMQ_URL is provided, uses it directly."""
         monkeypatch.setenv("RABBITMQ_URL", "amqp://custom:url@host:5672/")
 
@@ -211,7 +213,7 @@ class TestRabbitConfig:
 
         assert config.url == "amqp://custom:url@host:5672/"
 
-    def test_raises_when_no_url_and_missing_parts(self, monkeypatch):
+    def test_raises_when_no_url_and_missing_parts(self, monkeypatch: pytest.MonkeyPatch):
         """When neither URL nor all required parts provided, raises error."""
         monkeypatch.delenv("RABBITMQ_URL", raising=False)
         monkeypatch.delenv("RABBITMQ_HOST", raising=False)
@@ -223,7 +225,7 @@ class TestRabbitConfig:
         with pytest.raises(ValueError, match="RABBITMQ_URL not set; missing required fields:"):
             RabbitConfig()
 
-    def test_url_encodes_special_characters(self, monkeypatch):
+    def test_url_encodes_special_characters(self, monkeypatch: pytest.MonkeyPatch):
         """URL encoding handles special characters in password."""
         monkeypatch.setenv("RABBITMQ_HOST", "localhost")
         monkeypatch.setenv("RABBITMQ_USER", "user@domain")
@@ -232,10 +234,11 @@ class TestRabbitConfig:
         from edgar_mcp.config import RabbitConfig
 
         config = RabbitConfig()
+        assert config.url is not None
         assert "user%40domain" in config.url
         assert "p%40ss%3Aw%2Frd" in config.url
 
-    def test_handles_root_vhost(self, monkeypatch):
+    def test_handles_root_vhost(self, monkeypatch: pytest.MonkeyPatch):
         """Root vhost '/' is handled correctly in URL."""
         monkeypatch.setenv("RABBITMQ_HOST", "localhost")
         monkeypatch.setenv("RABBITMQ_USER", "guest")
@@ -248,7 +251,7 @@ class TestRabbitConfig:
 
         assert config.url == "amqp://guest:guest@localhost:5672/"
 
-    def test_raises_when_url_is_not_amqp(self, monkeypatch):
+    def test_raises_when_url_is_not_amqp(self, monkeypatch: pytest.MonkeyPatch):
         """When RABBITMQ_URL is not an AMQP URL, raises error."""
         monkeypatch.setenv("RABBITMQ_URL", "http://not-amqp@host:5672/")
 
@@ -257,7 +260,7 @@ class TestRabbitConfig:
         with pytest.raises(ValueError, match="RABBITMQ_URL must be an AMQP connection string"):
             RabbitConfig()
 
-    def test_uses_default_port_when_not_specified(self, monkeypatch):
+    def test_uses_default_port_when_not_specified(self, monkeypatch: pytest.MonkeyPatch):
         """Default port 5672 is used when RABBITMQ_PORT not set."""
         monkeypatch.setenv("RABBITMQ_HOST", "rabbithost")
         monkeypatch.delenv("RABBITMQ_PORT", raising=False)
@@ -268,9 +271,10 @@ class TestRabbitConfig:
 
         config = RabbitConfig()
 
+        assert config.url is not None
         assert ":5672/" in config.url
 
-    def test_uses_default_vhost_when_not_specified(self, monkeypatch):
+    def test_uses_default_vhost_when_not_specified(self, monkeypatch: pytest.MonkeyPatch):
         """Default vhost '/' is used when RABBITMQ_VHOST not set."""
         monkeypatch.setenv("RABBITMQ_HOST", "localhost")
         monkeypatch.setenv("RABBITMQ_USER", "guest")
@@ -283,7 +287,7 @@ class TestRabbitConfig:
 
         assert config.url == "amqp://guest:guest@localhost:5672/"
 
-    def test_accepts_amqps_scheme(self, monkeypatch):
+    def test_accepts_amqps_scheme(self, monkeypatch: pytest.MonkeyPatch):
         """AMQPS (TLS) URLs are accepted."""
         monkeypatch.setenv("RABBITMQ_URL", "amqps://user:pass@host:5671/")
 

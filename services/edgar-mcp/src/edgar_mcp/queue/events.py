@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Annotated, Literal
 
 from cloudevents.pydantic import CloudEvent
@@ -5,9 +6,13 @@ from pydantic import BaseModel, Discriminator, TypeAdapter
 
 EVENT_SOURCE = "/edgar-mcp"
 
-# Ping event
 
-PING_EVENT_TYPE = "com.unique-ag.edgar-mcp.ping"
+class EventType(StrEnum):
+    PING = "com.unique-ag.edgar-mcp.ping"
+    SECOND_TEST = "com.unique-ag.edgar-mcp.second-test"
+
+
+# Ping event
 
 
 class PingData(BaseModel):
@@ -17,13 +22,11 @@ class PingData(BaseModel):
 
 
 class PingEvent(BaseModel):
-    type: Literal[PING_EVENT_TYPE] = PING_EVENT_TYPE
+    type: Literal[EventType.PING] = EventType.PING
     data: PingData
 
 
 # Second test event
-
-SECOND_TEST_EVENT_TYPE = "com.unique-ag.edgar-mcp.second-test"
 
 
 class SecondTestData(BaseModel):
@@ -33,14 +36,15 @@ class SecondTestData(BaseModel):
 
 
 class SecondTestEvent(BaseModel):
-    type: Literal[SECOND_TEST_EVENT_TYPE] = SECOND_TEST_EVENT_TYPE
+    type: Literal[EventType.SECOND_TEST] = EventType.SECOND_TEST
     data: SecondTestData
 
 
 # To add a new event:
 # 1. Define a data model (e.g. SyncFilingData)
-# 2. Define an event model with type: Literal[<EVENT_TYPE_CONST>]
-# 3. Add it to the EdgarEvent union below
+# 2. Add the event type to EventType enum
+# 3. Define an event model with type: Literal[EventType.<NAME>]
+# 4. Add it to the EdgarEvent union below
 
 EdgarEvent = Annotated[
     PingEvent | SecondTestEvent,  # | SyncFilingEvent | ...

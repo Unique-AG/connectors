@@ -30,7 +30,7 @@ def configure_metrics(app_config: AppConfig) -> MeterProvider:
 def create_metrics_app() -> Starlette:
     """Create ASGI app that serves Prometheus metrics."""
 
-    async def metrics_endpoint(request: Request) -> Response:
+    async def metrics_endpoint(_request: Request) -> Response:
         data = generate_latest(REGISTRY)
         return Response(data, media_type=CONTENT_TYPE_LATEST)
 

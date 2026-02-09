@@ -1,9 +1,10 @@
 from collections.abc import Awaitable, Callable
 
 import structlog
-from aio_pika import IncomingMessage
-from aio_pika.abc import AbstractQueue, AbstractRobustChannel
-from cloudevents.conversion import from_json
+from aio_pika.abc import AbstractChannel, AbstractIncomingMessage, AbstractQueue
+
+# Sccording to Opus cloudevents have incomplete type stubs, resulting in pyright error
+from cloudevents.conversion import from_json  # pyright: ignore[reportUnknownVariableType]
 from cloudevents.pydantic import CloudEvent
 
 from edgar_mcp.logging import get_logger
@@ -17,9 +18,9 @@ EventHandler = Callable[[EdgarEvent], Awaitable[None]]
 class Consumer:
     """RabbitMQ message consumer using CloudEvents."""
 
-    def __init__(self, channel: AbstractRobustChannel, queue_name: str):
-        self.channel = channel
-        self.queue_name = queue_name
+    def __init__(self, channel: AbstractChannel, queue_name: str):
+        self.channel: AbstractChannel = channel
+        self.queue_name: str = queue_name
         self._queue: AbstractQueue | None = None
         self._consumer_tag: str | None = None
 
@@ -35,7 +36,7 @@ class Consumer:
         if self._queue is None:
             raise RuntimeError("Must call setup() before start()")
 
-        async def process(message: IncomingMessage) -> None:
+        async def process(message: AbstractIncomingMessage) -> None:
             structlog.contextvars.clear_contextvars()
             structlog.contextvars.bind_contextvars(
                 message_id=message.message_id,
