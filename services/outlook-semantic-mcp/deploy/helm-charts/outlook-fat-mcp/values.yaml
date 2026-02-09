@@ -18,7 +18,9 @@ server:
   # -- Environment variables from secrets (required secrets listed at bottom of file)
   # @see https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars
   envVars: []
-  # -- ConfigMap(s) to load environment variables from (must match release name + '-config')
+  # -- ConfigMap(s) to load environment variables from.
+  # Default assumes release name is "outlook-semantic-mcp" (i.e., chart.fullname resolves to "outlook-semantic-mcp").
+  # Override with [<your-fullname>-config] if using a different release name or fullnameOverride.
   extraEnvCM:
     - outlook-semantic-mcp-config
   image:
