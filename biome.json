@@ -18,7 +18,8 @@
       "!**/drizzle",
       "!**/helm-charts/**/values.schema.json",
       "!**/scripts",
-      "!**/local-scripts"
+      "!**/local-scripts",
+      "!services/edgar-mcp"
     ]
   },
   "formatter": {

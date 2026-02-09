@@ -1,0 +1,43 @@
+name: "[mcp/server/edgar] Validate"
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "**/services/edgar-mcp/**"
+      - .github/workflows/edgar.server.mcp.ci.yaml
+
+concurrency:
+  group: edgar-mcp-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services/edgar-mcp
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/edgar-mcp/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --all-extras --frozen
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run basedpyright
+
+      - name: Run tests
+        run: uv run pytest

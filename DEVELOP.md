@@ -101,6 +101,12 @@ Releases are handled by [release-please](https://github.com/googleapis/release-p
 
 Python services live under `services/` but are **excluded from the pnpm workspace and turbo**. Each service is self-contained and managed with uv.
 
+### IDE Setup
+
+Open `connectors.code-workspace` instead of the root folder when working on Python services. This is a VS Code/Cursor multi-root workspace that adds each Python service as a separate workspace folder. Without it, basedpyright (Pylance) looks for `pyrightconfig.json` / `pyproject.toml` at the repository root and fails to resolve Python imports and virtual environments correctly. Each Python service folder needs to be a workspace root so the type checker picks up its own config.
+
+When adding a new Python service, add it as a folder entry in `connectors.code-workspace`.
+
 ### Installation
 
 ```bash
@@ -163,6 +169,7 @@ Create `services/<service-name>/` with:
 
 - `pyproject.toml` with basedpyright, ruff, and pytest config
 - Exclude from pnpm workspace in `pnpm-workspace.yaml` (`!services/<service-name>`)
+- Exclude from biome formatting in `biome.json`
 - Add as a folder in `connectors.code-workspace` (for basedpyright IDE support)
 
 ### Monorepo Registration Checklist
@@ -173,15 +180,14 @@ These files must be updated when adding a new service:
 - [ ] `DEVELOP.md` - add to **Project Structure** listing
 - [ ] `.github/workflows/<service-name>.ci.yaml` - create CI workflow (use `_template-ci.yaml` for TypeScript, or a standalone workflow for Python)
 - [ ] `.github/workflows/release-please.yaml` - add output variables and a `release-<service-name>` job
-- [ ] `release-please-config.json` - add package entry with Helm chart paths
+- [ ] `release-please-config.json` - add package entry with `release-type` (`node` for TypeScript, `python` for Python)
 - [ ] `.release-please-manifest.json` - add initial version entry (e.g. `"services/<service-name>": "0.1.0"`)
+- [ ] `.github/dependabot.yml` - add `uv` ecosystem entry for Python services (Docker/Helm/Terraform use wildcards, but `uv` requires an explicit directory)
 
 These files use wildcards and **don't** need per-service updates:
 
 - `.github/CODEOWNERS` - covers all files
-- `.github/dependabot.yml` - uses `services/**/*`
 - `docker-compose.yaml` - shared infrastructure only
-- `biome.json` - global config
 - Root `turbo.json` - global config
 
 ## Project Structure

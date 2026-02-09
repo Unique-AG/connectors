@@ -3,12 +3,12 @@
   "tag-separator": "@",
   "include-v-in-tag": false,
   "separate-pull-requests": true,
-  "release-type": "node",
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "initial-version": "0.1.0",
   "packages": {
     "services/factset-mcp": {
+      "release-type": "node",
       "extra-files": [
         {
           "type": "yaml",
@@ -27,6 +27,7 @@
       ]
     },
     "services/outlook-mcp": {
+      "release-type": "node",
       "extra-files": [
         {
           "type": "yaml",
@@ -45,6 +46,7 @@
       ]
     },
     "services/sharepoint-connector": {
+      "release-type": "node",
       "prerelease": true,
       "prerelease-type": "beta",
       "versioning": "prerelease",
@@ -66,6 +68,7 @@
       ]
     },
     "services/teams-mcp": {
+      "release-type": "node",
       "prerelease": true,
       "versioning": "prerelease",
       "extra-files": [
@@ -84,6 +87,11 @@
           "path": "deploy/helm-charts/teams-mcp/values.yaml"
         }
       ]
+    },
+    "services/edgar-mcp": {
+      "release-type": "python",
+      "prerelease": true,
+      "versioning": "prerelease"
     }
   }
 }

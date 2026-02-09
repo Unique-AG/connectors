@@ -31,3 +31,11 @@ updates:
       default-days: 14
     schedule:
       interval: weekly
+
+  - package-ecosystem: uv
+    directories:
+      - services/edgar-mcp
+    cooldown:
+      default-days: 14
+    schedule:
+      interval: weekly
