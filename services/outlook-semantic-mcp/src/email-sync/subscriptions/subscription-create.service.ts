@@ -202,7 +202,7 @@ export class SubscriptionCreateService {
       notificationUrl,
       lifecycleNotificationUrl,
       clientState: webhookSecret,
-      resource: `users/${userProfile.providerUserId}/onlineMeetings/getAllTranscripts`,
+      resource: `users/${userProfile.providerUserId}/messages`,
       expirationDateTime: nextScheduledExpiration,
     });
 
