@@ -1,6 +1,5 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
-import { parseJsonOrPassthrough } from '../utils/config.util';
 import { requiredStringSchema } from '../utils/zod.util';
 
 // ==========================================
@@ -45,7 +44,7 @@ export const AppConfigSchema = z
       ),
     logsDiagnosticsConfigEmitPolicy: z
       .preprocess(
-        parseJsonOrPassthrough,
+        (val) => (typeof val === 'string' ? JSON.parse(val) : val),
         z.discriminatedUnion('emit', [
           z.object({
             emit: z.literal('on'),
