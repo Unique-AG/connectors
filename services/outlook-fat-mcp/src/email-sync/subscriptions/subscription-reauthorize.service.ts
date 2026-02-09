@@ -38,7 +38,7 @@ export class SubscriptionReauthorizeService {
 
     const payload = await ReauthorizationRequiredEventDto.encodeAsync({
       subscriptionId,
-      type: 'unique.teams-mcp.transcript.lifecycle-notification.reauthorization-required',
+      type: 'unique.outlook-mcp.mail.lifecycle-notification.reauthorization-required',
     });
 
     const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});

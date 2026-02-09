@@ -42,7 +42,7 @@ export class SubscriptionRemoveService {
 
     const payload = await SubscriptionRemovedEventDto.encodeAsync({
       subscriptionId,
-      type: 'unique.teams-mcp.transcript.lifecycle-notification.subscription-removed',
+      type: 'unique.outlook-mcp.mail.lifecycle-notification.subscription-removed',
     });
 
     const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});

@@ -46,7 +46,7 @@ export class SubscriptionCreateService {
 
     const payload = await SubscriptionRequestedEventDto.encodeAsync({
       userProfileId,
-      type: 'unique.teams-mcp.transcript.lifecycle-notification.subscription-requested',
+      type: 'unique.outlook-mcp.mail.lifecycle-notification.subscription-requested',
     });
 
     this.logger.debug(
