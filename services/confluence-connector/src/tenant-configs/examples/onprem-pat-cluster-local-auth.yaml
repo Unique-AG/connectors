@@ -1,0 +1,33 @@
+# Example: Confluence On-Prem with PAT + Cluster-Local Unique API auth
+#
+# This configuration is suitable for on-premises Confluence Data Center instances
+# where authentication uses a Personal Access Token, and the Unique platform
+# is accessed within the same Kubernetes cluster using service headers.
+#
+# Secrets are injected from environment variables at startup:
+#   - CONFLUENCE_PAT -> confluence.auth.token
+
+confluence:
+  instanceType: onprem
+  baseUrl: https://confluence.your-company.com
+  auth:
+    mode: pat
+    # token: injected from CONFLUENCE_PAT env var
+  apiRateLimitPerMinute: 50
+  ingestSingleLabel: ai-ingest
+  ingestAllLabel: ai-ingest-all
+
+unique:
+  serviceAuthMode: cluster_local
+  serviceExtraHeaders:
+    x-company-id: your-company-id
+    x-user-id: your-user-id
+  ingestionServiceBaseUrl: http://node-ingestion-service:8080
+  scopeManagementServiceBaseUrl: http://scope-management-service:8080
+  apiRateLimitPerMinute: 100
+
+processing:
+  stepTimeoutSeconds: 600
+  concurrency: 3
+  scanIntervalCron: "0 */2 * * *" # Every 2 hours
+  # maxPagesToScan: 500 # Uncomment to limit pages scanned (useful for testing)

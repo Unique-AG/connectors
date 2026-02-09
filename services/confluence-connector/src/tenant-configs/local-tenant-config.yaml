@@ -1,0 +1,25 @@
+confluence:
+  instanceType: onprem
+  baseUrl: https://confluence.qa.unique.app
+  auth:
+    mode: pat
+    # token: injected from CONFLUENCE_PAT env var
+  apiRateLimitPerMinute: 100
+  ingestSingleLabel: ai-ingest
+  ingestAllLabel: ai-ingest-all
+
+unique:
+  serviceAuthMode: external
+  zitadelOauthTokenUrl: http://localhost:10116/oauth/v2/token
+  zitadelProjectId: '341558074118504450'
+  zitadelClientId: confluence-connector-v2
+  # zitadelClientSecret: injected from ZITADEL_CLIENT_SECRET env var
+  ingestionServiceBaseUrl: http://localhost:8091
+  scopeManagementServiceBaseUrl: http://localhost:8094
+  apiRateLimitPerMinute: 60
+
+processing:
+  stepTimeoutSeconds: 300
+  concurrency: 1
+  maxPagesToScan: 50 # For testing: limit scanned pages (unset for unlimited)
+  scanIntervalCron: "*/15 * * * *"
