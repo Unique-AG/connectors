@@ -18,7 +18,7 @@ EventHandler = Callable[[EdgarEvent], Awaitable[None]]
 class Consumer:
     """RabbitMQ message consumer using CloudEvents."""
 
-    def __init__(self, channel: AbstractChannel, queue_name: str):
+    def __init__(self, channel: AbstractChannel, queue_name: str) -> None:
         self.channel: AbstractChannel = channel
         self.queue_name: str = queue_name
         self._queue: AbstractQueue | None = None

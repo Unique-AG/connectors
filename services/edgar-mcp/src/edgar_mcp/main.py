@@ -1,4 +1,4 @@
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -35,7 +35,7 @@ async def handle_event(event: EdgarEvent) -> None:
 
 
 @asynccontextmanager
-async def app_lifespan(app: FastAPI):
+async def app_lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: startup and shutdown."""
     logger.info("Starting application", version=app_config.version)
 
@@ -99,7 +99,7 @@ mcp_app = mcp.http_app(path="/")
 
 
 @asynccontextmanager
-async def combined_lifespan(app: FastAPI):
+async def combined_lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Combine app lifespan with FastMCP lifespan."""
     async with app_lifespan(app), mcp_app.lifespan(app):
         yield
@@ -117,7 +117,7 @@ app.mount("/mcp", mcp_app)
 app.mount("/metrics", create_metrics_app())
 
 
-def main():
+def main() -> None:
     """Entry point for running the application."""
     import uvicorn
 
