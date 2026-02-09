@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AppConfigSchema, ConfigEmitEvent } from './app.config';
+import { AppConfigSchema } from './app.config';
 
 describe('AppConfigSchema', () => {
   const validConfig = {
@@ -16,7 +16,7 @@ describe('AppConfigSchema', () => {
       expect(result.logsDiagnosticsDataPolicy).toBe('conceal');
       expect(result.logsDiagnosticsConfigEmitPolicy).toEqual({
         emit: 'on',
-        events: ['on_startup', 'per_sync'],
+        events: ['on_startup', 'on_sync'],
       });
       expect(result.isDev).toBe(false);
     });
@@ -104,12 +104,12 @@ describe('AppConfigSchema', () => {
     it('parses JSON object string with both events', () => {
       const result = AppConfigSchema.parse({
         ...validConfig,
-        logsDiagnosticsConfigEmitPolicy: '{"emit":"on","events":["on_startup","per_sync"]}',
+        logsDiagnosticsConfigEmitPolicy: '{"emit":"on","events":["on_startup","on_sync"]}',
       });
 
       expect(result.logsDiagnosticsConfigEmitPolicy).toEqual({
         emit: 'on',
-        events: ['on_startup', 'per_sync'],
+        events: ['on_startup', 'on_sync'],
       });
     });
 
@@ -152,19 +152,22 @@ describe('AppConfigSchema', () => {
       ).toThrow();
     });
 
-    it('accepts a native object value', () => {
-      const result = AppConfigSchema.parse({
-        ...validConfig,
-        logsDiagnosticsConfigEmitPolicy: {
-          emit: 'on',
-          events: [ConfigEmitEvent.PER_SYNC],
-        },
-      });
+    it('rejects a native object (requires JSON string)', () => {
+      expect(() =>
+        AppConfigSchema.parse({
+          ...validConfig,
+          logsDiagnosticsConfigEmitPolicy: { emit: 'on', events: ['on_startup'] },
+        }),
+      ).toThrow();
+    });
 
-      expect(result.logsDiagnosticsConfigEmitPolicy).toEqual({
-        emit: 'on',
-        events: ['per_sync'],
-      });
+    it('rejects an empty string', () => {
+      expect(() =>
+        AppConfigSchema.parse({
+          ...validConfig,
+          logsDiagnosticsConfigEmitPolicy: '',
+        }),
+      ).toThrow();
     });
 
     it('rejects invalid enum values in events array', () => {

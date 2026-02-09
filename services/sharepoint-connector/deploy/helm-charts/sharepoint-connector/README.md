@@ -71,7 +71,7 @@ spec:
 | alerts.defaultAlerts.uniqueApi.disabled | object | `{}` | Disable specific alerts by setting them to true |
 | alerts.enabled | bool | `false` | Enable PrometheusRule resource creation |
 | connector.deployment.metadata.annotations."reloader.stakater.com/auto" | string | `"true"` |  |
-| connector.env.LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY | string | `"{\"emit\":\"on\",\"events\":[\"on_startup\",\"per_sync\"]}"` |  |
+| connector.env.LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY | string | `"{\"emit\":\"on\",\"events\":[\"on_startup\",\"on_sync\"]}"` |  |
 | connector.env.LOGS_DIAGNOSTICS_DATA_POLICY | string | `"conceal"` |  |
 | connector.env.LOG_LEVEL | string | `"info"` |  |
 | connector.env.MAX_FILE_SIZE_BYTES | string | `"209715200"` |  |

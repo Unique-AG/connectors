@@ -88,7 +88,7 @@ describe('ConfigDiagnosticsService', () => {
     it('returns false when policy does not include the requested event', () => {
       vi.spyOn(configService, 'get').mockReturnValue({
         emit: 'on',
-        events: [ConfigEmitEvent.PER_SYNC],
+        events: [ConfigEmitEvent.ON_SYNC],
       });
 
       expect(service.shouldLogConfig(ConfigEmitEvent.ON_STARTUP)).toBe(false);
@@ -97,18 +97,18 @@ describe('ConfigDiagnosticsService', () => {
     it('returns true when policy includes both events and requesting either', () => {
       vi.spyOn(configService, 'get').mockReturnValue({
         emit: 'on',
-        events: [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.PER_SYNC],
+        events: [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.ON_SYNC],
       });
 
       expect(service.shouldLogConfig(ConfigEmitEvent.ON_STARTUP)).toBe(true);
-      expect(service.shouldLogConfig(ConfigEmitEvent.PER_SYNC)).toBe(true);
+      expect(service.shouldLogConfig(ConfigEmitEvent.ON_SYNC)).toBe(true);
     });
 
     it('returns false when emit is off', () => {
       vi.spyOn(configService, 'get').mockReturnValue({ emit: 'off' });
 
       expect(service.shouldLogConfig(ConfigEmitEvent.ON_STARTUP)).toBe(false);
-      expect(service.shouldLogConfig(ConfigEmitEvent.PER_SYNC)).toBe(false);
+      expect(service.shouldLogConfig(ConfigEmitEvent.ON_SYNC)).toBe(false);
     });
   });
 
@@ -130,7 +130,7 @@ describe('ConfigDiagnosticsService', () => {
         if (key === 'app.logsDiagnosticsConfigEmitPolicy')
           return {
             emit: 'on',
-            events: [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.PER_SYNC],
+            events: [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.ON_SYNC],
           };
         return { some: 'config' };
       });
@@ -151,10 +151,10 @@ describe('ConfigDiagnosticsService', () => {
       expect(loggerSpy).not.toHaveBeenCalled();
     });
 
-    it('skips emitting configurations when emit is on with only per_sync event', async () => {
+    it('skips emitting configurations when emit is on with only on_sync event', async () => {
       vi.spyOn(configService, 'get').mockImplementation((key) => {
         if (key === 'app.logsDiagnosticsConfigEmitPolicy')
-          return { emit: 'on', events: [ConfigEmitEvent.PER_SYNC] };
+          return { emit: 'on', events: [ConfigEmitEvent.ON_SYNC] };
         return { some: 'config' };
       });
 

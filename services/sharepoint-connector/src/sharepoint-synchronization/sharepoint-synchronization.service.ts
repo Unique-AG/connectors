@@ -264,7 +264,7 @@ export class SharepointSynchronizationService {
     let scopes: ScopeWithPath[] | null = null;
     const siteStartTime = Date.now();
 
-    if (this.configDiagnosticsService.shouldLogConfig(ConfigEmitEvent.PER_SYNC)) {
+    if (this.configDiagnosticsService.shouldLogConfig(ConfigEmitEvent.ON_SYNC)) {
       this.configDiagnosticsService.logConfig(`${logPrefix} Site Config`, siteConfig);
     }
 

@@ -1,5 +1,6 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
+import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { requiredStringSchema } from '../utils/zod.util';
 
 // ==========================================
@@ -13,11 +14,11 @@ export const LogsDiagnosticDataPolicy = {
 
 export const ConfigEmitEvent = {
   ON_STARTUP: 'on_startup',
-  PER_SYNC: 'per_sync',
+  ON_SYNC: 'on_sync',
 } as const;
 export type ConfigEmitEventType = (typeof ConfigEmitEvent)[keyof typeof ConfigEmitEvent];
 
-const allConfigEmitEvents = [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.PER_SYNC] as const;
+const allConfigEmitEvents = [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.ON_SYNC] as const;
 
 export const AppConfigSchema = z
   .object({
@@ -42,9 +43,10 @@ export const AppConfigSchema = z
       .describe(
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
-    logsDiagnosticsConfigEmitPolicy: z
-      .preprocess(
-        (val) => (typeof val === 'string' ? JSON.parse(val) : val),
+    logsDiagnosticsConfigEmitPolicy: parseJsonEnvironmentVariable(
+      'LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY',
+    )
+      .pipe(
         z.discriminatedUnion('emit', [
           z.object({
             emit: z.literal('on'),
@@ -55,9 +57,9 @@ export const AppConfigSchema = z
           }),
         ]),
       )
-      .prefault({ emit: 'on' as const, events: [...allConfigEmitEvents] })
+      .prefault(JSON.stringify({ emit: 'on', events: allConfigEmitEvents }))
       .describe(
-        'Controls when configuration is logged. Object with emit: "on"/"off". When "on", events array is required and must contain at least one of: on_startup, per_sync.',
+        'Controls when configuration is logged. Object with emit: "on"/"off". When "on", events array is required and must contain at least one of: on_startup, on_sync.',
       ),
     tenantConfigPathPattern: requiredStringSchema.describe(
       'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/tenant-configs/*-tenant-config.yaml)',
