@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0...sharepoint-connector@2.1.0) (2026-02-09)
+
+
+### Features
+
+* **sharepoint-connector:** trigger release of 2.0.1 ([#262](https://github.com/Unique-AG/connectors/issues/262)) ([85eedae](https://github.com/Unique-AG/connectors/commit/85eedae503b60bd66db89b0c2c8ac8d2a5991d11))
+
 ## [2.0.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0-beta.13...sharepoint-connector@2.0.0) (2026-02-05)
 
 
