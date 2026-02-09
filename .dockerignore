@@ -21,3 +21,9 @@
 **/dist/
 **/coverage/
 **/.turbo/
+
+# python
+**/.venv/
+**/__pycache__/
+**/.ruff_cache/
+**/.pytest_cache/

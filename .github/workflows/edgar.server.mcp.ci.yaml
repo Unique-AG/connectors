@@ -41,3 +41,41 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+  check_chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0 # we need the main branch as well
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # 4.3.1
+        with:
+          version: v3.19.0
+
+      - name: Setup Chart Linting
+        id: lint
+        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # 2.8.0
+        with:
+          version: v3.14.0
+
+      - name: Render chart
+        working-directory: services/edgar-mcp/deploy/helm-charts/edgar-mcp
+        run: |
+          helm dependency build
+          helm template .
+
+      - name: Run chart-testing (lint)
+        run: ct lint --debug --config ./.github/configs/ct-lint-edgar-mcp.yaml --lint-conf ./.github/configs/lintconf.yaml
+
+  check_terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # 3.1.2
+        with:
+          terraform_version: 1.13.4
+      - name: validate edgar-mcp-secrets
+        working-directory: services/edgar-mcp/deploy/terraform/azure/edgar-mcp-secrets
+        run: |
+          terraform init
+          terraform validate

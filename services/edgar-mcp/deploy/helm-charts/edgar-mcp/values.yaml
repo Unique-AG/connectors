@@ -1,0 +1,90 @@
+server:
+  deployment:
+    metadata:
+      annotations:
+        reloader.stakater.com/auto: "true"
+  hooks:
+    migration:
+      enabled: false
+      command: |
+        echo "No migrations configured"
+  extraObjects:
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: apps-mcp-server-edgar-mcp
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt
+          external-dns.alpha.kubernetes.io/hostname: edgar.mcp.unique.app
+          konghq.com/plugins: unique-route-metrics
+      spec:
+        ingressClassName: kong
+        tls:
+          - hosts:
+              - edgar.mcp.unique.app
+            secretName: apps-mcp-server-edgar-mcp-tls
+        rules:
+          - host: edgar.mcp.unique.app
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: apps-mcp-server-edgar
+                      port:
+                        number: 80
+  image:
+    repository: ghcr.io/unique-ag/connectors/services/edgar-mcp
+    tag: 0.1.0 # x-release-please-version
+  # TODO: Policies must be defined as good practice, living documentation and as enterprise software
+  #       and standard (ingress- and egress-policies)
+  networkPolicy:
+    enabled: false
+  ports:
+    application: 51345
+    metrics: 51346
+  probes:
+    enabled: true
+  env:
+    APP_ENV: production
+    PORT: "51345"
+    LOG_LEVEL: info
+    LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+    OTEL_METRICS_EXPORTER: "prometheus"
+    OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
+    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+  # -- Environment variables from secrets (required secrets listed at bottom of file)
+  # @see https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars
+  envVars: []
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  volumes:
+    - name: tmp
+      emptyDir: {}
+  volumeMounts:
+    - name: tmp
+      mountPath: /tmp
+  prometheus:
+    enabled: true
+  routes:
+    paths:
+      default:
+        enabled: false
+
+grafana:
+  dashboard:
+    enabled: false
+    folder: "mcp-servers"
+
+# Note: The following secrets must be provided via server.envVars:
+# - Database (choose one):
+#   - DB_URL: PostgreSQL connection string
+#   - DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+# - RabbitMQ (choose one):
+#   - RABBITMQ_URL: Full AMQP/RabbitMQ connection URL (contains credentials)
+#   - RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASSWORD, RABBITMQ_VHOST
