@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { getItemUrl } from './sharepoint.util';
+import { Smeared } from './smeared';
 
 describe('getItemUrl', () => {
   it('returns full URL when no rootScopeName is provided for driveItem', () => {
     const item = {
       itemType: 'driveItem' as const,
-      siteId: 'site123',
+      siteId: new Smeared('site123', false),
       driveId: 'drive123',
       driveName: 'Shared Documents',
       folderPath: '/folder',
@@ -30,7 +31,7 @@ describe('getItemUrl', () => {
   it('appends web=1 parameter for driveItem', () => {
     const item = {
       itemType: 'driveItem' as const,
-      siteId: 'site123',
+      siteId: new Smeared('site123', false),
       driveId: 'drive123',
       driveName: 'Shared Documents',
       folderPath: '/folder',
@@ -54,7 +55,7 @@ describe('getItemUrl', () => {
   it('appends web=1 parameter for listItem', () => {
     const item = {
       itemType: 'listItem' as const,
-      siteId: 'site456',
+      siteId: new Smeared('site456', false),
       driveId: 'drive456',
       driveName: 'SitePages',
       folderPath: '/',
@@ -75,7 +76,7 @@ describe('getItemUrl', () => {
   it('handles different SharePoint domains correctly', () => {
     const item = {
       itemType: 'driveItem' as const,
-      siteId: 'site789',
+      siteId: new Smeared('site789', false),
       driveId: 'drive789',
       driveName: 'Documents',
       folderPath: '/',
@@ -98,7 +99,7 @@ describe('getItemUrl', () => {
   it('handles URLs with existing query parameters', () => {
     const item = {
       itemType: 'listItem' as const,
-      siteId: 'site999',
+      siteId: new Smeared('site999', false),
       driveId: 'drive999',
       driveName: 'news',
       folderPath: '/',
@@ -119,7 +120,7 @@ describe('getItemUrl', () => {
   it('handles special characters in folder paths', () => {
     const item = {
       itemType: 'driveItem' as const,
-      siteId: 'site111',
+      siteId: new Smeared('site111', false),
       driveId: 'drive111',
       driveName: 'Shared Documents',
       folderPath: '/2024 Q1',
@@ -142,7 +143,7 @@ describe('getItemUrl', () => {
   it('handles URLs with existing query string', () => {
     const item = {
       itemType: 'driveItem' as const,
-      siteId: 'site222',
+      siteId: new Smeared('site222', false),
       driveId: 'drive222',
       driveName: 'library',
       folderPath: '/path',

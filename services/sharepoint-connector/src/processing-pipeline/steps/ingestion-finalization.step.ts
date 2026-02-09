@@ -6,7 +6,6 @@ import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/in
 import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
-import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
 import { buildIngestionItemKey } from '../../utils/sharepoint.util';
 import type { ProcessingContext } from '../types/processing-context';
@@ -18,14 +17,12 @@ export class IngestionFinalizationStep implements IPipelineStep {
   private readonly logger = new Logger(this.constructor.name);
   public readonly stepName = PipelineStep.IngestionFinalization;
   private readonly sharepointBaseUrl: string;
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly configService: ConfigService<Config, true>,
   ) {
     this.sharepointBaseUrl = this.configService.get('sharepoint.baseUrl', { infer: true });
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
@@ -66,9 +63,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
         correlationId: context.correlationId,
         itemId: context.pipelineItem.item.id,
         driveId: context.pipelineItem.driveId,
-        siteId: this.shouldConcealLogs
-          ? smear(context.pipelineItem.siteId)
-          : context.pipelineItem.siteId,
+        siteId: context.pipelineItem.siteId,
         error: sanitizeError(error),
       });
       throw error;

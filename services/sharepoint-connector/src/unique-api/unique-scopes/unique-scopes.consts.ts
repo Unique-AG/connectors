@@ -106,6 +106,9 @@ export interface PaginatedScopeQueryInput {
     parentId?: {
       equals: string;
     } | null;
+    externalId?: {
+      equals: string;
+    };
   };
 }
 
@@ -133,7 +136,13 @@ export const PAGINATED_SCOPE_QUERY = gql`
 export interface UpdateScopeMutationInput {
   id: string;
   input: {
-    externalId: string;
+    externalId?: string;
+    // There's a typo in Unique API: "parrent" instead of "parent"
+    parrentScope?: {
+      connect: {
+        id: string;
+      };
+    };
   };
 }
 
@@ -142,6 +151,7 @@ export interface UpdateScopeMutationResult {
     id: string;
     name: string;
     externalId: string | null;
+    parentId: string | null;
   };
 }
 
@@ -151,6 +161,7 @@ export const UPDATE_SCOPE_MUTATION = gql`
       id
       name
       externalId
+      parentId
     }
   }
 `;

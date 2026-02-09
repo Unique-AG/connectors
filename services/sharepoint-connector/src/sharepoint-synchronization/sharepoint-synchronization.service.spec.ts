@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
@@ -7,6 +6,7 @@ import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
+import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
@@ -86,7 +86,7 @@ describe('SharepointSynchronizationService', () => {
         },
       },
     },
-    siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+    siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
     driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
     driveName: 'Documents',
     folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -96,20 +96,20 @@ describe('SharepointSynchronizationService', () => {
   beforeEach(async () => {
     mockGraphApiService = {
       getAllSiteItems: vi.fn().mockResolvedValue({ items: [mockFile], directories: [] }),
-      getSiteName: vi.fn().mockResolvedValue('test-site-name'),
+      getSiteName: vi.fn().mockResolvedValue(new Smeared('test-site-name', false)),
     };
 
     mockSitesConfigurationService = {
-      loadSitesConfiguration: vi
-        .fn()
-        .mockResolvedValue([
-          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
-        ]),
-      fetchSitesFromSharePointList: vi
-        .fn()
-        .mockResolvedValue([
-          createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
-        ]),
+      loadSitesConfiguration: vi.fn().mockResolvedValue([
+        createMockSiteConfig({
+          siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
+        }),
+      ]),
+      fetchSitesFromSharePointList: vi.fn().mockResolvedValue([
+        createMockSiteConfig({
+          siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
+        }),
+      ]),
     };
 
     mockContentSyncService = {
@@ -123,7 +123,7 @@ describe('SharepointSynchronizationService', () => {
     mockScopeManagementService = {
       initializeRootScope: vi.fn().mockResolvedValue({
         serviceUserId: 'user-123',
-        rootPath: '/test-root',
+        rootPath: new Smeared('/test-root', false),
       }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
       deleteRootScopeRecursively: vi.fn().mockResolvedValue(undefined),
@@ -134,18 +134,6 @@ describe('SharepointSynchronizationService', () => {
     };
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: vi.fn((key: string) => {
-          if (key === 'sharepoint')
-            return {
-              sitesSource: 'config_file',
-              sites: [createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' })],
-            };
-          return undefined;
-        }),
-      }))
       .mock(GraphApiService)
       .impl(() => mockGraphApiService)
       .mock(SitesConfigurationService)
@@ -168,7 +156,7 @@ describe('SharepointSynchronizationService', () => {
 
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-      'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      expect.any(Object),
       'TestColumn',
     );
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
@@ -176,14 +164,18 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Smeared),
           scopeId: 'scope-id',
         }),
-        siteName: 'test-site-name',
-        rootPath: '/test-root',
+        siteName: expect.any(Smeared),
+        rootPath: expect.any(Smeared),
         serviceUserId: 'user-123',
       }),
     );
+
+    const context = vi.mocked(mockContentSyncService.syncContentForSite).mock.calls[0]?.[2];
+    expect(context?.siteName.value).toBe('test-site-name');
+    expect(context?.rootPath.value).toBe('/test-root');
   });
 
   it('delegates content synchronization to ContentSyncService', async () => {
@@ -194,14 +186,18 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Smeared),
           scopeId: 'scope-id',
         }),
-        siteName: 'test-site-name',
-        rootPath: '/test-root',
+        siteName: expect.any(Smeared),
+        rootPath: expect.any(Smeared),
         serviceUserId: 'user-123',
       }),
     );
+
+    const context = vi.mocked(mockContentSyncService.syncContentForSite).mock.calls[0]?.[2];
+    expect(context?.siteName.value).toBe('test-site-name');
+    expect(context?.rootPath.value).toBe('/test-root');
   });
 
   it('skips site when no items found', async () => {
@@ -275,24 +271,12 @@ describe('SharepointSynchronizationService', () => {
 
     const mockSiteConfigs = [
       createMockSiteConfig({
-        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
         syncMode: 'content_and_permissions',
       }),
     ];
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: vi.fn((key: string) => {
-          if (key === 'sharepoint')
-            return {
-              sitesSource: 'config_file',
-              sites: mockSiteConfigs,
-            };
-          return undefined;
-        }),
-      }))
       .mock(GraphApiService)
       .impl(() => ({
         ...mockGraphApiService,
@@ -317,16 +301,21 @@ describe('SharepointSynchronizationService', () => {
     expect(mockPermissionsSyncService.syncPermissionsForSite).toHaveBeenCalledWith({
       context: expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Smeared),
           scopeId: 'scope-id',
         }),
-        siteName: 'test-site-name',
-        rootPath: '/test-root',
+        siteName: expect.any(Smeared),
+        rootPath: expect.any(Smeared),
         serviceUserId: 'user-123',
       }),
       sharePoint: { items: [mockFile], directories: [] },
       unique: { folders: null },
     });
+
+    const permissionsCall = vi.mocked(mockPermissionsSyncService.syncPermissionsForSite).mock
+      .calls[0]?.[0];
+    expect(permissionsCall?.context.siteName.value).toBe('test-site-name');
+    expect(permissionsCall?.context.rootPath.value).toBe('/test-root');
   });
 
   it('skips permissions sync when disabled', async () => {
@@ -341,22 +330,10 @@ describe('SharepointSynchronizationService', () => {
     };
 
     const mockSiteConfigs = [
-      createMockSiteConfig({ siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66' }),
+      createMockSiteConfig({ siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false) }),
     ];
 
     const { unit } = await TestBed.solitary(SharepointSynchronizationService)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: vi.fn((key: string) => {
-          if (key === 'sharepoint')
-            return {
-              sitesSource: 'config_file',
-              sites: mockSiteConfigs,
-            };
-          return undefined;
-        }),
-      }))
       .mock(GraphApiService)
       .impl(() => ({
         ...mockGraphApiService,
@@ -442,7 +419,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -460,7 +437,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Smeared),
         }),
       }),
     );
@@ -525,7 +502,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -543,7 +520,7 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Smeared),
         }),
       }),
     );
@@ -608,7 +585,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -673,7 +650,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -738,7 +715,7 @@ describe('SharepointSynchronizationService', () => {
           },
         },
       },
-      siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       driveId: 'b!7oWcvY-ZZUacRFd89aCKZjWhNFgDOmpNl-ie90bvedU15Nf6hZUDQZwrC8isb7Oq',
       driveName: 'Documents',
       folderPath: '/Freigegebene Dokumente/test-sharepoint-connector-v2',
@@ -756,16 +733,25 @@ describe('SharepointSynchronizationService', () => {
       null,
       expect.objectContaining({
         siteConfig: expect.objectContaining({
-          siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+          siteId: expect.any(Smeared),
         }),
       }),
     );
   });
 
   it('ensures unique scopeIds and logs errors for duplicates', async () => {
-    const site1 = createMockSiteConfig({ siteId: 'site-1', scopeId: 'duplicate-scope' });
-    const site2 = createMockSiteConfig({ siteId: 'site-2', scopeId: 'duplicate-scope' });
-    const site3 = createMockSiteConfig({ siteId: 'site-3', scopeId: 'unique-scope' });
+    const site1 = createMockSiteConfig({
+      siteId: new Smeared('site-1', false),
+      scopeId: 'duplicate-scope',
+    });
+    const site2 = createMockSiteConfig({
+      siteId: new Smeared('site-2', false),
+      scopeId: 'duplicate-scope',
+    });
+    const site3 = createMockSiteConfig({
+      siteId: new Smeared('site-3', false),
+      scopeId: 'unique-scope',
+    });
 
     mockSitesConfigurationService.loadSitesConfiguration = vi
       .fn()
@@ -779,15 +765,15 @@ describe('SharepointSynchronizationService', () => {
     // Should only sync site1 and site3
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-      site1.siteId,
+      expect.objectContaining({ value: site1.siteId.value }),
       expect.any(String),
     );
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-      site3.siteId,
+      expect.objectContaining({ value: site3.siteId.value }),
       expect.any(String),
     );
     expect(mockGraphApiService.getAllSiteItems).not.toHaveBeenCalledWith(
-      site2.siteId,
+      expect.objectContaining({ value: site2.siteId.value }),
       expect.any(String),
     );
 

@@ -1,11 +1,9 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import {
   differenceWith,
   filter,
-  indexBy,
   isDeepEqual,
   isNonNullish,
   isNullish,
@@ -13,25 +11,19 @@ import {
   partition,
   pipe,
 } from 'remeda';
-import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL } from '../metrics';
-import { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
-import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
-import { UniqueGroup } from '../unique-api/unique-groups/unique-groups.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { ScopeAccess, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { concealIngestionKey, redact, shouldConcealLogs, smear } from '../utils/logging.util';
-import { isAncestorOfRootPath, normalizeSlashes } from '../utils/paths.util';
-import { buildIngestionItemKey, getUniquePathFromItem } from '../utils/sharepoint.util';
+import { isAncestorOfRootPath } from '../utils/paths.util';
+import { createSmeared } from '../utils/smeared';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
 interface Input {
   context: SharepointSyncContext;
   sharePoint: {
-    directories: SharepointDirectoryItem[];
-    permissionsMap: Record<string, Membership[]>;
+    folderPermissions: Map<string, Membership[]>;
   };
   unique: {
     folders: ScopeWithPath[];
@@ -43,39 +35,22 @@ interface Input {
 @Injectable()
 export class SyncSharepointFolderPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueScopesService: UniqueScopesService,
-    private readonly uniqueGroupsService: UniqueGroupsService,
-    private readonly configService: ConfigService<Config, true>,
     @Inject(SPC_PERMISSIONS_SYNC_FOLDER_OPERATIONS_TOTAL)
     private readonly spcFolderPermissionsSyncTotal: Counter,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId } = context.siteConfig;
     const { rootPath, serviceUserId } = context;
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
-
-    const rootGroup = await this.uniqueGroupsService.getRootGroup();
-    if (!rootGroup) {
-      this.logger.warn(`${logPrefix} Root group not found, skipping folder permissions sync`);
-      return;
-    }
-
-    const sharePointDirectoriesPathMap = this.getSharePointDirectoriesPathMap(
-      sharePoint.directories,
-      rootPath,
-    );
+    const logPrefix = `[Site: ${siteId}]`;
 
     const uniqueFoldersToProcess = unique.folders.filter(
-      (folder) => !isAncestorOfRootPath(folder.path, rootPath),
+      (folder) => !isAncestorOfRootPath(folder.path, rootPath.value),
     );
 
     this.logger.log(
@@ -95,24 +70,20 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
       const loopLogPrefix = `${logPrefix}[Folder: ${uniqueFolder.id}]`;
       this.logger.debug(`${loopLogPrefix} Starting folder permissions processing`);
 
-      const sharePointScopeAccesses = this.getSharePointScopeAccesses({
-        logPrefix: loopLogPrefix,
-        sharePoint: {
-          directoriesPathMap: sharePointDirectoriesPathMap,
-          permissionsMap: sharePoint.permissionsMap,
-        },
-        unique: {
-          folder: uniqueFolder,
-          rootGroup,
-          groupsMap: unique.groupsMap,
-          usersMap: unique.usersMap,
-        },
-        rootPath,
-      });
+      const permissions = sharePoint.folderPermissions.get(uniqueFolder.path);
 
-      if (isNullish(sharePointScopeAccesses)) {
+      if (isNullish(permissions)) {
+        this.logger.warn(
+          `${loopLogPrefix} No permissions found for path ${createSmeared(uniqueFolder.path)}`,
+        );
         continue;
       }
+
+      const sharePointScopeAccesses = this.mapSharePointPermissionsToScopeAccesses(
+        permissions,
+        unique.groupsMap,
+        unique.usersMap,
+      );
 
       const { added, removed } = await this.syncScopeAccesses({
         logPrefix: loopLogPrefix,
@@ -131,39 +102,16 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
 
     if (totalScopeAccessesAdded > 0) {
       this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesAdded, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         operation: 'added',
       });
     }
     if (totalScopeAccessesRemoved > 0) {
       this.spcFolderPermissionsSyncTotal.add(totalScopeAccessesRemoved, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         operation: 'removed',
       });
     }
-  }
-
-  private getSharePointDirectoriesPathMap(
-    directories: SharepointDirectoryItem[],
-    rootPath: string,
-  ): Record<string, SharepointDirectoryItem> {
-    return indexBy(directories, (directory) => getUniquePathFromItem(directory, rootPath));
-  }
-
-  private isTopFolder(path: string, rootPath: string): boolean {
-    // We're removing the root scope part, in case it has any slashes, to make it predictable.
-    // Then we can check if the remaining part has at most 1 level, because it indicates it is
-    // the drive level.
-    // Example: /RootScope/Drive/Folder -> Drive/Folder -> 2 levels -> false
-    // Example: /RootScope/Drive -> Drive -> 1 level -> true
-    // Top folders don't have permissions fetched from SharePoint, so we use root group permission
-    // instead.
-    // The actual root path will not have replacement working for them because of no trailing slash,
-    // so we handle it separately.
-    if (path === rootPath) {
-      return true;
-    }
-    return path.replace(`/${normalizeSlashes(rootPath)}/`, '').split('/').length <= 1;
   }
 
   private mapSharePointPermissionsToScopeAccesses(
@@ -206,67 +154,6 @@ export class SyncSharepointFolderPermissionsToUniqueCommand {
     );
 
     return [...userScopeAccesses, ...groupScopeAccesses];
-  }
-
-  private getSharePointScopeAccesses(input: {
-    logPrefix: string;
-    sharePoint: {
-      directoriesPathMap: Record<string, SharepointDirectoryItem>;
-      permissionsMap: Record<string, Membership[]>;
-    };
-    unique: {
-      folder: ScopeWithPath;
-      rootGroup: UniqueGroup;
-      groupsMap: UniqueGroupsMap;
-      usersMap: UniqueUsersMap;
-    };
-    rootPath: string;
-  }): ScopeAccess[] | null {
-    const { logPrefix, sharePoint, unique, rootPath } = input;
-    const { folder, rootGroup } = unique;
-
-    if (this.isTopFolder(folder.path, rootPath)) {
-      this.logger.debug(
-        `${logPrefix} Using root group permission for top folder at path ${
-          this.shouldConcealLogs ? redact(folder.path) : folder.path
-        }`,
-      );
-      return [
-        {
-          type: 'READ' as const,
-          entityId: rootGroup.id,
-          entityType: 'GROUP' as const,
-        },
-      ];
-    }
-
-    const sharePointDirectory = sharePoint.directoriesPathMap[folder.path];
-
-    if (isNullish(sharePointDirectory)) {
-      this.logger.warn(
-        `${logPrefix} No SharePoint directory found for path ${this.shouldConcealLogs ? redact(folder.path) : folder.path}`,
-      );
-      return null;
-    }
-
-    const sharePointDirectoryKey = buildIngestionItemKey(sharePointDirectory);
-    const sharePointPermissions = sharePoint.permissionsMap[sharePointDirectoryKey];
-    if (isNullish(sharePointPermissions)) {
-      this.logger.warn(
-        `${logPrefix} No SharePoint permissions found for key ${
-          this.shouldConcealLogs
-            ? concealIngestionKey(sharePointDirectoryKey)
-            : sharePointDirectoryKey
-        }`,
-      );
-      return null;
-    }
-
-    return this.mapSharePointPermissionsToScopeAccesses(
-      sharePointPermissions,
-      unique.groupsMap,
-      unique.usersMap,
-    );
   }
 
   private async syncScopeAccesses(input: {

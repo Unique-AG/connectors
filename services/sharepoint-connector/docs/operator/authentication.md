@@ -1,0 +1,360 @@
+<!-- confluence-space-key: PUBDOC -->
+
+## Overview
+
+The SharePoint Connector authenticates with Microsoft services using Azure AD (Microsoft Entra ID) application credentials. This guide covers the setup process for authentication.
+
+## Authentication Methods
+
+| Method | Use Case | Recommended |
+|--------|----------|-------------|
+| Certificate | Production environments | Yes |
+| Client Secret | Development/testing only | No |
+
+**Certificate authentication** is the recommended method for production. It uses an X.509 certificate to obtain OAuth2 access tokens from Entra ID.
+
+## Setup Steps
+
+### 1. Create a Unique Service User
+
+The connector requires a service user in Unique with the following permissions:
+
+- `chat.admin.all`
+- `chat.knowledge.read`
+- `chat.knowledge.write`
+
+**Steps:**
+
+1. Navigate to ZITADEL
+2. Create a new service user
+3. Assign the required permissions
+4. Note the user ID for configuration
+
+For detailed instructions, see:
+- [How To Configure A Service User](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075)
+- [Understand Roles and Permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023168)
+
+### 2. Create Azure AD Application Registration
+
+#### Required Permissions
+
+**Microsoft Graph** (for content sync):
+
+| Permission | Type | Description |
+|------------|------|-------------|
+| `Sites.Selected` | Application | Fetch sites, folders, and content (if site-specific access) |
+| `Lists.SelectedOperations.Selected` | Application | Fetch content from specific libraries (if library-specific access) |
+
+**Microsoft Graph** (for permission sync - optional):
+
+| Permission | Type | Description |
+|------------|------|-------------|
+| `GroupMember.Read.All` | Application | Read group members |
+| `User.ReadBasic.All` | Application | Read user details |
+
+**SharePoint REST API** (for permission sync - optional):
+
+| Permission | Type | Description |
+|------------|------|-------------|
+| `Sites.Selected` | Application | Read site groups and members |
+
+#### Registration Steps
+
+1. Go to [Azure Portal](https://portal.azure.com) → **Azure Active Directory** → **App registrations**
+
+2. Click **New registration**:
+   - Name: `Unique SharePoint Connector`
+   - Supported account types: **Accounts in this organizational directory only**
+   - Redirect URI: Leave empty
+
+3. Note the **Application (client) ID** and **Directory (tenant) ID**
+
+4. Go to **API permissions** → **Add a permission**:
+   - Select **Microsoft Graph** → **Application permissions**:
+     - Add `Sites.Selected` (for site-specific access)
+     - Add `Lists.SelectedOperations.Selected` (for library-specific access)
+   - If permission sync is enabled, also add:
+     - `GroupMember.Read.All`
+     - `User.ReadBasic.All`
+   - Select **SharePoint** → **Application permissions**:
+     - Add `Sites.Selected` (required for permission sync to read site groups)
+
+5. Click **Grant admin consent for [Your Organization]**
+
+### 3. Create Azure AD Service Principal
+
+The service principal enables the app registration to authenticate.
+
+**Option 1: Admin consent URL**
+
+Have an admin visit:
+
+```
+https://login.microsoftonline.com/{tenant-id}/v2.0/adminconsent
+  ?client_id={your-app-id}
+  &scope=https://graph.microsoft.com/.default
+```
+
+**Option 2: Azure CLI**
+
+```bash
+# Create the service principal
+az ad sp create --id <app-id>
+
+# Grant admin consent
+# Go to Azure Portal → Enterprise applications → Your app → Permissions
+# Click "Grant admin consent for <tenant>"
+```
+
+### 4. Grant Site-Specific Access
+
+The `Sites.Selected` permission requires explicit access grants for each site. This is done via PowerShell.
+
+#### Prerequisites
+
+- PowerShell 7+
+- [PnP PowerShell](https://pnp.github.io/powershell/) module
+- SharePoint administrator rights
+
+#### Grant Access Script
+
+```powershell
+# Install PnP PowerShell if needed
+Install-Module -Name PnP.PowerShell -Scope CurrentUser
+
+# Connect to SharePoint Admin
+Connect-PnPOnline -Url "https://<tenant>-admin.sharepoint.com" -Interactive
+
+# Grant site access to the app
+Grant-PnPAzureADAppSitePermission `
+  -AppId "<your-app-client-id>" `
+  -DisplayName "Unique SharePoint Connector" `
+  -Site "https://<tenant>.sharepoint.com/sites/<site-name>" `
+  -Permissions Read
+
+# Verify the grant
+Get-PnPAzureADAppSitePermission -Site "https://<tenant>.sharepoint.com/sites/<site-name>"
+```
+
+**Repeat for each site** that should be synced.
+
+### 5. Grant Library-Specific Access
+
+For more granular control, you can grant access to specific document libraries using `Lists.SelectedOperations.Selected`:
+
+```powershell
+# Grant library-specific access
+Grant-PnPAzureADAppSitePermission `
+  -AppId "<your-app-client-id>" `
+  -DisplayName "Unique SharePoint Connector" `
+  -Site "https://<tenant>.sharepoint.com/sites/<site-name>" `
+  -Permissions Read `
+  -List "Documents"
+```
+
+### 6. Create Certificate
+
+Create a self-signed certificate for authentication:
+
+#### Using OpenSSL
+
+```bash
+# Generate private key
+openssl genrsa -out connector.key 2048
+
+# Generate certificate signing request
+openssl req -new -key connector.key -out connector.csr \
+  -subj "/CN=Unique SharePoint Connector/O=Your Organization"
+
+# Generate self-signed certificate (valid for 2 years)
+openssl x509 -req -days 730 -in connector.csr \
+  -signkey connector.key -out connector.crt
+
+# Create PFX for Azure upload (optional)
+openssl pkcs12 -export -out connector.pfx \
+  -inkey connector.key -in connector.crt
+```
+
+#### Using PowerShell
+
+```powershell
+# Generate certificate
+$cert = New-SelfSignedCertificate `
+  -Subject "CN=Unique SharePoint Connector" `
+  -CertStoreLocation "Cert:\CurrentUser\My" `
+  -KeyExportPolicy Exportable `
+  -KeySpec Signature `
+  -KeyLength 2048 `
+  -KeyAlgorithm RSA `
+  -HashAlgorithm SHA256 `
+  -NotAfter (Get-Date).AddYears(2)
+
+# Export certificate (for Azure upload)
+Export-Certificate -Cert $cert -FilePath "connector.cer"
+
+# Export private key (for connector configuration)
+$password = ConvertTo-SecureString -String "YourPassword" -Force -AsPlainText
+Export-PfxCertificate -Cert $cert -FilePath "connector.pfx" -Password $password
+```
+
+#### Upload Certificate to Azure AD
+
+1. Go to Azure Portal → **App registrations** → Your app
+2. Select **Certificates & secrets**
+3. Click **Upload certificate**
+4. Upload the `.cer` or `.crt` file
+5. Note the **Thumbprint** displayed
+
+## Hosting Models
+
+### Self-Hosted (SH)
+
+Client hosts the connector and manages Entra App registration:
+
+```mermaid
+flowchart LR
+    subgraph Client["Client Infrastructure"]
+        Connector["SharePoint Connector"]
+        EntraApp["Entra App Registration"]
+    end
+
+    subgraph Microsoft["Microsoft Cloud"]
+        MSGraph["Microsoft Graph"]
+        SharePoint["SharePoint Online"]
+    end
+
+    subgraph Unique["Unique Platform"]
+        UniqueAPI["Unique API"]
+    end
+
+    EntraApp --> Connector
+    Connector --> MSGraph
+    Connector --> SharePoint
+    Connector --> UniqueAPI
+```
+
+### Single-Tenant: Client-Hosted Connector
+
+Client hosts connector within their infrastructure, connecting to Unique Single Tenant:
+
+- Connector hosted by client
+- Entra App Registration managed by client
+- Suitable for isolated/on-premise SharePoints
+
+### Single-Tenant: Unique-Hosted Connector
+
+Unique hosts the connector on behalf of the client:
+
+- Connector hosted by Unique
+- Entra App Registration managed by Unique
+- Client provides:
+  - SharePoint URL
+  - Tenant ID
+  - Site configuration (one of):
+    - Site IDs and settings via YAML configuration, or
+    - SharePoint list location for dynamic configuration
+
+## Interacting with Microsoft Graph
+
+### Graph Principal
+
+The connector uses the app registration to obtain OAuth2 tokens:
+
+```mermaid
+sequenceDiagram
+    participant Connector
+    participant EntraID as Microsoft Entra ID
+    participant Graph as Microsoft Graph
+
+    Connector->>EntraID: POST /oauth2/v2.0/token<br/>(certificate assertion)
+    EntraID->>Connector: Access token
+
+    Connector->>Graph: GET /sites/{siteId}<br/>(Bearer token)
+    Graph->>Connector: Site data
+```
+
+### Token Endpoint
+
+```
+https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token
+```
+
+## Interacting with SharePoint REST API
+
+### SharePoint REST Principal
+
+For permission sync, the connector also authenticates with SharePoint REST API:
+
+**Token Endpoint:**
+
+```
+https://{tenant}.sharepoint.com
+```
+
+The same certificate is used for both Graph API and SharePoint REST API authentication.
+
+### Site Group Access Requirements
+
+When using permission sync, the app principal must be able to read site group members. If "Who can view the membership of the group?" is **not** set to **Everyone**, the connector cannot read group members.
+
+**Mitigation options:**
+
+1. Set group visibility to "Everyone"
+2. Add the app principal as a group member/owner
+3. Grant Full Control to the app principal
+
+## Troubleshooting
+
+### Invalid Client Error
+
+**Symptom:** `AADSTS700016: Application with identifier 'xxx' was not found`
+
+**Causes:**
+- App registration not found in the tenant
+- Service principal not created
+- Wrong tenant ID
+
+**Resolution:**
+1. Verify app registration exists
+2. Create service principal via admin consent
+3. Check tenant ID configuration
+
+### Certificate Errors
+
+**Symptom:** `AADSTS700027: Client assertion contains an invalid signature`
+
+**Causes:**
+- Wrong certificate uploaded to Azure
+- Certificate expired
+- Private key doesn't match certificate
+
+**Resolution:**
+1. Re-upload certificate to Azure AD
+2. Generate new certificate if expired
+3. Verify certificate and key match
+
+### Permission Denied
+
+**Symptom:** `403 Forbidden` when accessing sites or libraries
+
+**Causes:**
+- `Sites.Selected` or `Lists.SelectedOperations.Selected` permission not granted for the site/library
+- Admin consent not completed
+
+**Resolution:**
+1. Grant site or library access via PowerShell
+2. Complete admin consent in Azure Portal
+
+### Site Not Found
+
+**Symptom:** `Site not found` or `404` errors
+
+**Causes:**
+- Incorrect site ID
+- Site deleted or renamed
+- No access to site
+
+**Resolution:**
+1. Verify site ID using Graph Explorer
+2. Re-grant site access if renamed
+3. Check site exists in SharePoint

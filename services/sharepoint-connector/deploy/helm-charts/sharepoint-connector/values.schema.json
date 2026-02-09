@@ -15,6 +15,11 @@
               "enum": ["conceal", "disclose"],
               "description": "Controls whether sensitive data like site names and IDs are logged in full or redacted",
               "default": "conceal"
+            },
+            "LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY": {
+              "type": "string",
+              "description": "Controls when configuration is logged. Use JSON array string of triggers: on_startup, per_sync. Use \"none\" to disable.",
+              "default": "[\"on_startup\",\"per_sync\"]"
             }
           },
           "additionalProperties": true
@@ -546,6 +551,65 @@
             }
           },
           "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "proxyConfig": {
+      "type": "object",
+      "description": "HTTP proxy configuration for external API calls. Required for environments where internet access is only available through a proxy.",
+      "required": ["enabled", "authMode"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable proxy configuration. If disabled, sharepoint-connector-proxy-config must be removed from connector.extraEnvCM.",
+          "default": true
+        },
+        "authMode": {
+          "type": "string",
+          "enum": ["none", "username_password", "ssl_tls"],
+          "description": "Proxy authentication mode: none (proxy disabled), username_password (username/password authentication), ssl_tls (TLS client certificate authentication)",
+          "default": "none"
+        },
+        "host": {
+          "type": "string",
+          "description": "Proxy server hostname (required for username_password/ssl_tls modes)",
+          "examples": ["proxy.example.com"]
+        },
+        "port": {
+          "type": "integer",
+          "description": "Proxy server port (required for username_password/ssl_tls modes)",
+          "examples": [8080, 3128]
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["http", "https"],
+          "description": "Proxy protocol: http or https (required for username_password/ssl_tls modes)",
+          "default": "http"
+        },
+        "username": {
+          "type": "string",
+          "description": "Basic auth username (required for username_password mode)"
+        },
+        "sslCertPath": {
+          "type": "string",
+          "description": "Path to SSL/TLS client certificate (required for ssl_tls mode)",
+          "examples": ["/app/proxy-certs/client.crt"]
+        },
+        "sslKeyPath": {
+          "type": "string",
+          "description": "Path to SSL/TLS client key (required for ssl_tls mode)",
+          "examples": ["/app/proxy-certs/client.key"]
+        },
+        "sslCaBundlePath": {
+          "type": "string",
+          "description": "Path to CA bundle for verifying proxy server certificate (optional)",
+          "examples": ["/app/proxy-certs/ca.crt"]
+        },
+        "headers": {
+          "type": "string",
+          "description": "Optional JSON string of headers for CONNECT request",
+          "examples": ["{\"X-Proxy-Header\":\"value\"}"]
         }
       },
       "additionalProperties": false

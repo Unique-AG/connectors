@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Smeared } from '../../utils/smeared';
 import { GraphApiService } from './graph-api.service';
 import { SitesConfigurationService } from './sites-configuration.service';
 import type { ListColumn, ListItem } from './types/sharepoint.types';
@@ -30,7 +31,7 @@ describe('SitesConfigurationService', () => {
               sitesSource: 'config_file',
               sites: [
                 {
-                  siteId: '12345678-1234-4234-8123-123456789abc',
+                  siteId: new Smeared('12345678-1234-4234-8123-123456789abc', false),
                   syncColumnName: 'TestColumn',
                   ingestionMode: 'recursive',
                   scopeId: 'scope_test',
@@ -57,7 +58,7 @@ describe('SitesConfigurationService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
-        siteId: '12345678-1234-4234-8123-123456789abc',
+        siteId: expect.any(Smeared),
         syncColumnName: 'TestColumn',
         ingestionMode: 'recursive',
         scopeId: 'scope_test',
@@ -108,7 +109,7 @@ describe('SitesConfigurationService', () => {
       mockGraphApiService.getListItems.mockResolvedValue([mockListItem as unknown as ListItem]);
 
       const sharepointList = {
-        siteId: 'test-site-id',
+        siteId: new Smeared('test-site-id', false),
         listId: 'list-id-456',
       };
 
@@ -116,7 +117,7 @@ describe('SitesConfigurationService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
-        siteId: '12345678-1234-4234-8123-123456789abc',
+        siteId: expect.any(Smeared),
         syncColumnName: 'TestColumn',
         ingestionMode: 'recursive',
         scopeId: 'scope_test',
@@ -127,11 +128,15 @@ describe('SitesConfigurationService', () => {
         permissionsInheritanceMode: 'inherit_scopes_and_files',
       });
 
-      expect(mockGraphApiService.getListItems).toHaveBeenCalledWith('test-site-id', 'list-id-456', {
-        expand: 'fields',
-      });
+      expect(mockGraphApiService.getListItems).toHaveBeenCalledWith(
+        expect.any(Smeared),
+        'list-id-456',
+        {
+          expand: 'fields',
+        },
+      );
       expect(mockGraphApiService.getListColumns).toHaveBeenCalledWith(
-        'test-site-id',
+        expect.any(Smeared),
         'list-id-456',
       );
     });
@@ -170,7 +175,7 @@ describe('SitesConfigurationService', () => {
       const result = (service as any).transformListItemToSiteConfig(listItem, 0, mockNameMap);
 
       expect(result).toEqual({
-        siteId: '12345678-1234-4234-8234-123456789abc',
+        siteId: expect.any(Smeared),
         syncColumnName: 'TestColumn',
         ingestionMode: 'recursive',
         scopeId: 'scope_test',

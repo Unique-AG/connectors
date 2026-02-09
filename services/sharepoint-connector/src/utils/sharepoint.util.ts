@@ -4,6 +4,7 @@ import type {
   SharepointContentItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { normalizeSlashes } from './paths.util';
+import { createSmeared, type Smeared } from './smeared';
 
 /**
  * Gets the web URL for a SharePoint item with ?web=1 parameter.
@@ -32,7 +33,7 @@ export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): 
  * Builds a unique hierarchical key for ingestion.
  */
 export function buildIngestionItemKey(sharepointContentItem: AnySharepointItem): string {
-  return `${sharepointContentItem.siteId}/${sharepointContentItem.item.id}`;
+  return `${sharepointContentItem.siteId.value}/${sharepointContentItem.item.id}`;
 }
 
 /**
@@ -66,20 +67,20 @@ function getRelativeUniqueParentPathFromUrl(url: string): string {
   return '';
 }
 
-export function getUniquePathFromItem(item: AnySharepointItem, rootPath: string): string {
-  assert.ok(rootPath, 'rootPath cannot be empty');
+export function getUniquePathFromItem(item: AnySharepointItem, rootPath: Smeared): Smeared {
+  assert.ok(rootPath.value, 'rootPath cannot be empty');
   const fileUrl = extractFileUrl(item);
   const uniquePath = getRelativeUniquePathFromUrl(fileUrl);
 
-  return `/${normalizeSlashes(rootPath)}${uniquePath}`;
+  return createSmeared(`/${normalizeSlashes(rootPath.value)}${uniquePath}`);
 }
 
-export function getUniqueParentPathFromItem(item: AnySharepointItem, rootPath: string): string {
-  assert.ok(rootPath, 'rootPath cannot be empty');
+export function getUniqueParentPathFromItem(item: AnySharepointItem, rootPath: Smeared): Smeared {
+  assert.ok(rootPath.value, 'rootPath cannot be empty');
   const fileUrl = extractFileUrl(item);
   const uniqueParentPath = getRelativeUniqueParentPathFromUrl(fileUrl);
 
-  return `/${normalizeSlashes(rootPath)}${uniqueParentPath}`;
+  return createSmeared(`/${normalizeSlashes(rootPath.value)}${uniqueParentPath}`);
 }
 
 function extractFileUrl(item: AnySharepointItem): string {

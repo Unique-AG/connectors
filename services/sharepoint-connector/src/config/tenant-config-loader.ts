@@ -3,7 +3,6 @@ import { globSync, readFileSync } from 'node:fs';
 import { registerAs } from '@nestjs/config';
 import { load } from 'js-yaml';
 import { isPlainObject } from 'remeda';
-import { Redacted } from 'src/utils/redacted';
 import { z } from 'zod';
 import { type ProcessingConfig, ProcessingConfigSchema } from './processing.schema';
 import { type SharepointConfig, SharepointConfigSchema } from './sharepoint.schema';
@@ -14,41 +13,19 @@ export type { ProcessingConfig } from './processing.schema';
 export type { SharepointConfig } from './sharepoint.schema';
 export type { UniqueConfig } from './unique.schema';
 
-// ==========================================
-// Tenant Configuration
-// ==========================================
-
-const TenantConfigSchema = z.object({
-  sharepoint: SharepointConfigSchema,
-  unique: UniqueConfigSchema,
-  processing: ProcessingConfigSchema,
-});
-
-type TenantConfig = z.infer<typeof TenantConfigSchema>;
-
-// --- Tenant Configs (From File) ---
-
-/**
- * Helper to register configurations that are extracted and validated from the tenant YAML file.
- */
-const fromTenant = <T extends z.ZodTypeAny>(key: keyof TenantConfig, schema: T) =>
-  registerAs(key as string, () => schema.parse(getTenantConfig()[key]) as Record<string, unknown>);
-
-export const sharepointConfig = fromTenant('sharepoint', SharepointConfigSchema);
-export const uniqueConfig = fromTenant('unique', UniqueConfigSchema);
-export const processingConfig = fromTenant('processing', ProcessingConfigSchema);
-
-export interface SharepointConfigNamespaced {
-  sharepoint: SharepointConfig;
-}
-export interface UniqueConfigNamespaced {
-  unique: UniqueConfig;
-}
-export interface ProcessingConfigNamespaced {
-  processing: ProcessingConfig;
-}
-
 let cachedConfig: TenantConfig | null = null;
+export function getTenantConfig(): TenantConfig {
+  if (!cachedConfig) {
+    const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
+
+    if (!tenantConfigPathPattern) {
+      throw new Error('TENANT_CONFIG_PATH_PATTERN environment variable is not set');
+    }
+
+    cachedConfig = loadTenantConfig(tenantConfigPathPattern);
+  }
+  return cachedConfig;
+}
 
 function loadTenantConfig(pathPattern: string): TenantConfig {
   const files = globSync(pathPattern);
@@ -86,8 +63,11 @@ function loadTenantConfig(pathPattern: string): TenantConfig {
 }
 
 function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
-  // Type assertion for discriminated union
-  const typedConfig = config as TenantConfig;
+  // Config is still an unvalidated object here; schemas will do the final typing/transforms.
+  const typedConfig = config as {
+    sharepoint: { auth: { mode: string; privateKeyPassword?: string } };
+    unique: { serviceAuthMode: string; zitadelClientSecret?: string };
+  };
 
   // we throw an error if the object path is not defined
   if (
@@ -99,19 +79,33 @@ function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
   }
 
   if (process.env.ZITADEL_CLIENT_SECRET && typedConfig.unique.serviceAuthMode === 'external') {
-    typedConfig.unique.zitadelClientSecret = new Redacted(process.env.ZITADEL_CLIENT_SECRET);
+    typedConfig.unique.zitadelClientSecret = process.env.ZITADEL_CLIENT_SECRET;
   }
 }
 
-export function getTenantConfig(): TenantConfig {
-  if (!cachedConfig) {
-    const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
+// ==========================================
+// Tenant Configuration
+// ==========================================
 
-    if (!tenantConfigPathPattern) {
-      throw new Error('TENANT_CONFIG_PATH_PATTERN environment variable is not set');
-    }
+const TenantConfigSchema = z.object({
+  sharepoint: SharepointConfigSchema,
+  unique: UniqueConfigSchema,
+  processing: ProcessingConfigSchema,
+});
 
-    cachedConfig = loadTenantConfig(tenantConfigPathPattern);
-  }
-  return cachedConfig;
+type TenantConfig = z.infer<typeof TenantConfigSchema>;
+
+// --- Tenant Configs (From File) ---
+export const sharepointConfig = registerAs('sharepoint', () => getTenantConfig().sharepoint);
+export const uniqueConfig = registerAs('unique', () => getTenantConfig().unique);
+export const processingConfig = registerAs('processing', () => getTenantConfig().processing);
+
+export interface SharepointConfigNamespaced {
+  sharepoint: SharepointConfig;
+}
+export interface UniqueConfigNamespaced {
+  unique: UniqueConfig;
+}
+export interface ProcessingConfigNamespaced {
+  processing: ProcessingConfig;
 }
