@@ -6,8 +6,8 @@ connector:
   env:
     LOG_LEVEL: info
     LOGS_DIAGNOSTICS_DATA_POLICY: conceal
-    # When to emit config diagnostics logs. Use JSON array string or just the string "none".
-    LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY: '["on_startup","per_sync"]'
+    # When to emit config diagnostics logs. JSON object with emit: "on"/"off" and required events array when "on".
+    LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY: '{"emit":"on","events":["on_startup","on_sync"]}'
     MAX_FILE_SIZE_BYTES: "209715200"
     MAX_HEAP_MB: 1920
     NODE_ENV: production

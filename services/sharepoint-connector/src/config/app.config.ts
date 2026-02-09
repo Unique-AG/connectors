@@ -1,5 +1,6 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
+import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { requiredStringSchema } from '../utils/zod.util';
 
 // ==========================================
@@ -11,11 +12,13 @@ export const LogsDiagnosticDataPolicy = {
   DISCLOSE: 'disclose',
 } as const;
 
-export const ConfigEmitPolicy = {
+export const ConfigEmitEvent = {
   ON_STARTUP: 'on_startup',
-  PER_SYNC: 'per_sync',
+  ON_SYNC: 'on_sync',
 } as const;
-export type ConfigEmitPolicyType = (typeof ConfigEmitPolicy)[keyof typeof ConfigEmitPolicy];
+export type ConfigEmitEventType = (typeof ConfigEmitEvent)[keyof typeof ConfigEmitEvent];
+
+const allConfigEmitEvents = [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.ON_SYNC] as const;
 
 export const AppConfigSchema = z
   .object({
@@ -40,11 +43,23 @@ export const AppConfigSchema = z
       .describe(
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
       ),
-    logsDiagnosticsConfigEmitPolicy: z
-      .union([z.literal('none'), z.array(z.enum(ConfigEmitPolicy))])
-      .prefault([ConfigEmitPolicy.ON_STARTUP, ConfigEmitPolicy.PER_SYNC])
+    logsDiagnosticsConfigEmitPolicy: parseJsonEnvironmentVariable(
+      'LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY',
+    )
+      .pipe(
+        z.discriminatedUnion('emit', [
+          z.object({
+            emit: z.literal('on'),
+            events: z.array(z.enum(ConfigEmitEvent)).nonempty(),
+          }),
+          z.object({
+            emit: z.literal('off'),
+          }),
+        ]),
+      )
+      .prefault(JSON.stringify({ emit: 'on', events: allConfigEmitEvents }))
       .describe(
-        'Controls when configuration is logged. Array of triggers: on_startup logs once on start, per_sync logs at each site sync. Use "none" to disable.',
+        'Controls when configuration is logged. Object with emit: "on"/"off". When "on", events array is required and must contain at least one of: on_startup, on_sync.',
       ),
     tenantConfigPathPattern: requiredStringSchema.describe(
       'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/tenant-configs/*-tenant-config.yaml)',

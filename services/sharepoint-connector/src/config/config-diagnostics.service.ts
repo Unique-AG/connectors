@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ConfigEmitPolicy, type ConfigEmitPolicyType } from './app.config';
+import { ConfigEmitEvent, type ConfigEmitEventType } from './app.config';
 import type { Config } from './index';
 
 @Injectable()
@@ -12,7 +12,7 @@ export class ConfigDiagnosticsService implements OnModuleInit {
   public async onModuleInit() {
     await ConfigModule.envVariablesLoaded;
 
-    if (!this.shouldLogConfig(ConfigEmitPolicy.ON_STARTUP)) {
+    if (!this.shouldLogConfig(ConfigEmitEvent.ON_STARTUP)) {
       return;
     }
     this.logConfig('App Config', this.configService.get('app', { infer: true }));
@@ -21,11 +21,11 @@ export class ConfigDiagnosticsService implements OnModuleInit {
     this.logConfig('Processing Config', this.configService.get('processing', { infer: true }));
   }
 
-  public shouldLogConfig(configEmitPolicy: ConfigEmitPolicyType): boolean {
-    const emitPolicy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
+  public shouldLogConfig(event: ConfigEmitEventType): boolean {
+    const policy = this.configService.get('app.logsDiagnosticsConfigEmitPolicy', {
       infer: true,
     });
-    return emitPolicy !== 'none' && emitPolicy.includes(configEmitPolicy);
+    return policy.emit === 'on' && policy.events.includes(event);
   }
 
   public logConfig(msg: string, config: object) {
