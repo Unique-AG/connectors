@@ -1,5 +1,3 @@
-import assert from 'node:assert';
-import { isNullish } from 'remeda';
 import { z } from 'zod';
 
 export const parseJsonEnvironmentVariable = (fieldName: string) =>
@@ -13,25 +11,3 @@ export const parseJsonEnvironmentVariable = (fieldName: string) =>
       );
     }
   });
-
-export const parseCommaSeparatedArray = (value: unknown): string[] => {
-  if (isNullish(value)) {
-    return [];
-  }
-
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed
-      ? trimmed
-          .split(',')
-          .map((item) => item.trim())
-          .filter(Boolean)
-      : [];
-  }
-
-  assert.fail('Expected a comma-separated string or array');
-};
