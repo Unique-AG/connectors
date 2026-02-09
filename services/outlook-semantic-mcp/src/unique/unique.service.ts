@@ -8,6 +8,8 @@ import {
   PublicAddScopeAccessRequestSchema,
   type PublicAddScopeAccessResult,
   PublicAddScopeAccessResultSchema,
+  type PublicContentByKeyResult,
+  PublicContentByKeyResultSchema,
   type PublicContentUpsertRequest,
   PublicContentUpsertRequestSchema,
   type PublicContentUpsertResult,
@@ -167,6 +169,86 @@ export class UniqueService {
       },
       'Successfully completed meeting transcript ingestion process',
     );
+  }
+
+  @Span()
+  public async ingestEmail(
+    ownerEmail: string,
+    email: {
+      key: string;
+      subject: string;
+      content: ReadableStream<Uint8Array<ArrayBuffer>>;
+      metadata: Record<string, string>;
+    },
+  ): Promise<{ scopeId: string }> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('email_key', email.key);
+    span?.setAttribute('owner_email', ownerEmail);
+
+    this.logger.log(
+      { emailKey: email.key, ownerEmail },
+      'Beginning processing of email for ingestion',
+    );
+
+    const owner = await this.fetchUserForScopeAccess(ownerEmail);
+    if (!owner) {
+      assert.fail(`Cannot ingest email: owner account not found for ${ownerEmail}`);
+    }
+
+    const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
+    const scopePath = `/${rootScopePath}/${ownerEmail}/email`;
+
+    const scope = await this.createScope(scopePath, false);
+    span?.setAttribute('scope_id', scope.id);
+
+    const accesses: PublicScopeAccessSchema[] = [
+      { entityId: owner.id, entityType: ScopeAccessEntityType.User, type: ScopeAccessType.Write },
+      { entityId: owner.id, entityType: ScopeAccessEntityType.User, type: ScopeAccessType.Read },
+      { entityId: owner.id, entityType: ScopeAccessEntityType.User, type: ScopeAccessType.Manage },
+    ];
+    await this.addScopeAccesses(scope.id, accesses);
+
+    const title = email.subject || 'Untitled';
+
+    this.logger.log(
+      { emailKey: email.key, scopeId: scope.id },
+      'Beginning email upload to Unique system',
+    );
+
+    const emailUpload = await this.upsertContent({
+      storeInternally: true,
+      scopeId: scope.id,
+      input: {
+        key: email.key,
+        mimeType: 'message/rfc822',
+        title,
+        byteSize: 1,
+        metadata: email.metadata,
+      },
+    });
+    await this.uploadToStorage(emailUpload.writeUrl, email.content, 'message/rfc822');
+    await this.upsertContent({
+      storeInternally: true,
+      scopeId: scope.id,
+      fileUrl: emailUpload.readUrl,
+      input: {
+        key: email.key,
+        mimeType: 'message/rfc822',
+        title,
+      },
+    });
+
+    span?.addEvent('ingestion_completed', {
+      emailKey: email.key,
+      scopeId: scope.id,
+    });
+
+    this.logger.log(
+      { emailKey: email.key, scopeId: scope.id },
+      'Successfully completed email ingestion process',
+    );
+
+    return { scopeId: scope.id };
   }
 
   // !SECTION: Public API
@@ -470,6 +552,94 @@ export class UniqueService {
       { storageEndpoint },
       'Successfully completed content upload to storage system',
     );
+  }
+
+  @Span()
+  public async deleteContent(key: string, scopeId: string): Promise<void> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('content_key', key);
+    span?.setAttribute('scope_id', scopeId);
+
+    const baseUrl = this.config.get('unique.apiBaseUrl', { infer: true });
+    const endpoint = new URL('content/by-key', baseUrl);
+    endpoint.searchParams.set('key', key);
+    endpoint.searchParams.set('scopeId', scopeId);
+
+    this.logger.debug(
+      { contentKey: key, scopeId },
+      'Deleting content by key from Unique system',
+    );
+
+    const response = await fetch(endpoint, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      this.logger.error(
+        { status: response.status, contentKey: key, scopeId },
+        'Unique Public API rejected content deletion request with error',
+      );
+      assert.fail(`Unique Public API returned an error for content deletion: ${response.status}`);
+    }
+
+    this.logger.log(
+      { contentKey: key, scopeId },
+      'Successfully deleted content from Unique system',
+    );
+  }
+
+  @Span()
+  public async findContentByKey(
+    key: string,
+    scopeId: string,
+  ): Promise<PublicContentByKeyResult | null> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('content_key', key);
+    span?.setAttribute('scope_id', scopeId);
+
+    const baseUrl = this.config.get('unique.apiBaseUrl', { infer: true });
+    const endpoint = new URL('content/by-key', baseUrl);
+    endpoint.searchParams.set('key', key);
+    endpoint.searchParams.set('scopeId', scopeId);
+
+    this.logger.debug(
+      { contentKey: key, scopeId },
+      'Looking up content by key in Unique system',
+    );
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    if (response.status === 404) {
+      span?.setAttribute('content_found', false);
+      this.logger.debug(
+        { contentKey: key, scopeId },
+        'Content not found in Unique system',
+      );
+      return null;
+    }
+
+    if (!response.ok) {
+      this.logger.error(
+        { status: response.status, contentKey: key, scopeId },
+        'Unique Public API rejected content lookup request with error',
+      );
+      assert.fail(`Unique Public API returned an error for content lookup: ${response.status}`);
+    }
+
+    const body = await response.json();
+    const result = PublicContentByKeyResultSchema.parse(body);
+
+    span?.setAttribute('content_found', true);
+    this.logger.debug(
+      { contentKey: key, scopeId, contentId: result.id },
+      'Successfully found content in Unique system',
+    );
+
+    return result;
   }
 
   // !SECTION: Unique API Methods

@@ -182,3 +182,18 @@ export const PublicContentUpsertResultSchema = z.object({
 export type PublicContentUpsertResult = z.infer<typeof PublicContentUpsertResultSchema>;
 
 // !SECTION - ContentUpsert endpoint types
+
+// SECTION - ContentByKey endpoint types
+
+export const PublicContentByKeyResultSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  title: z.string().nullable(),
+  mimeType: z.string().nullable(),
+  // biome-ignore lint/suspicious/noExplicitAny: Unique API returns arbitrary metadata
+  metadata: z.any().nullable(),
+  object: z.literal('content'),
+});
+export type PublicContentByKeyResult = z.infer<typeof PublicContentByKeyResultSchema>;
+
+// !SECTION - ContentByKey endpoint types
