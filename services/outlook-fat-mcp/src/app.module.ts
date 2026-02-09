@@ -32,11 +32,11 @@ import {
   uniqueConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
+import { SubscriptionModule } from './email-sync/subscriptions/subscription.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
 import { GraphErrorFilter } from './utils/graph-error.filter';
-import { SubscriptionModule } from './email-sync/subscriptions/subscription.module';
 
 @Module({
   imports: [
