@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Redacted } from '../utils/redacted';
-import { ConfigEmitPolicy } from './app.config';
+import { ConfigEmitEvent } from './app.config';
 import { ConfigDiagnosticsService } from './config-diagnostics.service';
 
 vi.mock('@nestjs/config', async (importOriginal) => {
@@ -76,53 +76,47 @@ describe('ConfigDiagnosticsService', () => {
   });
 
   describe('shouldLogConfig', () => {
-    it('returns true when policy includes the requested emit policy', () => {
-      vi.spyOn(configService, 'get').mockReturnValue([ConfigEmitPolicy.ON_STARTUP]);
+    it('returns true when policy includes the requested event', () => {
+      vi.spyOn(configService, 'get').mockReturnValue({
+        emit: 'on',
+        events: [ConfigEmitEvent.ON_STARTUP],
+      });
 
-      expect(service.shouldLogConfig(ConfigEmitPolicy.ON_STARTUP)).toBe(true);
+      expect(service.shouldLogConfig(ConfigEmitEvent.ON_STARTUP)).toBe(true);
     });
 
-    it('returns false when policy does not include the requested emit policy', () => {
-      vi.spyOn(configService, 'get').mockReturnValue([ConfigEmitPolicy.PER_SYNC]);
+    it('returns false when policy does not include the requested event', () => {
+      vi.spyOn(configService, 'get').mockReturnValue({
+        emit: 'on',
+        events: [ConfigEmitEvent.ON_SYNC],
+      });
 
-      expect(service.shouldLogConfig(ConfigEmitPolicy.ON_STARTUP)).toBe(false);
+      expect(service.shouldLogConfig(ConfigEmitEvent.ON_STARTUP)).toBe(false);
     });
 
-    it('returns true when policy includes both and requesting either', () => {
-      vi.spyOn(configService, 'get').mockReturnValue([
-        ConfigEmitPolicy.ON_STARTUP,
-        ConfigEmitPolicy.PER_SYNC,
-      ]);
+    it('returns true when policy includes both events and requesting either', () => {
+      vi.spyOn(configService, 'get').mockReturnValue({
+        emit: 'on',
+        events: [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.ON_SYNC],
+      });
 
-      expect(service.shouldLogConfig(ConfigEmitPolicy.ON_STARTUP)).toBe(true);
-      expect(service.shouldLogConfig(ConfigEmitPolicy.PER_SYNC)).toBe(true);
+      expect(service.shouldLogConfig(ConfigEmitEvent.ON_STARTUP)).toBe(true);
+      expect(service.shouldLogConfig(ConfigEmitEvent.ON_SYNC)).toBe(true);
     });
 
-    it('returns false when policy is none', () => {
-      vi.spyOn(configService, 'get').mockReturnValue('none');
+    it('returns false when emit is off', () => {
+      vi.spyOn(configService, 'get').mockReturnValue({ emit: 'off' });
 
-      expect(service.shouldLogConfig(ConfigEmitPolicy.ON_STARTUP)).toBe(false);
-      expect(service.shouldLogConfig(ConfigEmitPolicy.PER_SYNC)).toBe(false);
+      expect(service.shouldLogConfig(ConfigEmitEvent.ON_STARTUP)).toBe(false);
+      expect(service.shouldLogConfig(ConfigEmitEvent.ON_SYNC)).toBe(false);
     });
   });
 
   describe('onModuleInit', () => {
-    it('emits all configurations when policy includes on_startup', async () => {
-      vi.spyOn(configService, 'get').mockImplementation((key) => {
-        if (key === 'app.logsDiagnosticsConfigEmitPolicy') return [ConfigEmitPolicy.ON_STARTUP];
-        return { some: 'config' };
-      });
-
-      await service.onModuleInit();
-
-      // Should be called 4 times for each config section (App, SharePoint, Unique, Processing)
-      expect(loggerSpy).toHaveBeenCalledTimes(4);
-    });
-
-    it('emits all configurations when policy includes both on_startup and per_sync', async () => {
+    it('emits all configurations when emit is on with on_startup event', async () => {
       vi.spyOn(configService, 'get').mockImplementation((key) => {
         if (key === 'app.logsDiagnosticsConfigEmitPolicy')
-          return [ConfigEmitPolicy.ON_STARTUP, ConfigEmitPolicy.PER_SYNC];
+          return { emit: 'on', events: [ConfigEmitEvent.ON_STARTUP] };
         return { some: 'config' };
       });
 
@@ -131,9 +125,24 @@ describe('ConfigDiagnosticsService', () => {
       expect(loggerSpy).toHaveBeenCalledTimes(4);
     });
 
-    it('skips emitting configurations when policy is none', async () => {
+    it('emits all configurations when emit is on with both events', async () => {
       vi.spyOn(configService, 'get').mockImplementation((key) => {
-        if (key === 'app.logsDiagnosticsConfigEmitPolicy') return 'none';
+        if (key === 'app.logsDiagnosticsConfigEmitPolicy')
+          return {
+            emit: 'on',
+            events: [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.ON_SYNC],
+          };
+        return { some: 'config' };
+      });
+
+      await service.onModuleInit();
+
+      expect(loggerSpy).toHaveBeenCalledTimes(4);
+    });
+
+    it('skips emitting configurations when emit is off', async () => {
+      vi.spyOn(configService, 'get').mockImplementation((key) => {
+        if (key === 'app.logsDiagnosticsConfigEmitPolicy') return { emit: 'off' };
         return { some: 'config' };
       });
 
@@ -142,9 +151,10 @@ describe('ConfigDiagnosticsService', () => {
       expect(loggerSpy).not.toHaveBeenCalled();
     });
 
-    it('skips emitting configurations when policy only includes per_sync', async () => {
+    it('skips emitting configurations when emit is on with only on_sync event', async () => {
       vi.spyOn(configService, 'get').mockImplementation((key) => {
-        if (key === 'app.logsDiagnosticsConfigEmitPolicy') return [ConfigEmitPolicy.PER_SYNC];
+        if (key === 'app.logsDiagnosticsConfigEmitPolicy')
+          return { emit: 'on', events: [ConfigEmitEvent.ON_SYNC] };
         return { some: 'config' };
       });
 

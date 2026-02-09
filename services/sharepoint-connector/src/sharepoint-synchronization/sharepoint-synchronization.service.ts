@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { type Histogram } from '@opentelemetry/api';
 import { entries, groupBy } from 'remeda';
-import { ConfigEmitPolicy } from '../config/app.config';
+import { ConfigEmitEvent } from '../config/app.config';
 import { ConfigDiagnosticsService } from '../config/config-diagnostics.service';
 import type { SiteConfig } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
@@ -264,7 +264,7 @@ export class SharepointSynchronizationService {
     let scopes: ScopeWithPath[] | null = null;
     const siteStartTime = Date.now();
 
-    if (this.configDiagnosticsService.shouldLogConfig(ConfigEmitPolicy.PER_SYNC)) {
+    if (this.configDiagnosticsService.shouldLogConfig(ConfigEmitEvent.ON_SYNC)) {
       this.configDiagnosticsService.logConfig(`${logPrefix} Site Config`, siteConfig);
     }
 
