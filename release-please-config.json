@@ -91,7 +91,23 @@
     "services/edgar-mcp": {
       "release-type": "python",
       "prerelease": true,
-      "versioning": "prerelease"
+      "versioning": "prerelease",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/edgar-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/edgar-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/edgar-mcp/values.yaml"
+        }
+      ]
     }
   }
 }
