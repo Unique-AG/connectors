@@ -168,51 +168,63 @@ export class UniqueService {
     });
 
     // Upload recording if provided (with SKIP_INGESTION)
+    // Wrapped in try-catch to ensure recording upload failures don't break transcript ingestion
     if (recording) {
-      this.logger.log(
-        { recordingId: recording.id, scopeId: childScope.id },
-        'Beginning recording upload to Unique system (skip ingestion)',
-      );
+      try {
+        this.logger.log(
+          { recordingId: recording.id, scopeId: childScope.id },
+          'Beginning recording upload to Unique system (skip ingestion)',
+        );
 
-      const recordingUpload = await this.upsertContent({
-        storeInternally: true,
-        scopeId: childScope.id,
-        input: {
-          key: recording.id,
-          mimeType: 'video/mp4',
-          title: `${meeting.subject}.mp4`,
-          byteSize: 1,
-          ingestionConfig: {
-            uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+        const recordingUpload = await this.upsertContent({
+          storeInternally: true,
+          scopeId: childScope.id,
+          input: {
+            key: recording.id,
+            mimeType: 'video/mp4',
+            title: `${meeting.subject}.mp4`,
+            byteSize: 1,
+            ingestionConfig: {
+              uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+            },
+            metadata: {
+              date: meeting.startDateTime.toISOString(),
+              content_correlation_id: meeting.contentCorrelationId,
+              participant_names: meeting.participants.map((p) => p.name).join(', '),
+              participant_emails: meeting.participants.map((p) => p.email).join(', '),
+            },
           },
-          metadata: {
-            date: meeting.startDateTime.toISOString(),
-            content_correlation_id: meeting.contentCorrelationId,
-            participant_names: meeting.participants.map((p) => p.name).join(', '),
-            participant_emails: meeting.participants.map((p) => p.email).join(', '),
+        });
+        await this.uploadToStorage(recordingUpload.writeUrl, recording.content, 'video/mp4');
+        await this.upsertContent({
+          storeInternally: true,
+          scopeId: childScope.id,
+          fileUrl: recordingUpload.readUrl,
+          input: {
+            key: recording.id,
+            mimeType: 'video/mp4',
+            title: `${meeting.subject}.mp4`,
+            ingestionConfig: {
+              uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+            },
           },
-        },
-      });
-      await this.uploadToStorage(recordingUpload.writeUrl, recording.content, 'video/mp4');
-      await this.upsertContent({
-        storeInternally: true,
-        scopeId: childScope.id,
-        fileUrl: recordingUpload.readUrl,
-        input: {
-          key: recording.id,
-          mimeType: 'video/mp4',
-          title: `${meeting.subject}.mp4`,
-          ingestionConfig: {
-            uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
-          },
-        },
-      });
+        });
 
-      span?.addEvent('recording_stored', {
-        recordingId: recording.id,
-        parentScopeId: parentScope.id,
-        childScopeId: childScope.id,
-      });
+        span?.addEvent('recording_stored', {
+          recordingId: recording.id,
+          parentScopeId: parentScope.id,
+          childScopeId: childScope.id,
+        });
+      } catch (error) {
+        span?.addEvent('recording_upload_failed', {
+          recordingId: recording.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        this.logger.warn(
+          { error, recordingId: recording.id },
+          'Failed to upload recording, transcript ingestion will continue',
+        );
+      }
     }
 
     this.logger.log(
