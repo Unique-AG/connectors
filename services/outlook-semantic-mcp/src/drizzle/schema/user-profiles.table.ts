@@ -1,17 +1,17 @@
-import { relations } from 'drizzle-orm';
-import { jsonb, pgTable, unique, varchar } from 'drizzle-orm/pg-core';
-import { typeid } from 'typeid-js';
-import { timestamps } from '../timestamps.columns';
-import { authorizationCodes } from './auth/authorization-codes.table';
-import { tokens } from './auth/tokens.table';
-import { mailFolders } from './mail-folder/mail-folders.table';
+import { relations } from "drizzle-orm";
+import { jsonb, pgTable, unique, varchar } from "drizzle-orm/pg-core";
+import { typeid } from "typeid-js";
+import { timestamps } from "../timestamps.columns";
+import { authorizationCodes } from "./auth/authorization-codes.table";
+import { tokens } from "./auth/tokens.table";
+import { mailFolders } from "./mail-folder/mail-folders.table";
 
 export const userProfiles = pgTable(
-  'user_profiles',
+  "user_profiles",
   {
     id: varchar()
       .primaryKey()
-      .$default(() => typeid('user_profile').toString()),
+      .$default(() => typeid("user_profile").toString()),
     provider: varchar().notNull(),
     providerUserId: varchar().notNull(),
     username: varchar().notNull(),
@@ -25,6 +25,8 @@ export const userProfiles = pgTable(
   },
   (table) => [unique().on(table.provider, table.providerUserId)],
 );
+
+export type UserProfile = typeof userProfiles.$inferSelect;
 
 export const userProfileRelations = relations(userProfiles, ({ many }) => ({
   authorizationCodes: many(authorizationCodes),

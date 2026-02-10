@@ -1,11 +1,14 @@
-import { Module } from '@nestjs/common';
-import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
-import { type DatabaseConfig, databaseConfig } from '~/config';
-import * as schema from './schema';
+import { Module } from "@nestjs/common";
+import { drizzle, NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { type DatabaseConfig, databaseConfig } from "~/config";
+import * as schema from "./schema";
 
-export const DRIZZLE = Symbol('DRIZZLE');
+export const DRIZZLE = Symbol("DRIZZLE");
 export type DrizzleDatabase = NodePgDatabase<typeof schema>;
+export type DrizzleTransaction = Parameters<
+  Parameters<DrizzleDatabase["transaction"]>[0]
+>[0];
 
 @Module({
   imports: [],
@@ -18,7 +21,7 @@ export type DrizzleDatabase = NodePgDatabase<typeof schema>;
           connectionString: config.url.value.toString(),
         });
 
-        return drizzle({ client: pool, casing: 'snake_case', schema });
+        return drizzle({ client: pool, casing: "snake_case", schema });
       },
     },
   ],
