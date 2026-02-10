@@ -1,33 +1,35 @@
 connectorConfig:
   enabled: true
-  confluence:
-    instanceType: cloud
-    baseUrl: https://acme.atlassian.net/wiki
-    auth:
-      mode: api_token
-      email: user@example.com
-    apiRateLimitPerMinute: 100
-    ingestSingleLabel: ai-ingest
-    ingestAllLabel: ai-ingest-all
-    labels:
-      - "knowledge-base"
-      - "ai-ready"
-    spaces:
-      - "ENGINEERING"
-      - "PRODUCT"
-  unique:
-    authMode: cluster_local
-    ingestionServiceBaseUrl: http://node-ingestion.finance-gpt:8091
-    scopeManagementServiceBaseUrl: http://node-scope-management.finance-gpt:8094
-    apiRateLimitPerMinute: 200
-    serviceExtraHeaders:
-      x-company-id: "123456789101112131"
-      x-user-id: "123456789101112131"
-    ingestionConfig:
-      uniqueIngestionMode: INGESTION
-      customProperty: value
-  processing:
-    stepTimeoutSeconds: 300
-    concurrency: 3
-    scanIntervalCron: "*/30 * * * *"
-    maxPagesToScan: 50
+  tenants:
+    - name: default
+      confluence:
+        instanceType: cloud
+        baseUrl: https://acme.atlassian.net/wiki
+        auth:
+          mode: oauth_2lo
+          clientId: test-client-id
+        apiRateLimitPerMinute: 100
+        ingestSingleLabel: ai-ingest
+        ingestAllLabel: ai-ingest-all
+        labels:
+          - "knowledge-base"
+          - "ai-ready"
+        spaces:
+          - "ENGINEERING"
+          - "PRODUCT"
+      unique:
+        authMode: cluster_local
+        ingestionServiceBaseUrl: http://node-ingestion.finance-gpt:8091
+        scopeManagementServiceBaseUrl: http://node-scope-management.finance-gpt:8094
+        apiRateLimitPerMinute: 200
+        serviceExtraHeaders:
+          x-company-id: "123456789101112131"
+          x-user-id: "123456789101112131"
+        ingestionConfig:
+          uniqueIngestionMode: INGESTION
+          customProperty: value
+      processing:
+        stepTimeoutSeconds: 300
+        concurrency: 3
+        scanIntervalCron: "*/30 * * * *"
+        maxPagesToScan: 50

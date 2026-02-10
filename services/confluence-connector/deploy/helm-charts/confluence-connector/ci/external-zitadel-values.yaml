@@ -1,20 +1,23 @@
 connectorConfig:
   enabled: true
-  confluence:
-    instanceType: onprem
-    baseUrl: https://confluence.acme.com
-    auth:
-      mode: pat
-    apiRateLimitPerMinute: 200
-  unique:
-    authMode: external
-    ingestionServiceBaseUrl: https://api.unique.app/ingestion
-    scopeManagementServiceBaseUrl: https://api.unique.app/scope-management
-    zitadel:
-      clientId: confluence-connector@idp.unique.app
-      oauthTokenUrl: https://idp.unique.app/oauth/v2/token
-      projectId: "225317577440629999"
-  processing:
-    stepTimeoutSeconds: 300
-    concurrency: 1
-    scanIntervalCron: "*/15 * * * *"
+  tenants:
+    - name: default
+      confluence:
+        instanceType: data-center
+        baseUrl: https://confluence.acme.com
+        auth:
+          mode: oauth_2lo
+          clientId: test-dc-client-id
+        apiRateLimitPerMinute: 200
+      unique:
+        authMode: external
+        ingestionServiceBaseUrl: https://api.unique.app/ingestion
+        scopeManagementServiceBaseUrl: https://api.unique.app/scope-management
+        zitadel:
+          clientId: confluence-connector@idp.unique.app
+          oauthTokenUrl: https://idp.unique.app/oauth/v2/token
+          projectId: "225317577440629999"
+      processing:
+        stepTimeoutSeconds: 300
+        concurrency: 1
+        scanIntervalCron: "*/15 * * * *"
