@@ -147,6 +147,7 @@ jobs:
           helm dependency build
           helm template .
 
+      # FIXME: This step does not fail CI when docs are outdated - add exit 1 to enforce
       - name: Validate helm-docs
         if: steps.check-helm.outputs.exists == 'true'
         working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts
