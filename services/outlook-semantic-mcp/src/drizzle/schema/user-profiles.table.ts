@@ -4,6 +4,7 @@ import { typeid } from 'typeid-js';
 import { timestamps } from '../timestamps.columns';
 import { authorizationCodes } from './auth/authorization-codes.table';
 import { tokens } from './auth/tokens.table';
+import { mailFolders } from './mail-folder/mail-folders.table';
 
 export const userProfiles = pgTable(
   'user_profiles',
@@ -27,5 +28,6 @@ export const userProfiles = pgTable(
 
 export const userProfileRelations = relations(userProfiles, ({ many }) => ({
   authorizationCodes: many(authorizationCodes),
+  mailFolders: many(mailFolders),
   tokens: many(tokens),
 }));
