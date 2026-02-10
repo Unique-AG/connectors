@@ -108,39 +108,9 @@ grafana:
 # -- Prometheus alerting rules configuration
 alerts:
   # -- Enable PrometheusRule resource creation
-  enabled: true
-  # -- Default alert definitions
-  defaultAlerts:
-    # -- Enable GraphQL API error rate alerts
-    graphql:
-      enabled: true
-      # -- Disable specific alerts by setting them to true
-      disabled: {}
-        # OutlookFatMcpGraphQLErrors: false
-      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
-      customRules: {}
-        # OutlookFatMcpGraphQLErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    # -- Enable Unique REST API error rate alerts
-    uniqueApi:
-      enabled: true
-      # -- Disable specific alerts by setting them to true
-      disabled: {}
-        # OutlookFatMcpUniqueAPIErrors: false
-      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
-      customRules: {}
-        # OutlookFatMcpUniqueAPIErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    # -- Additional labels to add to all default alerts
-    additionalLabels: {}
-      # environment: production
-      # team: backend
+  enabled: false
 
-# -- Configuration for the deployed Outlook Fat MCP Server, will be mapped to environment variables
+# -- Configuration for the deployed Outlook Semantic MCP Server, will be mapped to environment variables
 # Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
 mcpConfig:
   # -- if disabled, server.extraEnvCM must be set to []

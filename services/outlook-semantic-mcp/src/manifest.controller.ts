@@ -11,7 +11,7 @@ export class ManifestController {
       version: packageJson.version,
       description:
         packageJson.description ||
-        'Outlook Fat MCP Server - Microsoft Graph integration for Model Context Protocol',
+        'Outlook Semantic MCP Server - Microsoft Graph integration for Model Context Protocol',
       type: 'mcp-server',
       endpoints: {
         mcp: '/mcp',

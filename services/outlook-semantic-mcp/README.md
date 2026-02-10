@@ -1,4 +1,4 @@
-# Outlook Fat MCP Server
+# Outlook Semantic MCP Server
 
 A NestJS-based microservice that integrates Microsoft Outlook with the Unique platform through the Model Context Protocol (MCP). It provides email management capabilities through Microsoft Graph API.
 

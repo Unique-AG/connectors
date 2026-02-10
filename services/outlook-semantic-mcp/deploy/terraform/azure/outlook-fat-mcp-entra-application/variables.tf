@@ -1,7 +1,7 @@
 variable "display_name" {
   description = "The display name for the Azure AD application registration."
   type        = string
-  default     = "Unique AI Outlook Fat MCP"
+  default     = "Unique AI Outlook Semantic MCP"
 }
 
 variable "notes" {
@@ -27,7 +27,7 @@ variable "sign_in_audience" {
 }
 
 variable "redirect_uris" {
-  description = "List of OAuth redirect URIs for the application. Should include the callback URL for your Outlook Fat MCP server."
+  description = "List of OAuth redirect URIs for the application. Should include the callback URL for your Outlook Semantic MCP server."
   type        = list(string)
   default     = []
 }

@@ -128,43 +128,6 @@
         "enabled": {
           "type": "boolean",
           "description": "Enable PrometheusRule resource creation"
-        },
-        "defaultAlerts": {
-          "type": "object",
-          "description": "Default alert definitions",
-          "properties": {
-            "graphql": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "disabled": {
-                  "type": "object"
-                },
-                "customRules": {
-                  "type": "object"
-                }
-              }
-            },
-            "uniqueApi": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "disabled": {
-                  "type": "object"
-                },
-                "customRules": {
-                  "type": "object"
-                }
-              }
-            },
-            "additionalLabels": {
-              "type": "object"
-            }
-          }
         }
       },
       "additionalProperties": false

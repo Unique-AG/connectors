@@ -16,7 +16,7 @@ variable "secrets_placeholders" {
   }))
   default = {
     /**
-      Manual secrets that need to be set based on Outlook Fat MCP configuration:
+      Manual secrets that need to be set based on Outlook Semantic MCP configuration:
 
       Microsoft Configuration (microsoft.config.ts):
       - outlook-semantic-mcp-client-secret: The Microsoft Entra application client secret (MICROSOFT_CLIENT_SECRET)

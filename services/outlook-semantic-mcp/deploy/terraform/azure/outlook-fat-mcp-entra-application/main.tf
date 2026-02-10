@@ -6,7 +6,7 @@ resource "azuread_service_principal" "msgraph" {
 }
 
 locals {
-  # Microsoft Graph delegated scopes required by Outlook Fat MCP
+  # Microsoft Graph delegated scopes required by Outlook Semantic MCP
   # Based on SCOPES in services/outlook-semantic-mcp/src/auth/microsoft.provider.ts
   graph_scopes = toset([
     "User.Read",

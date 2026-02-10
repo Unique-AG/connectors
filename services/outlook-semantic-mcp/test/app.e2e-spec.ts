@@ -28,7 +28,7 @@ describe('AppController (e2e)', () => {
         expect(res.body).toMatchObject({
           name: '@unique-ag/outlook-semantic-mcp',
           description:
-            'Outlook Fat MCP Server - Microsoft Graph integration for Model Context Protocol',
+            'Outlook Semantic MCP Server - Microsoft Graph integration for Model Context Protocol',
           type: 'mcp-server',
           endpoints: {
             mcp: '/mcp',
