@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: read
+  packages: read # Required for docker/login-action to authenticate with GHCR
+  actions: read # Required for cache-from: type=gha
 
 jobs:
   build-matrix:
