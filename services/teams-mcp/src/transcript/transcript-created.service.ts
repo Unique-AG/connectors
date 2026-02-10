@@ -147,6 +147,14 @@ export class TranscriptCreatedService {
 
     span?.addEvent('transcript processing completed');
 
+    // Fetch the correlated recording (if available) before ingesting
+    const recording = await this.recordingService.fetchRecording(
+      subscription.userProfileId,
+      userId,
+      meetingId,
+      transcript.contentCorrelationId,
+    );
+
     await this.unique.ingestTranscript(
       {
         subject: meeting.subject ?? '',
@@ -165,15 +173,7 @@ export class TranscriptCreatedService {
         })),
       },
       { id: transcript.id, content: vttStream },
-    );
-
-    // Fetch and store the correlated recording (if available)
-    await this.recordingService.fetchAndStore(
-      subscription.userProfileId,
-      userId,
-      meetingId,
-      meeting,
-      transcript,
+      recording ?? undefined,
     );
   }
 }

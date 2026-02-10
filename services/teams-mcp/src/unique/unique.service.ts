@@ -47,16 +47,21 @@ export class UniqueService {
       owner: { id: string; name: string; email: string };
     },
     transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
+    recording?: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
   ): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('transcript_id', transcript.id);
     span?.setAttribute('participant_count', meeting.participants.length);
     span?.setAttribute('meeting_date', meeting.startDateTime.toISOString());
     span?.setAttribute('owner_id', meeting.owner.id);
+    if (recording) {
+      span?.setAttribute('recording_id', recording.id);
+    }
 
     this.logger.log(
       {
         transcriptId: transcript.id,
+        recordingId: recording?.id,
         participantCount: meeting.participants.length,
         meetingDate: meeting.startDateTime.toISOString(),
       },
@@ -156,166 +161,69 @@ export class UniqueService {
         title: `${meeting.subject}.vtt`,
       },
     });
-    span?.addEvent('ingestion_completed', {
+    span?.addEvent('transcript_ingestion_completed', {
       transcriptId: transcript.id,
       parentScopeId: parentScope.id,
       childScopeId: childScope.id,
     });
 
+    // Upload recording if provided (with SKIP_INGESTION)
+    if (recording) {
+      this.logger.log(
+        { recordingId: recording.id, scopeId: childScope.id },
+        'Beginning recording upload to Unique system (skip ingestion)',
+      );
+
+      const recordingUpload = await this.upsertContent({
+        storeInternally: true,
+        scopeId: childScope.id,
+        input: {
+          key: recording.id,
+          mimeType: 'video/mp4',
+          title: `${meeting.subject}.mp4`,
+          byteSize: 1,
+          ingestionConfig: {
+            uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+          },
+          metadata: {
+            date: meeting.startDateTime.toISOString(),
+            content_correlation_id: meeting.contentCorrelationId,
+            participant_names: meeting.participants.map((p) => p.name).join(', '),
+            participant_emails: meeting.participants.map((p) => p.email).join(', '),
+          },
+        },
+      });
+      await this.uploadToStorage(recordingUpload.writeUrl, recording.content, 'video/mp4');
+      await this.upsertContent({
+        storeInternally: true,
+        scopeId: childScope.id,
+        fileUrl: recordingUpload.readUrl,
+        input: {
+          key: recording.id,
+          mimeType: 'video/mp4',
+          title: `${meeting.subject}.mp4`,
+          ingestionConfig: {
+            uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+          },
+        },
+      });
+
+      span?.addEvent('recording_stored', {
+        recordingId: recording.id,
+        parentScopeId: parentScope.id,
+        childScopeId: childScope.id,
+      });
+    }
+
     this.logger.log(
       {
         transcriptId: transcript.id,
+        recordingId: recording?.id,
         parentScopeId: parentScope.id,
         childScopeId: childScope.id,
       },
       'Successfully completed meeting transcript ingestion process',
     );
-  }
-
-  @Span()
-  public async storeRecording(
-    meeting: {
-      subject: string;
-      startDateTime: Date;
-      contentCorrelationId: string;
-      participants: { id?: string; name: string; email: string }[];
-      owner: { id: string; name: string; email: string };
-    },
-    recording: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
-  ): Promise<{ recordingId: string; readUrl: string }> {
-    const span = this.trace.getSpan();
-    span?.setAttribute('recording_id', recording.id);
-    span?.setAttribute('content_correlation_id', meeting.contentCorrelationId);
-    span?.setAttribute('participant_count', meeting.participants.length);
-    span?.setAttribute('meeting_date', meeting.startDateTime.toISOString());
-    span?.setAttribute('owner_id', meeting.owner.id);
-
-    this.logger.log(
-      {
-        recordingId: recording.id,
-        contentCorrelationId: meeting.contentCorrelationId,
-        participantCount: meeting.participants.length,
-        meetingDate: meeting.startDateTime.toISOString(),
-      },
-      'Beginning processing of meeting recording for storage (without ingestion)',
-    );
-
-    const concurrency = this.config.get('unique.userFetchConcurrency', { infer: true });
-    const limit = pLimit(concurrency);
-    const participantsPromises = meeting.participants.map((p) =>
-      limit(() => this.fetchUserForScopeAccess(p.email)),
-    );
-    const participants = (await Promise.all(participantsPromises)).filter((v) => v !== null);
-    const owner = await this.fetchUserForScopeAccess(meeting.owner.email);
-
-    if (!owner) {
-      span?.addEvent('owner_not_found');
-      this.logger.warn(
-        { participantCount: meeting.participants.length },
-        'Cannot proceed: meeting owner account not found in Unique system',
-      );
-      throw new Error('Meeting owner account not found in Unique system');
-    }
-
-    span?.setAttribute('resolved_participants_count', participants.length);
-    span?.addEvent('participants_resolved', {
-      foundParticipants: participants.length,
-      totalParticipants: meeting.participants.length,
-    });
-
-    this.logger.debug(
-      { foundParticipants: participants.length, totalParticipants: meeting.participants.length },
-      'Successfully resolved meeting participant accounts in Unique system',
-    );
-
-    const { parentPath, childPath } = this.mapMeetingToScopePaths(
-      meeting.subject,
-      meeting.startDateTime,
-    );
-
-    const parentScope = await this.createScope(parentPath, false);
-    span?.setAttribute('parent_scope_id', parentScope.id);
-
-    const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
-      entityId: p.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Read,
-    }));
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Write,
-    });
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Read,
-    });
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Manage,
-    });
-    await this.addScopeAccesses(parentScope.id, accesses);
-
-    const childScope = await this.createScope(childPath, true);
-    span?.setAttribute('child_scope_id', childScope.id);
-
-    this.logger.log(
-      { recordingId: recording.id, scopeId: childScope.id },
-      'Beginning recording upload to Unique system (skip ingestion)',
-    );
-
-    const recordingUpload = await this.upsertContent({
-      storeInternally: true,
-      scopeId: childScope.id,
-      input: {
-        key: recording.id,
-        mimeType: 'video/mp4',
-        title: `${meeting.subject}.mp4`,
-        byteSize: 1,
-        ingestionConfig: {
-          uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
-        },
-        metadata: {
-          date: meeting.startDateTime.toISOString(),
-          content_correlation_id: meeting.contentCorrelationId,
-          participant_names: meeting.participants.map((p) => p.name).join(', '),
-          participant_emails: meeting.participants.map((p) => p.email).join(', '),
-        },
-      },
-    });
-    await this.uploadToStorage(recordingUpload.writeUrl, recording.content, 'video/mp4');
-    await this.upsertContent({
-      storeInternally: true,
-      scopeId: childScope.id,
-      fileUrl: recordingUpload.readUrl,
-      input: {
-        key: recording.id,
-        mimeType: 'video/mp4',
-        title: `${meeting.subject}.mp4`,
-        ingestionConfig: {
-          uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
-        },
-      },
-    });
-
-    span?.addEvent('recording_stored', {
-      recordingId: recording.id,
-      parentScopeId: parentScope.id,
-      childScopeId: childScope.id,
-    });
-
-    this.logger.log(
-      {
-        recordingId: recording.id,
-        parentScopeId: parentScope.id,
-        childScopeId: childScope.id,
-      },
-      'Successfully completed meeting recording storage process',
-    );
-
-    return { recordingId: recording.id, readUrl: recordingUpload.readUrl };
   }
 
   // !SECTION: Public API
