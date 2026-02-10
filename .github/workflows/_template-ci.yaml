@@ -108,6 +108,8 @@ jobs:
 
   # Validates Helm charts if they exist for this service
   validate-helm:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -170,6 +172,8 @@ jobs:
 
   # Validates Terraform configurations if they exist for this service
   validate-terraform:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
