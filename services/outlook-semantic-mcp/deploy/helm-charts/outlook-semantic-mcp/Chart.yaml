@@ -8,4 +8,4 @@ dependencies:
   - alias: server
     name: backend-service
     repository: oci://ghcr.io/unique-ag/helm-charts
-    version: ~8.2.0
+    version: ~10.1.1

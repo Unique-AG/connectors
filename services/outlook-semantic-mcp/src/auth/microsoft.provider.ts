@@ -6,9 +6,9 @@ export const SCOPES = [
   'profile',
   'email',
   'offline_access',
-  'User.Read', // (delegated): 
-  'Mail.Read', // (delegated): 
-  'Mail.ReadBasic', // (delegated): 
+  'User.Read', // (delegated):
+  'Mail.Read', // (delegated):
+  'Mail.ReadBasic', // (delegated):
 ];
 
 export const MicrosoftOAuthProvider: OAuthProviderConfig = {
