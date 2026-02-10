@@ -13,7 +13,7 @@ on:
         type: string
 
 concurrency:
-  group: _template-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: _template-ci-${{ github.workflow }}-${{ inputs.service-name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -105,3 +105,99 @@ jobs:
       - name: Run tests
         working-directory: ${{ env.SERVICE_PATH }}
         run: pnpm test
+
+  # Validates Helm charts if they exist for this service
+  validate-helm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SERVICE_PATH: ${{ inputs.service-path }}
+      SERVICE_NAME: ${{ inputs.service-name }}
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check if Helm charts exist
+        id: check-helm
+        run: |
+          if [ -d "${{ env.SERVICE_PATH }}/deploy/helm-charts" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        if: steps.check-helm.outputs.exists == 'true'
+        with:
+          version: v3.19.0
+
+      - name: Setup Chart Linting
+        if: steps.check-helm.outputs.exists == 'true'
+        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
+        with:
+          version: v3.14.0
+
+      - name: Render chart
+        if: steps.check-helm.outputs.exists == 'true'
+        working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ env.SERVICE_NAME }}
+        run: |
+          helm dependency build
+          helm template .
+
+      - name: Validate helm-docs
+        if: steps.check-helm.outputs.exists == 'true'
+        working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts
+        run: |
+          if [ -f "./helm-docs.sh" ]; then
+            ./helm-docs.sh
+            if [[ $(git diff --stat) != '' ]]; then
+              echo -e '\033[0;31mDocumentation outdated!\033[0m ❌'
+              echo "Run helm-docs to update the documentation."
+              git diff --color
+            else
+              echo -e '\033[0;32mDocumentation up to date\033[0m ✔'
+            fi
+          else
+            echo "No helm-docs.sh found, skipping documentation validation"
+          fi
+
+      - name: Run chart-testing (lint)
+        if: steps.check-helm.outputs.exists == 'true'
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest.git
+          ct lint --debug --config ./.github/configs/ct-lint.yaml --lint-conf ./.github/configs/lintconf.yaml --charts ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ env.SERVICE_NAME }}
+
+  # Validates Terraform configurations if they exist for this service
+  validate-terraform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SERVICE_PATH: ${{ inputs.service-path }}
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Check if Terraform exists
+        id: check-terraform
+        run: |
+          if [ -d "${{ env.SERVICE_PATH }}/deploy/terraform" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        if: steps.check-terraform.outputs.exists == 'true'
+        with:
+          terraform_version: 1.13.4
+
+      - name: Validate Terraform modules
+        if: steps.check-terraform.outputs.exists == 'true'
+        run: |
+          for dir in $(find ${{ env.SERVICE_PATH }}/deploy/terraform -mindepth 2 -maxdepth 2 -type d); do
+            echo "Validating: $dir"
+            cd "$dir"
+            terraform init -backend=false
+            terraform validate
+            cd - > /dev/null
+          done
