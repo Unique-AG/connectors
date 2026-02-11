@@ -1,26 +1,20 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { TraceService } from "nestjs-otel";
+import { and, eq, not, notInArray } from "drizzle-orm";
+import { Span, TraceService } from "nestjs-otel";
+import assert from "node:assert";
+import { isNullish } from "remeda";
 import {
   DRIZZLE,
   DrizzleDatabase,
   MailFolder,
   mailFolders,
-  mailFoldersSync,
   userProfiles,
 } from "~/drizzle";
-import { DrizzleTransaction } from "~/drizzle/drizzle.module";
 import { GraphClientFactory } from "~/msgraph/graph-client.factory";
 import { UniqueService } from "~/unique/unique.service";
-import { eq } from "drizzle-orm";
-import {
-  GraphMailFolder,
-  graphMailFolderSchema,
-  graphMailFoldersSchema,
-} from "../microsoft-graph.dtos";
+import { GraphMailFolder } from "../microsoft-graph.dtos";
 import { FetchAllFodlersFromMicrosoftGraphQuery } from "./fetch-all-folders-from-microsoft-graph.query";
-import assert from "node:assert";
-import { isNullish } from "remeda";
-import { FetchOrCreateOutlookEmailsRootScopeCommand } from "./fetch-or-create-outlook-emails-root-scope.command";
+import { FetchOrCreateOutlookEmailsRootScopeCommand } from "../../../unique/fetch-or-create-outlook-emails-root-scope.command";
 
 @Injectable()
 export class SyncFullFolderStructureCommand {
@@ -33,12 +27,10 @@ export class SyncFullFolderStructureCommand {
     private readonly fetchAllFodlersFromMicrosoftGraphQuery: FetchAllFodlersFromMicrosoftGraphQuery,
   ) {}
 
+  @Span()
   public async run(userProfileId: string): Promise<void> {
     const graphDirectories =
       await this.fetchAllFodlersFromMicrosoftGraphQuery.run(userProfileId);
-    const allDirectoriesInDatabase = await this.db.query.mailFolders.findMany({
-      where: eq(mailFolders.userProfileId, userProfileId),
-    });
     const userProfile = await this.db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });
@@ -48,21 +40,38 @@ export class SyncFullFolderStructureCommand {
       `User Profile: ${userProfile.id} without email`,
     );
 
+    const graphDirectoryIds = await this.addMissingMicrosoftFoldersToDatabase({
+      userProfile: { email: userProfile.email, id: userProfile.id },
+      // allDirectoriesInDatabase,
+      graphDirectories,
+    });
+    await this.removeExtraDirectories({ userProfileId, graphDirectoryIds });
+  }
+
+  private async addMissingMicrosoftFoldersToDatabase({
+    userProfile,
+    graphDirectories,
+  }: {
+    graphDirectories: GraphMailFolder[];
+    userProfile: { email: string; id: string };
+  }): Promise<string[]> {
+    const allDirectoriesInDatabase = await this.db.query.mailFolders.findMany({
+      where: eq(mailFolders.userProfileId, userProfile.id),
+    });
     const rootScope = await this.fetchOrCreateOutlookEmailsRootScopeCommand.run(
       userProfile.email,
     );
-
     const microsoftIdToDatabaseRecord = allDirectoriesInDatabase.reduce<
       Record<string, MailFolder>
     >((acc, item) => {
       acc[item.microsoftId] = item;
       return acc;
     }, {});
-    const initialIds = allDirectoriesInDatabase.map(
-      (directory) => directory.microsoftId,
+    const microsoftFolderIdsIgnoredForSync = new Set(
+      allDirectoriesInDatabase
+        .filter((item) => item.isDirectoryIgnoredForSync)
+        .map((item) => item.microsoftId),
     );
-    const microsoftGraphIds: Set<string> = new Set();
-
     // TODO: Think if we can generate the whole scopes on paths -> and then maybe just update the db ?
     // Once we have all the paths go and update the db
     // My main concern is -> if the db fails or query to unique service fails what do we do ? The directories will remain in an inconcistent state
@@ -70,16 +79,25 @@ export class SyncFullFolderStructureCommand {
     let queue = graphDirectories.map((folder) => ({
       folder,
       parentScopeId: rootScope.id,
+      isDirectoryIgnoredForSync: microsoftFolderIdsIgnoredForSync.has(
+        folder.id,
+      ),
     }));
     let level = 0;
+    const graphDirectoryIds: string[] = [];
     while (queue.length > 0) {
-      const nextQueue: { folder: GraphMailFolder; parentScopeId: string }[] =
-        [];
+      const nextQueue: {
+        folder: GraphMailFolder;
+        parentScopeId: string;
+        isDirectoryIgnoredForSync: boolean;
+      }[] = [];
 
-      // awa
-      for (const { folder, parentScopeId } of queue) {
-        microsoftGraphIds.add(folder.id);
-        // nextQueue.push(...(folder.childFolders ?? []));
+      for (const {
+        folder,
+        parentScopeId,
+        isDirectoryIgnoredForSync,
+      } of queue) {
+        graphDirectoryIds.push(folder.id);
 
         const doesDirectoryExist = folder.id in microsoftIdToDatabaseRecord;
 
@@ -95,7 +113,8 @@ export class SyncFullFolderStructureCommand {
               microsoftId: folder.id,
               isSystemFolder: true,
               uniqueScopeId,
-              userProfileId,
+              userProfileId: userProfile.id,
+              isDirectoryIgnoredForSync,
               parentId: null,
             })
             .returning();
@@ -103,7 +122,13 @@ export class SyncFullFolderStructureCommand {
           microsoftIdToDatabaseRecord[folder.id] = newDirectory;
           const children = folder.childFolders ?? [];
           children.forEach((child) =>
-            nextQueue.push({ folder: child, parentScopeId: uniqueScopeId }),
+            nextQueue.push({
+              folder: child,
+              parentScopeId: uniqueScopeId,
+              isDirectoryIgnoredForSync:
+                isDirectoryIgnoredForSync ||
+                microsoftFolderIdsIgnoredForSync.has(child.id),
+            }),
           );
           continue;
         }
@@ -136,11 +161,34 @@ export class SyncFullFolderStructureCommand {
           nextQueue.push({
             folder: child,
             parentScopeId: dbRecord.uniqueScopeId,
+            isDirectoryIgnoredForSync:
+              isDirectoryIgnoredForSync ||
+              microsoftFolderIdsIgnoredForSync.has(child.id),
           }),
         );
       }
       level++;
       queue = nextQueue;
     }
+
+    return graphDirectoryIds;
+  }
+
+  private async removeExtraDirectories({
+    userProfileId,
+    graphDirectoryIds,
+  }: {
+    userProfileId: string;
+    graphDirectoryIds: string[];
+  }): Promise<void> {
+    await this.db
+      .delete(mailFolders)
+      .where(
+        and(
+          eq(mailFolders.userProfileId, userProfileId),
+          not(mailFolders.isSystemFolder),
+          notInArray(mailFolders.microsoftId, graphDirectoryIds),
+        ),
+      );
   }
 }

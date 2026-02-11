@@ -26,6 +26,7 @@ export const mailFolders = pgTable(
     uniqueScopeId: varchar().unique().notNull(),
     isSystemFolder: boolean().default(false).notNull(),
     debugData: jsonb(),
+    isDirectoryIgnoredForSync: boolean().default(false),
 
     // References
     userProfileId: varchar()
