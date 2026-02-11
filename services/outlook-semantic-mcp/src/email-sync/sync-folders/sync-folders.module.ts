@@ -2,7 +2,7 @@ import { Module, Provider } from "@nestjs/common";
 import { DrizzleModule } from "~/drizzle/drizzle.module";
 import { MsGraphModule } from "~/msgraph/msgraph.module";
 import { UniqueModule } from "~/unique/unique.module";
-import { SyncFoldersCommand } from "./commands/sync-system-folders.command";
+import { SyncFoldersCommand } from "./sync-system-folders.command";
 
 const COMMANDS: Provider[] = [SyncFoldersCommand];
 

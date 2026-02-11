@@ -27,6 +27,9 @@ export interface ScopeAccess {
 export const getRootScopePath = (userEmail: string): string =>
   `${userEmail}/Outlook Emails`;
 
+export const getRootScopeToBeProcessed = (userEmail: string): string =>
+  `${userEmail}/Outlook Pending Emails`;
+
 @Injectable()
 export class FetchOrCreateOutlookEmailsRootScopeCommand {
   constructor(
@@ -40,16 +43,22 @@ export class FetchOrCreateOutlookEmailsRootScopeCommand {
     assert.ok(userEmail, `User Email: ${userEmail}`);
     span?.setAttribute(`user_emails`, userEmail);
     const scopePath = getRootScopePath(userEmail);
-    span?.addEvent(`Creating root scope`);
-    const [rootScope] = await this.uniqueScopesService.createScopesBasedOnPaths(
-      [scopePath],
-      {
-        inheritAccess: true,
-        includePermissions: true,
-      },
-    );
-    span?.addEvent(`Root scope created`);
+    const toBeProcessedScopePath = getRootScopeToBeProcessed(userEmail);
+    const [rootScope, toBeProcessedScope] =
+      await this.uniqueScopesService.createScopesBasedOnPaths(
+        [scopePath, toBeProcessedScopePath],
+        {
+          inheritAccess: true,
+          includePermissions: true,
+        },
+      );
     assert.ok(rootScope, `Could not create root scope for email: ${userEmail}`);
+    assert.ok(
+      toBeProcessedScope,
+      `Could not create to be processed scope for email: ${userEmail}`,
+    );
+    span?.addEvent(`Root scopes created`);
+
     if (!rootScope.externalId) {
       span?.addEvent(`Locking root scope with externalId`);
       await this.uniqueScopesService.updateScopeExternalId(
@@ -57,6 +66,14 @@ export class FetchOrCreateOutlookEmailsRootScopeCommand {
         scopePath,
       );
       span?.addEvent(`Root scope locked with externalId`);
+    }
+    if (!toBeProcessedScope.externalId) {
+      span?.addEvent(`Locking to be processed root scope with externalId`);
+      await this.uniqueScopesService.updateScopeExternalId(
+        toBeProcessedScope.id,
+        scopePath,
+      );
+      span?.addEvent(`To be processed  scope locked with externalId`);
     }
     return rootScope;
   }

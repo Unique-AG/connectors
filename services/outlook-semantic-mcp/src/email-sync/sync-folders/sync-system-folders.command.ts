@@ -9,10 +9,7 @@ import {
   userProfiles,
 } from "~/drizzle";
 import { GraphClientFactory } from "~/msgraph/graph-client.factory";
-import {
-  GraphMailFolder,
-  graphMailFolderSchema,
-} from "../microsoft-graph.dtos";
+import { GraphMailFolder, graphMailFolderSchema } from "./microsoft-graph.dtos";
 import { and, eq } from "drizzle-orm";
 import { getRootScopePath } from "~/unique/unique-scopes/fetch-or-create-outlook-emails-root-scope.command";
 import assert from "node:assert";

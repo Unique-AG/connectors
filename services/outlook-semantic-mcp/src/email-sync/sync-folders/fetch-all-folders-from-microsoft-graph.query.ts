@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import {
   GraphMailFolder,
   graphMailFoldersSchema,
-} from "../microsoft-graph.dtos";
+} from "./microsoft-graph.dtos";
 import { GraphClientFactory } from "~/msgraph/graph-client.factory";
 import { Client } from "@microsoft/microsoft-graph-client";
 

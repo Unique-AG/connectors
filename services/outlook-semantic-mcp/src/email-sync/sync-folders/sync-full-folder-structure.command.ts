@@ -10,7 +10,7 @@ import {
   mailFolders,
   userProfiles,
 } from "~/drizzle";
-import { GraphMailFolder } from "../microsoft-graph.dtos";
+import { GraphMailFolder } from "./microsoft-graph.dtos";
 import { FetchAllFodlersFromMicrosoftGraphQuery } from "./fetch-all-folders-from-microsoft-graph.query";
 import { UniqueScopesService } from "~/unique/unique-scopes/unique-scopes.service";
 import {
