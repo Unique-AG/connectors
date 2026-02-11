@@ -30,7 +30,9 @@ jobs:
           export FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
 
           # Source shell plugin (nix shell has stdin/stdout issues in GitHub Actions)
-          git clone --depth 1 --quiet https://github.com/proventuslabs/scriptorium.git /tmp/scriptorium
+          git -c init.defaultBranch=main init --quiet /tmp/scriptorium
+          git -C /tmp/scriptorium fetch --depth 1 --quiet https://github.com/proventuslabs/scriptorium.git 924e9a72df74224b7d237974f4c7e5d5c432d574 # cz-v0.1.0
+          git -C /tmp/scriptorium checkout --quiet FETCH_HEAD
           source /tmp/scriptorium/scriptorium.plugin.sh
 
           # printenv outputs values directly without any shell interpretation
