@@ -145,7 +145,7 @@ nix develop
 
 | Category | Tools |
 |----------|-------|
-| Node.js | Node.js 24.x, pnpm (via corepack), lefthook |
+| Node.js | Node.js 24.x, pnpm (via corepack) |
 | Infrastructure | terraform, kubectl, helm, azure-cli, devtunnel |
 | Utilities | jq, yq, zsh |
 

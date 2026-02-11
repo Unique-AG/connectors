@@ -74,7 +74,6 @@
         nodePkgs = with pkgs; [
           nodejs_24 # matches Dockerfiles
           corepack # pnpm version managed via corepack
-          lefthook
         ];
 
         # Infrastructure (deploy/)
