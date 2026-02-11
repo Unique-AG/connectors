@@ -37,29 +37,17 @@ jobs:
           echo "FILES: $FILES"
           echo "CONFIG: $CONFIG"
 
-          echo "=== DEBUG: nix shell echo test ==="
-          nix shell github:proventuslabs/scriptorium#cz --command echo "hello from nix shell"
-          echo "nix shell echo exit: $?"
-
-          echo "=== DEBUG: nix shell approach ==="
-          nix shell github:proventuslabs/scriptorium#cz --command cz --version 2>&1
-          nix shell github:proventuslabs/scriptorium#cz --command cz parse 2>&1
-          printf '%s\n' "$PR_TITLE" | nix shell github:proventuslabs/scriptorium#cz --command cz lint --paths $FILES 2>&1
-          echo "nix shell pipe exit: $?"
-
-          echo "=== DEBUG: nix shell with bash -c ==="
-          nix shell github:proventuslabs/scriptorium#cz --command bash -c "printf '%s\n' '$PR_TITLE' | cz lint --paths $FILES"
-          echo "nix shell bash -c exit: $?"
-
-          echo "=== DEBUG: nix run echo test ==="
-          nix run nixpkgs#hello || echo "nix run hello failed"
-          echo "nix run echo exit: $?"
-
-          echo "=== DEBUG: nix run approach ==="
-          nix run github:proventuslabs/scriptorium#cz -- --version || echo "nix run --version failed"
-          nix run github:proventuslabs/scriptorium#cz -- parse || echo "nix run parse failed"
-          printf '%s\n' "$PR_TITLE" | nix run github:proventuslabs/scriptorium#cz -- lint --paths $FILES || true
-          echo "nix run pipe exit: $?"
+          echo "=== DEBUG: shell plugin approach ==="
+          nix shell github:proventuslabs/scriptorium#shell-plugin --command bash -c '
+            source $scriptorium/scriptorium.plugin.sh
+            echo "cz version: $(cz --version)"
+            echo "cz parse:"
+            cz parse
+            echo "cz lint:"
+            printf "%s\n" "'"$PR_TITLE"'" | cz lint --paths '"$FILES"'
+            echo "cz lint exit: $?"
+          '
+          echo "shell plugin exit: $?"
 
   gatekeeper:
     runs-on: ubuntu-latest
