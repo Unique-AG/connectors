@@ -64,7 +64,7 @@
             };
           };
 
-        # Shell
+        # Shell (team preference: zsh, but any shell works with `nix develop`)
         shellPkgs = with pkgs; [
           zsh
         ];
