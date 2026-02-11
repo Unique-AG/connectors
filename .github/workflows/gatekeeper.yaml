@@ -42,9 +42,9 @@ jobs:
           echo "nix shell echo exit: $?"
 
           echo "=== DEBUG: nix shell approach ==="
-          nix shell github:proventuslabs/scriptorium#cz --command cz --version
-          nix shell github:proventuslabs/scriptorium#cz --command cz parse
-          printf '%s\n' "$PR_TITLE" | nix shell github:proventuslabs/scriptorium#cz --command cz lint --paths $FILES
+          nix shell github:proventuslabs/scriptorium#cz --command cz --version 2>&1
+          nix shell github:proventuslabs/scriptorium#cz --command cz parse 2>&1
+          printf '%s\n' "$PR_TITLE" | nix shell github:proventuslabs/scriptorium#cz --command cz lint --paths $FILES 2>&1
           echo "nix shell pipe exit: $?"
 
           echo "=== DEBUG: nix shell with bash -c ==="
