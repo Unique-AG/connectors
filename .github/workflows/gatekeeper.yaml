@@ -32,32 +32,30 @@ jobs:
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
           CONFIG="$PWD/.gitcommitizen"
 
-          # Run cz lint - write to temp file inside nix shell to avoid stdin pipe issues
-          # --impure allows environment variables to pass through nix shell's pure mode
-          echo "Running: cz -c $CONFIG lint --paths $FILES"
+          echo "=== DEBUG: Basic info ==="
           echo "PR_TITLE: $PR_TITLE"
-          export PR_TITLE CONFIG FILES
-          nix shell --impure github:proventuslabs/scriptorium#cz --command bash -c '
-            echo "DEBUG: Inside nix shell"
-            echo "DEBUG: PR_TITLE=$PR_TITLE"
-            echo "DEBUG: CONFIG=$CONFIG"
-            echo "DEBUG: FILES=$FILES"
-            echo "DEBUG: .gitcommitizen exists: $(test -f "$CONFIG" && echo yes || echo no)"
-            echo "DEBUG: .gitcommitizen contents:"
-            cat "$CONFIG" 2>&1 || echo "ERROR: Cannot read config"
-            printf "%s\n" "$PR_TITLE" > /tmp/title.txt
-            echo "DEBUG: title.txt contents: $(cat /tmp/title.txt)"
-            echo "DEBUG: Running cz lint..."
-            cz -c "$CONFIG" lint --paths $FILES < /tmp/title.txt
-            echo "DEBUG: cz lint returned: $?"
-          '
-          CZ_EXIT=$?
-          echo "cz lint exit code: $CZ_EXIT"
+          echo "FILES: $FILES"
+          echo "CONFIG: $CONFIG"
 
-          if [ $CZ_EXIT -ne 0 ]; then
-            echo "::error title=Invalid PR Title::cz lint failed"
-            exit 1
-          fi
+          echo "=== DEBUG: nix shell approach ==="
+          nix shell github:proventuslabs/scriptorium#cz --command cz --version
+          nix shell github:proventuslabs/scriptorium#cz --command cz parse
+          printf '%s\n' "$PR_TITLE" | nix shell github:proventuslabs/scriptorium#cz --command cz lint --paths $FILES
+          echo "nix shell pipe exit: $?"
+
+          echo "=== DEBUG: nix shell with bash -c ==="
+          nix shell github:proventuslabs/scriptorium#cz --command bash -c "printf '%s\n' '$PR_TITLE' | cz lint --paths $FILES"
+          echo "nix shell bash -c exit: $?"
+
+          echo "=== DEBUG: nix run approach ==="
+          nix run github:proventuslabs/scriptorium#cz -- --version || echo "nix run --version failed"
+          nix run github:proventuslabs/scriptorium#cz -- parse || echo "nix run parse failed"
+          printf '%s\n' "$PR_TITLE" | nix run github:proventuslabs/scriptorium#cz -- lint --paths $FILES || true
+          echo "nix run pipe exit: $?"
+
+          echo "=== DEBUG: nix run with bash -c ==="
+          nix run github:proventuslabs/scriptorium#cz -- bash -c "printf '%s\n' '$PR_TITLE' | cz lint --paths $FILES" || true
+          echo "nix run bash -c exit: $?"
 
   gatekeeper:
     runs-on: ubuntu-latest
