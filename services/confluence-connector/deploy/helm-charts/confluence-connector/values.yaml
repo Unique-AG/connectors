@@ -41,10 +41,10 @@ connector:
     metrics: 51350
   resources:
     limits:
-      memory: 1024Mi
+      memory: 768Mi
     requests:
       cpu: 500m
-      memory: 960Mi
+      memory: 512Mi
   routes:
     paths:
       default:
