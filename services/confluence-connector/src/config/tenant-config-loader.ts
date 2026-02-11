@@ -60,9 +60,8 @@ function loadTenantConfigs(pathPattern: string): TenantConfig[] {
   });
 }
 
-// Note: secrets are shared across all tenants. Multi-tenant secret isolation
-// (e.g., per-tenant env vars) is not yet supported and should be addressed
-// when multi-tenant deployments become a reality.
+// per-tenant env vars is not yet supported and should be addressed when multi-tenant ticket is implemented.
+// this is just a temporary solution to get the secrets from the environment
 function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
   const confluence = config.confluence as Record<string, unknown> | undefined;
   const confluenceAuth = confluence?.auth as Record<string, unknown> | undefined;
@@ -77,8 +76,7 @@ function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
   }
 }
 
-// NestJS ConfigModule uses only the first tenant's config for DI.
-// Full multi-tenant runtime routing will be addressed separately.
+// Full multi-tenant support is not yet implemented, so we return the first tenant config for now
 function getFirstTenantConfig(): TenantConfig {
   const configs = getTenantConfigs();
   const first = configs[0];
