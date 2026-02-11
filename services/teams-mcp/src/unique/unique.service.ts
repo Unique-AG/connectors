@@ -22,6 +22,7 @@ import {
   type Scope,
   ScopeAccessEntityType,
   ScopeAccessType,
+  UniqueIngestionMode,
 } from './unique.dtos';
 
 @Injectable()
@@ -41,20 +42,26 @@ export class UniqueService {
       subject: string;
       startDateTime: Date;
       endDateTime: Date;
+      contentCorrelationId: string;
       participants: { id?: string; name: string; email: string }[];
       owner: { id: string; name: string; email: string };
     },
     transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
+    recording?: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
   ): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('transcript_id', transcript.id);
     span?.setAttribute('participant_count', meeting.participants.length);
     span?.setAttribute('meeting_date', meeting.startDateTime.toISOString());
     span?.setAttribute('owner_id', meeting.owner.id);
+    if (recording) {
+      span?.setAttribute('recording_id', recording.id);
+    }
 
     this.logger.log(
       {
         transcriptId: transcript.id,
+        recordingId: recording?.id,
         participantCount: meeting.participants.length,
         meetingDate: meeting.startDateTime.toISOString(),
       },
@@ -137,6 +144,7 @@ export class UniqueService {
         byteSize: 1,
         metadata: {
           date: meeting.startDateTime.toISOString(),
+          content_correlation_id: meeting.contentCorrelationId,
           participant_names: meeting.participants.map((p) => p.name).join(', '),
           participant_emails: meeting.participants.map((p) => p.email).join(', '),
         },
@@ -153,15 +161,76 @@ export class UniqueService {
         title: `${meeting.subject}.vtt`,
       },
     });
-    span?.addEvent('ingestion_completed', {
+    span?.addEvent('transcript_ingestion_completed', {
       transcriptId: transcript.id,
       parentScopeId: parentScope.id,
       childScopeId: childScope.id,
     });
 
+    // Upload recording if provided (with SKIP_INGESTION)
+    // Wrapped in try-catch to ensure recording upload failures don't break transcript ingestion
+    if (recording) {
+      try {
+        this.logger.log(
+          { recordingId: recording.id, scopeId: childScope.id },
+          'Beginning recording upload to Unique system (skip ingestion)',
+        );
+
+        const recordingUpload = await this.upsertContent({
+          storeInternally: true,
+          scopeId: childScope.id,
+          input: {
+            key: recording.id,
+            mimeType: 'video/mp4',
+            title: `${meeting.subject}.mp4`,
+            byteSize: 1,
+            ingestionConfig: {
+              uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+            },
+            metadata: {
+              date: meeting.startDateTime.toISOString(),
+              content_correlation_id: meeting.contentCorrelationId,
+              participant_names: meeting.participants.map((p) => p.name).join(', '),
+              participant_emails: meeting.participants.map((p) => p.email).join(', '),
+            },
+          },
+        });
+        await this.uploadToStorage(recordingUpload.writeUrl, recording.content, 'video/mp4');
+        await this.upsertContent({
+          storeInternally: true,
+          scopeId: childScope.id,
+          fileUrl: recordingUpload.readUrl,
+          input: {
+            key: recording.id,
+            mimeType: 'video/mp4',
+            title: `${meeting.subject}.mp4`,
+            ingestionConfig: {
+              uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+            },
+          },
+        });
+
+        span?.addEvent('recording_stored', {
+          recordingId: recording.id,
+          parentScopeId: parentScope.id,
+          childScopeId: childScope.id,
+        });
+      } catch (error) {
+        span?.addEvent('recording_upload_failed', {
+          recordingId: recording.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        this.logger.warn(
+          { error, recordingId: recording.id },
+          'Failed to upload recording, transcript ingestion will continue',
+        );
+      }
+    }
+
     this.logger.log(
       {
         transcriptId: transcript.id,
+        recordingId: recording?.id,
         parentScopeId: parentScope.id,
         childScopeId: childScope.id,
       },

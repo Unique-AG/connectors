@@ -8,6 +8,7 @@ import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UniqueService } from '~/unique/unique.service';
 import { CreatedEventDto, Meeting, Transcript, TranscriptResourceSchema } from './transcript.dtos';
+import { TranscriptRecordingService } from './transcript-recording.service';
 
 @Injectable()
 export class TranscriptCreatedService {
@@ -19,6 +20,7 @@ export class TranscriptCreatedService {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly unique: UniqueService,
+    private readonly recordingService: TranscriptRecordingService,
   ) {}
 
   @Span()
@@ -145,11 +147,20 @@ export class TranscriptCreatedService {
 
     span?.addEvent('transcript processing completed');
 
+    // Fetch the correlated recording (if available) before ingesting
+    const recording = await this.recordingService.fetchRecording(
+      subscription.userProfileId,
+      userId,
+      meetingId,
+      transcript.contentCorrelationId,
+    );
+
     await this.unique.ingestTranscript(
       {
         subject: meeting.subject ?? '',
         startDateTime: transcript.createdDateTime,
         endDateTime: transcript.endDateTime,
+        contentCorrelationId: transcript.contentCorrelationId,
         owner: {
           id: meeting.participants.organizer.identity.user.id,
           name: meeting.participants.organizer.identity.user.displayName ?? '',
@@ -162,6 +173,7 @@ export class TranscriptCreatedService {
         })),
       },
       { id: transcript.id, content: vttStream },
+      recording ?? undefined,
     );
   }
 }
