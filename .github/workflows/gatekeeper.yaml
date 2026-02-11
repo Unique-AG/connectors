@@ -32,18 +32,11 @@ jobs:
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
           CONFIG="$PWD/.gitcommitizen"
 
-          # Debug: show resolved config
-          echo "=== cz parse output ==="
-          nix shell github:proventuslabs/scriptorium#cz --command cz -c "$CONFIG" parse || true
-          echo "=== end cz parse ==="
-
-          # Write PR title to temp file
-          echo "$PR_TITLE" > /tmp/pr_title.txt
-          echo "PR_TITLE content: $(cat /tmp/pr_title.txt)"
-
-          # Run cz lint with explicit config file
+          # Run cz lint - use printenv to safely pipe PR title since nix shell doesn't forward stdin directly
           echo "Running: cz -c $CONFIG lint --paths $FILES"
-          nix shell github:proventuslabs/scriptorium#cz --command cz -c "$CONFIG" lint --paths "$FILES" < /tmp/pr_title.txt
+          echo "PR_TITLE: $PR_TITLE"
+          export PR_TITLE CONFIG FILES
+          nix shell github:proventuslabs/scriptorium#cz --command bash -c 'printenv PR_TITLE | cz -c "$CONFIG" lint --paths $FILES'
           CZ_EXIT=$?
           echo "cz lint exit code: $CZ_EXIT"
 
