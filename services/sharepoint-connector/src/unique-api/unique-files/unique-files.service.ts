@@ -1,10 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { chunk } from 'remeda';
-import { Config } from '../../config';
 import { getErrorCodeFromGraphqlRequest } from '../../utils/graphql-error.util';
-import { shouldConcealLogs, smear } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
+import type { Smeared } from '../../utils/smeared';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   ADD_ACCESSES_MUTATION,
@@ -42,13 +40,10 @@ const ACCESS_BATCH_SIZE = 20;
 @Injectable()
 export class UniqueFilesService {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
+
   public constructor(
     @Inject(INGESTION_CLIENT) private readonly ingestionClient: UniqueGraphqlClient,
-    private readonly configService: ConfigService<Config, true>,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async moveFile(
     contentId: string,
@@ -84,8 +79,8 @@ export class UniqueFilesService {
     return result.contentDelete;
   }
 
-  public async deleteFilesBySiteId(siteId: string): Promise<number> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+  public async deleteFilesBySiteId(siteId: Smeared): Promise<number> {
+    const logPrefix = `[Site: ${siteId}]`;
     this.logger.log(`${logPrefix} Starting iterative file deletion`);
 
     let totalDeleted = 0;
@@ -100,7 +95,7 @@ export class UniqueFilesService {
         take: CONTENT_BATCH_SIZE,
         where: {
           key: {
-            startsWith: `${siteId}/`,
+            startsWith: `${siteId.value}/`,
           },
         },
       });
@@ -164,8 +159,8 @@ export class UniqueFilesService {
     return files;
   }
 
-  public async getFilesForSite(siteId: string): Promise<UniqueFile[]> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+  public async getFilesForSite(siteId: Smeared): Promise<UniqueFile[]> {
+    const logPrefix = `[Site: ${siteId}]`;
     this.logger.log(`${logPrefix} Fetching files`);
 
     let skip = 0;
@@ -181,7 +176,7 @@ export class UniqueFilesService {
         take: CONTENT_BATCH_SIZE,
         where: {
           key: {
-            startsWith: `${siteId}/`,
+            startsWith: `${siteId.value}/`,
           },
         },
       });
@@ -193,8 +188,8 @@ export class UniqueFilesService {
     return files;
   }
 
-  public async getFilesCountForSite(siteId: string): Promise<number> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+  public async getFilesCountForSite(siteId: Smeared): Promise<number> {
+    const logPrefix = `[Site: ${siteId}]`;
     this.logger.debug(`${logPrefix} Fetching files count`);
 
     const result = await this.ingestionClient.request<
@@ -203,7 +198,7 @@ export class UniqueFilesService {
     >(PAGINATED_CONTENT_COUNT_QUERY, {
       where: {
         key: {
-          startsWith: `${siteId}/`,
+          startsWith: `${siteId.value}/`,
         },
       },
     });

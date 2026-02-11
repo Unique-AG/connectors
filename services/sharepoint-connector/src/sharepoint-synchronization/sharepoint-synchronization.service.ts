@@ -1,9 +1,9 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Histogram } from '@opentelemetry/api';
 import { entries, groupBy } from 'remeda';
-import { Config } from '../config';
+import { ConfigEmitEvent } from '../config/app.config';
+import { ConfigDiagnosticsService } from '../config/config-diagnostics.service';
 import type { SiteConfig } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { SyncStep } from '../constants/sync-step.enum';
@@ -18,8 +18,8 @@ import { PermissionsSyncService } from '../permissions-sync/permissions-sync.ser
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { shouldConcealLogs, smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
+import type { Smeared } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
@@ -39,10 +39,8 @@ type FullSyncResult =
 export class SharepointSynchronizationService {
   private readonly logger = new Logger(this.constructor.name);
   private isScanning = false;
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
-    private readonly configService: ConfigService<Config, true>,
     private readonly graphApiService: GraphApiService,
     private readonly sitesConfigurationService: SitesConfigurationService,
     private readonly contentSyncService: ContentSyncService,
@@ -50,11 +48,10 @@ export class SharepointSynchronizationService {
     private readonly scopeManagementService: ScopeManagementService,
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly uniqueScopesService: UniqueScopesService,
+    private readonly configDiagnosticsService: ConfigDiagnosticsService,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async synchronize(): Promise<FullSyncResult> {
     const syncStartTime = Date.now();
@@ -105,10 +102,9 @@ export class SharepointSynchronizationService {
 
       for (const siteConfig of active) {
         const siteSyncStartTime = Date.now();
-        const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
 
         const result = await this.syncSite(siteConfig);
-        this.recordSiteMetric(siteSyncStartTime, logSiteId, result);
+        this.recordSiteMetric(siteSyncStartTime, siteConfig.siteId, result);
       }
 
       this.logger.log(
@@ -142,10 +138,10 @@ export class SharepointSynchronizationService {
     });
   }
 
-  private recordSiteMetric(startTime: number, logSiteId: string, result: SiteSyncResult): void {
+  private recordSiteMetric(startTime: number, siteId: Smeared, result: SiteSyncResult): void {
     this.spcSyncDurationSeconds.record(elapsedSeconds(startTime), {
       sync_type: 'site',
-      sp_site_id: logSiteId,
+      sp_site_id: siteId.toString(),
       result: result.status,
       ...(result.status === 'failure' && { failure_step: result.step }),
       ...(result.status === 'skipped' && { skip_reason: result.reason }),
@@ -181,16 +177,14 @@ export class SharepointSynchronizationService {
     this.logger.error(`ScopeId: ${scopeId} is configured for multiple sites:`);
 
     for (const [index, site] of sitesWithSameScopeId.entries()) {
-      const logSiteId = this.shouldConcealLogs ? smear(site.siteId) : site.siteId;
       const status = index === 0 ? 'WILL SYNC - first occurrence' : 'SKIPPED - duplicate scopeId';
-      this.logger.error(`  - siteId: ${logSiteId} (${status})`);
+      this.logger.error(`  - siteId: ${site.siteId} (${status})`);
     }
     this.logger.error('Only the first site will be synchronized.');
   }
 
   private async processSingleSiteDeletion(siteConfig: SiteConfig): Promise<void> {
-    const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
+    const logPrefix = `[Site: ${siteConfig.siteId}]`;
 
     this.logger.log(
       `${logPrefix} Processing site marked for deletion (ScopeId: ${siteConfig.scopeId})`,
@@ -244,7 +238,7 @@ export class SharepointSynchronizationService {
       return { failureStep: SyncStep.RootScopeInit };
     }
 
-    let siteName: string;
+    let siteName: Smeared;
     try {
       siteName = await this.graphApiService.getSiteName(siteConfig.siteId);
     } catch (error) {
@@ -266,10 +260,13 @@ export class SharepointSynchronizationService {
   }
 
   private async syncSite(siteConfig: SiteConfig): Promise<SiteSyncResult> {
-    const logSiteId = this.shouldConcealLogs ? smear(siteConfig.siteId) : siteConfig.siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
+    const logPrefix = `[Site: ${siteConfig.siteId}]`;
     let scopes: ScopeWithPath[] | null = null;
     const siteStartTime = Date.now();
+
+    if (this.configDiagnosticsService.shouldLogConfig(ConfigEmitEvent.ON_SYNC)) {
+      this.configDiagnosticsService.logConfig(`${logPrefix} Site Config`, siteConfig);
+    }
 
     const initResult = await this.initializeSiteContext(siteConfig, logPrefix);
     if ('failureStep' in initResult) {

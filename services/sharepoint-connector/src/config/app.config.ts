@@ -1,10 +1,24 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
+import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { requiredStringSchema } from '../utils/zod.util';
 
 // ==========================================
 // App Configuration
 // ==========================================
+
+export const LogsDiagnosticDataPolicy = {
+  CONCEAL: 'conceal',
+  DISCLOSE: 'disclose',
+} as const;
+
+export const ConfigEmitEvent = {
+  ON_STARTUP: 'on_startup',
+  ON_SYNC: 'on_sync',
+} as const;
+export type ConfigEmitEventType = (typeof ConfigEmitEvent)[keyof typeof ConfigEmitEvent];
+
+const allConfigEmitEvents = [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.ON_SYNC] as const;
 
 export const AppConfigSchema = z
   .object({
@@ -24,10 +38,28 @@ export const AppConfigSchema = z
       .prefault('info')
       .describe('The log level at which the services outputs (pino)'),
     logsDiagnosticsDataPolicy: z
-      .enum(['conceal', 'disclose'])
-      .prefault('conceal')
+      .enum(LogsDiagnosticDataPolicy)
+      .prefault(LogsDiagnosticDataPolicy.CONCEAL)
       .describe(
         'Controls whether sensitive data e.g. site names, file names, etc. are logged in full or redacted',
+      ),
+    logsDiagnosticsConfigEmitPolicy: parseJsonEnvironmentVariable(
+      'LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY',
+    )
+      .pipe(
+        z.discriminatedUnion('emit', [
+          z.object({
+            emit: z.literal('on'),
+            events: z.array(z.enum(ConfigEmitEvent)).nonempty(),
+          }),
+          z.object({
+            emit: z.literal('off'),
+          }),
+        ]),
+      )
+      .prefault(JSON.stringify({ emit: 'on', events: allConfigEmitEvents }))
+      .describe(
+        'Controls when configuration is logged. Object with emit: "on"/"off". When "on", events array is required and must contain at least one of: on_startup, on_sync.',
       ),
     tenantConfigPathPattern: requiredStringSchema.describe(
       'Path pattern to tenant configuration YAML file(s). Supports glob patterns (e.g., /app/tenant-configs/*-tenant-config.yaml)',
@@ -38,14 +70,13 @@ export const AppConfigSchema = z
     isDev: c.nodeEnv === 'development',
   }));
 
-export type AppConfigFromSchema = z.infer<typeof AppConfigSchema>;
-
 export const appConfig = registerConfig('app', AppConfigSchema, {
   whitelistKeys: new Set([
     'LOG_LEVEL',
     'PORT',
     'NODE_ENV',
     'LOGS_DIAGNOSTICS_DATA_POLICY',
+    'LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY',
     'TENANT_CONFIG_PATH_PATTERN',
   ]),
 });

@@ -1,9 +1,7 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Histogram } from '@opentelemetry/api';
 import { filter, flat, indexBy, mapKeys, mapValues, pipe, prop, uniqueBy, values } from 'remeda';
-import { Config } from '../config';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { SyncStep } from '../constants/sync-step.enum';
 import { SPC_PERMISSIONS_SYNC_DURATION_SECONDS } from '../metrics';
@@ -16,10 +14,12 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/unique-groups/unique-groups.utils';
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { shouldConcealLogs, smear } from '../utils/logging.util';
+import { Smeared } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery, PermissionsMap } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
+import { GetRegularFolderPermissionsQuery } from './get-regular-folder-permissions.query';
+import { GetTopFolderPermissionsQuery } from './get-top-folder-permissions.query';
 import { SyncSharepointFilesPermissionsToUniqueCommand } from './sync-sharepoint-files-permissions-to-unique.command';
 import { SyncSharepointFolderPermissionsToUniqueCommand } from './sync-sharepoint-folder-permissions-to-unique.command';
 import { SyncSharepointGroupsToUniqueCommand } from './sync-sharepoint-groups-to-unique.command';
@@ -41,29 +41,26 @@ interface Input {
 @Injectable()
 export class PermissionsSyncService {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly fetchGraphPermissionsMapQuery: FetchGraphPermissionsMapQuery,
     private readonly fetchGroupsWithMembershipsQuery: FetchGroupsWithMembershipsQuery,
+    private readonly getRegularFolderPermissionsQuery: GetRegularFolderPermissionsQuery,
+    private readonly getTopFolderPermissionsQuery: GetTopFolderPermissionsQuery,
     private readonly syncSharepointGroupsToUniqueCommand: SyncSharepointGroupsToUniqueCommand,
     private readonly syncSharepointFilesPermissionsToUniqueCommand: SyncSharepointFilesPermissionsToUniqueCommand,
     private readonly syncSharepointFolderPermissionsToUniqueCommand: SyncSharepointFolderPermissionsToUniqueCommand,
     private readonly uniqueGroupsService: UniqueGroupsService,
     private readonly uniqueUsersService: UniqueUsersService,
-    private readonly configService: ConfigService<Config, true>,
     @Inject(SPC_PERMISSIONS_SYNC_DURATION_SECONDS)
     private readonly spcPermissionsSyncDurationSeconds: Histogram,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async syncPermissionsForSite(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId, ingestionMode } = context.siteConfig;
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
+    const logPrefix = `[Site: ${siteId}]`;
     const startTime = Date.now();
     let currentStep: SyncStep = SyncStep.PermissionsFetch;
 
@@ -120,9 +117,25 @@ export class PermissionsSyncService {
       if (ingestionMode === IngestionMode.Recursive) {
         currentStep = SyncStep.FolderPermissionsSync;
         assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
+
+        const regularFolderPermissions = this.getRegularFolderPermissionsQuery.run({
+          directories: sharePoint.directories,
+          permissionsMap,
+          rootPath: context.rootPath,
+        });
+
+        const topFolderPermissions = this.getTopFolderPermissionsQuery.run({
+          items: sharePoint.items,
+          directories: sharePoint.directories,
+          permissionsMap,
+          rootPath: context.rootPath,
+        });
+
         await this.syncSharepointFolderPermissionsToUniqueCommand.run({
           context,
-          sharePoint: { directories: sharePoint.directories, permissionsMap },
+          sharePoint: {
+            folderPermissions: new Map([...regularFolderPermissions, ...topFolderPermissions]),
+          },
           unique: {
             folders: unique.folders,
             groupsMap: updatedUniqueGroupsMap,
@@ -134,12 +147,12 @@ export class PermissionsSyncService {
       this.logger.log(`${logPrefix} Synced file permissions to Unique`);
 
       this.spcPermissionsSyncDurationSeconds.record(elapsedSeconds(startTime), {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         result: 'success',
       });
     } catch (error) {
       this.spcPermissionsSyncDurationSeconds.record(elapsedSeconds(startTime), {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         result: 'failure',
         failure_step: currentStep,
       });
@@ -148,10 +161,10 @@ export class PermissionsSyncService {
   }
 
   private async fetchGroupsWithMembershipsForSite(
-    siteId: string,
+    siteId: Smeared,
     permissionsMap: PermissionsMap,
   ): Promise<SharePointGroupsMap> {
-    const logPrefix = `[Site: ${this.shouldConcealLogs ? smear(siteId) : siteId}]`;
+    const logPrefix = `[Site: ${siteId}]`;
     const uniqueGroupPermissions = pipe(
       permissionsMap,
       values(),
@@ -174,8 +187,8 @@ export class PermissionsSyncService {
     );
   }
 
-  private async getUniqueGroupsMap(siteId: string): Promise<UniqueGroupsMap> {
-    const groupExternalIdPrefix = getSharepointConnectorGroupExternalIdPrefix(siteId);
+  private async getUniqueGroupsMap(siteId: Smeared): Promise<UniqueGroupsMap> {
+    const groupExternalIdPrefix = getSharepointConnectorGroupExternalIdPrefix(siteId.value);
     return pipe(
       await this.uniqueGroupsService.listAllGroupsForSite(siteId),
       indexBy(prop('externalId')),

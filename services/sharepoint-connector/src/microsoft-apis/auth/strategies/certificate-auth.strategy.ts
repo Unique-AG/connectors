@@ -4,8 +4,10 @@ import { readFileSync } from 'node:fs';
 import { ConfidentialClientApplication, type Configuration } from '@azure/msal-node';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Dispatcher } from 'undici';
 import { Config } from '../../../config';
 import { sanitizeError } from '../../../utils/normalize-error';
+import { ProxiedMsalNetworkClient } from '../msal-proxy-config';
 import { TokenAcquisitionResult } from '../types';
 import { AuthStrategy } from './auth-strategy.interface';
 
@@ -14,7 +16,10 @@ export class CertificateAuthStrategy implements AuthStrategy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly msalClient: ConfidentialClientApplication;
 
-  public constructor(private readonly configService: ConfigService<Config, true>) {
+  public constructor(
+    private readonly configService: ConfigService<Config, true>,
+    private readonly dispatcher: Dispatcher,
+  ) {
     const sharePointConfig = this.configService.get('sharepoint', { infer: true });
 
     assert.strictEqual(
@@ -38,7 +43,7 @@ export class CertificateAuthStrategy implements AuthStrategy {
     if (privateKeyPassword) {
       const privateKeyObject = crypto.createPrivateKey({
         key: privateKeyRaw,
-        passphrase: privateKeyPassword,
+        passphrase: privateKeyPassword.value,
         format: 'pem',
       });
       privateKey = privateKeyObject.export({ format: 'pem', type: 'pkcs8' }).toString();
@@ -54,6 +59,9 @@ export class CertificateAuthStrategy implements AuthStrategy {
           privateKey,
           ...(thumbprintSha256 ? { thumbprintSha256 } : { thumbprint }),
         },
+      },
+      system: {
+        networkClient: new ProxiedMsalNetworkClient(this.dispatcher),
       },
     };
 

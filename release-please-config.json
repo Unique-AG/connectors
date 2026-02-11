@@ -47,9 +47,6 @@
     },
     "services/sharepoint-connector": {
       "release-type": "node",
-      "prerelease": true,
-      "prerelease-type": "beta",
-      "versioning": "prerelease",
       "extra-files": [
         {
           "type": "yaml",
@@ -85,6 +82,29 @@
         {
           "type": "generic",
           "path": "deploy/helm-charts/teams-mcp/values.yaml"
+        }
+      ]
+    },
+    "services/outlook-semantic-mcp": {
+      "prerelease": true,
+      "versioning": "prerelease",
+      "extra-files": [
+        {
+          "type": "yaml",
+
+          "path": "deploy/helm-charts/outlook-semantic-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+
+          "path": "deploy/helm-charts/outlook-semantic-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+
+          "path": "deploy/helm-charts/outlook-semantic-mcp/values.yaml"
         }
       ]
     },

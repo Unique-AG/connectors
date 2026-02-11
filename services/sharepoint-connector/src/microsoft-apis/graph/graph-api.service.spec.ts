@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Smeared } from '../../utils/smeared';
 import { FileFilterService } from './file-filter.service';
 import { GraphApiService } from './graph-api.service';
 import { GraphClientFactory } from './graph-client.factory';
@@ -103,7 +104,7 @@ describe('GraphApiService', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
       (service as any).paginateGraphApiRequest = vi.fn().mockResolvedValue(mockColumns);
 
-      const result = await service.getListColumns('site-1', 'list-1');
+      const result = await service.getListColumns(new Smeared('site-1', false), 'list-1');
 
       expect(result).toEqual(mockColumns);
       // biome-ignore lint/suspicious/noExplicitAny: Check private method call
@@ -117,7 +118,9 @@ describe('GraphApiService', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
       (service as any).paginateGraphApiRequest = vi.fn().mockRejectedValue(new Error('API Error'));
 
-      await expect(service.getListColumns('site-1', 'list-1')).rejects.toThrow('API Error');
+      await expect(service.getListColumns(new Smeared('site-1', false), 'list-1')).rejects.toThrow(
+        'API Error',
+      );
     });
   });
 
@@ -177,7 +180,7 @@ describe('GraphApiService', () => {
           },
         },
       },
-      siteId: 'site-1',
+      siteId: new Smeared('site-1', false),
       driveId: 'drive-1',
       driveName: 'Documents',
       folderPath: '/',
@@ -211,12 +214,18 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
+        new Smeared('site-1', false),
+        'TestColumn',
+      );
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
+        new Smeared('site-1', false),
+        'TestColumn',
+      );
     });
 
     it('skips drives without IDs', async () => {
@@ -226,12 +235,18 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
+        new Smeared('site-1', false),
+        'TestColumn',
+      );
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
+        new Smeared('site-1', false),
+        'TestColumn',
+      );
     });
 
     it('handles pagination correctly', async () => {
@@ -248,12 +263,18 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
 
       expect(result.items).toHaveLength(2);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
+        new Smeared('site-1', false),
+        'TestColumn',
+      );
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
+        new Smeared('site-1', false),
+        'TestColumn',
+      );
     });
 
     it('filters out non-syncable files', async () => {
@@ -267,7 +288,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
 
       expect(result.items).toHaveLength(0);
       expect(result.directories).toHaveLength(0);
@@ -280,12 +301,18 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith('site-1', 'TestColumn');
+      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
+        new Smeared('site-1', false),
+        'TestColumn',
+      );
+      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
+        new Smeared('site-1', false),
+        'TestColumn',
+      );
     });
 
     it('counts total files vs syncable files', async () => {
@@ -301,7 +328,7 @@ describe('GraphApiService', () => {
         directories: [],
       });
 
-      const result = await service.getAllSiteItems('site-1', 'TestColumn');
+      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
 
       expect(result.items).toHaveLength(1);
       expect(result.directories).toHaveLength(0);
@@ -341,7 +368,7 @@ describe('GraphApiService', () => {
       maxFilesToScanConfig = 1;
 
       const result = await service.getAspxListItems(
-        'site-1',
+        new Smeared('site-1', false),
         'list-1',
         'FinanceGPTKnowledge',
         maxFilesToScanConfig,
@@ -364,7 +391,11 @@ describe('GraphApiService', () => {
         },
       });
 
-      const result = await service.getAspxPageContent('site-1', 'list-1', 'item-1');
+      const result = await service.getAspxPageContent(
+        new Smeared('site-1', false),
+        'list-1',
+        'item-1',
+      );
 
       expect(result).toEqual({
         canvasContent: '<div>Modern content</div>',
@@ -386,7 +417,11 @@ describe('GraphApiService', () => {
         },
       });
 
-      const result = await service.getAspxPageContent('site-1', 'list-1', 'item-1');
+      const result = await service.getAspxPageContent(
+        new Smeared('site-1', false),
+        'list-1',
+        'item-1',
+      );
 
       expect(result).toEqual({
         canvasContent: undefined,
@@ -404,7 +439,11 @@ describe('GraphApiService', () => {
         },
       });
 
-      const result = await service.getAspxPageContent('site-1', 'list-1', 'item-1');
+      const result = await service.getAspxPageContent(
+        new Smeared('site-1', false),
+        'list-1',
+        'item-1',
+      );
 
       expect(result).toEqual({
         canvasContent: '<div>Modern content</div>',
@@ -422,7 +461,11 @@ describe('GraphApiService', () => {
         },
       });
 
-      const result = await service.getAspxPageContent('site-1', 'list-1', 'item-1');
+      const result = await service.getAspxPageContent(
+        new Smeared('site-1', false),
+        'list-1',
+        'item-1',
+      );
 
       expect(result).toEqual({
         canvasContent: '<div>Modern content</div>',
@@ -435,9 +478,9 @@ describe('GraphApiService', () => {
       const mockChain = mockGraphClient.api();
       mockChain.get.mockResolvedValue({});
 
-      await expect(service.getAspxPageContent('site-1', 'list-1', 'item-1')).rejects.toThrow(
-        'MS Graph response missing fields for page content',
-      );
+      await expect(
+        service.getAspxPageContent(new Smeared('site-1', false), 'list-1', 'item-1'),
+      ).rejects.toThrow('MS Graph response missing fields for page content');
     });
   });
 });

@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { type Counter } from '@opentelemetry/api';
 import {
   differenceWith,
@@ -12,12 +11,11 @@ import {
   partition,
   pipe,
 } from 'remeda';
-import { Config } from '../config';
 import { SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL } from '../metrics';
 import { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueFile, UniqueFileAccessInput } from '../unique-api/unique-files/unique-files.types';
-import { shouldConcealLogs, smear } from '../utils/logging.util';
+import { createSmeared } from '../utils/smeared';
 import { Membership, UniqueGroupsMap, UniqueUsersMap } from './types';
 import { groupDistinctId } from './utils';
 
@@ -35,24 +33,19 @@ interface Input {
 @Injectable()
 export class SyncSharepointFilesPermissionsToUniqueCommand {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly shouldConcealLogs: boolean;
 
   public constructor(
     private readonly uniqueFilesService: UniqueFilesService,
-    private readonly configService: ConfigService<Config, true>,
     @Inject(SPC_PERMISSIONS_SYNC_FILE_OPERATIONS_TOTAL)
     private readonly spcPermissionsSyncFileOperationsTotal: Counter,
-  ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
-  }
+  ) {}
 
   public async run(input: Input): Promise<void> {
     const { context, sharePoint, unique } = input;
     const { siteId } = context.siteConfig;
     const { serviceUserId } = context;
 
-    const logSiteId = this.shouldConcealLogs ? smear(siteId) : siteId;
-    const logPrefix = `[Site: ${logSiteId}]`;
+    const logPrefix = `[Site: ${siteId}]`;
     this.logger.log(
       `${logPrefix} Starting permissions sync for ` +
         `${Object.keys(sharePoint.permissionsMap).length} items`,
@@ -70,9 +63,8 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
       const permissions = sharePoint.permissionsMap[uniqueFile.key];
 
       if (isNullish(permissions)) {
-        this.logger.warn(
-          `${loopLogPrefix} No SharePoint permissions found for key ${uniqueFile.key}`,
-        );
+        const logKey = createSmeared(uniqueFile.key);
+        this.logger.warn(`${loopLogPrefix} No SharePoint permissions found for key ${logKey}`);
         continue;
       }
 
@@ -147,13 +139,13 @@ export class SyncSharepointFilesPermissionsToUniqueCommand {
 
     if (totalPermissionsAdded > 0) {
       this.spcPermissionsSyncFileOperationsTotal.add(totalPermissionsAdded, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         operation: 'added',
       });
     }
     if (totalPermissionsRemoved > 0) {
       this.spcPermissionsSyncFileOperationsTotal.add(totalPermissionsRemoved, {
-        sp_site_id: logSiteId,
+        sp_site_id: siteId.toString(),
         operation: 'removed',
       });
     }

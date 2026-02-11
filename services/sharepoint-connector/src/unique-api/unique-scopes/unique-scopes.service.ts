@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { isNullish } from 'remeda';
+import { Smeared } from 'src/utils/smeared';
 import { BatchProcessorService } from '../../shared/services/batch-processor.service';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -76,14 +77,33 @@ export class UniqueScopesService {
 
   public async updateScopeExternalId(
     scopeId: string,
-    externalId: string,
+    externalId: Smeared,
   ): Promise<{ id: string; externalId: string | null }> {
     const result = await this.scopeManagementClient.request<
       UpdateScopeMutationResult,
       UpdateScopeMutationInput
     >(UPDATE_SCOPE_MUTATION, {
       id: scopeId,
-      input: { externalId },
+      input: { externalId: externalId.value },
+    });
+
+    return result.updateScope;
+  }
+
+  public async updateScopeParent(
+    scopeId: string,
+    newParentId: string,
+  ): Promise<{ id: string; parentId: string | null }> {
+    const result = await this.scopeManagementClient.request<
+      UpdateScopeMutationResult,
+      UpdateScopeMutationInput
+    >(UPDATE_SCOPE_MUTATION, {
+      id: scopeId,
+      input: {
+        parrentScope: {
+          connect: { id: newParentId },
+        },
+      },
     });
 
     return result.updateScope;
@@ -152,6 +172,21 @@ export class UniqueScopesService {
     return result.paginatedScope.nodes[0] ?? null;
   }
 
+  public async getScopeByExternalId(externalId: string): Promise<Scope | null> {
+    const result = await this.scopeManagementClient.request<
+      PaginatedScopeQueryResult,
+      PaginatedScopeQueryInput
+    >(PAGINATED_SCOPE_QUERY, {
+      skip: 0,
+      take: 1,
+      where: {
+        externalId: { equals: externalId },
+      },
+    });
+
+    return result.paginatedScope.nodes[0] ?? null;
+  }
+
   public async listChildrenScopes(parentId: string): Promise<Scope[]> {
     const logPrefix = `[ParentId: ${parentId}]`;
     this.logger.debug(`${logPrefix} Fetching children scopes from Unique API`);
@@ -181,17 +216,19 @@ export class UniqueScopesService {
     return scopes;
   }
 
-  public async deleteScopeRecursively(
+  public async deleteScope(
     scopeId: string,
+    options: { recursive?: boolean } = {},
   ): Promise<DeleteFolderMutationResult['deleteFolder']> {
-    this.logger.debug(`Deleting scope recursively: ${scopeId}`);
+    const { recursive = false } = options;
+    this.logger.debug(`Deleting scope: ${scopeId} (recursive: ${recursive})`);
 
     const result = await this.scopeManagementClient.request<
       DeleteFolderMutationResult,
       DeleteFolderMutationInput
     >(DELETE_FOLDER_MUTATION, {
       scopeId,
-      recursive: true,
+      recursive,
     });
 
     this.logger.debug(

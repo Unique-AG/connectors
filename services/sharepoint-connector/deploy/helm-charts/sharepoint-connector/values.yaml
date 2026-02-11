@@ -6,6 +6,8 @@ connector:
   env:
     LOG_LEVEL: info
     LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+    # When to emit config diagnostics logs. JSON object with emit: "on"/"off" and required events array when "on".
+    LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY: '{"emit":"on","events":["on_startup","on_sync"]}'
     MAX_FILE_SIZE_BYTES: "209715200"
     MAX_HEAP_MB: 1920
     NODE_ENV: production
@@ -29,11 +31,20 @@ connector:
   #         secretKeyRef:
   #           name: sharepoint-connector-secret
   #           key: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
+  #     # For proxy basic auth password (required when proxy.authMode is 'username_password')
+  #     - name: PROXY_PASSWORD
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: sharepoint-connector-secret
+  #           key: PROXY_PASSWORD
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
+  # -- List of ConfigMaps to load as environment variables
+  extraEnvCM:
+    - sharepoint-connector-proxy-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
-    tag: 2.0.0-beta.13 # x-release-please-version
+    tag: 2.1.0 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
@@ -55,14 +66,12 @@ connector:
     workloadIdentity:
       enabled: true
       clientId: unset_default_value
-  # The volume is needed for CorePack afawct
-  # FIXME: Correct @konsti?
   volumes:
     - name: tmp
       emptyDir: {}
       # -- Graph/SharePoint Certificate Secret
       # by default the chart expects the certificate to be in a secret named sharepoint-connector-secret under the key key.pem
-      # Users can supersede this with their own secret that contains the certificate under a different key or use
+      # Users can supersede this with their own secret that contains the certificate under a different key or use their own secret name
       # Users must also set the connectorConfig.sharepoint.auth.privateKeyPath to the path of the certificate in the secret
     - name: sharepoint-connector-secret
       secret:
@@ -70,7 +79,7 @@ connector:
         items:
           - key: key.pem
             path: key.pem
-      # -- Tenant configuration YAML file mounted from ConfigMap
+    # -- Tenant configuration YAML file mounted from ConfigMap
     - name: tenant-config
       configMap:
         name: sharepoint-connector-tenant-config
@@ -81,7 +90,7 @@ connector:
       mountPath: /app/key.pem
       subPath: key.pem
       readOnly: true
-      # -- Mount tenant configuration directory
+    # -- Mount tenant configuration directory
     - name: tenant-config
       mountPath: /app/tenant-configs
       readOnly: true
@@ -141,10 +150,12 @@ alerts:
       # environment: production
       # team: backend
 
-# -- config for the deployed connector, will be mapped to the connectors environment variables
-# users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
+# -- Config for the deployed connector, will be mapped to the connectors environment variables.
+# Users preferring setting all variables on their own disable the enabled flag and remove the
+# tenant-config from the connector.volumes and connector.volumeMounts.
 connectorConfig:
-  # -- if disabled, connector.extraEnvCM must be set to []
+  # -- if disabled, tenant-config must be removed from the connector.volumes and
+  # connector.volumeMounts
   enabled: true
   sharepoint:
     # -- tenant id against which the graph api calls are made
@@ -200,16 +211,16 @@ connectorConfig:
     #     # Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.
     #     # When unset, defaults to inherit_scopes_and_files; ignored in content_and_permissions.
     #     permissionsInheritanceMode: inherit_scopes_and_files
-      # Example: Additional site with different settings
-      # - siteId: 00000000-0000-0000-0000-000000000001
-      #   syncColumnName: HRKnowledge
-      #   ingestionMode: flat
-      #   scopeId: scope_bu4gokr0atzj0kfiubbbbbb
-      #   maxFilesToIngest: 500
-      #   storeInternally: enabled
-      #   syncStatus: active
-      #   syncMode: content_only
-      #   permissionsInheritanceMode: inherit_scopes_and_files
+    #   Example: Additional site with different settings
+    #   - siteId: 00000000-0000-0000-0000-000000000001
+    #     syncColumnName: HRKnowledge
+    #     ingestionMode: flat
+    #     scopeId: scope_bu4gokr0atzj0kfiubbbbbb
+    #     maxFilesToIngest: 500
+    #     storeInternally: enabled
+    #     syncStatus: active
+    #     syncMode: content_only
+    #     permissionsInheritanceMode: inherit_scopes_and_files
 
   unique:
     # -- communication mode for the Unique Services
@@ -267,3 +278,33 @@ connectorConfig:
     maxFileSizeToIngestBytes: null
     # -- cron expression for the scheduled SharePoint scan interval default: every 15 minutes
     scanIntervalCron: "*/15 * * * *"
+
+# -- HTTP proxy configuration for external API calls
+# Required for environments where internet access is only available through a proxy.
+# Users preferring setting all variables by hand disable the enabled flag and remove
+# sharepoint-connector-proxy-config from connector.extraEnvCM.
+proxyConfig:
+  # -- if disabled, sharepoint-connector-proxy-config must be removed from connector.extraEnvCM.
+  enabled: true
+  # -- Proxy authentication mode
+  # none: proxy disabled
+  # username_password: username/password authentication
+  # ssl_tls: TLS client certificate authentication
+  authMode: none
+  # -- Proxy server hostname (required for username_password/ssl_tls modes)
+  # host: proxy.example.com
+  # -- Proxy server port (required for username_password/ssl_tls modes)
+  # port: 8080
+  # -- Proxy protocol: http or https (required for username_password/ssl_tls modes)
+  # protocol: http
+  # -- Basic auth username (required for username_password mode)
+  # username: proxy-user
+  # password is loaded from a secret, see connector.envVars example for PROXY_PASSWORD
+  # -- Path to SSL/TLS client certificate (required for ssl_tls mode)
+  # sslCertPath: /app/proxy-certs/client.crt
+  # -- Path to SSL/TLS client key (required for ssl_tls mode)
+  # sslKeyPath: /app/proxy-certs/client.key
+  # -- Path to CA bundle for verifying proxy server certificate (optional)
+  # sslCaBundlePath: /app/proxy-certs/ca.crt
+  # -- Optional JSON string of headers for CONNECT request
+  # headers: '{"X-Proxy-Header":"value"}'

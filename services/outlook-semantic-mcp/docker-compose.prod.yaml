@@ -1,0 +1,104 @@
+services:
+  outlook-semantic-mcp-migration:
+    # image: ghcr.io/unique-ag/connectors/services/outlook-semantic-mcp:latest
+    build:
+      context: ../.. # Build from monorepo root
+      dockerfile: ./services/outlook-semantic-mcp/deploy/Dockerfile
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/outlook_semantic_mcp?schema=public
+    command: ["pnpm", "run", "db:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - outlook-semantic-mcp-network
+    restart: "no"
+
+  outlook-semantic-mcp:
+    # image: ghcr.io/unique-ag/connectors/services/outlook-semantic-mcp:latest
+    build:
+      context: ../.. # Build from monorepo root
+      dockerfile: ./services/outlook-semantic-mcp/deploy/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      # App configuration
+      - NODE_ENV=production
+      - PORT=3000
+      - SELF_URL=http://localhost:3000
+      # Database configuration
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/outlook_semantic_mcp?schema=public
+      # AMQP configuration
+      - AMQP_URL=amqp://rabbitmq:rabbitmq@rabbitmq:5672
+      # Microsoft configuration (from .env or environment)
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
+      - MICROSOFT_WEBHOOK_SECRET=${MICROSOFT_WEBHOOK_SECRET}
+      - MICROSOFT_PUBLIC_WEBHOOK_URL=${MICROSOFT_PUBLIC_WEBHOOK_URL}
+      # Auth configuration
+      - AUTH_HMAC_SECRET=${AUTH_HMAC_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      # Unique API configuration
+      - UNIQUE_SERVICE_AUTH_MODE=${UNIQUE_SERVICE_AUTH_MODE:-external}
+      - UNIQUE_API_BASE_URL=${UNIQUE_API_BASE_URL}
+      - UNIQUE_SERVICE_EXTRA_HEADERS=${UNIQUE_SERVICE_EXTRA_HEADERS}
+      # Optional: only needed for cluster_local mode
+      # - UNIQUE_INGESTION_SERVICE_BASE_URL=${UNIQUE_INGESTION_SERVICE_BASE_URL}
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      outlook-semantic-mcp-migration:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - outlook-semantic-mcp-network
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=outlook_semantic_mcp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - outlook-semantic-mcp-network
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    restart: always
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - 4369:4369
+      - 5671:5671
+      - 5672:5672
+      - 15671:15671
+      - 15672:15672
+      - 16691:16691
+      - 16692:16692
+      - 25672:25672
+    environment:
+      RABBITMQ_ERLANG_COOKIE: VHQXKTAQNDAZVACSQWMCTMJJ
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+    networks:
+      - outlook-semantic-mcp-network
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+
+networks:
+  outlook-semantic-mcp-network:
+    driver: bridge

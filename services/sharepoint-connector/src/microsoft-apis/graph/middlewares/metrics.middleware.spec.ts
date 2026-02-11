@@ -741,7 +741,7 @@ describe('MetricsMiddleware', () => {
 
       expect(loggerDebugSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          endpoint: '/sites/Lo[Redacted]at/_layouts/15/download.aspx',
+          endpoint: '/sites/********Flat/_layouts/15/download.aspx',
         }),
       );
     });
