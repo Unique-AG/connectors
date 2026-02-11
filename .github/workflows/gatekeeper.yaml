@@ -30,10 +30,13 @@ jobs:
       - name: Validate PR title
         run: |
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
-          export FILES
+          CONFIG="$PWD/.gitcommitizen"
 
-          # printenv outputs values directly without any shell interpretation
-          if ! OUTPUT=$(nix shell github:proventuslabs/scriptorium#cz --command bash -c 'printenv PR_TITLE | cz lint --paths "$(printenv FILES)"' 2>&1); then
+          # Write PR title to temp file to avoid stdin issues
+          echo "$PR_TITLE" > /tmp/pr_title.txt
+
+          # Run cz lint with explicit config file
+          if ! OUTPUT=$(nix shell github:proventuslabs/scriptorium#cz --command cz -c "$CONFIG" lint --paths "$FILES" < /tmp/pr_title.txt 2>&1); then
             echo "::error title=Invalid PR Title::$OUTPUT"
             exit 1
           fi
