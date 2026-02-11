@@ -73,7 +73,7 @@
         # turbo and biome are installed via pnpm (in package.json)
         nodePkgs = with pkgs; [
           nodejs_24 # matches Dockerfiles
-          corepack # pnpm version managed via corepack
+          corepack_24 # pnpm version managed via corepack
         ];
 
         # Infrastructure (deploy/)
