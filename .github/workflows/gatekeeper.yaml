@@ -32,12 +32,23 @@ jobs:
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
           CONFIG="$PWD/.gitcommitizen"
 
-          # Write PR title to temp file to avoid stdin issues
+          # Debug: show resolved config
+          echo "=== cz parse output ==="
+          nix shell github:proventuslabs/scriptorium#cz --command cz -c "$CONFIG" parse || true
+          echo "=== end cz parse ==="
+
+          # Write PR title to temp file
           echo "$PR_TITLE" > /tmp/pr_title.txt
+          echo "PR_TITLE content: $(cat /tmp/pr_title.txt)"
 
           # Run cz lint with explicit config file
-          if ! OUTPUT=$(nix shell github:proventuslabs/scriptorium#cz --command cz -c "$CONFIG" lint --paths "$FILES" < /tmp/pr_title.txt 2>&1); then
-            echo "::error title=Invalid PR Title::$OUTPUT"
+          echo "Running: cz -c $CONFIG lint --paths $FILES"
+          nix shell github:proventuslabs/scriptorium#cz --command cz -c "$CONFIG" lint --paths "$FILES" < /tmp/pr_title.txt
+          CZ_EXIT=$?
+          echo "cz lint exit code: $CZ_EXIT"
+
+          if [ $CZ_EXIT -ne 0 ]; then
+            echo "::error title=Invalid PR Title::cz lint failed"
             exit 1
           fi
 
