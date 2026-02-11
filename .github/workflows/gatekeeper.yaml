@@ -38,16 +38,14 @@ jobs:
           echo "CONFIG: $CONFIG"
 
           echo "=== DEBUG: shell plugin approach ==="
-          nix shell github:proventuslabs/scriptorium#shell-plugin --command bash -c '
-            source $scriptorium/scriptorium.plugin.sh
-            echo "cz version: $(cz --version)"
-            echo "cz parse:"
-            cz parse
-            echo "cz lint:"
-            printf "%s\n" "'"$PR_TITLE"'" | cz lint --paths '"$FILES"'
-            echo "cz lint exit: $?"
-          '
-          echo "shell plugin exit: $?"
+          git clone --depth 1 https://github.com/proventuslabs/scriptorium.git /tmp/scriptorium
+          source /tmp/scriptorium/scriptorium.plugin.sh
+          echo "cz version: $(cz --version)"
+          echo "cz parse:"
+          cz parse
+          echo "cz lint:"
+          printf '%s\n' "$PR_TITLE" | cz lint --paths $FILES
+          echo "cz lint exit: $?"
 
   gatekeeper:
     runs-on: ubuntu-latest
