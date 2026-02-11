@@ -9,21 +9,17 @@ export const getPossibleUniqueIds = (
     | "internetMessageId"
     | "id"
     | "uniqueBody"
-    | "from"
     | "toRecipients"
     | "sentDateTime"
+    | "from"
     | "subject"
-    | "isDraft"
   >,
 ): string => {
-  const internetId = `InternetMessageId:${message.internetMessageId}`;
-  const draftKey = `DraftMessageMicrosoftId:${message.id}`;
-  // if (message.internetMessageId) {
-  //   return `InternetMessageId:${message.internetMessageId}`;
-  // }
-
-  if (message.isDraft) {
-    return `DraftMessageMicrosoftId:${message.id}`;
+  // The following things were considered.
+  // 1. We do not use id of the message because it changes when you archive.
+  // 2. For draft emails the Fingerprint is not useful cause it changes but I tested it and draft emails have the internetMessageId attached as soon as they are created.
+  if (message.internetMessageId) {
+    return `InternetMessageId:${message.internetMessageId}`;
   }
 
   const toRecipients =
@@ -31,11 +27,12 @@ export const getPossibleUniqueIds = (
       ?.map((item) => item.emailAddress?.address)
       .filter(isNonNullish) ?? [];
 
-  // assert.ok(message.uniqueBody, `Unique body missing`);
   const fingerprint = [
     ["from", message.from?.emailAddress],
     ["to", toRecipients.sort().join(",")],
-    [""],
+    ["subject", message.subject?.trim() ?? ""],
+    ["sentDateTime", message?.sentDateTime?.toString() ?? ""],
+    ["uniqueBody", message.uniqueBody?.content?.toString() ?? ""],
   ]
     .map((item) => item.join(":"))
     .join(`|`);
