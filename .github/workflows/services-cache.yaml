@@ -22,7 +22,7 @@ jobs:
     outputs:
       services: ${{ steps.matrix.outputs.services }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       # Builds a JSON array of service names to fan out into parallel cache warming jobs.
       # On manual dispatch with specific services, validates input and uses the comma-separated input.
