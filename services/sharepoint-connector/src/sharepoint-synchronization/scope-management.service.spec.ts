@@ -638,7 +638,9 @@ describe('ScopeManagementService', () => {
 
       beforeEach(async () => {
         getScopeByExternalIdMock = vi.fn().mockResolvedValue(null);
-        updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
+        updateScopeExternalIdMock = vi
+          .fn()
+          .mockResolvedValue({ externalId: 'updated-external-id' });
 
         const { unit } = await TestBed.solitary(ScopeManagementService)
           .mock<UniqueScopesService>(UniqueScopesService)

@@ -1,11 +1,8 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
-import { isNullish } from "remeda";
-import { Smeared } from "src/utils/smeared";
-import { BatchProcessorService } from "../../shared/services/batch-processor.service";
-import {
-  SCOPE_MANAGEMENT_CLIENT,
-  UniqueGraphqlClient,
-} from "../clients/unique-graphql.client";
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { isNullish } from 'remeda';
+import { Smeared } from 'src/utils/smeared';
+import { BatchProcessorService } from '../../shared/services/batch-processor.service';
+import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   CREATE_SCOPE_ACCESSES_MUTATION,
   CreateScopeAccessesMutationInput,
@@ -25,8 +22,8 @@ import {
   UPDATE_SCOPE_MUTATION,
   UpdateScopeMutationInput,
   UpdateScopeMutationResult,
-} from "./unique-scopes.consts";
-import { Scope, ScopeAccess } from "./unique-scopes.types";
+} from './unique-scopes.consts';
+import { Scope, ScopeAccess } from './unique-scopes.types';
 
 const BATCH_SIZE = 100;
 
@@ -52,9 +49,7 @@ export class UniqueScopesService {
       return [];
     }
 
-    const mutation = getGenerateScopesBasedOnPathsMutation(
-      opts.includePermissions,
-    );
+    const mutation = getGenerateScopesBasedOnPathsMutation(opts.includePermissions);
 
     const allScopes = await this.batchProcessor.processInBatches({
       items: paths,
@@ -76,12 +71,10 @@ export class UniqueScopesService {
         return result.generateScopesBasedOnPaths;
       },
       logger: this.logger,
-      logPrefix: "[createScopesBasedOnPaths]",
+      logPrefix: '[createScopesBasedOnPaths]',
     });
 
-    this.logger.debug(
-      `Created ${allScopes.length} scopes from ${paths.length} paths`,
-    );
+    this.logger.debug(`Created ${allScopes.length} scopes from ${paths.length} paths`);
     return allScopes;
   }
 
@@ -228,9 +221,7 @@ export class UniqueScopesService {
 
   public async listScopesByExternalIdPrefix(prefix: Smeared): Promise<Scope[]> {
     const logPrefix = `[ExternalIdPrefix: ${prefix}]`;
-    this.logger.debug(
-      `${logPrefix} Fetching scopes by externalId prefix from Unique API`,
-    );
+    this.logger.debug(`${logPrefix} Fetching scopes by externalId prefix from Unique API`);
 
     let skip = 0;
     const scopes: Scope[] = [];
@@ -260,7 +251,7 @@ export class UniqueScopesService {
   public async deleteScope(
     scopeId: string,
     options: { recursive?: boolean } = {},
-  ): Promise<DeleteFolderMutationResult["deleteFolder"]> {
+  ): Promise<DeleteFolderMutationResult['deleteFolder']> {
     const { recursive = false } = options;
     this.logger.debug(`Deleting scope: ${scopeId} (recursive: ${recursive})`);
 

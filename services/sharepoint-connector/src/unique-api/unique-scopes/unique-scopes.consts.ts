@@ -1,6 +1,6 @@
-import { gql } from "graphql-request";
-import { UniqueAccessType, UniqueEntityType } from "../types";
-import type { Scope } from "./unique-scopes.types";
+import { gql } from 'graphql-request';
+import { UniqueAccessType, UniqueEntityType } from '../types';
+import type { Scope } from './unique-scopes.types';
 
 export interface GenerateScopesBasedOnPathsMutationInput {
   paths: string[];
@@ -11,16 +11,14 @@ export interface GenerateScopesBasedOnPathsMutationResult {
   generateScopesBasedOnPaths: Scope[];
 }
 
-export function getGenerateScopesBasedOnPathsMutation(
-  includePermissions: boolean,
-): string {
+export function getGenerateScopesBasedOnPathsMutation(includePermissions: boolean): string {
   const scopeAccessFields = includePermissions
     ? `scopeAccess {
           entityId
           type
           entityType
         }`
-    : "";
+    : '';
 
   return gql`
     mutation GenerateScopesBasedOnPaths($paths: [String!]!, $inheritAccess: Boolean) {
