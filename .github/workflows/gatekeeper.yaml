@@ -30,22 +30,12 @@ jobs:
       - name: Validate PR title
         run: |
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
-          CONFIG="$PWD/.gitcommitizen"
 
-          echo "=== DEBUG: Basic info ==="
-          echo "PR_TITLE: $PR_TITLE"
-          echo "FILES: $FILES"
-          echo "CONFIG: $CONFIG"
-
-          echo "=== DEBUG: shell plugin approach ==="
-          git clone --depth 1 https://github.com/proventuslabs/scriptorium.git /tmp/scriptorium
+          # Use shell plugin approach (nix shell has stdin issues in CI)
+          git clone --depth 1 --quiet https://github.com/proventuslabs/scriptorium.git /tmp/scriptorium
           source /tmp/scriptorium/scriptorium.plugin.sh
-          echo "cz version: $(cz --version)"
-          echo "cz parse:"
-          cz parse
-          echo "cz lint:"
+
           printf '%s\n' "$PR_TITLE" | cz lint --paths $FILES
-          echo "cz lint exit: $?"
 
   gatekeeper:
     runs-on: ubuntu-latest
