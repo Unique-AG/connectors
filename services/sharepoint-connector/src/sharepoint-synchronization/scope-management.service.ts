@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
+import { isNonNullish, isNullish, prop, pullObject, sortBy } from 'remeda';
 import { getInheritanceSettings } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
@@ -150,6 +150,71 @@ export class ScopeManagementService {
         error: sanitizeError(error),
       });
       throw error;
+    }
+  }
+
+  public async deleteOrphanedScopes(siteId: Smeared): Promise<void> {
+    const logPrefix = `[Site: ${siteId}]`;
+
+    let orphanedScopes: Scope[];
+    try {
+      orphanedScopes = await this.uniqueScopesService.listScopesByExternalIdPrefix(
+        siteId.transform((value) => `${PENDING_DELETE_PREFIX}${value}/`),
+      );
+    } catch (error) {
+      this.logger.warn({
+        msg: `${logPrefix} Failed to query orphaned scopes, skipping cleanup`,
+        error: sanitizeError(error),
+      });
+      return;
+    }
+
+    if (orphanedScopes.length === 0) {
+      return;
+    }
+
+    // We sort the orphans by depth to delete the deepest scopes first to avoid deleting scopes that
+    // have children. This way we can delete without recursive to be sure we're not accidentally
+    // deleting some content.
+
+    const orphanById = new Map(orphanedScopes.map((s) => [s.id, s]));
+    const depthById = new Map<string, number>();
+
+    const setOrphanDepth = (scope: Scope): number => {
+      const cached = depthById.get(scope.id);
+      if (isNonNullish(cached)) {
+        return cached;
+      }
+
+      let depth = 0;
+      const parent = scope.parentId ? orphanById.get(scope.parentId) : undefined;
+      if (parent) {
+        depth = 1 + setOrphanDepth(parent);
+      }
+      depthById.set(scope.id, depth);
+      return depth;
+    };
+
+    for (const scope of orphanedScopes) {
+      setOrphanDepth(scope);
+    }
+
+    const sortedOrphans = sortBy(orphanedScopes, [(scope) => depthById.get(scope.id) ?? 0, 'desc']);
+
+    this.logger.log(
+      `${logPrefix} Deleting ${orphanedScopes.length} orphaned scopes marked with pending-delete prefix`,
+    );
+
+    for (const scope of sortedOrphans) {
+      try {
+        await this.uniqueScopesService.deleteScope(scope.id);
+        this.logger.debug(`${logPrefix} Deleted orphaned scope ${scope.id}`);
+      } catch (error) {
+        this.logger.warn({
+          msg: `${logPrefix} Failed to delete orphaned scope ${scope.id}`,
+          error: sanitizeError(error),
+        });
+      }
     }
   }
 
