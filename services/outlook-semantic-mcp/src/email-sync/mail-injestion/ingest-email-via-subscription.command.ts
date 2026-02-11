@@ -6,7 +6,7 @@ import { IngestEmailCommand } from './ingest-email.command';
 
 @Injectable()
 export class IngestEmailViaSubscriptionCommand {
-  constructor(
+  public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly ingestEmailCommand: IngestEmailCommand,
   ) {}

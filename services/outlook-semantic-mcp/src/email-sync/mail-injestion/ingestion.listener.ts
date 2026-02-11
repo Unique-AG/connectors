@@ -14,7 +14,7 @@ import { IngestionPriority } from './utils/ingestion-queue.utils';
 
 @Injectable()
 export class IngestionListener {
-  constructor(
+  public constructor(
     private readonly ingestEmailViaSubscriptionCommand: IngestEmailViaSubscriptionCommand,
     private readonly ingestEmailCommand: IngestEmailCommand,
     private readonly updateMetadataCommand: UpdateMetadataCommand,

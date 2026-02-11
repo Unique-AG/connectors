@@ -27,7 +27,7 @@ export interface UniqueFileAccessInput {
 
 @Injectable()
 export class UniqueFilesService {
-  public async getFilesByKeys(keys: string[]): Promise<UniqueFile[]> {
+  public async getFilesByKeys(_keys: string[]): Promise<UniqueFile[]> {
     return [];
   }
 }

@@ -6,7 +6,7 @@ import { Scope } from './fetch-or-create-outlook-emails-root-scope.command';
 export class UniqueScopesService {
   public createScopesBasedOnPaths(
     paths: string[],
-    opts: { includePermissions: boolean; inheritAccess: boolean } = {
+    _opts: { includePermissions: boolean; inheritAccess: boolean } = {
       includePermissions: false,
       inheritAccess: true,
     },
@@ -25,7 +25,7 @@ export class UniqueScopesService {
   }
 
   public updateScopeExternalId(
-    scopeId: string,
+    _scopeId: string,
     externalId: unknown,
   ): Promise<{ id: string; externalId: string | null }> {
     return Promise.resolve({
@@ -44,7 +44,10 @@ export class UniqueScopesService {
     });
   }
 
-  public async deleteScope(scopeId: string, options: { recursive?: boolean } = {}): Promise<void> {
+  public async deleteScope(
+    _scopeId: string,
+    _options: { recursive?: boolean } = {},
+  ): Promise<void> {
     return Promise.resolve();
   }
 }

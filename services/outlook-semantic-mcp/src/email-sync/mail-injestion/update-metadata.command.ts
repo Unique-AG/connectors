@@ -4,7 +4,7 @@ import { getMetadataFromMessage } from './utils/get-metadata-from-message';
 
 @Injectable()
 export class UpdateMetadataCommand {
-  constructor(private readonly getMessageDetailsQuery: GetMessageDetailsQuery) {}
+  public constructor(private readonly getMessageDetailsQuery: GetMessageDetailsQuery) {}
 
   public async run({
     userProfileId,
@@ -18,7 +18,7 @@ export class UpdateMetadataCommand {
       userProfileId,
       messageId,
     });
-    const metadata = getMetadataFromMessage(message);
+    const _metadata = getMetadataFromMessage(message);
     // TODO: Update metadata
   }
 }

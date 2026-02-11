@@ -31,7 +31,7 @@ export const getRootScopeToBeProcessed = (userEmail: string): string =>
 
 @Injectable()
 export class FetchOrCreateOutlookEmailsRootScopeCommand {
-  constructor(
+  public constructor(
     private readonly traceService: TraceService,
     private readonly uniqueScopesService: UniqueScopesService,
   ) {}

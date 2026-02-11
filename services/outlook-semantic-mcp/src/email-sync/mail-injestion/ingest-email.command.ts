@@ -11,7 +11,7 @@ import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
 
 @Injectable()
 export class IngestEmailCommand {
-  constructor(
+  public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly getMessageDetailsQuery: GetMessageDetailsQuery,
     private readonly uniqueFileService: UniqueFilesService,
@@ -34,7 +34,7 @@ export class IngestEmailCommand {
       userProfileId: userProfile.id,
       messageId,
     });
-    const metadata = getMetadataFromMessage(graphMessage);
+    const _metadata = getMetadataFromMessage(graphMessage);
     const fileKey = getUniqueKeyForMessage(userProfile.email, graphMessage);
     const file = this.uniqueFileService.getFilesByKeys([fileKey]);
     if (isNullish(file)) {

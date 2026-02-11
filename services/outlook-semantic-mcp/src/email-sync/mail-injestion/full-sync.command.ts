@@ -24,7 +24,7 @@ type SyncFilters = z.infer<typeof syncFilters>;
 
 @Injectable()
 export class FullSyncCommand {
-  constructor(
+  public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly amqp: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
@@ -67,7 +67,7 @@ export class FullSyncCommand {
       url: item.webLink,
       updatedAt: item.lastModifiedDateTime,
     }));
-    const request = {
+    const _request = {
       partialKey: `TODO_DEFINE`,
       sourceKind: `TODO_DEFINE`,
       sourceName: `TODO_DEFINE`,
@@ -113,7 +113,7 @@ export class FullSyncCommand {
         priority: IngestionPriority.Low,
       });
     }
-    for (const fileKey of filleDiffResponse.deletedFiles) {
+    for (const _fileKey of filleDiffResponse.deletedFiles) {
       // TODO: Delete
     }
   }

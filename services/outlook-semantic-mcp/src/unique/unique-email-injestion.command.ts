@@ -1,10 +1,10 @@
 import { Injectable, NotImplementedException } from '@nestjs/common';
-import { Span, TraceService } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 
 @Injectable()
 export class InjestEmailCommand {
   @Span()
-  public async run(email: {
+  public async run(_email: {
     subject: string;
     key: string;
     metadata: Record<string, string>;
