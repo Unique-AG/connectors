@@ -187,13 +187,6 @@
                     "type": "string",
                     "description": "Label to trigger full sync of all labeled pages"
                   },
-                  "labels": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Labels to filter content for ingestion"
-                  },
                   "spaces": {
                     "type": "array",
                     "items": {

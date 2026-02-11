@@ -231,7 +231,7 @@ describe('tenant-config-loader', () => {
       expect(tenant2?.confluence.auth.clientId).toBe('tenant2-client-id');
     });
 
-    it('parses optional labels and spaces fields', async () => {
+    it('parses optional spaces field', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
 
       const config = {
@@ -240,7 +240,6 @@ describe('tenant-config-loader', () => {
           baseUrl: 'https://acme.atlassian.net/wiki',
           auth: oauth2loAuth,
           ...baseConfluenceFields,
-          labels: ['engineering', 'public'],
           spaces: ['ENG', 'HR'],
         },
         unique: clusterLocalUniqueConfig,
@@ -252,11 +251,10 @@ describe('tenant-config-loader', () => {
 
       const result = getTenantConfigs();
       const tenant = first(result);
-      expect(tenant.confluence.labels).toEqual(['engineering', 'public']);
       expect(tenant.confluence.spaces).toEqual(['ENG', 'HR']);
     });
 
-    it('accepts config without labels and spaces fields', async () => {
+    it('accepts config without optional spaces field', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
 
       const config = {
@@ -275,7 +273,6 @@ describe('tenant-config-loader', () => {
 
       const result = getTenantConfigs();
       const tenant = first(result);
-      expect(tenant.confluence.labels).toBeUndefined();
       expect(tenant.confluence.spaces).toBeUndefined();
     });
   });

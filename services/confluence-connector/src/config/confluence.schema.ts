@@ -36,7 +36,6 @@ export const ConfluenceConfigSchema = z.object({
     .string()
     .prefault(DEFAULT_INGEST_ALL_LABEL)
     .describe('Label to trigger full sync of all labeled pages'),
-  labels: z.array(z.string()).optional().describe('Labels to filter content for ingestion'),
   spaces: z
     .array(z.string())
     .optional()
