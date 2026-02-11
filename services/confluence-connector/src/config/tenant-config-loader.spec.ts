@@ -230,51 +230,6 @@ describe('tenant-config-loader', () => {
       expect(tenant2?.confluence.baseUrl).toBe('https://confluence.tenant2.com');
       expect(tenant2?.confluence.auth.clientId).toBe('tenant2-client-id');
     });
-
-    it('parses optional spaces field', async () => {
-      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
-
-      const config = {
-        confluence: {
-          instanceType: 'cloud',
-          baseUrl: 'https://acme.atlassian.net/wiki',
-          auth: oauth2loAuth,
-          ...baseConfluenceFields,
-          spaces: ['ENG', 'HR'],
-        },
-        unique: clusterLocalUniqueConfig,
-        processing: baseProcessingConfig,
-      };
-
-      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
-      setupSingleConfig(globSync, readFileSync, config);
-
-      const result = getTenantConfigs();
-      const tenant = first(result);
-      expect(tenant.confluence.spaces).toEqual(['ENG', 'HR']);
-    });
-
-    it('accepts config without optional spaces field', async () => {
-      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
-
-      const config = {
-        confluence: {
-          instanceType: 'cloud',
-          baseUrl: 'https://acme.atlassian.net/wiki',
-          auth: oauth2loAuth,
-          ...baseConfluenceFields,
-        },
-        unique: clusterLocalUniqueConfig,
-        processing: baseProcessingConfig,
-      };
-
-      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
-      setupSingleConfig(globSync, readFileSync, config);
-
-      const result = getTenantConfigs();
-      const tenant = first(result);
-      expect(tenant.confluence.spaces).toBeUndefined();
-    });
   });
 
   describe('secret injection', () => {

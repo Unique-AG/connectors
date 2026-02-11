@@ -36,10 +36,6 @@ export const ConfluenceConfigSchema = z.object({
     .string()
     .prefault(DEFAULT_INGEST_ALL_LABEL)
     .describe('Label to trigger full sync of all labeled pages'),
-  spaces: z
-    .array(z.string())
-    .optional()
-    .describe('Space keys to sync (if empty, syncs all accessible spaces)'),
 });
 
 export type ConfluenceConfig = z.infer<typeof ConfluenceConfigSchema>;
