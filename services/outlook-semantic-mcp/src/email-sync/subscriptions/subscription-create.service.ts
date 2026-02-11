@@ -110,15 +110,6 @@ export class SubscriptionCreateService {
       ),
     });
 
-    const syncStats = await this.db.query.mailFoldersSync.findFirst({
-      where: eq(mailFoldersSync.userProfileId, userProfileId.toString()),
-    });
-    if (!syncStats) {
-      this.db
-        .insert(mailFoldersSync)
-        .values({ userProfileId: userProfileId.toString() });
-    }
-
     if (existingSubscription) {
       span?.addEvent("found managed subscription", {
         id: existingSubscription.id,
@@ -302,10 +293,18 @@ export class SubscriptionCreateService {
       "Successfully created new managed subscription record",
     );
 
-    assert.ok(userProfile.email, `User has no emails`);
-    await this.fetchOrCreateOutlookEmailsRootScopeCommand.run(
-      userProfile.email,
-    );
+    // assert.ok(userProfile.email, `User has no emails`);
+    // await this.fetchOrCreateOutlookEmailsRootScopeCommand.run(
+    //   userProfile.email,
+    // );
+    // const syncStats = await this.db.query.mailFoldersSync.findFirst({
+    //   where: eq(mailFoldersSync.userProfileId, userProfileId.toString()),
+    // });
+    // if (!syncStats) {
+    //   this.db
+    //     .insert(mailFoldersSync)
+    //     .values({ userProfileId: userProfileId.toString() });
+    // }
 
     return { status: "created", subscription: created };
   }
