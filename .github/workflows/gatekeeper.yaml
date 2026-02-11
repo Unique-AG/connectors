@@ -27,7 +27,8 @@ jobs:
 
       - name: Validate PR title
         run: |
-          export FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
+          FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
+          export FILES
 
           # Source shell plugin (nix shell has stdin/stdout issues in GitHub Actions)
           git -c init.defaultBranch=main init --quiet /tmp/scriptorium
