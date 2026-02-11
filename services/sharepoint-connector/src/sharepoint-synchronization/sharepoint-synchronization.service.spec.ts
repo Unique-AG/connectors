@@ -124,6 +124,7 @@ describe('SharepointSynchronizationService', () => {
       initializeRootScope: vi.fn().mockResolvedValue({
         serviceUserId: 'user-123',
         rootPath: new Smeared('/test-root', false),
+        isInitialSync: false,
       }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
       deleteRootScopeRecursively: vi.fn().mockResolvedValue(undefined),

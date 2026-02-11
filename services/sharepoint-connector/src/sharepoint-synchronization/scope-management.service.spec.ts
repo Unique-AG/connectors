@@ -112,6 +112,7 @@ describe('ScopeManagementService', () => {
       siteId: new Smeared('site-123', false),
       scopeId: 'root-scope-123',
     }),
+    isInitialSync: false,
   };
 
   let service: ScopeManagementService;

@@ -7,4 +7,5 @@ export interface SharepointSyncContext {
   serviceUserId: string;
   /** Resolved path of the root scope (e.g. "/Root/Project") */
   rootPath: Smeared;
+  isInitialSync: boolean;
 }

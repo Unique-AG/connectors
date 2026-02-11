@@ -25,6 +25,7 @@ const buildSiteExternalId = (siteId: Smeared) =>
 export interface RootScopeInfo {
   serviceUserId: string;
   rootPath: Smeared;
+  isInitialSync: boolean;
 }
 
 @Injectable()
@@ -63,7 +64,9 @@ export class ScopeManagementService {
       `Root scope ${rootScopeId} is owned by a different site. This scope cannot be synced by this site.`,
     );
 
-    if (!rootScope.externalId) {
+    const isInitialSync = !rootScope.externalId;
+
+    if (isInitialSync) {
       const migrationResult = await this.rootScopeMigrationService.migrateIfNeeded(
         rootScopeId,
         siteId,
@@ -114,7 +117,7 @@ export class ScopeManagementService {
     const rootPath = createSmeared(`/${pathSegments.join('/')}`);
     this.logger.log(`Resolved root path: ${smearPath(rootPath)}`);
 
-    return { serviceUserId: userId, rootPath };
+    return { serviceUserId: userId, rootPath, isInitialSync };
   }
 
   public async deleteRootScopeRecursively(scopeId: string): Promise<void> {

@@ -255,6 +255,7 @@ export class SharepointSynchronizationService {
         siteName,
         serviceUserId: baseContext.serviceUserId,
         rootPath: baseContext.rootPath,
+        isInitialSync: baseContext.isInitialSync,
       },
     };
   }
