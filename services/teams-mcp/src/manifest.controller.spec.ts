@@ -21,7 +21,7 @@ describe('ManifestController', () => {
       },
       features: [
         'Microsoft Graph integration',
-        'Teams transcripts management',
+        'Teams transcripts and recordings management',
         'OAuth2 authentication',
         'Secure token handling',
         'RESTful API endpoints',
