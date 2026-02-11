@@ -30,15 +30,13 @@ jobs:
       - name: Validate PR title
         run: |
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
+          export FILES
 
-          # Source shell plugin (nix shell has stdin/stdout issues in GitHub Actions)
-          git clone --depth 1 --quiet https://github.com/proventuslabs/scriptorium.git /tmp/scriptorium
-          source /tmp/scriptorium/scriptorium.plugin.sh
-          printenv PR_TITLE | cz lint --paths $FILES
-
-          # Alternative: nix shell (currently broken in CI - no stdin forwarding)
-          # shell: 'nix shell github:proventuslabs/scriptorium#cz -c bash -e {0}'
-          # printf '%s\n' "$PR_TITLE" | cz lint --paths $FILES
+          # printenv outputs values directly without any shell interpretation
+          if ! OUTPUT=$(nix shell github:proventuslabs/scriptorium#cz --command bash -c 'printenv PR_TITLE | cz lint --paths "$(printenv FILES)"' 2>&1); then
+            echo "::error title=Invalid PR Title::$OUTPUT"
+            exit 1
+          fi
 
   gatekeeper:
     runs-on: ubuntu-latest
