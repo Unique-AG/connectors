@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import {
   AmqpConnection,
   defaultNackErrorHandler,
@@ -17,7 +18,6 @@ import {
 import { TraceService } from 'nestjs-otel';
 import { partition } from 'remeda';
 import { serializeError } from 'serialize-error-cjs';
-import { assert } from 'vitest';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { normalizeError } from '~/utils/normalize-error';
