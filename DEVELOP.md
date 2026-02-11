@@ -2,8 +2,20 @@
 
 ### Prerequisites
 
+**Option A: Nix (recommended)**
+
+If you have [Nix](https://nixos.org/) with flakes enabled:
+
+```bash
+nix develop
+```
+
+This provides all required tools (Node.js, pnpm, terraform, kubectl, helm, etc.) with pinned versions.
+
+**Option B: Manual setup**
+
 - Node.js >= 22
-- pnpm (specified version: 10.15.1)
+- pnpm (specified version in `package.json` `packageManager` field)
 
 ### Installation
 
@@ -114,6 +126,37 @@ Shared packages used across services:
 - **[mcp-oauth](./packages/mcp-oauth/README.md)** - OAuth 2.1 Authorization Code + PKCE flow for MCP servers
 - **[mcp-server-module](./packages/mcp-server-module/README.md)** - NestJS module for creating MCP servers
 - **[probe](./packages/probe/)** - Health check and monitoring utilities
+
+## Nix Development Environment
+
+The repository includes a Nix flake (`flake.nix`) that provides a reproducible development environment.
+
+### Usage
+
+```bash
+# Enter the development shell
+nix develop
+
+# Or use direnv for automatic activation
+# Add "use flake" to .envrc
+```
+
+### Included Tools
+
+| Category | Tools |
+|----------|-------|
+| Node.js | Node.js 24.x, pnpm (via corepack), turbo, biome, lefthook |
+| Infrastructure | terraform, kubectl, helm, azure-cli, devtunnel |
+| Utilities | jq, yq, zsh |
+
+### Extending for New Languages
+
+The flake uses a single devShell by design. When adding new language support (e.g., Python):
+
+1. Add the language packages to the appropriate category in `flake.nix`
+2. The shared tools (infrastructure, utilities) remain available to all services
+
+This approach keeps the development experience consistent across the monorepo while allowing services to use different languages.
 
 ## Contributing
 
