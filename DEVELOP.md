@@ -158,6 +158,32 @@ The flake uses a single devShell by design. When adding new language support (e.
 
 This approach keeps the development experience consistent across the monorepo while allowing services to use different languages.
 
+### Multiple DevShells (Optional)
+
+If isolated environments become necessary (e.g., conflicting tool versions or reducing shell startup time), the flake can expose multiple devShells:
+
+```nix
+devShells = {
+  default = pkgs.mkShell {
+    buildInputs = sharedPkgs ++ nodePkgs ++ infraPkgs;
+  };
+  python = pkgs.mkShell {
+    buildInputs = sharedPkgs ++ pythonPkgs ++ infraPkgs;
+  };
+  # Or per-service:
+  # teams-mcp = pkgs.mkShell { ... };
+};
+```
+
+Usage:
+
+```bash
+nix develop          # default (Node.js)
+nix develop .#python # Python environment
+```
+
+Prefer the single devShell approach unless there's a concrete need for separation.
+
 ## Contributing
 
 1. Install dependencies: `pnpm install`
