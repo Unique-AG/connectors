@@ -32,8 +32,8 @@ jobs:
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
           export FILES
 
-          # Use bash -c with single quotes - inner bash expands env vars safely
-          if ! OUTPUT=$(nix shell github:proventuslabs/scriptorium#cz --command bash -c 'echo "$PR_TITLE" | cz lint --paths "$FILES"' 2>&1); then
+          # Use bash -c with single quotes and printf %s to safely pass untrusted input
+          if ! OUTPUT=$(nix shell github:proventuslabs/scriptorium#cz --command bash -c 'printf "%s" "$PR_TITLE" | cz lint --paths "$FILES"' 2>&1); then
             echo "::error title=Invalid PR Title::$OUTPUT"
             exit 1
           fi
