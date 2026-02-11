@@ -1,4 +1,5 @@
 import {
+  AmqpConnection,
   defaultNackErrorHandler,
   RabbitPayload,
   RabbitSubscribe,
@@ -14,20 +15,24 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { TraceService } from 'nestjs-otel';
+import { partition } from 'remeda';
 import { serializeError } from 'serialize-error-cjs';
+import { assert } from 'vitest';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { normalizeError } from '~/utils/normalize-error';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
+import { MessageEventDto } from './mail-injestion/dtos/message-events.dtos';
+import { IngestionPriority } from './mail-injestion/utils/ingestion-queue.utils';
 import {
   ChangeNotificationCollectionDto,
   LifecycleChangeNotificationCollectionDto,
   LifecycleEventDto,
-} from './subscription.dtos';
-import { SubscriptionCreateService } from './subscription-create.service';
-import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
-import { SubscriptionRemoveService } from './subscription-remove.service';
-import { MailSubscriptionUtilsService } from './subscription-utils.service';
+} from './subscriptions/subscription.dtos';
+import { SubscriptionCreateService } from './subscriptions/subscription-create.service';
+import { SubscriptionReauthorizeService } from './subscriptions/subscription-reauthorize.service';
+import { SubscriptionRemoveService } from './subscriptions/subscription-remove.service';
+import { MailSubscriptionUtilsService } from './subscriptions/subscription-utils.service';
 
 @Controller('mail-subscription')
 export class MailSubscriptionController {
@@ -39,6 +44,7 @@ export class MailSubscriptionController {
     private readonly subscriptionRemove: SubscriptionRemoveService,
     private readonly utils: MailSubscriptionUtilsService,
     private readonly trace: TraceService,
+    private readonly amqpConnection: AmqpConnection,
   ) {}
 
   @Post('lifecycle')
@@ -83,7 +89,10 @@ export class MailSubscriptionController {
               type: notification.lifecycleEvent,
             });
             this.logger.warn(
-              { lifecycleNotification: notification, eventType: notification.lifecycleEvent },
+              {
+                lifecycleNotification: notification,
+                eventType: notification.lifecycleEvent,
+              },
               'Discarding lifecycle notification with unsupported event type',
             );
             return null;
@@ -117,7 +126,9 @@ export class MailSubscriptionController {
       });
       throw new InternalServerErrorException(
         { errors: failed.map((v) => v.reason) },
-        { description: `internal publishing of ${failed.length} messages failed` },
+        {
+          description: `internal publishing of ${failed.length} messages failed`,
+        },
       );
     }
   }
@@ -136,64 +147,35 @@ export class MailSubscriptionController {
     );
 
     const span = this.trace.getSpan();
-    const processRequests = event.value
-      .filter((notification) => {
-        const isTrusted = this.utils.isWebhookTrustedViaState(notification.clientState);
-        if (!isTrusted) {
-          span?.addEvent('change notification invalid');
-          this.logger.warn(
-            { changeNotification: notification },
-            'Discarding change notification due to invalid authentication state',
-          );
-        }
-        return isTrusted;
-      })
-      .map((notification) => {
-        switch (notification.changeType) {
-          case 'created': {
-            // TOOD: Implement subscription created and full sync
-            return null;
-          }
-
-          default: {
-            span?.addEvent('change notification unsupported', { type: notification.changeType });
-            this.logger.warn(
-              { changeNotification: notification, changeType: notification.changeType },
-              'Discarding change notification with unsupported change type',
-            );
-            return null;
-          }
-        }
-      })
-      // REVIEW: we could just leave the `null` values and then filter on `fulfilled` + `null` to see how many discarded
-      .filter((v) => v !== null);
-
-    const publishings = await Promise.allSettled(processRequests);
-    const successful = publishings.filter((result) => result.status === 'fulfilled');
-    const failed = publishings.filter((result) => result.status === 'rejected');
-
-    span?.addEvent('notifications published', {
-      successful: successful.length,
-      failed: failed.length,
-    });
-    this.logger.log(
-      { successful: successful.length, failed: failed.length },
-      'Successfully processed all change notifications from Microsoft Graph',
+    const [notificationsToIgnore, notificationsToProcess] = partition(
+      event.value,
+      (notification) => notification.changeType === 'deleted',
     );
 
-    // NOTE: if we fail any, we reject this webhook as microsoft will send this again later
-    if (failed.length > 0) {
-      failed.forEach((fail) => {
-        this.logger.warn(
-          { error: serializeError(normalizeError(fail.reason)) },
-          'Failed to publish processing request to message queue',
-        );
-        // span?.recordException(fail.reason)
-      });
-      throw new InternalServerErrorException(
-        { errors: failed.map((v) => v.reason) },
-        { description: `internal publishing of ${failed.length} messages failed` },
+    span?.setAttribute(`notifications_to_process_count`, notificationsToProcess.length);
+    span?.setAttribute(`notifications_to_ignore_count`, notificationsToIgnore.length);
+
+    if (!notificationsToProcess.length) {
+      span?.addEvent(`No notifications to process`);
+      return;
+    }
+
+    span?.addEvent(`No notifications to process`);
+    for (const notification of notificationsToProcess) {
+      assert.ok(
+        notification.resourceData,
+        `Missing resource data from notification: ${JSON.stringify(notification)}`,
       );
+      const payload = await MessageEventDto.encodeAsync({
+        type: 'unique.outlook-semantic-mcp.mail.subscription-message-changed',
+        payload: {
+          subscriptionId: notification.subscriptionId,
+          messageId: notification.resourceData.id,
+        },
+      });
+      await this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload, {
+        priority: IngestionPriority.Heigh,
+      });
     }
   }
 

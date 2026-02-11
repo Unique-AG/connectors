@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { DrizzleModule } from '~/drizzle/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueModule } from '~/unique/unique.module';
-import { MailSubscriptionController } from './mail-subscription.controller';
 import { SubscriptionCreateService } from './subscription-create.service';
 import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscription-remove.service';
@@ -20,12 +19,16 @@ import {
     SubscriptionCreateService,
     SubscriptionReauthorizeService,
     SubscriptionRemoveService,
-    MailSubscriptionController,
     // KB Integration MCP Tools
     VerifyKbIntegrationStatusTool,
     StartKbIntegrationTool,
     StopKbIntegrationTool,
   ],
-  controllers: [MailSubscriptionController],
+  exports: [
+    MailSubscriptionUtilsService,
+    SubscriptionCreateService,
+    SubscriptionReauthorizeService,
+    SubscriptionRemoveService,
+  ],
 })
 export class SubscriptionModule {}
