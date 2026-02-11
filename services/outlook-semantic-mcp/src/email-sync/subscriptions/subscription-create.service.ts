@@ -19,6 +19,7 @@ import {
   SubscriptionRequestedEventDto,
 } from "./subscription.dtos";
 import { MailSubscriptionUtilsService } from "./subscription-utils.service";
+import { FetchOrCreateOutlookEmailsRootScopeCommand } from "~/unique/unique-scopes/fetch-or-create-outlook-emails-root-scope.command";
 
 export interface SubscribeResult {
   status: "created" | "already_active" | "expiring_soon";
@@ -42,6 +43,7 @@ export class SubscriptionCreateService {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly utils: MailSubscriptionUtilsService,
+    private readonly fetchOrCreateOutlookEmailsRootScopeCommand: FetchOrCreateOutlookEmailsRootScopeCommand,
   ) {}
 
   @Span()
@@ -208,6 +210,7 @@ export class SubscriptionCreateService {
     const userProfile = await this.db.query.userProfiles.findFirst({
       columns: {
         providerUserId: true,
+        email: true,
       },
       where: eq(userProfiles.id, userProfileId.toString()),
     });
@@ -297,6 +300,11 @@ export class SubscriptionCreateService {
     this.logger.log(
       { id: created.id },
       "Successfully created new managed subscription record",
+    );
+
+    assert.ok(userProfile.email, `User has no emails`);
+    await this.fetchOrCreateOutlookEmailsRootScopeCommand.run(
+      userProfile.email,
     );
 
     return { status: "created", subscription: created };

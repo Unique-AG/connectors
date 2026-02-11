@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { DrizzleModule } from "../drizzle/drizzle.module";
 import { UniqueService } from "./unique.service";
-import { FetchOrCreateOutlookEmailsRootScopeCommand } from "./fetch-or-create-outlook-emails-root-scope.command";
+import { FetchOrCreateOutlookEmailsRootScopeCommand } from "./unique-scopes/fetch-or-create-outlook-emails-root-scope.command";
 
 @Module({
   imports: [DrizzleModule],

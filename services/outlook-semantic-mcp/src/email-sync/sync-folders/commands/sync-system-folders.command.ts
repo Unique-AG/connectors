@@ -9,19 +9,16 @@ import {
   userProfiles,
 } from "~/drizzle";
 import { GraphClientFactory } from "~/msgraph/graph-client.factory";
-import { UniqueService } from "~/unique/unique.service";
 import {
   GraphMailFolder,
   graphMailFolderSchema,
 } from "../microsoft-graph.dtos";
 import { and, eq } from "drizzle-orm";
-import { FetchOrCreateOutlookEmailsRootScopeCommand } from "../../../unique/fetch-or-create-outlook-emails-root-scope.command";
+import { getRootScopePath } from "~/unique/unique-scopes/fetch-or-create-outlook-emails-root-scope.command";
 import assert from "node:assert";
 import { isNonNullish } from "remeda";
-import {
-  isDrizzleDatabaseError,
-  isDrizzleDuplicateFieldError,
-} from "~/drizzle/isDrizzleError";
+import { isDrizzleDuplicateFieldError } from "~/drizzle/isDrizzleError";
+import { UniqueScopesService } from "~/unique/unique-scopes/unique-scopes.service";
 
 interface GraphFolderInfo {
   folder: GraphMailFolder;
@@ -33,7 +30,7 @@ export class SyncFoldersCommand {
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly trace: TraceService,
-    private readonly fetchOrCreateOutlookEmailsRootScopeCommand: FetchOrCreateOutlookEmailsRootScopeCommand,
+    private readonly uniqueScopeService: UniqueScopesService,
     private readonly graphClientFactory: GraphClientFactory,
   ) {}
 
@@ -104,11 +101,8 @@ export class SyncFoldersCommand {
     userProfile: UserProfile;
     microsoftGraphDirectories: GraphFolderInfo[];
   }): Promise<void> {
-    assert.ok(userProfile.email, `Missing user email: ${userProfile.id}`);
-    const rootScope = await this.fetchOrCreateOutlookEmailsRootScopeCommand.run(
-      userProfile.email,
-    );
-    const scopesToDeleteInCaseOfFailure: { id: string }[] = [];
+    const userEmail = userProfile.email;
+    assert.ok(userEmail, `Missing user email: ${userProfile.id}`);
     const [foldersSyncStatus] = await this.db
       .select()
       .from(mailFoldersSync)
@@ -120,10 +114,25 @@ export class SyncFoldersCommand {
       return;
     }
 
-    for (const {
-      folder,
-      isDirectoryIgnoredForSync,
-    } of microsoftGraphDirectories) {
+    const scopes = await this.uniqueScopeService.createScopesBasedOnPaths(
+      microsoftGraphDirectories.map(
+        ({ folder }) => `${getRootScopePath(userEmail)}/${folder.displayName}`,
+      ),
+    );
+
+    for (let index = 0; index < microsoftGraphDirectories.length; index++) {
+      const directoryInfo = microsoftGraphDirectories[index];
+      assert.ok(
+        directoryInfo,
+        `Wrong index:${index} access for microsoftGraphDirectories: ${microsoftGraphDirectories.length}`,
+      );
+      const { folder, isDirectoryIgnoredForSync } = directoryInfo;
+      const scope = scopes[index];
+      assert.ok(
+        scope,
+        `Wrong index:${index} access for scopes: ${scopes.length}`,
+      );
+      await this.uniqueScopeService.updateScopeExternalId(scope.id, folder.id);
       const currentFolder = await this.db.query.mailFolders.findFirst({
         where: and(
           eq(mailFolders.userProfileId, userProfile.id),
@@ -134,13 +143,6 @@ export class SyncFoldersCommand {
       if (isNonNullish(currentFolder)) {
         continue;
       }
-
-      // TODO: create directory in rootScope
-      const uniqueScopeId = `some_scope_id`;
-      // Do we treat our service as some thing which can fail
-      // If yes how we handle it ? Do I insert hald and go on later with the other half ?
-      scopesToDeleteInCaseOfFailure.push({ id: uniqueScopeId });
-
       try {
         await this.db.insert(mailFolders).values({
           debugData: folder,
@@ -148,13 +150,13 @@ export class SyncFoldersCommand {
           microsoftId: folder.id,
           isSystemFolder: true,
           isDirectoryIgnoredForSync,
-          uniqueScopeId,
+          uniqueScopeId: scope.id,
           userProfileId: userProfile.id,
           parentId: null,
         });
       } catch (error) {
         if (isDrizzleDuplicateFieldError(error)) {
-          // TODO: Delete previous scope.
+          await this.uniqueScopeService.deleteScope(scope.id);
         }
       }
     }

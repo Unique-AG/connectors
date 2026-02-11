@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, not, notInArray } from "drizzle-orm";
-import { Span, TraceService } from "nestjs-otel";
+import { Span } from "nestjs-otel";
 import assert from "node:assert";
 import { isNullish } from "remeda";
 import {
@@ -10,21 +10,21 @@ import {
   mailFolders,
   userProfiles,
 } from "~/drizzle";
-import { GraphClientFactory } from "~/msgraph/graph-client.factory";
-import { UniqueService } from "~/unique/unique.service";
 import { GraphMailFolder } from "../microsoft-graph.dtos";
 import { FetchAllFodlersFromMicrosoftGraphQuery } from "./fetch-all-folders-from-microsoft-graph.query";
-import { FetchOrCreateOutlookEmailsRootScopeCommand } from "../../../unique/fetch-or-create-outlook-emails-root-scope.command";
+import { UniqueScopesService } from "~/unique/unique-scopes/unique-scopes.service";
+import {
+  FetchOrCreateOutlookEmailsRootScopeCommand,
+  getRootScopePath,
+} from "~/unique/unique-scopes/fetch-or-create-outlook-emails-root-scope.command";
 
 @Injectable()
 export class SyncFullFolderStructureCommand {
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    private readonly trace: TraceService,
-    private readonly uniqueService: UniqueService,
-    private readonly graphClientFactory: GraphClientFactory,
-    private readonly fetchOrCreateOutlookEmailsRootScopeCommand: FetchOrCreateOutlookEmailsRootScopeCommand,
     private readonly fetchAllFodlersFromMicrosoftGraphQuery: FetchAllFodlersFromMicrosoftGraphQuery,
+    private uniqueScopesService: UniqueScopesService,
+    private fetchOrCreateOutlookEmailsRootScopeCommand: FetchOrCreateOutlookEmailsRootScopeCommand,
   ) {}
 
   @Span()
@@ -58,9 +58,6 @@ export class SyncFullFolderStructureCommand {
     const allDirectoriesInDatabase = await this.db.query.mailFolders.findMany({
       where: eq(mailFolders.userProfileId, userProfile.id),
     });
-    const rootScope = await this.fetchOrCreateOutlookEmailsRootScopeCommand.run(
-      userProfile.email,
-    );
     const microsoftIdToDatabaseRecord = allDirectoriesInDatabase.reduce<
       Record<string, MailFolder>
     >((acc, item) => {
@@ -72,6 +69,12 @@ export class SyncFullFolderStructureCommand {
         .filter((item) => item.isDirectoryIgnoredForSync)
         .map((item) => item.microsoftId),
     );
+
+    // uniqueScopesService
+    const rootScope = await this.fetchOrCreateOutlookEmailsRootScopeCommand.run(
+      userProfile.email,
+    );
+
     // TODO: Think if we can generate the whole scopes on paths -> and then maybe just update the db ?
     // Once we have all the paths go and update the db
     // My main concern is -> if the db fails or query to unique service fails what do we do ? The directories will remain in an inconcistent state
@@ -79,6 +82,7 @@ export class SyncFullFolderStructureCommand {
     let queue = graphDirectories.map((folder) => ({
       folder,
       parentScopeId: rootScope.id,
+      path: [getRootScopePath(userProfile.email)],
       isDirectoryIgnoredForSync: microsoftFolderIdsIgnoredForSync.has(
         folder.id,
       ),
@@ -89,6 +93,7 @@ export class SyncFullFolderStructureCommand {
       const nextQueue: {
         folder: GraphMailFolder;
         parentScopeId: string;
+        path: string[];
         isDirectoryIgnoredForSync: boolean;
       }[] = [];
 
@@ -96,13 +101,25 @@ export class SyncFullFolderStructureCommand {
         folder,
         parentScopeId,
         isDirectoryIgnoredForSync,
+        path,
       } of queue) {
         graphDirectoryIds.push(folder.id);
 
         const doesDirectoryExist = folder.id in microsoftIdToDatabaseRecord;
+        const newPath = [...path, folder.displayName];
 
         if (!doesDirectoryExist) {
-          const uniqueScopeId = `SOME_SCOPE`;
+          const [newScope] =
+            await this.uniqueScopesService.createScopesBasedOnPaths([
+              newPath.join("/"),
+              folder.displayName,
+            ]);
+          assert.ok(newScope, `Could not create new scope on path`);
+          await this.uniqueScopesService.updateScopeExternalId(
+            newScope.id,
+            folder.id,
+          );
+          // const uniqueScopeId = `SOME_SCOPE`;
           // TODO: Create scope in parent scope.
 
           const [newDirectory] = await this.db
@@ -112,7 +129,7 @@ export class SyncFullFolderStructureCommand {
               displayName: folder.displayName,
               microsoftId: folder.id,
               isSystemFolder: true,
-              uniqueScopeId,
+              uniqueScopeId: newScope.id,
               userProfileId: userProfile.id,
               isDirectoryIgnoredForSync,
               parentId: null,
@@ -124,7 +141,8 @@ export class SyncFullFolderStructureCommand {
           children.forEach((child) =>
             nextQueue.push({
               folder: child,
-              parentScopeId: uniqueScopeId,
+              parentScopeId: newScope.id,
+              path: newPath,
               isDirectoryIgnoredForSync:
                 isDirectoryIgnoredForSync ||
                 microsoftFolderIdsIgnoredForSync.has(child.id),
@@ -143,8 +161,14 @@ export class SyncFullFolderStructureCommand {
 
         // Directory was moved
         if (currentMicrosoftParentId === databaseMicrosoftParentId) {
-          // TODO: Unique -> move scope to parent scope
-          // TODO: Update metadata request
+          await this.uniqueScopesService.updateScopeParent(
+            dbRecord.uniqueScopeId,
+            parentScopeId,
+          );
+          await this.uniqueScopesService.updateScopeExternalId(
+            dbRecord.uniqueScopeId,
+            folder.id,
+          );
 
           dbRecord.parentId = isNullish(currentMicrosoftParentId)
             ? null
@@ -161,6 +185,7 @@ export class SyncFullFolderStructureCommand {
           nextQueue.push({
             folder: child,
             parentScopeId: dbRecord.uniqueScopeId,
+            path: newPath,
             isDirectoryIgnoredForSync:
               isDirectoryIgnoredForSync ||
               microsoftFolderIdsIgnoredForSync.has(child.id),
