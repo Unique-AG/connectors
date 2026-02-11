@@ -25,12 +25,6 @@ data:
       {{- if $tenant.confluence.ingestAllLabel }}
       ingestAllLabel: {{ $tenant.confluence.ingestAllLabel | quote }}
       {{- end }}
-      {{- if $tenant.confluence.spaces }}
-      spaces:
-        {{- range $tenant.confluence.spaces }}
-        - {{ . | quote }}
-        {{- end }}
-      {{- end }}
     # Unique API Configuration
     unique:
       serviceAuthMode: {{ $tenant.unique.authMode | quote }}

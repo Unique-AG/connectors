@@ -125,10 +125,6 @@ connectorConfig:
         ingestSingleLabel: ai-ingest
         # -- Label to trigger full sync of all labeled pages
         ingestAllLabel: ai-ingest-all
-        # -- Space keys to sync (if empty, syncs all accessible spaces)
-        # spaces:
-        #   - "ENGINEERING"
-        #   - "PRODUCT"
 
       unique:
         # -- communication mode for the Unique Services
