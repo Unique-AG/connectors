@@ -1,7 +1,6 @@
-import assert from "node:assert";
 import { GraphMessage } from "./microsoft-graph.dtos";
 import { createHash } from "node:crypto";
-import { isNonNullish, sort } from "remeda";
+import { isNonNullish } from "remeda";
 
 export const getPossibleUniqueIds = (
   message: Pick<

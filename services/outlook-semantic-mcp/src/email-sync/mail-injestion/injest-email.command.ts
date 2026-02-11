@@ -7,7 +7,7 @@ import {
   GraphMessageFields,
 } from "./microsoft-graph.dtos";
 import { pick } from "remeda";
-import { getPossibleUniqueId } from "./get-unique-id";
+import { getUniqueKey } from "./get-unique-id";
 
 @Injectable()
 class InjestEmailCommand {
@@ -32,7 +32,7 @@ class InjestEmailCommand {
       .get();
 
     const graphMessage = graphMessageSchema.parse(messageRaw);
-    const injestionId = getPossibleUniqueId(graphMessage);
+    const injestionId = getUniqueKey(graphMessage);
     // const metadata = pick(graphMessage, ['']);
   }
 
