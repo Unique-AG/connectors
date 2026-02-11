@@ -28,14 +28,15 @@ jobs:
       - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
 
       - name: Validate PR title
+        shell: 'nix shell github:proventuslabs/scriptorium#cz -c bash -e {0}'
         run: |
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
-
-          # Use shell plugin approach (nix shell has stdin issues in CI)
-          git clone --depth 1 --quiet https://github.com/proventuslabs/scriptorium.git /tmp/scriptorium
-          source /tmp/scriptorium/scriptorium.plugin.sh
-
           printf '%s\n' "$PR_TITLE" | cz lint --paths $FILES
+
+          # Alternative: source shell plugin directly (works if nix shell has issues)
+          # git clone --depth 1 --quiet https://github.com/proventuslabs/scriptorium.git /tmp/scriptorium
+          # source /tmp/scriptorium/scriptorium.plugin.sh
+          # printf '%s\n' "$PR_TITLE" | cz lint --paths $FILES
 
   gatekeeper:
     runs-on: ubuntu-latest
