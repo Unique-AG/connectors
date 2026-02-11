@@ -23,15 +23,17 @@ jobs:
       PR_NUMBER: ${{ github.event.number }}
       PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: cachix/install-nix-action@v30
+      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
 
       - name: Validate PR title
         run: |
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
+          export FILES
 
-          if ! OUTPUT=$(echo "$PR_TITLE" | nix shell github:proventuslabs/scriptorium#cz --command cz lint --paths "$FILES" 2>&1); then
+          # printenv outputs values directly without any shell interpretation
+          if ! OUTPUT=$(nix shell github:proventuslabs/scriptorium#cz --command bash -c 'printenv PR_TITLE | cz lint --paths "$(printenv FILES)"' 2>&1); then
             echo "::error title=Invalid PR Title::$OUTPUT"
             exit 1
           fi
