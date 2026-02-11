@@ -11,7 +11,7 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { EXTERNAL_ID_PREFIX } from '../utils/logging.util';
+import { EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
@@ -295,27 +295,68 @@ export class ScopeManagementService {
       /* We have a couple of known directories in sharepoint for which it's more complex to get the id: root scope,
        * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
        */
-      let externalId = pathToExternalIdMap[path];
+      let externalId = pathToExternalIdMap[path]
+        ? createSmeared(pathToExternalIdMap[path])
+        : undefined;
+
       if (isNullish(externalId)) {
         this.logger.warn(`${logPrefix} No external ID found for path ${createSmeared(path)}`);
-        externalId = `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId.value}/${scope.name}-${randomUUID()}`;
+        externalId = context.siteConfig.siteId.transform(
+          (siteId) => `${EXTERNAL_ID_PREFIX}unknown:${siteId}/${scope.name}-${randomUUID()}`,
+        );
+      }
+
+      if (!context.isInitialSync) {
+        await this.markConflictingScope(scope.id, externalId, logPrefix);
       }
 
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           scope.id,
-          createSmeared(externalId),
+          externalId,
         );
         scope.externalId = updatedScope.externalId;
-        this.logger.debug(
-          `Updated scope ${scope.id} with externalId: ${createSmeared(externalId)}`,
-        );
+        this.logger.debug(`Updated scope ${scope.id} with externalId: ${externalId}`);
       } catch (error) {
         this.logger.warn({
           msg: `Failed to update externalId for scope ${scope.id}`,
           error: sanitizeError(error),
         });
       }
+    }
+  }
+
+  // When folder was moved in SharePoint, we will recreate it at a new location because we create
+  // scopes by path and not by id. Therefore if we find a scope with the same externalId, we mark it
+  // for deletion. It will happen after content sync, because we have to move files from old scopes
+  // to new ones.
+  private async markConflictingScope(
+    newScopeId: string,
+    externalId: Smeared,
+    logPrefix: string,
+  ): Promise<void> {
+    try {
+      const existingScope = await this.uniqueScopesService.getScopeByExternalId(externalId.value);
+
+      if (!existingScope || existingScope.id === newScopeId) {
+        return;
+      }
+
+      const pendingDeleteExternalId = externalId.transform((value) =>
+        value.replace(EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX),
+      );
+      this.logger.log(
+        `${logPrefix} Marking conflicting scope ${existingScope.id} with pending-delete prefix`,
+      );
+      await this.uniqueScopesService.updateScopeExternalId(
+        existingScope.id,
+        pendingDeleteExternalId,
+      );
+    } catch (error) {
+      this.logger.warn({
+        msg: `${logPrefix} Failed to mark conflicting scope for externalId ${externalId}`,
+        error: sanitizeError(error),
+      });
     }
   }
 
