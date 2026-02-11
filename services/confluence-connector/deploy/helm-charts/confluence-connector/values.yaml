@@ -125,10 +125,6 @@ connectorConfig:
         ingestSingleLabel: ai-ingest
         # -- Label to trigger full sync of all labeled pages
         ingestAllLabel: ai-ingest-all
-        # -- Labels to filter content for ingestion
-        # labels:
-        #   - "unique-ingest"
-        #   - "knowledge-base"
         # -- Space keys to sync (if empty, syncs all accessible spaces)
         # spaces:
         #   - "ENGINEERING"

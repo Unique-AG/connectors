@@ -11,9 +11,6 @@ connectorConfig:
         apiRateLimitPerMinute: 100
         ingestSingleLabel: ai-ingest
         ingestAllLabel: ai-ingest-all
-        labels:
-          - "knowledge-base"
-          - "ai-ready"
         spaces:
           - "ENGINEERING"
           - "PRODUCT"
