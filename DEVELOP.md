@@ -145,9 +145,11 @@ nix develop
 
 | Category | Tools |
 |----------|-------|
-| Node.js | Node.js 24.x, pnpm (via corepack), turbo, biome, lefthook |
+| Node.js | Node.js 24.x, pnpm (via corepack), lefthook |
 | Infrastructure | terraform, kubectl, helm, azure-cli, devtunnel |
 | Utilities | jq, yq, zsh |
+
+> **Note:** `turbo` and `biome` are installed via pnpm (`node_modules/.bin`).
 
 ### Extending for New Languages
 
