@@ -338,6 +338,16 @@ export class SharepointSynchronizationService {
       }
     }
 
+    try {
+      await this.scopeManagementService.deleteOrphanedScopes(siteConfig.siteId);
+    } catch (error) {
+      this.logger.warn({
+        msg: `${logPrefix} Failed to clean up orphaned scopes`,
+        error: sanitizeError(error),
+      });
+      return { status: 'failure', step: SyncStep.OrphanScopeCleanup };
+    }
+
     return { status: 'success' };
   }
 }
