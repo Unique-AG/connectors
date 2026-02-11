@@ -17,7 +17,7 @@ export const AppConfigSchema = z
       .int()
       .min(0)
       .max(65535)
-      .prefault(51347)
+      .prefault(51349)
       .describe('The local HTTP port to bind the server to'),
     logLevel: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
