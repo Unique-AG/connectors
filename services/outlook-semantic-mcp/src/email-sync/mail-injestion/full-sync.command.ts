@@ -2,10 +2,12 @@ import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import { Span } from 'nestjs-otel';
 import { isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, subscriptions, userProfiles } from '~/drizzle';
+import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { GetSubscriptionAndUserProfileQuery } from '../subscription-utils/get-subscription-and-user-profile.query';
 import { MessageEventDto } from './dtos/message-events.dtos';
 import {
   FileDiffGraphMessage,
@@ -24,14 +26,14 @@ export class FullSyncCommand {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly amqp: AmqpConnection,
+    private readonly getSubscriptionAndUserProfileQuery: GetSubscriptionAndUserProfileQuery,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
+  @Span()
   public async run(subscriptionId: string): Promise<void> {
-    const subscription = await this.db.query.subscriptions.findFirst({
-      where: eq(subscriptions.subscriptionId, subscriptionId),
-    });
-    assert.ok(subscription, `Missing subscription for if: ${subscriptionId}`);
+    const { userProfile, subscription } =
+      await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
     const twoDaysAgo = new Date();
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
     if (
@@ -46,12 +48,6 @@ export class FullSyncCommand {
       .where(eq(subscriptions.id, subscription.id))
       .execute();
 
-    const userProfile = await this.db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, subscription.userProfileId),
-    });
-    assert.ok(userProfile, `Missing User Profile: ${userProfile?.id}`);
-    const userProfileEmail = userProfile.email;
-    assert.ok(userProfileEmail, `Missing User Profile email: ${userProfile?.id}`);
     const filters = subscriptionMailFilters.parse(subscription.filters);
 
     const allGraphEmails = await this.fetchAllEmails({
@@ -59,7 +55,7 @@ export class FullSyncCommand {
       filters,
     });
     const filesList = allGraphEmails.map((item) => ({
-      key: getUniqueKeyForMessage(userProfileEmail, item),
+      key: getUniqueKeyForMessage(userProfile.email, item),
       url: item.webLink,
       updatedAt: item.lastModifiedDateTime,
     }));
@@ -84,7 +80,7 @@ export class FullSyncCommand {
     };
 
     const filesRecord = allGraphEmails.reduce<Record<string, FileDiffGraphMessage>>((acc, item) => {
-      acc[getUniqueKeyForMessage(userProfileEmail, item)] = item;
+      acc[getUniqueKeyForMessage(userProfile.email, item)] = item;
       return acc;
     }, {});
     for (const fileKey of [...filleDiffResponse.updatedFiles, ...filleDiffResponse.newFiles]) {

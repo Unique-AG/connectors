@@ -6,11 +6,11 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
-import { MessageEventDto } from './dtos/message-events.dtos';
-import { IngestEmailCommand } from './ingest-email.command';
-import { IngestEmailViaSubscriptionCommand } from './ingest-email-via-subscription.command';
-import { UpdateMetadataCommand } from './update-metadata.command';
-import { IngestionPriority } from './utils/ingestion-queue.utils';
+import { MessageEventDto } from './mail-injestion/dtos/message-events.dtos';
+import { IngestEmailCommand } from './mail-injestion/ingest-email.command';
+import { IngestEmailViaSubscriptionCommand } from './mail-injestion/ingest-email-via-subscription.command';
+import { UpdateMetadataCommand } from './mail-injestion/update-metadata.command';
+import { IngestionPriority } from './mail-injestion/utils/ingestion-queue.utils';
 
 @Injectable()
 export class IngestionListener {

@@ -39,6 +39,7 @@ export class IngestEmailCommand {
     // => Here do full file ingestion.
     const file = this.uniqueFileService.getFilesByKeys([fileKey]);
     if (isNullish(file)) {
+      //
       // -> Look at sentDateTime in metadta and compare with outlook.
       return;
     }
