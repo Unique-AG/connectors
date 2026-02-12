@@ -53,8 +53,8 @@ function loadTenantConfigs(pathPattern: string): TenantConfig[] {
   });
 }
 
+// TODO: Replace with lite-llm style lazy loading for secrets
 // per-tenant env vars is not yet supported and should be addressed when multi-tenant ticket is implemented.
-// this is just a temporary solution to get the secrets from the environment
 function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
   const confluence = config.confluence as Record<string, unknown> | undefined;
   const confluenceAuth = confluence?.auth as Record<string, unknown> | undefined;
