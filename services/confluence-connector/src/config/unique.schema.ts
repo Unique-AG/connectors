@@ -1,16 +1,10 @@
 import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
-import { createSmeared, type Smeared } from '../utils/smeared';
 import {
   coercedPositiveIntSchema,
   redactedNonEmptyStringSchema,
   urlWithoutTrailingSlashSchema,
 } from '../utils/zod.util';
-
-const SMEARED_HEADER_KEYS = new Map<string, boolean>([
-  ['x-company-id', true],
-  ['x-user-id', true],
-]);
 
 const clusterLocalConfig = z.object({
   serviceAuthMode: z
@@ -29,13 +23,6 @@ const clusterLocalConfig = z.object({
         path: ['serviceExtraHeaders'],
       },
     )
-    .transform((headers) => {
-      const result: Record<string, string | Smeared> = {};
-      for (const [key, value] of Object.entries(headers)) {
-        result[key] = SMEARED_HEADER_KEYS.has(key) ? createSmeared(value) : value;
-      }
-      return result;
-    })
     .describe(
       `String of extra HTTP headers for ingestion API requests (e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>"})`,
     ),

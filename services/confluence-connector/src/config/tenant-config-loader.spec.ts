@@ -7,13 +7,6 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
 }));
 
-function expectSmeared(val: unknown, rawValue: string) {
-  expect(val).toHaveProperty('value', rawValue);
-  expect(val).toHaveProperty('active');
-  expect(val).toHaveProperty('toString');
-  expect(val).toHaveProperty('toJSON');
-}
-
 const CONFIG_PATH = '/config/tenant.yaml';
 const CONFIG_PATH_2 = '/config/tenant2.yaml';
 
@@ -152,8 +145,8 @@ describe('tenant-config-loader', () => {
         typeof uniqueResult,
         { serviceAuthMode: 'cluster_local' }
       >;
-      expectSmeared(unique.serviceExtraHeaders['x-company-id'], 'test-company');
-      expectSmeared(unique.serviceExtraHeaders['x-user-id'], 'test-user');
+      expect(unique.serviceExtraHeaders['x-company-id']).toBe('test-company');
+      expect(unique.serviceExtraHeaders['x-user-id']).toBe('test-user');
       expect(tenant.processing.concurrency).toBe(1);
     });
 
@@ -253,7 +246,9 @@ describe('tenant-config-loader', () => {
 
       const result = getTenantConfigs();
 
-      expect(assertFirstElement(result).confluence.auth.clientSecret.value).toBe('env-client-secret');
+      expect(assertFirstElement(result).confluence.auth.clientSecret.value).toBe(
+        'env-client-secret',
+      );
     });
 
     it('injects ZITADEL_CLIENT_SECRET when serviceAuthMode is external', async () => {
