@@ -19,9 +19,7 @@ let cachedConfigs: TenantConfig[] | null = null;
 export function getTenantConfigs(): TenantConfig[] {
   if (!cachedConfigs) {
     const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
-    if (!tenantConfigPathPattern) {
-      throw new Error('TENANT_CONFIG_PATH_PATTERN environment variable is not set');
-    }
+    assert.ok(tenantConfigPathPattern, 'TENANT_CONFIG_PATH_PATTERN environment variable is not set');
     cachedConfigs = loadTenantConfigs(tenantConfigPathPattern);
   }
   return cachedConfigs;
@@ -75,9 +73,7 @@ function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
 function getFirstTenantConfig(): TenantConfig {
   const configs = getTenantConfigs();
   const first = configs[0];
-  if (!first) {
-    throw new Error('No tenant configurations loaded');
-  }
+  assert.ok(first, 'No tenant configurations loaded');
   return first;
 }
 
