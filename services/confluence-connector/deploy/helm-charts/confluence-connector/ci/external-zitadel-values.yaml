@@ -9,10 +9,13 @@ connectorConfig:
           mode: oauth_2lo
           clientId: test-dc-client-id
         apiRateLimitPerMinute: 200
+        ingestSingleLabel: ai-ingest
+        ingestAllLabel: ai-ingest-all
       unique:
         authMode: external
         ingestionServiceBaseUrl: https://api.unique.app/ingestion
         scopeManagementServiceBaseUrl: https://api.unique.app/scope-management
+        apiRateLimitPerMinute: 100
         zitadel:
           clientId: confluence-connector@idp.unique.app
           oauthTokenUrl: https://idp.unique.app/oauth/v2/token

@@ -145,7 +145,10 @@
                 "required": [
                   "instanceType",
                   "baseUrl",
-                  "auth"
+                  "auth",
+                  "apiRateLimitPerMinute",
+                  "ingestSingleLabel",
+                  "ingestAllLabel"
                 ],
                 "properties": {
                   "instanceType": {
@@ -196,7 +199,8 @@
                 "required": [
                   "ingestionServiceBaseUrl",
                   "scopeManagementServiceBaseUrl",
-                  "authMode"
+                  "authMode",
+                  "apiRateLimitPerMinute"
                 ],
                 "properties": {
                   "ingestionServiceBaseUrl": {
