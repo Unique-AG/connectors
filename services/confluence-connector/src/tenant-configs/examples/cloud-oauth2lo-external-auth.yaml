@@ -13,7 +13,7 @@ confluence:
   baseUrl: https://your-domain.atlassian.net/wiki
   auth:
     mode: oauth_2lo
-    clientId: your-confluence-app-client-id
+    clientId: your-oauth-client-id
     # clientSecret: injected from CONFLUENCE_CLIENT_SECRET env var
   apiRateLimitPerMinute: 100
   ingestSingleLabel: ai-ingest
@@ -28,8 +28,11 @@ unique:
   ingestionServiceBaseUrl: https://ingestion.your-unique-instance.com
   scopeManagementServiceBaseUrl: https://scope-management.your-unique-instance.com
   apiRateLimitPerMinute: 100
+  # ingestionConfig:
+  #   uniqueIngestionMode: SKIP_INGESTION
 
 processing:
   stepTimeoutSeconds: 300
   concurrency: 5
   scanIntervalCron: "*/15 * * * *"
+  # maxPagesToScan: 100 # Uncomment to limit pages scanned (useful for testing)

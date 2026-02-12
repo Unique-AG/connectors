@@ -55,4 +55,6 @@ __snapshot__
 
 # local scripts
 **/local-scripts/**
-services/**/src/tenant-configs/**
+services/**/src/tenant-configs/*
+!services/**/src/tenant-configs/examples/
+!services/**/src/tenant-configs/examples/*
