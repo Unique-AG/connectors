@@ -8,11 +8,6 @@ import { type ConfluenceConfig, ConfluenceConfigSchema } from './confluence.sche
 import { type ProcessingConfig, ProcessingConfigSchema } from './processing.schema';
 import { type UniqueConfig, UniqueConfigSchema } from './unique.schema';
 
-export { type AppConfig, type AppConfigNamespaced, appConfig } from './app.config';
-export type { ConfluenceConfig } from './confluence.schema';
-export type { ProcessingConfig } from './processing.schema';
-export type { UniqueConfig } from './unique.schema';
-
 const TenantConfigSchema = z.object({
   confluence: ConfluenceConfigSchema,
   unique: UniqueConfigSchema,
