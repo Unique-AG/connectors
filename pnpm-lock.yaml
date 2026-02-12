@@ -274,6 +274,22 @@ importers:
         specifier: ^5.9.2
         version: 5.9.2
 
+  packages/up:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10 || ^11
+        version: 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^10 || ^11
+        version: 11.1.6(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.6)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11
+        version: 11.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(reflect-metadata@0.2.2)
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+
   services/factset-mcp:
     dependencies:
       '@modelcontextprotocol/sdk':
@@ -834,6 +850,9 @@ importers:
       '@unique-ag/probe':
         specifier: workspace:*
         version: link:../../packages/probe
+      '@unique-ag/up':
+        specifier: workspace:*
+        version: link:../../packages/up
       bottleneck:
         specifier: ^2.19.5
         version: 2.19.5

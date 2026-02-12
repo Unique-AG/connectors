@@ -1,5 +1,6 @@
 import { defaultLoggerOptions } from '@unique-ag/logger';
 import { ProbeModule } from '@unique-ag/probe';
+import { UpModule } from '@unique-ag/up';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { context, trace } from '@opentelemetry/api';
@@ -52,6 +53,7 @@ import { Redacted } from './utils/redacted';
     ProbeModule.forRoot({
       VERSION: packageJson.version,
     }),
+    UpModule,
     OpenTelemetryModule.forRoot({
       metrics: {
         hostMetrics: true,

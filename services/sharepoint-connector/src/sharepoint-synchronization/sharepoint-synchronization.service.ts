@@ -30,7 +30,7 @@ type SiteSyncResult =
   | { status: 'failure'; step: SyncStep }
   | { status: 'skipped'; reason: string };
 
-type FullSyncResult =
+export type FullSyncResult =
   | { status: 'success' }
   | { status: 'failure'; step: SyncStep }
   | { status: 'skipped'; reason: string };
@@ -100,16 +100,26 @@ export class SharepointSynchronizationService {
 
       this.logger.log(`Starting scan of ${active.length} active SharePoint sites...`);
 
+      const siteResults: SiteSyncResult[] = [];
       for (const siteConfig of active) {
         const siteSyncStartTime = Date.now();
 
-        const result = await this.syncSite(siteConfig);
-        this.recordSiteMetric(siteSyncStartTime, siteConfig.siteId, result);
+        const siteResult = await this.syncSite(siteConfig);
+        this.recordSiteMetric(siteSyncStartTime, siteConfig.siteId, siteResult);
+        siteResults.push(siteResult);
       }
 
       this.logger.log(
         `SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`,
       );
+
+      const failedSite = siteResults.find((r) => r.status === 'failure');
+      if (failedSite) {
+        const result: FullSyncResult = { status: 'failure', step: failedSite.step };
+        this.recordFullSyncMetric(syncStartTime, result);
+        return result;
+      }
+
       const result: FullSyncResult = { status: 'success' };
       this.recordFullSyncMetric(syncStartTime, result);
       return result;
