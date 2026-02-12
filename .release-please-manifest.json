@@ -2,6 +2,6 @@
   "services/factset-mcp": "0.3.0",
   "services/outlook-mcp": "0.6.0",
   "services/sharepoint-connector": "2.1.0",
-  "services/teams-mcp": "0.2.3",
+  "services/teams-mcp": "0.2.4",
   "services/confluence-connector": "2.0.0-alpha.0"
 }
