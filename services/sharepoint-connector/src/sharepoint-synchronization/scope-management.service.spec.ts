@@ -693,7 +693,9 @@ describe('ScopeManagementService', () => {
         ];
         expect(renameId).toBe('old-scope-id');
         expect(renameExternalId).toBeInstanceOf(Smeared);
-        expect(renameExternalId.value).toContain('pending-delete');
+        expect(renameExternalId.value).toMatch(
+          /^spc:pending-delete:site-123\/unknown:site-123\/TestScope-/,
+        );
 
         expect(updateScopeExternalIdMock).toHaveBeenNthCalledWith(
           2,
@@ -827,6 +829,11 @@ describe('ScopeManagementService', () => {
 
       await service.deleteOrphanedScopes(new Smeared('site-123', false));
 
+      expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          value: 'spc:pending-delete:site-123/',
+        }),
+      );
       expect(deleteScopeMock).toHaveBeenCalledTimes(2);
       expect(deleteScopeMock).toHaveBeenNthCalledWith(1, 'child-scope');
       expect(deleteScopeMock).toHaveBeenNthCalledWith(2, 'parent-scope');

@@ -372,7 +372,7 @@ export class ScopeManagementService {
       }
 
       if (!context.isInitialSync) {
-        await this.markConflictingScope(scope.id, externalId, logPrefix);
+        await this.markConflictingScope(scope.id, externalId, context.siteConfig.siteId, logPrefix);
       }
 
       try {
@@ -398,6 +398,7 @@ export class ScopeManagementService {
   private async markConflictingScope(
     newScopeId: string,
     externalId: Smeared,
+    siteId: Smeared,
     logPrefix: string,
   ): Promise<void> {
     try {
@@ -408,7 +409,7 @@ export class ScopeManagementService {
       }
 
       const pendingDeleteExternalId = externalId.transform((value) =>
-        value.replace(EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX),
+        value.replace(EXTERNAL_ID_PREFIX, `${PENDING_DELETE_PREFIX}${siteId.value}/`),
       );
       this.logger.log(
         `${logPrefix} Marking conflicting scope ${existingScope.id} with pending-delete prefix`,
