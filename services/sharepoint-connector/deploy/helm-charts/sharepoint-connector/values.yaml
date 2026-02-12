@@ -59,6 +59,9 @@ connector:
     paths:
       default:
         enabled: false
+      probe:
+        enabled: true
+        probePath: /up
   service:
     enabled: false
   serviceAccount:
