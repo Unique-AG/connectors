@@ -7,7 +7,6 @@ import {
   urlWithoutTrailingSlashSchema,
 } from '../utils/zod.util';
 
-// TODO: Confirm smearing policy with #sig-security-compliance
 const SMEARED_HEADER_KEYS = new Map<string, boolean>([
   ['x-company-id', true],
   ['x-user-id', true],
