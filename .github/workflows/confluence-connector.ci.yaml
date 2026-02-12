@@ -1,0 +1,90 @@
+name: "[confluence-connector] Validate"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "**/services/confluence-connector/**"
+      - .github/workflows/confluence-connector.ci.yaml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: ./.github/workflows/_template-ci.yaml
+    with:
+      service-name: confluence-connector
+      service-path: services/confluence-connector
+      orm: none
+
+  check_chart:
+    runs-on: ubuntu-latest # TODO: can we use singularity here?
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0 # we need the main branch as well
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # 4.3.1
+        with:
+          version: v3.19.0
+
+      - name: Setup Chart Linting
+        id: lint
+        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # 2.8.0
+        with:
+          version: v3.14.0
+
+      - name: Render chart
+        working-directory: services/confluence-connector/deploy/helm-charts/confluence-connector
+        run: |
+          helm dependency build
+          helm template .
+
+      - name: Validate (helm-docs)
+        working-directory: services/confluence-connector/deploy/helm-charts
+        # FIXME: @vabatta make script exit 1 again please
+        run: |
+          ./helm-docs.sh
+          if [[ $(git diff --stat) != '' ]]; then
+            echo -e '\033[0;31mDocumentation outdated!\033[0m ❌'
+            echo "Run 'make cc-helm-docs' in root directory to update the documentation. We automate that later away."
+            git diff --color
+          else
+            echo -e '\033[0;32mDocumentation up to date\033[0m ✔'
+          fi
+
+      - name: List changed charts
+        id: list-changed
+        run: |
+          ## If executed with debug this won't work anymore.
+          changed=$(ct --config ./.github/configs/ct-lint.yaml list-changed)
+          charts=$(echo "$changed" | tr '\n' ' ' | xargs)
+          if [[ -n "$changed" ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed_charts=$charts" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run chart-testing (lint)
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest.git
+          ct lint --debug --config ./.github/configs/ct-lint.yaml --lint-conf ./.github/configs/lintconf.yaml
+
+      # This is commented because of: https://unique-ag.slack.com/archives/C09JVFPUVJR/p1762852377333459
+      # - name: Create kind cluster
+      #   uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
+      #   if: steps.list-changed.outputs.changed == 'true'
+      #   with:
+      #     config: .github/configs/kind-config.yaml
+
+      # - name: Deploy CRDs needed for charts to be able to install
+      #   if: steps.list-changed.outputs.changed == 'true'
+      #   run: ./scripts/setup-cluster.sh
+
+      # - name: Run chart-testing (install)
+      #   run: ct install --config ./.github/configs/ct-install.yaml
+      #   if: steps.list-changed.outputs.changed == 'true'

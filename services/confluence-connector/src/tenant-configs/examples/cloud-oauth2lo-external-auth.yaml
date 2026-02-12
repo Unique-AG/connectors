@@ -1,0 +1,38 @@
+# Example: Confluence Cloud with OAuth 2.0 (2LO) + External Unique API auth (Zitadel)
+#
+# This configuration is suitable for connecting to Confluence Cloud instances
+# where authentication uses OAuth 2.0 two-legged (2LO), and the Unique platform
+# is accessed via external Zitadel OAuth credentials.
+#
+# Secrets are injected from environment variables at startup:
+#   - CONFLUENCE_CLIENT_SECRET -> confluence.auth.clientSecret
+#   - ZITADEL_CLIENT_SECRET   -> unique.zitadelClientSecret
+
+confluence:
+  instanceType: cloud
+  baseUrl: https://your-domain.atlassian.net/wiki
+  auth:
+    mode: oauth_2lo
+    clientId: your-oauth-client-id
+    # clientSecret: injected from CONFLUENCE_CLIENT_SECRET env var
+  apiRateLimitPerMinute: 100
+  ingestSingleLabel: ai-ingest
+  ingestAllLabel: ai-ingest-all
+
+unique:
+  serviceAuthMode: external
+  zitadelOauthTokenUrl: https://auth.your-unique-instance.com/oauth/v2/token
+  zitadelProjectId: your-zitadel-project-id
+  zitadelClientId: confluence-connector
+  # zitadelClientSecret: injected from ZITADEL_CLIENT_SECRET env var
+  ingestionServiceBaseUrl: https://ingestion.your-unique-instance.com
+  scopeManagementServiceBaseUrl: https://scope-management.your-unique-instance.com
+  apiRateLimitPerMinute: 100
+  # ingestionConfig:
+  #   uniqueIngestionMode: SKIP_INGESTION
+
+processing:
+  stepTimeoutSeconds: 300
+  concurrency: 1
+  scanIntervalCron: "*/15 * * * *"
+  # maxPagesToScan: 100 # Uncomment to limit pages scanned (useful for testing)
