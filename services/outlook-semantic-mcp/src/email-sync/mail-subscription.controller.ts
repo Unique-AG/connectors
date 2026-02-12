@@ -23,13 +23,13 @@ import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { normalizeError } from '~/utils/normalize-error';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
 import { MessageEventDto } from './mail-injestion/dtos/message-events.dtos';
+import { FullSyncCommand } from './mail-injestion/full-sync.command';
 import { IngestionPriority } from './mail-injestion/utils/ingestion-queue.utils';
 import {
   ChangeNotificationCollectionDto,
   LifecycleChangeNotificationCollectionDto,
   LifecycleEventDto,
 } from './subscriptions/subscription.dtos';
-import { SubscriptionCreateService } from './subscriptions/subscription-create.service';
 import { SubscriptionReauthorizeService } from './subscriptions/subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscriptions/subscription-remove.service';
 import { MailSubscriptionUtilsService } from './subscriptions/subscription-utils.service';
@@ -39,12 +39,12 @@ export class MailSubscriptionController {
   private readonly logger = new Logger(MailSubscriptionController.name);
 
   public constructor(
-    private readonly subscriptionCreate: SubscriptionCreateService,
     private readonly subscriptionReauthorize: SubscriptionReauthorizeService,
     private readonly subscriptionRemove: SubscriptionRemoveService,
     private readonly utils: MailSubscriptionUtilsService,
     private readonly trace: TraceService,
     private readonly amqpConnection: AmqpConnection,
+    private readonly fullSyncCommand: FullSyncCommand,
   ) {}
 
   @Post('lifecycle')
@@ -190,16 +190,13 @@ export class MailSubscriptionController {
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
-  public async onLifecycleNotification(
-    // @RabbitPayload(new ZodValidationPipe(LifecycleEventDto)) event: LifecycleEventDto,
-    @RabbitPayload() payload: unknown,
-  ) {
+  public async onLifecycleNotification(@RabbitPayload() payload: unknown) {
     const event = await LifecycleEventDto.parseAsync(payload);
     this.logger.log({ event }, 'Processing lifecycle event from message queue');
 
     switch (event.type) {
-      case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-requested': {
-        return this.subscriptionCreate.subscribe(event.userProfileId);
+      case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created': {
+        return this.fullSyncCommand.run(event.subscriptionId);
       }
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-removed': {
         return this.subscriptionRemove.remove(event.subscriptionId);

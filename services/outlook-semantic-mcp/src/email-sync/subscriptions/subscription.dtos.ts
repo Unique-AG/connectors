@@ -250,12 +250,10 @@ export type BatchResponse = z.infer<typeof BatchResponse>;
 
 // SECTION - Lifecycle Events
 
-export const SubscriptionRequestedEventDto = lifecycle.SubscriptionRequestedEvent.schema.safeExtend(
-  {
-    type: z.literal(lifecycle.SubscriptionRequestedEvent.type),
-  },
-);
-export type SubscriptionRequestedEventDto = z.output<typeof SubscriptionRequestedEventDto>;
+export const SubscriptionCreatedEventDto = lifecycle.SubscriptionCreatedEvent.schema.safeExtend({
+  type: z.literal(lifecycle.SubscriptionCreatedEvent.type),
+});
+// unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created
 
 export const SubscriptionRemovedEventDto = lifecycle.SubscriptionRemovedEvent.schema.safeExtend({
   type: z.literal(lifecycle.SubscriptionRemovedEvent.type),
@@ -274,10 +272,10 @@ export const ReauthorizationRequiredEventDto =
 export type ReauthorizationRequiredEventDto = z.output<typeof ReauthorizationRequiredEventDto>;
 
 export const LifecycleEventDto = z.discriminatedUnion('type', [
-  SubscriptionRequestedEventDto,
   SubscriptionRemovedEventDto,
   MissedEventDto,
   ReauthorizationRequiredEventDto,
+  SubscriptionCreatedEventDto,
 ]);
 export type LifecycleEventDto = z.output<typeof LifecycleEventDto>;
 

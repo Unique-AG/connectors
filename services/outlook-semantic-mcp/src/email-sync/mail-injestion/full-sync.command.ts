@@ -2,10 +2,9 @@ import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { isNonNullish, isNullish } from 'remeda';
-import { z } from 'zod/v4';
+import { isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, emailSyncStats, userProfiles } from '~/drizzle';
+import { DRIZZLE, DrizzleDatabase, subscriptions, userProfiles } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { MessageEventDto } from './dtos/message-events.dtos';
 import {
@@ -13,14 +12,12 @@ import {
   FileDiffGraphMessageFields,
   fileDiffGraphMessageResponseSchema,
 } from './dtos/microsoft-graph.dtos';
+import {
+  SubscriptionMailFilters,
+  subscriptionMailFilters,
+} from './dtos/subscription-mail-filters.dto';
 import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
 import { IngestionPriority } from './utils/ingestion-queue.utils';
-
-const syncFilters = z.object({
-  createdAfter: z.date(),
-});
-
-type SyncFilters = z.infer<typeof syncFilters>;
 
 @Injectable()
 export class FullSyncCommand {
@@ -30,36 +27,35 @@ export class FullSyncCommand {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
-  public async run(userProfileId: string): Promise<void> {
-    let emailSyncProgress = await this.db.query.emailSyncStats.findFirst({
-      where: eq(emailSyncStats.userProfileId, userProfileId),
+  public async run(subscriptionId: string): Promise<void> {
+    const subscription = await this.db.query.subscriptions.findFirst({
+      where: eq(subscriptions.subscriptionId, subscriptionId),
     });
+    assert.ok(subscription, `Missing subscription for if: ${subscriptionId}`);
     const twoDaysAgo = new Date();
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    if (isNonNullish(emailSyncProgress) && emailSyncProgress.startedAt > twoDaysAgo) {
+    if (
+      isNonNullish(subscription.lastFullSyncRunAt) &&
+      subscription.lastFullSyncRunAt > twoDaysAgo
+    ) {
       return;
     }
-    if (isNullish(emailSyncProgress)) {
-      const result = await this.db
-        .insert(emailSyncStats)
-        .values({
-          userProfileId,
-          startedAt: new Date(),
-        })
-        .returning();
-      emailSyncProgress = result[0];
-    }
-    assert.ok(emailSyncProgress, `Missing email sync progress`);
+    await this.db
+      .update(subscriptions)
+      .set({ lastFullSyncRunAt: new Date() })
+      .where(eq(subscriptions.id, subscription.id))
+      .execute();
+
     const userProfile = await this.db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, userProfileId),
+      where: eq(userProfiles.id, subscriptions.userProfileId),
     });
     assert.ok(userProfile, `Missing User Profile: ${userProfile?.id}`);
     const userProfileEmail = userProfile.email;
     assert.ok(userProfileEmail, `Missing User Profile email: ${userProfile?.id}`);
-    const filters = syncFilters.parse(emailSyncStats?.filters);
+    const filters = subscriptionMailFilters.parse(subscription.filters);
 
     const allGraphEmails = await this.fetchAllEmails({
-      userProfileId,
+      userProfileId: userProfile.id,
       filters,
     });
     const filesList = allGraphEmails.map((item) => ({
@@ -96,7 +92,7 @@ export class FullSyncCommand {
       assert.ok(message, `Missing message for file key: ${fileKey}`);
       const event = MessageEventDto.encode({
         type: 'unique.outlook-semantic-mcp.mail-notification.new-message',
-        payload: { messageId: message.id, userProfileId },
+        payload: { messageId: message.id, userProfileId: userProfile.id },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
         priority: IngestionPriority.Low,
@@ -108,7 +104,11 @@ export class FullSyncCommand {
       assert.ok(message, `Missing message for file key: ${fileKey}`);
       const event = MessageEventDto.encode({
         type: 'unique.outlook-semantic-mcp.mail-notification.message-metadata-changed',
-        payload: { key: fileKey, messageId: message.id, userProfileId },
+        payload: {
+          key: fileKey,
+          messageId: message.id,
+          userProfileId: userProfile.id,
+        },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
         priority: IngestionPriority.Low,
@@ -123,7 +123,7 @@ export class FullSyncCommand {
     filters,
     userProfileId,
   }: {
-    filters: SyncFilters;
+    filters: SubscriptionMailFilters;
     userProfileId: string;
   }): Promise<FileDiffGraphMessage[]> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
@@ -132,7 +132,7 @@ export class FullSyncCommand {
       .api(`me/messages`)
       .header('Prefer', 'IdType="ImmutableId"')
       .select(FileDiffGraphMessageFields)
-      .filter(`createdDateTime gt ${filters.createdAfter.toISOString()}`)
+      .filter(`createdDateTime gt ${filters.dateFrom.toISOString()}`)
       .orderby(`createdDateTime desc`)
       .top(200)
       .get();

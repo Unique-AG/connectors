@@ -35,6 +35,7 @@ export class IngestionListener {
   })
   public async onIngestionRequested(@RabbitPayload() payload: unknown): Promise<void> {
     const event = MessageEventDto.parse(payload);
+    this.logger.debug(`Message received from microsoft graph`);
 
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.mail-notification.subscription-message-changed':

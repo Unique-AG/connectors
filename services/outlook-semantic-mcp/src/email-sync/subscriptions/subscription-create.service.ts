@@ -4,13 +4,14 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
 import type { TypeID } from 'typeid-js';
-import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions, userProfiles } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { MAIN_EXCHANGE } from '../../amqp/amqp.constants';
+import { subscriptionMailFilters } from '../mail-injestion/dtos/subscription-mail-filters.dto';
 import {
   CreateSubscriptionRequestSchema,
+  LifecycleEventDto,
   Subscription,
-  SubscriptionRequestedEventDto,
 } from './subscription.dtos';
 import { MailSubscriptionUtilsService } from './subscription-utils.service';
 
@@ -31,52 +32,18 @@ export class SubscriptionCreateService {
   private readonly logger = new Logger(SubscriptionCreateService.name);
 
   public constructor(
-    private readonly amqp: AmqpConnection,
     private readonly trace: TraceService,
+    private amqp: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly utils: MailSubscriptionUtilsService,
   ) {}
 
   @Span()
-  public async enqueueSubscriptionRequested(userProfileId: TypeID<'user_profile'>): Promise<void> {
-    const span = this.trace.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId.toString());
-    span?.setAttribute('operation', 'enqueue_subscription_request');
-
-    const payload = await SubscriptionRequestedEventDto.encodeAsync({
-      userProfileId,
-      type: 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-requested',
-    });
-
-    this.logger.debug(
-      { userProfileId: userProfileId.toString(), eventType: payload.type },
-      'Enqueuing subscription request event for user profile processing',
-    );
-
-    const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
-
-    span?.setAttribute('published', published);
-    span?.addEvent('event published to AMQP', {
-      exchangeName: MAIN_EXCHANGE.name,
-      eventType: payload.type,
-      published,
-    });
-
-    this.logger.debug(
-      {
-        exchangeName: MAIN_EXCHANGE.name,
-        payload,
-        published,
-      },
-      'Publishing event to message queue for asynchronous processing',
-    );
-
-    assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
-  }
-
-  @Span()
-  public async subscribe(userProfileId: TypeID<'user_profile'>): Promise<SubscribeResult> {
+  public async subscribe(
+    userProfileId: TypeID<'user_profile'>,
+    filters: { dateFrom: string },
+  ): Promise<SubscribeResult> {
     const span = this.trace.getSpan();
     span?.setAttribute('user_profile_id', userProfileId.toString());
     span?.setAttribute('operation', 'create_subscription');
@@ -136,8 +103,13 @@ export class SubscriptionCreateService {
           { id: existingSubscription.id, count: result.rowCount ?? NaN },
           'Successfully deleted expired managed subscription from database',
         );
-        // Continue to create a new subscription below
-      } else if (diffFromNow <= minimalTimeForLifecycleNotificationsInMinutes * 60 * 1000) {
+        return await this.createNewSubscription({
+          userProfileId: userProfileId.toString(),
+          filters,
+        });
+      }
+
+      if (diffFromNow <= minimalTimeForLifecycleNotificationsInMinutes * 60 * 1000) {
         // NOTE: here we are below the threshold and ideally we should also be discarding the existing subscription
         // but there might be an edge case where this event gets picked up while a renewal is already in progress or
         // is about to happen very soon - this is a very unlikely edge case (never happened in prod),
@@ -155,19 +127,32 @@ export class SubscriptionCreateService {
           'Subscription expires too soon to renew safely, returning existing',
         );
         return { status: 'expiring_soon', subscription: existingSubscription };
-      } else {
-        // NOTE: here we have enough time left on the subscription, so we do nothing
-        span?.addEvent('subscription valid, skipping creation');
-
-        this.logger.debug(
-          { id: existingSubscription.id },
-          'Existing subscription is valid, skipping new subscription creation',
-        );
-        return { status: 'already_active', subscription: existingSubscription };
       }
-    }
 
+      // NOTE: here we have enough time left on the subscription, so we do nothing
+      span?.addEvent('subscription valid, skipping creation');
+
+      this.logger.debug(
+        { id: existingSubscription.id },
+        'Existing subscription is valid, skipping new subscription creation',
+      );
+      return { status: 'already_active', subscription: existingSubscription };
+    }
     span?.addEvent('no existing subscription found');
+    return await this.createNewSubscription({
+      userProfileId: userProfileId.toString(),
+      filters,
+    });
+  }
+
+  private async createNewSubscription({
+    userProfileId,
+    filters,
+  }: {
+    userProfileId: string;
+    filters: { dateFrom: string };
+  }): Promise<SubscribeResult> {
+    const span = this.trace.getSpan();
     this.logger.debug(
       {},
       'No existing subscription found, proceeding with new subscription creation',
@@ -252,6 +237,9 @@ export class SubscriptionCreateService {
         expiresAt: graphSubscription.expirationDateTime,
         userProfileId: userProfileId.toString(),
         subscriptionId: graphSubscription.id,
+        filters: subscriptionMailFilters.encode({
+          dateFrom: new Date(filters.dateFrom),
+        }),
       })
       .returning();
 
@@ -264,6 +252,11 @@ export class SubscriptionCreateService {
     span?.addEvent('new managed subscription created', { id: created.id });
     this.logger.log({ id: created.id }, 'Successfully created new managed subscription record');
 
+    const subscriptionCreated = LifecycleEventDto.encode({
+      type: 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created',
+      subscriptionId: created.subscriptionId,
+    });
+    await this.amqp.publish(MAIN_EXCHANGE.name, subscriptionCreated.type, subscriptionCreated);
     return { status: 'created', subscription: created };
   }
 }

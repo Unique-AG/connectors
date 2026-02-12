@@ -1,29 +1,48 @@
-import { relations } from 'drizzle-orm';
-import { pgEnum, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
-import { typeid } from 'typeid-js';
-import { timestamps } from '../../timestamps.columns';
-import { userProfiles } from '../user-profiles.table';
+import { relations } from "drizzle-orm";
+import {
+  jsonb,
+  pgEnum,
+  pgTable,
+  timestamp,
+  unique,
+  varchar,
+} from "drizzle-orm/pg-core";
+import { typeid } from "typeid-js";
+import { timestamps } from "../../timestamps.columns";
+import { userProfiles } from "../user-profiles.table";
 
-export const subscriptionInternalType = pgEnum('subscription_internal_type', ['mail_monitoring']);
+export const subscriptionInternalType = pgEnum("subscription_internal_type", [
+  "mail_monitoring",
+]);
 
 export const subscriptions = pgTable(
-  'subscriptions',
+  "subscriptions",
   {
     id: varchar()
       .primaryKey()
-      .$default(() => typeid('subscription').toString()),
+      .$default(() => typeid("subscription").toString()),
     subscriptionId: varchar().unique().notNull(),
     internalType: subscriptionInternalType().notNull(),
     expiresAt: timestamp().notNull(),
+    lastFullSyncRunAt: timestamp(),
+    filters: jsonb(),
 
     // References
     userProfileId: varchar()
       .notNull()
-      .references(() => userProfiles.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+      .references(() => userProfiles.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
 
     ...timestamps,
   },
-  (t) => [unique('single_subscription_for_internal_type').on(t.userProfileId, t.internalType)],
+  (t) => [
+    unique("single_subscription_for_internal_type").on(
+      t.userProfileId,
+      t.internalType,
+    ),
+  ],
 );
 
 export const subscriptionRelations = relations(subscriptions, ({ one }) => ({

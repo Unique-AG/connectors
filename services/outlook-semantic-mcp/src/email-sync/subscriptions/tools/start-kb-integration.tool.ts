@@ -6,7 +6,9 @@ import { fromString, parseTypeId, typeid } from 'typeid-js';
 import * as z from 'zod';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
-const StartKbIntegrationInputSchema = z.object({});
+const StartKbIntegrationInputSchema = z.object({
+  dateFrom: z.string().describe('Start date for date range filter (ISO format: YYYY-MM-DD)'),
+});
 
 const StartKbIntegrationOutputSchema = z.object({
   success: z.boolean(),
@@ -34,7 +36,7 @@ export class StartKbIntegrationTool {
     name: 'start_kb_integration',
     title: 'Start Knowledge Base Integration',
     description:
-      'Start the knowledge base integration to begin ingesting Microsoft Teams meeting transcripts. This creates a subscription with Microsoft Graph to receive notifications when new emails are available.',
+      'Start the knowledge base integration to begin ingesting Microsoft Outlook emails. This creates a subscription with Microsoft Graph to receive notifications when new emails are available.',
     parameters: StartKbIntegrationInputSchema,
     outputSchema: StartKbIntegrationOutputSchema,
     annotations: {
@@ -52,7 +54,7 @@ export class StartKbIntegrationTool {
   })
   @Span()
   public async startKbIntegration(
-    _input: z.infer<typeof StartKbIntegrationInputSchema>,
+    input: z.infer<typeof StartKbIntegrationInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {
@@ -68,7 +70,7 @@ export class StartKbIntegrationTool {
     const pid = parseTypeId(tid);
     const userProfileTypeid = typeid(pid.prefix, pid.suffix);
 
-    const result = await this.subscriptionCreate.subscribe(userProfileTypeid);
+    const result = await this.subscriptionCreate.subscribe(userProfileTypeid, input);
     const { status, subscription } = result;
 
     const expiresAt = new Date(subscription.expiresAt);
