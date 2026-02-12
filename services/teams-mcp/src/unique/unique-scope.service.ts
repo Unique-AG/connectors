@@ -28,7 +28,7 @@ export class UniqueScopeService {
 
     const payload = PublicCreateScopeRequestSchema.encode({ paths: [path], inheritAccess });
 
-    this.logger.debug({ path, inheritAccess }, 'Creating new organizational scope in Unique API');
+    this.logger.debug({ inheritAccess }, 'Creating new organizational scope in Unique API');
 
     const body = await this.api.post('folder', payload);
     const result = PublicCreateScopeResultSchema.refine(

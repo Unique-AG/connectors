@@ -123,7 +123,6 @@ export class FindTranscriptsTool {
 
     const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
     const filter = this.buildMetadataFilter(rootScopePath, userProfileId, input);
-    this.logger.debug({ filter }, 'metadata filter');
 
     const result = await this.contentService.findByMetadata(filter, {
       skip: input.skip,
