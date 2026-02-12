@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { dump } from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -56,7 +57,7 @@ const oauth2loAuth = {
 
 function first<T>(arr: T[]): T {
   const item = arr[0];
-  if (item === undefined) throw new Error('Expected at least one element');
+  assert.ok(item !== undefined, 'Expected at least one element');
   return item;
 }
 
