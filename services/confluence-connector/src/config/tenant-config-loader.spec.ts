@@ -55,7 +55,7 @@ const oauth2loAuth = {
   clientId: 'test-client-id',
 };
 
-function first<T>(arr: T[]): T {
+function assertFirstElement<T>(arr: T[]): T {
   const item = arr[0];
   assert.ok(item !== undefined, 'Expected at least one element');
   return item;
@@ -140,7 +140,7 @@ describe('tenant-config-loader', () => {
       const result = getTenantConfigs();
 
       expect(result).toHaveLength(1);
-      const tenant = first(result);
+      const tenant = assertFirstElement(result);
       expect(tenant.confluence.instanceType).toBe('cloud');
       expect(tenant.confluence.baseUrl).toBe('https://acme.atlassian.net/wiki');
       expect(tenant.confluence.auth.mode).toBe('oauth_2lo');
@@ -177,7 +177,7 @@ describe('tenant-config-loader', () => {
       const result = getTenantConfigs();
 
       expect(result).toHaveLength(1);
-      const tenant = first(result);
+      const tenant = assertFirstElement(result);
       expect(tenant.confluence.instanceType).toBe('data-center');
       expect(tenant.confluence.baseUrl).toBe('https://confluence.acme.com');
       expect(tenant.confluence.auth.mode).toBe('oauth_2lo');
@@ -253,7 +253,7 @@ describe('tenant-config-loader', () => {
 
       const result = getTenantConfigs();
 
-      expect(first(result).confluence.auth.clientSecret.value).toBe('env-client-secret');
+      expect(assertFirstElement(result).confluence.auth.clientSecret.value).toBe('env-client-secret');
     });
 
     it('injects ZITADEL_CLIENT_SECRET when serviceAuthMode is external', async () => {
@@ -276,7 +276,7 @@ describe('tenant-config-loader', () => {
 
       const result = getTenantConfigs();
 
-      const tenant = first(result);
+      const tenant = assertFirstElement(result);
       expect(tenant.unique.serviceAuthMode).toBe('external');
       const uniqueResult = tenant.unique;
       const unique = uniqueResult as Extract<typeof uniqueResult, { serviceAuthMode: 'external' }>;
@@ -303,7 +303,7 @@ describe('tenant-config-loader', () => {
 
       const result = getTenantConfigs();
 
-      const tenant = first(result);
+      const tenant = assertFirstElement(result);
       expect(tenant.unique.serviceAuthMode).toBe('cluster_local');
       expect(tenant.unique).not.toHaveProperty('zitadelClientSecret');
     });
