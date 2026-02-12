@@ -223,7 +223,7 @@
             },
             "rootScopePath": {
               "type": "string",
-              "description": "The root scope path where to upload transcripts",
+              "description": "The root scope path where to upload transcripts and recordings",
               "default": "Teams-MCP"
             },
             "serviceExtraHeaders": {

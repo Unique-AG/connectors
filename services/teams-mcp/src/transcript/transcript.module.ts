@@ -12,12 +12,14 @@ import {
 } from './tools';
 import { TranscriptController } from './transcript.controller';
 import { TranscriptCreatedService } from './transcript-created.service';
+import { TranscriptRecordingService } from './transcript-recording.service';
 import { TranscriptUtilsService } from './transcript-utils.service';
 
 @Module({
   imports: [DrizzleModule, MsGraphModule, UniqueModule],
   providers: [
     TranscriptUtilsService,
+    TranscriptRecordingService,
     SubscriptionCreateService,
     SubscriptionReauthorizeService,
     SubscriptionRemoveService,

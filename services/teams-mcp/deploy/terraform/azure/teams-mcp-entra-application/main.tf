@@ -12,6 +12,7 @@ locals {
     "User.Read",
     "Calendars.Read",
     "OnlineMeetings.Read",
+    "OnlineMeetingRecording.Read.All",
     "OnlineMeetingTranscript.Read.All",
   ])
 }

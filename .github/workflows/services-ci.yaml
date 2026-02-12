@@ -1,0 +1,107 @@
+name: "Services CI"
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "services/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/services-ci.yaml"
+      - ".github/workflows/_template-ci.yaml"
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Services to run CI for (comma-separated, e.g., "teams-mcp,outlook-mcp" or "all")'
+        required: true
+        default: "all"
+
+concurrency:
+  group: services-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  detect-changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.build-matrix.outputs.services }}
+      packages-changed: ${{ steps.filter.outputs.packages }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        with:
+          list-files: json
+          filters: |
+            services:
+              - 'services/**'
+            packages:
+              - 'packages/**'
+
+      # Builds a JSON array of service names to fan out into parallel CI matrix jobs.
+      # Handles three scenarios:
+      #   1. workflow_dispatch: uses user input (comma-separated list or "all"), validates against existing services/
+      #   2. PR with package changes: runs all services since packages are shared dependencies
+      #   3. PR with only service changes: extracts unique service names from changed file paths
+      # If none of the above match, outputs an empty array so the CI job is skipped.
+      - name: Build service matrix
+        id: build-matrix
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SERVICES: ${{ github.event.inputs.services }}
+          SERVICES_CHANGED: ${{ steps.filter.outputs.services }}
+          SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
+          PACKAGES_CHANGED: ${{ steps.filter.outputs.packages }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            available=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+
+            if [ "$INPUT_SERVICES" = "all" ]; then
+              services=$(echo "$available" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            else
+              IFS=',' read -ra requested <<< "$INPUT_SERVICES"
+              valid=()
+              for service in "${requested[@]}"; do
+                service=$(echo "$service" | xargs)
+                if echo "$available" | grep -qx "$service"; then
+                  valid+=("$service")
+                else
+                  echo "::error::Unknown service: $service"
+                  echo "Available services: $available"
+                  exit 1
+                fi
+              done
+              services=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            fi
+          elif [ "$PACKAGES_CHANGED" = "true" ]; then
+            # Packages are shared dependencies — run CI for all services to catch breakage
+            services=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          elif [ "$SERVICES_CHANGED" = "true" ]; then
+            services=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          else
+            services='[]'
+          fi
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+          echo "Services to validate: $services"
+
+  # Fans out into one job per affected service using the reusable CI template.
+  ci:
+    name: ${{ matrix.service }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.services != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
+    uses: ./.github/workflows/_template-ci.yaml
+    with:
+      service-name: ${{ matrix.service }}
+      service-path: services/${{ matrix.service }}

@@ -23,18 +23,27 @@ jobs:
       PR_NUMBER: ${{ github.event.number }}
       PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: cachix/install-nix-action@v30
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Validate PR title
         run: |
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path' | tr '\n' ' ')
+          export FILES
 
-          if ! OUTPUT=$(echo "$PR_TITLE" | nix shell github:proventuslabs/scriptorium#cz --command cz lint --paths "$FILES" 2>&1); then
+          # Source shell plugin (nix shell has stdin/stdout issues in GitHub Actions)
+          git -c init.defaultBranch=main init --quiet /tmp/scriptorium
+          git -C /tmp/scriptorium fetch --depth 1 --quiet https://github.com/proventuslabs/scriptorium.git 924e9a72df74224b7d237974f4c7e5d5c432d574 # cz-v0.1.0
+          git -C /tmp/scriptorium checkout --quiet FETCH_HEAD
+          source /tmp/scriptorium/scriptorium.plugin.sh
+
+          # printenv outputs values directly without any shell interpretation
+          if ! OUTPUT=$(printenv PR_TITLE | cz lint --paths "$(printenv FILES)" 2>&1); then
             echo "::error title=Invalid PR Title::$OUTPUT"
             exit 1
           fi
+
+          # Alternative: nix shell (currently has stdin/stdout issues in GitHub Actions)
+          # nix shell github:proventuslabs/scriptorium#cz --command bash -c 'printenv PR_TITLE | cz lint --paths "$(printenv FILES)"'
 
   gatekeeper:
     runs-on: ubuntu-latest

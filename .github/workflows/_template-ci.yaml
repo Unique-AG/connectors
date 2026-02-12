@@ -11,13 +11,9 @@ on:
         description: "Path to the service directory (e.g., services/factset-mcp)"
         required: true
         type: string
-      orm:
-        description: "ORM in use (e.g., prisma, drizzle, none)"
-        type: string
-        default: "prisma"
 
 concurrency:
-  group: _template-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: _template-ci-${{ github.workflow }}-${{ inputs.service-name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -31,7 +27,21 @@ jobs:
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
-      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+      # Detect ORM from conventional config files:
+      #   - drizzle.config.ts → drizzle
+      #   - prisma/schema.prisma → prisma
+      #   - neither → none
+      - name: Detect ORM
+        run: |
+          if [ -f "${{ env.SERVICE_PATH }}/drizzle.config.ts" ]; then
+            echo "ORM=drizzle" >> $GITHUB_ENV
+          elif [ -f "${{ env.SERVICE_PATH }}/prisma/schema.prisma" ]; then
+            echo "ORM=prisma" >> $GITHUB_ENV
+          else
+            echo "ORM=none" >> $GITHUB_ENV
+          fi
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: "22"
 
@@ -41,7 +51,7 @@ jobs:
           PNPM_VERSION=$(jq -r '.packageManager | split("@")[1]' package.json)
           echo "version=$PNPM_VERSION" >> $GITHUB_OUTPUT
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c # v4
         with:
           version: ${{ steps.pnpm-version.outputs.version }}
           run_install: false
@@ -64,12 +74,12 @@ jobs:
 
       - name: Generate Prisma client
         working-directory: ${{ env.SERVICE_PATH }}
-        if: ${{ inputs.orm == 'prisma' }}
+        if: env.ORM == 'prisma'
         run: pnpm db:generate
 
       - name: Check Drizzle migrations
         working-directory: ${{ env.SERVICE_PATH }}
-        if: ${{ inputs.orm == 'drizzle' }}
+        if: env.ORM == 'drizzle'
         run: pnpm db:check
 
       - name: Run codegen
@@ -95,3 +105,104 @@ jobs:
       - name: Run tests
         working-directory: ${{ env.SERVICE_PATH }}
         run: pnpm test
+
+  # Validates Helm charts if they exist for this service
+  validate-helm:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SERVICE_PATH: ${{ inputs.service-path }}
+      SERVICE_NAME: ${{ inputs.service-name }}
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check if Helm charts exist
+        id: check-helm
+        run: |
+          if [ -d "${{ env.SERVICE_PATH }}/deploy/helm-charts" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        if: steps.check-helm.outputs.exists == 'true'
+        with:
+          version: v3.19.0
+
+      - name: Setup Chart Linting
+        if: steps.check-helm.outputs.exists == 'true'
+        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
+        with:
+          version: v3.14.0
+
+      - name: Render chart
+        if: steps.check-helm.outputs.exists == 'true'
+        working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ env.SERVICE_NAME }}
+        run: |
+          helm dependency build
+          helm template .
+
+      # FIXME: This step does not fail CI when docs are outdated - add exit 1 to enforce
+      - name: Validate helm-docs
+        if: steps.check-helm.outputs.exists == 'true'
+        working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts
+        run: |
+          if [ -f "./helm-docs.sh" ]; then
+            ./helm-docs.sh
+            if [[ $(git diff --stat) != '' ]]; then
+              echo -e '\033[0;31mDocumentation outdated!\033[0m ❌'
+              echo "Run helm-docs to update the documentation."
+              git diff --color
+            else
+              echo -e '\033[0;32mDocumentation up to date\033[0m ✔'
+            fi
+          else
+            echo "No helm-docs.sh found, skipping documentation validation"
+          fi
+
+      - name: Run chart-testing (lint)
+        if: steps.check-helm.outputs.exists == 'true'
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest.git
+          ct lint --debug --config ./.github/configs/ct-lint.yaml --lint-conf ./.github/configs/lintconf.yaml --charts ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ env.SERVICE_NAME }}
+
+  # Validates Terraform configurations if they exist for this service
+  validate-terraform:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SERVICE_PATH: ${{ inputs.service-path }}
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Check if Terraform exists
+        id: check-terraform
+        run: |
+          if [ -d "${{ env.SERVICE_PATH }}/deploy/terraform" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        if: steps.check-terraform.outputs.exists == 'true'
+        with:
+          terraform_version: 1.13.4
+
+      - name: Validate Terraform modules
+        if: steps.check-terraform.outputs.exists == 'true'
+        run: |
+          for dir in $(find ${{ env.SERVICE_PATH }}/deploy/terraform -mindepth 2 -maxdepth 2 -type d); do
+            echo "Validating: $dir"
+            cd "$dir"
+            terraform init -backend=false
+            terraform validate
+            cd - > /dev/null
+          done
