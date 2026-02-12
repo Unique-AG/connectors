@@ -274,6 +274,34 @@ importers:
         specifier: ^5.9.2
         version: 5.9.2
 
+  packages/utils:
+    dependencies:
+      serialize-error-cjs:
+        specifier: ^0.2.0
+        version: 0.2.0
+      typeid-js:
+        specifier: ^1.2.0
+        version: 1.2.0
+      zod:
+        specifier: ^4.1.5
+        version: 4.1.5
+    devDependencies:
+      '@swc/core':
+        specifier: ^1.13.5
+        version: 1.13.5
+      '@types/node':
+        specifier: ^22.13.14
+        version: 22.16.5
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      unplugin-swc:
+        specifier: ^1.5.7
+        version: 1.5.7(@swc/core@1.13.5)(rollup@4.50.0)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1)
+
   services/factset-mcp:
     dependencies:
       '@modelcontextprotocol/sdk':
