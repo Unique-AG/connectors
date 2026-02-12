@@ -19,7 +19,10 @@ let cachedConfigs: TenantConfig[] | null = null;
 export function getTenantConfigs(): TenantConfig[] {
   if (!cachedConfigs) {
     const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
-    assert.ok(tenantConfigPathPattern, 'TENANT_CONFIG_PATH_PATTERN environment variable is not set');
+    assert.ok(
+      tenantConfigPathPattern,
+      'TENANT_CONFIG_PATH_PATTERN environment variable is not set',
+    );
     cachedConfigs = loadTenantConfigs(tenantConfigPathPattern);
   }
   return cachedConfigs;
