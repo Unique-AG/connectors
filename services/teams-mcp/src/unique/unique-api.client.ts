@@ -31,7 +31,7 @@ export class UniqueApiClient {
       endpoint.search = searchParams.toString();
     }
 
-    this.logger.debug({ endpoint: endpoint.href }, `GET ${path}`);
+    this.logger.debug({ endpoint: endpoint.pathname }, `GET ${path}`);
 
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -39,7 +39,10 @@ export class UniqueApiClient {
     });
 
     if (!response.ok) {
-      this.logger.error({ status: response.status, endpoint: endpoint.href }, `GET ${path} failed`);
+      this.logger.error(
+        { status: response.status, endpoint: endpoint.pathname },
+        `GET ${path} failed`,
+      );
       throw new Error(`Unique API GET ${path} failed: ${response.status}`);
     }
 
@@ -49,7 +52,7 @@ export class UniqueApiClient {
   public async post<T>(path: string, body: unknown): Promise<T> {
     const endpoint = this.createEndpoint(path);
 
-    this.logger.debug({ endpoint: endpoint.href }, `POST ${path}`);
+    this.logger.debug({ endpoint: endpoint.pathname }, `POST ${path}`);
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -62,7 +65,7 @@ export class UniqueApiClient {
 
     if (!response.ok) {
       this.logger.error(
-        { status: response.status, endpoint: endpoint.href },
+        { status: response.status, endpoint: endpoint.pathname },
         `POST ${path} failed`,
       );
       throw new Error(`Unique API POST ${path} failed: ${response.status}`);
@@ -74,7 +77,7 @@ export class UniqueApiClient {
   public async patch<T>(path: string, body: unknown): Promise<T> {
     const endpoint = this.createEndpoint(path);
 
-    this.logger.debug({ endpoint: endpoint.href }, `PATCH ${path}`);
+    this.logger.debug({ endpoint: endpoint.pathname }, `PATCH ${path}`);
 
     const response = await fetch(endpoint, {
       method: 'PATCH',
@@ -87,7 +90,7 @@ export class UniqueApiClient {
 
     if (!response.ok) {
       this.logger.error(
-        { status: response.status, endpoint: endpoint.href },
+        { status: response.status, endpoint: endpoint.pathname },
         `PATCH ${path} failed`,
       );
       throw new Error(`Unique API PATCH ${path} failed: ${response.status}`);
@@ -96,6 +99,13 @@ export class UniqueApiClient {
     return response.json() as Promise<T>;
   }
 
+  // HACK:
+  // When running in internal auth mode, rewrite the writeUrl to route through the ingestion
+  // service's scoped upload endpoint. This enables internal services to upload files without
+  // requiring external network access (hairpinning).
+  // Ideally we should fix this somehow in the service itself by using a separate property or make
+  // writeUrl configurable, but for now this hack lets us avoid hairpinning issues in the internal
+  // upload flows.
   public correctWriteUrl(writeUrl: string): string {
     const uniqueConfig = this.config.get('unique', { infer: true });
     if (uniqueConfig.serviceAuthMode === 'external') {

@@ -8,6 +8,19 @@ import type { UniqueConfigNamespaced } from '~/config';
 import { type MetadataFilter, UniqueQLOperator } from '~/unique/unique.dtos';
 import { UniqueContentService } from '~/unique/unique-content.service';
 
+/**
+ * Typed interface for transcript metadata stored during ingestion.
+ * The generic metadata schema uses `unknown` for values, but we know the specific
+ * types for our transcript metadata fields.
+ */
+interface TranscriptMetadata {
+  date?: string;
+  participant_names?: string;
+  participant_emails?: string;
+  participant_user_profile_ids?: string;
+  content_correlation_id?: string;
+}
+
 const FindTranscriptsInputSchema = z.object({
   subject: z.string().optional().describe('Filter by meeting subject (partial match)'),
   dateFrom: z
@@ -109,7 +122,7 @@ export class FindTranscriptsTool {
     );
 
     const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
-    const filter = this.buildMetadataFilter(rootScopePath, input);
+    const filter = this.buildMetadataFilter(rootScopePath, userProfileId, input);
     this.logger.debug({ filter }, 'metadata filter');
 
     const result = await this.contentService.findByMetadata(filter, {
@@ -118,13 +131,14 @@ export class FindTranscriptsTool {
     });
 
     const transcripts = result.contents.map((content) => {
-      const metadata = content.metadata;
+      // Cast to our known transcript metadata structure
+      const metadata = content.metadata as TranscriptMetadata | null | undefined;
       return {
         id: content.id,
         title: content.title,
-        date: (metadata?.date as string | undefined) ?? null,
-        participantNames: (metadata?.participant_names as string | undefined) ?? null,
-        participantEmails: (metadata?.participant_emails as string | undefined) ?? null,
+        date: metadata?.date ?? null,
+        participantNames: metadata?.participant_names ?? null,
+        participantEmails: metadata?.participant_emails ?? null,
         readUrl: content.readUrl ?? null,
       };
     });
@@ -148,6 +162,7 @@ export class FindTranscriptsTool {
 
   private buildMetadataFilter(
     rootScopePath: string,
+    userProfileId: string,
     input: z.infer<typeof FindTranscriptsInputSchema>,
   ): MetadataFilter {
     const conditions: MetadataFilter[] = [
@@ -155,6 +170,12 @@ export class FindTranscriptsTool {
         path: ['folderIdPath'],
         operator: UniqueQLOperator.CONTAINS,
         value: `uniquepathid://${rootScopePath}`,
+      },
+      // Permission filter: only return transcripts where the current user is a participant
+      {
+        path: ['metadata', 'participant_user_profile_ids'],
+        operator: UniqueQLOperator.CONTAINS,
+        value: userProfileId,
       },
     ];
 

@@ -138,6 +138,8 @@ export class UniqueService {
           content_correlation_id: meeting.contentCorrelationId,
           participant_names: meeting.participants.map((p) => p.name).join(', '),
           participant_emails: meeting.participants.map((p) => p.email).join(', '),
+          // Store participant IDs for permission filtering during search
+          participant_user_profile_ids: [...participants.map((p) => p.id), owner.id].join(','),
         },
       },
     });
@@ -187,6 +189,8 @@ export class UniqueService {
               content_correlation_id: meeting.contentCorrelationId,
               participant_names: meeting.participants.map((p) => p.name).join(', '),
               participant_emails: meeting.participants.map((p) => p.email).join(', '),
+              // Store participant IDs for permission filtering during search
+              participant_user_profile_ids: [...participants.map((p) => p.id), owner.id].join(','),
             },
           },
         });
