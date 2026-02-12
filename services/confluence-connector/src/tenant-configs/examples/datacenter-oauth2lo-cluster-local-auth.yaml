@@ -29,6 +29,6 @@ unique:
 
 processing:
   stepTimeoutSeconds: 600
-  concurrency: 3
+  concurrency: 1
   scanIntervalCron: "0 */2 * * *" # Every 2 hours
   # maxPagesToScan: 500 # Uncomment to limit pages scanned (useful for testing)

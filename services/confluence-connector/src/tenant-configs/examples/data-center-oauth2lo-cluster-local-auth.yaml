@@ -29,5 +29,5 @@ unique:
 
 processing:
   stepTimeoutSeconds: 600
-  concurrency: 3
+  concurrency: 1
   scanIntervalCron: "0 */2 * * *"
