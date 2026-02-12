@@ -47,7 +47,7 @@ export class FullSyncCommand {
       .execute();
 
     const userProfile = await this.db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, subscriptions.userProfileId),
+      where: eq(userProfiles.id, subscription.userProfileId),
     });
     assert.ok(userProfile, `Missing User Profile: ${userProfile?.id}`);
     const userProfileEmail = userProfile.email;

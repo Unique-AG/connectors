@@ -2,7 +2,7 @@ import { createZodDto } from 'nestjs-zod';
 import { type Join, type Split } from 'type-fest';
 import z from 'zod/v4';
 import { isoDatetimeToDate, redacted, stringToURL } from '~/utils/zod';
-import { change, lifecycle } from './subscription.events';
+import { lifecycle } from './subscription.events';
 
 // SECTION - Microsoft Graph types
 
@@ -280,29 +280,3 @@ export const LifecycleEventDto = z.discriminatedUnion('type', [
 export type LifecycleEventDto = z.output<typeof LifecycleEventDto>;
 
 // !SECTION - Lifecycle Events
-
-// SECTION - Change Events
-
-export const CreatedEventDto = change.CreatedEvent.schema.safeExtend({
-  type: z.literal(change.CreatedEvent.type),
-});
-export type CreatedEventDto = z.output<typeof CreatedEventDto>;
-
-export const UpdatedEventDto = change.UpdatedEvent.schema.safeExtend({
-  type: z.literal(change.UpdatedEvent.type),
-});
-export type UpdatedEventDto = z.output<typeof UpdatedEventDto>;
-
-export const DeletedEventDto = change.DeletedEvent.schema.safeExtend({
-  type: z.literal(change.DeletedEvent.type),
-});
-export type DeletedEventDto = z.output<typeof DeletedEventDto>;
-
-export const ChangeEventDto = z.discriminatedUnion('type', [
-  CreatedEventDto,
-  UpdatedEventDto,
-  DeletedEventDto,
-]);
-export type ChangeEventDto = z.output<typeof ChangeEventDto>;
-
-// !SECTION - Change Events

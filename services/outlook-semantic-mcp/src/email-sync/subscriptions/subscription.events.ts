@@ -29,28 +29,3 @@ export const lifecycle = {
 } as const;
 
 // !SECTION - Lifecycle events
-
-// SECTION - Change events
-
-const CreatedEvent = {
-  type: 'unique.outlook-semantic-mcp.mail.change-notification.created',
-  schema: z.object({ subscriptionId: z.string(), resource: z.string() }),
-} as const;
-
-const UpdatedEvent = {
-  type: 'unique.outlook-semantic-mcp.mail.change-notification.updated',
-  schema: z.object({ subscriptionId: z.string(), resource: z.string() }),
-} as const;
-
-const DeletedEvent = {
-  type: 'unique.outlook-semantic-mcp.mail.change-notification.deleted',
-  schema: z.object({ subscriptionId: z.string(), resource: z.string() }),
-} as const;
-
-export const change = {
-  CreatedEvent,
-  UpdatedEvent,
-  DeletedEvent,
-} as const;
-
-// !SECTION - Change events
