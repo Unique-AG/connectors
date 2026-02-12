@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  elapsedMilliseconds,
-  elapsedSeconds,
-  elapsedSecondsLog,
-} from '../timing';
+import { elapsedMilliseconds, elapsedSeconds, elapsedSecondsLog } from '../timing';
 
 beforeEach(() => {
   vi.useFakeTimers();

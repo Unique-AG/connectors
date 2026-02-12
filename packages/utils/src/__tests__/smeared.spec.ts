@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createSmeared, isSmearingActive, LogsDiagnosticDataPolicy, smearPath, Smeared } from '../smeared';
+import {
+  createSmeared,
+  isSmearingActive,
+  LogsDiagnosticDataPolicy,
+  Smeared,
+  smearPath,
+} from '../smeared';
 
 describe('Smeared', () => {
   describe('constructor and getters', () => {
