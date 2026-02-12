@@ -14,6 +14,7 @@ on:
 jobs:
   manual-release:
     uses: ./.github/workflows/_template-cd.yaml
+    secrets: inherit
     with:
       service-name: confluence-connector
       service-version: ${{ inputs.existing-version }}

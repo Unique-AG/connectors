@@ -9,7 +9,7 @@ export default defineConfig({
     include: ['**/*.spec.ts'],
     setupFiles: ['./test/setup.ts'],
     coverage: {
-      provider: 'v8',
+      provider: 'istanbul',
       enabled: true,
       reporter: ['text', 'json-summary'],
       reportsDirectory: './coverage',

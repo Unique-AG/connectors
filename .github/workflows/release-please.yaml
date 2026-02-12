@@ -85,6 +85,7 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs['services/confluence-connector--release_created'] == 'true' }}
     uses: ./.github/workflows/_template-cd.yaml
+    secrets: inherit
     with:
       service-name: confluence-connector
       service-version: ${{ needs.release-please.outputs['services/confluence-connector--version'] }}
