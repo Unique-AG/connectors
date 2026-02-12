@@ -20,7 +20,7 @@ export class IngestEmailViaSubscriptionCommand {
   }): Promise<void> {
     const subscription = await this.db.query.subscriptions.findFirst({
       columns: { userProfileId: true },
-      where: eq(subscriptions.id, subscriptionId),
+      where: eq(subscriptions.subscriptionId, subscriptionId),
     });
 
     assert.ok(subscription, `Subscription missing for: ${subscriptionId}`);

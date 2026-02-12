@@ -94,7 +94,9 @@ export class SubscriptionCreateService {
     });
 
     if (existingSubscription) {
-      span?.addEvent('found managed subscription', { id: existingSubscription.id });
+      span?.addEvent('found managed subscription', {
+        id: existingSubscription.id,
+      });
       this.logger.debug(
         { id: existingSubscription.id },
         'Located existing managed subscription in database',
@@ -227,7 +229,10 @@ export class SubscriptionCreateService {
     );
 
     const client = this.graphClientFactory.createClientForUser(userProfileId.toString());
-    const graphResponse = (await client.api('/subscriptions').post(payload)) as unknown;
+    const graphResponse = (await client
+      .api('/subscriptions')
+      .header('Prefer', 'IdType="ImmutableId"')
+      .post(payload)) as unknown;
     const graphSubscription = await Subscription.parseAsync(graphResponse);
 
     span?.setAttribute('graph_subscription.id', graphSubscription.id);

@@ -131,6 +131,7 @@ export class SubscriptionRemoveService {
     // Be explicit that this returns the response but we don't care about it if successful
     const _graphResponse = (await client
       .api(`/subscriptions/${subscriptionId}`)
+      .header('Prefer', 'IdType="ImmutableId"')
       .delete()) as unknown;
 
     span?.addEvent('Graph API subscription deleted');

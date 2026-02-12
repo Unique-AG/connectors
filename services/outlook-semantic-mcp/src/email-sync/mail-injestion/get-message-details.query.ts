@@ -1,15 +1,26 @@
-import { Injectable } from '@nestjs/common';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { GraphMessageFields, graphMessageSchema } from './dtos/microsoft-graph.dtos';
+import { Injectable } from "@nestjs/common";
+import { GraphClientFactory } from "~/msgraph/graph-client.factory";
+import {
+  GraphMessageFields,
+  graphMessageSchema,
+} from "./dtos/microsoft-graph.dtos";
+import { Span } from "nestjs-otel";
 
 @Injectable()
 export class GetMessageDetailsQuery {
   public constructor(private readonly graphClientFactory: GraphClientFactory) {}
 
-  public async run({ userProfileId, messageId }: { userProfileId: string; messageId: string }) {
+  @Span()
+  public async run({
+    userProfileId,
+    messageId,
+  }: {
+    userProfileId: string;
+    messageId: string;
+  }) {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const messageRaw = await client
-      .api(`messages/${messageId}`)
+      .api(`me/messages/${messageId}`)
       .header(`Prefer`, `IdType="ImmutableId"`)
       .select(GraphMessageFields)
       .get();

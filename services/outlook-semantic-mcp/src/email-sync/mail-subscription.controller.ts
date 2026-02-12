@@ -167,14 +167,15 @@ export class MailSubscriptionController {
         `Missing resource data from notification: ${JSON.stringify(notification)}`,
       );
       const payload = await MessageEventDto.encodeAsync({
-        type: 'unique.outlook-semantic-mcp.mail.subscription-message-changed',
+        type: 'unique.outlook-semantic-mcp.mail-notification.subscription-message-changed',
         payload: {
           subscriptionId: notification.subscriptionId,
           messageId: notification.resourceData.id,
         },
       });
+      this.logger.log(`published, ${JSON.stringify(payload)}`);
       await this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload, {
-        priority: IngestionPriority.Heigh,
+        priority: IngestionPriority.High,
       });
     }
   }

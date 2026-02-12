@@ -94,7 +94,11 @@ export class SubscriptionReauthorizeService {
     span?.setAttribute('subscription.id', subscription.id);
 
     this.logger.debug(
-      { subscriptionId, managedId: subscription.id, userProfileId: subscription.userProfileId },
+      {
+        subscriptionId,
+        managedId: subscription.id,
+        userProfileId: subscription.userProfileId,
+      },
       'Located managed subscription record that requires reauthorization',
     );
 
@@ -123,6 +127,7 @@ export class SubscriptionReauthorizeService {
     const client = this.graphClientFactory.createClientForUser(subscription.userProfileId);
     const graphResponse = (await client
       .api(`/subscriptions/${subscriptionId}`)
+      .header('Prefer', 'IdType="ImmutableId"')
       .patch(payload)) as unknown;
     const graphSubscription = await Subscription.parseAsync(graphResponse);
 

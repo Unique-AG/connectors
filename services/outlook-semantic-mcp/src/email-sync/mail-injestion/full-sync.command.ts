@@ -95,18 +95,19 @@ export class FullSyncCommand {
       const message = filesRecord[fileKey];
       assert.ok(message, `Missing message for file key: ${fileKey}`);
       const event = MessageEventDto.encode({
-        type: 'unique.outlook-semantic-mcp.mail.new-message',
+        type: 'unique.outlook-semantic-mcp.mail-notification.new-message',
         payload: { messageId: message.id, userProfileId },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
         priority: IngestionPriority.Low,
       });
     }
+
     for (const fileKey of filleDiffResponse.movedFiles) {
       const message = filesRecord[fileKey];
       assert.ok(message, `Missing message for file key: ${fileKey}`);
       const event = MessageEventDto.encode({
-        type: 'unique.outlook-semantic-mcp.mail.message-metadata-changed',
+        type: 'unique.outlook-semantic-mcp.mail-notification.message-metadata-changed',
         payload: { key: fileKey, messageId: message.id, userProfileId },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
@@ -128,7 +129,7 @@ export class FullSyncCommand {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
     let emailsRaw = await client
-      .api(`messages`)
+      .api(`me/messages`)
       .header('Prefer', 'IdType="ImmutableId"')
       .select(FileDiffGraphMessageFields)
       .filter(`createdDateTime gt ${filters.createdAfter.toISOString()}`)

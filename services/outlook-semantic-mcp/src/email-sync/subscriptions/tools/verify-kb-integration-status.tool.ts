@@ -70,7 +70,7 @@ export class VerifyKbIntegrationStatusTool {
 
     const subscription = await this.db.query.subscriptions.findFirst({
       where: and(
-        eq(subscriptions.internalType, 'transcript'),
+        eq(subscriptions.internalType, 'mail_monitoring'),
         eq(subscriptions.userProfileId, userProfileId),
       ),
     });
