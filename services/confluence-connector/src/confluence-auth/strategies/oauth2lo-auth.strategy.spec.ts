@@ -59,7 +59,7 @@ describe('OAuth2LoAuthStrategy', () => {
   });
 
   describe('Cloud instance', () => {
-    it('sends POST to the Atlassian Cloud token endpoint with JSON body', async () => {
+    it('requests a Cloud access token via the Atlassian OAuth endpoint', async () => {
       fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
@@ -104,7 +104,7 @@ describe('OAuth2LoAuthStrategy', () => {
   });
 
   describe('Data Center instance', () => {
-    it('sends POST to the DC token endpoint with form-urlencoded body', async () => {
+    it('requests a Data Center access token via the instance OAuth endpoint', async () => {
       fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection);
