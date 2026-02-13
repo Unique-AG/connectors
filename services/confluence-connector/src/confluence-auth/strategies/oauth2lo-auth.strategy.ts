@@ -20,6 +20,9 @@ interface OAuth2LoConnectionConfig {
 // Centralized Atlassian identity endpoint — same for all Cloud tenants
 const CLOUD_TOKEN_ENDPOINT = 'https://api.atlassian.com/oauth/token';
 
+// Data Center service accounts require an explicit scope in the token request
+const DC_TOKEN_SCOPE = 'READ';
+
 const tokenResponseSchema = z.object({
   access_token: z.string(),
   expires_in: z.number(),
@@ -111,7 +114,7 @@ export class OAuth2LoAuthStrategy implements ConfluenceAuthStrategy {
 
     return {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(payload).toString(),
+      body: new URLSearchParams({ ...payload, scope: DC_TOKEN_SCOPE }).toString(),
     };
   }
 
