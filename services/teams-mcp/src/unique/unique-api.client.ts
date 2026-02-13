@@ -98,26 +98,4 @@ export class UniqueApiClient {
 
     return response.json() as Promise<T>;
   }
-
-  // HACK:
-  // When running in internal auth mode, rewrite the writeUrl to route through the ingestion
-  // service's scoped upload endpoint. This enables internal services to upload files without
-  // requiring external network access (hairpinning).
-  // Ideally we should fix this somehow in the service itself by using a separate property or make
-  // writeUrl configurable, but for now this hack lets us avoid hairpinning issues in the internal
-  // upload flows.
-  public correctWriteUrl(writeUrl: string): string {
-    const uniqueConfig = this.config.get('unique', { infer: true });
-    if (uniqueConfig.serviceAuthMode === 'external') {
-      return writeUrl;
-    }
-    const url = new URL(writeUrl);
-    const key = url.searchParams.get('key');
-    if (!key) throw new Error('writeUrl is missing key parameter');
-
-    return new URL(
-      `scoped/upload?key=${encodeURIComponent(key)}`,
-      uniqueConfig.ingestionServiceBaseUrl,
-    ).toString();
-  }
 }

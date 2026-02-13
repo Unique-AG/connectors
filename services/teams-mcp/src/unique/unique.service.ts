@@ -9,7 +9,6 @@ import {
   ScopeAccessType,
   UniqueIngestionMode,
 } from './unique.dtos';
-import { UniqueApiClient } from './unique-api.client';
 import { UniqueContentService } from './unique-content.service';
 import { UniqueScopeService } from './unique-scope.service';
 import { UniqueUserService } from './unique-user.service';
@@ -21,7 +20,6 @@ export class UniqueService {
   public constructor(
     private readonly config: ConfigService<UniqueConfigNamespaced, true>,
     private readonly trace: TraceService,
-    private readonly api: UniqueApiClient,
     private readonly userService: UniqueUserService,
     private readonly scopeService: UniqueScopeService,
     private readonly contentService: UniqueContentService,
@@ -145,8 +143,7 @@ export class UniqueService {
       },
     });
 
-    const correctedWriteUrl = this.api.correctWriteUrl(transcriptUpload.writeUrl);
-    await this.contentService.uploadToStorage(correctedWriteUrl, transcript.content, 'text/vtt');
+    await this.contentService.uploadToStorage(transcriptUpload.writeUrl, transcript.content, 'text/vtt');
 
     await this.contentService.upsertContent({
       storeInternally: true,
@@ -195,9 +192,8 @@ export class UniqueService {
             },
           },
         });
-        const correctedRecordingWriteUrl = this.api.correctWriteUrl(recordingUpload.writeUrl);
         await this.contentService.uploadToStorage(
-          correctedRecordingWriteUrl,
+          recordingUpload.writeUrl,
           recording.content,
           'video/mp4',
         );
