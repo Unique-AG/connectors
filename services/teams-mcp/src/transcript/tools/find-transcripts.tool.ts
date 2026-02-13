@@ -173,12 +173,21 @@ export class FindTranscriptsTool {
     input: z.infer<typeof FindTranscriptsInputSchema>,
   ): MetadataFilter {
     const conditions: MetadataFilter[] = [
+      // Scope filter: only return content under our root scope
       {
         path: ['folderIdPath'],
         operator: UniqueQLOperator.CONTAINS,
         value: `uniquepathid://${rootScopeId}`,
       },
-      // Permission filter: only return transcripts where the current user is a participant
+      // Type filter: only return transcripts (VTT files), not recordings
+      {
+        path: ['mimeType'],
+        operator: UniqueQLOperator.EQUALS,
+        value: 'text/vtt',
+      },
+      // Permission filter: only return transcripts where the current user is a participant.
+      // Uses CONTAINS on comma-separated IDs which is safe in practice since user profile IDs
+      // are UUIDs - the probability of a partial match across ID boundaries is negligible.
       {
         path: ['metadata', 'participant_user_profile_ids'],
         operator: UniqueQLOperator.CONTAINS,
