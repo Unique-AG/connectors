@@ -251,8 +251,24 @@ Per-tenant cron jobs are registered dynamically via NestJS `SchedulerRegistry` s
 
 #### Layer 5: Observability
 
-- Each `TenantContext` holds a `Logger` instance scoped to the tenant (e.g., `Logger('Tenant:acme')`)
-- All downstream operations use `tenant.logger` — logs automatically include tenant context
+Each `TenantContext` holds a NestJS `Logger` scoped to the tenant:
+
+```typescript
+const logger = new Logger(`Tenant:${name}`);
+```
+
+NestJS `Logger` accepts a context string in the constructor. This context is included in every log line automatically via `nestjs-pino`:
+
+```json
+{"level":"info", "context":"Tenant:acme", "msg":"Starting sync"}
+{"level":"error", "context":"Tenant:acme", "msg":"Sync failed", "error":"..."}
+```
+
+This is **not** a pino child logger (which would add `tenantName` as a separate structured field via `pinoLogger.child({ tenantName: 'acme' })`). The NestJS `Logger` approach is simpler and consistent with how logging works throughout the codebase (e.g., `new Logger(SchedulerService.name)` in SPC). The context string `"Tenant:acme"` is filterable in log aggregation tools.
+
+If deeper structured logging is needed later (e.g., a dedicated `tenantName` JSON field for dashboards), we can switch to pino child loggers — but that requires accessing the underlying pino instance, which adds complexity. The NestJS Logger context is sufficient for this ticket.
+
+- All downstream operations use `tenant.logger` — logs automatically include the tenant context string
 - Future: When metrics are added, they should carry a `tenant` label
 
 ### Error Handling
