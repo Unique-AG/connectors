@@ -43,12 +43,14 @@ export class IngestionHttpClient {
     const ingestionUrl = new URL(deps.baseUrl);
     this.origin = `${ingestionUrl.protocol}//${ingestionUrl.host}`;
 
-    this.httpClient = deps.dispatcher.compose([interceptors.retry({
-      maxRetries: 3,
-      minTimeout: 3_000,
-      methods: ['POST'],
-      throwOnError: false,
-    })]);
+    this.httpClient = deps.dispatcher.compose([
+      interceptors.retry({
+        maxRetries: 3,
+        minTimeout: 3_000,
+        methods: ['POST'],
+        throwOnError: false,
+      }),
+    ]);
 
     this.extractApiMethod = createApiMethodExtractor([
       'v2',

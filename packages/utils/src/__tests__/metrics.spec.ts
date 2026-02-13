@@ -127,9 +127,7 @@ describe('createApiMethodExtractor', () => {
 
   it('handles paths with query strings', () => {
     const extractor = createApiMethodExtractor(['sites', 'drives']);
-    expect(extractor('/sites/abc123/drives?filter=xyz', 'GET')).toBe(
-      'GET:/sites/{siteId}/drives',
-    );
+    expect(extractor('/sites/abc123/drives?filter=xyz', 'GET')).toBe('GET:/sites/{siteId}/drives');
   });
 
   it('handles empty paths', () => {

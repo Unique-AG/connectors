@@ -21,10 +21,7 @@ function createMockLogger() {
   return { error: vi.fn(), debug: vi.fn() };
 }
 
-function createDispatcherResponse(
-  statusCode: number,
-  body: object,
-): Dispatcher.ResponseData {
+function createDispatcherResponse(statusCode: number, body: object): Dispatcher.ResponseData {
   return {
     statusCode,
     headers: {},
@@ -181,9 +178,7 @@ describe('UniqueAuth', () => {
 
       const auth = createExternalAuth();
 
-      await expect(auth.getToken()).rejects.toThrow(
-        'Zitadel token request failed with status 401',
-      );
+      await expect(auth.getToken()).rejects.toThrow('Zitadel token request failed with status 401');
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           msg: 'Failed to acquire Unique API token from Zitadel',
