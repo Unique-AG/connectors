@@ -44,7 +44,7 @@ Set via `mcpConfig.unique` in Helm values:
 | `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
 | `UNIQUE_API_BASE_URL` | `mcpConfig.unique.apiBaseUrl` | (required) | Unique API endpoint |
 | `UNIQUE_API_VERSION` | `mcpConfig.unique.apiVersion` | `2023-12-06` | API version |
-| `UNIQUE_ROOT_SCOPE_PATH` | `mcpConfig.unique.rootScopePath` | `Teams-MCP` | Root folder for uploads |
+| `UNIQUE_ROOT_SCOPE_ID` | `mcpConfig.unique.rootScopeId` | (required) | Root scope ID for uploads |
 | `UNIQUE_USER_FETCH_CONCURRENCY` | `mcpConfig.unique.userFetchConcurrency` | `5` | Parallel user lookups |
 | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required) | Ingestion service endpoint |
 
@@ -116,7 +116,7 @@ mcpConfig:
     serviceAuthMode: cluster_local
     apiBaseUrl: http://api-gateway.unique:8080
     apiVersion: "2023-12-06"
-    rootScopePath: Teams-MCP
+    rootScopeId: folder_abc123  # Your root scope ID from Unique
     userFetchConcurrency: 5
     ingestionServiceBaseUrl: http://node-ingestion.unique:8091
 
