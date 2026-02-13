@@ -96,26 +96,22 @@ export class OAuth2LoAuthStrategy implements ConfluenceAuthStrategy {
   }
 
   private buildRequest(): { headers: Record<string, string>; body: string } {
-    if (this.instanceType === 'cloud') {
-      return {
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grant_type: 'client_credentials',
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
-        }),
-      };
-    }
-
-    const params = new URLSearchParams({
+    const payload = {
       grant_type: 'client_credentials',
       client_id: this.clientId,
       client_secret: this.clientSecret,
-    });
+    };
+
+    if (this.instanceType === 'cloud') {
+      return {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      };
+    }
 
     return {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString(),
+      body: new URLSearchParams(payload).toString(),
     };
   }
 
