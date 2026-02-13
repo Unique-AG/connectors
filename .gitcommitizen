@@ -36,6 +36,7 @@ logger = packages/logger/**
 mcp-oauth = packages/mcp-oauth/**
 mcp-server-module = packages/mcp-server-module/**
 probe = packages/probe/**
+utils = packages/utils/**
 
 # Special scopes
 ci = .github/**
