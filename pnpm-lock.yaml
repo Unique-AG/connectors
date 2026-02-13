@@ -160,7 +160,7 @@ importers:
         specifier: ^0.2.2
         version: 0.2.2
       serialize-error-cjs:
-        specifier: 0.2.0
+        specifier: ^0.2.0
         version: 0.2.0
       typeid-js:
         specifier: ^1.2.0
