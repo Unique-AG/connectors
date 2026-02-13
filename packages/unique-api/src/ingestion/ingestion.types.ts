@@ -63,7 +63,7 @@ export interface IngestionApiResponse {
   readUrl: string;
   createdAt: string;
   internallyStoredAt: string | null;
-  source: string;
+  source: { kind: string; name: string };
 }
 
 export interface FileDiffItem {

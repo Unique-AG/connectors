@@ -158,6 +158,7 @@ export interface UniqueApiClient {
     create(group: {
       name: string;
       externalId: string;
+      createdBy: string;
     }): Promise<GroupWithMembers>;
     update(group: { id: string; name: string }): Promise<Group>;
     delete(groupId: string): Promise<void>;
@@ -174,6 +175,8 @@ export interface UniqueApiClient {
     performFileDiff(
       fileList: FileDiffItem[],
       partialKey: string,
+      sourceKind: string,
+      sourceName: string,
     ): Promise<FileDiffResponse>;
   };
   close?(): Promise<void>;
