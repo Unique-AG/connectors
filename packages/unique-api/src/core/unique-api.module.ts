@@ -47,11 +47,7 @@ export class UniqueApiModule implements OnModuleDestroy {
         { provide: UNIQUE_API_MODULE_OPTIONS, useValue: options },
         ...UniqueApiModule.createCoreProviders(),
       ],
-      exports: [
-        UNIQUE_API_CLIENT_FACTORY,
-        UNIQUE_API_CLIENT_REGISTRY,
-        UNIQUE_API_METRICS,
-      ],
+      exports: [UNIQUE_API_CLIENT_FACTORY, UNIQUE_API_CLIENT_REGISTRY, UNIQUE_API_METRICS],
     };
   }
 
@@ -68,11 +64,7 @@ export class UniqueApiModule implements OnModuleDestroy {
         },
         ...UniqueApiModule.createCoreProviders(),
       ],
-      exports: [
-        UNIQUE_API_CLIENT_FACTORY,
-        UNIQUE_API_CLIENT_REGISTRY,
-        UNIQUE_API_METRICS,
-      ],
+      exports: [UNIQUE_API_CLIENT_FACTORY, UNIQUE_API_CLIENT_REGISTRY, UNIQUE_API_METRICS],
     };
   }
 

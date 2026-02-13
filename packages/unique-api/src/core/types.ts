@@ -67,12 +67,10 @@ export interface UniqueApiClientConfig {
 export interface UniqueApiObservabilityConfig {
   loggerContext?: string;
   metricPrefix?: string;
-  includeTenantDimension?: boolean;
 }
 
 export interface UniqueApiModuleOptions {
   observability?: UniqueApiObservabilityConfig;
-  defaultClient?: UniqueApiClientConfig;
 }
 
 export interface UniqueApiModuleAsyncOptions {
