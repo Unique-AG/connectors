@@ -166,7 +166,7 @@ describe('OAuth2LoAuthStrategy', () => {
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(
-        'Invalid credentials: https://api.atlassian.com/oauth/token responded with 401 — verify client_id and client_secret: Unauthorized',
+        'Invalid credentials: https://api.atlassian.com/oauth/token responded with 401: Unauthorized',
       );
     });
 
@@ -176,7 +176,7 @@ describe('OAuth2LoAuthStrategy', () => {
       const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(
-        'Invalid credentials: https://confluence.corp.example.com/rest/oauth2/latest/token responded with 403 — verify client_id and client_secret: Forbidden',
+        'Invalid credentials: https://confluence.corp.example.com/rest/oauth2/latest/token responded with 403: Forbidden',
       );
     });
 
