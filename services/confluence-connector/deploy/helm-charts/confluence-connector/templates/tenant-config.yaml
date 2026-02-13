@@ -14,11 +14,22 @@ data:
       baseUrl: {{ $tenant.confluence.baseUrl | quote }}
       auth:
         mode: {{ $tenant.confluence.auth.mode | quote }}
+        {{- if eq $tenant.confluence.auth.mode "oauth_2lo" }}
         clientId: {{ $tenant.confluence.auth.clientId | quote }}
         # clientSecret is loaded from environment variable (secret)
+        {{- end }}
+        {{- if eq $tenant.confluence.auth.mode "pat" }}
+        # token is loaded from environment variable (secret)
+        {{- end }}
+      {{- if $tenant.confluence.apiRateLimitPerMinute }}
       apiRateLimitPerMinute: {{ $tenant.confluence.apiRateLimitPerMinute }}
+      {{- end }}
+      {{- if $tenant.confluence.ingestSingleLabel }}
       ingestSingleLabel: {{ $tenant.confluence.ingestSingleLabel | quote }}
+      {{- end }}
+      {{- if $tenant.confluence.ingestAllLabel }}
       ingestAllLabel: {{ $tenant.confluence.ingestAllLabel | quote }}
+      {{- end }}
     # Unique API Configuration
     unique:
       serviceAuthMode: {{ $tenant.unique.authMode | quote }}

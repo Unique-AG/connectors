@@ -4,7 +4,7 @@ import { registerAs } from '@nestjs/config';
 import { load } from 'js-yaml';
 import { isPlainObject } from 'remeda';
 import { z } from 'zod';
-import { type ConfluenceConfig, ConfluenceConfigSchema } from './confluence.schema';
+import { AuthMode, type ConfluenceConfig, ConfluenceConfigSchema } from './confluence.schema';
 import { type ProcessingConfig, ProcessingConfigSchema } from './processing.schema';
 import { type UniqueConfig, UniqueConfigSchema } from './unique.schema';
 
@@ -63,11 +63,11 @@ function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
   const confluenceAuth = confluence?.auth as Record<string, unknown> | undefined;
   const unique = config.unique as Record<string, unknown> | undefined;
 
-  if (process.env.CONFLUENCE_CLIENT_SECRET && confluenceAuth?.mode === 'oauth_2lo') {
+  if (process.env.CONFLUENCE_CLIENT_SECRET && confluenceAuth?.mode === AuthMode.OAUTH_2LO) {
     confluenceAuth.clientSecret = process.env.CONFLUENCE_CLIENT_SECRET;
   }
 
-  if (process.env.CONFLUENCE_PAT && confluenceAuth?.mode === 'pat') {
+  if (process.env.CONFLUENCE_PAT && confluenceAuth?.mode === AuthMode.PAT) {
     confluenceAuth.token = process.env.CONFLUENCE_PAT;
   }
 

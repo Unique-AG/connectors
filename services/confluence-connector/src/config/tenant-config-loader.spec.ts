@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { dump } from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AuthMode } from './confluence.schema';
 
 vi.mock('node:fs', () => ({
   globSync: vi.fn(),
@@ -44,12 +45,12 @@ const baseConfluenceFields = {
 };
 
 const oauth2loAuth = {
-  mode: 'oauth_2lo',
+  mode: AuthMode.OAUTH_2LO,
   clientId: 'test-client-id',
 };
 
 const patAuth = {
-  mode: 'pat',
+  mode: AuthMode.PAT,
 };
 
 function assertFirstElement<T>(arr: T[]): T {
@@ -142,10 +143,10 @@ describe('tenant-config-loader', () => {
       const tenant = assertFirstElement(result);
       expect(tenant.confluence.instanceType).toBe('cloud');
       expect(tenant.confluence.baseUrl).toBe('https://acme.atlassian.net/wiki');
-      expect(tenant.confluence.auth.mode).toBe('oauth_2lo');
+      expect(tenant.confluence.auth.mode).toBe(AuthMode.OAUTH_2LO);
       const auth = tenant.confluence.auth as Extract<
         typeof tenant.confluence.auth,
-        { mode: 'oauth_2lo' }
+        { mode: typeof AuthMode.OAUTH_2LO }
       >;
       expect(auth.clientId).toBe('test-client-id');
       expect(auth.clientSecret.value).toBe('env-client-secret');
@@ -183,10 +184,10 @@ describe('tenant-config-loader', () => {
       const tenant = assertFirstElement(result);
       expect(tenant.confluence.instanceType).toBe('data-center');
       expect(tenant.confluence.baseUrl).toBe('https://confluence.acme.com');
-      expect(tenant.confluence.auth.mode).toBe('pat');
+      expect(tenant.confluence.auth.mode).toBe(AuthMode.PAT);
       const auth = tenant.confluence.auth as Extract<
         typeof tenant.confluence.auth,
-        { mode: 'pat' }
+        { mode: typeof AuthMode.PAT }
       >;
       expect(auth.token.value).toBe('env-pat-token');
     });
@@ -214,10 +215,10 @@ describe('tenant-config-loader', () => {
       const tenant = assertFirstElement(result);
       expect(tenant.confluence.instanceType).toBe('data-center');
       expect(tenant.confluence.baseUrl).toBe('https://confluence.acme.com');
-      expect(tenant.confluence.auth.mode).toBe('oauth_2lo');
+      expect(tenant.confluence.auth.mode).toBe(AuthMode.OAUTH_2LO);
       const auth = tenant.confluence.auth as Extract<
         typeof tenant.confluence.auth,
-        { mode: 'oauth_2lo' }
+        { mode: typeof AuthMode.OAUTH_2LO }
       >;
       expect(auth.clientSecret.value).toBe('env-client-secret');
     });
@@ -240,7 +241,7 @@ describe('tenant-config-loader', () => {
         confluence: {
           instanceType: 'data-center',
           baseUrl: 'https://confluence.tenant2.com',
-          auth: { mode: 'oauth_2lo', clientId: 'tenant2-client-id' },
+          auth: { mode: AuthMode.OAUTH_2LO, clientId: 'tenant2-client-id' },
           ...baseConfluenceFields,
         },
         unique: {
@@ -269,7 +270,7 @@ describe('tenant-config-loader', () => {
       expect(tenant2?.confluence.baseUrl).toBe('https://confluence.tenant2.com');
       const tenant2Auth = tenant2?.confluence.auth as Extract<
         NonNullable<typeof tenant2>['confluence']['auth'],
-        { mode: 'oauth_2lo' }
+        { mode: typeof AuthMode.OAUTH_2LO }
       >;
       expect(tenant2Auth.clientId).toBe('tenant2-client-id');
     });
@@ -298,7 +299,7 @@ describe('tenant-config-loader', () => {
       const tenant = assertFirstElement(result);
       const auth = tenant.confluence.auth as Extract<
         typeof tenant.confluence.auth,
-        { mode: 'oauth_2lo' }
+        { mode: typeof AuthMode.OAUTH_2LO }
       >;
       expect(auth.clientSecret.value).toBe('env-client-secret');
     });
@@ -325,7 +326,7 @@ describe('tenant-config-loader', () => {
       const tenant = assertFirstElement(result);
       const auth = tenant.confluence.auth as Extract<
         typeof tenant.confluence.auth,
-        { mode: 'pat' }
+        { mode: typeof AuthMode.PAT }
       >;
       expect(auth.token.value).toBe('env-pat-token');
     });
@@ -351,7 +352,7 @@ describe('tenant-config-loader', () => {
       const result = getTenantConfigs();
 
       const tenant = assertFirstElement(result);
-      expect(tenant.confluence.auth.mode).toBe('oauth_2lo');
+      expect(tenant.confluence.auth.mode).toBe(AuthMode.OAUTH_2LO);
       expect(tenant.confluence.auth).not.toHaveProperty('token');
     });
 
@@ -376,7 +377,7 @@ describe('tenant-config-loader', () => {
       const result = getTenantConfigs();
 
       const tenant = assertFirstElement(result);
-      expect(tenant.confluence.auth.mode).toBe('pat');
+      expect(tenant.confluence.auth.mode).toBe(AuthMode.PAT);
       expect(tenant.confluence.auth).not.toHaveProperty('clientSecret');
     });
 

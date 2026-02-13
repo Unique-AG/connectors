@@ -142,14 +142,7 @@
               "confluence": {
                 "type": "object",
                 "description": "Confluence configuration",
-                "required": [
-                  "instanceType",
-                  "baseUrl",
-                  "auth",
-                  "apiRateLimitPerMinute",
-                  "ingestSingleLabel",
-                  "ingestAllLabel"
-                ],
+                "required": ["instanceType", "baseUrl", "auth"],
                 "properties": {
                   "instanceType": {
                     "type": "string",
@@ -164,19 +157,35 @@
                   "auth": {
                     "type": "object",
                     "description": "Confluence authentication configuration",
-                    "required": ["mode", "clientId"],
-                    "properties": {
-                      "mode": {
-                        "type": "string",
-                        "description": "Authentication mode: oauth_2lo (OAuth 2.0 two-legged)",
-                        "enum": ["oauth_2lo"]
+                    "required": ["mode"],
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": ["oauth_2lo"],
+                            "description": "OAuth 2.0 two-legged (client credentials)"
+                          },
+                          "clientId": {
+                            "type": "string",
+                            "description": "OAuth 2.0 (2LO) application client ID"
+                          }
+                        },
+                        "required": ["mode", "clientId"],
+                        "additionalProperties": false
                       },
-                      "clientId": {
-                        "type": "string",
-                        "description": "OAuth 2.0 (2LO) application client ID"
+                      {
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": ["pat"],
+                            "description": "Personal Access Token (Data Center only)"
+                          }
+                        },
+                        "required": ["mode"],
+                        "additionalProperties": false
                       }
-                    },
-                    "additionalProperties": false
+                    ]
                   },
                   "apiRateLimitPerMinute": {
                     "type": "integer",
