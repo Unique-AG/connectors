@@ -274,8 +274,75 @@ importers:
         specifier: ^5.9.2
         version: 5.9.2
 
+  packages/unique-api:
+    dependencies:
+      '@unique-ag/utils':
+        specifier: workspace:*
+        version: link:../utils
+      bottleneck:
+        specifier: ^2.19.5
+        version: 2.19.5
+      graphql:
+        specifier: ^16.11.0
+        version: 16.11.0
+      graphql-request:
+        specifier: ^7.2.0
+        version: 7.2.0(graphql@16.11.0)
+      remeda:
+        specifier: ^2.32.0
+        version: 2.32.0
+      undici:
+        specifier: ^7.18.2
+        version: 7.18.2
+    devDependencies:
+      '@nestjs/common':
+        specifier: ^11.1.6
+        version: 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.1.6
+        version: 11.1.6(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.6)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/testing':
+        specifier: ^11.1.6
+        version: 11.1.6(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/platform-express@11.1.6)
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.0
+      '@suites/di.nestjs':
+        specifier: ^3.0.1
+        version: 3.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
+      '@suites/doubles.vitest':
+        specifier: ^3.0.1
+        version: 3.0.1(@vitest/spy@3.2.4)(vitest@3.2.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))
+      '@suites/unit':
+        specifier: ^3.0.1
+        version: 3.0.1
+      '@swc/core':
+        specifier: ^1.13.5
+        version: 1.13.5
+      '@types/node':
+        specifier: ^22.13.14
+        version: 22.16.5
+      nestjs-otel:
+        specifier: ^7.0.1
+        version: 7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      unplugin-swc:
+        specifier: ^1.5.7
+        version: 1.5.7(@swc/core@1.13.5)(rollup@4.50.0)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1)
+
   packages/utils:
     dependencies:
+      remeda:
+        specifier: ^2.32.0
+        version: 2.32.0
       serialize-error-cjs:
         specifier: ^0.2.0
         version: 0.2.0
@@ -9136,14 +9203,6 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
-  '@vitest/mocker@3.2.4(vite@7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))':
-    dependencies:
-      '@vitest/spy': 3.2.4
-      estree-walker: 3.0.3
-      magic-string: 0.30.17
-    optionalDependencies:
-      vite: 7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1)
-
   '@vitest/mocker@3.2.4(vite@7.1.4(@types/node@24.4.0)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))':
     dependencies:
       '@vitest/spy': 3.2.4
@@ -12571,7 +12630,7 @@ snapshots:
     dependencies:
       '@types/chai': 5.2.2
       '@vitest/expect': 3.2.4
-      '@vitest/mocker': 3.2.4(vite@7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))
+      '@vitest/mocker': 3.2.4(vite@7.1.4(@types/node@24.4.0)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))
       '@vitest/pretty-format': 3.2.4
       '@vitest/runner': 3.2.4
       '@vitest/snapshot': 3.2.4
