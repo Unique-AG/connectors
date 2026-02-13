@@ -207,6 +207,30 @@
                     "description": "Label to trigger full sync of all labeled pages"
                   }
                 },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "auth": {
+                          "type": "object",
+                          "required": ["mode"],
+                          "properties": {
+                            "mode": {
+                              "const": "pat"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "instanceType": {
+                          "const": "data-center"
+                        }
+                      }
+                    }
+                  }
+                ],
                 "additionalProperties": false
               },
               "unique": {

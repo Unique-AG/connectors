@@ -121,6 +121,7 @@ describe('OAuth2LoAuthStrategy', () => {
       expect(params.get('grant_type')).toBe('client_credentials');
       expect(params.get('client_id')).toBe('my-client-id');
       expect(params.get('client_secret')).toBe('my-client-secret');
+      expect(params.get('scope')).toBe('READ');
     });
 
     it('returns accessToken and computed expiresAt for DC', async () => {
