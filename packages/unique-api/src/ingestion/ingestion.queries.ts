@@ -1,5 +1,4 @@
 import { gql } from 'graphql-request';
-
 import type { FileAccessKey } from '../files/files.types';
 import type { IngestionApiResponse } from './ingestion.types';
 

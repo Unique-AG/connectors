@@ -1,5 +1,4 @@
 import { Agent, interceptors } from 'undici';
-
 import { UniqueAuth } from '../auth/unique-auth';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
 import { UniqueGraphqlClient } from '../clients/unique-graphql.client';

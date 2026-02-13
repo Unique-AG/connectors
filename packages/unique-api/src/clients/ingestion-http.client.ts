@@ -7,7 +7,6 @@ import {
 } from '@unique-ag/utils';
 import Bottleneck from 'bottleneck';
 import { type Dispatcher, errors, interceptors } from 'undici';
-
 import type { UniqueAuth } from '../auth/unique-auth';
 import type { UniqueApiMetrics } from '../core/observability';
 import type { RequestMetricAttributes } from '../core/types';

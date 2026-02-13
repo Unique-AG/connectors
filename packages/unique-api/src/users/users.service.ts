@@ -1,7 +1,5 @@
 import { pick } from 'remeda';
-
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import type { SimpleUser } from './users.types';
 import {
   GET_CURRENT_USER_QUERY,
   type GetCurrentUserQueryResult,
@@ -9,6 +7,7 @@ import {
   type ListUsersQueryInput,
   type ListUsersQueryResult,
 } from './users.queries';
+import type { SimpleUser } from './users.types';
 
 const BATCH_SIZE = 100;
 

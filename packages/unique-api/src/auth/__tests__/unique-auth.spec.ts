@@ -1,8 +1,6 @@
 import assert from 'node:assert';
-
-import { type MockInstance, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Dispatcher } from 'undici';
-
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import type { UniqueApiMetrics } from '../../core/observability';
 import type { ClusterLocalAuthConfig, ExternalAuthConfig } from '../../core/types';
 import { UniqueAuth } from '../unique-auth';

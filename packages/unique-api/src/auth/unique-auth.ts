@@ -1,8 +1,6 @@
 import assert from 'node:assert';
-
 import { sanitizeError } from '@unique-ag/utils';
 import type { Dispatcher } from 'undici';
-
 import type { UniqueApiMetrics } from '../core/observability';
 import type { ExternalAuthConfig, UniqueApiClientAuthConfig } from '../core/types';
 

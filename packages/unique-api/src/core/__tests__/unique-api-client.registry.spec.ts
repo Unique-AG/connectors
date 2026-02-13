@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-
 import type { UniqueApiClient, UniqueApiClientConfig, UniqueApiClientFactory } from '../types';
 import { UniqueApiClientRegistryImpl } from '../unique-api-client.registry';
 

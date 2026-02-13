@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-
 import type { IngestionHttpClient } from '../clients/ingestion-http.client';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {

@@ -1,6 +1,5 @@
 import type { Meter } from '@opentelemetry/api';
 import { describe, expect, it, vi } from 'vitest';
-
 import { createUniqueApiMetrics } from '../observability';
 
 function createMockMeter() {

@@ -1,5 +1,4 @@
 import { gql } from 'graphql-request';
-
 import type { UniqueAccessType, UniqueEntityType } from '../core/types';
 import type { Scope } from './scopes.types';
 

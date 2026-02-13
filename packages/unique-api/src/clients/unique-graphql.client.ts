@@ -8,8 +8,7 @@ import {
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
-import { fetch as undiciFetch, type Dispatcher } from 'undici';
-
+import { type Dispatcher, fetch as undiciFetch } from 'undici';
 import type { UniqueAuth } from '../auth/unique-auth';
 import type { UniqueApiMetrics } from '../core/observability';
 import type { RequestMetricAttributes } from '../core/types';

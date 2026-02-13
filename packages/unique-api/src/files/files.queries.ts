@@ -1,5 +1,4 @@
 import { gql } from 'graphql-request';
-
 import type { FileAccessInput, UniqueFile } from './files.types';
 
 export interface ContentUpdateMutationInput {

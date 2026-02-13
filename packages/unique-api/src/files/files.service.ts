@@ -1,8 +1,6 @@
 import { getErrorCodeFromGraphqlRequest, sanitizeError } from '@unique-ag/utils';
 import { chunk } from 'remeda';
-
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import type { FileAccessInput, UniqueFile } from './files.types';
 import {
   ADD_ACCESSES_MUTATION,
   type AddAccessesMutationInput,
@@ -26,6 +24,7 @@ import {
   type RemoveAccessesMutationInput,
   type RemoveAccessesMutationResult,
 } from './files.queries';
+import type { FileAccessInput, UniqueFile } from './files.types';
 
 const CONTENT_BATCH_SIZE = 100;
 const DELETE_BATCH_SIZE = 20;

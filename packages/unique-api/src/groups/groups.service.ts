@@ -1,7 +1,5 @@
 import { pick, prop } from 'remeda';
-
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import type { Group, GroupWithMembers } from './groups.types';
 import {
   ADD_GROUP_MEMBERS_MUTATION,
   type AddGroupMembersMutationInput,
@@ -12,6 +10,7 @@ import {
   DELETE_GROUP_MUTATION,
   type DeleteGroupMutationInput,
   type DeleteGroupMutationResult,
+  getListGroupsQuery,
   type ListGroupsQueryInput,
   type ListGroupsQueryResult,
   REMOVE_GROUP_MEMBER_MUTATION,
@@ -20,8 +19,8 @@ import {
   UPDATE_GROUP_MUTATION,
   type UpdateGroupMutationInput,
   type UpdateGroupMutationResult,
-  getListGroupsQuery,
 } from './groups.queries';
+import type { Group, GroupWithMembers } from './groups.types';
 
 const BATCH_SIZE = 100;
 

@@ -1,8 +1,6 @@
 import { isNullish } from 'remeda';
-
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import { processInBatches } from '../core/batch-processor.service';
-import type { Scope, ScopeAccess } from './scopes.types';
 import {
   CREATE_SCOPE_ACCESSES_MUTATION,
   type CreateScopeAccessesMutationInput,
@@ -15,14 +13,15 @@ import {
   type DeleteScopeAccessesMutationResult,
   type GenerateScopesBasedOnPathsMutationInput,
   type GenerateScopesBasedOnPathsMutationResult,
+  getGenerateScopesBasedOnPathsMutation,
   PAGINATED_SCOPE_QUERY,
   type PaginatedScopeQueryInput,
   type PaginatedScopeQueryResult,
   UPDATE_SCOPE_MUTATION,
   type UpdateScopeMutationInput,
   type UpdateScopeMutationResult,
-  getGenerateScopesBasedOnPathsMutation,
 } from './scopes.queries';
+import type { Scope, ScopeAccess } from './scopes.types';
 
 const BATCH_SIZE = 100;
 
