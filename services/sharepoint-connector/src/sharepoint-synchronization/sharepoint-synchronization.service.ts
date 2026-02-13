@@ -255,6 +255,7 @@ export class SharepointSynchronizationService {
         siteName,
         serviceUserId: baseContext.serviceUserId,
         rootPath: baseContext.rootPath,
+        isInitialSync: baseContext.isInitialSync,
       },
     };
   }
@@ -335,6 +336,16 @@ export class SharepointSynchronizationService {
         });
         return { status: 'failure', step: SyncStep.PermissionsSync };
       }
+    }
+
+    try {
+      await this.scopeManagementService.deleteOrphanedScopes(siteConfig.siteId);
+    } catch (error) {
+      this.logger.warn({
+        msg: `${logPrefix} Failed to clean up orphaned scopes`,
+        error: sanitizeError(error),
+      });
+      return { status: 'failure', step: SyncStep.OrphanScopeCleanup };
     }
 
     return { status: 'success' };

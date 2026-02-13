@@ -107,7 +107,8 @@ export interface PaginatedScopeQueryInput {
       equals: string;
     } | null;
     externalId?: {
-      equals: string;
+      equals?: string;
+      startsWith?: string;
     };
   };
 }

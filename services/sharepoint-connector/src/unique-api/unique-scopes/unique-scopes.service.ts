@@ -31,7 +31,8 @@ const BATCH_SIZE = 100;
 export class UniqueScopesService {
   private readonly logger = new Logger(this.constructor.name);
   public constructor(
-    @Inject(SCOPE_MANAGEMENT_CLIENT) private readonly scopeManagementClient: UniqueGraphqlClient,
+    @Inject(SCOPE_MANAGEMENT_CLIENT)
+    private readonly scopeManagementClient: UniqueGraphqlClient,
     private readonly batchProcessor: BatchProcessorService,
   ) {}
 
@@ -54,7 +55,9 @@ export class UniqueScopesService {
       items: paths,
       batchSize: BATCH_SIZE,
       processor: async (batch) => {
-        const variables: GenerateScopesBasedOnPathsMutationInput = { paths: batch };
+        const variables: GenerateScopesBasedOnPathsMutationInput = {
+          paths: batch,
+        };
 
         if (!isNullish(opts.inheritAccess)) {
           variables.inheritAccess = opts.inheritAccess;
@@ -205,6 +208,35 @@ export class UniqueScopesService {
         where: {
           parentId: {
             equals: parentId,
+          },
+        },
+      });
+      scopes.push(...batchResult.paginatedScope.nodes);
+      batchCount = batchResult.paginatedScope.nodes.length;
+      skip += BATCH_SIZE;
+    } while (batchCount === BATCH_SIZE);
+
+    return scopes;
+  }
+
+  public async listScopesByExternalIdPrefix(prefix: Smeared): Promise<Scope[]> {
+    const logPrefix = `[ExternalIdPrefix: ${prefix}]`;
+    this.logger.debug(`${logPrefix} Fetching scopes by externalId prefix from Unique API`);
+
+    let skip = 0;
+    const scopes: Scope[] = [];
+
+    let batchCount = 0;
+    do {
+      const batchResult = await this.scopeManagementClient.request<
+        PaginatedScopeQueryResult,
+        PaginatedScopeQueryInput
+      >(PAGINATED_SCOPE_QUERY, {
+        skip,
+        take: BATCH_SIZE,
+        where: {
+          externalId: {
+            startsWith: prefix.value,
           },
         },
       });

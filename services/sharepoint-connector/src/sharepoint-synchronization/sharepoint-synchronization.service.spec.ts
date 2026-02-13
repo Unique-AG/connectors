@@ -26,6 +26,7 @@ describe('SharepointSynchronizationService', () => {
     initializeRootScope: ReturnType<typeof vi.fn>;
     batchCreateScopes: ReturnType<typeof vi.fn>;
     deleteRootScopeRecursively: ReturnType<typeof vi.fn>;
+    deleteOrphanedScopes: ReturnType<typeof vi.fn>;
   };
 
   const mockFile: SharepointContentItem = {
@@ -124,9 +125,11 @@ describe('SharepointSynchronizationService', () => {
       initializeRootScope: vi.fn().mockResolvedValue({
         serviceUserId: 'user-123',
         rootPath: new Smeared('/test-root', false),
+        isInitialSync: false,
       }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
       deleteRootScopeRecursively: vi.fn().mockResolvedValue(undefined),
+      deleteOrphanedScopes: vi.fn().mockResolvedValue(undefined),
     };
 
     const mockHistogram = {
@@ -322,6 +325,30 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
 
     expect(mockPermissionsSyncService.syncPermissionsForSite).not.toHaveBeenCalled();
+  });
+
+  it('calls orphan scope cleanup after content sync', async () => {
+    await service.synchronize();
+
+    expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledTimes(1);
+    expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledTimes(1);
+    expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        value: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+      }),
+    );
+  });
+
+  it('continues global synchronization when orphan scope cleanup fails for a site', async () => {
+    mockScopeManagementService.deleteOrphanedScopes.mockRejectedValueOnce(
+      new Error('Cleanup failed'),
+    );
+
+    const result = await service.synchronize();
+
+    expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledTimes(1);
+    expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe('success');
   });
 
   it('handles permissions sync errors gracefully', async () => {

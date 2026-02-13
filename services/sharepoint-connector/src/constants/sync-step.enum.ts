@@ -12,6 +12,7 @@ export const SyncStep = {
   GroupsSync: 'groups_sync',
   FilePermissionsSync: 'file_permissions_sync',
   FolderPermissionsSync: 'folder_permissions_sync',
+  OrphanScopeCleanup: 'orphan_scope_cleanup',
   Unknown: 'unknown',
 } as const;
 
