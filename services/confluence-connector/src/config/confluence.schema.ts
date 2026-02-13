@@ -10,14 +10,19 @@ import {
   urlWithoutTrailingSlashSchema,
 } from '../utils/zod.util';
 
+export const AuthMode = {
+  OAUTH_2LO: 'oauth_2lo',
+  PAT: 'pat',
+} as const;
+
 const oauth2loAuth = z.object({
-  mode: z.literal('oauth_2lo'),
+  mode: z.literal(AuthMode.OAUTH_2LO).describe('OAuth 2.0 two-legged (client credentials)'),
   clientId: z.string().min(1),
   clientSecret: redactedNonEmptyStringSchema,
 });
 
 const patAuth = z.object({
-  mode: z.literal('pat'),
+  mode: z.literal(AuthMode.PAT).describe('Personal Access Token (Data Center only)'),
   token: redactedNonEmptyStringSchema,
 });
 

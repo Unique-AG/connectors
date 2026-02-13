@@ -7,6 +7,7 @@ import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { AppConfig, appConfig, confluenceConfig, processingConfig, uniqueConfig } from './config';
+import { ConfluenceAuthModule } from './confluence-auth/confluence-auth.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { AppConfig, appConfig, confluenceConfig, processingConfig, uniqueConfig 
       ignoreEnvFile: true,
       load: [appConfig, confluenceConfig, processingConfig, uniqueConfig],
     }),
+    ConfluenceAuthModule,
     LoggerModule.forRootAsync({
       useFactory(appConfigValue: AppConfig) {
         return {

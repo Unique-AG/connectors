@@ -24,6 +24,6 @@ connectorConfig:
           customProperty: value
       processing:
         stepTimeoutSeconds: 300
-        concurrency: 3
+        concurrency: 1
         scanIntervalCron: "*/30 * * * *"
-        maxPagesToScan: 50
+        maxPagesToScan: 5000

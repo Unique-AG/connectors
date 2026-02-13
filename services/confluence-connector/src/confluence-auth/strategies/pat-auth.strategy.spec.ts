@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-
+import { AuthMode } from '../../config/confluence.schema';
 import { Redacted } from '../../utils/redacted';
 import { PatAuthStrategy } from './pat-auth.strategy';
 
 describe('PatAuthStrategy', () => {
   const authConfig = {
-    mode: 'pat' as const,
+    mode: AuthMode.PAT,
     token: new Redacted('my-personal-access-token'),
   };
 
