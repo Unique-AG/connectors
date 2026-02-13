@@ -22,7 +22,6 @@ import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { normalizeError } from '~/utils/normalize-error';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
-import { SyncSystemDirectoriesCommand } from './directories-sync/sync-system-driectories.command';
 import { MessageEventDto } from './mail-injestion/dtos/message-events.dtos';
 import { FullSyncCommand } from './mail-injestion/full-sync.command';
 import { IngestionPriority } from './mail-injestion/utils/ingestion-queue.utils';
@@ -46,7 +45,6 @@ export class MailSubscriptionController {
     private readonly trace: TraceService,
     private readonly amqpConnection: AmqpConnection,
     private readonly fullSyncCommand: FullSyncCommand,
-    private readonly syncSystemDirectoriesCommand: SyncSystemDirectoriesCommand,
   ) {}
 
   @Post('lifecycle')
@@ -198,7 +196,6 @@ export class MailSubscriptionController {
 
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created': {
-        await this.syncSystemDirectoriesCommand.run(event.subscriptionId);
         return this.fullSyncCommand.run(event.subscriptionId);
       }
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-removed': {

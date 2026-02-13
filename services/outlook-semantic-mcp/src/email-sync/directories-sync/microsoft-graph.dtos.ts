@@ -31,3 +31,10 @@ export const graphOutlookDirectoriesResponse = z.object({
   value: z.array(graphOutlookDirectory),
   '@odata.nextLink': z.string().optional(),
 });
+
+export const graphOutlookDirectoriesDeltaResponse = z.object({
+  '@odata.context': z.string().optional(),
+  value: z.array(graphOutlookDirectory),
+  '@odata.nextLink': z.string().optional(),
+  '@odata.deltaLink': z.string().optional(),
+});

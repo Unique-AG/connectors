@@ -56,6 +56,7 @@ export const directories = pgTable(
       onDelete: "cascade",
       onUpdate: "cascade",
     }),
+    ignoreForSync: boolean(),
     // References
     userProfileId: varchar()
       .notNull()
@@ -63,7 +64,6 @@ export const directories = pgTable(
         onDelete: "cascade",
         onUpdate: "cascade",
       }),
-    ignoreForSync: boolean(),
 
     ...timestamps,
   },

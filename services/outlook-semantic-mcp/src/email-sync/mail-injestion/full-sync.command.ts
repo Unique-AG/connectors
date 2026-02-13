@@ -7,7 +7,7 @@ import { isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { SyncDirectoriesCommand } from '../directories-sync/sync-directories.command';
+import { SyncDirectoriesWithDeltaCommand } from '../directories-sync/sync-directories-with-delta.command';
 import { GetSubscriptionAndUserProfileQuery } from '../subscription-utils/get-subscription-and-user-profile.query';
 import { MessageEventDto } from './dtos/message-events.dtos';
 import {
@@ -28,13 +28,13 @@ export class FullSyncCommand {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly amqp: AmqpConnection,
     private readonly getSubscriptionAndUserProfileQuery: GetSubscriptionAndUserProfileQuery,
-    private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
+    private readonly syncDirectoriesWithDeltaCommand: SyncDirectoriesWithDeltaCommand,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
   @Span()
   public async run(subscriptionId: string): Promise<void> {
-    await this.syncDirectoriesCommand.run(subscriptionId);
+    await this.syncDirectoriesWithDeltaCommand.run(subscriptionId);
     const { userProfile, subscription } =
       await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
     const twoDaysAgo = new Date();
