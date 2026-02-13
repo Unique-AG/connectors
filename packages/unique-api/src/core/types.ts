@@ -1,3 +1,4 @@
+import type { DynamicModule, InjectionToken, Type } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
 
 import type { FileAccessInput, UniqueFile } from '../files/files.types';
@@ -72,6 +73,18 @@ export interface UniqueApiObservabilityConfig {
 export interface UniqueApiModuleOptions {
   observability?: UniqueApiObservabilityConfig;
   defaultClient?: UniqueApiClientConfig;
+}
+
+export interface UniqueApiModuleAsyncOptions {
+  imports?: Array<Type<unknown> | DynamicModule>;
+  inject?: InjectionToken[];
+  useFactory: (...args: never[]) => UniqueApiModuleOptions | Promise<UniqueApiModuleOptions>;
+}
+
+export interface UniqueApiFeatureAsyncOptions {
+  imports?: Array<Type<unknown> | DynamicModule>;
+  inject?: InjectionToken[];
+  useFactory: (...args: never[]) => UniqueApiClientConfig | Promise<UniqueApiClientConfig>;
 }
 
 export interface ContentUpdateResult {
