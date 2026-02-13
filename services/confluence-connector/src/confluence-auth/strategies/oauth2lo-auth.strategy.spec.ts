@@ -151,13 +151,29 @@ describe('OAuth2LoAuthStrategy', () => {
     });
 
     it('throws on network error with endpoint URL', async () => {
-      fetchMock.mockRejectedValueOnce(new Error('getaddrinfo ENOTFOUND'));
+      const networkError = new Error('getaddrinfo ENOTFOUND');
+      fetchMock.mockRejectedValueOnce(networkError);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(
         'Network error requesting token from https://api.atlassian.com/oauth/token: getaddrinfo ENOTFOUND',
       );
+    });
+
+    it('preserves the original error as cause on network failures', async () => {
+      const networkError = new Error('getaddrinfo ENOTFOUND');
+      fetchMock.mockRejectedValueOnce(networkError);
+
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
+
+      try {
+        await strategy.acquireToken();
+        throw new Error('Expected acquireToken to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).cause).toBe(networkError);
+      }
     });
 
     it('throws on HTTP 401 indicating invalid credentials', async () => {
@@ -187,6 +203,22 @@ describe('OAuth2LoAuthStrategy', () => {
 
       await expect(strategy.acquireToken()).rejects.toThrow(
         'Token request to https://api.atlassian.com/oauth/token failed with status 500: Internal Server Error',
+      );
+    });
+
+    it('falls back to an unreadable-body message when response text cannot be read', async () => {
+      const unreadableResponse = {
+        ok: false,
+        status: 500,
+        text: vi.fn().mockRejectedValue(new Error('stream already disturbed')),
+      } as unknown as Response;
+
+      fetchMock.mockResolvedValueOnce(unreadableResponse);
+
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
+
+      await expect(strategy.acquireToken()).rejects.toThrow(
+        'Token request to https://api.atlassian.com/oauth/token failed with status 500: Unable to read response body',
       );
     });
 
