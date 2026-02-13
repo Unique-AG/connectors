@@ -67,6 +67,10 @@ function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
     confluenceAuth.clientSecret = process.env.CONFLUENCE_CLIENT_SECRET;
   }
 
+  if (process.env.CONFLUENCE_PAT && confluenceAuth?.mode === 'pat') {
+    confluenceAuth.token = process.env.CONFLUENCE_PAT;
+  }
+
   if (process.env.ZITADEL_CLIENT_SECRET && unique?.serviceAuthMode === 'external') {
     unique.zitadelClientSecret = process.env.ZITADEL_CLIENT_SECRET;
   }

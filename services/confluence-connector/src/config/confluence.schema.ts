@@ -16,15 +16,16 @@ const oauth2loAuth = z.object({
   clientSecret: redactedNonEmptyStringSchema,
 });
 
-export const ConfluenceConfigSchema = z.object({
-  instanceType: z
-    .enum(['cloud', 'data-center'])
-    .describe('Type of Confluence instance (cloud or data-center)'),
+const patAuth = z.object({
+  mode: z.literal('pat'),
+  token: redactedNonEmptyStringSchema,
+});
+
+const baseConfluenceFields = z.object({
   baseUrl: urlWithoutTrailingSlashSchema(
     'Base URL of the Confluence instance',
     'baseUrl must not end with a trailing slash',
   ),
-  auth: z.discriminatedUnion('mode', [oauth2loAuth]),
   apiRateLimitPerMinute: coercedPositiveIntSchema
     .prefault(DEFAULT_CONFLUENCE_API_RATE_LIMIT_PER_MINUTE)
     .describe('Number of Confluence API requests allowed per minute'),
@@ -37,5 +38,16 @@ export const ConfluenceConfigSchema = z.object({
     .prefault(DEFAULT_INGEST_ALL_LABEL)
     .describe('Label to trigger full sync of all labeled pages'),
 });
+
+export const ConfluenceConfigSchema = z.discriminatedUnion('instanceType', [
+  baseConfluenceFields.extend({
+    instanceType: z.literal('cloud'),
+    auth: oauth2loAuth,
+  }),
+  baseConfluenceFields.extend({
+    instanceType: z.literal('data-center'),
+    auth: z.discriminatedUnion('mode', [oauth2loAuth, patAuth]),
+  }),
+]);
 
 export type ConfluenceConfig = z.infer<typeof ConfluenceConfigSchema>;
