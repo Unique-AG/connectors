@@ -8,4 +8,10 @@ export {
   Smeared,
   smearPath,
 } from './smeared';
+export {
+  createApiMethodExtractor,
+  getErrorCodeFromGraphqlRequest,
+  getHttpStatusCodeClass,
+  getSlowRequestDurationBucket,
+} from './metrics';
 export { elapsedMilliseconds, elapsedSeconds, elapsedSecondsLog } from './timing';

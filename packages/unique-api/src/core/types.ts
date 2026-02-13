@@ -10,6 +10,14 @@ import type {
 import type { Scope, ScopeAccess } from '../scopes/scopes.types';
 import type { SimpleUser } from '../users/users.types';
 
+export interface RequestMetricAttributes {
+  operation: string;
+  target: string;
+  result: 'success' | 'error';
+  status_code_class?: string;
+  tenant?: string;
+}
+
 export type UniqueEntityType = 'GROUP' | 'USER';
 
 export type UniqueAccessType = 'MANAGE' | 'READ' | 'WRITE';

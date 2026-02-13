@@ -28,6 +28,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "remeda": "^2.32.0",
     "serialize-error-cjs": "^0.2.0"
   },
   "peerDependencies": {

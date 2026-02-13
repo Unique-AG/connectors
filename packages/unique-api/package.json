@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@unique-ag/utils": "workspace:*",
+    "bottleneck": "^2.19.5",
     "graphql": "^16.11.0",
     "graphql-request": "^7.2.0",
     "remeda": "^2.32.0",

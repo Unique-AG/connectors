@@ -42,19 +42,12 @@ export class UniqueAuth {
     return this.refreshToken(this.config);
   }
 
-  public getHeaders(): Record<string, string> {
+  public async getAuthHeaders(): Promise<Record<string, string>> {
     if (this.config.mode === 'cluster_local') {
       return {
         'x-service-id': this.config.serviceId,
         ...this.config.extraHeaders,
       };
-    }
-    throw new Error('getHeaders() is only available for cluster_local auth mode');
-  }
-
-  public async getAuthHeaders(): Promise<Record<string, string>> {
-    if (this.config.mode === 'cluster_local') {
-      return this.getHeaders();
     }
     const token = await this.getToken();
     return { Authorization: `Bearer ${token}` };
@@ -102,11 +95,11 @@ export class UniqueAuth {
       this.cachedToken = tokenData.access_token;
       this.tokenExpirationTime = Date.now() + expiresIn * 1000;
 
-      this.metrics?.authTokenRefreshTotal.add(1);
+      this.metrics.authTokenRefreshTotal.add(1);
 
       return tokenData.access_token;
     } catch (error) {
-      this.logger?.error({
+      this.logger.error({
         msg: 'Failed to acquire Unique API token from Zitadel',
         error: sanitizeError(error),
       });
