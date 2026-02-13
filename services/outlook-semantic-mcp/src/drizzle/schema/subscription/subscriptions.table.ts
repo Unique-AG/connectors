@@ -21,14 +21,14 @@ export const subscriptions = pgTable(
     id: varchar()
       .primaryKey()
       .$default(() => typeid("subscription").toString()),
-    subscriptionId: varchar().unique().notNull(),
-    internalType: subscriptionInternalType().notNull(),
-    expiresAt: timestamp().notNull(),
-    lastFullSyncRunAt: timestamp(),
-    filters: jsonb(),
+    subscriptionId: varchar(`subscription_id`).unique().notNull(),
+    internalType: subscriptionInternalType(`internal_type`).notNull(),
+    expiresAt: timestamp(`expires_at`).notNull(),
+    lastFullSyncRunAt: timestamp(`last_full_sync_run_at`),
+    filters: jsonb(`filters`),
 
     // References
-    userProfileId: varchar()
+    userProfileId: varchar(`user_profile_id`)
       .notNull()
       .references(() => userProfiles.id, {
         onDelete: "cascade",

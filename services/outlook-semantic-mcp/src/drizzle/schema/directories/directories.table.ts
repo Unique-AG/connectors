@@ -48,17 +48,20 @@ export const directories = pgTable(
   {
     id: varchar()
       .primaryKey()
-      .$default(() => typeid("irectory").toString()),
-    internalType: directoryType().notNull(),
-    providerDirectoryId: varchar().notNull(),
-    displayName: varchar().notNull(),
-    parentId: varchar().references((): AnyPgColumn => directories.id, {
-      onDelete: "cascade",
-      onUpdate: "cascade",
-    }),
-    ignoreForSync: boolean(),
+      .$default(() => typeid("directory").toString()),
+    internalType: directoryType(`internal_type`).notNull(),
+    providerDirectoryId: varchar(`provider_directory_id`).notNull(),
+    displayName: varchar(`display_name`).notNull(),
+    parentId: varchar(`parent_id`).references(
+      (): AnyPgColumn => directories.id,
+      {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      },
+    ),
+    ignoreForSync: boolean(`ignore_for_sync`),
     // References
-    userProfileId: varchar()
+    userProfileId: varchar(`user_profile_id`)
       .notNull()
       .references(() => userProfiles.id, {
         onDelete: "cascade",

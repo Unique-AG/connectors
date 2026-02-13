@@ -1,10 +1,16 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { SchedulerRegistry } from '@nestjs/schedule';
-import { CronJob } from 'cron';
-import { Config } from '../config';
-import { SharepointSynchronizationService } from '../sharepoint-synchronization/sharepoint-synchronization.service';
-import { sanitizeError } from '../utils/normalize-error';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { SchedulerRegistry } from "@nestjs/schedule";
+import { CronJob } from "cron";
+import { Config } from "../config";
+import { SharepointSynchronizationService } from "../sharepoint-synchronization/sharepoint-synchronization.service";
+import { sanitizeError } from "../utils/normalize-error";
+
 @Injectable()
 export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
@@ -17,46 +23,51 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   public onModuleInit() {
-    this.logger.log('Triggering initial scan on service startup...');
+    this.logger.log("Triggering initial scan on service startup...");
     void this.runScheduledScan();
     this.setupScheduledScan();
   }
 
   public onModuleDestroy() {
-    this.logger.log('SchedulerService is shutting down...');
+    this.logger.log("SchedulerService is shutting down...");
     this.isShuttingDown = true;
     this.destroyCronJobs();
   }
 
   private setupScheduledScan(): void {
-    const cronExpression = this.configService.get('processing.scanIntervalCron', { infer: true });
-    this.logger.log(`Scheduled scan configured with cron expression: ${cronExpression}`);
+    const cronExpression = this.configService.get(
+      "processing.scanIntervalCron",
+      { infer: true },
+    );
+    this.logger.log(
+      `Scheduled scan configured with cron expression: ${cronExpression}`,
+    );
 
     const job = new CronJob(cronExpression, () => {
       void this.runScheduledScan();
     });
 
-    this.schedulerRegistry.addCronJob('sharepoint-scan', job);
+    this.schedulerRegistry.addCronJob("sharepoint-scan", job);
     job.start();
   }
 
   public async runScheduledScan(): Promise<void> {
     if (this.isShuttingDown) {
-      this.logger.log('Skipping scheduled scan due to shutdown');
+      this.logger.log("Skipping scheduled scan due to shutdown");
       return;
     }
 
     try {
-      this.logger.log('Scheduler triggered');
+      this.logger.log("Scheduler triggered");
 
       const result = await this.sharepointScanner.synchronize();
 
-      if (result.status !== 'skipped' || result.reason !== 'scan_in_progress') {
-        this.logger.log('SharePoint scan ended');
+      if (result.status !== "skipped" || result.reason !== "scan_in_progress") {
+        this.logger.log("SharePoint scan ended");
       }
     } catch (error) {
       this.logger.error({
-        msg: 'An unexpected error occurred during the scheduled scan',
+        msg: "An unexpected error occurred during the scheduled scan",
         error: sanitizeError(error),
       });
     }
@@ -71,7 +82,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       });
     } catch (error) {
       this.logger.error({
-        msg: 'Error stopping cron jobs',
+        msg: "Error stopping cron jobs",
         error: sanitizeError(error),
       });
     }

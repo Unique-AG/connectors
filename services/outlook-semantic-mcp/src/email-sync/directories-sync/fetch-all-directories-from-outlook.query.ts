@@ -1,7 +1,11 @@
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable } from '@nestjs/common';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
-import { GraphOutlookDirectory, graphOutlookDirectoriesResponse } from './microsoft-graph.dtos';
+import {
+  GraphOutlookDirectory,
+  graphOutlookDirectoriesResponse,
+  graphOutlookDirectory,
+} from './microsoft-graph.dtos';
 
 @Injectable()
 export class FetchAllDirectoriesFromOutlookQuery {
@@ -11,7 +15,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
     const rootDirectories: GraphOutlookDirectory[] = await this.fetchAllDirectories({
-      apiUrl: `mailFolders`,
+      apiUrl: `me/mailFolders`,
       client,
     });
 
@@ -19,24 +23,27 @@ export class FetchAllDirectoriesFromOutlookQuery {
       directory.childFolderCount > 0 &&
       (!directory.childFolders || directory.childFolders.length !== directory.childFolderCount);
 
-    const allPromisses: Promise<void>[] = [];
-
     const expandDirectoryRecursive = async (directory: GraphOutlookDirectory): Promise<void> => {
       if (!shouldExpandDirectory(directory)) {
         return;
       }
 
-      directory.childFolders = await this.fetchAllDirectories({
-        apiUrl: `mailFolders/${directory.id}`,
+      const expanded = await this.expandDirectory({
+        parentDirectoryId: directory.id,
         client,
       });
-      directory.childFolders.forEach((child) => {
-        if (shouldExpandDirectory(child)) {
-          allPromisses.push(expandDirectoryRecursive(child));
-        }
-      });
+      directory.childFolders = expanded.childFolders;
+      const promises =
+        directory.childFolders?.map((child) => {
+          if (shouldExpandDirectory(child)) {
+            return expandDirectoryRecursive(child);
+          }
+          return Promise.resolve();
+        }) ?? [];
+      await Promise.all(promises);
     };
 
+    const allPromisses: Promise<void>[] = [];
     rootDirectories.forEach((rootDirectory) => {
       // Roots are already expanded.
       rootDirectory.childFolders?.forEach((subChild) => {
@@ -76,5 +83,21 @@ export class FetchAllDirectoriesFromOutlookQuery {
     }
 
     return output;
+  }
+
+  private async expandDirectory({
+    parentDirectoryId,
+    client,
+  }: {
+    parentDirectoryId: string;
+    client: Client;
+  }): Promise<GraphOutlookDirectory> {
+    const response = await client
+      .api(`me/mailFolders/${parentDirectoryId}`)
+      .top(500)
+      .expand('childFolders')
+      .header(`Prefer`, `IdType="ImmutableId"`)
+      .get();
+    return graphOutlookDirectory.parseAsync(response);
   }
 }

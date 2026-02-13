@@ -1,3 +1,5 @@
+import { serializeError } from 'serialize-error-cjs';
+
 export function normalizeError(error: unknown): Error {
   if (error instanceof Error) return error;
 
@@ -15,4 +17,8 @@ export function normalizeError(error: unknown): Error {
     // Handle circular references or non-serializable objects
     return new Error(String(error));
   }
+}
+
+export function sanitizeError(error: unknown): object {
+  return serializeError(normalizeError(error));
 }

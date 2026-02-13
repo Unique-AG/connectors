@@ -36,8 +36,8 @@ export class SyncDirectoriesCommand {
       .where(eq(directories.userProfileId, userProfile.id));
 
     // Normally it should not happen but we want to be sure we have the system directories correctly defined first.
-    if (!totalDirectories.length && totalDirectories.at(0)?.count === 0) {
-      await this.syncSystemDirectoriesCommand.run(userProfile.id);
+    if (!totalDirectories.length || totalDirectories.at(0)?.count === 0) {
+      await this.syncSystemDirectoriesCommand.run(subscriptionId);
     }
 
     const microsoftDirectories = await this.fetchAllDirectoriesFromOutlookQuery.run(userProfile.id);

@@ -22,21 +22,34 @@ export class SyncDirectoriesWithDeltaCommand {
   @Span()
   public async run(subscriptionId: string): Promise<void> {
     const { userProfile } = await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
-    const { shouldSyncDirectories } = await this.runDeltaQuery(userProfile.id);
+    const { shouldSyncDirectories, deltaLink, syncStatsId } = await this.runDeltaQuery(
+      userProfile.id,
+    );
     if (shouldSyncDirectories) {
-      await this.syncDirectoriesCommand.run(userProfile.id);
+      await this.syncDirectoriesCommand.run(subscriptionId);
     }
+    // We do not check the delta link because microsoft returns the same delta link as the current one.
+    await this.db
+      .update(directoriesSync)
+      .set({
+        deltaLink,
+        lastDeltaSyncRunedAt: new Date(),
+      })
+      .where(eq(directoriesSync.id, syncStatsId))
+      .execute();
   }
 
-  private async runDeltaQuery(userProfileId: string): Promise<{ shouldSyncDirectories: boolean }> {
+  private async runDeltaQuery(userProfileId: string): Promise<{
+    shouldSyncDirectories: boolean;
+    deltaLink: string | null;
+    syncStatsId: string;
+  }> {
     const syncStats = await this.findOrCreateStats(userProfileId);
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
-    let deltaLink = syncStats.deltaLink ?? `/me/mailFolders/delta`;
-
     let directoriesDeltaResult = await client
-      .api(syncStats.deltaLink ?? `/me/mailFolders/delta`)
+      .api(syncStats.deltaLink || `/me/mailFolders/delta`)
       .get();
 
     let directroriesResponse = graphOutlookDirectoriesDeltaResponse.parse(directoriesDeltaResult);
@@ -50,28 +63,30 @@ export class SyncDirectoriesWithDeltaCommand {
         .where(eq(directoriesSync.id, syncStats.id))
         .execute();
     }
+
     while (directroriesResponse['@odata.nextLink']) {
-      deltaLink = directroriesResponse['@odata.nextLink'];
-      await this.db
-        .update(directoriesSync)
-        .set({ deltaLink: deltaLink })
-        .where(eq(directoriesSync.id, syncStats.id))
-        .execute();
+      const previousNextLink = directroriesResponse['@odata.nextLink'];
       directoriesDeltaResult = await client.api(directroriesResponse['@odata.nextLink']).get();
       directroriesResponse = graphOutlookDirectoriesDeltaResponse.parse(directoriesDeltaResult);
+
+      if (directroriesResponse['@odata.nextLink']) {
+        // We advance the query but we stop advancing on the last response because we want to run the sync and put the
+        // final delta with no results once that happens.
+        await this.db
+          .update(directoriesSync)
+          .set({
+            deltaLink: previousNextLink,
+          })
+          .where(eq(directoriesSync.id, syncStats.id))
+          .execute();
+      }
     }
 
-    // We do not check the delta link because microsoft returns the same delta link as the current one.
-    await this.db
-      .update(directoriesSync)
-      .set({
-        deltaLink: directroriesResponse['@odata.deltaLink'],
-        lastDeltaSyncRunedAt: new Date(),
-      })
-      .where(eq(directoriesSync.id, syncStats.id))
-      .execute();
-
-    return { shouldSyncDirectories };
+    return {
+      shouldSyncDirectories,
+      deltaLink: directroriesResponse['@odata.deltaLink'] ?? null,
+      syncStatsId: syncStats.id,
+    };
   }
 
   private async findOrCreateStats(userProfileId: string): Promise<DirectoriesSync> {

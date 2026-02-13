@@ -2,8 +2,8 @@ import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNullish } from 'remeda';
-import { DRIZZLE, DrizzleDatabase, userProfiles } from '~/drizzle';
+import { isNonNullish, isNullish } from 'remeda';
+import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/drizzle';
 import { UniqueFilesService } from '~/unique/unique-files.service';
 import { GetMessageDetailsQuery } from './get-message-details.query';
 import { getMetadataFromMessage } from './utils/get-metadata-from-message';
@@ -34,15 +34,33 @@ export class IngestEmailCommand {
       userProfileId: userProfile.id,
       messageId,
     });
+
     const _metadata = getMetadataFromMessage(graphMessage);
     const fileKey = getUniqueKeyForMessage(userProfile.email, graphMessage);
     // => Here do full file ingestion.
-    const file = this.uniqueFileService.getFilesByKeys([fileKey]);
-    if (isNullish(file)) {
-      //
-      // -> Look at sentDateTime in metadta and compare with outlook.
+    const files = await this.uniqueFileService.getFilesByKeys([fileKey]);
+    const file = files.at(0);
+
+    const parentDirectory = await this.db.query.directories.findFirst({
+      where: eq(directories.providerDirectoryId, graphMessage.parentFolderId),
+    });
+
+    // Parent directory should exist because once he connects we run a full directory sync. If it's not there
+    // we thrust that the full sync will catch this email. TODO: Check with Michat if we should Throw error.
+    if (!parentDirectory?.ignoreForSync) {
+      if (isNonNullish(file)) {
+        // DELETE FROM UNIQUE
+      }
       return;
     }
-    // TODO: Injest the file in unique.
+
+    if (isNullish(file)) {
+      // TODO: Injest the file in unique.
+      return;
+    }
+    // TODO:
+    // Compare sentDateTime - sentDateTime
+    //    => if not equal reingest + metadata update
+    //    => if equal => compare metadata and update
   }
 }

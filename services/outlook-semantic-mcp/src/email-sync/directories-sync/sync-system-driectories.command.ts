@@ -67,7 +67,7 @@ export class SyncSystemDirectoriesCommand {
     for (const [directoryType, apiName] of Object.entries(
       MAP_SYSTEM_DIRECTORY_TO_MS_GRAPH_API_NAME,
     )) {
-      const directoryResponse = await client.api(`mailFolders/${apiName}`).get();
+      const directoryResponse = await client.api(`me/mailFolders/${apiName}`).get();
       microsoftGraphDirectories.push({
         type: directoryType as SystemDirectoryType,
         directoryInfo: graphOutlookDirectory.parse(directoryResponse),

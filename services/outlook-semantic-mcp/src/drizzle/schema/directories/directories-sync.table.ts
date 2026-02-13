@@ -5,16 +5,16 @@ import { timestamps } from "../../timestamps.columns";
 import { relations } from "drizzle-orm";
 
 export const directoriesSync = pgTable("directories_sync", {
-  id: varchar()
+  id: varchar(`id`)
     .primaryKey()
     .$default(() => typeid("directories_sync").toString()),
-  deltaLink: varchar(),
-  lastDeltaSyncRunedAt: timestamp(),
-  lastDeltaChangeDetectedAt: timestamp(),
-  lastDirectorySyncRunnedAt: timestamp(),
+  deltaLink: varchar(`delta_link`),
+  lastDeltaSyncRunedAt: timestamp(`last_delta_sync_runed_at`),
+  lastDeltaChangeDetectedAt: timestamp(`last_delta_change_detected_at`),
+  lastDirectorySyncRunnedAt: timestamp(`last_directory_sync_runned_at`),
 
   // References
-  userProfileId: varchar()
+  userProfileId: varchar(`user_profile_id`)
     .notNull()
     .unique()
     .references(() => userProfiles.id, {

@@ -12,6 +12,7 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start",
+    "debug:mac": "lsof -i tcp:9229 | grep node | awk '{print $2}' | xargs -r kill -9 && nest start --debug",
     "debug": "nest start --debug",
     "codegen": "echo \"No codegen for this server\"",
     "db:generate": "drizzle-kit generate",
@@ -37,6 +38,7 @@
     "@nestjs/event-emitter": "^3.0.1",
     "@nestjs/platform-express": "^11.1.6",
     "@nestjs/swagger": "^11.2.0",
+    "@nestjs/schedule": "^6.0.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/instrumentation-pg": "^0.58.0",
     "@proventuslabs/nestjs-zod": "^2.0.0",
@@ -48,6 +50,7 @@
     "@unique-ag/probe": "workspace:*",
     "amqplib": "^0.10.9",
     "cache-manager": "^7.2.0",
+    "cron": "^4.3.0",
     "drizzle-orm": "^0.44.5",
     "drizzle-zod": "^0.8.3",
     "jsonwebtoken": "^9.0.2",

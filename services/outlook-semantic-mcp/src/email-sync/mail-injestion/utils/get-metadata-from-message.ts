@@ -7,6 +7,8 @@ export const getMetadataFromMessage = (message: GraphMessage): Record<string, st
     internetMessageId: message.internetMessageId ?? '',
     conversationId: message.conversationId ?? '',
     parentFolderId: message.parentFolderId ?? '',
+    sentDateTime: message.sentDateTime ?? '',
+    lastModifiedDateTime: message.lastModifiedDateTime ?? '',
     'from.emailAddress': message.from?.emailAddress?.address ?? '',
     'from.name': message.from?.emailAddress?.name ?? '',
     'sender.emailAddress': message.sender?.emailAddress?.address ?? '',

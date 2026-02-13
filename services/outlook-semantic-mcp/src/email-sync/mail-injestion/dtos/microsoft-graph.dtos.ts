@@ -56,7 +56,7 @@ export const graphMessageSchema = z.object({
   isRead: z.boolean().optional(),
   isReadReceiptRequested: z.boolean().optional(),
   lastModifiedDateTime: z.string(),
-  parentFolderId: z.string().optional(),
+  parentFolderId: z.string(),
   receivedDateTime: z.string(),
   replyTo: z.array(graphRecipientSchema).optional(),
   sender: graphRecipientSchema.optional().nullable(),
