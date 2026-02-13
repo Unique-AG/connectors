@@ -36,10 +36,21 @@ export type PublicUsersResult = z.infer<typeof PublicUsersResultSchema>;
 
 // SECTION - CreateScope endpoint types
 
-export const PublicCreateScopeRequestSchema = z.object({
+const CreateScopeByPathsSchema = z.object({
   paths: z.array(z.string()),
-  inheritAccess: z.boolean(),
+  inheritAccess: z.boolean().default(true),
 });
+
+const CreateScopeByParentSchema = z.object({
+  parentScopeId: z.string(),
+  relativePaths: z.array(z.string()),
+  inheritAccess: z.boolean().default(true),
+});
+
+export const PublicCreateScopeRequestSchema = z.union([
+  CreateScopeByPathsSchema,
+  CreateScopeByParentSchema,
+]);
 export type PublicCreateScopeRequest = z.infer<typeof PublicCreateScopeRequestSchema>;
 
 export const ScopeSchema = z.object({

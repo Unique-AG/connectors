@@ -20,17 +20,17 @@ const TranscriptMetadataSchema = z
     participant_user_profile_ids: z.string().optional(),
     content_correlation_id: z.string().optional(),
   })
-  .passthrough();
+  .loose();
 
 const FindTranscriptsInputSchema = z.object({
   subject: z.string().optional().describe('Filter by meeting subject (partial match)'),
   dateFrom: z
-    .string()
+    .iso
     .datetime()
     .optional()
     .describe('Filter transcripts from this datetime (ISO 8601, e.g., 2024-01-15T00:00:00.000Z)'),
   dateTo: z
-    .string()
+    .iso
     .datetime()
     .optional()
     .describe('Filter transcripts until this datetime (ISO 8601, e.g., 2024-01-31T23:59:59.999Z)'),
