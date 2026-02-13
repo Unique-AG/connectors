@@ -142,7 +142,14 @@
               "confluence": {
                 "type": "object",
                 "description": "Confluence configuration",
-                "required": ["instanceType", "baseUrl", "auth"],
+                "required": [
+                  "instanceType",
+                  "baseUrl",
+                  "auth",
+                  "apiRateLimitPerMinute",
+                  "ingestSingleLabel",
+                  "ingestAllLabel"
+                ],
                 "properties": {
                   "instanceType": {
                     "type": "string",
