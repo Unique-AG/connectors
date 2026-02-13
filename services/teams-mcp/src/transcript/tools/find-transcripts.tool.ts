@@ -9,17 +9,18 @@ import { type MetadataFilter, UniqueQLOperator } from '~/unique/unique.dtos';
 import { UniqueContentService } from '~/unique/unique-content.service';
 
 /**
- * Typed interface for transcript metadata stored during ingestion.
- * The generic metadata schema uses `unknown` for values, but we know the specific
- * types for our transcript metadata fields.
+ * Schema for transcript metadata stored during ingestion.
+ * Uses passthrough() to allow additional fields without failing validation.
  */
-interface TranscriptMetadata {
-  date?: string;
-  participant_names?: string;
-  participant_emails?: string;
-  participant_user_profile_ids?: string;
-  content_correlation_id?: string;
-}
+const TranscriptMetadataSchema = z
+  .object({
+    date: z.string().optional(),
+    participant_names: z.string().optional(),
+    participant_emails: z.string().optional(),
+    participant_user_profile_ids: z.string().optional(),
+    content_correlation_id: z.string().optional(),
+  })
+  .passthrough();
 
 const FindTranscriptsInputSchema = z.object({
   subject: z.string().optional().describe('Filter by meeting subject (partial match)'),
@@ -130,8 +131,15 @@ export class FindTranscriptsTool {
     });
 
     const transcripts = result.contents.map((content) => {
-      // Cast to our known transcript metadata structure
-      const metadata = content.metadata as TranscriptMetadata | null | undefined;
+      const parsed = TranscriptMetadataSchema.safeParse(content.metadata);
+      if (!parsed.success) {
+        // This shouldn't happen - if the item matched our metadata filter, it should have valid metadata
+        this.logger.warn(
+          { contentId: content.id, error: parsed.error.message },
+          'Content matched metadata filter but has invalid metadata structure',
+        );
+      }
+      const metadata = parsed.success ? parsed.data : null;
       return {
         id: content.id,
         title: content.title,
