@@ -122,8 +122,8 @@ export class FindTranscriptsTool {
       'Searching for meeting transcripts',
     );
 
-    const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
-    const filter = this.buildMetadataFilter(rootScopePath, userProfileId, input);
+    const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
+    const filter = this.buildMetadataFilter(rootScopeId, userProfileId, input);
 
     const result = await this.contentService.findByMetadata(filter, {
       skip: input.skip,
@@ -168,7 +168,7 @@ export class FindTranscriptsTool {
   }
 
   private buildMetadataFilter(
-    rootScopePath: string,
+    rootScopeId: string,
     userProfileId: string,
     input: z.infer<typeof FindTranscriptsInputSchema>,
   ): MetadataFilter {
@@ -176,7 +176,7 @@ export class FindTranscriptsTool {
       {
         path: ['folderIdPath'],
         operator: UniqueQLOperator.CONTAINS,
-        value: `uniquepathid://${rootScopePath}`,
+        value: `uniquepathid://${rootScopeId}`,
       },
       // Permission filter: only return transcripts where the current user is a participant
       {

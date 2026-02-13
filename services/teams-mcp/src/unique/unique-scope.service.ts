@@ -21,14 +21,26 @@ export class UniqueScopeService {
   ) {}
 
   @Span()
-  public async createScope(path: string, inheritAccess = false): Promise<Scope> {
+  public async createScope(
+    parentScopeId: string,
+    relativePath: string,
+    inheritAccess = false,
+  ): Promise<Scope> {
     const span = this.trace.getSpan();
-    span?.setAttribute('path', path);
+    span?.setAttribute('parent_scope_id', parentScopeId);
+    span?.setAttribute('relative_path', relativePath);
     span?.setAttribute('inherit_access', inheritAccess);
 
-    const payload = PublicCreateScopeRequestSchema.encode({ paths: [path], inheritAccess });
+    const payload = PublicCreateScopeRequestSchema.encode({
+      parentScopeId,
+      relativePaths: [relativePath],
+      inheritAccess,
+    });
 
-    this.logger.debug({ inheritAccess }, 'Creating new organizational scope in Unique API');
+    this.logger.debug(
+      { parentScopeId, inheritAccess },
+      'Creating new organizational scope in Unique API',
+    );
 
     const body = await this.api.post('folder', payload);
     const result = PublicCreateScopeResultSchema.refine(

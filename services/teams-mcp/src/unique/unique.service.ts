@@ -87,12 +87,13 @@ export class UniqueService {
       'Successfully resolved meeting participant accounts in Unique system',
     );
 
-    const { parentPath, childPath } = this.mapMeetingToScopePaths(
+    const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
+    const { subjectPath, datePath } = this.mapMeetingToRelativePaths(
       meeting.subject,
       meeting.startDateTime,
     );
 
-    const parentScope = await this.scopeService.createScope(parentPath, false);
+    const parentScope = await this.scopeService.createScope(rootScopeId, subjectPath, false);
     span?.setAttribute('parent_scope_id', parentScope.id);
 
     const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
@@ -117,7 +118,7 @@ export class UniqueService {
     });
     await this.scopeService.addScopeAccesses(parentScope.id, accesses);
 
-    const childScope = await this.scopeService.createScope(childPath, true);
+    const childScope = await this.scopeService.createScope(parentScope.id, datePath, true);
     span?.setAttribute('child_scope_id', childScope.id);
 
     this.logger.log(
@@ -242,16 +243,13 @@ export class UniqueService {
     );
   }
 
-  private mapMeetingToScopePaths(
+  private mapMeetingToRelativePaths(
     subject: string,
     happenedAt: Date,
-  ): { parentPath: string; childPath: string } {
-    const rootScopePath = this.config.get('unique.rootScopePath', { infer: true });
+  ): { subjectPath: string; datePath: string } {
     // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
     const formattedDate = happenedAt.toISOString().split('T').at(0)!;
-    const meetingSubject = subject || 'Untitled Meeting';
-    const parentPath = `/${rootScopePath}/${meetingSubject}`;
-    const childPath = `${parentPath}/${formattedDate}`;
-    return { parentPath, childPath };
+    const subjectPath = subject || 'Untitled Meeting';
+    return { subjectPath, datePath: formattedDate };
   }
 }
