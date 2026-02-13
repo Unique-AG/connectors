@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 
 import { sanitizeError } from '@unique-ag/utils';
+import type { Dispatcher } from 'undici';
 
 import type { UniqueApiMetrics } from '../core/observability';
 import type { ExternalAuthConfig, UniqueApiClientAuthConfig } from '../core/types';
@@ -9,7 +10,7 @@ interface UniqueAuthDeps {
   config: UniqueApiClientAuthConfig;
   metrics: UniqueApiMetrics;
   logger: { error: (obj: object) => void; debug: (msg: string) => void };
-  fetch?: typeof fetch;
+  dispatcher: Dispatcher;
 }
 
 export class UniqueAuth {
@@ -19,13 +20,13 @@ export class UniqueAuth {
   private readonly config: UniqueApiClientAuthConfig;
   private readonly metrics: UniqueApiMetrics;
   private readonly logger: UniqueAuthDeps['logger'];
-  private readonly fetchFn: typeof fetch;
+  private readonly dispatcher: Dispatcher;
 
   public constructor(deps: UniqueAuthDeps) {
     this.config = deps.config;
     this.metrics = deps.metrics;
     this.logger = deps.logger;
-    this.fetchFn = deps.fetch ?? fetch;
+    this.dispatcher = deps.dispatcher;
   }
 
   public async getToken(): Promise<string> {
@@ -65,7 +66,9 @@ export class UniqueAuth {
 
     try {
       const basicAuth = Buffer.from(`${zitadelClientId}:${zitadelClientSecret}`).toString('base64');
-      const response = await this.fetchFn(zitadelOauthTokenUrl, {
+      const { statusCode, body } = await this.dispatcher.request({
+        origin: new URL(zitadelOauthTokenUrl).origin,
+        path: new URL(zitadelOauthTokenUrl).pathname,
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -74,15 +77,15 @@ export class UniqueAuth {
         body: params.toString(),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'No response body');
+      if (statusCode < 200 || statusCode >= 300) {
+        const errorText = await body.text().catch(() => 'No response body');
         throw new Error(
-          `Zitadel token request failed with status ${response.status}. ` +
+          `Zitadel token request failed with status ${statusCode}. ` +
             `URL: ${zitadelOauthTokenUrl}, Response: ${errorText}`,
         );
       }
 
-      const tokenData = (await response.json()) as ZitadelTokenResponse;
+      const tokenData = (await body.json()) as ZitadelTokenResponse;
       assert.ok(tokenData.access_token, 'Invalid token response: missing access_token');
 
       const expiresIn = tokenData.expires_in;

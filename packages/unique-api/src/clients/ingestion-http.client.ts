@@ -6,7 +6,7 @@ import {
   sanitizeError,
 } from '@unique-ag/utils';
 import Bottleneck from 'bottleneck';
-import { Agent, type Dispatcher, errors, interceptors } from 'undici';
+import { type Dispatcher, errors, interceptors } from 'undici';
 
 import type { UniqueAuth } from '../auth/unique-auth';
 import type { UniqueApiMetrics } from '../core/observability';
@@ -20,6 +20,7 @@ interface IngestionHttpClientDeps {
   metrics: UniqueApiMetrics;
   logger: { warn: (obj: object) => void; error: (obj: object) => void };
   rateLimitPerMinute?: number;
+  dispatcher: Dispatcher;
   clientName?: string;
 }
 
@@ -42,18 +43,12 @@ export class IngestionHttpClient {
     const ingestionUrl = new URL(deps.baseUrl);
     this.origin = `${ingestionUrl.protocol}//${ingestionUrl.host}`;
 
-    const interceptorsInCallingOrder = [
-      interceptors.redirect({ maxRedirections: 10 }),
-      interceptors.retry({
-        maxRetries: 3,
-        minTimeout: 3_000,
-        methods: ['POST'],
-        throwOnError: false,
-      }),
-    ];
-
-    const baseDispatcher = new Agent();
-    this.httpClient = baseDispatcher.compose(interceptorsInCallingOrder.reverse());
+    this.httpClient = deps.dispatcher.compose([interceptors.retry({
+      maxRetries: 3,
+      minTimeout: 3_000,
+      methods: ['POST'],
+      throwOnError: false,
+    })]);
 
     this.extractApiMethod = createApiMethodExtractor([
       'v2',
@@ -80,7 +75,7 @@ export class IngestionHttpClient {
   }
 
   public async close(): Promise<void> {
-    await this.httpClient.close();
+    await this.limiter.stop();
   }
 
   private async executeRequest(

@@ -1,3 +1,5 @@
+import type { Dispatcher } from 'undici';
+
 import type { FileAccessInput, UniqueFile } from '../files/files.types';
 import type { Group, GroupWithMembers } from '../groups/groups.types';
 import type {
@@ -54,7 +56,7 @@ export interface UniqueApiClientConfig {
     ingestionBaseUrl: string;
   };
   rateLimitPerMinute?: number;
-  fetch?: typeof fetch;
+  dispatcher?: Dispatcher;
   metadata?: {
     clientName?: string;
     tenantKey?: string;
@@ -122,39 +124,24 @@ export interface UniqueApiClient {
       accesses: ScopeAccess[],
       applyToSubScopes?: boolean,
     ): Promise<void>;
-    delete(
-      scopeId: string,
-      options?: { recursive?: boolean },
-    ): Promise<DeleteFolderResult>;
+    delete(scopeId: string, options?: { recursive?: boolean }): Promise<DeleteFolderResult>;
   };
   files: {
     getByKeys(keys: string[]): Promise<UniqueFile[]>;
     getByKeyPrefix(keyPrefix: string): Promise<UniqueFile[]>;
     getCountByKeyPrefix(keyPrefix: string): Promise<number>;
-    move(
-      contentId: string,
-      newOwnerId: string,
-      newUrl: string,
-    ): Promise<ContentUpdateResult>;
+    move(contentId: string, newOwnerId: string, newUrl: string): Promise<ContentUpdateResult>;
     delete(contentId: string): Promise<boolean>;
     deleteByKeyPrefix(keyPrefix: string): Promise<number>;
-    addAccesses(
-      scopeId: string,
-      fileAccesses: FileAccessInput[],
-    ): Promise<number>;
-    removeAccesses(
-      scopeId: string,
-      fileAccesses: FileAccessInput[],
-    ): Promise<number>;
+    addAccesses(scopeId: string, fileAccesses: FileAccessInput[]): Promise<number>;
+    removeAccesses(scopeId: string, fileAccesses: FileAccessInput[]): Promise<number>;
   };
   users: {
     listAll(): Promise<SimpleUser[]>;
     getCurrentId(): Promise<string>;
   };
   groups: {
-    listByExternalIdPrefix(
-      externalIdPrefix: string,
-    ): Promise<GroupWithMembers[]>;
+    listByExternalIdPrefix(externalIdPrefix: string): Promise<GroupWithMembers[]>;
     create(group: {
       name: string;
       externalId: string;
@@ -166,12 +153,8 @@ export interface UniqueApiClient {
     removeMembers(groupId: string, userIds: string[]): Promise<void>;
   };
   ingestion: {
-    registerContent(
-      request: ContentRegistrationRequest,
-    ): Promise<IngestionApiResponse>;
-    finalizeIngestion(
-      request: IngestionFinalizationRequest,
-    ): Promise<{ id: string }>;
+    registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse>;
+    finalizeIngestion(request: IngestionFinalizationRequest): Promise<{ id: string }>;
     performFileDiff(
       fileList: FileDiffItem[],
       partialKey: string,
@@ -188,10 +171,7 @@ export interface UniqueApiClientFactory {
 
 export interface UniqueApiClientRegistry {
   get(key: string): UniqueApiClient | undefined;
-  getOrCreate(
-    key: string,
-    config: UniqueApiClientConfig,
-  ): Promise<UniqueApiClient>;
+  getOrCreate(key: string, config: UniqueApiClientConfig): Promise<UniqueApiClient>;
   set(key: string, client: UniqueApiClient): void;
   delete(key: string): Promise<void>;
   clear(): Promise<void>;

@@ -8,6 +8,7 @@ import {
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
+import { fetch as undiciFetch, type Dispatcher } from 'undici';
 
 import type { UniqueAuth } from '../auth/unique-auth';
 import type { UniqueApiMetrics } from '../core/observability';
@@ -24,7 +25,7 @@ interface UniqueGraphqlClientDeps {
   metrics: UniqueApiMetrics;
   logger: { warn: (obj: object) => void; error: (obj: object) => void };
   rateLimitPerMinute?: number;
-  fetch?: typeof fetch;
+  dispatcher: Dispatcher;
   clientName?: string;
 }
 
@@ -47,7 +48,14 @@ export class UniqueGraphqlClient {
     const graphqlUrl = `${deps.baseUrl}/graphql`;
 
     this.graphQlClient = new GraphQLClient(graphqlUrl, {
-      ...(deps.fetch ? { fetch: deps.fetch } : {}),
+      fetch: ((url: RequestInfo | URL, options?: RequestInit) =>
+        undiciFetch(
+          url as Parameters<typeof undiciFetch>[0],
+          {
+            ...options,
+            dispatcher: deps.dispatcher,
+          } as Parameters<typeof undiciFetch>[1],
+        )) as typeof fetch,
       requestMiddleware: async (request) => {
         const authHeaders = await this.auth.getAuthHeaders();
         return {
@@ -74,6 +82,10 @@ export class UniqueGraphqlClient {
     variables?: V,
   ): Promise<T> {
     return this.limiter.schedule(() => this.executeRequest<T, V>(document, variables));
+  }
+
+  public async close(): Promise<void> {
+    await this.limiter.stop();
   }
 
   private async executeRequest<T, V extends Variables = Variables>(
