@@ -48,6 +48,10 @@ const oauth2loAuth = {
   clientId: 'test-client-id',
 };
 
+const patAuth = {
+  mode: 'pat',
+};
+
 function assertFirstElement<T>(arr: T[]): T {
   const item = arr[0];
   assert.ok(item !== undefined, 'Expected at least one element');
@@ -58,6 +62,7 @@ describe('tenant-config-loader', () => {
   const envKeysToClean = [
     'TENANT_CONFIG_PATH_PATTERN',
     'CONFLUENCE_CLIENT_SECRET',
+    'CONFLUENCE_PAT',
     'ZITADEL_CLIENT_SECRET',
     'LOGS_DIAGNOSTICS_DATA_POLICY',
   ] as const;
@@ -70,6 +75,7 @@ describe('tenant-config-loader', () => {
     }
     process.env.TENANT_CONFIG_PATH_PATTERN = '/config/*.yaml';
     delete process.env.CONFLUENCE_CLIENT_SECRET;
+    delete process.env.CONFLUENCE_PAT;
     delete process.env.ZITADEL_CLIENT_SECRET;
   });
 
@@ -137,8 +143,12 @@ describe('tenant-config-loader', () => {
       expect(tenant.confluence.instanceType).toBe('cloud');
       expect(tenant.confluence.baseUrl).toBe('https://acme.atlassian.net/wiki');
       expect(tenant.confluence.auth.mode).toBe('oauth_2lo');
-      expect(tenant.confluence.auth.clientId).toBe('test-client-id');
-      expect(tenant.confluence.auth.clientSecret.value).toBe('env-client-secret');
+      const auth = tenant.confluence.auth as Extract<
+        typeof tenant.confluence.auth,
+        { mode: 'oauth_2lo' }
+      >;
+      expect(auth.clientId).toBe('test-client-id');
+      expect(auth.clientSecret.value).toBe('env-client-secret');
       expect(tenant.unique.serviceAuthMode).toBe('cluster_local');
       const uniqueResult = tenant.unique;
       const unique = uniqueResult as Extract<
@@ -148,6 +158,37 @@ describe('tenant-config-loader', () => {
       expect(unique.serviceExtraHeaders['x-company-id']).toBe('test-company');
       expect(unique.serviceExtraHeaders['x-user-id']).toBe('test-user');
       expect(tenant.processing.concurrency).toBe(1);
+    });
+
+    it('loads data-center config with pat auth', async () => {
+      process.env.CONFLUENCE_PAT = 'env-pat-token';
+
+      const dataCenterPatConfig = {
+        confluence: {
+          instanceType: 'data-center',
+          baseUrl: 'https://confluence.acme.com',
+          auth: patAuth,
+          ...baseConfluenceFields,
+        },
+        unique: clusterLocalUniqueConfig,
+        processing: baseProcessingConfig,
+      };
+
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupSingleConfig(globSync, readFileSync, dataCenterPatConfig);
+
+      const result = getTenantConfigs();
+
+      expect(result).toHaveLength(1);
+      const tenant = assertFirstElement(result);
+      expect(tenant.confluence.instanceType).toBe('data-center');
+      expect(tenant.confluence.baseUrl).toBe('https://confluence.acme.com');
+      expect(tenant.confluence.auth.mode).toBe('pat');
+      const auth = tenant.confluence.auth as Extract<
+        typeof tenant.confluence.auth,
+        { mode: 'pat' }
+      >;
+      expect(auth.token.value).toBe('env-pat-token');
     });
 
     it('loads data-center config with oauth_2lo auth', async () => {
@@ -174,7 +215,11 @@ describe('tenant-config-loader', () => {
       expect(tenant.confluence.instanceType).toBe('data-center');
       expect(tenant.confluence.baseUrl).toBe('https://confluence.acme.com');
       expect(tenant.confluence.auth.mode).toBe('oauth_2lo');
-      expect(tenant.confluence.auth.clientSecret.value).toBe('env-client-secret');
+      const auth = tenant.confluence.auth as Extract<
+        typeof tenant.confluence.auth,
+        { mode: 'oauth_2lo' }
+      >;
+      expect(auth.clientSecret.value).toBe('env-client-secret');
     });
 
     it('loads multiple tenant config files', async () => {
@@ -222,7 +267,11 @@ describe('tenant-config-loader', () => {
       expect(tenant1?.confluence.baseUrl).toBe('https://tenant1.atlassian.net/wiki');
       expect(tenant2?.confluence.instanceType).toBe('data-center');
       expect(tenant2?.confluence.baseUrl).toBe('https://confluence.tenant2.com');
-      expect(tenant2?.confluence.auth.clientId).toBe('tenant2-client-id');
+      const tenant2Auth = tenant2?.confluence.auth as Extract<
+        NonNullable<typeof tenant2>['confluence']['auth'],
+        { mode: 'oauth_2lo' }
+      >;
+      expect(tenant2Auth.clientId).toBe('tenant2-client-id');
     });
   });
 
@@ -246,9 +295,89 @@ describe('tenant-config-loader', () => {
 
       const result = getTenantConfigs();
 
-      expect(assertFirstElement(result).confluence.auth.clientSecret.value).toBe(
-        'env-client-secret',
-      );
+      const tenant = assertFirstElement(result);
+      const auth = tenant.confluence.auth as Extract<
+        typeof tenant.confluence.auth,
+        { mode: 'oauth_2lo' }
+      >;
+      expect(auth.clientSecret.value).toBe('env-client-secret');
+    });
+
+    it('injects CONFLUENCE_PAT for pat mode', async () => {
+      process.env.CONFLUENCE_PAT = 'env-pat-token';
+
+      const config = {
+        confluence: {
+          instanceType: 'data-center',
+          baseUrl: 'https://confluence.acme.com',
+          auth: patAuth,
+          ...baseConfluenceFields,
+        },
+        unique: clusterLocalUniqueConfig,
+        processing: baseProcessingConfig,
+      };
+
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupSingleConfig(globSync, readFileSync, config);
+
+      const result = getTenantConfigs();
+
+      const tenant = assertFirstElement(result);
+      const auth = tenant.confluence.auth as Extract<
+        typeof tenant.confluence.auth,
+        { mode: 'pat' }
+      >;
+      expect(auth.token.value).toBe('env-pat-token');
+    });
+
+    it('does not inject CONFLUENCE_PAT when auth mode is oauth_2lo', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      process.env.CONFLUENCE_PAT = 'should-not-be-injected';
+
+      const config = {
+        confluence: {
+          instanceType: 'cloud',
+          baseUrl: 'https://acme.atlassian.net/wiki',
+          auth: oauth2loAuth,
+          ...baseConfluenceFields,
+        },
+        unique: clusterLocalUniqueConfig,
+        processing: baseProcessingConfig,
+      };
+
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupSingleConfig(globSync, readFileSync, config);
+
+      const result = getTenantConfigs();
+
+      const tenant = assertFirstElement(result);
+      expect(tenant.confluence.auth.mode).toBe('oauth_2lo');
+      expect(tenant.confluence.auth).not.toHaveProperty('token');
+    });
+
+    it('does not inject CONFLUENCE_CLIENT_SECRET when auth mode is pat', async () => {
+      process.env.CONFLUENCE_PAT = 'env-pat-token';
+      process.env.CONFLUENCE_CLIENT_SECRET = 'should-not-be-injected';
+
+      const config = {
+        confluence: {
+          instanceType: 'data-center',
+          baseUrl: 'https://confluence.acme.com',
+          auth: patAuth,
+          ...baseConfluenceFields,
+        },
+        unique: clusterLocalUniqueConfig,
+        processing: baseProcessingConfig,
+      };
+
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupSingleConfig(globSync, readFileSync, config);
+
+      const result = getTenantConfigs();
+
+      const tenant = assertFirstElement(result);
+      expect(tenant.confluence.auth.mode).toBe('pat');
+      expect(tenant.confluence.auth).not.toHaveProperty('clientSecret');
     });
 
     it('injects ZITADEL_CLIENT_SECRET when serviceAuthMode is external', async () => {
@@ -342,6 +471,68 @@ describe('tenant-config-loader', () => {
 
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupSingleConfig(globSync, readFileSync, incompleteConfig);
+
+      expect(() => getTenantConfigs()).toThrow(
+        `Failed to load or validate tenant config from ${CONFIG_PATH}`,
+      );
+    });
+
+    it('throws when pat auth is used with cloud instance type', async () => {
+      process.env.CONFLUENCE_PAT = 'env-pat-token';
+
+      const config = {
+        confluence: {
+          instanceType: 'cloud',
+          baseUrl: 'https://acme.atlassian.net/wiki',
+          auth: patAuth,
+          ...baseConfluenceFields,
+        },
+        unique: clusterLocalUniqueConfig,
+        processing: baseProcessingConfig,
+      };
+
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupSingleConfig(globSync, readFileSync, config);
+
+      expect(() => getTenantConfigs()).toThrow(
+        `Failed to load or validate tenant config from ${CONFIG_PATH}`,
+      );
+    });
+
+    it('throws when auth mode is unknown', async () => {
+      const config = {
+        confluence: {
+          instanceType: 'cloud',
+          baseUrl: 'https://acme.atlassian.net/wiki',
+          auth: { mode: 'unknown_mode' },
+          ...baseConfluenceFields,
+        },
+        unique: clusterLocalUniqueConfig,
+        processing: baseProcessingConfig,
+      };
+
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupSingleConfig(globSync, readFileSync, config);
+
+      expect(() => getTenantConfigs()).toThrow(
+        `Failed to load or validate tenant config from ${CONFIG_PATH}`,
+      );
+    });
+
+    it('throws when CONFLUENCE_PAT is not set for pat auth', async () => {
+      const config = {
+        confluence: {
+          instanceType: 'data-center',
+          baseUrl: 'https://confluence.acme.com',
+          auth: patAuth,
+          ...baseConfluenceFields,
+        },
+        unique: clusterLocalUniqueConfig,
+        processing: baseProcessingConfig,
+      };
+
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupSingleConfig(globSync, readFileSync, config);
 
       expect(() => getTenantConfigs()).toThrow(
         `Failed to load or validate tenant config from ${CONFIG_PATH}`,
