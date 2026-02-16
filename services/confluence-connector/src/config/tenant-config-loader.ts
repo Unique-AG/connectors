@@ -4,7 +4,7 @@ import { registerAs } from '@nestjs/config';
 import { load } from 'js-yaml';
 import { isPlainObject } from 'remeda';
 import { z } from 'zod';
-import { AuthMode, type ConfluenceConfig, ConfluenceConfigSchema } from './confluence.schema';
+import { type ConfluenceConfig, ConfluenceConfigSchema } from './confluence.schema';
 import { type ProcessingConfig, ProcessingConfigSchema } from './processing.schema';
 import { type UniqueConfig, UniqueConfigSchema } from './unique.schema';
 
@@ -43,7 +43,6 @@ function loadTenantConfigs(pathPattern: string): TenantConfig[] {
         isPlainObject(config),
         `Invalid tenant config: expected a plain object, got ${typeof config}`,
       );
-      injectSecretsFromEnvironment(config);
       return TenantConfigSchema.parse(config);
     } catch (error) {
       if (error instanceof Error) {
@@ -54,26 +53,6 @@ function loadTenantConfigs(pathPattern: string): TenantConfig[] {
       throw error;
     }
   });
-}
-
-// TODO: Replace with lite-llm style lazy loading for secrets
-// per-tenant env vars is not yet supported and should be addressed when multi-tenant ticket is implemented.
-function injectSecretsFromEnvironment(config: Record<string, unknown>): void {
-  const confluence = config.confluence as Record<string, unknown> | undefined;
-  const confluenceAuth = confluence?.auth as Record<string, unknown> | undefined;
-  const unique = config.unique as Record<string, unknown> | undefined;
-
-  if (process.env.CONFLUENCE_CLIENT_SECRET && confluenceAuth?.mode === AuthMode.OAUTH_2LO) {
-    confluenceAuth.clientSecret = process.env.CONFLUENCE_CLIENT_SECRET;
-  }
-
-  if (process.env.CONFLUENCE_PAT && confluenceAuth?.mode === AuthMode.PAT) {
-    confluenceAuth.token = process.env.CONFLUENCE_PAT;
-  }
-
-  if (process.env.ZITADEL_CLIENT_SECRET && unique?.serviceAuthMode === 'external') {
-    unique.zitadelClientSecret = process.env.ZITADEL_CLIENT_SECRET;
-  }
 }
 
 // Full multi-tenant support is not yet implemented, so we return the first tenant config for now

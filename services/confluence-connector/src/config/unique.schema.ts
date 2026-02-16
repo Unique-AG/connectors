@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import {
   coercedPositiveIntSchema,
-  redactedNonEmptyStringSchema,
+  envResolvableRedactedStringSchema,
   urlWithoutTrailingSlashSchema,
 } from '../utils/zod.util';
 
@@ -33,11 +33,9 @@ const externalConfig = z.object({
     .literal('external')
     .describe('Authentication mode to use for accessing Unique API services'),
   zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
-  zitadelProjectId: redactedNonEmptyStringSchema.describe('Zitadel project ID'),
+  zitadelProjectId: envResolvableRedactedStringSchema.describe('Zitadel project ID'),
   zitadelClientId: z.string().describe('Zitadel client ID'),
-  zitadelClientSecret: redactedNonEmptyStringSchema.describe(
-    'Zitadel client secret (injected from ZITADEL_CLIENT_SECRET environment variable)',
-  ),
+  zitadelClientSecret: envResolvableRedactedStringSchema.describe('Zitadel client secret'),
 });
 
 const uniqueBaseConfig = z.object({
