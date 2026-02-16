@@ -1,4 +1,4 @@
-import type { FileAccessKey } from "../files/files.types";
+import type { FileAccessKey } from '../files/files.types';
 
 export interface AuthorMetadata {
   email: string;

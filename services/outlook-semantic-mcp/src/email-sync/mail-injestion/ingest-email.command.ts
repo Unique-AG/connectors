@@ -1,22 +1,19 @@
-import assert from "node:assert";
-import { UniqueApiClient, UniqueOwnerType } from "@unique-ag/unique-api";
-import { Inject, Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { eq } from "drizzle-orm";
-import { Span } from "nestjs-otel";
-import { isNonNullish, isNullish } from "remeda";
-import { UniqueConfigNamespaced } from "~/config";
-import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from "~/drizzle";
-import { GraphClientFactory } from "~/msgraph/graph-client.factory";
-import { getRootScopeExternalId } from "~/unique/get-root-scope-path";
-import { InjectUniqueApi } from "~/unique/unique-api.module";
-import {
-  INGESTION_SOURCE_KIND,
-  INGESTION_SOURCE_NAME,
-} from "~/utils/source-kind-and-name";
-import { GetMessageDetailsQuery } from "./get-message-details.query";
-import { getMetadataFromMessage } from "./utils/get-metadata-from-message";
-import { getUniqueKeyForMessage } from "./utils/get-unique-key-for-message";
+import assert from 'node:assert';
+import { UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
+import { Client } from '@microsoft/microsoft-graph-client';
+import { Inject, Injectable } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
+import { Span } from 'nestjs-otel';
+import { isNonNullish, isNullish } from 'remeda';
+import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/drizzle';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
+import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
+import { GraphMessage } from './dtos/microsoft-graph.dtos';
+import { GetMessageDetailsQuery } from './get-message-details.query';
+import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
+import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
 
 @Injectable()
 export class IngestEmailCommand {
@@ -25,7 +22,6 @@ export class IngestEmailCommand {
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getMessageDetailsQuery: GetMessageDetailsQuery,
-    private readonly configService: ConfigService<UniqueConfigNamespaced, true>,
   ) {}
 
   @Span()
@@ -40,10 +36,7 @@ export class IngestEmailCommand {
       where: eq(userProfiles.id, userProfileId),
     });
     assert.ok(userProfile, `User Profile missing for id: ${userProfileId}`);
-    assert.ok(
-      userProfile.email,
-      `User Profile email missing for: ${userProfile.id}`,
-    );
+    assert.ok(userProfile.email, `User Profile email missing for: ${userProfile.id}`);
     const graphMessage = await this.getMessageDetailsQuery.run({
       userProfileId: userProfile.id,
       messageId,
@@ -75,85 +68,113 @@ export class IngestEmailCommand {
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
-    if (isNullish(file)) {
-      const response = (await client
-        .api(`me/messages/${messageId}/$value`)
-        .header(`Prefer`, `IdType="ImmutableId"`)
-        .getStream()) as ReadableStream<Uint8Array<ArrayBuffer>>;
+    // TODO tomorrow: Check with Michat
+    // 1 - I need more details on file
+    //     metadata
+    // 2 - Register content isn't actually a content upsert why we force all parameters to be passed since they require just a few ?
+    //     Can I use registerContent to upsert existing metadata
 
-      const createContentRequest = {
-        key: fileKey,
-        title: `${graphMessage.subject} - ${graphMessage.id}.eml`,
-        mimeType: `message/rfc822`,
-        // FROM where do we I get this thing ? I got just a readable stream from microsoft
-        byteSize: 1,
-        metadata: metadata,
-        scopeId: rootScope.id,
-        ownerType: UniqueOwnerType.User,
-        sourceOwnerType: UniqueOwnerType.User,
-        sourceKind: INGESTION_SOURCE_KIND,
-        sourceName: INGESTION_SOURCE_NAME,
-        // TODO: Check with Michat
-        storeInternally: false,
-      };
-
-      const content =
-        await this.uniqueApi.ingestion.registerContent(createContentRequest);
-
-      // TODO: Injest the file in unique.
-      this.uniqueApi.ingestion.streamUpload({
-        uploadUrl: this.correctWriteUrl(content.writeUrl),
-        mimeType: createContentRequest.mimeType,
-        content: response,
+    if (
+      isNullish(file) || // File does not exist
+      metadata.sentDateTime !== file.metadata?.sentDateTime // File exists but the sentDateTime is different so we need to reigest everything.
+    ) {
+      await this.injestEmail({
+        fileKey,
+        metadata,
+        rootScopeId: rootScope.id,
+        graphMessage,
+        messageId,
+        client,
       });
-
-      await this.uniqueApi.ingestion.finalizeIngestion({
-        key: fileKey,
-        title: createContentRequest.title,
-        mimeType: createContentRequest.mimeType,
-        ownerType: createContentRequest.ownerType,
-        byteSize: createContentRequest.byteSize,
-        scopeId: createContentRequest.scopeId,
-        sourceOwnerType: createContentRequest.sourceOwnerType,
-        sourceName: createContentRequest.sourceName,
-        sourceKind: createContentRequest.sourceKind,
-        fileUrl: content.readUrl,
-        url: content.readUrl,
-        baseUrl: graphMessage.webLink,
-        storeInternally: !isNullish(content.internallyStoredAt),
-      });
+      return;
     }
 
-    // if (graphMessage.sentDateTime === file.)
-    // TODO:
-    // Compare sentDateTime - sentDateTime
-    //    => if not equal reingest + metadata update
-    //    => if equal => compare metadata and update
+    await this.uniqueApi.ingestion.upsertContent({
+      key: fileKey,
+      title: `${graphMessage.subject} - ${graphMessage.id}.eml`,
+      mimeType: `message/rfc822`,
+      // FROM where do we I get this thing ? I got just a readable stream from microsoft
+      byteSize: file.byteSize,
+      metadata: metadata,
+      scopeId: rootScope.id,
+      ownerType: UniqueOwnerType.User,
+      sourceOwnerType: UniqueOwnerType.User,
+      sourceKind: INGESTION_SOURCE_KIND,
+      sourceName: INGESTION_SOURCE_NAME,
+      // TODO: Check with Michat
+      storeInternally: false,
+    });
   }
 
-  // HACK:
-  // When running in internal auth mode, rewrite the writeUrl to route through the ingestion
-  // service's scoped upload endpoint. This enables internal services to upload files without
-  // requiring external network access (hairpinning).
-  // Ideally we should fix this somehow in the service itself by using a separate property or make
-  // writeUrl configurable, but for now this hack lets us avoid hairpinning issues in the internal
-  // upload flows.
-  private correctWriteUrl(writeUrl: string): string {
-    const uniqueAuthMode = this.configService.get("unique.serviceAuthMode", {
-      infer: true,
-    });
-    if (uniqueAuthMode === "external") {
-      return writeUrl;
-    }
-    const url = new URL(writeUrl);
-    const key = url.searchParams.get("key");
-    assert.ok(key, "writeUrl is missing key parameter");
+  private async injestEmail({
+    client,
+    rootScopeId,
+    graphMessage,
+    metadata,
+    messageId,
+    fileKey,
+  }: {
+    client: Client;
+    rootScopeId: string;
+    graphMessage: GraphMessage;
+    messageId: string;
+    fileKey: string;
+    metadata: MessageMetadata;
+  }): Promise<void> {
+    const response = (await client
+      .api(`me/messages/${messageId}/$value`)
+      .header(`Prefer`, `IdType="ImmutableId"`)
+      .getStream()) as ReadableStream<Uint8Array<ArrayBuffer>>;
 
-    const ingestionApiUrl = this.configService.get("unique.apiBaseUrl", {
-      infer: true,
+    const createContentRequest = {
+      key: fileKey,
+      title: `${graphMessage.subject} - ${graphMessage.id}.eml`,
+      mimeType: `message/rfc822`,
+      // FROM where do we I get this thing ? I got just a readable stream from microsoft
+      byteSize: 1,
+      metadata: metadata,
+      scopeId: rootScopeId,
+      ownerType: UniqueOwnerType.User,
+      sourceOwnerType: UniqueOwnerType.User,
+      sourceKind: INGESTION_SOURCE_KIND,
+      sourceName: INGESTION_SOURCE_NAME,
+      // TODO: Check with Michat
+      storeInternally: false,
+    };
+
+    const content = await this.uniqueApi.ingestion.upsertContent(createContentRequest);
+
+    let byteSize = 0;
+
+    const transformedStream = response.pipeThrough(
+      new TransformStream({
+        transform: (chunk, controller) => {
+          byteSize += chunk.length;
+          controller.enqueue(chunk);
+        },
+      }),
+    );
+
+    await this.uniqueApi.ingestion.streamUpload({
+      uploadUrl: content.writeUrl,
+      mimeType: createContentRequest.mimeType,
+      content: transformedStream,
     });
-    return `${ingestionApiUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
+
+    await this.uniqueApi.ingestion.finalizeIngestion({
+      key: fileKey,
+      title: createContentRequest.title,
+      mimeType: createContentRequest.mimeType,
+      ownerType: createContentRequest.ownerType,
+      byteSize: byteSize,
+      scopeId: createContentRequest.scopeId,
+      sourceOwnerType: createContentRequest.sourceOwnerType,
+      sourceName: createContentRequest.sourceName,
+      sourceKind: createContentRequest.sourceKind,
+      fileUrl: content.readUrl,
+      url: content.readUrl,
+      baseUrl: graphMessage.webLink,
+      storeInternally: !isNullish(content.internallyStoredAt),
+    });
   }
-
-  // !SECTION: Helpers
 }

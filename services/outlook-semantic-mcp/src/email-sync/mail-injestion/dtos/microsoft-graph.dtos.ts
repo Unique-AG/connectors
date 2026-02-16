@@ -1,5 +1,5 @@
-import z from "zod/v4";
-import { asAllOptions } from "~/utils/as-all-options";
+import z from 'zod/v4';
+import { asAllOptions } from '~/utils/as-all-options';
 
 const graphEmailAddressSchema = z.object({
   address: z.string().optional(),
@@ -11,7 +11,7 @@ const graphRecipientSchema = z.object({
 });
 
 const graphItemBodySchema = z.object({
-  contentType: z.enum(["text", "html"]).optional(),
+  contentType: z.enum(['text', 'html']).optional(),
   content: z.string().optional(),
 });
 
@@ -23,7 +23,7 @@ const graphDateTimeTimeZoneSchema = z.object({
 const graphFollowupFlagSchema = z.object({
   completedDateTime: graphDateTimeTimeZoneSchema.optional().nullable(),
   dueDateTime: graphDateTimeTimeZoneSchema.optional().nullable(),
-  flagStatus: z.enum(["notFlagged", "complete", "flagged"]).optional(),
+  flagStatus: z.enum(['notFlagged', 'complete', 'flagged']).optional(),
   startDateTime: graphDateTimeTimeZoneSchema.optional().nullable(),
 });
 
@@ -39,8 +39,8 @@ export const graphMessageSchema = z.object({
   from: graphRecipientSchema.optional().nullable(),
   hasAttachments: z.boolean().optional(),
   id: z.string(),
-  importance: z.enum(["low", "normal", "high"]).optional(),
-  inferenceClassification: z.enum(["focused", "other"]).optional(),
+  importance: z.enum(['low', 'normal', 'high']).optional(),
+  inferenceClassification: z.enum(['focused', 'other']).optional(),
   internetMessageHeaders: z
     .array(
       z.object({
@@ -101,9 +101,9 @@ export const GraphMessageFields = asAllOptions<keyof GraphMessage>()([
 ]);
 
 export const graphMessagesResponseSchema = z.object({
-  "@odata.context": z.string().optional(),
+  '@odata.context': z.string().optional(),
   value: z.array(graphMessageSchema),
-  "@odata.nextLink": z.string().optional(),
+  '@odata.nextLink': z.string().optional(),
 });
 
 export type GraphMessagesResponse = z.infer<typeof graphMessagesResponseSchema>;
@@ -122,9 +122,7 @@ const fileDiffGraphMessage = graphMessageSchema.pick({
 
 export type FileDiffGraphMessage = z.infer<typeof fileDiffGraphMessage>;
 
-export const FileDiffGraphMessageFields = asAllOptions<
-  keyof FileDiffGraphMessage
->()([
+export const FileDiffGraphMessageFields = asAllOptions<keyof FileDiffGraphMessage>()([
   `internetMessageId`,
   `id`,
   `uniqueBody`,
@@ -137,7 +135,7 @@ export const FileDiffGraphMessageFields = asAllOptions<
 ]);
 
 export const fileDiffGraphMessageResponseSchema = z.object({
-  "@odata.context": z.string().optional(),
+  '@odata.context': z.string().optional(),
   value: z.array(fileDiffGraphMessage),
-  "@odata.nextLink": z.string().optional(),
+  '@odata.nextLink': z.string().optional(),
 });

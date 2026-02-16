@@ -1,12 +1,12 @@
-import assert from "node:assert";
-import type { IngestionHttpClient } from "../clients/ingestion-http.client";
-import type { UniqueGraphqlClient } from "../clients/unique-graphql.client";
-import type { UniqueApiIngestion } from "../types";
+import assert from 'node:assert';
+import type { IngestionHttpClient } from '../clients/ingestion-http.client';
+import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import type { UniqueApiClientAuthConfig, UniqueApiIngestion } from '../types';
 import {
   CONTENT_UPSERT_MUTATION,
   type ContentUpsertMutationInput,
   type ContentUpsertMutationResult,
-} from "./ingestion.queries";
+} from './ingestion.queries';
 import type {
   ContentRegistrationRequest,
   FileDiffItem,
@@ -15,28 +15,32 @@ import type {
   IngestionApiResponse,
   IngestionFinalizationRequest,
   UploadContentRequest,
-} from "./ingestion.types";
+} from './ingestion.types';
 
 interface FileIngestionServiceDeps {
   ingestionClient: UniqueGraphqlClient;
   ingestionHttpClient: IngestionHttpClient;
   ingestionBaseUrl: string;
+  uniqueConfig: {
+    ingestionApiUrl: string;
+    authMode: UniqueApiClientAuthConfig['mode'];
+  };
 }
 
 export class FileIngestionService implements UniqueApiIngestion {
   private readonly ingestionClient: UniqueGraphqlClient;
   private readonly ingestionHttpClient: IngestionHttpClient;
   private readonly ingestionBaseUrl: string;
+  private readonly uniqueConfig: { ingestionApiUrl: string; authMode: string };
 
   public constructor(deps: FileIngestionServiceDeps) {
+    this.uniqueConfig = deps.uniqueConfig;
     this.ingestionClient = deps.ingestionClient;
     this.ingestionHttpClient = deps.ingestionHttpClient;
     this.ingestionBaseUrl = deps.ingestionBaseUrl;
   }
 
-  public async registerContent(
-    request: ContentRegistrationRequest,
-  ): Promise<IngestionApiResponse> {
+  public async upsertContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse> {
     const variables: ContentUpsertMutationInput = {
       input: {
         key: request.key,
@@ -64,28 +68,33 @@ export class FileIngestionService implements UniqueApiIngestion {
       ContentUpsertMutationInput
     >(CONTENT_UPSERT_MUTATION, variables);
 
-    assert.ok(
-      result?.contentUpsert,
-      "Invalid response from Unique API content registration",
-    );
+    assert.ok(result?.contentUpsert, 'Invalid response from Unique API content registration');
     return result.contentUpsert;
   }
 
   public async streamUpload(request: UploadContentRequest): Promise<void> {
-    await this.ingestionClient.request(request.uploadUrl, {
-      method: "PUT",
+    await this.ingestionClient.request(this.correctWriteUrl(request.uploadUrl), {
+      method: 'PUT',
       headers: {
-        "Content-Type": request.mimeType,
-        "x-ms-blob-type": "BlockBlob",
+        'Content-Type': request.mimeType,
+        'x-ms-blob-type': 'BlockBlob',
       },
       body: request.content,
-      duplex: "half",
+      duplex: 'half',
     });
   }
 
-  public async finalizeIngestion(
-    request: IngestionFinalizationRequest,
-  ): Promise<{ id: string }> {
+  private correctWriteUrl(writeUrl: string): string {
+    if (this.uniqueConfig.authMode === 'external') {
+      return writeUrl;
+    }
+    const url = new URL(writeUrl);
+    const key = url.searchParams.get('key');
+    assert.ok(key, 'writeUrl is missing key parameter');
+    return `${this.uniqueConfig.ingestionApiUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
+  }
+
+  public async finalizeIngestion(request: IngestionFinalizationRequest): Promise<{ id: string }> {
     const variables: ContentUpsertMutationInput = {
       input: {
         key: request.key,
@@ -110,10 +119,7 @@ export class FileIngestionService implements UniqueApiIngestion {
       ContentUpsertMutationInput
     >(CONTENT_UPSERT_MUTATION, variables);
 
-    assert.ok(
-      result?.contentUpsert?.id,
-      "Invalid response from Unique API ingestion finalization",
-    );
+    assert.ok(result?.contentUpsert?.id, 'Invalid response from Unique API ingestion finalization');
     return { id: result.contentUpsert.id };
   }
 
@@ -125,8 +131,7 @@ export class FileIngestionService implements UniqueApiIngestion {
   ): Promise<FileDiffResponse> {
     const ingestionUrl = new URL(this.ingestionBaseUrl);
     // The ingestionBaseUrl can already have part of the path when running in external mode
-    const pathPrefix =
-      ingestionUrl.pathname === "/" ? "" : ingestionUrl.pathname;
+    const pathPrefix = ingestionUrl.pathname === '/' ? '' : ingestionUrl.pathname;
     const fileDiffPath = `${pathPrefix}/v2/content/file-diff`;
 
     const diffRequest: FileDiffRequest = {
@@ -137,20 +142,18 @@ export class FileIngestionService implements UniqueApiIngestion {
     };
 
     const { statusCode, body } = await this.ingestionHttpClient.request({
-      method: "POST",
+      method: 'POST',
       path: fileDiffPath,
       body: JSON.stringify(diffRequest),
     });
 
     if (statusCode < 200 || statusCode >= 300) {
-      const errorText = await body.text().catch(() => "No response body");
-      throw new Error(
-        `File diff request failed with status ${statusCode}. Response: ${errorText}`,
-      );
+      const errorText = await body.text().catch(() => 'No response body');
+      throw new Error(`File diff request failed with status ${statusCode}. Response: ${errorText}`);
     }
 
     const responseData = await body.json();
-    assert.ok(responseData, "Invalid response from Unique API file diff");
+    assert.ok(responseData, 'Invalid response from Unique API file diff');
     return responseData as FileDiffResponse;
   }
 }

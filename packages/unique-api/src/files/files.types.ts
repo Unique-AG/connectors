@@ -12,6 +12,8 @@ export interface UniqueFile {
   key: string;
   ownerType: string;
   ownerId: string;
+  byteSize: number;
+  metadata: Record<string, string> | null;
 }
 
 export interface FileAccessInput {

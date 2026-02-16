@@ -20,8 +20,6 @@ export const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(
     imports: [ConfigModule],
     inject: [uniqueConfig.KEY],
     useFactory: (config: UniqueConfig): UniqueApiClientConfig => {
-      // console.log(`--------------------${JSON.stringify(config, null, 4)}`);
-
       let auth: ClusterLocalAuthConfig | ExternalAuthConfig;
       if (config.serviceAuthMode === 'external') {
         auth = {
@@ -35,7 +33,7 @@ export const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(
         auth = {
           mode: 'cluster_local',
           extraHeaders: config.serviceExtraHeaders,
-          serviceId: `TEST`,
+          serviceId: config.serviceId,
         };
       }
 

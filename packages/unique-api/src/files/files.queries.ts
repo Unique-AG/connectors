@@ -1,5 +1,5 @@
-import { gql } from "graphql-request";
-import type { FileAccessInput, UniqueFile } from "./files.types";
+import { gql } from 'graphql-request';
+import type { FileAccessInput, UniqueFile } from './files.types';
 
 export interface ContentUpdateMutationInput {
   contentId: string;
@@ -90,6 +90,8 @@ export const PAGINATED_CONTENT_QUERY = gql`
         key
         ownerType
         ownerId
+        metadata
+        byteSize
       }
       totalCount
     }
