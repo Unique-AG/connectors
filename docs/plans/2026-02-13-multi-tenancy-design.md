@@ -10,22 +10,24 @@ The confluence-connector operates in single-tenant mode: it reads the first tena
 
 ### Overview
 
-Transform the connector to support multiple Confluence tenants from a single deployment across four layers:
+Transform the connector to support multiple Confluence tenants from a single deployment across five layers:
 
-1. **Config & Secrets (Layer 1):** Replace the implicit secret injection (`injectSecretsFromEnvironment`) with LiteLLM-style `os.environ/VAR_NAME` references in tenant YAML. Secrets are resolved inside Zod transforms during validation. Tenant name is derived from the filename. A top-level `status` field (`active` | `inactive` | `deleted`) controls tenant lifecycle — only `active` tenants are registered and scheduled.
+1. **Config & Secrets (Layer 1):** Replace the implicit secret injection (`injectSecretsFromEnvironment`) with LiteLLM-style `os.environ/VAR_NAME` references in tenant YAML. Secrets are resolved inside Zod transforms during validation. Tenant name is derived from the filename and validated (lowercase alphanumeric + dashes, unique across files). A top-level `status` field (`active` | `inactive` | `deleted`) controls tenant lifecycle — only `active` tenants are registered and scheduled.
 
-2. **TenantRegistry (Layer 2):** A global `TenantRegistry` service holds a `Map<string, TenantContext>`. Each `TenantContext` bundles the tenant's config, a pre-configured auth strategy with its own `TokenCache`, and a child logger with `tenantName` context. This replaces the current `ConfigModule.forRoot` registration of tenant-scoped config.
+2. **TenantRegistry (Layer 2):** A global `TenantRegistry` service holds a `Map<string, TenantContext>`. Each `TenantContext` bundles the tenant's config, a pre-configured auth strategy with its own `TokenCache`, and a scoped logger. The registry is a **thin orchestrator** delegating construction to dedicated factories — it must not become a god class. This replaces the current `ConfigModule.forRoot` registration of tenant-scoped config.
 
 3. **Scheduler (Layer 3):** Each tenant gets its own `CronJob` registered dynamically at startup via NestJS `SchedulerRegistry`, using the tenant's `scanIntervalCron` expression. Each `TenantContext` carries an `isScanning` flag so overlapping cron ticks for the same tenant are skipped. For this ticket, the sync action acquires an auth token per tenant (proving per-tenant auth works end-to-end).
 
-4. **Observability (Layer 5):** Every `TenantContext` includes a child logger (`Logger` with `tenantName` context). All log lines during a tenant sync include `tenantName` as a structured field.
+4. **Tenant Context Propagation (Layer 4):** `AsyncLocalStorage` provides implicit access to the current `TenantContext` during a sync execution. The scheduler sets the context once at the start of `syncTenant()`, and downstream services retrieve per-tenant resources (logger, API clients, config) via a helper — no prop-drilling required.
+
+5. **Observability (Layer 5):** Logs include both service context and tenant context as structured fields. Start with a simple approach (combined NestJS Logger context string), with room to evolve to pino child loggers for dedicated `tenantName` JSON fields. Metrics with tenant labels are deferred to a later ticket.
 
 ### Key Decisions
 
 #### Decision 1: Auth wiring — combined TenantContext vs separate ConfluenceAuthModule
 
-**Option A (chosen): Combined TenantContext with `getAccessToken()` baked in.**
-`TenantRegistry` creates per-tenant auth strategies and token caches at startup, exposing a single `getAccessToken()` closure on `TenantContext`. `ConfluenceAuthModule` and `ConfluenceAuthenticationService` are removed — their role is absorbed by the registry. Consumers get a `TenantContext` and call `tenant.getAccessToken()` directly.
+**Option A (chosen): Combined TenantContext with `auth: TenantAuth` baked in.**
+`TenantAuthFactory` creates per-tenant `TenantAuth` instances (auth strategy + token cache) at startup. `TenantRegistry` injects the factory and wires the result into `TenantContext.auth`. `ConfluenceAuthModule` and `ConfluenceAuthenticationService` are removed. Consumers call `tenant.auth.getAccessToken()` directly.
 
 **Option B (rejected): Keep ConfluenceAuthModule, make it tenant-aware.**
 `ConfluenceAuthenticationService` would hold a `Map<string, { strategy, cache }>` internally, and its signature would change from `getAccessToken()` to `getAccessToken(tenantName: string)`. `TenantContext` would NOT include auth — consumers would need to inject both `TenantRegistry` and `ConfluenceAuthenticationService`, passing `tenantName` strings to look things up in two places.
@@ -45,19 +47,22 @@ Transform the connector to support multiple Confluence tenants from a single dep
 #### Component Layout
 
 ```
-┌─────────────────────────────────────────────────────┐
-│ AppModule                                           │
-│                                                     │
-│  ConfigModule.forRoot (app-level config only)       │
-│  TenantModule (global)                              │
-│    └─ TenantRegistry                                │
-│         └─ Map<string, TenantContext>                │
-│              ├─ name, config, logger, isScanning     │
-│              └─ getAccessToken()                     │
-│  SchedulerModule                                    │
-│    └─ TenantSyncScheduler                           │
-│  LoggerModule, ProbeModule, OpenTelemetryModule      │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│ AppModule                                                │
+│                                                          │
+│  ConfigModule.forRoot (app-level config only)            │
+│  TenantModule (global)                                   │
+│    ├─ TenantRegistry                                     │
+│    │    └─ Map<string, TenantContext>                     │
+│    │         ├─ name, config, logger, isScanning          │
+│    │         └─ auth: TenantAuth                          │
+│    └─ AsyncLocalStorage<TenantContext> (tenant context)   │
+│         └─ getCurrentTenant() helper                      │
+│  SchedulerModule                                         │
+│    └─ TenantSyncScheduler (sets AsyncLocalStorage per    │
+│         sync, registers per-tenant CronJobs)              │
+│  LoggerModule, ProbeModule, OpenTelemetryModule           │
+└──────────────────────────────────────────────────────────┘
 ```
 
 #### Layer 1: Config & Secret Resolution
@@ -99,25 +104,26 @@ processing:
 ```typescript
 const ENV_REF_PREFIX = 'os.environ/';
 
-// Base: resolves os.environ/ references to actual env var values
-const envResolvableStringSchema = z.string().transform((val, ctx) => {
+// Base: resolves os.environ/ references to actual env var values.
+// Does NOT validate whether the env var is set — the Zod schema
+// (required vs optional) decides whether a missing value is an error.
+const envResolvableStringSchema = z.string().transform((val) => {
   if (!val.startsWith(ENV_REF_PREFIX)) return val;
   const varName = val.slice(ENV_REF_PREFIX.length);
-  const resolved = process.env[varName];
-  if (!resolved) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: `Environment variable '${varName}' is not set (referenced as '${val}')`,
-    });
-    return z.NEVER;
-  }
-  return resolved;
+  return process.env[varName] ?? '';
 });
 
-// For secret fields: resolve env ref, then wrap in Redacted
+// Default for secret fields: resolve env ref, then wrap in Redacted.
+// This is the schema used in most places — env-loaded values are
+// assumed to be secrets unless explicitly opted out.
 const envResolvableRedactedStringSchema = envResolvableStringSchema
   .pipe(z.string().min(1))
   .transform((val) => new Redacted(val));
+
+// Explicit opt-out for non-secret env references (rare).
+// Returns a plain string without Redacted wrapping.
+const envResolvablePlainStringSchema = envResolvableStringSchema
+  .pipe(z.string().min(1));
 ```
 
 **The `injectSecretsFromEnvironment()` function is removed entirely.** The YAML is the single source of truth for which env var each field reads from.
@@ -131,6 +137,10 @@ const envResolvableRedactedStringSchema = envResolvableStringSchema
 | `acme-corp-tenant-config.yaml` | `acme-corp` |
 
 Rule: strip the `-tenant-config.yaml` suffix from the filename (without directory path).
+
+**Tenant name validation:** Extracted names are validated with regex `^[a-z0-9]+(-[a-z0-9]+)*$` (lowercase alphanumeric + dashes). Fail-fast at startup if:
+- A tenant name contains invalid characters (misconfiguration)
+- Two tenant config files resolve to the same name (duplicate)
 
 **Tenant lifecycle status:** A top-level `status` field controls tenant behavior (similar to SPC site statuses):
 
@@ -165,37 +175,56 @@ function getTenantConfigs(): NamedTenantConfig[]
 
 #### Layer 2: TenantRegistry
 
-A global NestJS provider holding all tenant contexts:
+A global NestJS provider holding all tenant contexts. The registry is a **thin orchestrator** — it delegates construction of per-tenant services to dedicated classes/factories rather than building everything inline. This prevents the registry from becoming a god class as `TenantContext` grows.
+
+**Factory pattern:** Each category of per-tenant resource gets its own factory. The registry injects factories and delegates construction to them, keeping its `onModuleInit` a simple assembly loop.
+
+```typescript
+interface TenantAuth {
+  getAccessToken(): Promise<string>;
+}
+
+@Injectable()
+export class TenantAuthFactory {
+  create(confluenceConfig: ConfluenceConfig): TenantAuth {
+    const strategy = createAuthStrategy(confluenceConfig);
+    const tokenCache = new TokenCache();
+    return {
+      getAccessToken: () => tokenCache.getToken(() => strategy.acquireToken()),
+    };
+  }
+}
+```
 
 ```typescript
 interface TenantContext {
   readonly name: string;
   readonly config: TenantConfig;
   readonly logger: Logger;
+  readonly auth: TenantAuth;
   isScanning: boolean;
-  getAccessToken(): Promise<string>;
-  // TODO: Add per-tenant Confluence API client
-  // TODO: Add per-tenant Unique API client
-  // TODO: Add per-tenant rate limiters
+  // TODO: Add per-tenant Confluence API client (via ConfluenceClientFactory)
+  // TODO: Add per-tenant Unique API client (via UniqueClientFactory)
+  // TODO: Add per-tenant rate limiters (via RateLimiterFactory)
 }
 
 @Injectable()
 export class TenantRegistry implements OnModuleInit {
   private readonly tenants = new Map<string, TenantContext>();
 
+  constructor(private readonly authFactory: TenantAuthFactory) {}
+
   onModuleInit() {
     const configs = getTenantConfigs();
     for (const { name, config } of configs) {
-      const authStrategy = createAuthStrategy(config.confluence);
-      const tokenCache = new TokenCache();
       const logger = new Logger(`Tenant:${name}`);
 
       this.tenants.set(name, {
         name,
         config,
         logger,
+        auth: this.authFactory.create(config.confluence),
         isScanning: false,
-        getAccessToken: () => tokenCache.getToken(() => authStrategy.acquireToken()),
       });
 
       logger.log('Tenant registered');
@@ -208,11 +237,56 @@ export class TenantRegistry implements OnModuleInit {
 }
 ```
 
+**Design principle:** As more per-tenant resources are added, each gets its own factory (e.g., `ConfluenceClientFactory`, `UniqueClientFactory`, `RateLimiterFactory`). The registry injects all factories and orchestrates the assembly — but never owns the construction logic itself. Clients and services are created once at startup and cached in the `TenantContext` — not recreated per sync.
+
+#### Layer 4: Tenant Context Propagation (AsyncLocalStorage)
+
+`AsyncLocalStorage` provides implicit access to the current `TenantContext` during a sync execution, avoiding prop-drilling through every function call. This was agreed as a core part of the design (not deferred) because `TenantContext` will grow to include Confluence API client, Unique API client, rate limiters, etc. — passing it explicitly everywhere would quickly become cumbersome.
+
+**How it works:**
+
+```typescript
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+const tenantStorage = new AsyncLocalStorage<TenantContext>();
+
+// Scheduler sets context once per sync
+async syncTenant(tenant: TenantContext) {
+  await tenantStorage.run(tenant, async () => {
+    // All downstream code can access tenant context implicitly
+    await this.doSync();
+  });
+}
+
+// Downstream helper — retrieves current tenant context
+function getCurrentTenant(): TenantContext {
+  const tenant = tenantStorage.getStore();
+  if (!tenant) throw new Error('No tenant context — called outside of sync execution');
+  return tenant;
+}
+
+// Usage in any downstream service
+class SomeService {
+  doWork() {
+    const tenant = getCurrentTenant();
+    const logger = tenant.logger;
+    const config = tenant.config;
+    // ...
+  }
+}
+```
+
+**Key properties:**
+- Context is set once at the start of `syncTenant()` and is read-only downstream — no mutation concerns
+- Similar to NestJS `ClsModule` / request-scoped context in HTTP servers
+- Works with `Map<Class, Instance>` indexing for typed service retrieval (e.g., `tenant.get(Logger)`) if needed later
+- Services remain NestJS singletons — only the tenant context varies per execution
+
 **Changes to existing modules:**
 
 - `AppModule` removes `confluenceConfig`, `uniqueConfig`, `processingConfig` from `ConfigModule.forRoot` load array (tenant config is no longer global)
-- `ConfluenceAuthModule` is removed — auth strategy creation moves into `TenantRegistry`
-- `ConfluenceAuthenticationService` is removed — `TenantContext.getAccessToken()` replaces it
+- `ConfluenceAuthModule` is removed — `TenantAuthFactory` replaces the singleton auth wiring
+- `ConfluenceAuthenticationService` is removed — its logic moves into `TenantAuthFactory`
 - Auth strategy classes (`OAuth2LoAuthStrategy`, `PatAuthStrategy`) and `TokenCache` remain unchanged
 - `getFirstTenantConfig()` and the singleton `registerAs` exports are removed
 
@@ -245,10 +319,13 @@ export class TenantSyncScheduler implements OnModuleInit {
     }
     tenant.isScanning = true;
     try {
-      tenant.logger.log('Starting sync');
-      const token = await tenant.getAccessToken();
-      tenant.logger.log('Token acquired successfully');
-      // TODO: Full sync pipeline
+      // Set AsyncLocalStorage context for downstream access
+      await tenantStorage.run(tenant, async () => {
+        tenant.logger.log('Starting sync');
+        const token = await tenant.auth.getAccessToken();
+        tenant.logger.log('Token acquired successfully');
+        // TODO: Full sync pipeline
+      });
     } catch (error) {
       tenant.logger.error('Sync failed', { error });
     } finally {
@@ -262,31 +339,38 @@ Per-tenant cron jobs are registered dynamically via NestJS `SchedulerRegistry` s
 
 #### Layer 5: Observability
 
-Each `TenantContext` holds a NestJS `Logger` scoped to the tenant:
+**Logging — per-service AND per-tenant:**
+
+Logs should include both the service name (e.g., `TenantSyncScheduler`) and the tenant name (e.g., `acme`) so they are independently filterable in Grafana/log aggregation.
+
+For this ticket, start with a simple combined NestJS Logger context string:
 
 ```typescript
+// In TenantContext — a base logger scoped to the tenant
 const logger = new Logger(`Tenant:${name}`);
-```
 
-NestJS `Logger` accepts a context string in the constructor. This context is included in every log line automatically via `nestjs-pino`:
+// In downstream services — can further scope
+tenant.logger.log('Starting sync'); // context: "Tenant:acme"
+```
 
 ```json
 {"level":"info", "context":"Tenant:acme", "msg":"Starting sync"}
 {"level":"error", "context":"Tenant:acme", "msg":"Sync failed", "error":"..."}
 ```
 
-This is **not** a pino child logger (which would add `tenantName` as a separate structured field via `pinoLogger.child({ tenantName: 'acme' })`). The NestJS `Logger` approach is simpler and consistent with how logging works throughout the codebase (e.g., `new Logger(SchedulerService.name)` in SPC). The context string `"Tenant:acme"` is filterable in log aggregation tools.
-
-If deeper structured logging is needed later (e.g., a dedicated `tenantName` JSON field for dashboards), we can switch to pino child loggers — but that requires accessing the underlying pino instance, which adds complexity. The NestJS Logger context is sufficient for this ticket.
+**Future improvement:** Evolve to pino child loggers that add `tenantName` as a dedicated structured JSON field (via `pinoLogger.child({ tenantName: 'acme' })`). This would be retrieved from `AsyncLocalStorage`, enriching any service-scoped logger with the current tenant context automatically. The NestJS Logger context string approach is sufficient for the initial implementation.
 
 - All downstream operations use `tenant.logger` — logs automatically include the tenant context string
-- Future: When metrics are added, they should carry a `tenant` label
+- **Metrics:** Should carry a `tenant` label, leveraging `AsyncLocalStorage` for automatic scoping. Deferred to a later ticket — not in scope here.
+- **OpenTelemetry spans:** `@Span` decorators (as used in SPC) are also deferred. Focus on getting the multi-tenancy foundation working first.
 
 ### Error Handling
 
 **Config loading errors:**
-- Missing `os.environ/` variable → Zod validation error with full path (e.g., `confluence.auth.clientSecret: Environment variable 'ACME_SECRET' is not set`)
+- Missing `os.environ/` variable → the env resolver returns an empty string; the Zod schema decides if this is an error (required fields fail with standard Zod "string must be at least 1 character" errors, optional fields accept it)
 - Invalid YAML → fail-fast at startup with file path in error message
+- Invalid tenant name (characters/format) → fail-fast at startup as misconfiguration
+- Duplicate tenant names → fail-fast at startup as misconfiguration
 - `inactive` tenant → config validated but tenant not registered, logged as info
 - `deleted` tenant → config NOT validated, tenant not registered, logged as info
 - Zero `active` tenants → fail-fast at startup
@@ -297,21 +381,25 @@ If deeper structured logging is needed later (e.g., a dedicated `tenantName` JSO
 - `tenant.isScanning` flag prevents overlapping syncs per tenant
 
 **Secret handling:**
+- `os.environ/` resolution defaults to `Redacted` wrapping via `envResolvableRedactedStringSchema` — env-loaded fields are secrets by default
+- Explicit `envResolvablePlainStringSchema` opt-out required for the rare non-secret env reference
+- The env resolver itself does not validate — it resolves the reference and returns the value (or empty string). The Zod schema (required/optional, min length) decides whether a missing value is an error
 - `Redacted` wrapper prevents secrets from appearing in logs/errors (unchanged from current)
-- `os.environ/` resolution inside Zod means unresolved refs fail with clear messages and full field paths
 
 ### Testing Strategy
 
 - **Config loader tests** — extend existing `tenant-config-loader.spec.ts`:
-  - `os.environ/` resolution (happy path + missing env var)
+  - `os.environ/` resolution (happy path + missing env var → empty string returned to schema)
   - Tenant name extraction from filename
+  - Tenant name validation: valid names pass, invalid characters rejected, duplicates rejected
   - `status: inactive` skipping (config validated, tenant not registered)
   - `status: deleted` skipping (config not validated, tenant not registered)
   - Default status is `active` when field is omitted
   - Multi-tenant loading with different auth modes
-  - Backward compatibility: plain string values still work (for non-secret fields)
-- **Zod schema tests** — test `envResolvableStringSchema` and `envResolvableRedactedStringSchema` in isolation
+  - Backward compatibility: plain string values still work (non-`os.environ/` fields are unaffected)
+- **Zod schema tests** — test `envResolvableRedactedStringSchema` (Redacted by default) and `envResolvablePlainStringSchema` (explicit opt-out) in isolation
 - **TenantRegistry tests** — construction from multiple configs, `get()`, `getAll()`, token acquisition delegation, unknown tenant error
+- **AsyncLocalStorage tests** — context is set during sync execution, context is accessible in downstream calls, error thrown when accessed outside of sync execution
 - **Scheduler tests** — parallel execution, `tenant.isScanning` prevents duplicate syncs, error isolation between tenants, per-tenant cron registration
 - **Existing auth tests** — unchanged (strategies and token cache are reused as-is)
 
@@ -319,10 +407,12 @@ If deeper structured logging is needed later (e.g., a dedicated `tenantName` JSO
 
 - Confluence API client (pages, labels, content fetching)
 - Unique API client (ingestion, scope management)
-- Per-tenant rate limiters (Bottleneck)
+- Per-tenant rate limiters (Bottleneck) — future architecture: Confluence rate limiter per-tenant, Unique rate limiter global shared; potential optimization to detect tenants sharing the same Confluence instance
 - Processing pipeline (page scanning, content extraction, ingestion)
 - Helm chart multi-tenant changes (env var template per tenant)
-- Per-tenant metrics labels
+- Per-tenant metrics labels (deferred — will leverage AsyncLocalStorage)
+- OpenTelemetry `@Span` decorators (deferred — add after foundation is working)
+- Pino child logger evolution for dedicated `tenantName` JSON fields (start simple, improve later)
 
 When these layers are implemented, `TenantContext` will expand to include them:
 
@@ -332,11 +422,12 @@ interface TenantContext {
   readonly name: string;
   readonly config: TenantConfig;
   readonly logger: Logger;
-  getAccessToken(): Promise<string>;
-  readonly confluenceClient: ConfluenceApiClient;   // pre-configured with baseUrl + auth
-  readonly uniqueClient: UniqueApiClient;            // pre-configured with baseUrl + auth
-  readonly confluenceRateLimiter: Bottleneck;        // per-tenant, from config.confluence.apiRateLimitPerMinute
-  readonly uniqueRateLimiter: Bottleneck;            // global shared instance (per ADR reviewer feedback)
+  readonly auth: TenantAuth;
+  readonly confluenceClient: ConfluenceApiClient;   // via ConfluenceClientFactory
+  readonly uniqueClient: UniqueApiClient;            // via UniqueClientFactory
+  readonly confluenceRateLimiter: Bottleneck;        // via RateLimiterFactory (per-tenant — each tenant may hit different instance)
+  readonly uniqueRateLimiter: Bottleneck;            // via RateLimiterFactory (global shared — all tenants share same Unique platform)
+  isScanning: boolean;
 }
 ```
 
@@ -354,14 +445,16 @@ async syncTenant(tenant: TenantContext) {
 
 ## Tasks
 
-1. **Create `envResolvableStringSchema` Zod utilities** — Add `envResolvableStringSchema` and `envResolvableRedactedStringSchema` to `zod.util.ts`. Update `confluence.schema.ts` and `unique.schema.ts` to use them for secret fields. Remove `injectSecretsFromEnvironment()` from `tenant-config-loader.ts`.
+1. **Create `envResolvableSchema` Zod utilities** — Add `envResolvableRedactedStringSchema` (Redacted by default) and `envResolvablePlainStringSchema` (explicit opt-out for non-secrets) to `zod.util.ts`. The env resolver returns empty string for missing env vars (schema decides if it's an error via required/optional). Update `confluence.schema.ts` and `unique.schema.ts` to use the new schemas for secret fields. Remove `injectSecretsFromEnvironment()` from `tenant-config-loader.ts`.
 
-2. **Add tenant name extraction and status field to config loader** — `getTenantConfigs()` returns `NamedTenantConfig[]` with name derived from filename. Support top-level `status` field (`active` | `inactive` | `deleted`, default `active`). `inactive` tenants are validated but skipped; `deleted` tenants skip validation entirely. Remove `getFirstTenantConfig()` and the singleton `registerAs` exports. Update tests.
+2. **Add tenant name extraction, validation, and status field to config loader** — `getTenantConfigs()` returns `NamedTenantConfig[]` with name derived from filename. Validate tenant names with regex `^[a-z0-9]+(-[a-z0-9]+)*$` and reject duplicates (fail-fast). Support top-level `status` field (`active` | `inactive` | `deleted`, default `active`). `inactive` tenants are validated but skipped; `deleted` tenants skip validation entirely. Remove `getFirstTenantConfig()` and the singleton `registerAs` exports. Update tests.
 
-3. **Create TenantContext interface and TenantRegistry service** — Define `TenantContext` with `name`, `config`, `logger`, `getAccessToken()`. Create `TenantRegistry` as a global provider that builds the tenant map at startup, creating per-tenant auth strategies and token caches. Create `TenantModule`.
+3. **Create TenantAuth, TenantContext, TenantAuthFactory, and TenantRegistry** — Define `TenantAuth` interface with `getAccessToken()`. Define `TenantContext` with `name`, `config`, `logger`, `auth`, `isScanning`. Create `TenantAuthFactory` (NestJS injectable) with `create(config)` returning a `TenantAuth`. Create `TenantRegistry` as a thin orchestrator that injects the factory and assembles contexts (clients created once and cached). Create `TenantModule`.
 
-4. **Remove ConfluenceAuthModule and update AppModule** — Remove `ConfluenceAuthModule` and `ConfluenceAuthenticationService` (role absorbed by `TenantRegistry`). Update `AppModule` to import `TenantModule` instead. Remove tenant config from `ConfigModule.forRoot` load array. Keep auth strategy classes and `TokenCache` unchanged.
+4. **Implement AsyncLocalStorage for tenant context propagation** — Create `tenantStorage` (`AsyncLocalStorage<TenantContext>`) and `getCurrentTenant()` helper. The scheduler sets context via `tenantStorage.run()` at the start of each sync. Downstream services retrieve the current tenant implicitly.
 
-5. **Implement TenantSyncScheduler** — Create `SchedulerModule` with `TenantSyncScheduler`. Register per-tenant cron jobs dynamically via `SchedulerRegistry`. Use `tenant.isScanning` flag to prevent overlapping syncs. Sync action: acquire token and log success/failure. Add `@nestjs/schedule` dependency.
+5. **Remove ConfluenceAuthModule and update AppModule** — Remove `ConfluenceAuthModule` and `ConfluenceAuthenticationService` (role replaced by `TenantAuthFactory`). Update `AppModule` to import `TenantModule` instead. Remove tenant config from `ConfigModule.forRoot` load array. Keep auth strategy classes and `TokenCache` unchanged.
 
-6. **Update local tenant config and .env for os.environ/ pattern** — Update `local-tenant-config.yaml` to use `os.environ/` references for secrets. Update `.env.example` and `.env` with the new variable naming convention.
+6. **Implement TenantSyncScheduler** — Create `SchedulerModule` with `TenantSyncScheduler`. Register per-tenant cron jobs dynamically via `SchedulerRegistry`. Use `tenant.isScanning` flag to prevent overlapping syncs. Set `AsyncLocalStorage` context at the start of each sync. Sync action: acquire token and log success/failure. Add `@nestjs/schedule` dependency.
+
+7. **Update local tenant config and .env for os.environ/ pattern** — Update `local-tenant-config.yaml` to use `os.environ/` references for secrets. Update `.env.example` and `.env` with the new variable naming convention.
