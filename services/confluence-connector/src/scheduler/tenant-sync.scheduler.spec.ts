@@ -1,5 +1,4 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
-import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantAuth } from '../tenant/tenant-auth.interface';
 import type { TenantContext } from '../tenant/tenant-context.interface';
@@ -8,14 +7,14 @@ import { TenantRegistry } from '../tenant/tenant-registry';
 import { smear } from '../utils/logging.util';
 import { TenantSyncScheduler } from './tenant-sync.scheduler';
 
-const mockSyncLogger = vi.hoisted(() => ({
+const mockTenantLogger = vi.hoisted(() => ({
   info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
-})) as unknown as pino.Logger;
+}));
 
 vi.mock('../tenant/tenant-logger', () => ({
-  getTenantLogger: vi.fn().mockReturnValue(mockSyncLogger),
+  getTenantLogger: vi.fn().mockReturnValue(mockTenantLogger),
 }));
 
 import { getTenantLogger } from '../tenant/tenant-logger';
@@ -89,11 +88,11 @@ describe('TenantSyncScheduler', () => {
       expect(tenantB.auth.getAccessToken).toHaveBeenCalledOnce();
     });
 
-    it('logs the scheduled cron expression per tenant', () => {
+    it('logs the scheduled cron expression via getTenantLogger', () => {
       scheduler.onModuleInit();
 
-      expect(tenantA.logger.info).toHaveBeenCalledWith('Scheduled sync with cron: */5 * * * *');
-      expect(tenantB.logger.info).toHaveBeenCalledWith('Scheduled sync with cron: */5 * * * *');
+      expect(getTenantLogger).toHaveBeenCalledWith(TenantSyncScheduler);
+      expect(mockTenantLogger.info).toHaveBeenCalledWith('Scheduled sync with cron: */5 * * * *');
     });
 
     it('skips scheduling when no tenants are registered', () => {
@@ -134,8 +133,8 @@ describe('TenantSyncScheduler', () => {
       await (scheduler as any).syncTenant(tenantA);
 
       expect(tenantA.auth.getAccessToken).toHaveBeenCalledOnce();
-      expect(mockSyncLogger.info).toHaveBeenCalledWith('Starting sync');
-      expect(mockSyncLogger.info).toHaveBeenCalledWith(
+      expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
+      expect(mockTenantLogger.info).toHaveBeenCalledWith(
         { token: smear('mock-token-12345678') },
         'Token acquired',
       );
@@ -161,7 +160,7 @@ describe('TenantSyncScheduler', () => {
       await (scheduler as any).syncTenant(tenantA);
 
       expect(tenantA.auth.getAccessToken).not.toHaveBeenCalled();
-      expect(tenantA.logger.info).toHaveBeenCalledWith('Sync already in progress, skipping');
+      expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync already in progress, skipping');
     });
 
     it('resets isScanning after successful sync', async () => {
@@ -178,7 +177,7 @@ describe('TenantSyncScheduler', () => {
       await (scheduler as any).syncTenant(tenantA);
 
       expect(tenantA.isScanning).toBe(false);
-      expect(tenantA.logger.error).toHaveBeenCalledWith(
+      expect(mockTenantLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ msg: 'Sync failed' }),
       );
     });
@@ -186,11 +185,12 @@ describe('TenantSyncScheduler', () => {
     it('skips sync when shutting down', async () => {
       scheduler.onModuleInit();
       scheduler.onModuleDestroy();
+      vi.clearAllMocks();
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(tenantA.logger.info).toHaveBeenCalledWith('Skipping sync due to shutdown');
+      expect(mockTenantLogger.info).toHaveBeenCalledWith('Skipping sync due to shutdown');
     });
 
     it('isolates errors between tenants', async () => {
@@ -201,9 +201,11 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantB);
 
-      expect(tenantA.logger.error).toHaveBeenCalled();
+      expect(mockTenantLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ msg: 'Sync failed' }),
+      );
       expect(tenantB.auth.getAccessToken).toHaveBeenCalledOnce();
-      expect(mockSyncLogger.info).toHaveBeenCalledWith('Starting sync');
+      expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
     });
   });
 });
