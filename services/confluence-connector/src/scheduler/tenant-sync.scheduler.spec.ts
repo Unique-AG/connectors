@@ -1,4 +1,5 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
+import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantAuth } from '../tenant/tenant-auth.interface';
 import type { TenantContext } from '../tenant/tenant-context.interface';
@@ -6,6 +7,18 @@ import { getCurrentTenant } from '../tenant/tenant-context.storage';
 import { TenantRegistry } from '../tenant/tenant-registry';
 import { smear } from '../utils/logging.util';
 import { TenantSyncScheduler } from './tenant-sync.scheduler';
+
+const mockSyncLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+})) as unknown as pino.Logger;
+
+vi.mock('../tenant/tenant-logger', () => ({
+  getTenantLogger: vi.fn().mockReturnValue(mockSyncLogger),
+}));
+
+import { getTenantLogger } from '../tenant/tenant-logger';
 
 function createMockTenant(name: string, overrides: Partial<TenantContext> = {}): TenantContext {
   return {
@@ -51,6 +64,7 @@ describe('TenantSyncScheduler', () => {
   let tenantB: TenantContext;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     tenantA = createMockTenant('tenant-a');
     tenantB = createMockTenant('tenant-b');
 
@@ -108,14 +122,22 @@ describe('TenantSyncScheduler', () => {
   });
 
   describe('syncTenant', () => {
-    it('acquires a token and logs smeared success', async () => {
+    it('creates a structured logger via getTenantLogger', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
+      await (scheduler as any).syncTenant(tenantA);
+
+      expect(getTenantLogger).toHaveBeenCalledWith(TenantSyncScheduler);
+    });
+
+    it('acquires a token and logs via getTenantLogger', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
       expect(tenantA.auth.getAccessToken).toHaveBeenCalledOnce();
-      expect(tenantA.logger.info).toHaveBeenCalledWith('Starting sync');
-      expect(tenantA.logger.info).toHaveBeenCalledWith(
-        `Token acquired successfully (${smear('mock-token-12345678')})`,
+      expect(mockSyncLogger.info).toHaveBeenCalledWith('Starting sync');
+      expect(mockSyncLogger.info).toHaveBeenCalledWith(
+        { token: smear('mock-token-12345678') },
+        'Token acquired',
       );
     });
 
@@ -181,7 +203,7 @@ describe('TenantSyncScheduler', () => {
 
       expect(tenantA.logger.error).toHaveBeenCalled();
       expect(tenantB.auth.getAccessToken).toHaveBeenCalledOnce();
-      expect(tenantB.logger.info).toHaveBeenCalledWith('Starting sync');
+      expect(mockSyncLogger.info).toHaveBeenCalledWith('Starting sync');
     });
   });
 });
