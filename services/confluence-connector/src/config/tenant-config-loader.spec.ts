@@ -13,9 +13,9 @@ vi.mock('@nestjs/common', async (importOriginal) => {
   return {
     ...original,
     Logger: class MockLogger {
-      log = vi.fn();
-      warn = vi.fn();
-      error = vi.fn();
+      public log = vi.fn();
+      public warn = vi.fn();
+      public error = vi.fn();
     },
   };
 });
@@ -163,7 +163,12 @@ describe('tenant-config-loader', () => {
     it('extracts tenant name from filename', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
-      setupSingleConfig(globSync, readFileSync, makeCloudOauth2loConfig(), '/config/acme-tenant-config.yaml');
+      setupSingleConfig(
+        globSync,
+        readFileSync,
+        makeCloudOauth2loConfig(),
+        '/config/acme-tenant-config.yaml',
+      );
 
       const result = getTenantConfigs();
 
@@ -174,7 +179,12 @@ describe('tenant-config-loader', () => {
     it('extracts multi-segment tenant name from filename', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
-      setupSingleConfig(globSync, readFileSync, makeCloudOauth2loConfig(), '/config/acme-corp-tenant-config.yaml');
+      setupSingleConfig(
+        globSync,
+        readFileSync,
+        makeCloudOauth2loConfig(),
+        '/config/acme-corp-tenant-config.yaml',
+      );
 
       const result = getTenantConfigs();
 
@@ -184,7 +194,12 @@ describe('tenant-config-loader', () => {
     it('extracts "default" from default-tenant-config.yaml', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
-      setupSingleConfig(globSync, readFileSync, makeCloudOauth2loConfig(), '/config/default-tenant-config.yaml');
+      setupSingleConfig(
+        globSync,
+        readFileSync,
+        makeCloudOauth2loConfig(),
+        '/config/default-tenant-config.yaml',
+      );
 
       const result = getTenantConfigs();
 
@@ -195,21 +210,36 @@ describe('tenant-config-loader', () => {
   describe('tenant name validation', () => {
     it('rejects tenant names with uppercase characters', async () => {
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
-      setupSingleConfig(globSync, readFileSync, makeCloudOauth2loConfig(), '/config/Acme-tenant-config.yaml');
+      setupSingleConfig(
+        globSync,
+        readFileSync,
+        makeCloudOauth2loConfig(),
+        '/config/Acme-tenant-config.yaml',
+      );
 
       expect(() => getTenantConfigs()).toThrow(/Invalid tenant name 'Acme'/);
     });
 
     it('rejects tenant names with underscores', async () => {
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
-      setupSingleConfig(globSync, readFileSync, makeCloudOauth2loConfig(), '/config/acme_corp-tenant-config.yaml');
+      setupSingleConfig(
+        globSync,
+        readFileSync,
+        makeCloudOauth2loConfig(),
+        '/config/acme_corp-tenant-config.yaml',
+      );
 
       expect(() => getTenantConfigs()).toThrow(/Invalid tenant name 'acme_corp'/);
     });
 
     it('rejects tenant names with trailing dash', async () => {
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
-      setupSingleConfig(globSync, readFileSync, makeCloudOauth2loConfig(), '/config/acme--tenant-config.yaml');
+      setupSingleConfig(
+        globSync,
+        readFileSync,
+        makeCloudOauth2loConfig(),
+        '/config/acme--tenant-config.yaml',
+      );
 
       expect(() => getTenantConfigs()).toThrow(/Invalid tenant name 'acme-'/);
     });
@@ -251,8 +281,14 @@ describe('tenant-config-loader', () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupFsMocks(globSync, readFileSync, [
-        { path: '/config/alpha-tenant-config.yaml', config: makeCloudOauth2loConfig({ status: 'active' }) },
-        { path: '/config/beta-tenant-config.yaml', config: makeCloudOauth2loConfig({ status: 'inactive' }) },
+        {
+          path: '/config/alpha-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'active' }),
+        },
+        {
+          path: '/config/beta-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'inactive' }),
+        },
       ]);
 
       const result = getTenantConfigs();
@@ -263,7 +299,12 @@ describe('tenant-config-loader', () => {
 
     it('fails validation for inactive tenant with invalid config', async () => {
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
-      const invalidConfig = { status: 'inactive', confluence: { instanceType: 'cloud' }, unique: {}, processing: {} };
+      const invalidConfig = {
+        status: 'inactive',
+        confluence: { instanceType: 'cloud' },
+        unique: {},
+        processing: {},
+      };
       setupSingleConfig(globSync, readFileSync, invalidConfig);
 
       expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
@@ -288,7 +329,10 @@ describe('tenant-config-loader', () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupFsMocks(globSync, readFileSync, [
-        { path: '/config/alpha-tenant-config.yaml', config: makeCloudOauth2loConfig({ status: 'inactive' }) },
+        {
+          path: '/config/alpha-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'inactive' }),
+        },
         { path: '/config/beta-tenant-config.yaml', config: { status: 'deleted' } },
       ]);
 
@@ -428,7 +472,10 @@ describe('tenant-config-loader', () => {
 
       const { config: tenantConfig } = assertFirstElement(getTenantConfigs());
       expect(tenantConfig.unique.serviceAuthMode).toBe('external');
-      const unique = tenantConfig.unique as Extract<typeof tenantConfig.unique, { serviceAuthMode: 'external' }>;
+      const unique = tenantConfig.unique as Extract<
+        typeof tenantConfig.unique,
+        { serviceAuthMode: 'external' }
+      >;
       expect(unique.zitadelClientSecret.value).toBe('env-zitadel-secret');
     });
 

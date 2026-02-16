@@ -19,7 +19,9 @@ const TenantStatus = {
 } as const;
 
 const TenantStatusSchema = z.object({
-  status: z.enum([TenantStatus.ACTIVE, TenantStatus.INACTIVE, TenantStatus.DELETED]).default(TenantStatus.ACTIVE),
+  status: z
+    .enum([TenantStatus.ACTIVE, TenantStatus.INACTIVE, TenantStatus.DELETED])
+    .default(TenantStatus.ACTIVE),
 });
 
 const TenantConfigSchema = z.object({
@@ -38,14 +40,13 @@ const logger = new Logger('TenantConfigLoader');
 
 let cachedConfigs: NamedTenantConfig[] | null = null;
 export function getTenantConfigs(): NamedTenantConfig[] {
-  if (!cachedConfigs) {
-    const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
-    assert.ok(
-      tenantConfigPathPattern,
-      'TENANT_CONFIG_PATH_PATTERN environment variable is not set',
-    );
-    cachedConfigs = loadTenantConfigs(tenantConfigPathPattern);
+  if (cachedConfigs) {
+    return cachedConfigs;
   }
+
+  const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
+  assert.ok(tenantConfigPathPattern, 'TENANT_CONFIG_PATH_PATTERN environment variable is not set');
+  cachedConfigs = loadTenantConfigs(tenantConfigPathPattern);
   return cachedConfigs;
 }
 
