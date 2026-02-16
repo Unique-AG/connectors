@@ -132,14 +132,7 @@ export class UniqueService {
         mimeType: 'text/vtt',
         title: `${meeting.subject}.vtt`,
         byteSize: 1,
-        metadata: {
-          date: meeting.startDateTime.toISOString(),
-          content_correlation_id: meeting.contentCorrelationId,
-          participant_names: meeting.participants.map((p) => p.name).join(', '),
-          participant_emails: meeting.participants.map((p) => p.email).join(', '),
-          // Store participant IDs for permission filtering during search
-          participant_user_profile_ids: [...participants.map((p) => p.id), owner.id].join(','),
-        },
+        metadata: this.buildContentMetadata(meeting, [...participants.map((p) => p.id), owner.id]),
       },
     });
 
@@ -182,14 +175,7 @@ export class UniqueService {
             ingestionConfig: {
               uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
             },
-            metadata: {
-              date: meeting.startDateTime.toISOString(),
-              content_correlation_id: meeting.contentCorrelationId,
-              participant_names: meeting.participants.map((p) => p.name).join(', '),
-              participant_emails: meeting.participants.map((p) => p.email).join(', '),
-              // Store participant IDs for permission filtering during search
-              participant_user_profile_ids: [...participants.map((p) => p.id), owner.id].join(','),
-            },
+            metadata: this.buildContentMetadata(meeting, [...participants.map((p) => p.id), owner.id]),
           },
         });
         await this.contentService.uploadToStorage(
@@ -247,5 +233,32 @@ export class UniqueService {
     const formattedDate = happenedAt.toISOString().split('T').at(0)!;
     const subjectPath = subject || 'Untitled Meeting';
     return { subjectPath, datePath: formattedDate };
+  }
+
+  private buildContentMetadata(
+    meeting: { startDateTime: Date; contentCorrelationId: string; participants: { name: string; email: string }[] },
+    participantIds: string[],
+  ): Record<string, string> {
+    const metadata: Record<string, string> = {
+      date: meeting.startDateTime.toISOString(),
+      content_correlation_id: meeting.contentCorrelationId,
+    };
+
+    // Filter out empty names/emails before joining
+    const names = meeting.participants.map((p) => p.name).filter(Boolean);
+    const emails = meeting.participants.map((p) => p.email).filter(Boolean);
+    const ids = participantIds.filter(Boolean);
+
+    if (names.length > 0) {
+      metadata.participant_names = names.join(', ');
+    }
+    if (emails.length > 0) {
+      metadata.participant_emails = emails.join(', ');
+    }
+    if (ids.length > 0) {
+      metadata.participant_user_profile_ids = ids.join(',');
+    }
+
+    return metadata;
   }
 }
