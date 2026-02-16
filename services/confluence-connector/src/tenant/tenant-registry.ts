@@ -1,14 +1,14 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { getTenantConfigs } from '../config/tenant-config-loader';
-import { TenantAuthFactory } from './tenant-auth.factory';
+import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
 import type { TenantContext } from './tenant-context.interface';
 
 @Injectable()
 export class TenantRegistry implements OnModuleInit {
   private readonly tenants = new Map<string, TenantContext>();
 
-  public constructor(private readonly authFactory: TenantAuthFactory) {}
+  public constructor(private readonly confluenceAuthFactory: ConfluenceTenantAuthFactory) {}
 
   public onModuleInit(): void {
     const configs = getTenantConfigs();
@@ -18,7 +18,7 @@ export class TenantRegistry implements OnModuleInit {
         name,
         config,
         logger: tenantLogger,
-        auth: this.authFactory.create(config.confluence),
+        auth: this.confluenceAuthFactory.create(config.confluence),
         isScanning: false,
       });
       tenantLogger.info('Tenant registered');

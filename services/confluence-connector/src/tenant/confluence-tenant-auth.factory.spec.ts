@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AuthMode, type ConfluenceConfig } from '../config/confluence.schema';
+import { AuthMode, type ConfluenceConfig } from '../config';
 import { Redacted } from '../utils/redacted';
-import { TenantAuthFactory } from './tenant-auth.factory';
+import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
 
 vi.mock('../confluence-auth/strategies/oauth2lo-auth.strategy', () => ({
   OAuth2LoAuthStrategy: vi.fn().mockImplementation(() => ({
@@ -27,8 +27,8 @@ const baseFields = {
   ingestAllLabel: 'sync-all',
 };
 
-describe('TenantAuthFactory', () => {
-  const factory = new TenantAuthFactory();
+describe('ConfluenceTenantAuthFactory', () => {
+  const factory = new ConfluenceTenantAuthFactory();
 
   describe('create', () => {
     it('creates auth for OAuth 2LO cloud config', async () => {

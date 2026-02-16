@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AuthMode, type ConfluenceConfig } from '../config/confluence.schema';
+import { AuthMode, type ConfluenceConfig } from '../config';
 import type { ConfluenceAuthStrategy } from '../confluence-auth/strategies/confluence-auth-strategy.interface';
 import { OAuth2LoAuthStrategy } from '../confluence-auth/strategies/oauth2lo-auth.strategy';
 import { PatAuthStrategy } from '../confluence-auth/strategies/pat-auth.strategy';
@@ -7,8 +7,8 @@ import { TokenCache } from '../confluence-auth/token-cache';
 import type { TenantAuth } from './tenant-auth.interface';
 
 @Injectable()
-export class TenantAuthFactory {
-  private readonly logger = new Logger(TenantAuthFactory.name);
+export class ConfluenceTenantAuthFactory {
+  private readonly logger = new Logger(ConfluenceTenantAuthFactory.name);
 
   public create(confluenceConfig: ConfluenceConfig): TenantAuth {
     const strategy = this.createAuthStrategy(confluenceConfig);
