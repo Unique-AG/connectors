@@ -1,0 +1,25 @@
+connectorConfig:
+  enabled: true
+  tenants:
+    - name: default
+      confluence:
+        instanceType: data-center
+        baseUrl: https://confluence.acme.com
+        auth:
+          mode: oauth_2lo
+          clientId: test-dc-client-id
+        apiRateLimitPerMinute: 50
+        ingestSingleLabel: ai-ingest
+        ingestAllLabel: ai-ingest-all
+      unique:
+        authMode: cluster_local
+        ingestionServiceBaseUrl: http://node-ingestion.finance-gpt:8091
+        scopeManagementServiceBaseUrl: http://node-scope-management.finance-gpt:8094
+        apiRateLimitPerMinute: 100
+        serviceExtraHeaders:
+          x-company-id: "123456789101112131"
+          x-user-id: "123456789101112131"
+      processing:
+        stepTimeoutSeconds: 600
+        concurrency: 1
+        scanIntervalCron: "0 */2 * * *"

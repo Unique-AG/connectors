@@ -6,7 +6,7 @@
 ## Reference: https://github.com/helm/chart-testing/blob/master/doc/ct_lint-and-install.md
 # Don't add the 'debug' attribute, otherwise the workflow won't work anymore
 # Only Used for the CT Install Stage
-chart-dirs: [services/sharepoint-connector/deploy/helm-charts]
+chart-dirs: [services/sharepoint-connector/deploy/helm-charts, services/confluence-connector/deploy/helm-charts]
 check-version-increment: false # release-please will handle this
 exclude-deprecated: true
 excluded-charts: []

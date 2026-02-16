@@ -66,7 +66,7 @@ const baseConfig = z.object({
   rootScopePath: z
     .string()
     .default('Teams-MCP')
-    .describe('The root scope path where to upload transcripts.'),
+    .describe('The root scope path where to upload transcripts and recordings.'),
   userFetchConcurrency: z.coerce
     .number()
     .int()

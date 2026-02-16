@@ -66,6 +66,7 @@ module "teams_mcp_app" {
    | `User.Read` | Delegated | No |
    | `Calendars.Read` | Delegated | No |
    | `OnlineMeetings.Read` | Delegated | No |
+   | `OnlineMeetingRecording.Read.All` | Delegated | **Yes** |
    | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** |
    | `offline_access` | Delegated | No |
 
@@ -74,7 +75,7 @@ module "teams_mcp_app" {
    - Click "Grant admin consent for [Tenant]"
    - Confirm the action
    
-   **Important**: Admin consent is required for `OnlineMeetingTranscript.Read.All` permission. Without admin consent, users will see an error when trying to connect. See [Understanding Admin Consent](#understanding-admin-consent-and-user-consent) below for details.
+   **Important**: Admin consent is required for `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` permissions. Without admin consent, users will see an error when trying to connect. See [Understanding Admin Consent](#understanding-admin-consent-and-user-consent) below for details.
 
 5. **Create Client Secret**
 
@@ -98,6 +99,7 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 - `User.Read` - Read user profile
 - `Calendars.Read` - Read calendar events (for recurring meeting detection)
 - `OnlineMeetings.Read` - Read meeting details
+- `OnlineMeetingRecording.Read.All` - Read recordings (admin consent required)
 - `OnlineMeetingTranscript.Read.All` - Read transcripts (admin consent required)
 - `offline_access` - Obtain refresh tokens
 
@@ -107,7 +109,7 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 
 ### Standard Microsoft Consent Process
 
-1. **Admin grants consent** for permissions requiring admin approval (`OnlineMeetingTranscript.Read.All`)
+1. **Admin grants consent** for permissions requiring admin approval (`OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`)
 
    - Organization-wide OR per-user
 2. **Admin approval workflow** (if enabled in tenant) - users request approval

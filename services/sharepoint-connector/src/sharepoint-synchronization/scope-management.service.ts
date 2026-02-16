@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { isNonNullish, isNullish, prop, pullObject } from 'remeda';
+import { isNonNullish, isNullish, prop, pullObject, sortBy } from 'remeda';
 import { getInheritanceSettings } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
@@ -11,7 +11,7 @@ import type {
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { EXTERNAL_ID_PREFIX } from '../utils/logging.util';
+import { EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
@@ -25,6 +25,7 @@ const buildSiteExternalId = (siteId: Smeared) =>
 export interface RootScopeInfo {
   serviceUserId: string;
   rootPath: Smeared;
+  isInitialSync: boolean;
 }
 
 @Injectable()
@@ -63,7 +64,9 @@ export class ScopeManagementService {
       `Root scope ${rootScopeId} is owned by a different site. This scope cannot be synced by this site.`,
     );
 
-    if (!rootScope.externalId) {
+    const isInitialSync = !rootScope.externalId;
+
+    if (isInitialSync) {
       const migrationResult = await this.rootScopeMigrationService.migrateIfNeeded(
         rootScopeId,
         siteId,
@@ -114,7 +117,7 @@ export class ScopeManagementService {
     const rootPath = createSmeared(`/${pathSegments.join('/')}`);
     this.logger.log(`Resolved root path: ${smearPath(rootPath)}`);
 
-    return { serviceUserId: userId, rootPath };
+    return { serviceUserId: userId, rootPath, isInitialSync };
   }
 
   public async deleteRootScopeRecursively(scopeId: string): Promise<void> {
@@ -147,6 +150,71 @@ export class ScopeManagementService {
         error: sanitizeError(error),
       });
       throw error;
+    }
+  }
+
+  public async deleteOrphanedScopes(siteId: Smeared): Promise<void> {
+    const logPrefix = `[Site: ${siteId}]`;
+
+    let orphanedScopes: Scope[];
+    try {
+      orphanedScopes = await this.uniqueScopesService.listScopesByExternalIdPrefix(
+        siteId.transform((value) => `${PENDING_DELETE_PREFIX}${value}/`),
+      );
+    } catch (error) {
+      this.logger.warn({
+        msg: `${logPrefix} Failed to query orphaned scopes, skipping cleanup`,
+        error: sanitizeError(error),
+      });
+      return;
+    }
+
+    if (orphanedScopes.length === 0) {
+      return;
+    }
+
+    // We sort the orphans by depth to delete the deepest scopes first to avoid deleting scopes that
+    // have children. This way we can delete without recursive to be sure we're not accidentally
+    // deleting some content.
+
+    const orphanById = new Map(orphanedScopes.map((s) => [s.id, s]));
+    const depthById = new Map<string, number>();
+
+    const setOrphanDepth = (scope: Scope): number => {
+      const cached = depthById.get(scope.id);
+      if (isNonNullish(cached)) {
+        return cached;
+      }
+
+      let depth = 0;
+      const parent = scope.parentId ? orphanById.get(scope.parentId) : undefined;
+      if (parent) {
+        depth = 1 + setOrphanDepth(parent);
+      }
+      depthById.set(scope.id, depth);
+      return depth;
+    };
+
+    for (const scope of orphanedScopes) {
+      setOrphanDepth(scope);
+    }
+
+    const sortedOrphans = sortBy(orphanedScopes, [(scope) => depthById.get(scope.id) ?? 0, 'desc']);
+
+    this.logger.log(
+      `${logPrefix} Deleting ${orphanedScopes.length} orphaned scopes marked with pending-delete prefix`,
+    );
+
+    for (const scope of sortedOrphans) {
+      try {
+        await this.uniqueScopesService.deleteScope(scope.id);
+        this.logger.debug(`${logPrefix} Deleted orphaned scope ${scope.id}`);
+      } catch (error) {
+        this.logger.warn({
+          msg: `${logPrefix} Failed to delete orphaned scope ${scope.id}`,
+          error: sanitizeError(error),
+        });
+      }
     }
   }
 
@@ -292,27 +360,69 @@ export class ScopeManagementService {
       /* We have a couple of known directories in sharepoint for which it's more complex to get the id: root scope,
        * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
        */
-      let externalId = pathToExternalIdMap[path];
+      let externalId = pathToExternalIdMap[path]
+        ? createSmeared(pathToExternalIdMap[path])
+        : undefined;
+
       if (isNullish(externalId)) {
         this.logger.warn(`${logPrefix} No external ID found for path ${createSmeared(path)}`);
-        externalId = `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId.value}/${scope.name}-${randomUUID()}`;
+        externalId = context.siteConfig.siteId.transform(
+          (siteId) => `${EXTERNAL_ID_PREFIX}unknown:${siteId}/${scope.name}-${randomUUID()}`,
+        );
+      }
+
+      if (!context.isInitialSync) {
+        await this.markConflictingScope(scope.id, externalId, context.siteConfig.siteId, logPrefix);
       }
 
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           scope.id,
-          createSmeared(externalId),
+          externalId,
         );
         scope.externalId = updatedScope.externalId;
-        this.logger.debug(
-          `Updated scope ${scope.id} with externalId: ${createSmeared(externalId)}`,
-        );
+        this.logger.debug(`Updated scope ${scope.id} with externalId: ${externalId}`);
       } catch (error) {
         this.logger.warn({
           msg: `Failed to update externalId for scope ${scope.id}`,
           error: sanitizeError(error),
         });
       }
+    }
+  }
+
+  // When folder was moved in SharePoint, we will recreate it at a new location because we create
+  // scopes by path and not by id. Therefore if we find a scope with the same externalId, we mark it
+  // for deletion. It will happen after content sync, because we have to move files from old scopes
+  // to new ones.
+  private async markConflictingScope(
+    newScopeId: string,
+    externalId: Smeared,
+    siteId: Smeared,
+    logPrefix: string,
+  ): Promise<void> {
+    try {
+      const existingScope = await this.uniqueScopesService.getScopeByExternalId(externalId.value);
+
+      if (!existingScope || existingScope.id === newScopeId) {
+        return;
+      }
+
+      const pendingDeleteExternalId = externalId.transform((value) =>
+        value.replace(EXTERNAL_ID_PREFIX, `${PENDING_DELETE_PREFIX}${siteId.value}/`),
+      );
+      this.logger.log(
+        `${logPrefix} Marking conflicting scope ${existingScope.id} with pending-delete prefix`,
+      );
+      await this.uniqueScopesService.updateScopeExternalId(
+        existingScope.id,
+        pendingDeleteExternalId,
+      );
+    } catch (error) {
+      this.logger.warn({
+        msg: `${logPrefix} Failed to mark conflicting scope for externalId ${externalId}`,
+        error: sanitizeError(error),
+      });
     }
   }
 

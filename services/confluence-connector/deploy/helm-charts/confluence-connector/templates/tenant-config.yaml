@@ -1,0 +1,59 @@
+{{- if .Values.connectorConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: confluence-connector-tenant-config
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+data:
+  {{- range $index, $tenant := .Values.connectorConfig.tenants }}
+  {{ $tenant.name }}-tenant-config.yaml: |
+    # Confluence Configuration
+    confluence:
+      instanceType: {{ $tenant.confluence.instanceType | quote }}
+      baseUrl: {{ $tenant.confluence.baseUrl | quote }}
+      auth:
+        mode: {{ $tenant.confluence.auth.mode | quote }}
+        clientId: {{ $tenant.confluence.auth.clientId | quote }}
+        # clientSecret is loaded from environment variable (secret)
+      apiRateLimitPerMinute: {{ $tenant.confluence.apiRateLimitPerMinute }}
+      ingestSingleLabel: {{ $tenant.confluence.ingestSingleLabel | quote }}
+      ingestAllLabel: {{ $tenant.confluence.ingestAllLabel | quote }}
+    # Unique API Configuration
+    unique:
+      serviceAuthMode: {{ $tenant.unique.authMode | quote }}
+      {{- if eq $tenant.unique.authMode "cluster_local" }}
+      serviceExtraHeaders:
+        {{- range $key, $value := $tenant.unique.serviceExtraHeaders }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if eq $tenant.unique.authMode "external" }}
+      zitadelOauthTokenUrl: {{ $tenant.unique.zitadel.oauthTokenUrl | quote }}
+      zitadelProjectId: {{ $tenant.unique.zitadel.projectId | quote }}
+      zitadelClientId: {{ $tenant.unique.zitadel.clientId | quote }}
+      # zitadelClientSecret is loaded from environment variable (secret)
+      {{- end }}
+      ingestionServiceBaseUrl: {{ $tenant.unique.ingestionServiceBaseUrl | quote }}
+      scopeManagementServiceBaseUrl: {{ $tenant.unique.scopeManagementServiceBaseUrl | quote }}
+      apiRateLimitPerMinute: {{ $tenant.unique.apiRateLimitPerMinute }}
+      {{- if $tenant.unique.ingestionConfig }}
+      ingestionConfig:
+        {{- toYaml $tenant.unique.ingestionConfig | nindent 8 }}
+      {{- end }}
+    # Processing Configuration
+    processing:
+      {{- if $tenant.processing.stepTimeoutSeconds }}
+      stepTimeoutSeconds: {{ $tenant.processing.stepTimeoutSeconds }}
+      {{- end }}
+      {{- if $tenant.processing.concurrency }}
+      concurrency: {{ $tenant.processing.concurrency }}
+      {{- end }}
+      {{- if $tenant.processing.scanIntervalCron }}
+      scanIntervalCron: {{ $tenant.processing.scanIntervalCron | quote }}
+      {{- end }}
+      {{- if $tenant.processing.maxPagesToScan }}
+      maxPagesToScan: {{ $tenant.processing.maxPagesToScan }}
+      {{- end }}
+  {{- end }}
+{{- end }}
