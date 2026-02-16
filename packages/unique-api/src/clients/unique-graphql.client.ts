@@ -10,6 +10,7 @@ import type { RequestDocument, RequestOptions, Variables } from 'graphql-request
 import { GraphQLClient } from 'graphql-request';
 import { type Dispatcher, fetch as undiciFetch } from 'undici';
 import type { UniqueAuth } from '../auth/unique-auth';
+import { BottleneckFactory } from '../core/bottleneck.factory';
 import type { RequestMetricAttributes, UniqueApiMetrics } from '../core/observability';
 
 const DEFAULT_RATE_LIMIT_PER_MINUTE = 1000;
@@ -24,6 +25,7 @@ interface UniqueGraphqlClientDeps {
   logger: { warn: (obj: object) => void; error: (obj: object) => void };
   rateLimitPerMinute?: number;
   dispatcher: Dispatcher;
+  bottleneckFactory: BottleneckFactory;
   clientName?: string;
 }
 
@@ -68,11 +70,14 @@ export class UniqueGraphqlClient {
     });
 
     const rateLimitPerMinute = deps.rateLimitPerMinute ?? DEFAULT_RATE_LIMIT_PER_MINUTE;
-    this.limiter = new Bottleneck({
-      reservoir: rateLimitPerMinute,
-      reservoirRefreshAmount: rateLimitPerMinute,
-      reservoirRefreshInterval: 60_000,
-    });
+    this.limiter = deps.bottleneckFactory.createLimiter(
+      {
+        reservoir: rateLimitPerMinute,
+        reservoirRefreshAmount: rateLimitPerMinute,
+        reservoirRefreshInterval: 60_000,
+      },
+      UniqueGraphqlClient.name,
+    );
   }
 
   public async request<T, V extends Variables = Variables>(
@@ -106,7 +111,10 @@ export class UniqueGraphqlClient {
 
       const durationMs = elapsedMilliseconds(startTime);
 
-      this.metrics.requestsTotal.add(1, { ...baseAttributes, result: 'success' });
+      this.metrics.requestsTotal.add(1, {
+        ...baseAttributes,
+        result: 'success',
+      });
       this.metrics.requestDurationMs.record(durationMs, {
         ...baseAttributes,
         result: 'success',

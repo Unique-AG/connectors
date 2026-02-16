@@ -15,6 +15,7 @@ import type {
   UniqueApiModuleAsyncOptions,
   UniqueApiModuleOptions,
 } from '../types';
+import { BottleneckFactory } from './bottleneck.factory';
 import { createUniqueApiMetrics, type UniqueApiMetrics } from './observability';
 import {
   getUniqueApiClientToken,
@@ -120,6 +121,7 @@ export class UniqueApiModule implements OnModuleDestroy {
 
   private static createCoreProviders(): Provider[] {
     return [
+      BottleneckFactory,
       {
         provide: UNIQUE_API_METER,
         useFactory: (options: UniqueApiModuleOptions) => {
@@ -138,12 +140,20 @@ export class UniqueApiModule implements OnModuleDestroy {
       },
       {
         provide: UNIQUE_API_CLIENT_FACTORY,
-        useFactory: (metricsInstance: UniqueApiMetrics, options: UniqueApiModuleOptions) => {
+        useFactory: (
+          metricsInstance: UniqueApiMetrics,
+          options: UniqueApiModuleOptions,
+          bottleneckFactory: BottleneckFactory,
+        ) => {
           const loggerContext = options.observability?.loggerContext ?? 'UniqueApi';
           const logger = new Logger(loggerContext);
-          return new UniqueApiClientFactoryImpl({ logger, metrics: metricsInstance });
+          return new UniqueApiClientFactoryImpl({
+            logger,
+            metrics: metricsInstance,
+            bottleneckFactory,
+          });
         },
-        inject: [UNIQUE_API_METRICS, UNIQUE_API_MODULE_OPTIONS],
+        inject: [UNIQUE_API_METRICS, UNIQUE_API_MODULE_OPTIONS, BottleneckFactory],
       },
       {
         provide: UNIQUE_API_CLIENT_REGISTRY,

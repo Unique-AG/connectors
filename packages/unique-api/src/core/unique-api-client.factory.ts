@@ -8,6 +8,7 @@ import { FileIngestionService } from '../ingestion/ingestion.service';
 import { ScopesService } from '../scopes/scopes.service';
 import type { UniqueApiClient, UniqueApiClientConfig, UniqueApiClientFactory } from '../types';
 import { UsersService } from '../users/users.service';
+import { BottleneckFactory } from './bottleneck.factory';
 import type { UniqueApiMetrics } from './observability';
 
 interface UniqueApiClientFactoryLogger {
@@ -20,15 +21,18 @@ interface UniqueApiClientFactoryLogger {
 interface UniqueApiClientFactoryDeps {
   logger: UniqueApiClientFactoryLogger;
   metrics: UniqueApiMetrics;
+  bottleneckFactory: BottleneckFactory;
 }
 
 export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
   private readonly logger: UniqueApiClientFactoryLogger;
   private readonly metrics: UniqueApiMetrics;
+  private readonly bottleneckFactory: BottleneckFactory;
 
   public constructor(deps: UniqueApiClientFactoryDeps) {
     this.logger = deps.logger;
     this.metrics = deps.metrics;
+    this.bottleneckFactory = deps.bottleneckFactory;
   }
 
   public create(config: UniqueApiClientConfig): UniqueApiClient {
@@ -52,6 +56,7 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       logger: this.logger,
       rateLimitPerMinute: config.rateLimitPerMinute,
       dispatcher,
+      bottleneckFactory: this.bottleneckFactory,
       clientName,
     });
 
@@ -63,6 +68,7 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       logger: this.logger,
       rateLimitPerMinute: config.rateLimitPerMinute,
       dispatcher,
+      bottleneckFactory: this.bottleneckFactory,
       clientName,
     });
 
@@ -74,6 +80,7 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       rateLimitPerMinute: config.rateLimitPerMinute,
       dispatcher,
       clientName,
+      bottleneckFactory: this.bottleneckFactory,
     });
 
     const scopes = new ScopesService({
