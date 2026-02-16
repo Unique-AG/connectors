@@ -28,7 +28,8 @@ const clusterLocalConfig = z.object({
       'JSON string of extra HTTP headers for API requests ' +
         '(e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
     ),
-  ingestionServiceBaseUrl: stringToURL().describe('Base URL for Unique ingestion service'),
+  ingestionServiceBaseUrl: z.string().describe('Base URL for Unique ingestion service'),
+  scopeManagementServiceBaseUrl: z.string().describe('Base URL for Scope Management service'),
 });
 
 // ==== Config for external communication with Unique API services via app key ====
@@ -53,6 +54,12 @@ const externalConfig = z.object({
       'JSON string of extra HTTP headers for API requests ' +
         '(e.g., {"authorization": "Bearer <app-key>", "x-app-id": "<app-id>", "x-user-id": "<user-id>", "x-company-id": "<company-id>"})',
     ),
+  zitadelOauthTokenUrl: z.string().describe(`Zitadel oauth token url`),
+  zitadelClientId: z.string().describe(`Zitadel client id`),
+  zitadelClientSecret: z.string().describe(`Zitadel client secret`),
+  zitadelProjectId: z.string().describe(`Zitadel project id`),
+  ingestionServiceBaseUrl: z.string().describe('Base URL for Unique ingestion service'),
+  scopeManagementServiceBaseUrl: z.string().describe('Base URL for Scope Management service'),
 });
 
 // ==== Config common for both cluster_local and external authentication modes ====

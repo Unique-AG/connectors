@@ -3,6 +3,7 @@ import { defaultLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
+import { UniqueApiModule } from '@unique-ag/unique-api';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -137,6 +138,12 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     MsGraphModule,
     AMQPModule,
+    UniqueApiModule.forRoot({
+      observability: {
+        metricPrefix: 'spc_unique',
+        loggerContext: 'UniqueApi',
+      },
+    }),
     MailSubscriptionModule,
   ],
   controllers: [ManifestController],

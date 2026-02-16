@@ -1,5 +1,5 @@
-import { gql } from 'graphql-request';
-import type { FileAccessInput, UniqueFile } from './files.types';
+import { gql } from "graphql-request";
+import type { FileAccessInput, UniqueFile } from "./files.types";
 
 export interface ContentUpdateMutationInput {
   contentId: string;
@@ -18,7 +18,11 @@ export interface ContentUpdateMutationResult {
 }
 
 export const CONTENT_UPDATE_MUTATION = gql`
-  mutation ContentUpdate($contentId: String!, $ownerId: String, $input: ContentUpdateInput!) {
+  mutation ContentUpdate(
+    $contentId: String!
+    $ownerId: String
+    $input: ContentUpdateInput!
+  ) {
     contentUpdate(contentId: $contentId, ownerId: $ownerId, input: $input) {
       id
       ownerId
@@ -127,8 +131,14 @@ export interface AddAccessesMutationResult {
 }
 
 export const ADD_ACCESSES_MUTATION = gql`
-  mutation CreateFileAccessesForContents($scopeId: String!, $fileAccesses: [FileAccessContentChangeDto!]!) {
-    createFileAccessesForContents(scopeId: $scopeId, fileAccesses: $fileAccesses)
+  mutation CreateFileAccessesForContents(
+    $scopeId: String!
+    $fileAccesses: [FileAccessContentChangeDto!]!
+  ) {
+    createFileAccessesForContents(
+      scopeId: $scopeId
+      fileAccesses: $fileAccesses
+    )
   }
 `;
 
@@ -142,7 +152,13 @@ export interface RemoveAccessesMutationResult {
 }
 
 export const REMOVE_ACCESSES_MUTATION = gql`
-  mutation RemoveFileAccessesForContents($scopeId: String!, $fileAccesses: [FileAccessContentChangeDto!]!) {
-    removeFileAccessesForContents(scopeId: $scopeId, fileAccesses: $fileAccesses)
+  mutation RemoveFileAccessesForContents(
+    $scopeId: String!
+    $fileAccesses: [FileAccessContentChangeDto!]!
+  ) {
+    removeFileAccessesForContents(
+      scopeId: $scopeId
+      fileAccesses: $fileAccesses
+    )
   }
 `;

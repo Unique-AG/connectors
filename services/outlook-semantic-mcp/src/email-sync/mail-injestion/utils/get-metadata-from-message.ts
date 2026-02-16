@@ -1,7 +1,28 @@
 import { isNonNull } from 'remeda';
 import { GraphMessage } from '../dtos/microsoft-graph.dtos';
 
-export const getMetadataFromMessage = (message: GraphMessage): Record<string, string> => {
+export interface MessageMetadata extends Record<string, string> {
+  id: string;
+  internetMessageId: string;
+  conversationId: string;
+  parentFolderId: string;
+  sentDateTime: string;
+  lastModifiedDateTime: string;
+  'from.emailAddress': string;
+  'from.name': string;
+  'sender.emailAddress': string;
+  'sender.name': string;
+  'toRecipients.emailAddresses': string;
+  'toRecipients.names': string;
+  isRead: string;
+  isDraft: string;
+  hasAttachments: string;
+  importance: string;
+  inferenceClassification: string;
+  'flag.flagStatus': string;
+}
+
+export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata => {
   return {
     id: message.id,
     internetMessageId: message.internetMessageId ?? '',

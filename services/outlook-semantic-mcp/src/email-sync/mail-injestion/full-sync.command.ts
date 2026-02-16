@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { UniqueApiClient } from '@unique-ag/unique-api';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
@@ -7,6 +8,9 @@ import { isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { getRootScopePath } from '~/unique/get-root-scope-path';
+import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
 import { SyncDirectoriesWithDeltaCommand } from '../directories-sync/sync-directories-with-delta.command';
 import { GetSubscriptionAndUserProfileQuery } from '../subscription-utils/get-subscription-and-user-profile.query';
 import { MessageEventDto } from './dtos/message-events.dtos';
@@ -29,6 +33,7 @@ export class FullSyncCommand {
     private readonly amqp: AmqpConnection,
     private readonly getSubscriptionAndUserProfileQuery: GetSubscriptionAndUserProfileQuery,
     private readonly syncDirectoriesWithDeltaCommand: SyncDirectoriesWithDeltaCommand,
+    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -62,25 +67,14 @@ export class FullSyncCommand {
       url: item.webLink,
       updatedAt: item.lastModifiedDateTime,
     }));
-    const _request = {
-      partialKey: `TODO_DEFINE`,
-      sourceKind: `TODO_DEFINE`,
-      sourceName: `TODO_DEFINE`,
-      filesList,
-    };
 
-    // TODO: File diff
-    const filleDiffResponse: {
-      newFiles: string[];
-      updatedFiles: string[];
-      movedFiles: string[];
-      deletedFiles: string[];
-    } = {
-      newFiles: [],
-      updatedFiles: [],
-      movedFiles: [],
-      deletedFiles: [],
-    };
+    const filleDiffResponse = await this.uniqueApi.ingestion.performFileDiff(
+      filesList,
+      // TODO: FIll
+      getRootScopePath(userProfile.email),
+      INGESTION_SOURCE_KIND,
+      INGESTION_SOURCE_NAME,
+    );
 
     const filesRecord = allGraphEmails.reduce<Record<string, FileDiffGraphMessage>>((acc, item) => {
       acc[getUniqueKeyForMessage(userProfile.email, item)] = item;
@@ -113,9 +107,8 @@ export class FullSyncCommand {
         priority: IngestionPriority.Low,
       });
     }
-    for (const _fileKey of filleDiffResponse.deletedFiles) {
-      // TODO: Delete
-    }
+    const filesToDelete = await this.uniqueApi.files.getByKeys(filleDiffResponse.deletedFiles);
+    await this.uniqueApi.files.deleteByIds(filesToDelete.map((file) => file.id));
   }
 
   private async fetchAllEmails({

@@ -1,7 +1,10 @@
-import { getErrorCodeFromGraphqlRequest, sanitizeError } from '@unique-ag/utils';
-import { chunk } from 'remeda';
-import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import type { UniqueApiFiles } from '../types';
+import {
+  getErrorCodeFromGraphqlRequest,
+  sanitizeError,
+} from "@unique-ag/utils";
+import { chunk } from "remeda";
+import type { UniqueGraphqlClient } from "../clients/unique-graphql.client";
+import type { UniqueApiFiles } from "../types";
 import {
   ADD_ACCESSES_MUTATION,
   type AddAccessesMutationInput,
@@ -24,8 +27,12 @@ import {
   REMOVE_ACCESSES_MUTATION,
   type RemoveAccessesMutationInput,
   type RemoveAccessesMutationResult,
-} from './files.queries';
-import type { ContentUpdateResult, FileAccessInput, UniqueFile } from './files.types';
+} from "./files.queries";
+import type {
+  ContentUpdateResult,
+  FileAccessInput,
+  UniqueFile,
+} from "./files.types";
 
 const CONTENT_BATCH_SIZE = 100;
 const DELETE_BATCH_SIZE = 20;
@@ -47,7 +54,7 @@ interface FilesServiceDeps {
 
 export class FilesService implements UniqueApiFiles {
   private readonly ingestionClient: UniqueGraphqlClient;
-  private readonly logger: FilesServiceDeps['logger'];
+  private readonly logger: FilesServiceDeps["logger"];
 
   public constructor(deps: FilesServiceDeps) {
     this.ingestionClient = deps.ingestionClient;
@@ -134,7 +141,9 @@ export class FilesService implements UniqueApiFiles {
     newOwnerId: string,
     newUrl: string,
   ): Promise<ContentUpdateResult> {
-    this.logger.debug(`[ContentId: ${contentId}] Moving file to owner ${newOwnerId}`);
+    this.logger.debug(
+      `[ContentId: ${contentId}] Moving file to owner ${newOwnerId}`,
+    );
 
     const result = await this.ingestionClient.request<
       ContentUpdateMutationResult,
@@ -159,6 +168,28 @@ export class FilesService implements UniqueApiFiles {
     });
 
     return result.contentDelete;
+  }
+
+  public async deleteByIds(contentIds: string[]): Promise<number> {
+    const logPrefix = `[Delete Contents]`;
+
+    let totalDeleted = 0;
+    const deleteBatches = chunk(contentIds, DELETE_BATCH_SIZE);
+    for (const deleteBatch of deleteBatches) {
+      await this.ingestionClient.request<
+        ContentDeleteByContentIdsMutationResult,
+        ContentDeleteByContentIdsMutationInput
+      >(CONTENT_DELETE_BY_IDS_MUTATION, {
+        contentIds: deleteBatch,
+      });
+
+      totalDeleted += deleteBatch.length;
+      this.logger.debug(
+        `${logPrefix} Deleted batch of ${deleteBatch.length} files (Total: ${totalDeleted})`,
+      );
+    }
+
+    return totalDeleted;
   }
 
   public async deleteByKeyPrefix(keyPrefix: string): Promise<number> {
@@ -211,7 +242,10 @@ export class FilesService implements UniqueApiFiles {
     return totalDeleted;
   }
 
-  public async addAccesses(scopeId: string, fileAccesses: FileAccessInput[]): Promise<number> {
+  public async addAccesses(
+    scopeId: string,
+    fileAccesses: FileAccessInput[],
+  ): Promise<number> {
     if (fileAccesses.length === 0) {
       return 0;
     }
@@ -222,13 +256,13 @@ export class FilesService implements UniqueApiFiles {
 
     for (const batch of batches) {
       try {
-        await this.ingestionClient.request<AddAccessesMutationResult, AddAccessesMutationInput>(
-          ADD_ACCESSES_MUTATION,
-          {
-            scopeId,
-            fileAccesses: batch,
-          },
-        );
+        await this.ingestionClient.request<
+          AddAccessesMutationResult,
+          AddAccessesMutationInput
+        >(ADD_ACCESSES_MUTATION, {
+          scopeId,
+          fileAccesses: batch,
+        });
         successCount += batch.length;
       } catch (error) {
         const statusCode = getErrorCodeFromGraphqlRequest(error);
@@ -246,13 +280,13 @@ export class FilesService implements UniqueApiFiles {
 
         for (const permission of batch) {
           try {
-            await this.ingestionClient.request<AddAccessesMutationResult, AddAccessesMutationInput>(
-              ADD_ACCESSES_MUTATION,
-              {
-                scopeId,
-                fileAccesses: [permission],
-              },
-            );
+            await this.ingestionClient.request<
+              AddAccessesMutationResult,
+              AddAccessesMutationInput
+            >(ADD_ACCESSES_MUTATION, {
+              scopeId,
+              fileAccesses: [permission],
+            });
             successCount += 1;
           } catch (singleError) {
             this.logger.error({
@@ -269,7 +303,10 @@ export class FilesService implements UniqueApiFiles {
     return successCount;
   }
 
-  public async removeAccesses(scopeId: string, fileAccesses: FileAccessInput[]): Promise<number> {
+  public async removeAccesses(
+    scopeId: string,
+    fileAccesses: FileAccessInput[],
+  ): Promise<number> {
     if (fileAccesses.length === 0) {
       return 0;
     }

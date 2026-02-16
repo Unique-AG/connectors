@@ -4,11 +4,17 @@ import type {
   FileDiffResponse,
   IngestionApiResponse,
   IngestionFinalizationRequest,
-} from '../ingestion/ingestion.types';
+  UploadContentRequest,
+} from "../ingestion/ingestion.types";
 
 export interface UniqueApiIngestion {
-  registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse>;
-  finalizeIngestion(request: IngestionFinalizationRequest): Promise<{ id: string }>;
+  registerContent(
+    request: ContentRegistrationRequest,
+  ): Promise<IngestionApiResponse>;
+  streamUpload(request: UploadContentRequest): Promise<void>;
+  finalizeIngestion(
+    request: IngestionFinalizationRequest,
+  ): Promise<{ id: string }>;
   performFileDiff(
     fileList: FileDiffItem[],
     partialKey: string,

@@ -1,4 +1,4 @@
-import type { FileAccessKey } from '../files/files.types';
+import type { FileAccessKey } from "../files/files.types";
 
 export interface AuthorMetadata {
   email: string;
@@ -50,6 +50,12 @@ export interface IngestionFinalizationRequest {
   baseUrl?: string;
   metadata?: ContentMetadata;
   storeInternally: boolean;
+}
+
+export interface UploadContentRequest {
+  uploadUrl: string;
+  content: ReadableStream<Uint8Array<ArrayBuffer>>;
+  mimeType: string;
 }
 
 export interface IngestionApiResponse {
