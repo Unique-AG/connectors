@@ -115,7 +115,7 @@ importers:
         version: 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
       nestjs-pino:
         specifier: ^4.4.0
-        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@9.8.0)(rxjs@7.8.2)
+        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       pino-http:
         specifier: ^10.5.0
         version: 10.5.0
@@ -288,6 +288,9 @@ importers:
       '@nestjs/platform-express':
         specifier: ^11.1.6
         version: 11.1.6(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
+      '@nestjs/schedule':
+        specifier: ^6.1.0
+        version: 6.1.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.0
@@ -303,6 +306,9 @@ importers:
       '@unique-ag/probe':
         specifier: workspace:*
         version: link:../../packages/probe
+      cron:
+        specifier: ^4.3.5
+        version: 4.3.5
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.0
@@ -311,7 +317,10 @@ importers:
         version: 7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
       nestjs-pino:
         specifier: ^4.4.0
-        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@9.8.0)(rxjs@7.8.2)
+        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
       pino-http:
         specifier: ^10.5.0
         version: 10.5.0
@@ -465,7 +474,7 @@ importers:
         version: 7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
       nestjs-pino:
         specifier: ^4.4.0
-        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@9.8.0)(rxjs@7.8.2)
+        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
         specifier: ^5.0.1
         version: 5.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.1.5)
@@ -613,7 +622,7 @@ importers:
         version: 7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
       nestjs-pino:
         specifier: ^4.4.0
-        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@9.8.0)(rxjs@7.8.2)
+        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
         specifier: ^5.0.1
         version: 5.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.1.5)
@@ -803,7 +812,7 @@ importers:
         version: 7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
       nestjs-pino:
         specifier: ^4.4.0
-        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@9.8.0)(rxjs@7.8.2)
+        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
         specifier: ^5.0.1
         version: 5.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.1.5)
@@ -978,7 +987,7 @@ importers:
         version: 7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
       nestjs-pino:
         specifier: ^4.4.0
-        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@9.8.0)(rxjs@7.8.2)
+        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
         specifier: ^5.0.1
         version: 5.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.1.5)
@@ -1150,7 +1159,7 @@ importers:
         version: 7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
       nestjs-pino:
         specifier: ^4.4.0
-        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@9.8.0)(rxjs@7.8.2)
+        version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
       nestjs-zod:
         specifier: ^5.0.1
         version: 5.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.2.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.1.5)
@@ -2809,6 +2818,9 @@ packages:
 
   '@paralleldrive/cuid2@2.2.2':
     resolution: {integrity: sha512-ZOBkgDwEdoYVlSeRbYYXs0S9MejQofiVYoTbKzy/6GQa39/q5tQU2IX46+shYnUkpEl3wc+J6wRlar7r2EK2xA==}
+
+  '@pinojs/redact@0.4.0':
+    resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -5642,6 +5654,9 @@ packages:
   pino-abstract-transport@2.0.0:
     resolution: {integrity: sha512-F63x5tizV6WCh4R6RHyi2Ml+M70DNRXt/+HANowMflpgGFMAym/VKm6G7ZOQRjqN7XbGxK1Lg9t6ZrtzOaivMw==}
 
+  pino-abstract-transport@3.0.0:
+    resolution: {integrity: sha512-wlfUczU+n7Hy/Ha5j9a/gZNy7We5+cXp8YL+X+PG8S0KXxw7n/JXA3c46Y0zQznIJ83URJiwy7Lh56WLokNuxg==}
+
   pino-http-print@3.1.0:
     resolution: {integrity: sha512-rIcBdxJYcknGDC1LJjbkEBPHqGRCE9Rjs00b8KGhwT5AQ0yIXp6xa68SG57bAwQqydyK/SUJzXYBvyv1jrheHA==}
     hasBin: true
@@ -5659,6 +5674,10 @@ packages:
 
   pino-std-serializers@7.0.0:
     resolution: {integrity: sha512-e906FRY0+tV27iq4juKzSYPbUj2do2X2JX4EzSca1631EB2QJQUqGbDuERal7LCtOpxl6x3+nvo9NPZcmjkiFA==}
+
+  pino@10.3.1:
+    resolution: {integrity: sha512-r34yH/GlQpKZbU1BvFFqOjhISRo1MNx1tWYsYvmj6KIRHSPMT2+yHOEb1SG6NMvRoHRF0a07kCOox/9yakl1vg==}
+    hasBin: true
 
   pino@9.8.0:
     resolution: {integrity: sha512-L5+rV1wL7vGAcxXP7sPpN5lrJ07Piruka6ArXr7EWBXxdVWjJshGVX8suFsiusJVcGKDGUFfbgbnKdg+VAC+0g==}
@@ -6289,6 +6308,10 @@ packages:
 
   thread-stream@3.1.0:
     resolution: {integrity: sha512-OqyPZ9u96VohAyMfJykzmivOrY2wfMSf3C5TtFJVgN+Hm6aj+voFhlK+kZEIv2FBh1X6Xp3DlnCOfEQ3B2J86A==}
+
+  thread-stream@4.0.0:
+    resolution: {integrity: sha512-4iMVL6HAINXWf1ZKZjIPcz5wYaOdPhtO8ATvZ+Xqp3BTdaqtAwQkNmKORqcIo5YkQqGXq5cwfswDwMqqQNrpJA==}
+    engines: {node: '>=20'}
 
   through2@4.0.2:
     resolution: {integrity: sha512-iOqSav00cVxEEICeD7TjLB1sueEL+81Wpzp2bY17uZjZN0pWZPuo4suZ/61VujxmqSGFfgOcNuTZ85QJwNZQpw==}
@@ -8537,6 +8560,8 @@ snapshots:
     dependencies:
       '@noble/hashes': 1.8.0
 
+  '@pinojs/redact@0.4.0': {}
+
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
@@ -9291,6 +9316,14 @@ snapshots:
       '@vitest/utils': 3.2.4
       chai: 5.3.3
       tinyrainbow: 2.0.0
+
+  '@vitest/mocker@3.2.4(vite@7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))':
+    dependencies:
+      '@vitest/spy': 3.2.4
+      estree-walker: 3.0.3
+      magic-string: 0.30.17
+    optionalDependencies:
+      vite: 7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1)
 
   '@vitest/mocker@3.2.4(vite@7.1.4(@types/node@24.4.0)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))':
     dependencies:
@@ -11268,10 +11301,10 @@ snapshots:
       '@opentelemetry/host-metrics': 0.36.0(@opentelemetry/api@1.9.0)
       response-time: 2.3.4
 
-  nestjs-pino@4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@9.8.0)(rxjs@7.8.2):
+  nestjs-pino@4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2):
     dependencies:
       '@nestjs/common': 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      pino: 9.8.0
+      pino: 10.3.1
       pino-http: 10.5.0
       rxjs: 7.8.2
 
@@ -11618,6 +11651,10 @@ snapshots:
     dependencies:
       split2: 4.2.0
 
+  pino-abstract-transport@3.0.0:
+    dependencies:
+      split2: 4.2.0
+
   pino-http-print@3.1.0:
     dependencies:
       args: 5.0.3
@@ -11668,6 +11705,20 @@ snapshots:
       strip-json-comments: 3.1.1
 
   pino-std-serializers@7.0.0: {}
+
+  pino@10.3.1:
+    dependencies:
+      '@pinojs/redact': 0.4.0
+      atomic-sleep: 1.0.0
+      on-exit-leak-free: 2.1.2
+      pino-abstract-transport: 3.0.0
+      pino-std-serializers: 7.0.0
+      process-warning: 5.0.0
+      quick-format-unescaped: 4.0.4
+      real-require: 0.2.0
+      safe-stable-stringify: 2.5.0
+      sonic-boom: 4.2.0
+      thread-stream: 4.0.0
 
   pino@9.8.0:
     dependencies:
@@ -12395,6 +12446,10 @@ snapshots:
     dependencies:
       real-require: 0.2.0
 
+  thread-stream@4.0.0:
+    dependencies:
+      real-require: 0.2.0
+
   through2@4.0.2:
     dependencies:
       readable-stream: 3.6.2
@@ -12729,7 +12784,7 @@ snapshots:
     dependencies:
       '@types/chai': 5.2.2
       '@vitest/expect': 3.2.4
-      '@vitest/mocker': 3.2.4(vite@7.1.4(@types/node@24.4.0)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))
+      '@vitest/mocker': 3.2.4(vite@7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))
       '@vitest/pretty-format': 3.2.4
       '@vitest/runner': 3.2.4
       '@vitest/snapshot': 3.2.4
