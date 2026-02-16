@@ -43,8 +43,7 @@ export class UniqueAuth implements UniqueApiAuth {
       return this.refreshTokenPromise;
     }
 
-    this.refreshTokenPromise = this.refreshToken(this.config);
-    this.refreshTokenPromise.finally(() => {
+    this.refreshTokenPromise = this.refreshToken(this.config).finally(() => {
       this.refreshTokenPromise = null;
     });
     return this.refreshTokenPromise;
