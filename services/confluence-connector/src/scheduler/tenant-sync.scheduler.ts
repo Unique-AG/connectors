@@ -55,26 +55,26 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     });
     this.schedulerRegistry.addCronJob(`sync:${tenant.name}`, job);
     job.start();
-    tenant.logger.log(`Scheduled sync with cron: ${cronExpression}`);
+    tenant.logger.info(`Scheduled sync with cron: ${cronExpression}`);
   }
 
   private async syncTenant(tenant: TenantContext): Promise<void> {
     if (this.isShuttingDown) {
-      tenant.logger.log('Skipping sync due to shutdown');
+      tenant.logger.info('Skipping sync due to shutdown');
       return;
     }
 
     if (tenant.isScanning) {
-      tenant.logger.log('Sync already in progress, skipping');
+      tenant.logger.info('Sync already in progress, skipping');
       return;
     }
 
     tenant.isScanning = true;
     try {
       await tenantStorage.run(tenant, async () => {
-        tenant.logger.log('Starting sync');
+        tenant.logger.info('Starting sync');
         const token = await tenant.auth.getAccessToken();
-        tenant.logger.log(`Token acquired successfully (${smear(token)})`);
+        tenant.logger.info(`Token acquired successfully (${smear(token)})`);
         // TODO: Full sync pipeline
       });
     } catch (error) {

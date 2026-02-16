@@ -1,4 +1,5 @@
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
 import { getTenantConfigs } from '../config/tenant-config-loader';
 import { TenantAuthFactory } from './tenant-auth.factory';
 import type { TenantContext } from './tenant-context.interface';
@@ -12,7 +13,7 @@ export class TenantRegistry implements OnModuleInit {
   public onModuleInit(): void {
     const configs = getTenantConfigs();
     for (const { name, config } of configs) {
-      const tenantLogger = new Logger(`Tenant:${name}`);
+      const tenantLogger = PinoLogger.root.child({ tenantName: name });
       this.tenants.set(name, {
         name,
         config,
@@ -20,7 +21,7 @@ export class TenantRegistry implements OnModuleInit {
         auth: this.authFactory.create(config.confluence),
         isScanning: false,
       });
-      tenantLogger.log('Tenant registered');
+      tenantLogger.info('Tenant registered');
     }
   }
 

@@ -1,4 +1,4 @@
-import type { Logger } from '@nestjs/common';
+import type { Logger } from 'pino';
 import type { TenantConfig } from '../config/tenant-config-loader';
 import type { TenantAuth } from './tenant-auth.interface';
 
