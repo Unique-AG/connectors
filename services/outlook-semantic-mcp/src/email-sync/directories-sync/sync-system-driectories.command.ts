@@ -8,8 +8,8 @@ import {
   SystemDirectoriesIgnoredForSync,
   SystemDirectoryType,
   UserProfile,
-} from '../../drizzle';
-import { GraphClientFactory } from '../../msgraph/graph-client.factory';
+} from '~/drizzle';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { GetSubscriptionAndUserProfileQuery } from '../subscription-utils/get-subscription-and-user-profile.query';
 import { GraphOutlookDirectory, graphOutlookDirectory } from './microsoft-graph.dtos';
 

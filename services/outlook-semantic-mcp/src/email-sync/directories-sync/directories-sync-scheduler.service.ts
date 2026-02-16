@@ -27,7 +27,6 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
   }
 
   private setupScheduledScan(): void {
-    return;
     const job = new CronJob(`*/5 * * * *`, () => {
       void this.runScheduledScan();
     });
