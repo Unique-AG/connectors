@@ -104,6 +104,7 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
       const { status } = TenantStatusSchema.parse(rawConfig);
 
       if (status === TenantStatus.DELETED) {
+        // TODO implement deletion for ingested confluence-content
         logger.log(`Tenant '${entry.name}' is deleted, skipping`);
         continue;
       }
