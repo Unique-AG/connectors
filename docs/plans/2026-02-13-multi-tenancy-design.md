@@ -16,7 +16,7 @@ Transform the connector to support multiple Confluence tenants from a single dep
 
 2. **TenantRegistry (Layer 2):** A global `TenantRegistry` service holds a `Map<string, TenantContext>`. Each `TenantContext` bundles the tenant's config, a pre-configured auth strategy with its own `TokenCache`, and a child logger with `tenantName` context. This replaces the current `ConfigModule.forRoot` registration of tenant-scoped config.
 
-3. **Scheduler (Layer 3):** A cron-based scheduler iterates all enabled tenants in parallel. Each tenant has a per-tenant `isScanning` lock so a new cron tick only triggers syncs for tenants that aren't already running. For this ticket, the sync action acquires an auth token per tenant (proving per-tenant auth works end-to-end).
+3. **Scheduler (Layer 3):** Each tenant gets its own `CronJob` registered dynamically at startup via NestJS `SchedulerRegistry`, using the tenant's `scanIntervalCron` expression. Each `TenantContext` carries an `isScanning` flag so overlapping cron ticks for the same tenant are skipped. For this ticket, the sync action acquires an auth token per tenant (proving per-tenant auth works end-to-end).
 
 4. **Observability (Layer 5):** Every `TenantContext` includes a child logger (`Logger` with `tenantName` context). All log lines during a tenant sync include `tenantName` as a structured field.
 
@@ -52,11 +52,10 @@ Transform the connector to support multiple Confluence tenants from a single dep
 │  TenantModule (global)                              │
 │    └─ TenantRegistry                                │
 │         └─ Map<string, TenantContext>                │
-│              ├─ name, config, logger                 │
+│              ├─ name, config, logger, isScanning     │
 │              └─ getAccessToken()                     │
 │  SchedulerModule                                    │
 │    └─ TenantSyncScheduler                           │
-│         └─ per-tenant isScanning locks              │
 │  LoggerModule, ProbeModule, OpenTelemetryModule      │
 └─────────────────────────────────────────────────────┘
 ```
@@ -161,6 +160,7 @@ interface TenantContext {
   readonly name: string;
   readonly config: TenantConfig;
   readonly logger: Logger;
+  isScanning: boolean;
   getAccessToken(): Promise<string>;
   // TODO: Add per-tenant Confluence API client
   // TODO: Add per-tenant Unique API client
@@ -182,6 +182,7 @@ export class TenantRegistry implements OnModuleInit {
         name,
         config,
         logger,
+        isScanning: false,
         getAccessToken: () => tokenCache.getToken(() => authStrategy.acquireToken()),
       });
 
@@ -209,7 +210,6 @@ export class TenantRegistry implements OnModuleInit {
 @Injectable()
 export class TenantSyncScheduler implements OnModuleInit {
   private readonly logger = new Logger(TenantSyncScheduler.name);
-  private readonly scanningTenants = new Set<string>();
 
   constructor(
     private readonly tenantRegistry: TenantRegistry,
@@ -217,7 +217,6 @@ export class TenantSyncScheduler implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // Register per-tenant cron jobs dynamically
     for (const tenant of this.tenantRegistry.getAll()) {
       const cronExpression = tenant.config.processing.scanIntervalCron;
       const job = new CronJob(cronExpression, () => this.syncTenant(tenant));
@@ -228,11 +227,11 @@ export class TenantSyncScheduler implements OnModuleInit {
   }
 
   private async syncTenant(tenant: TenantContext): Promise<void> {
-    if (this.scanningTenants.has(tenant.name)) {
+    if (tenant.isScanning) {
       tenant.logger.log('Sync already in progress, skipping');
       return;
     }
-    this.scanningTenants.add(tenant.name);
+    tenant.isScanning = true;
     try {
       tenant.logger.log('Starting sync');
       const token = await tenant.getAccessToken();
@@ -241,7 +240,7 @@ export class TenantSyncScheduler implements OnModuleInit {
     } catch (error) {
       tenant.logger.error('Sync failed', { error });
     } finally {
-      this.scanningTenants.delete(tenant.name);
+      tenant.isScanning = false;
     }
   }
 }
@@ -282,7 +281,7 @@ If deeper structured logging is needed later (e.g., a dedicated `tenantName` JSO
 **Scheduler errors:**
 - Per-tenant `try/catch` — one tenant failure does not affect others
 - Token acquisition failure → logged with `tenantName` context, tenant skipped this cycle
-- `isScanning` lock prevents overlapping syncs per tenant
+- `tenant.isScanning` flag prevents overlapping syncs per tenant
 
 **Secret handling:**
 - `Redacted` wrapper prevents secrets from appearing in logs/errors (unchanged from current)
@@ -298,7 +297,7 @@ If deeper structured logging is needed later (e.g., a dedicated `tenantName` JSO
   - Backward compatibility: plain string values still work (for non-secret fields)
 - **Zod schema tests** — test `envResolvableStringSchema` and `envResolvableRedactedStringSchema` in isolation
 - **TenantRegistry tests** — construction from multiple configs, `get()`, `getAll()`, token acquisition delegation, unknown tenant error
-- **Scheduler tests** — parallel execution, `isScanning` lock prevents duplicate syncs, error isolation between tenants, per-tenant cron registration
+- **Scheduler tests** — parallel execution, `tenant.isScanning` prevents duplicate syncs, error isolation between tenants, per-tenant cron registration
 - **Existing auth tests** — unchanged (strategies and token cache are reused as-is)
 
 ## Out of Scope
@@ -348,6 +347,6 @@ async syncTenant(tenant: TenantContext) {
 
 4. **Remove ConfluenceAuthModule and update AppModule** — Remove `ConfluenceAuthModule` and `ConfluenceAuthenticationService` (role absorbed by `TenantRegistry`). Update `AppModule` to import `TenantModule` instead. Remove tenant config from `ConfigModule.forRoot` load array. Keep auth strategy classes and `TokenCache` unchanged.
 
-5. **Implement TenantSyncScheduler** — Create `SchedulerModule` with `TenantSyncScheduler`. Register per-tenant cron jobs dynamically via `SchedulerRegistry`. Implement `isScanning` per-tenant lock. Sync action: acquire token and log success/failure. Add `@nestjs/schedule` dependency.
+5. **Implement TenantSyncScheduler** — Create `SchedulerModule` with `TenantSyncScheduler`. Register per-tenant cron jobs dynamically via `SchedulerRegistry`. Use `tenant.isScanning` flag to prevent overlapping syncs. Sync action: acquire token and log success/failure. Add `@nestjs/schedule` dependency.
 
 6. **Update local tenant config and .env for os.environ/ pattern** — Update `local-tenant-config.yaml` to use `os.environ/` references for secrets. Update `.env.example` and `.env` with the new variable naming convention.
