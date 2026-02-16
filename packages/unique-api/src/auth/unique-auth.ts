@@ -15,6 +15,7 @@ export class UniqueAuth {
   // used protected to allow use of typeguard isTokenValid
   protected cachedToken?: string;
   private tokenExpirationTime?: number;
+  private refreshTokenPromise: Promise<string> | null = null;
   private readonly config: UniqueApiClientAuthConfig;
   private readonly metrics: UniqueApiMetrics;
   private readonly logger: UniqueAuthDeps['logger'];
@@ -38,7 +39,15 @@ export class UniqueAuth {
       'getToken() called but auth mode is not "external"',
     );
 
-    return this.refreshToken(this.config);
+    if (this.refreshTokenPromise) {
+      return this.refreshTokenPromise;
+    }
+
+    this.refreshTokenPromise = this.refreshToken(this.config);
+    this.refreshTokenPromise.finally(() => {
+      this.refreshTokenPromise = null;
+    });
+    return this.refreshTokenPromise;
   }
 
   public async getAuthHeaders(): Promise<Record<string, string>> {

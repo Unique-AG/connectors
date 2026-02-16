@@ -1,8 +1,8 @@
 import assert from 'node:assert';
-import { sanitizeError } from '@unique-ag/utils';
 import { chunk } from 'remeda';
+import { sanitizeError } from './normalize-error';
 
-interface BatchProcessorOptions<TInput, TOutput> {
+export interface BatchProcessorOptions<TInput, TOutput> {
   items: TInput[];
   batchSize: number;
   processor: (batch: TInput[], batchIndex: number) => Promise<TOutput[]>;

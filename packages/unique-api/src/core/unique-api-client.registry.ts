@@ -18,7 +18,7 @@ export class UniqueApiClientRegistryImpl implements UniqueApiClientRegistry {
     return this.clients.get(key);
   }
 
-  public async getOrCreate(key: string, config: UniqueApiClientConfig): Promise<UniqueApiClient> {
+  public getOrCreate(key: string, config: UniqueApiClientConfig): UniqueApiClient {
     const existing = this.clients.get(key);
     if (existing) {
       return existing;

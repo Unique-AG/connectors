@@ -1,6 +1,6 @@
+import { processInBatches } from '@unique-ag/utils';
 import { isNullish } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import { processInBatches } from '../core/batch-processor.service';
 import {
   CREATE_SCOPE_ACCESSES_MUTATION,
   type CreateScopeAccessesMutationInput,
@@ -58,7 +58,9 @@ export class ScopesService {
       items: paths,
       batchSize: BATCH_SIZE,
       processor: async (batch) => {
-        const variables: GenerateScopesBasedOnPathsMutationInput = { paths: batch };
+        const variables: GenerateScopesBasedOnPathsMutationInput = {
+          paths: batch,
+        };
 
         if (!isNullish(opts.inheritAccess)) {
           variables.inheritAccess = opts.inheritAccess;

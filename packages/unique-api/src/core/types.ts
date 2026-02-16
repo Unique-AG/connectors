@@ -181,7 +181,7 @@ export interface UniqueApiClientFactory {
 
 export interface UniqueApiClientRegistry {
   get(key: string): UniqueApiClient | undefined;
-  getOrCreate(key: string, config: UniqueApiClientConfig): Promise<UniqueApiClient>;
+  getOrCreate(key: string, config: UniqueApiClientConfig): UniqueApiClient;
   set(key: string, client: UniqueApiClient): void;
   delete(key: string): Promise<void>;
   clear(): Promise<void>;
