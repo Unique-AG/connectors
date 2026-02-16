@@ -11,12 +11,16 @@ export const coercedPositiveIntSchema = z.coerce.number().int().positive();
 export const coercedPositiveNumberSchema = z.coerce.number().positive();
 export const requiredStringSchema = z.string().trim().min(1);
 
-export const redactedStringSchema = z.string().transform((val) => new Redacted(val));
-export const redactedNonEmptyStringSchema = z
-  .string()
-  .nonempty()
+const ENV_REF_PREFIX = 'os.environ/';
+
+const envResolvableStringSchema = z.string().transform((val) => {
+  if (!val.startsWith(ENV_REF_PREFIX)) return val;
+  const varName = val.slice(ENV_REF_PREFIX.length);
+  return process.env[varName] ?? '';
+});
+
+export const envResolvableRedactedStringSchema = envResolvableStringSchema
+  .pipe(z.string().min(1))
   .transform((val) => new Redacted(val));
-export const redactedOptionalStringSchema = z
-  .string()
-  .optional()
-  .transform((val) => (val ? new Redacted(val) : undefined));
+
+export const envResolvablePlainStringSchema = envResolvableStringSchema.pipe(z.string().min(1));
