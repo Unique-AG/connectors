@@ -14,7 +14,7 @@ function createMockTenant(name: string, overrides: Partial<TenantContext> = {}):
       processing: { scanIntervalCron: '*/5 * * * *' },
     },
     logger: {
-      log: vi.fn(),
+      info: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),
     },
@@ -78,8 +78,8 @@ describe('TenantSyncScheduler', () => {
     it('logs the scheduled cron expression per tenant', () => {
       scheduler.onModuleInit();
 
-      expect(tenantA.logger.log).toHaveBeenCalledWith('Scheduled sync with cron: */5 * * * *');
-      expect(tenantB.logger.log).toHaveBeenCalledWith('Scheduled sync with cron: */5 * * * *');
+      expect(tenantA.logger.info).toHaveBeenCalledWith('Scheduled sync with cron: */5 * * * *');
+      expect(tenantB.logger.info).toHaveBeenCalledWith('Scheduled sync with cron: */5 * * * *');
     });
 
     it('skips scheduling when no tenants are registered', () => {
@@ -113,8 +113,8 @@ describe('TenantSyncScheduler', () => {
       await (scheduler as any).syncTenant(tenantA);
 
       expect(tenantA.auth.getAccessToken).toHaveBeenCalledOnce();
-      expect(tenantA.logger.log).toHaveBeenCalledWith('Starting sync');
-      expect(tenantA.logger.log).toHaveBeenCalledWith(
+      expect(tenantA.logger.info).toHaveBeenCalledWith('Starting sync');
+      expect(tenantA.logger.info).toHaveBeenCalledWith(
         `Token acquired successfully (${smear('mock-token-12345678')})`,
       );
     });
@@ -139,7 +139,7 @@ describe('TenantSyncScheduler', () => {
       await (scheduler as any).syncTenant(tenantA);
 
       expect(tenantA.auth.getAccessToken).not.toHaveBeenCalled();
-      expect(tenantA.logger.log).toHaveBeenCalledWith('Sync already in progress, skipping');
+      expect(tenantA.logger.info).toHaveBeenCalledWith('Sync already in progress, skipping');
     });
 
     it('resets isScanning after successful sync', async () => {
@@ -168,7 +168,7 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(tenantA.logger.log).toHaveBeenCalledWith('Skipping sync due to shutdown');
+      expect(tenantA.logger.info).toHaveBeenCalledWith('Skipping sync due to shutdown');
     });
 
     it('isolates errors between tenants', async () => {
@@ -181,7 +181,7 @@ describe('TenantSyncScheduler', () => {
 
       expect(tenantA.logger.error).toHaveBeenCalled();
       expect(tenantB.auth.getAccessToken).toHaveBeenCalledOnce();
-      expect(tenantB.logger.log).toHaveBeenCalledWith('Starting sync');
+      expect(tenantB.logger.info).toHaveBeenCalledWith('Starting sync');
     });
   });
 });

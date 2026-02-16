@@ -1,9 +1,30 @@
+import type pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { NamedTenantConfig, TenantConfig } from '../config/tenant-config-loader';
 import { getTenantConfigs } from '../config/tenant-config-loader';
 import { TenantAuthFactory } from './tenant-auth.factory';
 import type { TenantAuth } from './tenant-auth.interface';
 import { TenantRegistry } from './tenant-registry';
+
+const { mockChildLogger, mockRoot } = vi.hoisted(() => {
+  const mockChildLogger = {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  } as unknown as pino.Logger;
+  const mockRoot = {
+    child: vi.fn().mockReturnValue(mockChildLogger),
+  } as unknown as pino.Logger;
+  return { mockChildLogger, mockRoot };
+});
+
+vi.mock('nestjs-pino', async () => {
+  const actual = await vi.importActual('nestjs-pino');
+  return {
+    ...actual,
+    PinoLogger: { root: mockRoot },
+  };
+});
 
 vi.mock('../config/tenant-config-loader', () => ({
   getTenantConfigs: vi.fn(),
@@ -53,6 +74,24 @@ describe('TenantRegistry', () => {
       const registry = createRegistry(configs);
 
       expect(registry.size).toBe(2);
+    });
+
+    it('creates a pino child logger per tenant with tenantName binding', () => {
+      const configs: NamedTenantConfig[] = [
+        { name: 'tenant-a', config: createMockTenantConfig() },
+        { name: 'tenant-b', config: createMockTenantConfig() },
+      ];
+
+      createRegistry(configs);
+
+      expect(mockRoot.child).toHaveBeenCalledWith({ tenantName: 'tenant-a' });
+      expect(mockRoot.child).toHaveBeenCalledWith({ tenantName: 'tenant-b' });
+    });
+
+    it('logs tenant registration via pino child logger', () => {
+      createRegistry([{ name: 'tenant-a', config: createMockTenantConfig() }]);
+
+      expect(mockChildLogger.info).toHaveBeenCalledWith('Tenant registered');
     });
   });
 
