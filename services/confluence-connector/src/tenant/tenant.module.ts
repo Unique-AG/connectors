@@ -1,10 +1,10 @@
 import { Global, Module } from '@nestjs/common';
-import { TenantAuthFactory } from './tenant-auth.factory';
+import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
 import { TenantRegistry } from './tenant-registry';
 
 @Global()
 @Module({
-  providers: [TenantAuthFactory, TenantRegistry],
+  providers: [ConfluenceTenantAuthFactory, TenantRegistry],
   exports: [TenantRegistry],
 })
 export class TenantModule {}

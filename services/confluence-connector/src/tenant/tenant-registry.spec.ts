@@ -2,7 +2,7 @@ import type pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { NamedTenantConfig, TenantConfig } from '../config/tenant-config-loader';
 import { getTenantConfigs } from '../config/tenant-config-loader';
-import { TenantAuthFactory } from './tenant-auth.factory';
+import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
 import type { TenantAuth } from './tenant-auth.interface';
 import { TenantRegistry } from './tenant-registry';
 
@@ -30,7 +30,7 @@ vi.mock('../config/tenant-config-loader', () => ({
   getTenantConfigs: vi.fn(),
 }));
 
-vi.mock('./tenant-auth.factory');
+vi.mock('./confluence-tenant-auth.factory');
 
 function createMockTenantConfig(): TenantConfig {
   return {
@@ -55,7 +55,7 @@ function createRegistry(configs: NamedTenantConfig[]): TenantRegistry {
   vi.mocked(getTenantConfigs).mockReturnValue(configs);
 
   const mockAuth = createMockAuth();
-  const mockFactory = new TenantAuthFactory();
+  const mockFactory = new ConfluenceTenantAuthFactory();
   vi.mocked(mockFactory.create).mockReturnValue(mockAuth);
 
   const registry = new TenantRegistry(mockFactory);
