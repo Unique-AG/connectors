@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
 import { z } from 'zod';
-import { AuthMode } from '../../config/confluence.schema';
+import { AuthMode } from '../../config';
 import { normalizeError, sanitizeError } from '../../utils/normalize-error';
 import type { Redacted } from '../../utils/redacted';
 import type { ConfluenceAuthStrategy, TokenResult } from './confluence-auth-strategy.interface';
