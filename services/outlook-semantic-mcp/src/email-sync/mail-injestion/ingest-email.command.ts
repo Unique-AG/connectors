@@ -76,16 +76,17 @@ export class IngestEmailCommand {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
     if (isNullish(file)) {
-      const response = await client
+      const response = (await client
         .api(`me/messages/${messageId}/$value`)
         .header(`Prefer`, `IdType="ImmutableId"`)
-        .getStream();
+        .getStream()) as ReadableStream<Uint8Array<ArrayBuffer>>;
 
       const createContentRequest = {
         key: fileKey,
         title: `${graphMessage.subject} - ${graphMessage.id}.eml`,
         mimeType: `message/rfc822`,
-        byteSize: response.headers.get("content-length"),
+        // FROM where do we I get this thing ? I got just a readable stream from microsoft
+        byteSize: 1,
         metadata: metadata,
         scopeId: rootScope.id,
         ownerType: UniqueOwnerType.User,
