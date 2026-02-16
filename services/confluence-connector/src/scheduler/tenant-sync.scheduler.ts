@@ -19,8 +19,6 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   public onModuleInit(): void {
-    // Guard: TenantRegistry.onModuleInit must run before this — ensured by
-    // importing TenantModule before SchedulerModule in AppModule.imports.
     if (this.tenantRegistry.size === 0) {
       this.logger.warn('No tenants registered — no sync jobs will be scheduled');
       return;
@@ -50,42 +48,46 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
   }
 
   private registerCronJob(tenant: TenantContext): void {
-    const cronExpression = tenant.config.processing.scanIntervalCron;
-    const job = new CronJob(cronExpression, () => {
-      void this.syncTenant(tenant);
+    tenantStorage.run(tenant, () => {
+      const logger = getTenantLogger(TenantSyncScheduler);
+      const cronExpression = tenant.config.processing.scanIntervalCron;
+      const job = new CronJob(cronExpression, () => {
+        void this.syncTenant(tenant);
+      });
+      this.schedulerRegistry.addCronJob(`sync:${tenant.name}`, job);
+      job.start();
+      logger.info(`Scheduled sync with cron: ${cronExpression}`);
     });
-    this.schedulerRegistry.addCronJob(`sync:${tenant.name}`, job);
-    job.start();
-    tenant.logger.info(`Scheduled sync with cron: ${cronExpression}`);
   }
 
   private async syncTenant(tenant: TenantContext): Promise<void> {
-    if (this.isShuttingDown) {
-      tenant.logger.info('Skipping sync due to shutdown');
-      return;
-    }
+    await tenantStorage.run(tenant, async () => {
+      const logger = getTenantLogger(TenantSyncScheduler);
 
-    if (tenant.isScanning) {
-      tenant.logger.info('Sync already in progress, skipping');
-      return;
-    }
+      if (this.isShuttingDown) {
+        logger.info('Skipping sync due to shutdown');
+        return;
+      }
 
-    tenant.isScanning = true;
-    try {
-      await tenantStorage.run(tenant, async () => {
-        const logger = getTenantLogger(TenantSyncScheduler);
+      if (tenant.isScanning) {
+        logger.info('Sync already in progress, skipping');
+        return;
+      }
+
+      tenant.isScanning = true;
+      try {
         logger.info('Starting sync');
         const token = await tenant.auth.getAccessToken();
         logger.info({ token: smear(token) }, 'Token acquired');
         // TODO: Full sync pipeline
-      });
-    } catch (error) {
-      tenant.logger.error({
-        msg: 'Sync failed',
-        error: sanitizeError(error),
-      });
-    } finally {
-      tenant.isScanning = false;
-    }
+      } catch (error) {
+        logger.error({
+          msg: 'Sync failed',
+          error: sanitizeError(error),
+        });
+      } finally {
+        tenant.isScanning = false;
+      }
+    });
   }
 }
