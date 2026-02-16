@@ -1,0 +1,46 @@
+import { Injectable } from "@nestjs/common";
+import { UniqueApiClient } from "@unique-ag/unique-api";
+import assert from "node:assert";
+import {
+  getRootScopeExternalId,
+  getRootScopePath,
+} from "~/unique/get-root-scope-path";
+import { InjectUniqueApi } from "~/unique/unique-api.module";
+
+@Injectable()
+export class CreateRootScopeCommand {
+  public constructor(
+    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
+  ) {}
+
+  public async run({
+    userProviderUserId,
+  }: {
+    userProviderUserId: string;
+    userProfileEmail: string;
+  }): Promise<void> {
+    const externalId = getRootScopeExternalId(userProviderUserId);
+    const rootScopeExists =
+      await this.uniqueApi.scopes.getByExternalId(externalId);
+    if (rootScopeExists) {
+      return;
+    }
+
+    const rootScopePath = getRootScopePath(userProviderUserId);
+    const [rootScope] = await this.uniqueApi.scopes.createFromPaths(
+      [rootScopePath],
+      { includePermissions: true, inheritAccess: true },
+    );
+    assert.ok(rootScope, `Parent scope id`);
+    if (!rootScope.externalId) {
+      // TODO: check if this is needed ?
+      // const currentUserId = await this.uniqueApi.users.getCurrentId();
+      // await this.uniqueApi.scopes.createAccesses(
+      //   rootScope.id,
+      //   [{ type: "WRITE", entityId: currentUserId, entityType: "USER" }],
+      //   true,
+      // );
+      await this.uniqueApi.scopes.updateExternalId(rootScope.id, externalId);
+    }
+  }
+}

@@ -1,14 +1,16 @@
-import { Module } from '@nestjs/common';
-import { DrizzleModule } from '~/drizzle/drizzle.module';
-import { MsGraphModule } from '../../msgraph/msgraph.module';
-import { SubscriptionUtilsModule } from '../subscription-utils/subscription-utils.module';
-import { DirectorySyncSchedulerService } from './directories-sync-scheduler.service';
-import { FetchAllDirectoriesFromOutlookQuery } from './fetch-all-directories-from-outlook.query';
-import { SyncDirectoriesCommand } from './sync-directories.command';
-import { SyncDirectoriesForSubscriptionsCommand } from './sync-directories-for-subscriptions.command';
-import { SyncDirectoriesWithDeltaCommand } from './sync-directories-with-delta.command';
-import { SyncSystemDirectoriesCommand } from './sync-system-driectories.command';
-import { RunDirectorySyncTool } from './tools/run-directory-sync.tool';
+import { Module } from "@nestjs/common";
+import { DrizzleModule } from "~/drizzle/drizzle.module";
+import { MsGraphModule } from "../../msgraph/msgraph.module";
+import { SubscriptionUtilsModule } from "../subscription-utils/subscription-utils.module";
+import { DirectorySyncSchedulerService } from "./directories-sync-scheduler.service";
+import { FetchAllDirectoriesFromOutlookQuery } from "./fetch-all-directories-from-outlook.query";
+import { SyncDirectoriesCommand } from "./sync-directories.command";
+import { SyncDirectoriesForSubscriptionsCommand } from "./sync-directories-for-subscriptions.command";
+import { SyncDirectoriesWithDeltaCommand } from "./sync-directories-with-delta.command";
+import { SyncSystemDirectoriesCommand } from "./sync-system-driectories.command";
+import { RunDirectorySyncTool } from "./tools/run-directory-sync.tool";
+import { CreateRootScopeCommand } from "./create-root-scope.command";
+import { UNIQUE_API_FEATURE_MODULE } from "~/unique/unique-api.module";
 
 const QUERIES = [FetchAllDirectoriesFromOutlookQuery];
 
@@ -16,11 +18,17 @@ const COMMANDS = [
   SyncDirectoriesCommand,
   SyncSystemDirectoriesCommand,
   SyncDirectoriesForSubscriptionsCommand,
+  CreateRootScopeCommand,
 ];
 const PUBLIC_COMMANDS = [SyncDirectoriesWithDeltaCommand];
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule, SubscriptionUtilsModule],
+  imports: [
+    DrizzleModule,
+    MsGraphModule,
+    SubscriptionUtilsModule,
+    UNIQUE_API_FEATURE_MODULE,
+  ],
   providers: [
     ...QUERIES,
     ...COMMANDS,

@@ -1,7 +1,7 @@
-import assert from 'node:assert';
-import { Inject, Injectable } from '@nestjs/common';
-import { count, eq, inArray, sql } from 'drizzle-orm';
-import { Span } from 'nestjs-otel';
+import assert from "node:assert";
+import { Inject, Injectable } from "@nestjs/common";
+import { count, eq, inArray, sql } from "drizzle-orm";
+import { Span } from "nestjs-otel";
 import {
   DirectoryType,
   DRIZZLE,
@@ -9,13 +9,14 @@ import {
   directories,
   directoriesSync,
   SystemDirectoriesIgnoredForSync,
-} from '~/drizzle';
-import { GetSubscriptionAndUserProfileQuery } from '../subscription-utils/get-subscription-and-user-profile.query';
-import { FetchAllDirectoriesFromOutlookQuery } from './fetch-all-directories-from-outlook.query';
-import { GraphOutlookDirectory } from './microsoft-graph.dtos';
-import { SyncSystemDirectoriesCommand } from './sync-system-driectories.command';
+} from "~/drizzle";
+import { GetSubscriptionAndUserProfileQuery } from "../subscription-utils/get-subscription-and-user-profile.query";
+import { FetchAllDirectoriesFromOutlookQuery } from "./fetch-all-directories-from-outlook.query";
+import { GraphOutlookDirectory } from "./microsoft-graph.dtos";
+import { SyncSystemDirectoriesCommand } from "./sync-system-driectories.command";
+import { CreateRootScopeCommand } from "./create-root-scope.command";
 
-const USER_DIRECTORY_TYPE: DirectoryType = 'User Defined Directory';
+const USER_DIRECTORY_TYPE: DirectoryType = "User Defined Directory";
 
 @Injectable()
 export class SyncDirectoriesCommand {
@@ -24,11 +25,17 @@ export class SyncDirectoriesCommand {
     private readonly fetchAllDirectoriesFromOutlookQuery: FetchAllDirectoriesFromOutlookQuery,
     private readonly getSubscriptionAndUserProfileQuery: GetSubscriptionAndUserProfileQuery,
     private readonly syncSystemDirectoriesCommand: SyncSystemDirectoriesCommand,
+    private readonly createRootScopeCommand: CreateRootScopeCommand,
   ) {}
 
   @Span()
   public async run(subscriptionId: string): Promise<void> {
-    const { userProfile } = await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
+    const { userProfile } =
+      await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
+    await this.createRootScopeCommand.run({
+      userProfileEmail: userProfile.email,
+      userProviderUserId: userProfile.providerUserId,
+    });
 
     const totalDirectories = await this.db
       .select({ count: count() })
@@ -40,7 +47,8 @@ export class SyncDirectoriesCommand {
       await this.syncSystemDirectoriesCommand.run(subscriptionId);
     }
 
-    const microsoftDirectories = await this.fetchAllDirectoriesFromOutlookQuery.run(userProfile.id);
+    const microsoftDirectories =
+      await this.fetchAllDirectoriesFromOutlookQuery.run(userProfile.id);
 
     await this.upsertDirectories({
       userProfileId: userProfile.id,
@@ -138,7 +146,9 @@ export class SyncDirectoriesCommand {
       userProfileId,
       microsoftDirectories,
     });
-    await this.db.delete(directories).where(inArray(directories.id, idsToDeleteInDatabase));
+    await this.db
+      .delete(directories)
+      .where(inArray(directories.id, idsToDeleteInDatabase));
 
     await this.db
       .update(directories)
@@ -161,12 +171,19 @@ export class SyncDirectoriesCommand {
     directoryIdsToMarkAsIgnored: string[];
     providerParentIdsToDeleteInUnique: string[];
   }> {
-    const collectIdsRecurive = (directories: GraphOutlookDirectory[]): string[] => {
+    const collectIdsRecurive = (
+      directories: GraphOutlookDirectory[],
+    ): string[] => {
       return directories.flatMap((directory) => {
-        return [directory.id, ...collectIdsRecurive(directory?.childFolders ?? [])];
+        return [
+          directory.id,
+          ...collectIdsRecurive(directory?.childFolders ?? []),
+        ];
       });
     };
-    const currentDirectories = new Set(collectIdsRecurive(microsoftDirectories));
+    const currentDirectories = new Set(
+      collectIdsRecurive(microsoftDirectories),
+    );
 
     const databaseDirectories = await this.db.query.directories.findMany({
       where: eq(directories.userProfileId, userProfileId),
@@ -187,7 +204,9 @@ export class SyncDirectoriesCommand {
     const directoryIdsToMarkAsIgnored = [];
 
     while (queue.length) {
-      providerParentIdsToDeleteInUnique.push(...queue.map((item) => item.providerDirectoryId));
+      providerParentIdsToDeleteInUnique.push(
+        ...queue.map((item) => item.providerDirectoryId),
+      );
       const parentIdsToIgnore = queue.map((item) => item.id);
       queue = databaseDirectories.filter(
         (item) => item.parentId && parentIdsToIgnore.includes(item.parentId),

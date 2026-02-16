@@ -1,19 +1,22 @@
-import assert from 'node:assert';
-import { UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
-import { Inject, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { eq } from 'drizzle-orm';
-import { Span } from 'nestjs-otel';
-import { isNonNullish, isNullish } from 'remeda';
-import { UniqueConfigNamespaced } from '~/config';
-import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/drizzle';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { getRootScopePath } from '~/unique/get-root-scope-path';
-import { InjectUniqueApi } from '~/unique/unique-api.module';
-import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
-import { GetMessageDetailsQuery } from './get-message-details.query';
-import { getMetadataFromMessage } from './utils/get-metadata-from-message';
-import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
+import assert from "node:assert";
+import { UniqueApiClient, UniqueOwnerType } from "@unique-ag/unique-api";
+import { Inject, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { eq } from "drizzle-orm";
+import { Span } from "nestjs-otel";
+import { isNonNullish, isNullish } from "remeda";
+import { UniqueConfigNamespaced } from "~/config";
+import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from "~/drizzle";
+import { GraphClientFactory } from "~/msgraph/graph-client.factory";
+import { getRootScopeExternalId } from "~/unique/get-root-scope-path";
+import { InjectUniqueApi } from "~/unique/unique-api.module";
+import {
+  INGESTION_SOURCE_KIND,
+  INGESTION_SOURCE_NAME,
+} from "~/utils/source-kind-and-name";
+import { GetMessageDetailsQuery } from "./get-message-details.query";
+import { getMetadataFromMessage } from "./utils/get-metadata-from-message";
+import { getUniqueKeyForMessage } from "./utils/get-unique-key-for-message";
 
 @Injectable()
 export class IngestEmailCommand {
@@ -37,7 +40,10 @@ export class IngestEmailCommand {
       where: eq(userProfiles.id, userProfileId),
     });
     assert.ok(userProfile, `User Profile missing for id: ${userProfileId}`);
-    assert.ok(userProfile.email, `User Profile email missing for: ${userProfile.id}`);
+    assert.ok(
+      userProfile.email,
+      `User Profile email missing for: ${userProfile.id}`,
+    );
     const graphMessage = await this.getMessageDetailsQuery.run({
       userProfileId: userProfile.id,
       messageId,
@@ -55,21 +61,17 @@ export class IngestEmailCommand {
 
     // Parent directory should exist because once he connects we run a full directory sync. If it's not there
     // we thrust that the full sync will catch this email. TODO: Check with Michat if we should Throw error.
-    if (!parentDirectory?.ignoreForSync) {
+    if (!parentDirectory || parentDirectory.ignoreForSync) {
       if (isNonNullish(file)) {
         await this.uniqueApi.files.delete(file.id);
       }
       return;
     }
 
-    const [rootScope] = await this.uniqueApi.scopes.createFromPaths([
-      getRootScopePath(userProfile.email),
-    ]);
-    // await this.uniqueApi.scopes.();
+    const rootScope = await this.uniqueApi.scopes.getByExternalId(
+      getRootScopeExternalId(userProfile.providerUserId),
+    );
     assert.ok(rootScope, `Parent scope id`);
-    if (!rootScope.externalId) {
-      // await this.uniqueApi.scopes.updateExternalId(rootScope.id)
-    }
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
@@ -83,7 +85,7 @@ export class IngestEmailCommand {
         key: fileKey,
         title: `${graphMessage.subject} - ${graphMessage.id}.eml`,
         mimeType: `message/rfc822`,
-        byteSize: response.headers.get('content-length'),
+        byteSize: response.headers.get("content-length"),
         metadata: metadata,
         scopeId: rootScope.id,
         ownerType: UniqueOwnerType.User,
@@ -94,7 +96,8 @@ export class IngestEmailCommand {
         storeInternally: false,
       };
 
-      const content = await this.uniqueApi.ingestion.registerContent(createContentRequest);
+      const content =
+        await this.uniqueApi.ingestion.registerContent(createContentRequest);
 
       // TODO: Injest the file in unique.
       this.uniqueApi.ingestion.streamUpload({
@@ -135,17 +138,17 @@ export class IngestEmailCommand {
   // writeUrl configurable, but for now this hack lets us avoid hairpinning issues in the internal
   // upload flows.
   private correctWriteUrl(writeUrl: string): string {
-    const uniqueAuthMode = this.configService.get('unique.serviceAuthMode', {
+    const uniqueAuthMode = this.configService.get("unique.serviceAuthMode", {
       infer: true,
     });
-    if (uniqueAuthMode === 'external') {
+    if (uniqueAuthMode === "external") {
       return writeUrl;
     }
     const url = new URL(writeUrl);
-    const key = url.searchParams.get('key');
-    assert.ok(key, 'writeUrl is missing key parameter');
+    const key = url.searchParams.get("key");
+    assert.ok(key, "writeUrl is missing key parameter");
 
-    const ingestionApiUrl = this.configService.get('unique.apiBaseUrl', {
+    const ingestionApiUrl = this.configService.get("unique.apiBaseUrl", {
       infer: true,
     });
     return `${ingestionApiUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
