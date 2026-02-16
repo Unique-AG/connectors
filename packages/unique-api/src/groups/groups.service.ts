@@ -1,5 +1,6 @@
 import { pick, prop } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import type { UniqueApiGroups } from '../types';
 import {
   ADD_GROUP_MEMBERS_MUTATION,
   type AddGroupMembersMutationInput,
@@ -29,7 +30,7 @@ interface GroupsServiceDeps {
   logger: { log: (msg: string) => void };
 }
 
-export class GroupsService {
+export class GroupsService implements UniqueApiGroups {
   private readonly scopeManagementClient: UniqueGraphqlClient;
   private readonly logger: GroupsServiceDeps['logger'];
 

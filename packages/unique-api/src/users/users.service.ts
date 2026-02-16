@@ -1,5 +1,6 @@
 import { pick } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import type { UniqueApiUsers } from '../types';
 import {
   GET_CURRENT_USER_QUERY,
   type GetCurrentUserQueryResult,
@@ -16,7 +17,7 @@ interface UsersServiceDeps {
   logger: { log: (msg: string) => void };
 }
 
-export class UsersService {
+export class UsersService implements UniqueApiUsers {
   private readonly scopeManagementClient: UniqueGraphqlClient;
   private readonly logger: UsersServiceDeps['logger'];
 

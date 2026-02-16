@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { sanitizeError } from '@unique-ag/utils';
 import type { Dispatcher } from 'undici';
 import type { UniqueApiMetrics } from '../core/observability';
-import type { ExternalAuthConfig, UniqueApiClientAuthConfig } from '../core/types';
+import type { ExternalAuthConfig, UniqueApiAuth, UniqueApiClientAuthConfig } from '../types';
 
 interface UniqueAuthDeps {
   config: UniqueApiClientAuthConfig;
@@ -11,7 +11,7 @@ interface UniqueAuthDeps {
   dispatcher: Dispatcher;
 }
 
-export class UniqueAuth {
+export class UniqueAuth implements UniqueApiAuth {
   // used protected to allow use of typeguard isTokenValid
   protected cachedToken?: string;
   private tokenExpirationTime?: number;

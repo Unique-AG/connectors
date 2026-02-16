@@ -4,7 +4,7 @@ import type {
   UniqueApiClientConfig,
   UniqueApiClientFactory,
   UniqueApiClientRegistry,
-} from './types';
+} from '../types';
 
 export class UniqueApiClientRegistryImpl implements UniqueApiClientRegistry {
   private readonly clients = new Map<string, UniqueApiClient>();

@@ -1,6 +1,7 @@
 import { getErrorCodeFromGraphqlRequest, sanitizeError } from '@unique-ag/utils';
 import { chunk } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import type { UniqueApiFiles } from '../types';
 import {
   ADD_ACCESSES_MUTATION,
   type AddAccessesMutationInput,
@@ -24,7 +25,7 @@ import {
   type RemoveAccessesMutationInput,
   type RemoveAccessesMutationResult,
 } from './files.queries';
-import type { FileAccessInput, UniqueFile } from './files.types';
+import type { ContentUpdateResult, FileAccessInput, UniqueFile } from './files.types';
 
 const CONTENT_BATCH_SIZE = 100;
 const DELETE_BATCH_SIZE = 20;
@@ -44,7 +45,7 @@ interface FilesServiceDeps {
   };
 }
 
-export class FilesService {
+export class FilesService implements UniqueApiFiles {
   private readonly ingestionClient: UniqueGraphqlClient;
   private readonly logger: FilesServiceDeps['logger'];
 
@@ -132,7 +133,7 @@ export class FilesService {
     contentId: string,
     newOwnerId: string,
     newUrl: string,
-  ): Promise<ContentUpdateMutationResult['contentUpdate']> {
+  ): Promise<ContentUpdateResult> {
     this.logger.debug(`[ContentId: ${contentId}] Moving file to owner ${newOwnerId}`);
 
     const result = await this.ingestionClient.request<

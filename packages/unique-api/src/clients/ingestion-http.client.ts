@@ -8,8 +8,7 @@ import {
 import Bottleneck from 'bottleneck';
 import { type Dispatcher, errors, interceptors } from 'undici';
 import type { UniqueAuth } from '../auth/unique-auth';
-import type { UniqueApiMetrics } from '../core/observability';
-import type { RequestMetricAttributes } from '../core/types';
+import type { RequestMetricAttributes, UniqueApiMetrics } from '../core/observability';
 
 const DEFAULT_RATE_LIMIT_PER_MINUTE = 1000;
 

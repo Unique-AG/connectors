@@ -1,4 +1,4 @@
-import type { UniqueAccessType, UniqueEntityType } from '../core/types';
+import type { UniqueAccessType, UniqueEntityType } from '../types';
 
 export type FileAccessModifier = 'R' | 'W' | 'M';
 
@@ -19,4 +19,10 @@ export interface FileAccessInput {
   accessType: UniqueAccessType;
   entityId: string;
   entityType: UniqueEntityType;
+}
+
+export interface ContentUpdateResult {
+  id: string;
+  ownerId: string;
+  ownerType: string;
 }

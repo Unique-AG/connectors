@@ -1,5 +1,13 @@
 import type { Counter, Histogram, Meter } from '@opentelemetry/api';
 
+export interface RequestMetricAttributes {
+  operation: string;
+  target: string;
+  result: 'success' | 'error';
+  status_code_class?: string;
+  tenant?: string;
+}
+
 export interface UniqueApiMetrics {
   requestsTotal: Counter;
   errorsTotal: Counter;

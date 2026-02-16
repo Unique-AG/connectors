@@ -5,26 +5,13 @@ export {
   UNIQUE_API_CLIENT_REGISTRY,
   UNIQUE_API_METRICS,
 } from './core/tokens';
-export type {
-  ClusterLocalAuthConfig,
-  ContentUpdateResult,
-  DeleteFolderResult,
-  ExternalAuthConfig,
-  UniqueAccessType,
-  UniqueApiClient,
-  UniqueApiClientAuthConfig,
-  UniqueApiClientConfig,
-  UniqueApiClientFactory,
-  UniqueApiClientRegistry,
-  UniqueApiFeatureAsyncOptions,
-  UniqueApiModuleAsyncOptions,
-  UniqueApiModuleOptions,
-  UniqueApiObservabilityConfig,
-  UniqueEntityType,
-} from './core/types';
-export { UniqueOwnerType } from './core/types';
 export { UniqueApiModule } from './core/unique-api.module';
-export type { FileAccessInput, FileAccessKey, UniqueFile } from './files/files.types';
+export type {
+  ContentUpdateResult,
+  FileAccessInput,
+  FileAccessKey,
+  UniqueFile,
+} from './files/files.types';
 export type { Group, GroupWithMembers } from './groups/groups.types';
 export type {
   AuthorMetadata,
@@ -35,5 +22,27 @@ export type {
   IngestionApiResponse,
   IngestionFinalizationRequest,
 } from './ingestion/ingestion.types';
-export type { Scope, ScopeAccess, ScopeWithPath } from './scopes/scopes.types';
+export type { DeleteFolderResult, Scope, ScopeAccess, ScopeWithPath } from './scopes/scopes.types';
+export type {
+  ClusterLocalAuthConfig,
+  ExternalAuthConfig,
+  UniqueAccessType,
+  UniqueApiAuth,
+  UniqueApiClient,
+  UniqueApiClientAuthConfig,
+  UniqueApiClientConfig,
+  UniqueApiClientFactory,
+  UniqueApiClientRegistry,
+  UniqueApiFeatureAsyncOptions,
+  UniqueApiFiles,
+  UniqueApiGroups,
+  UniqueApiIngestion,
+  UniqueApiModuleAsyncOptions,
+  UniqueApiModuleOptions,
+  UniqueApiObservabilityConfig,
+  UniqueApiScopes,
+  UniqueApiUsers,
+  UniqueEntityType,
+} from './types';
+export { UniqueOwnerType } from './types';
 export type { SimpleUser } from './users/users.types';

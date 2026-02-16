@@ -1,5 +1,5 @@
 import { gql } from 'graphql-request';
-import type { UniqueAccessType, UniqueEntityType } from '../core/types';
+import type { UniqueAccessType, UniqueEntityType } from '../types';
 import type { Scope } from './scopes.types';
 
 export interface GenerateScopesBasedOnPathsMutationInput {

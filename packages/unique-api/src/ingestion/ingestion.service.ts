@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import type { IngestionHttpClient } from '../clients/ingestion-http.client';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import type { UniqueApiIngestion } from '../types';
 import {
   CONTENT_UPSERT_MUTATION,
   type ContentUpsertMutationInput,
@@ -21,7 +22,7 @@ interface FileIngestionServiceDeps {
   ingestionBaseUrl: string;
 }
 
-export class FileIngestionService {
+export class FileIngestionService implements UniqueApiIngestion {
   private readonly ingestionClient: UniqueGraphqlClient;
   private readonly ingestionHttpClient: IngestionHttpClient;
   private readonly ingestionBaseUrl: string;

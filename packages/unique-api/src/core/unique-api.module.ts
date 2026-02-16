@@ -7,6 +7,14 @@ import {
   type Provider,
 } from '@nestjs/common';
 import { type Meter, metrics } from '@opentelemetry/api';
+import type {
+  UniqueApiClientConfig,
+  UniqueApiClientFactory,
+  UniqueApiClientRegistry,
+  UniqueApiFeatureAsyncOptions,
+  UniqueApiModuleAsyncOptions,
+  UniqueApiModuleOptions,
+} from '../types';
 import { createUniqueApiMetrics, type UniqueApiMetrics } from './observability';
 import {
   getUniqueApiClientToken,
@@ -16,14 +24,6 @@ import {
   UNIQUE_API_METRICS,
   UNIQUE_API_MODULE_OPTIONS,
 } from './tokens';
-import type {
-  UniqueApiClientConfig,
-  UniqueApiClientFactory,
-  UniqueApiClientRegistry,
-  UniqueApiFeatureAsyncOptions,
-  UniqueApiModuleAsyncOptions,
-  UniqueApiModuleOptions,
-} from './types';
 import { UniqueApiClientFactoryImpl } from './unique-api-client.factory';
 import { UniqueApiClientRegistryImpl } from './unique-api-client.registry';
 

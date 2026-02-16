@@ -6,9 +6,9 @@ import { FilesService } from '../files/files.service';
 import { GroupsService } from '../groups/groups.service';
 import { FileIngestionService } from '../ingestion/ingestion.service';
 import { ScopesService } from '../scopes/scopes.service';
+import type { UniqueApiClient, UniqueApiClientConfig, UniqueApiClientFactory } from '../types';
 import { UsersService } from '../users/users.service';
 import type { UniqueApiMetrics } from './observability';
-import type { UniqueApiClient, UniqueApiClientConfig, UniqueApiClientFactory } from './types';
 
 interface UniqueApiClientFactoryLogger {
   log(message: string): void;
@@ -103,9 +103,7 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
     });
 
     return {
-      auth: {
-        getToken: () => auth.getToken(),
-      },
+      auth,
       scopes,
       files,
       users,

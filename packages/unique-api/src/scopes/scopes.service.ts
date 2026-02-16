@@ -1,6 +1,7 @@
 import { processInBatches } from '@unique-ag/utils';
 import { isNullish } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import type { UniqueApiScopes } from '../types';
 import {
   CREATE_SCOPE_ACCESSES_MUTATION,
   type CreateScopeAccessesMutationInput,
@@ -21,7 +22,7 @@ import {
   type UpdateScopeMutationInput,
   type UpdateScopeMutationResult,
 } from './scopes.queries';
-import type { Scope, ScopeAccess } from './scopes.types';
+import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
 
 const BATCH_SIZE = 100;
 
@@ -30,7 +31,7 @@ interface ScopesServiceDeps {
   logger: { debug: (msg: string) => void; error: (obj: object) => void };
 }
 
-export class ScopesService {
+export class ScopesService implements UniqueApiScopes {
   private readonly scopeManagementClient: UniqueGraphqlClient;
   private readonly logger: ScopesServiceDeps['logger'];
 
@@ -225,7 +226,7 @@ export class ScopesService {
   public async delete(
     scopeId: string,
     options: { recursive?: boolean } = {},
-  ): Promise<DeleteFolderMutationResult['deleteFolder']> {
+  ): Promise<DeleteFolderResult> {
     const { recursive = false } = options;
     this.logger.debug(`Deleting scope: ${scopeId} (recursive: ${recursive})`);
 
