@@ -1,4 +1,4 @@
-.PHONY: quality ct-install spc-helm-docs
+.PHONY: quality ct-install spc-helm-docs confluence-connector-helm-docs
 
 .DEFAULT_GOAL := quality
 
@@ -12,3 +12,6 @@ ct-install:
 
 spc-helm-docs:
 	@services/sharepoint-connector/deploy/helm-charts/helm-docs.sh
+
+confluence-connector-helm-docs:
+	@services/confluence-connector/deploy/helm-charts/helm-docs.sh

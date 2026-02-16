@@ -55,5 +55,12 @@ __snapshot__
 
 # local scripts
 **/local-scripts/**
-services/sharepoint-connector/src/tenant-configs/**
+services/**/src/tenant-configs/*
+!services/**/src/tenant-configs/examples/
+!services/**/src/tenant-configs/examples/*
+
+# Nix
+result
+
+# Zed config
 .zed

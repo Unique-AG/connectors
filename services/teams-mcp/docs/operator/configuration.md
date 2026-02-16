@@ -183,9 +183,9 @@ mcpConfig:
 The Teams MCP Server requires a Zitadel service account to authenticate with the Unique Public API. This service account is used to:
 
 1. **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants
-2. **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts
+2. **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts and recordings
 3. **Set access permissions** - Grant appropriate read/write permissions to meeting organizers and participants
-4. **Upload transcript data** - Ingest transcript content into the Unique knowledge base
+4. **Upload transcript and recording data** - Ingest transcript content and recordings into the Unique knowledge base
 
 The service account credentials are passed via the `x-company-id` and `x-user-id` headers in all API requests to ensure proper access control and authorization.
 
