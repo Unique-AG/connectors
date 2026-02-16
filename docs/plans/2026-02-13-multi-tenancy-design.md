@@ -12,7 +12,7 @@ The confluence-connector operates in single-tenant mode: it reads the first tena
 
 Transform the connector to support multiple Confluence tenants from a single deployment across four layers:
 
-1. **Config & Secrets (Layer 1):** Replace the implicit secret injection (`injectSecretsFromEnvironment`) with LiteLLM-style `os.environ/VAR_NAME` references in tenant YAML. Secrets are resolved inside Zod transforms during validation. Tenant name is derived from the filename. An optional `enabled` field (defaults to `true`) lets operators disable a tenant without removing its config file.
+1. **Config & Secrets (Layer 1):** Replace the implicit secret injection (`injectSecretsFromEnvironment`) with LiteLLM-style `os.environ/VAR_NAME` references in tenant YAML. Secrets are resolved inside Zod transforms during validation. Tenant name is derived from the filename. A top-level `status` field (`active` | `inactive` | `deleted`) controls tenant lifecycle — only `active` tenants are registered and scheduled.
 
 2. **TenantRegistry (Layer 2):** A global `TenantRegistry` service holds a `Map<string, TenantContext>`. Each `TenantContext` bundles the tenant's config, a pre-configured auth strategy with its own `TokenCache`, and a child logger with `tenantName` context. This replaces the current `ConfigModule.forRoot` registration of tenant-scoped config.
 
@@ -132,12 +132,24 @@ const envResolvableRedactedStringSchema = envResolvableStringSchema
 
 Rule: strip the `-tenant-config.yaml` suffix from the filename (without directory path).
 
-**Tenant disabling:** An optional top-level `enabled` field (defaults to `true`). Tenants with `enabled: false` are logged and skipped before validation:
+**Tenant lifecycle status:** A top-level `status` field controls tenant behavior (similar to SPC site statuses):
+
+| Status | Behavior |
+| --- | --- |
+| `active` | Tenant is registered, auth is initialized, cron job is scheduled. Default if `status` is omitted. |
+| `inactive` | Tenant is logged as skipped and not registered. Config is still validated. Use for temporarily pausing a tenant without losing its config. |
+| `deleted` | Tenant is logged as skipped and not registered. Config is NOT validated (may contain errors). When the sync pipeline is implemented, this status will trigger cleanup of previously ingested data. |
 
 ```yaml
-enabled: false  # This tenant is temporarily disabled
+status: inactive  # This tenant is temporarily paused
 confluence:
-  # ... (may contain errors, won't be validated)
+  # ... (config is validated but tenant is not registered)
+```
+
+```yaml
+status: deleted  # This tenant's ingested data should be cleaned up
+confluence:
+  # ... (config is NOT validated, may contain errors)
 ```
 
 **`getTenantConfigs()` return type changes:**
@@ -275,8 +287,9 @@ If deeper structured logging is needed later (e.g., a dedicated `tenantName` JSO
 **Config loading errors:**
 - Missing `os.environ/` variable → Zod validation error with full path (e.g., `confluence.auth.clientSecret: Environment variable 'ACME_SECRET' is not set`)
 - Invalid YAML → fail-fast at startup with file path in error message
-- `enabled: false` tenant → logged as info and skipped, not an error
-- Zero enabled tenants → fail-fast at startup
+- `inactive` tenant → config validated but tenant not registered, logged as info
+- `deleted` tenant → config NOT validated, tenant not registered, logged as info
+- Zero `active` tenants → fail-fast at startup
 
 **Scheduler errors:**
 - Per-tenant `try/catch` — one tenant failure does not affect others
@@ -292,7 +305,9 @@ If deeper structured logging is needed later (e.g., a dedicated `tenantName` JSO
 - **Config loader tests** — extend existing `tenant-config-loader.spec.ts`:
   - `os.environ/` resolution (happy path + missing env var)
   - Tenant name extraction from filename
-  - `enabled: false` skipping
+  - `status: inactive` skipping (config validated, tenant not registered)
+  - `status: deleted` skipping (config not validated, tenant not registered)
+  - Default status is `active` when field is omitted
   - Multi-tenant loading with different auth modes
   - Backward compatibility: plain string values still work (for non-secret fields)
 - **Zod schema tests** — test `envResolvableStringSchema` and `envResolvableRedactedStringSchema` in isolation
@@ -341,7 +356,7 @@ async syncTenant(tenant: TenantContext) {
 
 1. **Create `envResolvableStringSchema` Zod utilities** — Add `envResolvableStringSchema` and `envResolvableRedactedStringSchema` to `zod.util.ts`. Update `confluence.schema.ts` and `unique.schema.ts` to use them for secret fields. Remove `injectSecretsFromEnvironment()` from `tenant-config-loader.ts`.
 
-2. **Add tenant name extraction and enabled flag to config loader** — `getTenantConfigs()` returns `NamedTenantConfig[]` with name derived from filename. Support optional top-level `enabled` field (default `true`). Remove `getFirstTenantConfig()` and the singleton `registerAs` exports. Update tests.
+2. **Add tenant name extraction and status field to config loader** — `getTenantConfigs()` returns `NamedTenantConfig[]` with name derived from filename. Support top-level `status` field (`active` | `inactive` | `deleted`, default `active`). `inactive` tenants are validated but skipped; `deleted` tenants skip validation entirely. Remove `getFirstTenantConfig()` and the singleton `registerAs` exports. Update tests.
 
 3. **Create TenantContext interface and TenantRegistry service** — Define `TenantContext` with `name`, `config`, `logger`, `getAccessToken()`. Create `TenantRegistry` as a global provider that builds the tenant map at startup, creating per-tenant auth strategies and token caches. Create `TenantModule`.
 
