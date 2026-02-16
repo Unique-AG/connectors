@@ -3,6 +3,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import type { TenantContext } from '../tenant/tenant-context.interface';
 import { tenantStorage } from '../tenant/tenant-context.storage';
+import { getTenantLogger } from '../tenant/tenant-logger';
 import { TenantRegistry } from '../tenant/tenant-registry';
 import { smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
@@ -72,9 +73,10 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     tenant.isScanning = true;
     try {
       await tenantStorage.run(tenant, async () => {
-        tenant.logger.info('Starting sync');
+        const logger = getTenantLogger(TenantSyncScheduler);
+        logger.info('Starting sync');
         const token = await tenant.auth.getAccessToken();
-        tenant.logger.info(`Token acquired successfully (${smear(token)})`);
+        logger.info({ token: smear(token) }, 'Token acquired');
         // TODO: Full sync pipeline
       });
     } catch (error) {
