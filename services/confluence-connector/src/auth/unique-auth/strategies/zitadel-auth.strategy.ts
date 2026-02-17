@@ -1,6 +1,8 @@
-import { Logger } from '@nestjs/common';
-import { Agent, type Dispatcher, interceptors } from 'undici';
+import assert from 'node:assert/strict';
+import { request } from 'undici';
 import { UniqueAuthMode, type UniqueConfig } from '../../../config';
+import { ServiceRegistry } from '../../../tenant/service-registry';
+import { handleErrorStatus } from '../../../utils/http-util';
 import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenCache } from '../../token-cache';
 import { UniqueAuth } from '../unique-auth.abstract';
@@ -14,19 +16,16 @@ interface ZitadelTokenResponse {
 }
 
 export class ZitadelAuthStrategy extends UniqueAuth {
-  private readonly logger = new Logger(ZitadelAuthStrategy.name);
+  private readonly serviceRegistry: ServiceRegistry;
   private readonly tokenCache: TokenCache;
-  private readonly agent: Agent;
-  private readonly dispatcher: Dispatcher;
   private readonly tokenUrl: string;
   private readonly basicAuth: string;
   private readonly scope: string;
 
-  public constructor(config: ExternalConfig) {
+  public constructor(config: ExternalConfig, serviceRegistry: ServiceRegistry) {
     super();
+    this.serviceRegistry = serviceRegistry;
     this.tokenCache = new TokenCache();
-    this.agent = new Agent();
-    this.dispatcher = this.agent.compose(interceptors.retry(), interceptors.redirect());
     this.tokenUrl = config.zitadelOauthTokenUrl;
 
     this.basicAuth = Buffer.from(
@@ -50,10 +49,7 @@ export class ZitadelAuthStrategy extends UniqueAuth {
     });
 
     try {
-      const url = new URL(this.tokenUrl);
-      const { statusCode, body: responseBody } = await this.dispatcher.request({
-        origin: url.origin,
-        path: url.pathname + url.search,
+      const { statusCode, body: responseBody } = await request(this.tokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -62,33 +58,22 @@ export class ZitadelAuthStrategy extends UniqueAuth {
         body: body.toString(),
       });
 
-      if (statusCode < 200 || statusCode >= 300) {
-        const errorText = await responseBody.text().catch(() => 'No response body');
-        throw new Error(
-          `Zitadel token request failed with status ${statusCode}. ` +
-            `URL: ${this.tokenUrl}, Response: ${errorText}`,
-        );
-      }
+      await handleErrorStatus(statusCode, responseBody, this.tokenUrl);
 
       const tokenData = (await responseBody.json()) as ZitadelTokenResponse;
-      if (!tokenData.access_token) {
-        throw new Error('Invalid token response: missing access_token');
-      }
+      assert.ok(tokenData.access_token, 'Invalid token response: missing access_token');
 
       return {
         accessToken: tokenData.access_token,
         expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
       };
     } catch (error) {
-      this.logger.error({
+      const logger = this.serviceRegistry.getServiceLogger(ZitadelAuthStrategy);
+      logger.error({
         msg: 'Failed to acquire Unique API token from Zitadel',
         error: sanitizeError(error),
       });
       throw error;
     }
-  }
-
-  public async close(): Promise<void> {
-    await this.agent.close();
   }
 }

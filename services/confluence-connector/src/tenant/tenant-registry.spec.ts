@@ -76,7 +76,7 @@ function createRegistry(configs: NamedTenantConfig[]): {
   const mockFactory = new ConfluenceAuthFactory({} as ServiceRegistry);
   vi.mocked(mockFactory.createAuthStrategy).mockImplementation(() => createMockAuth());
 
-  const mockUniqueFactory = new UniqueAuthFactory();
+  const mockUniqueFactory = new UniqueAuthFactory({} as ServiceRegistry);
   vi.mocked(mockUniqueFactory.create).mockImplementation(() => createMockUniqueAuth());
 
   const serviceRegistry = new ServiceRegistry();
@@ -128,7 +128,7 @@ describe('TenantRegistry', () => {
       const mockFactory = new ConfluenceAuthFactory({} as ServiceRegistry);
       vi.mocked(mockFactory.createAuthStrategy).mockReturnValue(createMockAuth());
 
-      const mockUniqueFactory = new UniqueAuthFactory();
+      const mockUniqueFactory = new UniqueAuthFactory({} as ServiceRegistry);
       vi.mocked(mockUniqueFactory.create).mockReturnValue(createMockUniqueAuth());
 
       const serviceRegistry = new ServiceRegistry();
@@ -151,7 +151,7 @@ describe('TenantRegistry', () => {
       const mockFactory = new ConfluenceAuthFactory({} as ServiceRegistry);
       vi.mocked(mockFactory.createAuthStrategy).mockReturnValue(createMockAuth());
 
-      const mockUniqueFactory = new UniqueAuthFactory();
+      const mockUniqueFactory = new UniqueAuthFactory({} as ServiceRegistry);
       vi.mocked(mockUniqueFactory.create).mockReturnValue(createMockUniqueAuth());
 
       const serviceRegistry = new ServiceRegistry();
