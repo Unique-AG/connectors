@@ -84,7 +84,8 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
     });
 
     const scopes = new ScopesService({
-      scopeManagementClient,
+      // Scope management was moved to ingestion
+      scopeManagementClient: ingestionClient,
       logger: this.logger,
     });
 

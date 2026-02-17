@@ -89,7 +89,7 @@ export class IngestEmailCommand {
       return;
     }
 
-    await this.uniqueApi.ingestion.upsertContent({
+    await this.uniqueApi.ingestion.registerContent({
       key: fileKey,
       title: `${graphMessage.subject} - ${graphMessage.id}.eml`,
       mimeType: `message/rfc822`,
@@ -134,15 +134,15 @@ export class IngestEmailCommand {
       byteSize: 1,
       metadata: metadata,
       scopeId: rootScopeId,
-      ownerType: UniqueOwnerType.User,
-      sourceOwnerType: UniqueOwnerType.User,
+      ownerType: UniqueOwnerType.Scope,
+      sourceOwnerType: UniqueOwnerType.Scope,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       // TODO: Check with Michat
       storeInternally: false,
     };
 
-    const content = await this.uniqueApi.ingestion.upsertContent(createContentRequest);
+    const content = await this.uniqueApi.ingestion.registerContent(createContentRequest);
 
     let byteSize = 0;
 

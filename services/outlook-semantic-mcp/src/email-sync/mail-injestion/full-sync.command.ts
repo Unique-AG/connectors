@@ -112,7 +112,9 @@ export class FullSyncCommand {
       });
     }
     const filesToDelete = await this.uniqueApi.files.getByKeys(filleDiffResponse.deletedFiles);
-    await this.uniqueApi.files.deleteByIds(filesToDelete.map((file) => file.id));
+    if (filesToDelete.length) {
+      await this.uniqueApi.files.deleteByIds(filesToDelete.map((file) => file.id));
+    }
   }
 
   private async fetchAllEmails({

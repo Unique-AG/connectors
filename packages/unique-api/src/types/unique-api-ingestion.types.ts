@@ -8,7 +8,7 @@ import type {
 } from '../ingestion/ingestion.types';
 
 export interface UniqueApiIngestion {
-  upsertContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse>;
+  registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse>;
   streamUpload(request: UploadContentRequest): Promise<void>;
   finalizeIngestion(request: IngestionFinalizationRequest): Promise<{ id: string }>;
   performFileDiff(

@@ -40,7 +40,7 @@ export class FileIngestionService implements UniqueApiIngestion {
     this.ingestionBaseUrl = deps.ingestionBaseUrl;
   }
 
-  public async upsertContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse> {
+  public async registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse> {
     const variables: ContentUpsertMutationInput = {
       input: {
         key: request.key,

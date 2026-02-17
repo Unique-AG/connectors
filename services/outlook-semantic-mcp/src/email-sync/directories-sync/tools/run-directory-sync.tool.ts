@@ -1,9 +1,12 @@
+import assert from 'node:assert';
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
-import { SyncDirectoriesForSubscriptionsCommand } from '../sync-directories-for-subscriptions.command';
+import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/drizzle';
+import { SyncDirectoriesWithDeltaCommand } from '../sync-directories-with-delta.command';
 
 const InputSchema = z.object({});
 
@@ -18,17 +21,18 @@ export class RunDirectorySyncTool {
 
   public constructor(
     private readonly traceService: TraceService,
-    private readonly syncDirectoriesForSubscriptionsCommand: SyncDirectoriesForSubscriptionsCommand,
+    private readonly syncDirectoriesWithDeltaCommand: SyncDirectoriesWithDeltaCommand,
+    @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
   ) {}
 
   @Tool({
-    name: 'run_directories_sync_for_all',
-    title: 'Run directories sync for all subscriptions',
-    description: 'Run directories sync for all subscriptions',
+    name: 'run_directories_sync',
+    title: 'Run directories sync',
+    description: 'Run directories sync',
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {
-      title: 'Run directories sync for all subscriptions',
+      title: 'Run directories sync',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: true,
@@ -36,8 +40,7 @@ export class RunDirectorySyncTool {
     },
     _meta: {
       'unique.app/icon': 'play',
-      'unique.app/system-prompt':
-        'Starts directories sync for last 10 users which synscronized a long time ago',
+      'unique.app/system-prompt': 'Starts directories in database',
     },
   })
   @Span()
@@ -54,8 +57,13 @@ export class RunDirectorySyncTool {
 
     this.logger.log({ userProfileId }, 'Starting directory sync');
 
+    const subscription = await this.drizzle.query.subscriptions.findFirst({
+      where: eq(subscriptions.userProfileId, userProfileId),
+    });
+    assert.ok(subscription, `Missing subscription for userProfile: ${userProfileId}`);
+
     try {
-      await this.syncDirectoriesForSubscriptionsCommand.run();
+      await this.syncDirectoriesWithDeltaCommand.run(subscription.subscriptionId);
     } catch (error) {
       await this.logger.error(error);
       return { success: false, message: `Failed to run sync` };
