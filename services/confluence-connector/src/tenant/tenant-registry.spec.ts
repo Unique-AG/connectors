@@ -2,8 +2,9 @@ import type pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { NamedTenantConfig, TenantConfig } from '../config/tenant-config-loader';
 import { getTenantConfigs } from '../config/tenant-config-loader';
+import { UniqueServiceAuth, UniqueTenantAuthFactory } from '../unique-auth';
 import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
-import type { TenantAuth } from './tenant-auth';
+import { TenantAuth } from './tenant-auth';
 import { TenantRegistry } from './tenant-registry';
 
 const { mockChildLogger, mockRoot } = vi.hoisted(() => {
@@ -31,6 +32,7 @@ vi.mock('../config/tenant-config-loader', () => ({
 }));
 
 vi.mock('./confluence-tenant-auth.factory');
+vi.mock('../unique-auth/unique-tenant-auth.factory');
 
 function createMockTenantConfig(): TenantConfig {
   return {
@@ -51,6 +53,10 @@ function createMockAuth(): TenantAuth {
   return { getAccessToken: vi.fn().mockResolvedValue('mock-token') };
 }
 
+function createMockUniqueAuth(): UniqueServiceAuth {
+  return { getHeaders: vi.fn().mockResolvedValue({ Authorization: 'Bearer mock' }) };
+}
+
 function createRegistry(configs: NamedTenantConfig[]): TenantRegistry {
   vi.mocked(getTenantConfigs).mockReturnValue(configs);
 
@@ -58,7 +64,11 @@ function createRegistry(configs: NamedTenantConfig[]): TenantRegistry {
   const mockFactory = new ConfluenceTenantAuthFactory();
   vi.mocked(mockFactory.create).mockReturnValue(mockAuth);
 
-  const registry = new TenantRegistry(mockFactory);
+  const mockUniqueAuth = createMockUniqueAuth();
+  const mockUniqueFactory = new UniqueTenantAuthFactory();
+  vi.mocked(mockUniqueFactory.create).mockReturnValue(mockUniqueAuth);
+
+  const registry = new TenantRegistry(mockFactory, mockUniqueFactory);
   registry.onModuleInit();
   return registry;
 }
@@ -92,6 +102,60 @@ describe('TenantRegistry', () => {
       createRegistry([{ name: 'tenant-a', config: createMockTenantConfig() }]);
 
       expect(mockChildLogger.info).toHaveBeenCalledWith('Tenant registered');
+    });
+
+    it('calls ConfluenceTenantAuthFactory.create for each tenant', () => {
+      const configA = createMockTenantConfig();
+      const configB = createMockTenantConfig();
+
+      vi.mocked(getTenantConfigs).mockReturnValue([
+        { name: 'tenant-a', config: configA },
+        { name: 'tenant-b', config: configB },
+      ]);
+
+      const mockFactory = new ConfluenceTenantAuthFactory();
+      vi.mocked(mockFactory.create).mockReturnValue(createMockAuth());
+
+      const mockUniqueFactory = new UniqueTenantAuthFactory();
+      vi.mocked(mockUniqueFactory.create).mockReturnValue(createMockUniqueAuth());
+
+      const registry = new TenantRegistry(mockFactory, mockUniqueFactory);
+      registry.onModuleInit();
+
+      expect(mockFactory.create).toHaveBeenCalledWith(configA.confluence);
+      expect(mockFactory.create).toHaveBeenCalledWith(configB.confluence);
+    });
+
+    it('calls UniqueTenantAuthFactory.create for each tenant', () => {
+      const configA = createMockTenantConfig();
+      const configB = createMockTenantConfig();
+
+      vi.mocked(getTenantConfigs).mockReturnValue([
+        { name: 'tenant-a', config: configA },
+        { name: 'tenant-b', config: configB },
+      ]);
+
+      const mockFactory = new ConfluenceTenantAuthFactory();
+      vi.mocked(mockFactory.create).mockReturnValue(createMockAuth());
+
+      const mockUniqueFactory = new UniqueTenantAuthFactory();
+      vi.mocked(mockUniqueFactory.create).mockReturnValue(createMockUniqueAuth());
+
+      const registry = new TenantRegistry(mockFactory, mockUniqueFactory);
+      registry.onModuleInit();
+
+      expect(mockUniqueFactory.create).toHaveBeenCalledWith(configA.unique);
+      expect(mockUniqueFactory.create).toHaveBeenCalledWith(configB.unique);
+    });
+
+    it('populates services registry with TenantAuth and UniqueServiceAuth', () => {
+      const configs: NamedTenantConfig[] = [{ name: 'tenant-a', config: createMockTenantConfig() }];
+
+      const registry = createRegistry(configs);
+      const tenant = registry.get('tenant-a');
+
+      expect(tenant.services.has(TenantAuth)).toBe(true);
+      expect(tenant.services.has(UniqueServiceAuth)).toBe(true);
     });
   });
 

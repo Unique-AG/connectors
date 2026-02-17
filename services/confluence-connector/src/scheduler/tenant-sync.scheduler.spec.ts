@@ -1,9 +1,10 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TenantAuth } from '../tenant/tenant-auth';
+import { TenantAuth } from '../tenant/tenant-auth';
 import type { TenantContext } from '../tenant/tenant-context.interface';
 import { getCurrentTenant } from '../tenant/tenant-context.storage';
 import { TenantRegistry } from '../tenant/tenant-registry';
+import { TenantServiceRegistry } from '../tenant/tenant-service-registry';
 import { smear } from '../utils/logging.util';
 import { TenantSyncScheduler } from './tenant-sync.scheduler';
 
@@ -19,7 +20,12 @@ vi.mock('../tenant/tenant-logger', () => ({
 
 import { getTenantLogger } from '../tenant/tenant-logger';
 
+function createMockAuth(): TenantAuth {
+  return { getAccessToken: vi.fn().mockResolvedValue('mock-token-12345678') } as TenantAuth;
+}
+
 function createMockTenant(name: string, overrides: Partial<TenantContext> = {}): TenantContext {
+  const services = new TenantServiceRegistry().set(TenantAuth, createMockAuth());
   return {
     name,
     config: {
@@ -30,9 +36,7 @@ function createMockTenant(name: string, overrides: Partial<TenantContext> = {}):
       warn: vi.fn(),
       error: vi.fn(),
     },
-    auth: {
-      getAccessToken: vi.fn().mockResolvedValue('mock-token-12345678'),
-    } satisfies TenantAuth,
+    services,
     isScanning: false,
     ...overrides,
   } as unknown as TenantContext;
@@ -84,8 +88,8 @@ describe('TenantSyncScheduler', () => {
     it('triggers initial sync for each tenant', () => {
       scheduler.onModuleInit();
 
-      expect(tenantA.auth.getAccessToken).toHaveBeenCalledOnce();
-      expect(tenantB.auth.getAccessToken).toHaveBeenCalledOnce();
+      expect(tenantA.services.get(TenantAuth).getAccessToken).toHaveBeenCalledOnce();
+      expect(tenantB.services.get(TenantAuth).getAccessToken).toHaveBeenCalledOnce();
     });
 
     it('logs the scheduled cron expression via getTenantLogger', () => {
@@ -132,7 +136,7 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(tenantA.auth.getAccessToken).toHaveBeenCalledOnce();
+      expect(tenantA.services.get(TenantAuth).getAccessToken).toHaveBeenCalledOnce();
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
       expect(mockTenantLogger.info).toHaveBeenCalledWith(
         { token: smear('mock-token-12345678') },
@@ -142,7 +146,7 @@ describe('TenantSyncScheduler', () => {
 
     it('sets AsyncLocalStorage context during sync', async () => {
       let capturedTenant: TenantContext | undefined;
-      vi.mocked(tenantA.auth.getAccessToken).mockImplementation(async () => {
+      vi.mocked(tenantA.services.get(TenantAuth).getAccessToken).mockImplementation(async () => {
         capturedTenant = getCurrentTenant();
         return 'mock-token-12345678';
       });
@@ -159,7 +163,7 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(tenantA.auth.getAccessToken).not.toHaveBeenCalled();
+      expect(tenantA.services.get(TenantAuth).getAccessToken).not.toHaveBeenCalled();
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync already in progress, skipping');
     });
 
@@ -171,7 +175,9 @@ describe('TenantSyncScheduler', () => {
     });
 
     it('resets isScanning after failed sync', async () => {
-      vi.mocked(tenantA.auth.getAccessToken).mockRejectedValue(new Error('auth failure'));
+      vi.mocked(tenantA.services.get(TenantAuth).getAccessToken).mockRejectedValue(
+        new Error('auth failure'),
+      );
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
@@ -194,7 +200,9 @@ describe('TenantSyncScheduler', () => {
     });
 
     it('isolates errors between tenants', async () => {
-      vi.mocked(tenantA.auth.getAccessToken).mockRejectedValue(new Error('tenant-a failed'));
+      vi.mocked(tenantA.services.get(TenantAuth).getAccessToken).mockRejectedValue(
+        new Error('tenant-a failed'),
+      );
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
@@ -204,7 +212,7 @@ describe('TenantSyncScheduler', () => {
       expect(mockTenantLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ msg: 'Sync failed' }),
       );
-      expect(tenantB.auth.getAccessToken).toHaveBeenCalledOnce();
+      expect(tenantB.services.get(TenantAuth).getAccessToken).toHaveBeenCalledOnce();
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
     });
   });
