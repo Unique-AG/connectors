@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { getTenantConfigs } from '../config/tenant-config-loader';
 import { UniqueServiceAuth, UniqueTenantAuthFactory } from '../unique-auth';
@@ -8,7 +8,8 @@ import type { TenantContext } from './tenant-context.interface';
 import { TenantServiceRegistry } from './tenant-service-registry';
 
 @Injectable()
-export class TenantRegistry implements OnModuleInit {
+export class TenantRegistry implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(TenantRegistry.name);
   private readonly tenants = new Map<string, TenantContext>();
 
   public constructor(
@@ -34,6 +35,20 @@ export class TenantRegistry implements OnModuleInit {
       });
       tenantLogger.info('Tenant registered');
     }
+  }
+
+  public async onModuleDestroy(): Promise<void> {
+    const closePromises = this.getAll().map(async (tenant) => {
+      try {
+        await tenant.services.get(UniqueServiceAuth).close();
+      } catch (error) {
+        this.logger.error({
+          msg: `Failed to close UniqueServiceAuth for tenant ${tenant.name}`,
+          error,
+        });
+      }
+    });
+    await Promise.all(closePromises);
   }
 
   public get(name: string): TenantContext {

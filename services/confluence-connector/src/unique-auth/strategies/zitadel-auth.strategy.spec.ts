@@ -141,7 +141,7 @@ describe('ZitadelAuthStrategy', () => {
       );
     });
 
-    it('caches the token across multiple calls', async () => {
+    it('caches the token across sequential calls', async () => {
       mockSuccessfulTokenResponse('cached-token', 3600);
       const strategy = new ZitadelAuthStrategy(createExternalConfig());
 
@@ -149,6 +149,20 @@ describe('ZitadelAuthStrategy', () => {
       await strategy.getHeaders();
 
       expect(mockRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('deduplicates concurrent getHeaders calls into a single request', async () => {
+      mockSuccessfulTokenResponse('deduped-token', 3600);
+      const strategy = new ZitadelAuthStrategy(createExternalConfig());
+
+      const [headersA, headersB] = await Promise.all([
+        strategy.getHeaders(),
+        strategy.getHeaders(),
+      ]);
+
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+      expect(headersA).toEqual({ Authorization: 'Bearer deduped-token' });
+      expect(headersB).toEqual({ Authorization: 'Bearer deduped-token' });
     });
 
     it('throws when response status is not 2xx', async () => {

@@ -54,19 +54,20 @@ function createMockAuth(): TenantAuth {
 }
 
 function createMockUniqueAuth(): UniqueServiceAuth {
-  return { getHeaders: vi.fn().mockResolvedValue({ Authorization: 'Bearer mock' }) };
+  return {
+    getHeaders: vi.fn().mockResolvedValue({ Authorization: 'Bearer mock' }),
+    close: vi.fn().mockResolvedValue(undefined),
+  } as unknown as UniqueServiceAuth;
 }
 
 function createRegistry(configs: NamedTenantConfig[]): TenantRegistry {
   vi.mocked(getTenantConfigs).mockReturnValue(configs);
 
-  const mockAuth = createMockAuth();
   const mockFactory = new ConfluenceTenantAuthFactory();
-  vi.mocked(mockFactory.create).mockReturnValue(mockAuth);
+  vi.mocked(mockFactory.create).mockImplementation(() => createMockAuth());
 
-  const mockUniqueAuth = createMockUniqueAuth();
   const mockUniqueFactory = new UniqueTenantAuthFactory();
-  vi.mocked(mockUniqueFactory.create).mockReturnValue(mockUniqueAuth);
+  vi.mocked(mockUniqueFactory.create).mockImplementation(() => createMockUniqueAuth());
 
   const registry = new TenantRegistry(mockFactory, mockUniqueFactory);
   registry.onModuleInit();
@@ -156,6 +157,41 @@ describe('TenantRegistry', () => {
 
       expect(tenant.services.has(TenantAuth)).toBe(true);
       expect(tenant.services.has(UniqueServiceAuth)).toBe(true);
+    });
+  });
+
+  describe('onModuleDestroy', () => {
+    it('closes UniqueServiceAuth for each tenant', async () => {
+      const configs: NamedTenantConfig[] = [
+        { name: 'tenant-a', config: createMockTenantConfig() },
+        { name: 'tenant-b', config: createMockTenantConfig() },
+      ];
+
+      const registry = createRegistry(configs);
+      await registry.onModuleDestroy();
+
+      for (const tenant of registry.getAll()) {
+        const auth = tenant.services.get(UniqueServiceAuth);
+        expect(auth.close).toHaveBeenCalledOnce();
+      }
+    });
+
+    it('continues closing remaining tenants when one fails', async () => {
+      const configs: NamedTenantConfig[] = [
+        { name: 'tenant-a', config: createMockTenantConfig() },
+        { name: 'tenant-b', config: createMockTenantConfig() },
+      ];
+
+      const registry = createRegistry(configs);
+      const tenantA = registry.get('tenant-a');
+      vi.mocked(tenantA.services.get(UniqueServiceAuth).close).mockRejectedValue(
+        new Error('close failed'),
+      );
+
+      await registry.onModuleDestroy();
+
+      const tenantB = registry.get('tenant-b');
+      expect(tenantB.services.get(UniqueServiceAuth).close).toHaveBeenCalledOnce();
     });
   });
 
