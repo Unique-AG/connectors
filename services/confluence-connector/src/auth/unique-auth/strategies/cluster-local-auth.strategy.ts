@@ -9,6 +9,9 @@ type ClusterLocalConfig = Extract<
 const SERVICE_ID_HEADER = 'x-service-id';
 const SERVICE_NAME = 'confluence-connector';
 
+/*
+ * Business logic will be replaced with the shared Unique auth library
+ */
 export class ClusterLocalAuthStrategy extends UniqueAuth {
   private readonly headers: Record<string, string>;
 
