@@ -71,9 +71,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       }
 
       try {
-        await this.serviceRegistry
-          .getService(ConfluenceSynchronizationService)
-          .synchronize();
+        await this.serviceRegistry.getService(ConfluenceSynchronizationService).synchronize();
       } catch (error) {
         logger.error({
           msg: 'Unexpected sync error',
