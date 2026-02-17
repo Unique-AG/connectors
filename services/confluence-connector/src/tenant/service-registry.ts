@@ -4,15 +4,13 @@ import type pino from 'pino';
 import { getCurrentTenant } from './tenant-context.storage';
 
 export type AbstractClass<T> = abstract new (...args: unknown[]) => T;
-
-type ServiceClass = {
+interface ServiceClass {
   readonly name: string;
-};
+}
 
 @Injectable()
 export class ServiceRegistry {
-  // biome-ignore lint/complexity/noBannedTypes: Function is used as runtime map key for abstract class constructors
-  private readonly tenantServices = new Map<string, Map<Function, unknown>>();
+  private readonly tenantServices = new Map<string, Map<AbstractClass<unknown>, unknown>>();
   private readonly tenantLoggers = new Map<string, pino.Logger>();
 
   public register<T>(tenantName: string, key: AbstractClass<T>, instance: T): void {
@@ -46,8 +44,7 @@ export class ServiceRegistry {
     return instance as T;
   }
 
-  // biome-ignore lint/complexity/noBannedTypes: Function is used as runtime map key for abstract class constructors
-  private getTenantServices(tenantName: string): Map<Function, unknown> {
+  private getTenantServices(tenantName: string): Map<AbstractClass<unknown>, unknown> {
     const services = this.tenantServices.get(tenantName);
     assert.ok(services, `No services registered for tenant: ${tenantName}`);
     return services;

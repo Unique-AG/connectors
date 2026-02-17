@@ -15,6 +15,9 @@ interface ZitadelTokenResponse {
   token_type: string;
 }
 
+/*
+ * Business logic will be replaced with the shared Unique auth library
+ */
 export class ZitadelAuthStrategy extends UniqueAuth {
   private readonly serviceRegistry: ServiceRegistry;
   private readonly tokenCache: TokenCache;

@@ -32,7 +32,7 @@ export class TenantRegistry implements OnModuleInit {
       };
       this.tenants.set(tenantName, tenant);
 
-      //
+      // initialize services for the tenant
       tenantStorage.run(tenant, () => {
         this.serviceRegistry.register(
           tenantName,
