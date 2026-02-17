@@ -1,19 +1,13 @@
 import assert from 'node:assert';
 import { z } from 'zod';
-import { AuthMode } from '../../../config';
+import { AuthMode, ConfluenceConfig } from '../../../config';
 import { ServiceRegistry } from '../../../tenant/service-registry';
 import { normalizeError, sanitizeError } from '../../../utils/normalize-error';
-import type { Redacted } from '../../../utils/redacted';
 import { TokenCache } from '../../token-cache';
 import type { TokenResult } from '../../token-result';
 import { ConfluenceAuth } from '../confluence-auth.abstract';
 
-interface OAuth2LoAuthConfig {
-  mode: typeof AuthMode.OAUTH_2LO;
-  clientId: string;
-  clientSecret: Redacted<string>;
-}
-
+type OAuth2LoAuthConfig = Extract<ConfluenceConfig['auth'], { mode: typeof AuthMode.OAUTH_2LO }>;
 interface OAuth2LoConnectionConfig {
   instanceType: 'cloud' | 'data-center';
   baseUrl: string;
@@ -66,9 +60,10 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
       const response = await this.requestToken();
       return this.parseTokenResponse(response);
     } catch (error) {
-      logger.error(
-        { msg: `Failed to acquire Confluence ${this.instanceType} token via OAuth 2.0 2LO`, error: sanitizeError(error) },
-      );
+      logger.error({
+        msg: `Failed to acquire Confluence ${this.instanceType} token via OAuth 2.0 2LO`,
+        error: sanitizeError(error),
+      });
 
       throw error;
     }

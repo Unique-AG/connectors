@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthMode } from '../../../config/confluence.schema';
 import { ServiceRegistry } from '../../../tenant/service-registry';
-import { tenantStorage } from '../../../tenant/tenant-context.storage';
 import type { TenantContext } from '../../../tenant/tenant-context.interface';
+import { tenantStorage } from '../../../tenant/tenant-context.storage';
 import { Redacted } from '../../../utils/redacted';
 import { OAuth2LoAuthStrategy } from './oauth2lo-auth.strategy';
 
@@ -169,9 +169,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
-      await expect(
-        tenantStorage.run(mockTenant, () => strategy.acquireToken()),
-      ).rejects.toThrow();
+      await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow();
 
       expect(loggerErrorMock).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
@@ -187,9 +185,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
-      await expect(
-        tenantStorage.run(mockTenant, () => strategy.acquireToken()),
-      ).rejects.toThrow(
+      await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
         'Network error requesting token from https://api.atlassian.com/oauth/token: getaddrinfo ENOTFOUND',
       );
     });
@@ -214,9 +210,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
-      await expect(
-        tenantStorage.run(mockTenant, () => strategy.acquireToken()),
-      ).rejects.toThrow(
+      await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
         'Invalid credentials: https://api.atlassian.com/oauth/token responded with 401: Unauthorized',
       );
     });
@@ -226,9 +220,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection, mockServiceRegistry);
 
-      await expect(
-        tenantStorage.run(mockTenant, () => strategy.acquireToken()),
-      ).rejects.toThrow(
+      await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
         'Invalid credentials: https://confluence.corp.example.com/rest/oauth2/latest/token responded with 403: Forbidden',
       );
     });
@@ -238,9 +230,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
-      await expect(
-        tenantStorage.run(mockTenant, () => strategy.acquireToken()),
-      ).rejects.toThrow(
+      await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
         'Token request to https://api.atlassian.com/oauth/token failed with status 500: Internal Server Error',
       );
     });
@@ -256,9 +246,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
-      await expect(
-        tenantStorage.run(mockTenant, () => strategy.acquireToken()),
-      ).rejects.toThrow(
+      await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
         'Token request to https://api.atlassian.com/oauth/token failed with status 500: Unable to read response body',
       );
     });
@@ -270,9 +258,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
-      await expect(
-        tenantStorage.run(mockTenant, () => strategy.acquireToken()),
-      ).rejects.toThrow(
+      await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
         /Malformed token response from https:\/\/api\.atlassian\.com\/oauth\/token:[\s\S]*access_token/,
       );
     });
@@ -284,9 +270,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
-      await expect(
-        tenantStorage.run(mockTenant, () => strategy.acquireToken()),
-      ).rejects.toThrow(
+      await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
         /Malformed token response from https:\/\/api\.atlassian\.com\/oauth\/token:[\s\S]*expires_in/,
       );
     });
@@ -296,9 +280,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
-      await expect(
-        tenantStorage.run(mockTenant, () => strategy.acquireToken()),
-      ).rejects.toThrow(
+      await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
         /Malformed token response from https:\/\/api\.atlassian\.com\/oauth\/token:[\s\S]*access_token[\s\S]*expires_in/,
       );
     });
@@ -313,9 +295,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
-      await expect(
-        tenantStorage.run(mockTenant, () => strategy.acquireToken()),
-      ).rejects.toThrow(
+      await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
         'Malformed response from https://api.atlassian.com/oauth/token: body is not valid JSON',
       );
     });
