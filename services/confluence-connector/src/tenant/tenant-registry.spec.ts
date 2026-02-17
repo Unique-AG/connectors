@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { NamedTenantConfig, TenantConfig } from '../config/tenant-config-loader';
 import { getTenantConfigs } from '../config/tenant-config-loader';
 import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
-import type { TenantAuth } from './tenant-auth.interface';
+import type { TenantAuth } from './tenant-auth';
 import { TenantRegistry } from './tenant-registry';
 
 const { mockChildLogger, mockRoot } = vi.hoisted(() => {

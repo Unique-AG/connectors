@@ -1,6 +1,6 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TenantAuth } from '../tenant/tenant-auth.interface';
+import type { TenantAuth } from '../tenant/tenant-auth';
 import type { TenantContext } from '../tenant/tenant-context.interface';
 import { getCurrentTenant } from '../tenant/tenant-context.storage';
 import { TenantRegistry } from '../tenant/tenant-registry';

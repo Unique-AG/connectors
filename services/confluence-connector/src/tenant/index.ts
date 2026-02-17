@@ -1,6 +1,6 @@
 export { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
 export { TenantModule } from './tenant.module';
-export type { TenantAuth } from './tenant-auth.interface';
+export { TenantAuth } from './tenant-auth';
 export type { TenantContext } from './tenant-context.interface';
 export { getCurrentTenant, getTenantService, tenantStorage } from './tenant-context.storage';
 export { getTenantLogger } from './tenant-logger';
