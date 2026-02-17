@@ -20,6 +20,7 @@ export class TenantRegistry implements OnModuleInit {
 
   public onModuleInit(): void {
     const tenantConfigs = getTenantConfigs();
+
     for (const { name: tenantName, config } of tenantConfigs) {
       const tenantLogger = PinoLogger.root.child({ tenantName });
       this.serviceRegistry.registerTenantLogger(tenantName, tenantLogger);
@@ -27,11 +28,11 @@ export class TenantRegistry implements OnModuleInit {
       const tenant: TenantContext = {
         name: tenantName,
         config,
-        logger: tenantLogger,
         isScanning: false,
       };
       this.tenants.set(tenantName, tenant);
 
+      //
       tenantStorage.run(tenant, () => {
         this.serviceRegistry.register(
           tenantName,
