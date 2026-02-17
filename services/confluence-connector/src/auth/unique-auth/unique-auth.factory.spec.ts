@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { UniqueAuthMode } from '../../config';
 import { Redacted } from '../../utils/redacted';
 import { ClusterLocalAuthStrategy } from './strategies/cluster-local-auth.strategy';
 import { ZitadelAuthStrategy } from './strategies/zitadel-auth.strategy';
@@ -17,7 +18,7 @@ describe('UniqueAuthFactory', () => {
     it('creates ClusterLocalAuthStrategy for cluster_local mode', () => {
       const config = {
         ...baseFields,
-        serviceAuthMode: 'cluster_local' as const,
+        serviceAuthMode: UniqueAuthMode.CLUSTER_LOCAL,
         serviceExtraHeaders: {
           'x-company-id': 'company-123',
           'x-user-id': 'user-456',
@@ -32,7 +33,7 @@ describe('UniqueAuthFactory', () => {
     it('creates ZitadelAuthStrategy for external mode', () => {
       const config = {
         ...baseFields,
-        serviceAuthMode: 'external' as const,
+        serviceAuthMode: UniqueAuthMode.EXTERNAL,
         zitadelOauthTokenUrl: 'https://zitadel.example.com/oauth/v2/token',
         zitadelProjectId: new Redacted('project-id'),
         zitadelClientId: 'client-id',

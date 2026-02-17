@@ -1,7 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { UniqueAuthMode } from '../../../config';
 import { Redacted } from '../../../utils/redacted';
-import { UniqueAuth } from '../unique-auth';
+import { UniqueAuthAbstract } from '../unique-auth.abstract';
 import { ZitadelAuthStrategy } from './zitadel-auth.strategy';
 
 const mockRequest = vi.fn();
@@ -27,7 +28,7 @@ vi.mock('@nestjs/common', async () => {
 
 function createExternalConfig() {
   return {
-    serviceAuthMode: 'external' as const,
+    serviceAuthMode: UniqueAuthMode.EXTERNAL,
     zitadelOauthTokenUrl: 'https://zitadel.example.com/oauth/v2/token',
     zitadelProjectId: new Redacted('project-id-123'),
     zitadelClientId: 'client-id',
@@ -69,7 +70,7 @@ describe('ZitadelAuthStrategy', () => {
   it('extends UniqueServiceAuth', () => {
     const strategy = new ZitadelAuthStrategy(createExternalConfig());
 
-    expect(strategy).toBeInstanceOf(UniqueAuth);
+    expect(strategy).toBeInstanceOf(UniqueAuthAbstract);
   });
 
   describe('getHeaders', () => {

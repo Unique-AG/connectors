@@ -1,11 +1,11 @@
 import { Logger } from '@nestjs/common';
 import { Agent, type Dispatcher, interceptors } from 'undici';
-import type { UniqueConfig } from '../../../config';
+import { UniqueAuthMode, type UniqueConfig } from '../../../config';
 import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenCache } from '../../token-cache';
-import { UniqueAuth } from '../unique-auth';
+import { UniqueAuthAbstract } from '../unique-auth.abstract';
 
-type ExternalConfig = Extract<UniqueConfig, { serviceAuthMode: 'external' }>;
+type ExternalConfig = Extract<UniqueConfig, { serviceAuthMode: typeof UniqueAuthMode.EXTERNAL }>;
 
 interface ZitadelTokenResponse {
   access_token: string;
@@ -13,7 +13,7 @@ interface ZitadelTokenResponse {
   token_type: string;
 }
 
-export class ZitadelAuthStrategy extends UniqueAuth {
+export class ZitadelAuthStrategy extends UniqueAuthAbstract {
   private readonly logger = new Logger(ZitadelAuthStrategy.name);
   private readonly tokenCache: TokenCache;
   private readonly agent: Agent;

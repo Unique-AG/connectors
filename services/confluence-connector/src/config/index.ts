@@ -8,3 +8,4 @@ export {
   type TenantConfig,
 } from './tenant-config-loader';
 export type { UniqueConfig } from './unique.schema';
+export { UniqueAuthMode } from './unique.schema';
