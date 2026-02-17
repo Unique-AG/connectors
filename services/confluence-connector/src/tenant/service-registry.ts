@@ -5,9 +5,9 @@ import { getCurrentTenant } from './tenant-context.storage';
 
 export type AbstractClass<T> = abstract new (...args: unknown[]) => T;
 
-interface ServiceClass {
+type ServiceClass = {
   readonly name: string;
-}
+};
 
 @Injectable()
 export class ServiceRegistry {
@@ -34,7 +34,7 @@ export class ServiceRegistry {
     const tenant = getCurrentTenant();
     const baseLogger = this.tenantLoggers.get(tenant.name);
     assert.ok(baseLogger, `No logger registered for tenant: ${tenant.name}`);
-    return baseLogger.child({ service: service.name });
+    return baseLogger.child({ tenantName: tenant.name, service: service.name });
   }
 
   public getService<T>(key: AbstractClass<T>): T {
