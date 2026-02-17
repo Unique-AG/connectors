@@ -4,7 +4,9 @@ import { z } from 'zod';
 import { AuthMode } from '../../../config';
 import { normalizeError, sanitizeError } from '../../../utils/normalize-error';
 import type { Redacted } from '../../../utils/redacted';
-import type { ConfluenceAuthStrategy, TokenResult } from './confluence-auth-strategy.interface';
+import { TokenCache } from '../../token-cache';
+import type { TokenResult } from '../../token-result';
+import { ConfluenceAuth } from '../confluence-auth';
 
 interface OAuth2LoAuthConfig {
   mode: typeof AuthMode.OAUTH_2LO;
@@ -28,14 +30,16 @@ const tokenResponseSchema = z.object({
   expires_in: z.number(),
 });
 
-export class OAuth2LoAuthStrategy implements ConfluenceAuthStrategy {
+export class OAuth2LoAuthStrategy extends ConfluenceAuth {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly tokenCache = new TokenCache();
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly tokenEndpoint: string;
   private readonly instanceType: 'cloud' | 'data-center';
 
   public constructor(authConfig: OAuth2LoAuthConfig, connectionConfig: OAuth2LoConnectionConfig) {
+    super();
     this.clientId = authConfig.clientId;
     this.clientSecret = authConfig.clientSecret.value;
     this.instanceType = connectionConfig.instanceType;
@@ -45,7 +49,11 @@ export class OAuth2LoAuthStrategy implements ConfluenceAuthStrategy {
         : `${connectionConfig.baseUrl}/rest/oauth2/latest/token`;
   }
 
-  public async acquireToken(): Promise<TokenResult> {
+  public async acquireToken(): Promise<string> {
+    return this.tokenCache.getToken(() => this.fetchToken());
+  }
+
+  private async fetchToken(): Promise<TokenResult> {
     this.logger.log(`Acquiring Confluence ${this.instanceType} token via OAuth 2.0 2LO`);
 
     try {

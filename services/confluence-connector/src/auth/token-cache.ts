@@ -1,4 +1,4 @@
-import type { TokenResult } from './confluence-auth/strategies/confluence-auth-strategy.interface';
+import type { TokenResult } from './token-result';
 
 const DEFAULT_BUFFER_MS = 5 * 60 * 1000;
 

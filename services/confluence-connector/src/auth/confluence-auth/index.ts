@@ -1,1 +1,2 @@
-export { ConfluenceAuth, ConfluenceAuthFactory } from './confluence-auth.factory';
+export { ConfluenceAuth } from './confluence-auth';
+export { ConfluenceAuthFactory } from './confluence-auth.factory';

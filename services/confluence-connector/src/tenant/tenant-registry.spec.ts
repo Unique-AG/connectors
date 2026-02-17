@@ -51,7 +51,7 @@ function createMockTenantConfig(): TenantConfig {
 }
 
 function createMockAuth(): ConfluenceAuth {
-  return { getAccessToken: vi.fn().mockResolvedValue('mock-token') };
+  return { acquireToken: vi.fn().mockResolvedValue('mock-token') };
 }
 
 function createMockUniqueAuth(): UniqueAuth {
@@ -68,7 +68,7 @@ function createRegistry(configs: NamedTenantConfig[]): {
   vi.mocked(getTenantConfigs).mockReturnValue(configs);
 
   const mockFactory = new ConfluenceAuthFactory();
-  vi.mocked(mockFactory.create).mockImplementation(() => createMockAuth());
+  vi.mocked(mockFactory.createAuthStrategy).mockImplementation(() => createMockAuth());
 
   const mockUniqueFactory = new UniqueAuthFactory();
   vi.mocked(mockUniqueFactory.create).mockImplementation(() => createMockUniqueAuth());
@@ -110,7 +110,7 @@ describe('TenantRegistry', () => {
       expect(mockChildLogger.info).toHaveBeenCalledWith('Tenant registered');
     });
 
-    it('calls ConfluenceAuthFactory.create for each tenant', () => {
+    it('calls ConfluenceAuthFactory.createAuthStrategy for each tenant', () => {
       const configA = createMockTenantConfig();
       const configB = createMockTenantConfig();
 
@@ -120,7 +120,7 @@ describe('TenantRegistry', () => {
       ]);
 
       const mockFactory = new ConfluenceAuthFactory();
-      vi.mocked(mockFactory.create).mockReturnValue(createMockAuth());
+      vi.mocked(mockFactory.createAuthStrategy).mockReturnValue(createMockAuth());
 
       const mockUniqueFactory = new UniqueAuthFactory();
       vi.mocked(mockUniqueFactory.create).mockReturnValue(createMockUniqueAuth());
@@ -129,8 +129,8 @@ describe('TenantRegistry', () => {
       const registry = new TenantRegistry(mockFactory, mockUniqueFactory, serviceRegistry);
       registry.onModuleInit();
 
-      expect(mockFactory.create).toHaveBeenCalledWith(configA.confluence);
-      expect(mockFactory.create).toHaveBeenCalledWith(configB.confluence);
+      expect(mockFactory.createAuthStrategy).toHaveBeenCalledWith(configA.confluence);
+      expect(mockFactory.createAuthStrategy).toHaveBeenCalledWith(configB.confluence);
     });
 
     it('calls UniqueAuthFactory.create for each tenant', () => {
@@ -143,7 +143,7 @@ describe('TenantRegistry', () => {
       ]);
 
       const mockFactory = new ConfluenceAuthFactory();
-      vi.mocked(mockFactory.create).mockReturnValue(createMockAuth());
+      vi.mocked(mockFactory.createAuthStrategy).mockReturnValue(createMockAuth());
 
       const mockUniqueFactory = new UniqueAuthFactory();
       vi.mocked(mockUniqueFactory.create).mockReturnValue(createMockUniqueAuth());

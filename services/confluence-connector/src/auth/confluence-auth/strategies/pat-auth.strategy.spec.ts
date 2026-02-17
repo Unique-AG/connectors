@@ -14,15 +14,7 @@ describe('PatAuthStrategy', () => {
 
     const result = await strategy.acquireToken();
 
-    expect(result.accessToken).toBe('my-personal-access-token');
-  });
-
-  it('returns no expiresAt', async () => {
-    const strategy = new PatAuthStrategy(authConfig);
-
-    const result = await strategy.acquireToken();
-
-    expect(result.expiresAt).toBeUndefined();
+    expect(result).toBe('my-personal-access-token');
   });
 
   it('returns the same token on multiple calls', async () => {
@@ -31,7 +23,7 @@ describe('PatAuthStrategy', () => {
     const first = await strategy.acquireToken();
     const second = await strategy.acquireToken();
 
-    expect(first.accessToken).toBe(second.accessToken);
-    expect(first.accessToken).toBe('my-personal-access-token');
+    expect(first).toBe(second);
+    expect(first).toBe('my-personal-access-token');
   });
 });

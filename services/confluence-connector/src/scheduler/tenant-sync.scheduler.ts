@@ -79,7 +79,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       tenant.isScanning = true;
       try {
         logger.info('Starting sync');
-        const token = await this.serviceRegistry.getService(ConfluenceAuth).getAccessToken();
+        const token = await this.serviceRegistry.getService(ConfluenceAuth).acquireToken();
         logger.info({ token: smear(token) }, 'Token acquired');
         // TODO: Full sync pipeline
       } catch (error) {

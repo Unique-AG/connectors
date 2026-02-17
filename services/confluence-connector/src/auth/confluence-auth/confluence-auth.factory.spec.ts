@@ -5,18 +5,13 @@ import { ConfluenceAuthFactory } from './confluence-auth.factory';
 
 vi.mock('./strategies/oauth2lo-auth.strategy', () => ({
   OAuth2LoAuthStrategy: vi.fn().mockImplementation(() => ({
-    acquireToken: vi.fn().mockResolvedValue({
-      accessToken: 'oauth-token',
-      expiresAt: new Date(Date.now() + 3600_000),
-    }),
+    acquireToken: vi.fn().mockResolvedValue('oauth-token'),
   })),
 }));
 
 vi.mock('./strategies/pat-auth.strategy', () => ({
   PatAuthStrategy: vi.fn().mockImplementation(() => ({
-    acquireToken: vi.fn().mockResolvedValue({
-      accessToken: 'pat-token',
-    }),
+    acquireToken: vi.fn().mockResolvedValue('pat-token'),
   })),
 }));
 
@@ -42,8 +37,8 @@ describe('ConfluenceAuthFactory', () => {
         },
       };
 
-      const auth = factory.create(config);
-      const token = await auth.getAccessToken();
+      const auth = factory.createAuthStrategy(config);
+      const token = await auth.acquireToken();
 
       expect(token).toBe('oauth-token');
     });
@@ -58,10 +53,20 @@ describe('ConfluenceAuthFactory', () => {
         },
       };
 
-      const auth = factory.create(config);
-      const token = await auth.getAccessToken();
+      const auth = factory.createAuthStrategy(config);
+      const token = await auth.acquireToken();
 
       expect(token).toBe('pat-token');
+    });
+
+    it('throws for unsupported auth mode', () => {
+      const config = {
+        ...baseFields,
+        instanceType: 'cloud',
+        auth: { mode: 'unknown_mode' },
+      } as unknown as ConfluenceConfig;
+
+      expect(() => factory.createAuthStrategy(config)).toThrow('Unsupported Confluence auth mode');
     });
   });
 });

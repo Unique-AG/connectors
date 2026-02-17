@@ -3,7 +3,7 @@ import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
 import { UniqueAuth, UniqueAuthFactory } from '../auth/unique-auth';
-import { getTenantConfigs } from '../config/tenant-config-loader';
+import { getTenantConfigs } from '../config';
 import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
 import { tenantStorage } from './tenant-context.storage';
@@ -26,7 +26,7 @@ export class TenantRegistry implements OnModuleInit {
       this.serviceRegistry.register(
         tenantName,
         ConfluenceAuth,
-        this.confluenceAuthFactory.create(config.confluence),
+        this.confluenceAuthFactory.createAuthStrategy(config.confluence),
       );
       this.serviceRegistry.register(
         tenantName,
