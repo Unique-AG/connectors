@@ -22,6 +22,7 @@ export class TenantRegistry implements OnModuleInit {
     const tenantConfigs = getTenantConfigs();
     for (const { name: tenantName, config } of tenantConfigs) {
       const tenantLogger = PinoLogger.root.child({ tenantName });
+      this.serviceRegistry.registerTenantLogger(tenantName, tenantLogger);
 
       this.serviceRegistry.register(
         tenantName,

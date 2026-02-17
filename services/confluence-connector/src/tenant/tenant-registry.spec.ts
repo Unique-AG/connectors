@@ -13,6 +13,12 @@ const { mockChildLogger, mockRoot } = vi.hoisted(() => {
     info: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
+    child: vi.fn().mockImplementation((bindings: Record<string, string>) => ({
+      info: vi.fn(),
+      error: vi.fn(),
+      warn: vi.fn(),
+      bindings: () => bindings,
+    })),
   } as unknown as pino.Logger;
   const mockRoot = {
     child: vi.fn().mockReturnValue(mockChildLogger),
@@ -165,6 +171,33 @@ describe('TenantRegistry', () => {
       tenantStorage.run(tenant, () => {
         expect(serviceRegistry.getService(ConfluenceAuth)).toBeDefined();
         expect(serviceRegistry.getService(UniqueAuth)).toBeDefined();
+      });
+    });
+
+    it('registers tenant base logger in ServiceRegistry for each tenant', () => {
+      const configs: NamedTenantConfig[] = [
+        { name: 'tenant-a', config: createMockTenantConfig() },
+        { name: 'tenant-b', config: createMockTenantConfig() },
+      ];
+
+      const { registry, serviceRegistry } = createRegistry(configs);
+
+      tenantStorage.run(registry.getTenant('tenant-a'), () => {
+        const loggerA = serviceRegistry.getServiceLogger({ name: 'TestService' });
+        expect(loggerA).toBeDefined();
+        expect(loggerA.bindings()).toMatchObject({
+          tenantName: 'tenant-a',
+          service: 'TestService',
+        });
+      });
+
+      tenantStorage.run(registry.getTenant('tenant-b'), () => {
+        const loggerB = serviceRegistry.getServiceLogger({ name: 'TestService' });
+        expect(loggerB).toBeDefined();
+        expect(loggerB.bindings()).toMatchObject({
+          tenantName: 'tenant-b',
+          service: 'TestService',
+        });
       });
     });
   });
