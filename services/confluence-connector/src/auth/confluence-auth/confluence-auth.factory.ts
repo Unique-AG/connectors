@@ -18,7 +18,7 @@ export class ConfluenceAuthFactory {
       }
       case AuthMode.PAT: {
         logger.info('Using PAT authentication for data-center instance');
-        return new PatAuthStrategy(config.auth, this.serviceRegistry);
+        return new PatAuthStrategy(config.auth);
       }
       default: {
         throw new Error(`Unsupported Confluence auth mode`);

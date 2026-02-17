@@ -1,15 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { AuthMode } from '../../../config/confluence.schema';
-import { ServiceRegistry } from '../../../tenant/service-registry';
-import { tenantStorage } from '../../../tenant/tenant-context.storage';
 import type { TenantContext } from '../../../tenant/tenant-context.interface';
+import { tenantStorage } from '../../../tenant/tenant-context.storage';
 import { Redacted } from '../../../utils/redacted';
 import { PatAuthStrategy } from './pat-auth.strategy';
-
-const mockLogger = { info: vi.fn(), error: vi.fn() };
-const mockServiceRegistry = {
-  getServiceLogger: vi.fn().mockReturnValue(mockLogger),
-} as unknown as ServiceRegistry;
 
 const mockTenant: TenantContext = {
   name: 'test-tenant',
@@ -25,7 +19,7 @@ describe('PatAuthStrategy', () => {
   };
 
   it('returns the unwrapped token value as accessToken', async () => {
-    const strategy = new PatAuthStrategy(authConfig, mockServiceRegistry);
+    const strategy = new PatAuthStrategy(authConfig);
 
     const result = await tenantStorage.run(mockTenant, () => strategy.acquireToken());
 
@@ -33,7 +27,7 @@ describe('PatAuthStrategy', () => {
   });
 
   it('returns the same token on multiple calls', async () => {
-    const strategy = new PatAuthStrategy(authConfig, mockServiceRegistry);
+    const strategy = new PatAuthStrategy(authConfig);
 
     const first = await tenantStorage.run(mockTenant, () => strategy.acquireToken());
     const second = await tenantStorage.run(mockTenant, () => strategy.acquireToken());
