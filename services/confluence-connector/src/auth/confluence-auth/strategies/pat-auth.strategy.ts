@@ -1,6 +1,7 @@
+import { Logger } from '@nestjs/common';
 import { AuthMode } from '../../../config/confluence.schema';
 import type { Redacted } from '../../../utils/redacted';
-import { ConfluenceAuth } from '../confluence-auth';
+import { ConfluenceAuth } from '../confluence-auth.abstract';
 
 interface PatAuthConfig {
   mode: typeof AuthMode.PAT;
@@ -8,6 +9,7 @@ interface PatAuthConfig {
 }
 
 export class PatAuthStrategy extends ConfluenceAuth {
+  private readonly logger = new Logger(PatAuthStrategy.name);
   private readonly token: string;
 
   public constructor(authConfig: PatAuthConfig) {
@@ -16,6 +18,7 @@ export class PatAuthStrategy extends ConfluenceAuth {
   }
 
   public async acquireToken(): Promise<string> {
+    this.logger.log('Acquiring Confluence PAT token');
     return this.token;
   }
 }

@@ -70,7 +70,7 @@ The `TenantAuth` interface stays unchanged — both domains produce `{ getAccess
 
 ## Tasks
 
-1. **Rename TenantAuthFactory to ConfluenceTenantAuthFactory** - Rename the class, update the filename from `tenant-auth.factory.ts` to `confluence-tenant-auth.factory.ts`, update barrel export in `index.ts`, and update all import paths across `tenant.module.ts`, `tenant-registry.ts`, and test files.
+1. **Rename TenantAuthFactory to ConfluenceTenantAuthFactory** - Rename the class, update the filename from `tenant-auth.factory.ts` to `confluence-auth.factory.ts`, update barrel export in `index.ts`, and update all import paths across `tenant.module.ts`, `tenant-registry.ts`, and test files.
 
 2. **Update TenantRegistry to use new name** - Change constructor injection and `this.authFactory` references to use `confluenceAuthFactory` as the property name for clarity.
 
