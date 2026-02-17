@@ -142,7 +142,7 @@ export class FindTranscriptsTool {
         title: item.title ?? 'Untitled Transcript',
         key: item.key,
         text: item.text,
-        url: item.url ?? undefined,
+        url: `unique://content/${item.id}`,
         meetingDate: typeof metadata?.date === 'string' ? metadata.date : undefined,
         participants: participants?.length ? participants : undefined,
         score: undefined, // Score not available in current response

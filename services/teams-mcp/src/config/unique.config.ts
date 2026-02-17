@@ -65,6 +65,7 @@ const baseConfig = z.object({
     .describe('The Public API version to use (maps to `x-api-version`).'),
   rootScopeId: z
     .string()
+    .min(1, 'rootScopeId cannot be empty')
     .describe('The root scope ID under which to create transcript and recording folders.'),
   userFetchConcurrency: z.coerce
     .number()
