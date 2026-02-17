@@ -6,6 +6,14 @@ import { tenantStorage } from '../../../tenant/tenant-context.storage';
 import { Redacted } from '../../../utils/redacted';
 import { OAuth2LoAuthStrategy } from './oauth2lo-auth.strategy';
 
+const { mockRequest } = vi.hoisted(() => ({
+  mockRequest: vi.fn(),
+}));
+
+vi.mock('undici', () => ({
+  request: mockRequest,
+}));
+
 const mockTenant: TenantContext = {
   name: 'test-tenant',
   config: {} as TenantContext['config'],
@@ -36,14 +44,22 @@ describe('OAuth2LoAuthStrategy', () => {
     token_type: 'Bearer',
   };
 
-  let fetchMock: ReturnType<typeof vi.fn>;
   let loggerInfoMock: ReturnType<typeof vi.fn>;
   let loggerErrorMock: ReturnType<typeof vi.fn>;
   let mockServiceRegistry: ServiceRegistry;
 
+  function mockTokenResponse(statusCode: number, body: unknown): void {
+    mockRequest.mockResolvedValueOnce({
+      statusCode,
+      body: {
+        json: vi.fn().mockResolvedValue(body),
+        text: vi.fn().mockResolvedValue(typeof body === 'string' ? body : JSON.stringify(body)),
+      },
+    });
+  }
+
   beforeEach(() => {
-    fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-13T12:00:00.000Z'));
 
@@ -58,20 +74,19 @@ describe('OAuth2LoAuthStrategy', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
   describe('Cloud instance', () => {
     it('requests a Cloud access token via the Atlassian OAuth endpoint', async () => {
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
+      mockTokenResponse(200, successBody);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
       await tenantStorage.run(mockTenant, () => strategy.acquireToken());
 
-      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(mockRequest).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
-      const [url, options] = fetchMock.mock.calls[0]!;
+      const [url, options] = mockRequest.mock.calls[0]!;
       expect(url).toBe('https://api.atlassian.com/oauth/token');
       expect(options.method).toBe('POST');
       expect(options.headers['Content-Type']).toBe('application/json');
@@ -85,7 +100,7 @@ describe('OAuth2LoAuthStrategy', () => {
     });
 
     it('returns access token for cloud', async () => {
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
+      mockTokenResponse(200, successBody);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
       const token = await tenantStorage.run(mockTenant, () => strategy.acquireToken());
@@ -94,7 +109,7 @@ describe('OAuth2LoAuthStrategy', () => {
     });
 
     it('caches token across sequential calls', async () => {
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
+      mockTokenResponse(200, successBody);
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
       const tokenA = await tenantStorage.run(mockTenant, () => strategy.acquireToken());
@@ -102,11 +117,11 @@ describe('OAuth2LoAuthStrategy', () => {
 
       expect(tokenA).toBe('returned-access-token');
       expect(tokenB).toBe('returned-access-token');
-      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(mockRequest).toHaveBeenCalledOnce();
     });
 
     it('deduplicates concurrent token acquisition calls', async () => {
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
+      mockTokenResponse(200, successBody);
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
       const [tokenA, tokenB] = await Promise.all([
@@ -116,11 +131,11 @@ describe('OAuth2LoAuthStrategy', () => {
 
       expect(tokenA).toBe('returned-access-token');
       expect(tokenB).toBe('returned-access-token');
-      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(mockRequest).toHaveBeenCalledOnce();
     });
 
     it('logs before acquiring token', async () => {
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
+      mockTokenResponse(200, successBody);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
       await tenantStorage.run(mockTenant, () => strategy.acquireToken());
@@ -134,14 +149,14 @@ describe('OAuth2LoAuthStrategy', () => {
 
   describe('Data Center instance', () => {
     it('requests a Data Center access token via the instance OAuth endpoint', async () => {
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
+      mockTokenResponse(200, successBody);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection, mockServiceRegistry);
       await tenantStorage.run(mockTenant, () => strategy.acquireToken());
 
-      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(mockRequest).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
-      const [url, options] = fetchMock.mock.calls[0]!;
+      const [url, options] = mockRequest.mock.calls[0]!;
       expect(url).toBe('https://confluence.corp.example.com/rest/oauth2/latest/token');
       expect(options.method).toBe('POST');
       expect(options.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
@@ -154,7 +169,7 @@ describe('OAuth2LoAuthStrategy', () => {
     });
 
     it('returns access token for DC', async () => {
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
+      mockTokenResponse(200, successBody);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection, mockServiceRegistry);
       const token = await tenantStorage.run(mockTenant, () => strategy.acquireToken());
@@ -165,7 +180,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
   describe('error handling', () => {
     it('logs the error with sanitizeError before rethrowing', async () => {
-      fetchMock.mockRejectedValueOnce(new Error('getaddrinfo ENOTFOUND'));
+      mockRequest.mockRejectedValueOnce(new Error('getaddrinfo ENOTFOUND'));
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
@@ -179,124 +194,106 @@ describe('OAuth2LoAuthStrategy', () => {
       expect(loggedPayload.error).toHaveProperty('message');
     });
 
-    it('throws on network error with endpoint URL', async () => {
+    it('throws the original network error', async () => {
       const networkError = new Error('getaddrinfo ENOTFOUND');
-      fetchMock.mockRejectedValueOnce(networkError);
+      mockRequest.mockRejectedValueOnce(networkError);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
       await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
-        'Network error requesting token from https://api.atlassian.com/oauth/token: getaddrinfo ENOTFOUND',
+        networkError,
       );
     });
 
-    it('preserves the original error as cause on network failures', async () => {
-      const networkError = new Error('getaddrinfo ENOTFOUND');
-      fetchMock.mockRejectedValueOnce(networkError);
-
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
-
-      try {
-        await tenantStorage.run(mockTenant, () => strategy.acquireToken());
-        throw new Error('Expected acquireToken to throw');
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).cause).toBe(networkError);
-      }
-    });
-
     it('throws on HTTP 401 indicating invalid credentials', async () => {
-      fetchMock.mockResolvedValueOnce(new Response('Unauthorized', { status: 401 }));
+      mockTokenResponse(401, 'Unauthorized');
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
       await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
-        'Invalid credentials: https://api.atlassian.com/oauth/token responded with 401: Unauthorized',
+        'Error response from https://api.atlassian.com/oauth/token: 401 Unauthorized',
       );
     });
 
     it('throws on HTTP 403 indicating invalid credentials', async () => {
-      fetchMock.mockResolvedValueOnce(new Response('Forbidden', { status: 403 }));
+      mockTokenResponse(403, 'Forbidden');
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection, mockServiceRegistry);
 
       await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
-        'Invalid credentials: https://confluence.corp.example.com/rest/oauth2/latest/token responded with 403: Forbidden',
+        'Error response from https://confluence.corp.example.com/rest/oauth2/latest/token: 403 Forbidden',
       );
     });
 
     it('throws on HTTP 500 with status and response body', async () => {
-      fetchMock.mockResolvedValueOnce(new Response('Internal Server Error', { status: 500 }));
+      mockTokenResponse(500, 'Internal Server Error');
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
       await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
-        'Token request to https://api.atlassian.com/oauth/token failed with status 500: Internal Server Error',
+        'Error response from https://api.atlassian.com/oauth/token: 500 Internal Server Error',
       );
     });
 
     it('falls back to an unreadable-body message when response text cannot be read', async () => {
-      const unreadableResponse = {
-        ok: false,
-        status: 500,
-        text: vi.fn().mockRejectedValue(new Error('stream already disturbed')),
-      } as unknown as Response;
-
-      fetchMock.mockResolvedValueOnce(unreadableResponse);
+      mockRequest.mockResolvedValueOnce({
+        statusCode: 500,
+        body: {
+          json: vi.fn(),
+          text: vi.fn().mockRejectedValue(new Error('stream already disturbed')),
+        },
+      });
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
       await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
-        'Token request to https://api.atlassian.com/oauth/token failed with status 500: Unable to read response body',
+        'Error response from https://api.atlassian.com/oauth/token: 500 No response body',
       );
     });
 
-    it('throws on malformed response missing access_token', async () => {
-      fetchMock.mockResolvedValueOnce(
-        new Response(JSON.stringify({ expires_in: 3600 }), { status: 200 }),
-      );
+    it('throws ZodError on malformed response missing access_token', async () => {
+      mockTokenResponse(200, { expires_in: 3600 });
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
       await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
-        /Malformed token response from https:\/\/api\.atlassian\.com\/oauth\/token:[\s\S]*access_token/,
+        /access_token/,
       );
     });
 
-    it('throws on malformed response missing expires_in', async () => {
-      fetchMock.mockResolvedValueOnce(
-        new Response(JSON.stringify({ access_token: 'tok' }), { status: 200 }),
-      );
+    it('throws ZodError on malformed response missing expires_in', async () => {
+      mockTokenResponse(200, { access_token: 'tok' });
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
       await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
-        /Malformed token response from https:\/\/api\.atlassian\.com\/oauth\/token:[\s\S]*expires_in/,
+        /expires_in/,
       );
     });
 
-    it('throws on malformed response missing both fields', async () => {
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }));
+    it('throws ZodError on malformed response missing both fields', async () => {
+      mockTokenResponse(200, {});
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
       await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
-        /Malformed token response from https:\/\/api\.atlassian\.com\/oauth\/token:[\s\S]*access_token[\s\S]*expires_in/,
+        /access_token/,
       );
     });
 
     it('throws on non-JSON response body', async () => {
-      fetchMock.mockResolvedValueOnce(
-        new Response('not json', {
-          status: 200,
-          headers: { 'Content-Type': 'text/plain' },
-        }),
-      );
+      mockRequest.mockResolvedValueOnce({
+        statusCode: 200,
+        body: {
+          json: vi.fn().mockRejectedValue(new Error('invalid json')),
+          text: vi.fn().mockResolvedValue('not json'),
+        },
+      });
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockServiceRegistry);
 
       await expect(tenantStorage.run(mockTenant, () => strategy.acquireToken())).rejects.toThrow(
-        'Malformed response from https://api.atlassian.com/oauth/token: body is not valid JSON',
+        'invalid json',
       );
     });
   });
