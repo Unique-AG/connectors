@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UniqueServiceAuth } from '../unique-service-auth';
+import { UniqueAuth } from '../unique-auth';
 import { ClusterLocalAuthStrategy } from './cluster-local-auth.strategy';
 
 function createConfig() {
@@ -19,7 +19,7 @@ describe('ClusterLocalAuthStrategy', () => {
   it('extends UniqueServiceAuth', () => {
     const strategy = new ClusterLocalAuthStrategy(createConfig());
 
-    expect(strategy).toBeInstanceOf(UniqueServiceAuth);
+    expect(strategy).toBeInstanceOf(UniqueAuth);
   });
 
   it('returns x-service-id header with confluence-connector value', async () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TokenResult } from './strategies/confluence-auth-strategy.interface';
+import type { TokenResult } from './confluence-auth/strategies/confluence-auth-strategy.interface';
 import { TokenCache } from './token-cache';
 
 describe('TokenCache', () => {

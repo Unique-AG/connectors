@@ -1,11 +1,9 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { TenantAuth } from '../tenant/tenant-auth';
-import type { TenantContext } from '../tenant/tenant-context.interface';
-import { getTenantService, tenantStorage } from '../tenant/tenant-context.storage';
-import { getTenantLogger } from '../tenant/tenant-logger';
-import { TenantRegistry } from '../tenant/tenant-registry';
+import { ConfluenceAuth } from '../auth/confluence-auth';
+import type { TenantContext } from '../tenant';
+import { getTenantLogger, ServiceRegistry, TenantRegistry } from '../tenant';
 import { smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 
@@ -16,16 +14,17 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
 
   public constructor(
     private readonly tenantRegistry: TenantRegistry,
+    private readonly serviceRegistry: ServiceRegistry,
     private readonly schedulerRegistry: SchedulerRegistry,
   ) {}
 
   public onModuleInit(): void {
-    if (this.tenantRegistry.size === 0) {
+    if (this.tenantRegistry.tenantCount === 0) {
       this.logger.warn('No tenants registered — no sync jobs will be scheduled');
       return;
     }
 
-    for (const tenant of this.tenantRegistry.getAll()) {
+    for (const tenant of this.tenantRegistry.getAllTenants()) {
       this.logger.log(`Triggering initial sync for tenant: ${tenant.name}`);
       void this.syncTenant(tenant);
       this.registerCronJob(tenant);
@@ -49,20 +48,22 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
   }
 
   private registerCronJob(tenant: TenantContext): void {
-    tenantStorage.run(tenant, () => {
+    this.tenantRegistry.run(tenant, () => {
       const logger = getTenantLogger(TenantSyncScheduler);
       const cronExpression = tenant.config.processing.scanIntervalCron;
+
       const job = new CronJob(cronExpression, () => {
         void this.syncTenant(tenant);
       });
       this.schedulerRegistry.addCronJob(`sync:${tenant.name}`, job);
+
       job.start();
       logger.info(`Scheduled sync with cron: ${cronExpression}`);
     });
   }
 
   private async syncTenant(tenant: TenantContext): Promise<void> {
-    await tenantStorage.run(tenant, async () => {
+    await this.tenantRegistry.run(tenant, async () => {
       const logger = getTenantLogger(TenantSyncScheduler);
 
       if (this.isShuttingDown) {
@@ -78,7 +79,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       tenant.isScanning = true;
       try {
         logger.info('Starting sync');
-        const token = await getTenantService(TenantAuth).getAccessToken();
+        const token = await this.serviceRegistry.getService(ConfluenceAuth).getAccessToken();
         logger.info({ token: smear(token) }, 'Token acquired');
         // TODO: Full sync pipeline
       } catch (error) {

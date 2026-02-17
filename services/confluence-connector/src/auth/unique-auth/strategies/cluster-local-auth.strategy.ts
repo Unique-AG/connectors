@@ -1,12 +1,12 @@
-import type { UniqueConfig } from '../../config/unique.schema';
-import { UniqueServiceAuth } from '../unique-service-auth';
+import type { UniqueConfig } from '../../../config/unique.schema';
+import { UniqueAuth } from '../unique-auth';
 
 type ClusterLocalConfig = Extract<UniqueConfig, { serviceAuthMode: 'cluster_local' }>;
 
 const SERVICE_ID_HEADER = 'x-service-id';
 const SERVICE_NAME = 'confluence-connector';
 
-export class ClusterLocalAuthStrategy extends UniqueServiceAuth {
+export class ClusterLocalAuthStrategy extends UniqueAuth {
   private readonly headers: Record<string, string>;
 
   public constructor(config: ClusterLocalConfig) {

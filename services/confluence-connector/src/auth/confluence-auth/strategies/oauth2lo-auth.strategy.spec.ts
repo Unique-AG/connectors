@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthMode } from '../../config/confluence.schema';
-import { Redacted } from '../../utils/redacted';
+import { AuthMode } from '../../../config/confluence.schema';
+import { Redacted } from '../../../utils/redacted';
 import { OAuth2LoAuthStrategy } from './oauth2lo-auth.strategy';
 
 vi.mock('@nestjs/common', async () => {
