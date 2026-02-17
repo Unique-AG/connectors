@@ -1,9 +1,9 @@
 import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
 import { z } from 'zod';
-import { AuthMode } from '../../config';
-import { normalizeError, sanitizeError } from '../../utils/normalize-error';
-import type { Redacted } from '../../utils/redacted';
+import { AuthMode } from '../../../config';
+import { normalizeError, sanitizeError } from '../../../utils/normalize-error';
+import type { Redacted } from '../../../utils/redacted';
 import type { ConfluenceAuthStrategy, TokenResult } from './confluence-auth-strategy.interface';
 
 interface OAuth2LoAuthConfig {
@@ -66,6 +66,7 @@ export class OAuth2LoAuthStrategy implements ConfluenceAuthStrategy {
 
     let response: Response;
     try {
+      // refactor to undici
       response = await fetch(this.tokenEndpoint, {
         method: 'POST',
         headers,
@@ -83,19 +84,6 @@ export class OAuth2LoAuthStrategy implements ConfluenceAuthStrategy {
     }
 
     return response;
-  }
-
-  private async handleErrorResponse(response: Response): Promise<never> {
-    const body = await response.text().catch(() => 'Unable to read response body');
-    const { status } = response;
-
-    if (status === 401 || status === 403) {
-      throw new Error(
-        `Invalid credentials: ${this.tokenEndpoint} responded with ${status}: ${body}`,
-      );
-    }
-
-    throw new Error(`Token request to ${this.tokenEndpoint} failed with status ${status}: ${body}`);
   }
 
   private buildRequest(): { headers: Record<string, string>; body: string } {
@@ -134,5 +122,18 @@ export class OAuth2LoAuthStrategy implements ConfluenceAuthStrategy {
 
     const expiresAt = new Date(Date.now() + result.data.expires_in * 1000);
     return { accessToken: result.data.access_token, expiresAt };
+  }
+
+  private async handleErrorResponse(response: Response): Promise<never> {
+    const body = await response.text().catch(() => 'Unable to read response body');
+    const { status } = response;
+
+    if (status === 401 || status === 403) {
+      throw new Error(
+        `Invalid credentials: ${this.tokenEndpoint} responded with ${status}: ${body}`,
+      );
+    }
+
+    throw new Error(`Token request to ${this.tokenEndpoint} failed with status ${status}: ${body}`);
   }
 }

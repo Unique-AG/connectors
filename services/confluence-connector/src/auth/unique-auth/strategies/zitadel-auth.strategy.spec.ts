@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Redacted } from '../../utils/redacted';
-import { UniqueServiceAuth } from '../unique-service-auth';
+import { Redacted } from '../../../utils/redacted';
+import { UniqueAuth } from '../unique-auth';
 import { ZitadelAuthStrategy } from './zitadel-auth.strategy';
 
 const mockRequest = vi.fn();
@@ -69,7 +69,7 @@ describe('ZitadelAuthStrategy', () => {
   it('extends UniqueServiceAuth', () => {
     const strategy = new ZitadelAuthStrategy(createExternalConfig());
 
-    expect(strategy).toBeInstanceOf(UniqueServiceAuth);
+    expect(strategy).toBeInstanceOf(UniqueAuth);
   });
 
   describe('getHeaders', () => {
@@ -208,16 +208,6 @@ describe('ZitadelAuthStrategy', () => {
       expect(loggedPayload.msg).toBe('Failed to acquire Unique API token from Zitadel');
       expect(loggedPayload.error).toBeTypeOf('object');
       expect(loggedPayload.error).toHaveProperty('message', 'network failure');
-    });
-  });
-
-  describe('close', () => {
-    it('closes the underlying undici Agent', async () => {
-      const strategy = new ZitadelAuthStrategy(createExternalConfig());
-
-      await strategy.close();
-
-      expect(mockClose).toHaveBeenCalledOnce();
     });
   });
 });

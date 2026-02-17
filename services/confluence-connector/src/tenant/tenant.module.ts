@@ -1,11 +1,11 @@
-import { Global, Module } from '@nestjs/common';
-import { UniqueTenantAuthFactory } from '../unique-auth';
-import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
+import { Module } from '@nestjs/common';
+import { ConfluenceAuthFactory } from '../auth/confluence-auth';
+import { UniqueAuthFactory } from '../auth/unique-auth';
+import { ServiceRegistry } from './service-registry';
 import { TenantRegistry } from './tenant-registry';
 
-@Global()
 @Module({
-  providers: [ConfluenceTenantAuthFactory, UniqueTenantAuthFactory, TenantRegistry],
-  exports: [TenantRegistry],
+  providers: [ConfluenceAuthFactory, UniqueAuthFactory, ServiceRegistry, TenantRegistry],
+  exports: [TenantRegistry, ServiceRegistry],
 })
 export class TenantModule {}

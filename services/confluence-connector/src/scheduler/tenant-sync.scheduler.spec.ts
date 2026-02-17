@@ -1,10 +1,10 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TenantAuth } from '../tenant/tenant-auth';
+import { ConfluenceAuth } from '../auth/confluence-auth';
+import { ServiceRegistry } from '../tenant/service-registry';
 import type { TenantContext } from '../tenant/tenant-context.interface';
-import { getCurrentTenant } from '../tenant/tenant-context.storage';
+import { getCurrentTenant, tenantStorage } from '../tenant/tenant-context.storage';
 import { TenantRegistry } from '../tenant/tenant-registry';
-import { TenantServiceRegistry } from '../tenant/tenant-service-registry';
 import { smear } from '../utils/logging.util';
 import { TenantSyncScheduler } from './tenant-sync.scheduler';
 
@@ -20,12 +20,13 @@ vi.mock('../tenant/tenant-logger', () => ({
 
 import { getTenantLogger } from '../tenant/tenant-logger';
 
-function createMockAuth(): TenantAuth {
-  return { getAccessToken: vi.fn().mockResolvedValue('mock-token-12345678') } as TenantAuth;
+function createMockAuth(): ConfluenceAuth {
+  return {
+    getAccessToken: vi.fn().mockResolvedValue('mock-token-12345678'),
+  } as ConfluenceAuth;
 }
 
 function createMockTenant(name: string, overrides: Partial<TenantContext> = {}): TenantContext {
-  const services = new TenantServiceRegistry().set(TenantAuth, createMockAuth());
   return {
     name,
     config: {
@@ -36,7 +37,6 @@ function createMockTenant(name: string, overrides: Partial<TenantContext> = {}):
       warn: vi.fn(),
       error: vi.fn(),
     },
-    services,
     isScanning: false,
     ...overrides,
   } as unknown as TenantContext;
@@ -54,14 +54,28 @@ function createMockSchedulerRegistry(): SchedulerRegistry {
 
 function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
   return {
-    getAll: vi.fn().mockReturnValue(tenants),
-    size: tenants.length,
+    getAllTenants: vi.fn().mockReturnValue(tenants),
+    tenantCount: tenants.length,
+    run: vi
+      .fn()
+      .mockImplementation(
+        <R>(tenant: TenantContext, fn: () => R): R => tenantStorage.run(tenant, fn),
+      ),
   } as unknown as TenantRegistry;
+}
+
+function createMockServiceRegistry(tenants: TenantContext[]): ServiceRegistry {
+  const serviceRegistry = new ServiceRegistry();
+  for (const tenant of tenants) {
+    serviceRegistry.register(tenant.name, ConfluenceAuth, createMockAuth());
+  }
+  return serviceRegistry;
 }
 
 describe('TenantSyncScheduler', () => {
   let scheduler: TenantSyncScheduler;
-  let registry: TenantRegistry;
+  let tenantRegistry: TenantRegistry;
+  let serviceRegistry: ServiceRegistry;
   let schedulerRegistry: SchedulerRegistry;
   let tenantA: TenantContext;
   let tenantB: TenantContext;
@@ -71,9 +85,10 @@ describe('TenantSyncScheduler', () => {
     tenantA = createMockTenant('tenant-a');
     tenantB = createMockTenant('tenant-b');
 
-    registry = createMockTenantRegistry([tenantA, tenantB]);
+    tenantRegistry = createMockTenantRegistry([tenantA, tenantB]);
+    serviceRegistry = createMockServiceRegistry([tenantA, tenantB]);
     schedulerRegistry = createMockSchedulerRegistry();
-    scheduler = new TenantSyncScheduler(registry, schedulerRegistry);
+    scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
   });
 
   describe('onModuleInit', () => {
@@ -85,11 +100,14 @@ describe('TenantSyncScheduler', () => {
       expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith('sync:tenant-b', expect.anything());
     });
 
-    it('triggers initial sync for each tenant', () => {
+    it('triggers initial sync for each tenant', async () => {
       scheduler.onModuleInit();
-
-      expect(tenantA.services.get(TenantAuth).getAccessToken).toHaveBeenCalledOnce();
-      expect(tenantB.services.get(TenantAuth).getAccessToken).toHaveBeenCalledOnce();
+      await vi.waitFor(() => {
+        const authA = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+        expect(authA.getAccessToken).toHaveBeenCalledOnce();
+        const authB = tenantStorage.run(tenantB, () => serviceRegistry.getService(ConfluenceAuth));
+        expect(authB.getAccessToken).toHaveBeenCalledOnce();
+      });
     });
 
     it('logs the scheduled cron expression via getTenantLogger', () => {
@@ -101,11 +119,16 @@ describe('TenantSyncScheduler', () => {
 
     it('skips scheduling when no tenants are registered', () => {
       const emptyRegistry = createMockTenantRegistry([]);
-      const emptyScheduler = new TenantSyncScheduler(emptyRegistry, schedulerRegistry);
+      const emptyServiceRegistry = createMockServiceRegistry([]);
+      const emptyScheduler = new TenantSyncScheduler(
+        emptyRegistry,
+        emptyServiceRegistry,
+        schedulerRegistry,
+      );
 
       emptyScheduler.onModuleInit();
 
-      expect(emptyRegistry.getAll).not.toHaveBeenCalled();
+      expect(emptyRegistry.getAllTenants).not.toHaveBeenCalled();
       expect(schedulerRegistry.addCronJob).not.toHaveBeenCalled();
     });
   });
@@ -136,7 +159,8 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(tenantA.services.get(TenantAuth).getAccessToken).toHaveBeenCalledOnce();
+      const auth = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+      expect(auth.getAccessToken).toHaveBeenCalledOnce();
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
       expect(mockTenantLogger.info).toHaveBeenCalledWith(
         { token: smear('mock-token-12345678') },
@@ -146,7 +170,8 @@ describe('TenantSyncScheduler', () => {
 
     it('sets AsyncLocalStorage context during sync', async () => {
       let capturedTenant: TenantContext | undefined;
-      vi.mocked(tenantA.services.get(TenantAuth).getAccessToken).mockImplementation(async () => {
+      const auth = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+      vi.mocked(auth.getAccessToken).mockImplementation(async () => {
         capturedTenant = getCurrentTenant();
         return 'mock-token-12345678';
       });
@@ -163,7 +188,8 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(tenantA.services.get(TenantAuth).getAccessToken).not.toHaveBeenCalled();
+      const auth = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+      expect(auth.getAccessToken).not.toHaveBeenCalled();
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync already in progress, skipping');
     });
 
@@ -175,9 +201,8 @@ describe('TenantSyncScheduler', () => {
     });
 
     it('resets isScanning after failed sync', async () => {
-      vi.mocked(tenantA.services.get(TenantAuth).getAccessToken).mockRejectedValue(
-        new Error('auth failure'),
-      );
+      const auth = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+      vi.mocked(auth.getAccessToken).mockRejectedValue(new Error('auth failure'));
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
@@ -200,9 +225,8 @@ describe('TenantSyncScheduler', () => {
     });
 
     it('isolates errors between tenants', async () => {
-      vi.mocked(tenantA.services.get(TenantAuth).getAccessToken).mockRejectedValue(
-        new Error('tenant-a failed'),
-      );
+      const authA = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+      vi.mocked(authA.getAccessToken).mockRejectedValue(new Error('tenant-a failed'));
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
@@ -212,7 +236,8 @@ describe('TenantSyncScheduler', () => {
       expect(mockTenantLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ msg: 'Sync failed' }),
       );
-      expect(tenantB.services.get(TenantAuth).getAccessToken).toHaveBeenCalledOnce();
+      const authB = tenantStorage.run(tenantB, () => serviceRegistry.getService(ConfluenceAuth));
+      expect(authB.getAccessToken).toHaveBeenCalledOnce();
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
     });
   });

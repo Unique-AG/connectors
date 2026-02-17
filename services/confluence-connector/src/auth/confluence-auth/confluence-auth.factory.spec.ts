@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AuthMode, type ConfluenceConfig } from '../config';
-import { Redacted } from '../utils/redacted';
-import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
+import { AuthMode, type ConfluenceConfig } from '../../config';
+import { Redacted } from '../../utils/redacted';
+import { ConfluenceAuthFactory } from './confluence-auth.factory';
 
-vi.mock('../confluence-auth/strategies/oauth2lo-auth.strategy', () => ({
+vi.mock('./strategies/oauth2lo-auth.strategy', () => ({
   OAuth2LoAuthStrategy: vi.fn().mockImplementation(() => ({
     acquireToken: vi.fn().mockResolvedValue({
       accessToken: 'oauth-token',
@@ -12,7 +12,7 @@ vi.mock('../confluence-auth/strategies/oauth2lo-auth.strategy', () => ({
   })),
 }));
 
-vi.mock('../confluence-auth/strategies/pat-auth.strategy', () => ({
+vi.mock('./strategies/pat-auth.strategy', () => ({
   PatAuthStrategy: vi.fn().mockImplementation(() => ({
     acquireToken: vi.fn().mockResolvedValue({
       accessToken: 'pat-token',
@@ -27,8 +27,8 @@ const baseFields = {
   ingestAllLabel: 'sync-all',
 };
 
-describe('ConfluenceTenantAuthFactory', () => {
-  const factory = new ConfluenceTenantAuthFactory();
+describe('ConfluenceAuthFactory', () => {
+  const factory = new ConfluenceAuthFactory();
 
   describe('create', () => {
     it('creates auth for OAuth 2LO cloud config', async () => {

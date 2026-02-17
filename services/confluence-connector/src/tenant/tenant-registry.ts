@@ -1,35 +1,42 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import assert from 'node:assert';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
+import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
+import { UniqueAuth, UniqueAuthFactory } from '../auth/unique-auth';
 import { getTenantConfigs } from '../config/tenant-config-loader';
-import { UniqueServiceAuth, UniqueTenantAuthFactory } from '../unique-auth';
-import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
-import { TenantAuth } from './tenant-auth';
+import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
-import { TenantServiceRegistry } from './tenant-service-registry';
+import { tenantStorage } from './tenant-context.storage';
 
 @Injectable()
-export class TenantRegistry implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(TenantRegistry.name);
+export class TenantRegistry implements OnModuleInit {
   private readonly tenants = new Map<string, TenantContext>();
 
   public constructor(
-    private readonly confluenceAuthFactory: ConfluenceTenantAuthFactory,
-    private readonly uniqueAuthFactory: UniqueTenantAuthFactory,
+    private readonly confluenceAuthFactory: ConfluenceAuthFactory,
+    private readonly uniqueAuthFactory: UniqueAuthFactory,
+    private readonly serviceRegistry: ServiceRegistry,
   ) {}
 
   public onModuleInit(): void {
-    const configs = getTenantConfigs();
-    for (const { name, config } of configs) {
-      const tenantLogger = PinoLogger.root.child({ tenantName: name });
+    const tenantConfigs = getTenantConfigs();
+    for (const { name: tenantName, config } of tenantConfigs) {
+      const tenantLogger = PinoLogger.root.child({ tenantName });
 
-      const services = new TenantServiceRegistry()
-        .set(TenantAuth, this.confluenceAuthFactory.create(config.confluence))
-        .set(UniqueServiceAuth, this.uniqueAuthFactory.create(config.unique));
+      this.serviceRegistry.register(
+        tenantName,
+        ConfluenceAuth,
+        this.confluenceAuthFactory.create(config.confluence),
+      );
+      this.serviceRegistry.register(
+        tenantName,
+        UniqueAuth,
+        this.uniqueAuthFactory.create(config.unique),
+      );
 
-      this.tenants.set(name, {
-        name,
+      this.tenants.set(tenantName, {
+        name: tenantName,
         config,
-        services,
         logger: tenantLogger,
         isScanning: false,
       });
@@ -37,31 +44,21 @@ export class TenantRegistry implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  public async onModuleDestroy(): Promise<void> {
-    const closePromises = this.getAll().map(async (tenant) => {
-      try {
-        await tenant.services.get(UniqueServiceAuth).close();
-      } catch (error) {
-        this.logger.error({
-          msg: `Failed to close UniqueServiceAuth for tenant ${tenant.name}`,
-          error,
-        });
-      }
-    });
-    await Promise.all(closePromises);
+  public run<R>(tenant: TenantContext, fn: () => R): R {
+    return tenantStorage.run(tenant, fn);
   }
 
-  public get(name: string): TenantContext {
+  public getTenant(name: string): TenantContext {
     const tenant = this.tenants.get(name);
-    if (!tenant) throw new Error(`Unknown tenant: ${name}`);
+    assert.ok(tenant, `Unknown tenant: ${name}`);
     return tenant;
   }
 
-  public getAll(): TenantContext[] {
+  public getAllTenants(): TenantContext[] {
     return [...this.tenants.values()];
   }
 
-  public get size(): number {
+  public get tenantCount(): number {
     return this.tenants.size;
   }
 }

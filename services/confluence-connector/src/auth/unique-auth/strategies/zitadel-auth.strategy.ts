@@ -1,9 +1,9 @@
 import { Logger } from '@nestjs/common';
 import { Agent, type Dispatcher, interceptors } from 'undici';
-import type { UniqueConfig } from '../../config/unique.schema';
-import { TokenCache } from '../../confluence-auth/token-cache';
-import { sanitizeError } from '../../utils/normalize-error';
-import { UniqueServiceAuth } from '../unique-service-auth';
+import type { UniqueConfig } from '../../../config';
+import { sanitizeError } from '../../../utils/normalize-error';
+import { TokenCache } from '../../token-cache';
+import { UniqueAuth } from '../unique-auth';
 
 type ExternalConfig = Extract<UniqueConfig, { serviceAuthMode: 'external' }>;
 
@@ -13,7 +13,7 @@ interface ZitadelTokenResponse {
   token_type: string;
 }
 
-export class ZitadelAuthStrategy extends UniqueServiceAuth {
+export class ZitadelAuthStrategy extends UniqueAuth {
   private readonly logger = new Logger(ZitadelAuthStrategy.name);
   private readonly tokenCache: TokenCache;
   private readonly agent: Agent;

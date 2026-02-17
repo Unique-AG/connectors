@@ -1,5 +1,5 @@
-import { AuthMode } from '../../config/confluence.schema';
-import type { Redacted } from '../../utils/redacted';
+import { AuthMode } from '../../../config/confluence.schema';
+import type { Redacted } from '../../../utils/redacted';
 import type { ConfluenceAuthStrategy, TokenResult } from './confluence-auth-strategy.interface';
 
 interface PatAuthConfig {

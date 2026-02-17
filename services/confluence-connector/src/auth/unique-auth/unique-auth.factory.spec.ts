@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Redacted } from '../utils/redacted';
+import { Redacted } from '../../utils/redacted';
 import { ClusterLocalAuthStrategy } from './strategies/cluster-local-auth.strategy';
 import { ZitadelAuthStrategy } from './strategies/zitadel-auth.strategy';
-import { UniqueTenantAuthFactory } from './unique-tenant-auth.factory';
+import { UniqueAuthFactory } from './unique-auth.factory';
 
 const baseFields = {
   ingestionServiceBaseUrl: 'https://ingestion.example.com',
@@ -10,8 +10,8 @@ const baseFields = {
   apiRateLimitPerMinute: 100,
 };
 
-describe('UniqueTenantAuthFactory', () => {
-  const factory = new UniqueTenantAuthFactory();
+describe('UniqueAuthFactory', () => {
+  const factory = new UniqueAuthFactory();
 
   describe('create', () => {
     it('creates ClusterLocalAuthStrategy for cluster_local mode', () => {
