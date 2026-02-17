@@ -4,6 +4,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
 import { UniqueAuth, UniqueAuthFactory } from '../auth/unique-auth';
 import { getTenantConfigs } from '../config';
+import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
 import { tenantStorage } from './tenant-context.storage';
@@ -43,6 +44,11 @@ export class TenantRegistry implements OnModuleInit {
           tenantName,
           UniqueAuth,
           this.uniqueAuthFactory.create(config.unique),
+        );
+        this.serviceRegistry.register(
+          tenantName,
+          ConfluenceSynchronizationService,
+          new ConfluenceSynchronizationService(this.serviceRegistry),
         );
       });
 

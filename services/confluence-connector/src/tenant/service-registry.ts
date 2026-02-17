@@ -3,8 +3,10 @@ import { Injectable } from '@nestjs/common';
 import type pino from 'pino';
 import { getCurrentTenant } from './tenant-context.storage';
 
-export type AbstractClass<T> = abstract new (...args: unknown[]) => T;
-type ConcreteClass<T> = new (...args: unknown[]) => T;
+// biome-ignore lint/suspicious/noExplicitAny: Constructor args are irrelevant — these types are used only as Map keys for service lookup
+export type AbstractClass<T> = abstract new (...args: any[]) => T;
+// biome-ignore lint/suspicious/noExplicitAny: Constructor args are irrelevant — these types are used only as Map keys for service lookup
+type ConcreteClass<T> = new (...args: any[]) => T;
 export type ServiceToken<T> = AbstractClass<T> | ConcreteClass<T>;
 
 interface ServiceClass {
