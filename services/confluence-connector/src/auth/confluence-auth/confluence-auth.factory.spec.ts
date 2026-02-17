@@ -40,7 +40,6 @@ const baseFields = {
 const mockTenant: TenantContext = {
   name: 'test-tenant',
   config: {} as TenantConfig,
-  logger: { info: vi.fn(), child: vi.fn() } as unknown as TenantContext['logger'],
   isScanning: false,
 };
 

@@ -19,12 +19,11 @@ describe('UniqueAuthFactory', () => {
     getServiceLogger: () => ({ info: () => undefined }),
   } as unknown as ServiceRegistry;
   const factory = new UniqueAuthFactory(mockServiceRegistry);
-  const mockTenant = {
+  const mockTenant: TenantContext = {
     name: 'test-tenant',
     config: {} as TenantContext['config'],
-    logger: {} as TenantContext['logger'],
     isScanning: false,
-  } as TenantContext;
+  };
 
   describe('create', () => {
     it('creates ClusterLocalAuthStrategy for cluster_local mode', () => {

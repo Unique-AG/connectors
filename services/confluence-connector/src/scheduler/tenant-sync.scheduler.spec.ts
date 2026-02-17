@@ -26,11 +26,6 @@ function createMockTenant(name: string, overrides: Partial<TenantContext> = {}):
     config: {
       processing: { scanIntervalCron: '*/5 * * * *' },
     },
-    logger: {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    },
     isScanning: false,
     ...overrides,
   } as unknown as TenantContext;
