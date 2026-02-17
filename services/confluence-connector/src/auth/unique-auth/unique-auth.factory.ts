@@ -1,20 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { UniqueConfig } from '../../config';
+import { UniqueAuthMode, type UniqueConfig } from '../../config';
 import { ClusterLocalAuthStrategy } from './strategies/cluster-local-auth.strategy';
 import { ZitadelAuthStrategy } from './strategies/zitadel-auth.strategy';
-import type { UniqueAuth } from './unique-auth';
+import type { UniqueAuthAbstract } from './unique-auth.abstract';
 
 @Injectable()
 export class UniqueAuthFactory {
   private readonly logger = new Logger(UniqueAuthFactory.name);
 
-  public create(uniqueConfig: UniqueConfig): UniqueAuth {
+  public create(uniqueConfig: UniqueConfig): UniqueAuthAbstract {
     switch (uniqueConfig.serviceAuthMode) {
-      case 'cluster_local': {
+      case UniqueAuthMode.CLUSTER_LOCAL: {
         this.logger.log('Using cluster_local authentication for Unique services');
         return new ClusterLocalAuthStrategy(uniqueConfig);
       }
-      case 'external': {
+      case UniqueAuthMode.EXTERNAL: {
         this.logger.log('Using Zitadel external authentication for Unique services');
         return new ZitadelAuthStrategy(uniqueConfig);
       }
