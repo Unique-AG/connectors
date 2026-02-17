@@ -1,4 +1,4 @@
-export type { AbstractClass } from './service-registry';
+export type { AbstractClass, ServiceToken } from './service-registry';
 export { ServiceRegistry } from './service-registry';
 export { TenantModule } from './tenant.module';
 export type { TenantContext } from './tenant-context.interface';

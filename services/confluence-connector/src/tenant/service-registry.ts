@@ -4,16 +4,19 @@ import type pino from 'pino';
 import { getCurrentTenant } from './tenant-context.storage';
 
 export type AbstractClass<T> = abstract new (...args: unknown[]) => T;
+type ConcreteClass<T> = new (...args: unknown[]) => T;
+export type ServiceToken<T> = AbstractClass<T> | ConcreteClass<T>;
+
 interface ServiceClass {
   readonly name: string;
 }
 
 @Injectable()
 export class ServiceRegistry {
-  private readonly tenantServices = new Map<string, Map<AbstractClass<unknown>, unknown>>();
+  private readonly tenantServices = new Map<string, Map<ServiceToken<unknown>, unknown>>();
   private readonly tenantLoggers = new Map<string, pino.Logger>();
 
-  public register<T>(tenantName: string, key: AbstractClass<T>, instance: T): void {
+  public register<T>(tenantName: string, key: ServiceToken<T>, instance: T): void {
     let services = this.tenantServices.get(tenantName);
 
     if (!services) {
@@ -35,7 +38,7 @@ export class ServiceRegistry {
     return baseLogger.child({ tenantName: tenant.name, service: service.name });
   }
 
-  public getService<T>(key: AbstractClass<T>): T {
+  public getService<T>(key: ServiceToken<T>): T {
     const tenant = getCurrentTenant();
     const services = this.getTenantServices(tenant.name);
     const instance = services.get(key);
@@ -44,7 +47,7 @@ export class ServiceRegistry {
     return instance as T;
   }
 
-  private getTenantServices(tenantName: string): Map<AbstractClass<unknown>, unknown> {
+  private getTenantServices(tenantName: string): Map<ServiceToken<unknown>, unknown> {
     const services = this.tenantServices.get(tenantName);
     assert.ok(services, `No services registered for tenant: ${tenantName}`);
     return services;
