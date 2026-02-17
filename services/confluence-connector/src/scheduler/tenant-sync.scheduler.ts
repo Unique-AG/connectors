@@ -1,10 +1,9 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { ConfluenceAuth } from '../auth/confluence-auth';
+import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import type { TenantContext } from '../tenant';
 import { ServiceRegistry, TenantRegistry } from '../tenant';
-import { smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 
 @Injectable()
@@ -71,24 +70,15 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      if (tenant.isScanning) {
-        logger.info('Sync already in progress, skipping');
-        return;
-      }
-
-      tenant.isScanning = true;
       try {
-        logger.info('Starting sync');
-        const token = await this.serviceRegistry.getService(ConfluenceAuth).acquireToken();
-        logger.info({ token: smear(token) }, 'Token acquired');
-        // TODO: Full sync pipeline
+        await this.serviceRegistry
+          .getService(ConfluenceSynchronizationService)
+          .synchronize();
       } catch (error) {
         logger.error({
-          msg: 'Sync failed',
+          msg: 'Unexpected sync error',
           error: sanitizeError(error),
         });
-      } finally {
-        tenant.isScanning = false;
       }
     });
   }
