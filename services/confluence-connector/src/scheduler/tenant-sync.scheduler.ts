@@ -1,8 +1,9 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { TenantAuth } from '../tenant/tenant-auth';
 import type { TenantContext } from '../tenant/tenant-context.interface';
-import { tenantStorage } from '../tenant/tenant-context.storage';
+import { getTenantService, tenantStorage } from '../tenant/tenant-context.storage';
 import { getTenantLogger } from '../tenant/tenant-logger';
 import { TenantRegistry } from '../tenant/tenant-registry';
 import { smear } from '../utils/logging.util';
@@ -77,7 +78,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       tenant.isScanning = true;
       try {
         logger.info('Starting sync');
-        const token = await tenant.auth.getAccessToken();
+        const token = await getTenantService(TenantAuth).getAccessToken();
         logger.info({ token: smear(token) }, 'Token acquired');
         // TODO: Full sync pipeline
       } catch (error) {

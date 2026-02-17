@@ -1,7 +1,9 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { getTenantConfigs } from '../config/tenant-config-loader';
+import { UniqueServiceAuth, UniqueTenantAuthFactory } from '../unique-auth';
 import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
+import { TenantAuth } from './tenant-auth';
 import type { TenantContext } from './tenant-context.interface';
 import { TenantServiceRegistry } from './tenant-service-registry';
 
@@ -9,18 +11,25 @@ import { TenantServiceRegistry } from './tenant-service-registry';
 export class TenantRegistry implements OnModuleInit {
   private readonly tenants = new Map<string, TenantContext>();
 
-  public constructor(private readonly confluenceAuthFactory: ConfluenceTenantAuthFactory) {}
+  public constructor(
+    private readonly confluenceAuthFactory: ConfluenceTenantAuthFactory,
+    private readonly uniqueAuthFactory: UniqueTenantAuthFactory,
+  ) {}
 
   public onModuleInit(): void {
     const configs = getTenantConfigs();
     for (const { name, config } of configs) {
       const tenantLogger = PinoLogger.root.child({ tenantName: name });
+
+      const services = new TenantServiceRegistry()
+        .set(TenantAuth, this.confluenceAuthFactory.create(config.confluence))
+        .set(UniqueServiceAuth, this.uniqueAuthFactory.create(config.unique));
+
       this.tenants.set(name, {
         name,
         config,
+        services,
         logger: tenantLogger,
-        auth: this.confluenceAuthFactory.create(config.confluence),
-        services: new TenantServiceRegistry(),
         isScanning: false,
       });
       tenantLogger.info('Tenant registered');
