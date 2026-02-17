@@ -1,7 +1,8 @@
 import assert from 'node:assert';
+import { Readable } from 'node:stream';
 import { UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
 import { Client } from '@microsoft/microsoft-graph-client';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish } from 'remeda';
@@ -17,6 +18,8 @@ import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
 
 @Injectable()
 export class IngestEmailCommand {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
@@ -45,7 +48,10 @@ export class IngestEmailCommand {
     const metadata = getMetadataFromMessage(graphMessage);
     const fileKey = getUniqueKeyForMessage(userProfile.email, graphMessage);
     // => Here do full file ingestion.
-    const files = await this.uniqueApi.files.getByKeys([fileKey]);
+    let files = await this.uniqueApi.files.getByKeys([fileKey]);
+    // TODO
+    await this.uniqueApi.files.deleteByIds(files.map((item) => item.id));
+    files = await this.uniqueApi.files.getByKeys([fileKey]);
     const file = files.at(0);
 
     const parentDirectory = await this.db.query.directories.findFirst({
@@ -97,8 +103,8 @@ export class IngestEmailCommand {
       byteSize: file.byteSize,
       metadata: metadata,
       scopeId: rootScope.id,
-      ownerType: UniqueOwnerType.User,
-      sourceOwnerType: UniqueOwnerType.User,
+      ownerType: UniqueOwnerType.Scope,
+      sourceOwnerType: UniqueOwnerType.Scope,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       // TODO: Check with Michat
@@ -106,6 +112,7 @@ export class IngestEmailCommand {
     });
   }
 
+  @Span()
   private async injestEmail({
     client,
     rootScopeId,
@@ -135,14 +142,16 @@ export class IngestEmailCommand {
       metadata: metadata,
       scopeId: rootScopeId,
       ownerType: UniqueOwnerType.Scope,
-      sourceOwnerType: UniqueOwnerType.Scope,
+      sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
-      // TODO: Check with Michat
-      storeInternally: false,
+      // TODO: MAKE A CONFIG FOR THIS.
+      storeInternally: true,
     };
 
     const content = await this.uniqueApi.ingestion.registerContent(createContentRequest);
+
+    this.logger.log(`Content registered: ${content.id}`);
 
     let byteSize = 0;
 
@@ -155,11 +164,17 @@ export class IngestEmailCommand {
       }),
     );
 
-    await this.uniqueApi.ingestion.streamUpload({
-      uploadUrl: content.writeUrl,
-      mimeType: createContentRequest.mimeType,
-      content: transformedStream,
-    });
+    try {
+      await this.uniqueApi.ingestion.streamUpload({
+        uploadUrl: content.writeUrl,
+        mimeType: createContentRequest.mimeType,
+        content: Readable.from(transformedStream),
+      });
+      this.logger.log(`Upload finished: ${content.id}, byteSize: ${byteSize}`);
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
 
     await this.uniqueApi.ingestion.finalizeIngestion({
       key: fileKey,
@@ -174,7 +189,8 @@ export class IngestEmailCommand {
       fileUrl: content.readUrl,
       url: content.readUrl,
       baseUrl: graphMessage.webLink,
-      storeInternally: !isNullish(content.internallyStoredAt),
+      storeInternally: createContentRequest.storeInternally,
     });
+    this.logger.log(`Ingestion finished: ${content.id}`);
   }
 }

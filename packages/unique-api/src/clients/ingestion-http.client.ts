@@ -102,9 +102,9 @@ export class IngestionHttpClient {
         origin: this.origin,
         ...options,
         headers: {
+          'Content-Type': 'application/json',
           ...options.headers,
           ...authHeaders,
-          'Content-Type': 'application/json',
         },
       });
 

@@ -17,10 +17,11 @@ export class GetMessageDetailsQuery {
       .header(`Prefer`, `IdType="ImmutableId"`)
       .select(GraphMessageFields)
       .get();
+    this.logger.log(`Received data for messageId: ${messageId}`);
 
-    this.logger.log(`Messaged data: ${JSON.stringify(messageRaw, null, 4)}`);
-
-    return graphMessageSchema.parse(messageRaw);
+    const output = graphMessageSchema.parse(messageRaw);
+    this.logger.log(`Parsed succesfully the data for message: ${messageId}`);
+    return output;
   }
 }
 

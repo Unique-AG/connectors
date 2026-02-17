@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { Agent, interceptors } from 'undici';
 import type { IngestionHttpClient } from '../clients/ingestion-http.client';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueApiClientAuthConfig, UniqueApiIngestion } from '../types';
@@ -73,15 +74,24 @@ export class FileIngestionService implements UniqueApiIngestion {
   }
 
   public async streamUpload(request: UploadContentRequest): Promise<void> {
-    await this.ingestionClient.request(this.correctWriteUrl(request.uploadUrl), {
+    const uploadUrl = this.correctWriteUrl(request.uploadUrl);
+    const url = new URL(uploadUrl);
+    const path = `${url.pathname}${url.search}`;
+
+    const httpAgent = new Agent().compose([interceptors.retry(), interceptors.redirect()]);
+    const requestObject = {
       method: 'PUT',
+      path,
+      origin: url.origin,
       headers: {
-        'Content-Type': request.mimeType,
+        'Content-Type': request.mimeType ?? 'application/octet-stream',
         'x-ms-blob-type': 'BlockBlob',
       },
       body: request.content,
       duplex: 'half',
-    });
+    };
+    console.log(requestObject);
+    await httpAgent.request(requestObject);
   }
 
   private correctWriteUrl(writeUrl: string): string {

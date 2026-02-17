@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "build": "nest build",
-    "dev": "nest start",
+    "dev": "nest start --watch",
     "debug:mac": "lsof -i tcp:9229 | grep node | awk '{print $2}' | xargs -r kill -9 && nest start --debug",
     "debug": "nest start --debug",
     "codegen": "echo \"No codegen for this server\"",

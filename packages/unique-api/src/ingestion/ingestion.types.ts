@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import type { FileAccessKey } from '../files/files.types';
 
 export interface AuthorMetadata {
@@ -54,7 +55,7 @@ export interface IngestionFinalizationRequest {
 
 export interface UploadContentRequest {
   uploadUrl: string;
-  content: ReadableStream<Uint8Array<ArrayBuffer>>;
+  content: Readable;
   mimeType: string;
 }
 
