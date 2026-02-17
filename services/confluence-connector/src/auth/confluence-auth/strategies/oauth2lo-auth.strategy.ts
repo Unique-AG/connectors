@@ -1,8 +1,9 @@
-import assert from 'node:assert';
+import { request } from 'undici';
 import { z } from 'zod';
 import { AuthMode, ConfluenceConfig } from '../../../config';
 import { ServiceRegistry } from '../../../tenant/service-registry';
-import { normalizeError, sanitizeError } from '../../../utils/normalize-error';
+import { handleErrorStatus } from '../../../utils/http-util';
+import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenCache } from '../../token-cache';
 import type { TokenResult } from '../../token-result';
 import { ConfluenceAuth } from '../confluence-auth.abstract';
@@ -57,8 +58,7 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
     logger.info(`Acquiring Confluence ${this.instanceType} token via OAuth 2.0 2LO`);
 
     try {
-      const response = await this.requestToken();
-      return this.parseTokenResponse(response);
+      return await this.requestToken();
     } catch (error) {
       logger.error({
         msg: `Failed to acquire Confluence ${this.instanceType} token via OAuth 2.0 2LO`,
@@ -69,29 +69,20 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
     }
   }
 
-  private async requestToken(): Promise<Response> {
+  private async requestToken(): Promise<TokenResult> {
     const { headers, body } = this.buildRequest();
 
-    let response: Response;
-    try {
-      // refactor to undici
-      response = await fetch(this.tokenEndpoint, {
-        method: 'POST',
-        headers,
-        body,
-      });
-    } catch (error: unknown) {
-      throw new Error(
-        `Network error requesting token from ${this.tokenEndpoint}: ${normalizeError(error).message}`,
-        { cause: error },
-      );
-    }
+    const response = await request(this.tokenEndpoint, { method: 'POST', headers, body });
 
-    if (!response.ok) {
-      await this.handleErrorResponse(response);
-    }
+    await handleErrorStatus(response.statusCode, response.body, this.tokenEndpoint);
 
-    return response;
+    const tokenBody = await response.body.json();
+    const { access_token, expires_in } = tokenResponseSchema.parse(tokenBody);
+
+    return {
+      accessToken: access_token,
+      expiresAt: new Date(Date.now() + expires_in * 1000),
+    };
   }
 
   private buildRequest(): { headers: Record<string, string>; body: string } {
@@ -112,36 +103,5 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ ...payload, scope: DC_TOKEN_SCOPE }).toString(),
     };
-  }
-
-  private async parseTokenResponse(response: Response): Promise<TokenResult> {
-    let body: unknown;
-    try {
-      body = await response.json();
-    } catch {
-      throw new Error(`Malformed response from ${this.tokenEndpoint}: body is not valid JSON`);
-    }
-
-    const result = tokenResponseSchema.safeParse(body);
-    assert.ok(
-      result.success,
-      `Malformed token response from ${this.tokenEndpoint}: ${result.error?.message}`,
-    );
-
-    const expiresAt = new Date(Date.now() + result.data.expires_in * 1000);
-    return { accessToken: result.data.access_token, expiresAt };
-  }
-
-  private async handleErrorResponse(response: Response): Promise<never> {
-    const body = await response.text().catch(() => 'Unable to read response body');
-    const { status } = response;
-
-    if (status === 401 || status === 403) {
-      throw new Error(
-        `Invalid credentials: ${this.tokenEndpoint} responded with ${status}: ${body}`,
-      );
-    }
-
-    throw new Error(`Token request to ${this.tokenEndpoint} failed with status ${status}: ${body}`);
   }
 }
