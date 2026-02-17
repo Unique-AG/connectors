@@ -103,9 +103,13 @@ describe('TenantSyncScheduler', () => {
     it('triggers initial sync for each tenant', async () => {
       scheduler.onModuleInit();
       await vi.waitFor(() => {
-        const authA = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+        const authA = tenantStorage.run(tenantA, () =>
+          serviceRegistry.getService(ConfluenceAuth),
+        );
         expect(authA.acquireToken).toHaveBeenCalledOnce();
-        const authB = tenantStorage.run(tenantB, () => serviceRegistry.getService(ConfluenceAuth));
+        const authB = tenantStorage.run(tenantB, () =>
+          serviceRegistry.getService(ConfluenceAuth),
+        );
         expect(authB.acquireToken).toHaveBeenCalledOnce();
       });
     });
@@ -159,7 +163,9 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      const auth = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+      const auth = tenantStorage.run(tenantA, () =>
+        serviceRegistry.getService(ConfluenceAuth),
+      );
       expect(auth.acquireToken).toHaveBeenCalledOnce();
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
       expect(mockTenantLogger.info).toHaveBeenCalledWith(
@@ -170,7 +176,9 @@ describe('TenantSyncScheduler', () => {
 
     it('sets AsyncLocalStorage context during sync', async () => {
       let capturedTenant: TenantContext | undefined;
-      const auth = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+      const auth = tenantStorage.run(tenantA, () =>
+        serviceRegistry.getService(ConfluenceAuth),
+      );
       vi.mocked(auth.acquireToken).mockImplementation(async () => {
         capturedTenant = getCurrentTenant();
         return 'mock-token-12345678';
@@ -188,7 +196,9 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      const auth = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+      const auth = tenantStorage.run(tenantA, () =>
+        serviceRegistry.getService(ConfluenceAuth),
+      );
       expect(auth.acquireToken).not.toHaveBeenCalled();
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync already in progress, skipping');
     });
@@ -201,7 +211,9 @@ describe('TenantSyncScheduler', () => {
     });
 
     it('resets isScanning after failed sync', async () => {
-      const auth = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+      const auth = tenantStorage.run(tenantA, () =>
+        serviceRegistry.getService(ConfluenceAuth),
+      );
       vi.mocked(auth.acquireToken).mockRejectedValue(new Error('auth failure'));
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
@@ -225,7 +237,9 @@ describe('TenantSyncScheduler', () => {
     });
 
     it('isolates errors between tenants', async () => {
-      const authA = tenantStorage.run(tenantA, () => serviceRegistry.getService(ConfluenceAuth));
+      const authA = tenantStorage.run(tenantA, () =>
+        serviceRegistry.getService(ConfluenceAuth),
+      );
       vi.mocked(authA.acquireToken).mockRejectedValue(new Error('tenant-a failed'));
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
@@ -236,7 +250,9 @@ describe('TenantSyncScheduler', () => {
       expect(mockTenantLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ msg: 'Sync failed' }),
       );
-      const authB = tenantStorage.run(tenantB, () => serviceRegistry.getService(ConfluenceAuth));
+      const authB = tenantStorage.run(tenantB, () =>
+        serviceRegistry.getService(ConfluenceAuth),
+      );
       expect(authB.acquireToken).toHaveBeenCalledOnce();
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
     });

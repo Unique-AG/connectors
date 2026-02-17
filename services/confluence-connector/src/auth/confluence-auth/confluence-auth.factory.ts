@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuthMode, type ConfluenceConfig } from '../../config';
-import { ConfluenceAuth } from './confluence-auth';
+import { ConfluenceAuth } from './confluence-auth.abstract';
 import { OAuth2LoAuthStrategy } from './strategies/oauth2lo-auth.strategy';
 import { PatAuthStrategy } from './strategies/pat-auth.strategy';
 

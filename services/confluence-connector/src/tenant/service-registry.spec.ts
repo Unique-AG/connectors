@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import type pino from 'pino';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
 import { tenantStorage } from './tenant-context.storage';

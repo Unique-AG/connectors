@@ -3,7 +3,7 @@ import { Agent, type Dispatcher, interceptors } from 'undici';
 import { UniqueAuthMode, type UniqueConfig } from '../../../config';
 import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenCache } from '../../token-cache';
-import { UniqueAuthAbstract } from '../unique-auth.abstract';
+import { UniqueAuth } from '../unique-auth.abstract';
 
 type ExternalConfig = Extract<UniqueConfig, { serviceAuthMode: typeof UniqueAuthMode.EXTERNAL }>;
 
@@ -13,7 +13,7 @@ interface ZitadelTokenResponse {
   token_type: string;
 }
 
-export class ZitadelAuthStrategy extends UniqueAuthAbstract {
+export class ZitadelAuthStrategy extends UniqueAuth {
   private readonly logger = new Logger(ZitadelAuthStrategy.name);
   private readonly tokenCache: TokenCache;
   private readonly agent: Agent;

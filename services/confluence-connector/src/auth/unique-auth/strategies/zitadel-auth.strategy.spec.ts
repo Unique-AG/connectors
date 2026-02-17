@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UniqueAuthMode } from '../../../config';
 import { Redacted } from '../../../utils/redacted';
-import { UniqueAuthAbstract } from '../unique-auth.abstract';
+import { UniqueAuth } from '../unique-auth.abstract';
 import { ZitadelAuthStrategy } from './zitadel-auth.strategy';
 
 const mockRequest = vi.fn();
@@ -70,7 +70,7 @@ describe('ZitadelAuthStrategy', () => {
   it('extends UniqueServiceAuth', () => {
     const strategy = new ZitadelAuthStrategy(createExternalConfig());
 
-    expect(strategy).toBeInstanceOf(UniqueAuthAbstract);
+    expect(strategy).toBeInstanceOf(UniqueAuth);
   });
 
   describe('getHeaders', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { UniqueAuthMode } from '../../../config';
-import { UniqueAuthAbstract } from '../unique-auth.abstract';
+import { UniqueAuth } from '../unique-auth.abstract';
 import { ClusterLocalAuthStrategy } from './cluster-local-auth.strategy';
 
 function createConfig() {
@@ -20,7 +20,7 @@ describe('ClusterLocalAuthStrategy', () => {
   it('extends UniqueServiceAuth', () => {
     const strategy = new ClusterLocalAuthStrategy(createConfig());
 
-    expect(strategy).toBeInstanceOf(UniqueAuthAbstract);
+    expect(strategy).toBeInstanceOf(UniqueAuth);
   });
 
   it('returns x-service-id header with confluence-connector value', async () => {

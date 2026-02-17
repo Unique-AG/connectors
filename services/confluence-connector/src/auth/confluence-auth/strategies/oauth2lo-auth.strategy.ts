@@ -6,7 +6,7 @@ import { normalizeError, sanitizeError } from '../../../utils/normalize-error';
 import type { Redacted } from '../../../utils/redacted';
 import { TokenCache } from '../../token-cache';
 import type { TokenResult } from '../../token-result';
-import { ConfluenceAuth } from '../confluence-auth';
+import { ConfluenceAuth } from '../confluence-auth.abstract';
 
 interface OAuth2LoAuthConfig {
   mode: typeof AuthMode.OAUTH_2LO;
@@ -31,7 +31,7 @@ const tokenResponseSchema = z.object({
 });
 
 export class OAuth2LoAuthStrategy extends ConfluenceAuth {
-  private readonly logger = new Logger(this.constructor.name);
+  private readonly logger = new Logger(OAuth2LoAuthStrategy.name);
   private readonly tokenCache = new TokenCache();
   private readonly clientId: string;
   private readonly clientSecret: string;

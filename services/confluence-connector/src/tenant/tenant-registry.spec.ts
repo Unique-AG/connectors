@@ -156,7 +156,7 @@ describe('TenantRegistry', () => {
       expect(mockUniqueFactory.create).toHaveBeenCalledWith(configB.unique);
     });
 
-    it('registers ConfluenceAuth and UniqueServiceAuth in ServiceRegistry for each tenant', () => {
+    it('registers ConfluenceAuthAbstract and UniqueServiceAuth in ServiceRegistry for each tenant', () => {
       const configs: NamedTenantConfig[] = [{ name: 'tenant-a', config: createMockTenantConfig() }];
 
       const { registry, serviceRegistry } = createRegistry(configs);
