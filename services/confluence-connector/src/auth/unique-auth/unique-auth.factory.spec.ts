@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { UniqueAuthMode } from '../../config';
+import { ServiceRegistry } from '../../tenant/service-registry';
+import type { TenantContext } from '../../tenant/tenant-context.interface';
+import { tenantStorage } from '../../tenant/tenant-context.storage';
 import { Redacted } from '../../utils/redacted';
 import { ClusterLocalAuthStrategy } from './strategies/cluster-local-auth.strategy';
 import { ZitadelAuthStrategy } from './strategies/zitadel-auth.strategy';
@@ -12,7 +15,16 @@ const baseFields = {
 };
 
 describe('UniqueAuthFactory', () => {
-  const factory = new UniqueAuthFactory();
+  const mockServiceRegistry = {
+    getServiceLogger: () => ({ info: () => undefined }),
+  } as unknown as ServiceRegistry;
+  const factory = new UniqueAuthFactory(mockServiceRegistry);
+  const mockTenant = {
+    name: 'test-tenant',
+    config: {} as TenantContext['config'],
+    logger: {} as TenantContext['logger'],
+    isScanning: false,
+  } as TenantContext;
 
   describe('create', () => {
     it('creates ClusterLocalAuthStrategy for cluster_local mode', () => {
@@ -25,7 +37,7 @@ describe('UniqueAuthFactory', () => {
         },
       };
 
-      const auth = factory.create(config);
+      const auth = tenantStorage.run(mockTenant, () => factory.create(config));
 
       expect(auth).toBeInstanceOf(ClusterLocalAuthStrategy);
     });
@@ -40,7 +52,7 @@ describe('UniqueAuthFactory', () => {
         zitadelClientSecret: new Redacted('client-secret'),
       };
 
-      const auth = factory.create(config);
+      const auth = tenantStorage.run(mockTenant, () => factory.create(config));
 
       expect(auth).toBeInstanceOf(ZitadelAuthStrategy);
     });
