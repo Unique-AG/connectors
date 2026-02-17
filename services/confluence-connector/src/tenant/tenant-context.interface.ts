@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
 import type { TenantConfig } from '../config/tenant-config-loader';
-import type { TenantAuth } from './tenant-auth.interface';
+import type { TenantAuth } from './tenant-auth';
 import type { TenantServiceRegistry } from './tenant-service-registry';
 
 export interface TenantContext {

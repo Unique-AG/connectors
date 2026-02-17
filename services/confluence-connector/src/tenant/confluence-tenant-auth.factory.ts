@@ -4,7 +4,7 @@ import type { ConfluenceAuthStrategy } from '../confluence-auth/strategies/confl
 import { OAuth2LoAuthStrategy } from '../confluence-auth/strategies/oauth2lo-auth.strategy';
 import { PatAuthStrategy } from '../confluence-auth/strategies/pat-auth.strategy';
 import { TokenCache } from '../confluence-auth/token-cache';
-import type { TenantAuth } from './tenant-auth.interface';
+import { TenantAuth } from './tenant-auth';
 
 @Injectable()
 export class ConfluenceTenantAuthFactory {
@@ -13,9 +13,12 @@ export class ConfluenceTenantAuthFactory {
   public create(confluenceConfig: ConfluenceConfig): TenantAuth {
     const strategy = this.createAuthStrategy(confluenceConfig);
     const tokenCache = new TokenCache();
-    return {
-      getAccessToken: () => tokenCache.getToken(() => strategy.acquireToken()),
-    };
+
+    return new (class extends TenantAuth {
+      public async getAccessToken(): Promise<string> {
+        return tokenCache.getToken(() => strategy.acquireToken());
+      }
+    })();
   }
 
   private createAuthStrategy(config: ConfluenceConfig): ConfluenceAuthStrategy {
