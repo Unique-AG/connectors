@@ -80,14 +80,39 @@ describe('OAuth2LoAuthStrategy', () => {
       });
     });
 
-    it('returns accessToken and computed expiresAt for cloud', async () => {
+    it('returns access token for cloud', async () => {
       fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
-      const result = await strategy.acquireToken();
+      const token = await strategy.acquireToken();
 
-      expect(result.accessToken).toBe('returned-access-token');
-      expect(result.expiresAt).toEqual(new Date('2026-02-13T13:00:00.000Z'));
+      expect(token).toBe('returned-access-token');
+    });
+
+    it('caches token across sequential calls', async () => {
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
+
+      const tokenA = await strategy.acquireToken();
+      const tokenB = await strategy.acquireToken();
+
+      expect(tokenA).toBe('returned-access-token');
+      expect(tokenB).toBe('returned-access-token');
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('deduplicates concurrent token acquisition calls', async () => {
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
+
+      const [tokenA, tokenB] = await Promise.all([
+        strategy.acquireToken(),
+        strategy.acquireToken(),
+      ]);
+
+      expect(tokenA).toBe('returned-access-token');
+      expect(tokenB).toBe('returned-access-token');
+      expect(fetchMock).toHaveBeenCalledOnce();
     });
 
     it('logs before acquiring token', async () => {
@@ -124,14 +149,13 @@ describe('OAuth2LoAuthStrategy', () => {
       expect(params.get('scope')).toBe('READ');
     });
 
-    it('returns accessToken and computed expiresAt for DC', async () => {
+    it('returns access token for DC', async () => {
       fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(successBody), { status: 200 }));
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection);
-      const result = await strategy.acquireToken();
+      const token = await strategy.acquireToken();
 
-      expect(result.accessToken).toBe('returned-access-token');
-      expect(result.expiresAt).toEqual(new Date('2026-02-13T13:00:00.000Z'));
+      expect(token).toBe('returned-access-token');
     });
   });
 
