@@ -3,6 +3,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { getTenantConfigs } from '../config/tenant-config-loader';
 import { ConfluenceTenantAuthFactory } from './confluence-tenant-auth.factory';
 import type { TenantContext } from './tenant-context.interface';
+import { TenantServiceRegistry } from './tenant-service-registry';
 
 @Injectable()
 export class TenantRegistry implements OnModuleInit {
@@ -19,6 +20,7 @@ export class TenantRegistry implements OnModuleInit {
         config,
         logger: tenantLogger,
         auth: this.confluenceAuthFactory.create(config.confluence),
+        services: new TenantServiceRegistry(),
         isScanning: false,
       });
       tenantLogger.info('Tenant registered');
