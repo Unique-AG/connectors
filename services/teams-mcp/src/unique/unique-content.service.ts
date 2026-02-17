@@ -12,6 +12,12 @@ import {
   PublicContentUpsertRequestSchema,
   type PublicContentUpsertResult,
   PublicContentUpsertResultSchema,
+  type PublicSearchRequest,
+  PublicSearchRequestSchema,
+  type PublicSearchResult,
+  PublicSearchResultSchema,
+  type SearchResultItem,
+  SearchType,
 } from './unique.dtos';
 import { UniqueApiClient } from './unique-api.client';
 
@@ -150,5 +156,88 @@ export class UniqueContentService {
       contents: result.contents,
       total: result.total ?? result.contents.length,
     };
+  }
+
+  @Span()
+  public async search(request: PublicSearchRequest): Promise<PublicSearchResult> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('search_type', request.searchType);
+    span?.setAttribute('has_scope_ids', !!request.scopeIds?.length);
+    span?.setAttribute('has_content_ids', !!request.contentIds?.length);
+    span?.setAttribute('has_metadata_filter', !!request.metaDataFilter);
+    span?.setAttribute('limit', request.limit ?? 10);
+    span?.setAttribute('page', request.page ?? 0);
+
+    const payload = PublicSearchRequestSchema.encode(request);
+
+    this.logger.debug(
+      {
+        searchType: request.searchType,
+        scopeCount: request.scopeIds?.length ?? 0,
+        contentCount: request.contentIds?.length ?? 0,
+        hasFilter: !!request.metaDataFilter,
+        limit: request.limit,
+        page: request.page,
+      },
+      'Executing content search in Unique system',
+    );
+
+    const body = await this.api.post('search/search', payload);
+    const result = PublicSearchResultSchema.parse(body);
+
+    span?.setAttribute('result_count', result.data.length);
+
+    this.logger.debug(
+      { resultCount: result.data.length },
+      'Successfully executed content search in Unique system',
+    );
+
+    return result;
+  }
+
+  @Span()
+  public async searchByScope(
+    searchString: string,
+    scopeIds: string[],
+    options?: {
+      limit?: number;
+      page?: number;
+      scoreThreshold?: number;
+    },
+  ): Promise<SearchResultItem[]> {
+    const request: PublicSearchRequest = {
+      searchString,
+      searchType: SearchType.VECTOR,
+      scopeIds,
+      limit: options?.limit ?? 10,
+      page: options?.page ?? 0,
+      scoreThreshold: options?.scoreThreshold,
+    };
+
+    const result = await this.search(request);
+    return result.data;
+  }
+
+  @Span()
+  public async searchByContent(
+    searchString: string,
+    contentIds: string[],
+    options?: {
+      limit?: number;
+      page?: number;
+      scoreThreshold?: number;
+    },
+  ): Promise<SearchResultItem[]> {
+    const request: PublicSearchRequest = {
+      searchString,
+      searchType: SearchType.VECTOR,
+      contentIds,
+      limit: options?.limit ?? 10,
+      page: options?.page ?? 0,
+      scoreThreshold: options?.scoreThreshold,
+    };
+
+    const result = await this.search(request);
+    return result.data;
   }
 }

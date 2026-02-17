@@ -270,3 +270,60 @@ export const PublicContentInfosResultSchema = z
 export type PublicContentInfosResult = z.output<typeof PublicContentInfosResultSchema>;
 
 // !SECTION - ContentInfos endpoint types
+
+// SECTION - Search endpoint types
+
+export enum SearchType {
+  VECTOR = 'VECTOR',
+  COMBINED = 'COMBINED',
+  FULL_TEXT = 'FULL_TEXT',
+  POSTGRES_FULL_TEXT = 'POSTGRES_FULL_TEXT',
+}
+
+export const RerankerRequestSchema = z.object({
+  deploymentName: z.string(),
+  options: z.record(z.string(), z.string()).optional(),
+});
+export type RerankerRequest = z.infer<typeof RerankerRequestSchema>;
+
+export const PublicSearchRequestSchema = z.object({
+  searchString: z.string(),
+  searchType: z.enum(SearchType),
+  chatId: z.string().optional(),
+  scopeIds: z.array(z.string()).optional(),
+  contentIds: z.array(z.string()).optional(),
+  chatOnly: z.boolean().optional(),
+  limit: z.number().int().min(1).max(1000).optional(),
+  page: z.number().int().min(0).optional(),
+  scoreThreshold: z.number().min(0).max(1).optional(),
+  language: z.string().optional(),
+  metaDataFilter: MetadataFilterSchema.optional(),
+  reranker: RerankerRequestSchema.optional(),
+});
+export type PublicSearchRequest = z.infer<typeof PublicSearchRequestSchema>;
+
+export const SearchResultItemSchema = z.object({
+  object: z.literal('search.search'),
+  id: z.string(),
+  chunkId: z.string(),
+  text: z.string(),
+  url: z.string().nullable(),
+  title: z.string().nullable(),
+  key: z.string(),
+  metadata: z.unknown().nullable(),
+  order: z.number(),
+  startPage: z.number(),
+  endPage: z.number(),
+  internallyStoredAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export type SearchResultItem = z.infer<typeof SearchResultItemSchema>;
+
+export const PublicSearchResultSchema = z.object({
+  object: z.literal('list'),
+  data: z.array(SearchResultItemSchema),
+});
+export type PublicSearchResult = z.infer<typeof PublicSearchResultSchema>;
+
+// !SECTION - Search endpoint types
