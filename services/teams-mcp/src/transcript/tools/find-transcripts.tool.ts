@@ -45,20 +45,22 @@ const FindTranscriptsInputSchema = z.object({
     .describe('Minimum relevance score threshold (0-1)'),
 });
 
-const TranscriptResultSchema = z.object({
-  id: z.string().describe('Unique identifier for this transcript chunk'),
-  title: z.string().describe('Meeting title or transcript name'),
-  text: z.string().describe('The relevant passage/excerpt'),
-  url: z.string().describe('URL to the source content'),
-  sequenceNumber: z.number().describe('Citation number [1], [2], etc.'),
+const TranscriptChunkSchema = z.object({
+  id: z.string().describe('Unique content ID'),
+  chunkId: z.string().optional().describe('Chunk ID within the content'),
+  title: z.string().describe('Meeting title'),
+  key: z.string().optional().describe('Content key/filename'),
+  text: z.string().describe('The relevant passage'),
+  url: z.string().optional().describe('External URL if applicable'),
   meetingDate: z.string().optional().describe('Date of the meeting'),
   participants: z.array(z.string()).optional().describe('List of participants'),
+  score: z.number().optional().describe('Relevance score'),
 });
 
 const FindTranscriptsOutputSchema = z.object({
-  summary: z.string().describe('Summary of findings with [N] citation markers'),
-  results: z.array(TranscriptResultSchema),
-  totalCount: z.number().optional().describe('Total number of results'),
+  results: z
+    .array(TranscriptChunkSchema)
+    .describe('Search results. Use [N] to cite result at index N (e.g., [0], [1])'),
 });
 
 @Injectable()
@@ -75,7 +77,7 @@ export class FindTranscriptsTool {
     name: 'find_transcripts',
     title: 'Search Meeting Transcripts',
     description:
-      'Search for content within meeting transcripts using semantic search. Provide a search query to find relevant passages. Optionally filter by subject, date range, or participant.',
+      'Search for content within meeting transcripts using semantic search. Returns relevant passages that can be cited using [N] notation where N is the result index.',
     parameters: FindTranscriptsInputSchema,
     outputSchema: FindTranscriptsOutputSchema,
     annotations: {
@@ -88,7 +90,7 @@ export class FindTranscriptsTool {
     _meta: {
       'unique.app/icon': 'search',
       'unique.app/system-prompt':
-        'Use this tool to search within meeting transcripts using semantic search. Provide a search query to find relevant passages. You can optionally filter by subject, date range, or participant name/email.',
+        'Use this tool to search meeting transcripts. Cite results using [N] where N is the array index (e.g., [0] for first result, [1] for second). The platform will automatically convert these to proper references.',
     },
   })
   @Span()
@@ -126,7 +128,7 @@ export class FindTranscriptsTool {
 
     const result = await this.contentService.search(searchRequest);
 
-    const results = result.data.map((item, index) => {
+    const results = result.data.map((item) => {
       const metadata = item.metadata as Record<string, unknown> | null;
       const participantNames = metadata?.participant_names;
       const participants =
@@ -135,13 +137,15 @@ export class FindTranscriptsTool {
           : undefined;
 
       return {
-        id: item.chunkId,
+        id: item.id,
+        chunkId: item.chunkId,
         title: item.title ?? 'Untitled Transcript',
+        key: item.key,
         text: item.text,
-        url: `unique://content/${item.id}`,
-        sequenceNumber: index + 1,
+        url: item.url ?? undefined,
         meetingDate: typeof metadata?.date === 'string' ? metadata.date : undefined,
         participants: participants?.length ? participants : undefined,
+        score: undefined, // Score not available in current response
       };
     });
 
@@ -152,19 +156,7 @@ export class FindTranscriptsTool {
       'Successfully searched meeting transcripts',
     );
 
-    const summary =
-      results.length > 0
-        ? `Found ${results.length} relevant passage(s) in transcripts:\n\n` +
-          results
-            .map((r) => `[${r.sequenceNumber}] ${r.title}: "${r.text.slice(0, 150)}${r.text.length > 150 ? '...' : ''}"`)
-            .join('\n\n')
-        : 'No relevant content found in transcripts matching your query.';
-
-    return {
-      summary,
-      results,
-      totalCount: results.length,
-    };
+    return { results };
   }
 
   private buildSearchRequest(
