@@ -1,7 +1,7 @@
 import assert from 'node:assert';
-import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { AuthMode } from '../../../config';
+import { ServiceRegistry } from '../../../tenant/service-registry';
 import { normalizeError, sanitizeError } from '../../../utils/normalize-error';
 import type { Redacted } from '../../../utils/redacted';
 import { TokenCache } from '../../token-cache';
@@ -31,15 +31,20 @@ const tokenResponseSchema = z.object({
 });
 
 export class OAuth2LoAuthStrategy extends ConfluenceAuth {
-  private readonly logger = new Logger(OAuth2LoAuthStrategy.name);
+  private readonly serviceRegistry: ServiceRegistry;
   private readonly tokenCache = new TokenCache();
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly tokenEndpoint: string;
   private readonly instanceType: 'cloud' | 'data-center';
 
-  public constructor(authConfig: OAuth2LoAuthConfig, connectionConfig: OAuth2LoConnectionConfig) {
+  public constructor(
+    authConfig: OAuth2LoAuthConfig,
+    connectionConfig: OAuth2LoConnectionConfig,
+    serviceRegistry: ServiceRegistry,
+  ) {
     super();
+    this.serviceRegistry = serviceRegistry;
     this.clientId = authConfig.clientId;
     this.clientSecret = authConfig.clientSecret.value;
     this.instanceType = connectionConfig.instanceType;
@@ -54,16 +59,16 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
   }
 
   private async fetchToken(): Promise<TokenResult> {
-    this.logger.log(`Acquiring Confluence ${this.instanceType} token via OAuth 2.0 2LO`);
+    const logger = this.serviceRegistry.getServiceLogger(OAuth2LoAuthStrategy);
+    logger.info(`Acquiring Confluence ${this.instanceType} token via OAuth 2.0 2LO`);
 
     try {
       const response = await this.requestToken();
       return this.parseTokenResponse(response);
     } catch (error) {
-      this.logger.error({
-        msg: `Failed to acquire Confluence ${this.instanceType} token via OAuth 2.0 2LO`,
-        error: sanitizeError(error),
-      });
+      logger.error(
+        { msg: `Failed to acquire Confluence ${this.instanceType} token via OAuth 2.0 2LO`, error: sanitizeError(error) },
+      );
 
       throw error;
     }

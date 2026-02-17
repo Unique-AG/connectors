@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AuthMode, type ConfluenceConfig } from '../../config';
+import type { TenantConfig } from '../../config/tenant-config-loader';
+import { ServiceRegistry } from '../../tenant/service-registry';
+import type { TenantContext } from '../../tenant/tenant-context.interface';
+import { tenantStorage } from '../../tenant/tenant-context.storage';
 import { Redacted } from '../../utils/redacted';
 import { ConfluenceAuthFactory } from './confluence-auth.factory';
+
+import { OAuth2LoAuthStrategy } from './strategies/oauth2lo-auth.strategy';
+import { PatAuthStrategy } from './strategies/pat-auth.strategy';
 
 vi.mock('./strategies/oauth2lo-auth.strategy', () => ({
   OAuth2LoAuthStrategy: vi.fn().mockImplementation(() => ({
@@ -15,6 +22,15 @@ vi.mock('./strategies/pat-auth.strategy', () => ({
   })),
 }));
 
+const mockServiceLogger = { info: vi.fn(), error: vi.fn() };
+const mockServiceRegistry = {
+  getServiceLogger: vi.fn().mockReturnValue(mockServiceLogger),
+} as unknown as ServiceRegistry;
+
+function createFactory(): ConfluenceAuthFactory {
+  return new ConfluenceAuthFactory(mockServiceRegistry);
+}
+
 const baseFields = {
   baseUrl: 'https://confluence.example.com',
   apiRateLimitPerMinute: 100,
@@ -22,11 +38,17 @@ const baseFields = {
   ingestAllLabel: 'sync-all',
 };
 
-describe('ConfluenceAuthFactory', () => {
-  const factory = new ConfluenceAuthFactory();
+const mockTenant: TenantContext = {
+  name: 'test-tenant',
+  config: {} as TenantConfig,
+  logger: { info: vi.fn(), child: vi.fn() } as unknown as TenantContext['logger'],
+  isScanning: false,
+};
 
-  describe('create', () => {
+describe('ConfluenceAuthFactory', () => {
+  describe('createAuthStrategy', () => {
     it('creates auth for OAuth 2LO cloud config', async () => {
+      const factory = createFactory();
       const config: ConfluenceConfig = {
         ...baseFields,
         instanceType: 'cloud',
@@ -37,13 +59,15 @@ describe('ConfluenceAuthFactory', () => {
         },
       };
 
-      const auth = factory.createAuthStrategy(config);
+      const auth = tenantStorage.run(mockTenant, () => factory.createAuthStrategy(config));
       const token = await auth.acquireToken();
 
       expect(token).toBe('oauth-token');
+      expect(OAuth2LoAuthStrategy).toHaveBeenCalledWith(config.auth, config, mockServiceRegistry);
     });
 
     it('creates auth for PAT data-center config', async () => {
+      const factory = createFactory();
       const config: ConfluenceConfig = {
         ...baseFields,
         instanceType: 'data-center',
@@ -53,20 +77,24 @@ describe('ConfluenceAuthFactory', () => {
         },
       };
 
-      const auth = factory.createAuthStrategy(config);
+      const auth = tenantStorage.run(mockTenant, () => factory.createAuthStrategy(config));
       const token = await auth.acquireToken();
 
       expect(token).toBe('pat-token');
+      expect(PatAuthStrategy).toHaveBeenCalledWith(config.auth, mockServiceRegistry);
     });
 
     it('throws for unsupported auth mode', () => {
+      const factory = createFactory();
       const config = {
         ...baseFields,
         instanceType: 'cloud',
         auth: { mode: 'unknown_mode' },
       } as unknown as ConfluenceConfig;
 
-      expect(() => factory.createAuthStrategy(config)).toThrow('Unsupported Confluence auth mode');
+      expect(() =>
+        tenantStorage.run(mockTenant, () => factory.createAuthStrategy(config)),
+      ).toThrow('Unsupported Confluence auth mode');
     });
   });
 });

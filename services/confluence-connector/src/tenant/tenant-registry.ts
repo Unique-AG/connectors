@@ -24,23 +24,27 @@ export class TenantRegistry implements OnModuleInit {
       const tenantLogger = PinoLogger.root.child({ tenantName });
       this.serviceRegistry.registerTenantLogger(tenantName, tenantLogger);
 
-      this.serviceRegistry.register(
-        tenantName,
-        ConfluenceAuth,
-        this.confluenceAuthFactory.createAuthStrategy(config.confluence),
-      );
-      this.serviceRegistry.register(
-        tenantName,
-        UniqueAuth,
-        this.uniqueAuthFactory.create(config.unique),
-      );
-
-      this.tenants.set(tenantName, {
+      const tenant: TenantContext = {
         name: tenantName,
         config,
         logger: tenantLogger,
         isScanning: false,
+      };
+      this.tenants.set(tenantName, tenant);
+
+      tenantStorage.run(tenant, () => {
+        this.serviceRegistry.register(
+          tenantName,
+          ConfluenceAuth,
+          this.confluenceAuthFactory.createAuthStrategy(config.confluence),
+        );
+        this.serviceRegistry.register(
+          tenantName,
+          UniqueAuth,
+          this.uniqueAuthFactory.create(config.unique),
+        );
       });
+
       tenantLogger.info('Tenant registered');
     }
   }
