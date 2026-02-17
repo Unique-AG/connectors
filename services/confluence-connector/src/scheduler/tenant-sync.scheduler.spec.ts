@@ -14,12 +14,6 @@ const mockTenantLogger = vi.hoisted(() => ({
   error: vi.fn(),
 }));
 
-vi.mock('../tenant/tenant-logger', () => ({
-  getTenantLogger: vi.fn().mockReturnValue(mockTenantLogger),
-}));
-
-import { getTenantLogger } from '../tenant/tenant-logger';
-
 function createMockAuth(): ConfluenceAuth {
   return {
     acquireToken: vi.fn().mockResolvedValue('mock-token-12345678'),
@@ -66,7 +60,11 @@ function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
 
 function createMockServiceRegistry(tenants: TenantContext[]): ServiceRegistry {
   const serviceRegistry = new ServiceRegistry();
+  const mockBaseLogger = {
+    child: () => mockTenantLogger,
+  };
   for (const tenant of tenants) {
+    serviceRegistry.registerTenantLogger(tenant.name, mockBaseLogger as never);
     serviceRegistry.register(tenant.name, ConfluenceAuth, createMockAuth());
   }
   return serviceRegistry;
@@ -114,10 +112,9 @@ describe('TenantSyncScheduler', () => {
       });
     });
 
-    it('logs the scheduled cron expression via getTenantLogger', () => {
+    it('logs the scheduled cron expression via ServiceRegistry.getServiceLogger', () => {
       scheduler.onModuleInit();
 
-      expect(getTenantLogger).toHaveBeenCalledWith(TenantSyncScheduler);
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Scheduled sync with cron: */5 * * * *');
     });
 
@@ -152,14 +149,14 @@ describe('TenantSyncScheduler', () => {
   });
 
   describe('syncTenant', () => {
-    it('creates a structured logger via getTenantLogger', async () => {
+    it('creates a structured logger via ServiceRegistry.getServiceLogger', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(getTenantLogger).toHaveBeenCalledWith(TenantSyncScheduler);
+      expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
     });
 
-    it('acquires a token and logs via getTenantLogger', async () => {
+    it('acquires a token and logs via ServiceRegistry.getServiceLogger', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 

@@ -3,7 +3,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { ConfluenceAuth } from '../auth/confluence-auth';
 import type { TenantContext } from '../tenant';
-import { getTenantLogger, ServiceRegistry, TenantRegistry } from '../tenant';
+import { ServiceRegistry, TenantRegistry } from '../tenant';
 import { smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 
@@ -49,7 +49,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
 
   private registerCronJob(tenant: TenantContext): void {
     this.tenantRegistry.run(tenant, () => {
-      const logger = getTenantLogger(TenantSyncScheduler);
+      const logger = this.serviceRegistry.getServiceLogger(TenantSyncScheduler);
       const cronExpression = tenant.config.processing.scanIntervalCron;
 
       const job = new CronJob(cronExpression, () => {
@@ -64,7 +64,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
 
   private async syncTenant(tenant: TenantContext): Promise<void> {
     await this.tenantRegistry.run(tenant, async () => {
-      const logger = getTenantLogger(TenantSyncScheduler);
+      const logger = this.serviceRegistry.getServiceLogger(TenantSyncScheduler);
 
       if (this.isShuttingDown) {
         logger.info('Skipping sync due to shutdown');
