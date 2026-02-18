@@ -7,7 +7,7 @@ import type { TypeID } from 'typeid-js';
 import { DRIZZLE, type DrizzleDatabase, subscriptions, userProfiles } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { MAIN_EXCHANGE } from '../../amqp/amqp.constants';
-import { subscriptionMailFilters } from '../mail-injestion/dtos/subscription-mail-filters.dto';
+import { subscriptionMailFilters } from '../mail-ingestion/dtos/subscription-mail-filters.dto';
 import {
   CreateSubscriptionRequestSchema,
   LifecycleEventDto,

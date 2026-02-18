@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DrizzleModule } from '~/drizzle/drizzle.module';
-import { UNIQUE_API_FEATURE_MODULE } from '~/unique/unique-api.module';
+import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { MsGraphModule } from '../../msgraph/msgraph.module';
 import { SubscriptionUtilsModule } from '../subscription-utils/subscription-utils.module';
 import { CreateRootScopeCommand } from './create-root-scope.command';
@@ -23,7 +23,7 @@ const COMMANDS = [
 const PUBLIC_COMMANDS = [SyncDirectoriesWithDeltaCommand];
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule, SubscriptionUtilsModule, UNIQUE_API_FEATURE_MODULE],
+  imports: [DrizzleModule, MsGraphModule, SubscriptionUtilsModule, UniqueApiFeatureModule],
   providers: [
     ...QUERIES,
     ...COMMANDS,

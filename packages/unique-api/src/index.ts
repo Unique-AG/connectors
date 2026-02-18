@@ -21,7 +21,6 @@ export type {
   FileDiffResponse,
   IngestionApiResponse,
   IngestionFinalizationRequest,
-  UploadContentRequest,
 } from './ingestion/ingestion.types';
 export type {
   DeleteFolderResult,

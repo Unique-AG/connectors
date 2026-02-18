@@ -1,4 +1,3 @@
-import { Readable } from 'node:stream';
 import type { FileAccessKey } from '../files/files.types';
 
 export interface AuthorMetadata {
@@ -53,12 +52,6 @@ export interface IngestionFinalizationRequest {
   storeInternally: boolean;
 }
 
-export interface UploadContentRequest {
-  uploadUrl: string;
-  content: Readable;
-  mimeType: string;
-}
-
 export interface IngestionApiResponse {
   id: string;
   key: string;
@@ -91,4 +84,33 @@ export interface FileDiffResponse {
   updatedFiles: string[];
   movedFiles: string[];
   deletedFiles: string[];
+}
+
+export enum IngestionState {
+  CheckingIntegrity = 'CHECKING_INTEGRITY',
+  Failed = 'FAILED',
+  FailedCreatingChunks = 'FAILED_CREATING_CHUNKS',
+  FailedEmbedding = 'FAILED_EMBEDDING',
+  FailedGettingFile = 'FAILED_GETTING_FILE',
+  FailedImage = 'FAILED_IMAGE',
+  FailedMalwareFound = 'FAILED_MALWARE_FOUND',
+  FailedMetadataValidation = 'FAILED_METADATA_VALIDATION',
+  FailedMalwareScanTimeout = 'FAILED_MALWARE_SCAN_TIMEOUT',
+  FailedParsing = 'FAILED_PARSING',
+  FailedRedelivered = 'FAILED_REDELIVERED',
+  FailedTimeout = 'FAILED_TIMEOUT',
+  FailedTooLessContent = 'FAILED_TOO_LESS_CONTENT',
+  FailedTableLimitExceeded = 'FAILED_TABLE_LIMIT_EXCEEDED',
+  Finished = 'FINISHED',
+  IngestionChunking = 'INGESTION_CHUNKING',
+  IngestionEmbedding = 'INGESTION_EMBEDDING',
+  IngestionReading = 'INGESTION_READING',
+  MalwareScanning = 'MALWARE_SCANNING',
+  MetadataValidation = 'METADATA_VALIDATION',
+  Queued = 'QUEUED',
+  RebuildingMetadata = 'REBUILDING_METADATA',
+  RecreatingVecetordbIndex = 'RECREATING_VECETORDB_INDEX',
+  Retrying = 'RETRYING',
+  ReEmbedding = 'RE_EMBEDDING',
+  ReIngesting = 'RE_INGESTING',
 }

@@ -1,10 +1,14 @@
 import assert from 'node:assert';
-import { Agent, interceptors } from 'undici';
+import { sanitizePath } from '@unique-ag/utils';
 import type { IngestionHttpClient } from '../clients/ingestion-http.client';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import type { UniqueApiClientAuthConfig, UniqueApiIngestion } from '../types';
+import type { UniqueApiIngestion } from '../types';
 import {
+  CONTENT_UPDATE_METADATA_MUTATION,
   CONTENT_UPSERT_MUTATION,
+  ContentUpdateMetadataMutationInput,
+  ContentUpdateMetadataMutationResponse,
+  ContentUpdateMetadataResponse,
   type ContentUpsertMutationInput,
   type ContentUpsertMutationResult,
 } from './ingestion.queries';
@@ -15,30 +19,34 @@ import type {
   FileDiffResponse,
   IngestionApiResponse,
   IngestionFinalizationRequest,
-  UploadContentRequest,
 } from './ingestion.types';
 
 interface FileIngestionServiceDeps {
   ingestionClient: UniqueGraphqlClient;
   ingestionHttpClient: IngestionHttpClient;
   ingestionBaseUrl: string;
-  uniqueConfig: {
-    ingestionApiUrl: string;
-    authMode: UniqueApiClientAuthConfig['mode'];
-  };
 }
 
 export class FileIngestionService implements UniqueApiIngestion {
   private readonly ingestionClient: UniqueGraphqlClient;
   private readonly ingestionHttpClient: IngestionHttpClient;
   private readonly ingestionBaseUrl: string;
-  private readonly uniqueConfig: { ingestionApiUrl: string; authMode: string };
 
   public constructor(deps: FileIngestionServiceDeps) {
-    this.uniqueConfig = deps.uniqueConfig;
     this.ingestionClient = deps.ingestionClient;
     this.ingestionHttpClient = deps.ingestionHttpClient;
     this.ingestionBaseUrl = deps.ingestionBaseUrl;
+  }
+  public async updateMetadata(
+    request: ContentUpdateMetadataMutationInput,
+  ): Promise<ContentUpdateMetadataResponse> {
+    const result = await this.ingestionClient.request<
+      ContentUpdateMetadataMutationResponse,
+      ContentUpdateMetadataMutationInput
+    >(CONTENT_UPDATE_METADATA_MUTATION, request);
+
+    assert.ok(result?.contentUpsert?.id, 'Invalid response from Unique API metadata update');
+    return result.contentUpsert;
   }
 
   public async registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse> {
@@ -71,37 +79,6 @@ export class FileIngestionService implements UniqueApiIngestion {
 
     assert.ok(result?.contentUpsert, 'Invalid response from Unique API content registration');
     return result.contentUpsert;
-  }
-
-  public async streamUpload(request: UploadContentRequest): Promise<void> {
-    const uploadUrl = this.correctWriteUrl(request.uploadUrl);
-    const url = new URL(uploadUrl);
-    const path = `${url.pathname}${url.search}`;
-
-    const httpAgent = new Agent().compose([interceptors.retry(), interceptors.redirect()]);
-    const requestObject = {
-      method: 'PUT',
-      path,
-      origin: url.origin,
-      headers: {
-        'Content-Type': request.mimeType ?? 'application/octet-stream',
-        'x-ms-blob-type': 'BlockBlob',
-      },
-      body: request.content,
-      duplex: 'half',
-    };
-    console.log(requestObject);
-    await httpAgent.request(requestObject);
-  }
-
-  private correctWriteUrl(writeUrl: string): string {
-    if (this.uniqueConfig.authMode === 'external') {
-      return writeUrl;
-    }
-    const url = new URL(writeUrl);
-    const key = url.searchParams.get('key');
-    assert.ok(key, 'writeUrl is missing key parameter');
-    return `${this.uniqueConfig.ingestionApiUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
   }
 
   public async finalizeIngestion(request: IngestionFinalizationRequest): Promise<{ id: string }> {
@@ -140,9 +117,6 @@ export class FileIngestionService implements UniqueApiIngestion {
     sourceName: string,
   ): Promise<FileDiffResponse> {
     const ingestionUrl = new URL(this.ingestionBaseUrl);
-    // The ingestionBaseUrl can already have part of the path when running in external mode
-    const pathPrefix = ingestionUrl.pathname === '/' ? '' : ingestionUrl.pathname;
-    const fileDiffPath = `${pathPrefix}/v2/content/file-diff`;
 
     const diffRequest: FileDiffRequest = {
       partialKey,
@@ -153,7 +127,10 @@ export class FileIngestionService implements UniqueApiIngestion {
 
     const { statusCode, body } = await this.ingestionHttpClient.request({
       method: 'POST',
-      path: fileDiffPath,
+      path: sanitizePath({
+        path: `${ingestionUrl.pathname}/v2/content/file-diff`,
+        prefixWithSlash: true,
+      }),
       body: JSON.stringify(diffRequest),
     });
 

@@ -13,7 +13,7 @@ import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
 import { SyncDirectoriesWithDeltaCommand } from '../directories-sync/sync-directories-with-delta.command';
 import { GetSubscriptionAndUserProfileQuery } from '../subscription-utils/get-subscription-and-user-profile.query';
-import { MessageEventDto } from './dtos/message-events.dtos';
+import { MessageEventDto } from './dtos/messag-event.dto';
 import {
   FileDiffGraphMessage,
   FileDiffGraphMessageFields,

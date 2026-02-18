@@ -105,10 +105,6 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
     });
 
     const ingestion = new FileIngestionService({
-      uniqueConfig: {
-        authMode: config.auth.mode,
-        ingestionApiUrl: config.endpoints.ingestionBaseUrl,
-      },
       ingestionClient,
       ingestionHttpClient,
       ingestionBaseUrl: config.endpoints.ingestionBaseUrl,

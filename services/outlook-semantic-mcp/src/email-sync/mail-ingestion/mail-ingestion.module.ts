@@ -1,7 +1,7 @@
 import { Module, Provider } from '@nestjs/common';
 import { DrizzleModule } from '~/drizzle/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
-import { UNIQUE_API_FEATURE_MODULE } from '~/unique/unique-api.module';
+import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';
 import { SubscriptionUtilsModule } from '../subscription-utils/subscription-utils.module';
 import { FullSyncCommand } from './full-sync.command';
@@ -26,7 +26,7 @@ const QUERIES: Provider[] = [GetMessageDetailsQuery];
     MsGraphModule,
     SubscriptionUtilsModule,
     DirectoriesSyncModule,
-    UNIQUE_API_FEATURE_MODULE,
+    UniqueApiFeatureModule,
   ],
   providers: [...COMMANDS, ...QUERIES, RunFullSyncTool],
   exports: [...COMMANDS, ...QUERIES],

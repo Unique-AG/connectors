@@ -22,9 +22,9 @@ import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { normalizeError } from '~/utils/normalize-error';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
-import { MessageEventDto } from './mail-injestion/dtos/message-events.dtos';
-import { FullSyncCommand } from './mail-injestion/full-sync.command';
-import { IngestionPriority } from './mail-injestion/utils/ingestion-queue.utils';
+import { MessageEventDto } from './mail-ingestion/dtos/messag-event.dto';
+import { FullSyncCommand } from './mail-ingestion/full-sync.command';
+import { IngestionPriority } from './mail-ingestion/utils/ingestion-queue.utils';
 import {
   ChangeNotificationCollectionDto,
   LifecycleChangeNotificationCollectionDto,

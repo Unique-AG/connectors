@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/drizzle';
-import { FullSyncCommand } from '~/email-sync/mail-injestion/full-sync.command';
+import { FullSyncCommand } from '~/email-sync/mail-ingestion/full-sync.command';
 
 const InputSchema = z.object({});
 

@@ -6,11 +6,11 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
-import { MessageEventDto } from './mail-injestion/dtos/message-events.dtos';
-import { IngestEmailCommand } from './mail-injestion/ingest-email.command';
-import { IngestEmailViaSubscriptionCommand } from './mail-injestion/ingest-email-via-subscription.command';
-import { UpdateMetadataCommand } from './mail-injestion/update-metadata.command';
-import { IngestionPriority } from './mail-injestion/utils/ingestion-queue.utils';
+import { MessageEventDto } from './mail-ingestion/dtos/messag-event.dto';
+import { IngestEmailCommand } from './mail-ingestion/ingest-email.command';
+import { IngestEmailViaSubscriptionCommand } from './mail-ingestion/ingest-email-via-subscription.command';
+import { UpdateMetadataCommand } from './mail-ingestion/update-metadata.command';
+import { IngestionPriority } from './mail-ingestion/utils/ingestion-queue.utils';
 
 @Injectable()
 export class IngestionListener {
@@ -35,7 +35,7 @@ export class IngestionListener {
   })
   public async onIngestionRequested(@RabbitPayload() payload: unknown): Promise<void> {
     const event = MessageEventDto.parse(payload);
-    this.logger.log(`Email injestion requested: ${event.type}`);
+    this.logger.log(`Email ingestion requested: ${event.type}`);
 
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.mail-notification.subscription-message-changed':
