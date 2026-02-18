@@ -5,6 +5,8 @@ import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
 import { UniqueAuth, UniqueAuthFactory } from '../auth/unique-auth';
 import { getTenantConfigs } from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
+import { ConfluenceContentFetcher } from '../synchronization/confluence-content-fetcher';
+import { ConfluencePageScanner } from '../synchronization/confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
@@ -51,6 +53,16 @@ export class TenantRegistry implements OnModuleInit {
           tenantName,
           ConfluenceApiClient,
           this.confluenceApiClientFactory.create(config.confluence),
+        );
+        this.serviceRegistry.register(
+          tenantName,
+          ConfluencePageScanner,
+          new ConfluencePageScanner(config.confluence, config.processing, this.serviceRegistry),
+        );
+        this.serviceRegistry.register(
+          tenantName,
+          ConfluenceContentFetcher,
+          new ConfluenceContentFetcher(config.confluence, this.serviceRegistry),
         );
         this.serviceRegistry.register(
           tenantName,
