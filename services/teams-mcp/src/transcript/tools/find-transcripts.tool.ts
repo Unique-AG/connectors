@@ -161,7 +161,7 @@ export class FindTranscriptsTool {
 
   private buildSearchRequest(
     rootScopeId: string,
-    userProfileId: string,
+    _userProfileId: string,
     input: z.infer<typeof FindTranscriptsInputSchema>,
   ): PublicSearchRequest {
     const conditions: MetadataFilter[] = [
@@ -177,15 +177,7 @@ export class FindTranscriptsTool {
         operator: UniqueQLOperator.EQUALS,
         value: 'text/vtt',
       },
-      // REVIEW: Is this actually needed given how ACL works in KB and through the public API?
-      // NOTE: Permission filter: only return transcripts where the current user is a participant.
-      // Uses CONTAINS on comma-separated IDs which is safe in practice since user profile IDs
-      // are UUIDs - the probability of a partial match across ID boundaries is negligible.
-      {
-        path: ['metadata', 'participant_user_profile_ids'],
-        operator: UniqueQLOperator.CONTAINS,
-        value: userProfileId,
-      },
+      // NOTE: Permission are enforced by KB assignments, no need to add additional filter here
     ];
 
     if (input.subject) {

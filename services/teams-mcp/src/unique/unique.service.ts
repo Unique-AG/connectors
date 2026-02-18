@@ -130,7 +130,7 @@ export class UniqueService {
       input: {
         key: transcript.id,
         mimeType: 'text/vtt',
-        title: `${meeting.subject}.vtt`,
+        title: meeting.subject || 'Untitled Meeting',
         byteSize: 1,
         metadata: this.buildContentMetadata(meeting, [...participants.map((p) => p.id), owner.id]),
       },
@@ -145,7 +145,7 @@ export class UniqueService {
       input: {
         key: transcript.id,
         mimeType: 'text/vtt',
-        title: `${meeting.subject}.vtt`,
+        title: meeting.subject || 'Untitled Meeting',
       },
     });
 
@@ -170,7 +170,7 @@ export class UniqueService {
           input: {
             key: recording.id,
             mimeType: 'video/mp4',
-            title: `${meeting.subject}.mp4`,
+            title: meeting.subject || 'Untitled Meeting',
             byteSize: 1,
             ingestionConfig: {
               uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
@@ -190,7 +190,7 @@ export class UniqueService {
           input: {
             key: recording.id,
             mimeType: 'video/mp4',
-            title: `${meeting.subject}.mp4`,
+            title: meeting.subject || 'Untitled Meeting',
             ingestionConfig: {
               uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
             },
