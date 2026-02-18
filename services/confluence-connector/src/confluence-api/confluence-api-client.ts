@@ -61,6 +61,10 @@ export class ConfluenceApiClient {
     );
   }
 
+  public buildPageWebUrl(page: ConfluencePage): string {
+    return this.adapter.buildPageWebUrl(page);
+  }
+
   private async makeRateLimitedRequest<T>(url: string): Promise<T> {
     return await this.limiter.schedule(async () => {
       const token = await this.confluenceAuth.acquireToken();
