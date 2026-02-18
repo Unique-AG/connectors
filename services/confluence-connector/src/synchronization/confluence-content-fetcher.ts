@@ -17,7 +17,7 @@ export class ConfluenceContentFetcher {
     this.logger = serviceRegistry.getServiceLogger(ConfluenceContentFetcher);
   }
 
-  public async fetchPages(pages: DiscoveredPage[]): Promise<FetchedPage[]> {
+  public async fetchPagesContent(pages: DiscoveredPage[]): Promise<FetchedPage[]> {
     const fetched: FetchedPage[] = [];
 
     for (const page of pages) {

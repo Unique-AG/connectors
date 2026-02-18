@@ -1,16 +1,18 @@
 import type pino from 'pino';
-import { ConfluenceAuth } from '../auth/confluence-auth';
 import type { ServiceRegistry } from '../tenant';
 import { getCurrentTenant } from '../tenant/tenant-context.storage';
-import { smear } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
+import { ConfluenceContentFetcher } from './confluence-content-fetcher';
+import { ConfluencePageScanner } from './confluence-page-scanner';
 
 export class ConfluenceSynchronizationService {
-  private readonly confluenceAuth: ConfluenceAuth;
+  private readonly scanner: ConfluencePageScanner;
+  private readonly contentFetcher: ConfluenceContentFetcher;
   private readonly logger: pino.Logger;
 
   public constructor(serviceRegistry: ServiceRegistry) {
-    this.confluenceAuth = serviceRegistry.getService(ConfluenceAuth);
+    this.scanner = serviceRegistry.getService(ConfluencePageScanner);
+    this.contentFetcher = serviceRegistry.getService(ConfluenceContentFetcher);
     this.logger = serviceRegistry.getServiceLogger(ConfluenceSynchronizationService);
   }
 
@@ -25,8 +27,13 @@ export class ConfluenceSynchronizationService {
     tenant.isScanning = true;
     try {
       this.logger.info('Starting sync');
-      const token = await this.confluenceAuth.acquireToken();
-      this.logger.info({ token: smear(token) }, 'Token acquired');
+
+      const discoveredPages = await this.scanner.discoverPages();
+      this.logger.info({ count: discoveredPages.length, pages: JSON.stringify(discoveredPages, null, 4) }, 'Discovery completed');
+
+      const fetchedPages = await this.contentFetcher.fetchPagesContent(discoveredPages);
+      this.logger.info({ count: fetchedPages.length, pages: JSON.stringify(fetchedPages, null, 4) }, 'Fetching completed');
+
       this.logger.info('Sync completed');
     } catch (error) {
       this.logger.error({ msg: 'Sync failed', error: sanitizeError(error) });
