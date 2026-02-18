@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { pick } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueApiUsers } from '../types';
@@ -10,21 +11,12 @@ import {
 } from './users.queries';
 import type { SimpleUser } from './users.types';
 
-const BATCH_SIZE = 100;
-
-interface UsersServiceDeps {
-  scopeManagementClient: UniqueGraphqlClient;
-  logger: { log: (msg: string) => void };
-}
-
 export class UsersService implements UniqueApiUsers {
-  private readonly scopeManagementClient: UniqueGraphqlClient;
-  private readonly logger: UsersServiceDeps['logger'];
-
-  public constructor(deps: UsersServiceDeps) {
-    this.scopeManagementClient = deps.scopeManagementClient;
-    this.logger = deps.logger;
-  }
+  public constructor(
+    private readonly scopeManagementClient: UniqueGraphqlClient,
+    private readonly logger: Logger,
+    private readonly options: { defaultBatchSize: number },
+  ) {}
 
   public async listAll(): Promise<SimpleUser[]> {
     this.logger.log('Requesting all users from Unique API');
@@ -39,7 +31,7 @@ export class UsersService implements UniqueApiUsers {
         ListUsersQueryInput
       >(LIST_USERS_QUERY, {
         skip,
-        take: BATCH_SIZE,
+        take: this.options.defaultBatchSize,
         where: {
           active: {
             equals: true,
@@ -48,8 +40,8 @@ export class UsersService implements UniqueApiUsers {
       });
       users.push(...batchResult.listUsers.nodes.map(pick(['id', 'email'])));
       batchCount = batchResult.listUsers.nodes.length;
-      skip += BATCH_SIZE;
-    } while (batchCount === BATCH_SIZE);
+      skip += this.options.defaultBatchSize;
+    } while (batchCount === this.options.defaultBatchSize);
 
     return users;
   }

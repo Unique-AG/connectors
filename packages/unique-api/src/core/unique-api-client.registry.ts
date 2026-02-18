@@ -1,10 +1,14 @@
 import * as assert from 'node:assert';
-import type {
-  UniqueApiClient,
-  UniqueApiClientConfig,
-  UniqueApiClientFactory,
-  UniqueApiClientRegistry,
-} from '../types';
+import type { UniqueApiClient, UniqueApiClientFactory } from '../types';
+import { UniqueApiFeatureModuleOptions } from './config/unique-api-feature-module-options';
+
+export interface UniqueApiClientRegistry {
+  get(key: string): UniqueApiClient | undefined;
+  getOrCreate(key: string, config: UniqueApiFeatureModuleOptions): UniqueApiClient;
+  set(key: string, client: UniqueApiClient): void;
+  delete(key: string): Promise<void>;
+  clear(): Promise<void>;
+}
 
 export class UniqueApiClientRegistryImpl implements UniqueApiClientRegistry {
   private readonly clients = new Map<string, UniqueApiClient>();
@@ -18,7 +22,7 @@ export class UniqueApiClientRegistryImpl implements UniqueApiClientRegistry {
     return this.clients.get(key);
   }
 
-  public getOrCreate(key: string, config: UniqueApiClientConfig): UniqueApiClient {
+  public getOrCreate(key: string, config: UniqueApiFeatureModuleOptions): UniqueApiClient {
     const existing = this.clients.get(key);
     if (existing) {
       return existing;

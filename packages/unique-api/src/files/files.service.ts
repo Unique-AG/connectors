@@ -1,4 +1,5 @@
 import { getErrorCodeFromGraphqlRequest, sanitizeError } from '@unique-ag/utils';
+import { Logger } from '@nestjs/common';
 import { chunk } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueApiFiles } from '../types';
@@ -35,24 +36,11 @@ const DELETE_BATCH_SIZE = 20;
 // system when we have a huge folder with many files.
 const ACCESS_BATCH_SIZE = 20;
 
-interface FilesServiceDeps {
-  ingestionClient: UniqueGraphqlClient;
-  logger: {
-    log: (msg: string) => void;
-    debug: (msg: string) => void;
-    warn: (obj: object) => void;
-    error: (obj: object) => void;
-  };
-}
-
 export class FilesService implements UniqueApiFiles {
-  private readonly ingestionClient: UniqueGraphqlClient;
-  private readonly logger: FilesServiceDeps['logger'];
-
-  public constructor(deps: FilesServiceDeps) {
-    this.ingestionClient = deps.ingestionClient;
-    this.logger = deps.logger;
-  }
+  public constructor(
+    private readonly ingestionClient: UniqueGraphqlClient,
+    private readonly logger: Logger,
+  ) {}
 
   public async getByKeys(keys: string[]): Promise<UniqueFile[]> {
     if (keys.length === 0) {

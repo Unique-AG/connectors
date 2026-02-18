@@ -1,3 +1,5 @@
+export type { UniqueApiFeatureModuleInputOptions } from './core/config/unique-api-feature-module-options';
+export type { UniqueApiRootModuleInputOptions } from './core/config/unique-api-root-module-options';
 export type { UniqueApiMetrics } from './core/observability';
 export {
   getUniqueApiClientToken,
@@ -35,16 +37,11 @@ export type {
   UniqueApiAuth,
   UniqueApiClient,
   UniqueApiClientAuthConfig,
-  UniqueApiClientConfig,
   UniqueApiClientFactory,
   UniqueApiClientRegistry,
-  UniqueApiFeatureAsyncOptions,
   UniqueApiFiles,
   UniqueApiGroups,
   UniqueApiIngestion,
-  UniqueApiModuleAsyncOptions,
-  UniqueApiModuleOptions,
-  UniqueApiObservabilityConfig,
   UniqueApiScopes,
   UniqueApiUsers,
   UniqueEntityType,

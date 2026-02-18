@@ -1,4 +1,5 @@
 import { processInBatches } from '@unique-ag/utils';
+import { Logger } from '@nestjs/common';
 import { isNullish } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueApiScopes } from '../types';
@@ -24,21 +25,12 @@ import {
 } from './scopes.queries';
 import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
 
-const BATCH_SIZE = 100;
-
-interface ScopesServiceDeps {
-  scopeManagementClient: UniqueGraphqlClient;
-  logger: { debug: (msg: string) => void; error: (obj: object) => void };
-}
-
 export class ScopesService implements UniqueApiScopes {
-  private readonly scopeManagementClient: UniqueGraphqlClient;
-  private readonly logger: ScopesServiceDeps['logger'];
-
-  public constructor(deps: ScopesServiceDeps) {
-    this.scopeManagementClient = deps.scopeManagementClient;
-    this.logger = deps.logger;
-  }
+  public constructor(
+    private readonly scopeManagementClient: UniqueGraphqlClient,
+    private readonly logger: Logger,
+    private readonly options: { defaultBatchSize: number },
+  ) {}
 
   public async createFromPaths(
     paths: string[],
@@ -57,7 +49,7 @@ export class ScopesService implements UniqueApiScopes {
 
     const allScopes = await processInBatches({
       items: paths,
-      batchSize: BATCH_SIZE,
+      batchSize: this.options.defaultBatchSize,
       processor: async (batch) => {
         const variables: GenerateScopesBasedOnPathsMutationInput = {
           paths: batch,
@@ -160,7 +152,7 @@ export class ScopesService implements UniqueApiScopes {
         PaginatedScopeQueryInput
       >(PAGINATED_SCOPE_QUERY, {
         skip,
-        take: BATCH_SIZE,
+        take: this.options.defaultBatchSize,
         where: {
           parentId: {
             equals: parentId,
@@ -169,8 +161,8 @@ export class ScopesService implements UniqueApiScopes {
       });
       scopes.push(...batchResult.paginatedScope.nodes);
       batchCount = batchResult.paginatedScope.nodes.length;
-      skip += BATCH_SIZE;
-    } while (batchCount === BATCH_SIZE);
+      skip += this.options.defaultBatchSize;
+    } while (batchCount === this.options.defaultBatchSize);
 
     return scopes;
   }

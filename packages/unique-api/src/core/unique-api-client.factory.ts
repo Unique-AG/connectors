@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Agent, interceptors } from 'undici';
 import { UniqueAuth } from '../auth/unique-auth';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
@@ -6,109 +7,95 @@ import { FilesService } from '../files/files.service';
 import { GroupsService } from '../groups/groups.service';
 import { FileIngestionService } from '../ingestion/ingestion.service';
 import { ScopesService } from '../scopes/scopes.service';
-import type { UniqueApiClient, UniqueApiClientConfig, UniqueApiClientFactory } from '../types';
+import type { UniqueApiClient } from '../types';
 import { UsersService } from '../users/users.service';
 import { BottleneckFactory } from './bottleneck.factory';
+import { UniqueApiFeatureModuleOptions } from './config/unique-api-feature-module-options';
 import type { UniqueApiMetrics } from './observability';
 
-interface UniqueApiClientFactoryLogger {
-  log(message: string): void;
-  error(obj: object): void;
-  warn(obj: object): void;
-  debug(message: string): void;
-}
-
-interface UniqueApiClientFactoryDeps {
-  logger: UniqueApiClientFactoryLogger;
-  metrics: UniqueApiMetrics;
-  bottleneckFactory: BottleneckFactory;
+export interface UniqueApiClientFactory {
+  create(config: UniqueApiFeatureModuleOptions): UniqueApiClient;
 }
 
 export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
-  private readonly logger: UniqueApiClientFactoryLogger;
-  private readonly metrics: UniqueApiMetrics;
-  private readonly bottleneckFactory: BottleneckFactory;
+  public constructor(
+    private readonly logger: Logger,
+    private readonly metrics: UniqueApiMetrics,
+    private readonly bottleneckFactory: BottleneckFactory,
+  ) {}
 
-  public constructor(deps: UniqueApiClientFactoryDeps) {
-    this.logger = deps.logger;
-    this.metrics = deps.metrics;
-    this.bottleneckFactory = deps.bottleneckFactory;
-  }
-
-  public create(config: UniqueApiClientConfig): UniqueApiClient {
-    const clientName = config.metadata?.clientName;
+  public create(config: UniqueApiFeatureModuleOptions): UniqueApiClient {
     const isOwnedDispatcher = !config.dispatcher;
     const dispatcher =
       config.dispatcher ?? new Agent().compose([interceptors.retry(), interceptors.redirect()]);
 
-    const auth = new UniqueAuth({
-      config: config.auth,
-      metrics: this.metrics,
-      logger: this.logger,
-      dispatcher,
-    });
+    const auth = new UniqueAuth(config.auth, this.metrics, this.logger, dispatcher);
 
-    const scopeManagementClient = new UniqueGraphqlClient({
-      target: 'scopeManagement',
-      baseUrl: config.endpoints.scopeManagementBaseUrl,
+    const scopeManagementClient = new UniqueGraphqlClient(
       auth,
-      metrics: this.metrics,
-      logger: this.logger,
-      rateLimitPerMinute: config.rateLimitPerMinute,
+      this.metrics,
+      this.logger,
       dispatcher,
-      bottleneckFactory: this.bottleneckFactory,
-      clientName,
-    });
+      this.bottleneckFactory,
+      {
+        target: 'scopeManagement',
+        baseUrl: config.scopeManagment.baseUrl,
+        rateLimitPerMinute: config.scopeManagment.rateLimitPerMinute,
+        clientName: config.metadata.clientName,
+      },
+    );
 
-    const ingestionClient = new UniqueGraphqlClient({
-      target: 'ingestion',
-      baseUrl: config.endpoints.ingestionBaseUrl,
+    const ingestionClient = new UniqueGraphqlClient(
       auth,
-      metrics: this.metrics,
-      logger: this.logger,
-      rateLimitPerMinute: config.rateLimitPerMinute,
+      this.metrics,
+      this.logger,
       dispatcher,
-      bottleneckFactory: this.bottleneckFactory,
-      clientName,
-    });
+      this.bottleneckFactory,
+      {
+        target: 'ingestion',
+        baseUrl: config.ingestion.baseUrl,
+        rateLimitPerMinute: config.ingestion.rateLimitPerMinute,
+        clientName: config.metadata.clientName,
+      },
+    );
 
-    const ingestionHttpClient = new IngestionHttpClient({
-      baseUrl: config.endpoints.ingestionBaseUrl,
+    const ingestionHttpClient = new IngestionHttpClient(
       auth,
-      metrics: this.metrics,
-      logger: this.logger,
-      rateLimitPerMinute: config.rateLimitPerMinute,
+      this.metrics,
+      this.logger,
       dispatcher,
-      clientName,
-      bottleneckFactory: this.bottleneckFactory,
-    });
+      this.bottleneckFactory,
+      {
+        baseUrl: config.ingestion.baseUrl,
+        rateLimitPerMinute: config.ingestion.rateLimitPerMinute,
+        clientName: config.metadata.clientName,
+      },
+    );
 
-    const scopes = new ScopesService({
-      // Scope management was moved to ingestion
-      scopeManagementClient: ingestionClient,
-      logger: this.logger,
-    });
-
-    const files = new FilesService({
+    const scopes = new ScopesService(
+      // Scope management was moved to ingestion.
       ingestionClient,
-      logger: this.logger,
+      this.logger,
+      {
+        defaultBatchSize: config.scopeManagment.batchSize,
+      },
+    );
+
+    const files = new FilesService(ingestionClient, this.logger);
+
+    const users = new UsersService(scopeManagementClient, this.logger, {
+      defaultBatchSize: config.users.batchSize,
     });
 
-    const users = new UsersService({
-      scopeManagementClient,
-      logger: this.logger,
+    const groups = new GroupsService(scopeManagementClient, this.logger, {
+      defaultBatchSize: config.users.batchSize,
     });
 
-    const groups = new GroupsService({
-      scopeManagementClient,
-      logger: this.logger,
-    });
-
-    const ingestion = new FileIngestionService({
+    const ingestion = new FileIngestionService(
       ingestionClient,
       ingestionHttpClient,
-      ingestionBaseUrl: config.endpoints.ingestionBaseUrl,
-    });
+      config.ingestion.baseUrl,
+    );
 
     return {
       auth,

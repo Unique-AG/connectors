@@ -5,45 +5,35 @@ import {
   getSlowRequestDurationBucket,
   sanitizeError,
 } from '@unique-ag/utils';
+import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { type Dispatcher, errors, interceptors } from 'undici';
 import type { UniqueAuth } from '../auth/unique-auth';
 import { BottleneckFactory } from '../core/bottleneck.factory';
 import type { RequestMetricAttributes, UniqueApiMetrics } from '../core/observability';
 
-const DEFAULT_RATE_LIMIT_PER_MINUTE = 1000;
-
-interface IngestionHttpClientDeps {
-  baseUrl: string;
-  auth: UniqueAuth;
-  metrics: UniqueApiMetrics;
-  logger: { warn: (obj: object) => void; error: (obj: object) => void };
-  rateLimitPerMinute?: number;
-  dispatcher: Dispatcher;
-  bottleneckFactory: BottleneckFactory;
-  clientName?: string;
-}
-
 export class IngestionHttpClient {
   private readonly httpClient: Dispatcher;
   private readonly limiter: Bottleneck;
   private readonly extractApiMethod: ReturnType<typeof createApiMethodExtractor>;
   private readonly origin: string;
-  private readonly auth: UniqueAuth;
-  private readonly metrics: UniqueApiMetrics;
-  private readonly logger: IngestionHttpClientDeps['logger'];
-  private readonly clientName?: string;
 
-  public constructor(deps: IngestionHttpClientDeps) {
-    this.auth = deps.auth;
-    this.metrics = deps.metrics;
-    this.logger = deps.logger;
-    this.clientName = deps.clientName;
-
-    const ingestionUrl = new URL(deps.baseUrl);
+  public constructor(
+    private readonly auth: UniqueAuth,
+    private readonly metrics: UniqueApiMetrics,
+    private readonly logger: Logger,
+    private readonly dispatcher: Dispatcher,
+    private readonly bottleneckFactory: BottleneckFactory,
+    private readonly options: {
+      baseUrl: string;
+      rateLimitPerMinute: number;
+      clientName?: string;
+    },
+  ) {
+    const ingestionUrl = new URL(this.options.baseUrl);
     this.origin = `${ingestionUrl.protocol}//${ingestionUrl.host}`;
 
-    this.httpClient = deps.dispatcher.compose([
+    this.httpClient = this.dispatcher.compose([
       interceptors.retry({
         maxRetries: 3,
         minTimeout: 3_000,
@@ -62,11 +52,10 @@ export class IngestionHttpClient {
       'ingestion-gen2',
     ]);
 
-    const rateLimitPerMinute = deps.rateLimitPerMinute ?? DEFAULT_RATE_LIMIT_PER_MINUTE;
-    this.limiter = deps.bottleneckFactory.createLimiter(
+    this.limiter = this.bottleneckFactory.createLimiter(
       {
-        reservoir: rateLimitPerMinute,
-        reservoirRefreshAmount: rateLimitPerMinute,
+        reservoir: this.options.rateLimitPerMinute,
+        reservoirRefreshAmount: this.options.rateLimitPerMinute,
         reservoirRefreshInterval: 60_000,
       },
       IngestionHttpClient.name,
@@ -93,7 +82,7 @@ export class IngestionHttpClient {
     const baseAttributes: Pick<RequestMetricAttributes, 'operation' | 'target' | 'tenant'> = {
       operation: apiMethod,
       target: 'ingestion',
-      ...(this.clientName ? { tenant: this.clientName } : {}),
+      ...(this.options.clientName ? { tenant: this.options.clientName } : {}),
     };
 
     try {

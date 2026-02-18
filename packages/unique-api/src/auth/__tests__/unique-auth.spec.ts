@@ -1,8 +1,9 @@
 import assert from 'node:assert';
+import { Logger } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
+import { UniqueAuthConfig } from '../../core/config/unique-api-auth-schema';
 import type { UniqueApiMetrics } from '../../core/observability';
-import type { ClusterLocalAuthConfig, ExternalAuthConfig } from '../../types';
 import { UniqueAuth } from '../unique-auth';
 
 function createMockMetrics(): UniqueApiMetrics {
@@ -30,7 +31,7 @@ function createDispatcherResponse(statusCode: number, body: object): Dispatcher.
   } as unknown as Dispatcher.ResponseData;
 }
 
-const externalConfig: ExternalAuthConfig = {
+const externalConfig: UniqueAuthConfig = {
   mode: 'external',
   zitadelOauthTokenUrl: 'https://zitadel.example.com/oauth/v2/token',
   zitadelClientId: 'client-id',
@@ -38,7 +39,7 @@ const externalConfig: ExternalAuthConfig = {
   zitadelProjectId: 'project-id',
 };
 
-const clusterLocalConfig: ClusterLocalAuthConfig = {
+const clusterLocalConfig: UniqueAuthConfig = {
   mode: 'cluster_local',
   serviceId: 'my-service',
   extraHeaders: { 'x-custom': 'value' },
@@ -62,12 +63,12 @@ describe('UniqueAuth', () => {
 
   describe('cluster_local mode', () => {
     it('returns x-service-id and extra headers from getAuthHeaders()', async () => {
-      const auth = new UniqueAuth({
-        config: clusterLocalConfig,
+      const auth = new UniqueAuth(
+        clusterLocalConfig,
         metrics,
-        logger,
-        dispatcher: dispatcher as unknown as Dispatcher,
-      });
+        logger as unknown as Logger,
+        dispatcher as unknown as Dispatcher,
+      );
 
       const headers = await auth.getAuthHeaders();
 
@@ -78,12 +79,12 @@ describe('UniqueAuth', () => {
     });
 
     it('throws assertion error when getToken() is called', async () => {
-      const auth = new UniqueAuth({
-        config: clusterLocalConfig,
+      const auth = new UniqueAuth(
+        clusterLocalConfig,
         metrics,
-        logger,
-        dispatcher: dispatcher as unknown as Dispatcher,
-      });
+        logger as unknown as Logger,
+        dispatcher as unknown as Dispatcher,
+      );
 
       await expect(auth.getToken()).rejects.toThrow(assert.AssertionError);
     });
@@ -91,12 +92,12 @@ describe('UniqueAuth', () => {
 
   describe('external mode', () => {
     function createExternalAuth() {
-      return new UniqueAuth({
-        config: externalConfig,
+      return new UniqueAuth(
+        externalConfig,
         metrics,
-        logger,
-        dispatcher: dispatcher as unknown as Dispatcher,
-      });
+        logger as unknown as Logger,
+        dispatcher as unknown as Dispatcher,
+      );
     }
 
     it('fetches token from Zitadel and caches it', async () => {

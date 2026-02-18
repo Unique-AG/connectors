@@ -1,32 +1,23 @@
 import assert from 'node:assert';
 import { sanitizeError } from '@unique-ag/utils';
+import { Logger } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
+import { UniqueAuthConfig } from '../core/config/unique-api-auth-schema';
 import type { UniqueApiMetrics } from '../core/observability';
-import type { ExternalAuthConfig, UniqueApiAuth, UniqueApiClientAuthConfig } from '../types';
-
-interface UniqueAuthDeps {
-  config: UniqueApiClientAuthConfig;
-  metrics: UniqueApiMetrics;
-  logger: { error: (obj: object) => void; debug: (msg: string) => void };
-  dispatcher: Dispatcher;
-}
+import type { ExternalAuthConfig, UniqueApiAuth } from '../types';
 
 export class UniqueAuth implements UniqueApiAuth {
   // used protected to allow use of typeguard isTokenValid
   protected cachedToken?: string;
   private tokenExpirationTime?: number;
   private refreshTokenPromise: Promise<string> | null = null;
-  private readonly config: UniqueApiClientAuthConfig;
-  private readonly metrics: UniqueApiMetrics;
-  private readonly logger: UniqueAuthDeps['logger'];
-  private readonly dispatcher: Dispatcher;
 
-  public constructor(deps: UniqueAuthDeps) {
-    this.config = deps.config;
-    this.metrics = deps.metrics;
-    this.logger = deps.logger;
-    this.dispatcher = deps.dispatcher;
-  }
+  public constructor(
+    private readonly config: UniqueAuthConfig,
+    private readonly metrics: UniqueApiMetrics,
+    private readonly logger: Logger,
+    private readonly dispatcher: Dispatcher,
+  ) {}
 
   public async getToken(): Promise<string> {
     if (this.isTokenValid()) {

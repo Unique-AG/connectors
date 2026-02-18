@@ -2,7 +2,7 @@ import {
   ClusterLocalAuthConfig,
   ExternalAuthConfig,
   getUniqueApiClientToken,
-  UniqueApiClientConfig,
+  UniqueApiFeatureModuleInputOptions,
   UniqueApiModule,
 } from '@unique-ag/unique-api';
 import { Inject, Module } from '@nestjs/common';
@@ -19,7 +19,7 @@ export const InjectUniqueApi = () =>
 const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANTIC_MCP_TOKEN_NAME, {
   imports: [ConfigModule],
   inject: [uniqueConfig.KEY],
-  useFactory: (config: UniqueConfig): UniqueApiClientConfig => {
+  useFactory: (config: UniqueConfig): UniqueApiFeatureModuleInputOptions => {
     let auth: ClusterLocalAuthConfig | ExternalAuthConfig;
     if (config.serviceAuthMode === 'external') {
       auth = {
@@ -39,10 +39,8 @@ const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANT
 
     return {
       auth,
-      endpoints: {
-        scopeManagementBaseUrl: config.scopeManagementServiceBaseUrl,
-        ingestionBaseUrl: config.ingestionServiceBaseUrl,
-      },
+      ingestion: { baseUrl: config.ingestionServiceBaseUrl },
+      scopeManagment: { baseUrl: config.scopeManagementServiceBaseUrl },
     };
   },
 });

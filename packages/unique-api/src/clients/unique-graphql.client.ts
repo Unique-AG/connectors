@@ -5,6 +5,7 @@ import {
   getSlowRequestDurationBucket,
   sanitizeError,
 } from '@unique-ag/utils';
+import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
@@ -13,39 +14,26 @@ import type { UniqueAuth } from '../auth/unique-auth';
 import { BottleneckFactory } from '../core/bottleneck.factory';
 import type { RequestMetricAttributes, UniqueApiMetrics } from '../core/observability';
 
-const DEFAULT_RATE_LIMIT_PER_MINUTE = 1000;
-
 export type UniqueGraphqlClientTarget = 'ingestion' | 'scopeManagement';
-
-interface UniqueGraphqlClientDeps {
-  target: UniqueGraphqlClientTarget;
-  baseUrl: string;
-  auth: UniqueAuth;
-  metrics: UniqueApiMetrics;
-  logger: { warn: (obj: object) => void; error: (obj: object) => void };
-  rateLimitPerMinute?: number;
-  dispatcher: Dispatcher;
-  bottleneckFactory: BottleneckFactory;
-  clientName?: string;
-}
 
 export class UniqueGraphqlClient {
   private readonly graphQlClient: GraphQLClient;
   private readonly limiter: Bottleneck;
-  private readonly target: UniqueGraphqlClientTarget;
-  private readonly auth: UniqueAuth;
-  private readonly metrics: UniqueApiMetrics;
-  private readonly logger: UniqueGraphqlClientDeps['logger'];
-  private readonly clientName?: string;
 
-  public constructor(deps: UniqueGraphqlClientDeps) {
-    this.target = deps.target;
-    this.auth = deps.auth;
-    this.metrics = deps.metrics;
-    this.logger = deps.logger;
-    this.clientName = deps.clientName;
-
-    const graphqlUrl = `${deps.baseUrl}/graphql`;
+  public constructor(
+    private readonly auth: UniqueAuth,
+    private readonly metrics: UniqueApiMetrics,
+    private readonly logger: Logger,
+    private readonly dispatcher: Dispatcher,
+    private readonly bottleneckFactory: BottleneckFactory,
+    private readonly config: {
+      target: UniqueGraphqlClientTarget;
+      baseUrl: string;
+      rateLimitPerMinute: number;
+      clientName?: string;
+    },
+  ) {
+    const graphqlUrl = `${this.config.baseUrl}/graphql`;
 
     this.graphQlClient = new GraphQLClient(graphqlUrl, {
       fetch: ((url: RequestInfo | URL, options?: RequestInit) =>
@@ -53,7 +41,7 @@ export class UniqueGraphqlClient {
           url as Parameters<typeof undiciFetch>[0],
           {
             ...options,
-            dispatcher: deps.dispatcher,
+            dispatcher: this.dispatcher,
           } as Parameters<typeof undiciFetch>[1],
         )) as typeof fetch,
       requestMiddleware: async (request) => {
@@ -69,11 +57,10 @@ export class UniqueGraphqlClient {
       },
     });
 
-    const rateLimitPerMinute = deps.rateLimitPerMinute ?? DEFAULT_RATE_LIMIT_PER_MINUTE;
-    this.limiter = deps.bottleneckFactory.createLimiter(
+    this.limiter = this.bottleneckFactory.createLimiter(
       {
-        reservoir: rateLimitPerMinute,
-        reservoirRefreshAmount: rateLimitPerMinute,
+        reservoir: this.config.rateLimitPerMinute,
+        reservoirRefreshAmount: this.config.rateLimitPerMinute,
         reservoirRefreshInterval: 60_000,
       },
       UniqueGraphqlClient.name,
@@ -97,12 +84,12 @@ export class UniqueGraphqlClient {
   ): Promise<T> {
     const startTime = Date.now();
     const operationName = extractOperationName(document);
-    const apiMethod = `graphql:${this.target}:${operationName}`;
+    const apiMethod = `graphql:${this.config.target}:${operationName}`;
 
     const baseAttributes: Pick<RequestMetricAttributes, 'operation' | 'target' | 'tenant'> = {
       operation: apiMethod,
-      target: this.target,
-      ...(this.clientName ? { tenant: this.clientName } : {}),
+      target: this.config.target,
+      ...(this.config?.clientName ? { tenant: this.config.clientName } : {}),
     };
 
     try {
@@ -130,7 +117,7 @@ export class UniqueGraphqlClient {
 
         this.logger.warn({
           msg: 'Slow Unique GraphQL request detected',
-          target: this.target,
+          target: this.config.target,
           operationName,
           duration: durationMs,
           durationBucket: slowBucket,
@@ -163,7 +150,7 @@ export class UniqueGraphqlClient {
       }
 
       this.logger.error({
-        msg: `Failed ${this.target} request (${operationName})`,
+        msg: `Failed ${this.config.target} request (${operationName})`,
         operationName,
         error: sanitizeError(error),
       });

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { pick, prop } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueApiGroups } from '../types';
@@ -23,21 +24,12 @@ import {
 } from './groups.queries';
 import type { Group, GroupWithMembers } from './groups.types';
 
-const BATCH_SIZE = 100;
-
-interface GroupsServiceDeps {
-  scopeManagementClient: UniqueGraphqlClient;
-  logger: { log: (msg: string) => void };
-}
-
 export class GroupsService implements UniqueApiGroups {
-  private readonly scopeManagementClient: UniqueGraphqlClient;
-  private readonly logger: GroupsServiceDeps['logger'];
-
-  public constructor(deps: GroupsServiceDeps) {
-    this.scopeManagementClient = deps.scopeManagementClient;
-    this.logger = deps.logger;
-  }
+  public constructor(
+    private readonly scopeManagementClient: UniqueGraphqlClient,
+    private readonly logger: Logger,
+    private readonly options: { defaultBatchSize: number },
+  ) {}
 
   public async listByExternalIdPrefix(externalIdPrefix: string): Promise<GroupWithMembers[]> {
     this.logger.log(
@@ -59,7 +51,7 @@ export class GroupsService implements UniqueApiGroups {
           },
         },
         skip,
-        take: BATCH_SIZE,
+        take: this.options.defaultBatchSize,
       });
       groups.push(
         ...batchResult.listGroups.map((group) => ({
@@ -68,8 +60,8 @@ export class GroupsService implements UniqueApiGroups {
         })),
       );
       batchCount = batchResult.listGroups.length;
-      skip += BATCH_SIZE;
-    } while (batchCount === BATCH_SIZE);
+      skip += this.options.defaultBatchSize;
+    } while (batchCount === this.options.defaultBatchSize);
 
     return groups;
   }

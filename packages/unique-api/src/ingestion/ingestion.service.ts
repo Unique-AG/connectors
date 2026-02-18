@@ -21,22 +21,13 @@ import type {
   IngestionFinalizationRequest,
 } from './ingestion.types';
 
-interface FileIngestionServiceDeps {
-  ingestionClient: UniqueGraphqlClient;
-  ingestionHttpClient: IngestionHttpClient;
-  ingestionBaseUrl: string;
-}
-
 export class FileIngestionService implements UniqueApiIngestion {
-  private readonly ingestionClient: UniqueGraphqlClient;
-  private readonly ingestionHttpClient: IngestionHttpClient;
-  private readonly ingestionBaseUrl: string;
+  public constructor(
+    private readonly ingestionClient: UniqueGraphqlClient,
+    private readonly ingestionHttpClient: IngestionHttpClient,
+    private readonly ingestionBaseUrl: string,
+  ) {}
 
-  public constructor(deps: FileIngestionServiceDeps) {
-    this.ingestionClient = deps.ingestionClient;
-    this.ingestionHttpClient = deps.ingestionHttpClient;
-    this.ingestionBaseUrl = deps.ingestionBaseUrl;
-  }
   public async updateMetadata(
     request: ContentUpdateMetadataMutationInput,
   ): Promise<ContentUpdateMetadataResponse> {

@@ -4,7 +4,7 @@ import {
   registerConfig,
 } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-import { json, stringToURL } from '~/utils/zod';
+import { json } from '~/utils/zod';
 
 // ==== Config for local in-cluster communication with Unique API services ====
 
@@ -29,8 +29,6 @@ const clusterLocalConfig = z.object({
         '(e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
     ),
   serviceId: z.string().describe('Service ID for auth'),
-  ingestionServiceBaseUrl: z.string().describe('Base URL for Unique ingestion service'),
-  scopeManagementServiceBaseUrl: z.string().describe('Base URL for Scope Management service'),
 });
 
 // ==== Config for external communication with Unique API services via app key ====
@@ -59,33 +57,18 @@ const externalConfig = z.object({
   zitadelClientId: z.string().describe(`Zitadel client id`),
   zitadelClientSecret: z.string().describe(`Zitadel client secret`),
   zitadelProjectId: z.string().describe(`Zitadel project id`),
-  ingestionServiceBaseUrl: z.string().describe('Base URL for Unique ingestion service'),
-  scopeManagementServiceBaseUrl: z.string().describe('Base URL for Scope Management service'),
 });
 
 // ==== Config common for both cluster_local and external authentication modes ====
 
-const baseConfig = z.object({
-  apiBaseUrl: stringToURL().describe('The Public API URL.'),
-  apiVersion: z
-    .string()
-    .default('2023-12-06')
-    .describe('The Public API version to use (maps to `x-api-version`).'),
-  rootScopePath: z
-    .string()
-    .default('outlook-semantic-mcp')
-    .describe('The root scope path where to upload transcripts.'),
-  userFetchConcurrency: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(5)
-    .describe('The concurrency limit for fetching users when resolving scope accesses.'),
-});
-
 export const UniqueConfigSchema = z
   .discriminatedUnion('serviceAuthMode', [clusterLocalConfig, externalConfig])
-  .and(baseConfig);
+  .and(
+    z.object({
+      ingestionServiceBaseUrl: z.string().describe('Base URL for Unique ingestion service'),
+      scopeManagementServiceBaseUrl: z.string().describe('Base URL for Scope Management service'),
+    }),
+  );
 
 export const uniqueConfig = registerConfig('unique', UniqueConfigSchema);
 
