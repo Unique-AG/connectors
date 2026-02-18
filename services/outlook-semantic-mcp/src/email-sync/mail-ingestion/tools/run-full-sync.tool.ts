@@ -61,12 +61,7 @@ export class RunFullSyncTool {
     });
     assert.ok(subscription, `Missing subscription for userProfile: ${userProfileId}`);
 
-    try {
-      await this.fullSyncCommand.run(subscription?.subscriptionId);
-    } catch (error) {
-      await this.logger.error(error);
-      return { success: false, message: `Failed to run sync` };
-    }
+    await this.fullSyncCommand.run(subscription.subscriptionId);
 
     return {
       success: true,

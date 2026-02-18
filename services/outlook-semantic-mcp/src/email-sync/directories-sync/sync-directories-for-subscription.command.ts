@@ -1,7 +1,8 @@
-import assert from "node:assert";
-import { Inject, Injectable } from "@nestjs/common";
-import { count, eq, inArray, sql } from "drizzle-orm";
-import { Span } from "nestjs-otel";
+import assert from 'node:assert';
+import { Inject, Injectable } from '@nestjs/common';
+import { count, eq, inArray, sql } from 'drizzle-orm';
+import { Span } from 'nestjs-otel';
+import { TypeID } from 'typeid-js';
 import {
   DirectoryType,
   DRIZZLE,
@@ -9,29 +10,28 @@ import {
   directories,
   directoriesSync,
   SystemDirectoriesIgnoredForSync,
-} from "~/drizzle";
-import { GetSubscriptionAndUserProfileQuery } from "../subscription-utils/get-subscription-and-user-profile.query";
-import { CreateRootScopeCommand } from "./create-root-scope.command";
-import { FetchAllDirectoriesFromOutlookQuery } from "./fetch-all-directories-from-outlook.query";
-import { GraphOutlookDirectory } from "./microsoft-graph.dtos";
-import { SyncSystemDirectoriesForSubscriptionCommand } from "./sync-system-driectories-for-subscription.command";
+} from '~/drizzle';
+import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
+import { CreateRootScopeCommand } from './create-root-scope.command';
+import { FetchAllDirectoriesFromOutlookQuery } from './fetch-all-directories-from-outlook.query';
+import { GraphOutlookDirectory } from './microsoft-graph.dtos';
+import { SyncSystemDirectoriesForSubscriptionCommand } from './sync-system-driectories-for-subscription.command';
 
-const USER_DIRECTORY_TYPE: DirectoryType = "User Defined Directory";
+const USER_DIRECTORY_TYPE: DirectoryType = 'User Defined Directory';
 
 @Injectable()
 export class SyncDirectoriesForSubscriptionCommand {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly fetchAllDirectoriesFromOutlookQuery: FetchAllDirectoriesFromOutlookQuery,
-    private readonly getSubscriptionAndUserProfileQuery: GetSubscriptionAndUserProfileQuery,
+    private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly syncSystemDirectoriesCommand: SyncSystemDirectoriesForSubscriptionCommand,
     private readonly createRootScopeCommand: CreateRootScopeCommand,
   ) {}
 
   @Span()
-  public async run(subscriptionId: string): Promise<void> {
-    const { userProfile } =
-      await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
+  public async run(userProfileTypeId: TypeID<'user_profile'>): Promise<void> {
+    const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
     await this.createRootScopeCommand.run({
       userProfileEmail: userProfile.email,
       userProviderUserId: userProfile.providerUserId,
@@ -44,11 +44,10 @@ export class SyncDirectoriesForSubscriptionCommand {
 
     // Normally it should not happen but we want to be sure we have the system directories correctly defined first.
     if (!totalDirectories.length || totalDirectories.at(0)?.count === 0) {
-      await this.syncSystemDirectoriesCommand.run(subscriptionId);
+      await this.syncSystemDirectoriesCommand.run(userProfileTypeId);
     }
 
-    const microsoftDirectories =
-      await this.fetchAllDirectoriesFromOutlookQuery.run(userProfile.id);
+    const microsoftDirectories = await this.fetchAllDirectoriesFromOutlookQuery.run(userProfile.id);
 
     await this.upsertDirectories({
       userProfileId: userProfile.id,
@@ -146,9 +145,7 @@ export class SyncDirectoriesForSubscriptionCommand {
       userProfileId,
       microsoftDirectories,
     });
-    await this.db
-      .delete(directories)
-      .where(inArray(directories.id, idsToDeleteInDatabase));
+    await this.db.delete(directories).where(inArray(directories.id, idsToDeleteInDatabase));
 
     await this.db
       .update(directories)
@@ -171,19 +168,12 @@ export class SyncDirectoriesForSubscriptionCommand {
     directoryIdsToMarkAsIgnored: string[];
     providerParentIdsToDeleteInUnique: string[];
   }> {
-    const collectIdsRecurive = (
-      directories: GraphOutlookDirectory[],
-    ): string[] => {
+    const collectIdsRecurive = (directories: GraphOutlookDirectory[]): string[] => {
       return directories.flatMap((directory) => {
-        return [
-          directory.id,
-          ...collectIdsRecurive(directory?.childFolders ?? []),
-        ];
+        return [directory.id, ...collectIdsRecurive(directory?.childFolders ?? [])];
       });
     };
-    const currentDirectories = new Set(
-      collectIdsRecurive(microsoftDirectories),
-    );
+    const currentDirectories = new Set(collectIdsRecurive(microsoftDirectories));
 
     const databaseDirectories = await this.db.query.directories.findMany({
       where: eq(directories.userProfileId, userProfileId),
@@ -204,9 +194,7 @@ export class SyncDirectoriesForSubscriptionCommand {
     const directoryIdsToMarkAsIgnored = [];
 
     while (queue.length) {
-      providerParentIdsToDeleteInUnique.push(
-        ...queue.map((item) => item.providerDirectoryId),
-      );
+      providerParentIdsToDeleteInUnique.push(...queue.map((item) => item.providerDirectoryId));
       const parentIdsToIgnore = queue.map((item) => item.id);
       queue = databaseDirectories.filter(
         (item) => item.parentId && parentIdsToIgnore.includes(item.parentId),

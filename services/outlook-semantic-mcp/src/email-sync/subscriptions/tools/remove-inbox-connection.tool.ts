@@ -2,8 +2,8 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
-import { fromString, parseTypeId, typeid } from 'typeid-js';
 import * as z from 'zod';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionRemoveService } from '../subscription-remove.service';
 
 const RemoveInboxConnectionInputSchema = z.object({});
@@ -62,16 +62,13 @@ export class RemoveInboxConnectionTool {
 
     this.logger.log({ userProfileId }, 'Removing inbox connection for user');
 
-    const tid = fromString(userProfileId, 'user_profile');
-    const pid = parseTypeId(tid);
-    const userProfileTypeid = typeid(pid.prefix, pid.suffix);
+    const userProfileTypeid = convertUserProfileIdToTypeId(userProfileId);
 
     const result = await this.subscriptionRemove.removeByUserProfileId(userProfileTypeid);
     const { status, subscription } = result;
 
     const messages: Record<typeof status, string> = {
-      removed:
-        'Inbox connection removed successfully. New emails will no longer be ingested.',
+      removed: 'Inbox connection removed successfully. New emails will no longer be ingested.',
       not_found: 'No active inbox connection found. Nothing to remove.',
     };
 

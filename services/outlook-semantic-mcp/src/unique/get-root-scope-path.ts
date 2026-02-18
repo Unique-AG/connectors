@@ -1,7 +1,5 @@
-// TODO: Check fi it's sensitive data.
-export const getRootScopePath = (userIdentifier: string): string =>
-  `/Outlook_${userIdentifier}_uncategoried`;
+export const getRootScopePath = (userProviderIdentifier: string): string =>
+  `/Outlook_${userProviderIdentifier}_uncategoried`;
 
-// TODO: Adjust
-export const getRootScopeExternalId = (userIdentifier: string): string =>
-  `Outlook_${userIdentifier}_uncategoried`;
+export const getRootScopeExternalId = (userProviderIdentifier: string): string =>
+  `Outlook_${userProviderIdentifier}_uncategoried`;

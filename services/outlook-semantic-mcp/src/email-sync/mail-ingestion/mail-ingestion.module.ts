@@ -3,7 +3,7 @@ import { DrizzleModule } from '~/drizzle/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';
-import { SubscriptionUtilsModule } from '../subscription-utils/subscription-utils.module';
+import { SubscriptionUtilsModule } from '../user-utils/subscription-utils.module';
 import { FullSyncCommand } from './full-sync.command';
 import { GetMessageDetailsQuery } from './get-message-details.query';
 import { IngestEmailCommand } from './ingest-email.command';

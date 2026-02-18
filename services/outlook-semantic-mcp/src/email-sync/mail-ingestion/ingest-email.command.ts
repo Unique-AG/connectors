@@ -4,7 +4,7 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNullish } from 'remeda';
+import { isNonNullish, isNullish } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
@@ -57,7 +57,10 @@ export class IngestEmailCommand {
 
     // Parent directory should exist because once he connects we run a full directory sync. If it's not there
     // we thrust that the full sync will catch this email. TODO: Check with Michat if we should Throw error.
-    if (!parentDirectory || parentDirectory.ignoreForSync) {
+    if (isNullish(parentDirectory) || parentDirectory.ignoreForSync) {
+      if (isNullish(parentDirectory)) {
+        // TODO: This should not normally happen unless the full sync is able to read the perma deleted messages via api - TODO: report this events.
+      }
       if (isNonNullish(file)) {
         await this.uniqueApi.files.delete(file.id);
       }

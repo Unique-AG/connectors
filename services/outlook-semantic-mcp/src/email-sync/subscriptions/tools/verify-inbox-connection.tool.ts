@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 
 const VerifyInboxConnectionInputSchema = z.object({});
 
@@ -67,11 +68,12 @@ export class VerifyInboxConnectionTool {
     span?.setAttribute('user_profile_id', userProfileId);
 
     this.logger.debug({ userProfileId }, 'Checking inbox connection status for user');
+    const userProfileTypeid = convertUserProfileIdToTypeId(userProfileId);
 
     const subscription = await this.db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.internalType, 'mail_monitoring'),
-        eq(subscriptions.userProfileId, userProfileId),
+        eq(subscriptions.userProfileId, userProfileTypeid.toString()),
       ),
     });
 
@@ -79,8 +81,7 @@ export class VerifyInboxConnectionTool {
       this.logger.debug({ userProfileId }, 'No mail subscription found for user');
       return {
         status: 'not_configured' as SubscriptionStatus,
-        message:
-          'Inbox connection is not configured. Use connect_inbox to begin ingesting emails.',
+        message: 'Inbox connection is not configured. Use connect_inbox to begin ingesting emails.',
         subscription: null,
       };
     }
@@ -105,8 +106,7 @@ export class VerifyInboxConnectionTool {
       message = `Inbox connection is active but expiring in ${minutesUntilExpiration} minutes. It will be automatically renewed.`;
     } else {
       status = 'active';
-      message =
-        'Inbox connection is active and running. Emails are being ingested.';
+      message = 'Inbox connection is active and running. Emails are being ingested.';
     }
 
     this.logger.debug(
