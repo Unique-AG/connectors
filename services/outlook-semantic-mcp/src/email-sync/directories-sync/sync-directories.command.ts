@@ -3,10 +3,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
-import { TypeID } from 'typeid-js';
 import { DirectoriesSync, directoriesSync } from '~/drizzle';
 import { DRIZZLE, DrizzleDatabase } from '~/drizzle/drizzle.module';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 import { graphOutlookDirectoriesDeltaResponse } from './microsoft-graph.dtos';
 import { SyncDirectoriesForSubscriptionCommand } from './sync-directories-for-subscription.command';
@@ -21,7 +21,7 @@ export class SyncDirectoriesCommand {
   ) {}
 
   @Span()
-  public async run(userProfileTypeId: TypeID<'user_profile'>): Promise<void> {
+  public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
     const { shouldSyncDirectories, deltaLink, syncStatsId } = await this.runDeltaQuery(
       userProfile.id,

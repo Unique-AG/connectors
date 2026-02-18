@@ -3,9 +3,9 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
-import type { TypeID } from 'typeid-js';
 import { DRIZZLE, type DrizzleDatabase, subscriptions, userProfiles } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { MAIN_EXCHANGE } from '../../amqp/amqp.constants';
 import { subscriptionMailFilters } from '../mail-ingestion/dtos/subscription-mail-filters.dto';
 import {
@@ -41,7 +41,7 @@ export class SubscriptionCreateService {
 
   @Span()
   public async subscribe(
-    userProfileId: TypeID<'user_profile'>,
+    userProfileId: UserProfileTypeID,
     filters: { dateFrom: string },
   ): Promise<SubscribeResult> {
     const span = this.trace.getSpan();

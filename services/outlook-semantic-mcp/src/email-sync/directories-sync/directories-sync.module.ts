@@ -6,6 +6,7 @@ import { SubscriptionUtilsModule } from '../user-utils/subscription-utils.module
 import { CreateRootScopeCommand } from './create-root-scope.command';
 import { DirectorySyncSchedulerService } from './directories-sync-scheduler.service';
 import { FetchAllDirectoriesFromOutlookQuery } from './fetch-all-directories-from-outlook.query';
+import { RemoveRootScopeAndDirectoriesCommand } from './remove-root-scope-and-directories.command';
 import { SyncDirectoriesCommand } from './sync-directories.command';
 import { SyncDirectoriesForSubscriptionCommand } from './sync-directories-for-subscription.command';
 import { SyncDirectoriesForSubscriptionsCommand } from './sync-directories-for-subscriptions.command';
@@ -20,7 +21,7 @@ const COMMANDS = [
   SyncDirectoriesForSubscriptionsCommand,
   CreateRootScopeCommand,
 ];
-const PUBLIC_COMMANDS = [SyncDirectoriesCommand];
+const PUBLIC_COMMANDS = [SyncDirectoriesCommand, RemoveRootScopeAndDirectoriesCommand];
 
 @Module({
   imports: [DrizzleModule, MsGraphModule, SubscriptionUtilsModule, UniqueApiFeatureModule],

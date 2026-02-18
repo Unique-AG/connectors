@@ -3,6 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
+import { RemoveRootScopeAndDirectoriesCommand } from '~/email-sync/directories-sync/remove-root-scope-and-directories.command';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionRemoveService } from '../subscription-remove.service';
 
@@ -25,6 +26,7 @@ export class RemoveInboxConnectionTool {
 
   public constructor(
     private readonly traceService: TraceService,
+    private readonly removeRootScopeAndDirectoriesCommand: RemoveRootScopeAndDirectoriesCommand,
     private readonly subscriptionRemove: SubscriptionRemoveService,
   ) {}
 
@@ -64,6 +66,7 @@ export class RemoveInboxConnectionTool {
 
     const userProfileTypeid = convertUserProfileIdToTypeId(userProfileId);
 
+    await this.removeRootScopeAndDirectoriesCommand.run(userProfileTypeid);
     const result = await this.subscriptionRemove.removeByUserProfileId(userProfileTypeid);
     const { status, subscription } = result;
 

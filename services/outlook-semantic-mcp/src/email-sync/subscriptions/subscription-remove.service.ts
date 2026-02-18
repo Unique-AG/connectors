@@ -3,10 +3,10 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
-import type { TypeID } from 'typeid-js';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionRemovedEventDto } from './subscription.dtos';
 
 export interface RemoveResult {
@@ -67,7 +67,7 @@ export class SubscriptionRemoveService {
   }
 
   @Span()
-  public async removeByUserProfileId(userProfileId: TypeID<'user_profile'>): Promise<RemoveResult> {
+  public async removeByUserProfileId(userProfileId: UserProfileTypeID): Promise<RemoveResult> {
     const span = this.trace.getSpan();
     span?.setAttribute('user_profile_id', userProfileId.toString());
     span?.setAttribute('operation', 'remove_subscription_by_user');

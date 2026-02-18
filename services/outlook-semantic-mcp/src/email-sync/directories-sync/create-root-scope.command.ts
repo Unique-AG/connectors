@@ -27,13 +27,6 @@ export class CreateRootScopeCommand {
     });
     assert.ok(rootScope, `Parent scope id`);
     if (!rootScope.externalId) {
-      // TODO: check if this is needed ?
-      // const currentUserId = await this.uniqueApi.users.getCurrentId();
-      // await this.uniqueApi.scopes.createAccesses(
-      //   rootScope.id,
-      //   [{ type: "WRITE", entityId: currentUserId, entityType: "USER" }],
-      //   true,
-      // );
       await this.uniqueApi.scopes.updateExternalId(rootScope.id, externalId);
     }
   }

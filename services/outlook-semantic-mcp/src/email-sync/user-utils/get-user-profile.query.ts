@@ -2,8 +2,8 @@ import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { TraceService } from 'nestjs-otel';
-import { TypeID } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, UserProfile, userProfiles } from '~/drizzle';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class GetUserProfileQuery {
   ) {}
 
   public async run(
-    userProfileId: TypeID<'user_profile'>,
+    userProfileId: UserProfileTypeID,
   ): Promise<NonNullishProps<UserProfile, 'email'>> {
     const span = this.trace.getSpan();
     const userProfile = await this.db.query.userProfiles.findFirst({

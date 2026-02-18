@@ -2,7 +2,6 @@ import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { count, eq, inArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { TypeID } from 'typeid-js';
 import {
   DirectoryType,
   DRIZZLE,
@@ -11,6 +10,7 @@ import {
   directoriesSync,
   SystemDirectoriesIgnoredForSync,
 } from '~/drizzle';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 import { CreateRootScopeCommand } from './create-root-scope.command';
 import { FetchAllDirectoriesFromOutlookQuery } from './fetch-all-directories-from-outlook.query';
@@ -30,7 +30,7 @@ export class SyncDirectoriesForSubscriptionCommand {
   ) {}
 
   @Span()
-  public async run(userProfileTypeId: TypeID<'user_profile'>): Promise<void> {
+  public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
     await this.createRootScopeCommand.run({
       userProfileEmail: userProfile.email,

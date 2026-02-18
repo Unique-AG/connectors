@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
-import { TypeID } from 'typeid-js';
 import {
   DRIZZLE,
   DrizzleDatabase,
@@ -11,6 +10,7 @@ import {
   UserProfile,
 } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 import { GraphOutlookDirectory, graphOutlookDirectory } from './microsoft-graph.dtos';
 
@@ -42,7 +42,7 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
   ) {}
 
   @Span()
-  public async run(userProfileTypeId: TypeID<'user_profile'>): Promise<void> {
+  public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
     const span = this.trace.getSpan();
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
 
