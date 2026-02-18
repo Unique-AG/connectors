@@ -45,9 +45,9 @@ The client reads these config values from `ConfluenceConfig`:
 - `baseUrl` — Confluence instance URL (passed to adapter for URL construction)
 
 Public methods:
-- `searchPagesByLabel(): AsyncGenerator<ConfluencePage>` — CQL search with automatic pagination. Labels are read from config, not passed as parameters. The CQL query is constructed by the client: `((label="{ingestSingleLabel}") OR (label="{ingestAllLabel}")) AND (space.type=global OR space.type=collaboration) AND type != attachment`
+- `searchPagesByLabel(): Promise<ConfluencePage[]>` — CQL search with full pagination. Labels are read from config, not passed as parameters. The CQL query is constructed by the client: `((label="{ingestSingleLabel}") OR (label="{ingestAllLabel}")) AND (space.type=global OR space.type=collaboration) AND type != attachment`
 - `getPageById(pageId: string): Promise<ConfluencePage | null>` — Single page with body, version, space, labels
-- `getChildPages(parentId: string, contentType: ContentType): AsyncGenerator<ConfluencePage>` — Direct children with auto-pagination (delegates to adapter)
+- `getChildPages(parentId: string, contentType: ContentType): Promise<ConfluencePage[]>` — All direct children (delegates to adapter)
 
 Internal infrastructure:
 - `makeRateLimitedRequest<T>(url: string): Promise<{ status: number; headers: Record<string, string>; body: T }>` — undici request with Bottleneck scheduling, auth header injection, 429 retry logic. **This is the single chokepoint for all Confluence HTTP traffic for the tenant.** All public methods and adapter callbacks route through it.
@@ -60,27 +60,19 @@ Internal infrastructure:
 Defines the variant interface:
 
 ```typescript
-abstract class ConfluenceApiAdapter {
-  abstract buildSearchUrl(cql: string, limit: number, start: number): string;
-  abstract buildGetPageUrl(pageId: string, expand: string[]): string;
-  abstract parseSinglePageResponse(body: unknown): ConfluencePage | null;
-
-  // Returns the canonical web URL for a page in Confluence.
-  // This is always the real Confluence URL (e.g. Cloud: {baseUrl}/wiki{webui}, DC: {baseUrl}/pages/viewpage.action?pageId={id}).
-  // Scope vs path-based ingestion does NOT affect this URL — scope management is handled
-  // separately by the synchronization layer, consistent with the SharePoint connector pattern.
-  abstract buildPageWebUrl(page: ConfluencePage): string;
-
-  // Fetches direct children of a parent page/folder/database.
-  // contentType determines which endpoint to use (Cloud has separate endpoints per type;
-  // DC uses a single endpoint regardless of type).
-  // httpGet is injected by the client — this IS the client's makeRateLimitedRequest,
-  // ensuring all child fetches go through the same per-tenant rate limiter.
-  abstract fetchChildPages(
+// Interface (not abstract class) — the adapter is an internal constructor argument passed by
+// the factory, not a ServiceRegistry key. Abstract classes are only used when runtime identity
+// is needed for ServiceRegistry lookups.
+interface ConfluenceApiAdapter {
+  buildSearchUrl(cql: string, limit: number, start: number): string;
+  buildGetPageUrl(pageId: string, expand: string[]): string;
+  parseSinglePageResponse(body: unknown): ConfluencePage | null;
+  buildPageWebUrl(page: ConfluencePage): string;
+  fetchChildPages(
     parentId: string,
     contentType: ContentType,
     httpGet: <T>(url: string) => Promise<T>,
-  ): AsyncGenerator<ConfluencePage>;
+  ): Promise<ConfluencePage[]>;
 }
 ```
 
