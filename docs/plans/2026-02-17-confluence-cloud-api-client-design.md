@@ -131,6 +131,10 @@ interface PaginatedResponse<T> {
 }
 ```
 
+### Conventions
+
+- Use `remeda` utility functions (`isPlainObject`, `isString`, etc.) for type checks and data validation instead of manual `typeof` chains.
+
 ### Error Handling
 
 - No custom error types — re-throw standard errors with contextual logging via `sanitizeError()`.
