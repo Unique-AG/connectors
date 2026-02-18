@@ -1,6 +1,6 @@
-import type { ContentUpdateResult, FileAccessInput, UniqueFile } from '../files/files.types';
+import type { ContentUpdateResult, FileAccessInput, UniqueFile } from './files.types';
 
-export interface UniqueApiFiles {
+export interface UniqueFilesFacade {
   getByKeys(keys: string[]): Promise<UniqueFile[]>;
   getByKeyPrefix(keyPrefix: string): Promise<UniqueFile[]>;
   getCountByKeyPrefix(keyPrefix: string): Promise<number>;

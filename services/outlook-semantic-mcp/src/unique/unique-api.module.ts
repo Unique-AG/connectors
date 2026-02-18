@@ -1,6 +1,4 @@
 import {
-  ClusterLocalAuthConfig,
-  ExternalAuthConfig,
   getUniqueApiClientToken,
   UniqueApiFeatureModuleInputOptions,
   UniqueApiModule,
@@ -20,7 +18,7 @@ const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANT
   imports: [ConfigModule],
   inject: [uniqueConfig.KEY],
   useFactory: (config: UniqueConfig): UniqueApiFeatureModuleInputOptions => {
-    let auth: ClusterLocalAuthConfig | ExternalAuthConfig;
+    let auth: UniqueApiFeatureModuleInputOptions['auth'];
     if (config.serviceAuthMode === 'external') {
       auth = {
         mode: 'external',

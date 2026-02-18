@@ -2,7 +2,6 @@ import { getErrorCodeFromGraphqlRequest } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { chunk } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import type { UniqueApiFiles } from '../types';
 import {
   ADD_ACCESSES_MUTATION,
   type AddAccessesMutationInput,
@@ -27,6 +26,7 @@ import {
   type RemoveAccessesMutationResult,
 } from './files.queries';
 import type { ContentUpdateResult, FileAccessInput, UniqueFile } from './files.types';
+import { UniqueFilesFacade } from './unique-files.facade';
 
 const CONTENT_BATCH_SIZE = 100;
 const DELETE_BATCH_SIZE = 20;
@@ -36,7 +36,7 @@ const DELETE_BATCH_SIZE = 20;
 // system when we have a huge folder with many files.
 const ACCESS_BATCH_SIZE = 20;
 
-export class FilesService implements UniqueApiFiles {
+export class FilesService implements UniqueFilesFacade {
   public constructor(
     private readonly ingestionClient: UniqueGraphqlClient,
     private readonly logger: Logger,

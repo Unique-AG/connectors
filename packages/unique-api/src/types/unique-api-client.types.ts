@@ -1,16 +1,16 @@
-import type { UniqueApiAuth } from './unique-api-auth.types';
-import type { UniqueApiFiles } from './unique-api-files.types';
-import type { UniqueApiGroups } from './unique-api-groups.types';
-import type { UniqueApiIngestion } from './unique-api-ingestion.types';
-import type { UniqueApiScopes } from './unique-api-scopes.types';
-import type { UniqueApiUsers } from './unique-api-users.types';
+import type { UniqueAuthFacade } from '../auth/unique-auth.facade';
+import type { UniqueFilesFacade } from '../files/unique-files.facade';
+import type { UniqueGroupsFacade } from '../groups/unique-groups.facade';
+import type { UniqueIngestionFacade } from '../ingestion/unique-ingestion.facade';
+import type { UniqueApiScopes } from '../scopes/unique-scopes.facade';
+import type { UniqueUsersFacade } from '../users/unique-users.facade';
 
 export interface UniqueApiClient {
-  auth: UniqueApiAuth;
+  auth: UniqueAuthFacade;
   scopes: UniqueApiScopes;
-  files: UniqueApiFiles;
-  users: UniqueApiUsers;
-  groups: UniqueApiGroups;
-  ingestion: UniqueApiIngestion;
+  files: UniqueFilesFacade;
+  users: UniqueUsersFacade;
+  groups: UniqueGroupsFacade;
+  ingestion: UniqueIngestionFacade;
   close?(): Promise<void>;
 }

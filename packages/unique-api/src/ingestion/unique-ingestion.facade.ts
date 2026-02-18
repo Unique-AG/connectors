@@ -1,16 +1,16 @@
 import {
   ContentUpdateMetadataMutationInput,
   ContentUpdateMetadataResponse,
-} from '../ingestion/ingestion.queries';
+} from './ingestion.queries';
 import type {
   ContentRegistrationRequest,
   FileDiffItem,
   FileDiffResponse,
   IngestionApiResponse,
   IngestionFinalizationRequest,
-} from '../ingestion/ingestion.types';
+} from './ingestion.types';
 
-export interface UniqueApiIngestion {
+export interface UniqueIngestionFacade {
   registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse>;
   finalizeIngestion(request: IngestionFinalizationRequest): Promise<{ id: string }>;
   performFileDiff(

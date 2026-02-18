@@ -2,7 +2,6 @@ import { processInBatches } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { isNullish } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import type { UniqueApiScopes } from '../types';
 import {
   CREATE_SCOPE_ACCESSES_MUTATION,
   type CreateScopeAccessesMutationInput,
@@ -24,6 +23,7 @@ import {
   type UpdateScopeMutationResult,
 } from './scopes.queries';
 import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
+import { UniqueApiScopes } from './unique-scopes.facade';
 
 export class ScopesService implements UniqueApiScopes {
   public constructor(

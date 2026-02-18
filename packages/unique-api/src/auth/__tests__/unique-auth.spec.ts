@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
-import { UniqueAuthConfig } from '../../core/config/unique-api-auth-schema';
+import { UniqueAuthConfig } from '../../config/unique-api-auth-schema';
 import type { UniqueApiMetrics } from '../../core/observability';
 import { UniqueAuth } from '../unique-auth';
 

@@ -1,5 +1,5 @@
-export type { UniqueApiFeatureModuleInputOptions } from './core/config/unique-api-feature-module-options';
-export type { UniqueApiRootModuleInputOptions } from './core/config/unique-api-root-module-options';
+export type { UniqueApiFeatureModuleInputOptions } from './config/unique-api-feature-module-options';
+export type { UniqueApiRootModuleInputOptions } from './config/unique-api-root-module-options';
 export type { UniqueApiMetrics } from './core/observability';
 export {
   getUniqueApiClientToken,
@@ -31,20 +31,17 @@ export type {
   ScopeWithPath,
 } from './scopes/scopes.types';
 export type {
-  ClusterLocalAuthConfig,
-  ExternalAuthConfig,
   UniqueAccessType,
-  UniqueApiAuth,
   UniqueApiClient,
-  UniqueApiClientAuthConfig,
   UniqueApiClientFactory,
   UniqueApiClientRegistry,
-  UniqueApiFiles,
-  UniqueApiGroups,
-  UniqueApiIngestion,
   UniqueApiScopes,
-  UniqueApiUsers,
+  UniqueAuthFacade,
   UniqueEntityType,
+  UniqueFilesFacade,
+  UniqueGroupsFacade,
+  UniqueIngestionFacade,
+  UniqueUsersFacade,
 } from './types';
 export { UniqueOwnerType } from './types';
 export type { SimpleUser } from './users/users.types';

@@ -1,6 +1,6 @@
-import type { Group, GroupWithMembers } from '../groups/groups.types';
+import type { Group, GroupWithMembers } from './groups.types';
 
-export interface UniqueApiGroups {
+export interface UniqueGroupsFacade {
   listByExternalIdPrefix(externalIdPrefix: string): Promise<GroupWithMembers[]>;
   create(group: { name: string; externalId: string; createdBy: string }): Promise<GroupWithMembers>;
   update(group: { id: string; name: string }): Promise<Group>;

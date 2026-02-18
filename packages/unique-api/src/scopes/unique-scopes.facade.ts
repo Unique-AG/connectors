@@ -1,4 +1,4 @@
-import type { DeleteFolderResult, Scope, ScopeAccess } from '../scopes/scopes.types';
+import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
 
 export interface UniqueApiScopes {
   createFromPaths(

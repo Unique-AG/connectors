@@ -2,7 +2,6 @@ import assert from 'node:assert';
 import { sanitizePath } from '@unique-ag/utils';
 import type { IngestionHttpClient } from '../clients/ingestion-http.client';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import type { UniqueApiIngestion } from '../types';
 import {
   CONTENT_UPDATE_METADATA_MUTATION,
   CONTENT_UPSERT_MUTATION,
@@ -20,8 +19,9 @@ import type {
   IngestionApiResponse,
   IngestionFinalizationRequest,
 } from './ingestion.types';
+import { UniqueIngestionFacade } from './unique-ingestion.facade';
 
-export class FileIngestionService implements UniqueApiIngestion {
+export class FileIngestionService implements UniqueIngestionFacade {
   public constructor(
     private readonly ingestionClient: UniqueGraphqlClient,
     private readonly ingestionHttpClient: IngestionHttpClient,

@@ -1,7 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { pick, prop } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import type { UniqueApiGroups } from '../types';
 import {
   ADD_GROUP_MEMBERS_MUTATION,
   type AddGroupMembersMutationInput,
@@ -23,8 +22,9 @@ import {
   type UpdateGroupMutationResult,
 } from './groups.queries';
 import type { Group, GroupWithMembers } from './groups.types';
+import { UniqueGroupsFacade } from './unique-groups.facade';
 
-export class GroupsService implements UniqueApiGroups {
+export class GroupsService implements UniqueGroupsFacade {
   public constructor(
     private readonly scopeManagementClient: UniqueGraphqlClient,
     private readonly logger: Logger,

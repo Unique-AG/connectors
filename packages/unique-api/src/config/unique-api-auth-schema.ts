@@ -42,4 +42,6 @@ export const UniqueAuthSchema = z.discriminatedUnion('mode', [
   authExternalConfig,
 ]);
 
+export type UniqueAuthExternalConfig = z.infer<typeof authExternalConfig>;
+
 export type UniqueAuthConfig = z.infer<typeof UniqueAuthSchema>;

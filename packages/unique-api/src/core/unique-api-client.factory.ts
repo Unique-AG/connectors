@@ -3,6 +3,7 @@ import { Agent, interceptors } from 'undici';
 import { UniqueAuth } from '../auth/unique-auth';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
 import { UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import { UniqueApiFeatureModuleOptions } from '../config/unique-api-feature-module-options';
 import { FilesService } from '../files/files.service';
 import { GroupsService } from '../groups/groups.service';
 import { FileIngestionService } from '../ingestion/ingestion.service';
@@ -10,7 +11,6 @@ import { ScopesService } from '../scopes/scopes.service';
 import type { UniqueApiClient } from '../types';
 import { UsersService } from '../users/users.service';
 import { BottleneckFactory } from './bottleneck.factory';
-import { UniqueApiFeatureModuleOptions } from './config/unique-api-feature-module-options';
 import type { UniqueApiMetrics } from './observability';
 
 export interface UniqueApiClientFactory {

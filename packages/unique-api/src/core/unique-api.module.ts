@@ -8,18 +8,18 @@ import {
   type Provider,
 } from '@nestjs/common';
 import { Meter, metrics } from '@opentelemetry/api';
-import type { UniqueApiClientFactory, UniqueApiClientRegistry } from '../types';
-import { BottleneckFactory } from './bottleneck.factory';
 import {
   UniqueApiFeatureModuleInputOptions,
   UniqueApiFeatureModuleOptions,
   uniqueApiFeatureModuleOptionsHost,
-} from './config/unique-api-feature-module-options';
+} from '../config/unique-api-feature-module-options';
 import {
   UniqueApiRootModuleInputOptions,
   UniqueApiRootModuleOptions,
   uniqueApiRootModuleHost,
-} from './config/unique-api-root-module-options';
+} from '../config/unique-api-root-module-options';
+import type { UniqueApiClientFactory, UniqueApiClientRegistry } from '../types';
+import { BottleneckFactory } from './bottleneck.factory';
 import { createUniqueApiMetrics, UniqueApiMetrics } from './observability';
 import {
   getUniqueApiClientToken,
@@ -180,6 +180,7 @@ const createCoreProviders = (): Provider[] => {
       ) => {
         const loggerContext = options.observability?.loggerContext ?? 'UniqueApi';
         const logger = new Logger(loggerContext);
+
         return new UniqueApiClientFactoryImpl(logger, metricsInstance, bottleneckFactory);
       },
       inject: [UNIQUE_API_METRICS, uniqueApiRootModuleHost.MODULE_OPTIONS_TOKEN, BottleneckFactory],

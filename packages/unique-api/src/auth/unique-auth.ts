@@ -1,11 +1,11 @@
 import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
-import { UniqueAuthConfig } from '../core/config/unique-api-auth-schema';
+import { UniqueAuthConfig, UniqueAuthExternalConfig } from '../config/unique-api-auth-schema';
 import type { UniqueApiMetrics } from '../core/observability';
-import type { ExternalAuthConfig, UniqueApiAuth } from '../types';
+import { UniqueAuthFacade } from './unique-auth.facade';
 
-export class UniqueAuth implements UniqueApiAuth {
+export class UniqueAuth implements UniqueAuthFacade {
   // used protected to allow use of typeguard isTokenValid
   protected cachedToken?: string;
   private tokenExpirationTime?: number;
@@ -50,7 +50,7 @@ export class UniqueAuth implements UniqueApiAuth {
     return { Authorization: `Bearer ${token}` };
   }
 
-  private async refreshToken(config: ExternalAuthConfig): Promise<string> {
+  private async refreshToken(config: UniqueAuthExternalConfig): Promise<string> {
     const { zitadelOauthTokenUrl, zitadelClientId, zitadelClientSecret, zitadelProjectId } = config;
 
     const params = new URLSearchParams({

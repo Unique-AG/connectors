@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { pick } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
-import type { UniqueApiUsers } from '../types';
+import { UniqueUsersFacade } from './unique-users.facade';
 import {
   GET_CURRENT_USER_QUERY,
   type GetCurrentUserQueryResult,
@@ -11,7 +11,7 @@ import {
 } from './users.queries';
 import type { SimpleUser } from './users.types';
 
-export class UsersService implements UniqueApiUsers {
+export class UsersService implements UniqueUsersFacade {
   public constructor(
     private readonly scopeManagementClient: UniqueGraphqlClient,
     private readonly logger: Logger,

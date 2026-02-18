@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
+import { UniqueApiFeatureModuleOptions } from '../config/unique-api-feature-module-options';
 import type { UniqueApiClient, UniqueApiClientFactory } from '../types';
-import { UniqueApiFeatureModuleOptions } from './config/unique-api-feature-module-options';
 
 export interface UniqueApiClientRegistry {
   get(key: string): UniqueApiClient | undefined;
