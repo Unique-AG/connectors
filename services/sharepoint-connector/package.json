@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/sharepoint-connector",
   "description": "Take content from SharePoint and send it to Unique AI for RAG ingestion..",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "author": "",
   "private": true,
   "license": "Unique License v1",
