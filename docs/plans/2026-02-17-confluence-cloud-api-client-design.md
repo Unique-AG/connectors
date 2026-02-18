@@ -4,17 +4,17 @@
 
 ## Problem
 
-The V2 Confluence Connector has multi-tenancy infrastructure, authentication, configuration, and scheduling — but no Confluence API client. The `ConfluenceSynchronizationService.synchronize()` is a stub that only acquires a token. We need a client that can search pages by label, fetch page content, fetch child pages, and handle pagination and rate limiting for both Cloud and Data Center instances.
+The V2 Confluence Connector has multi-tenancy infrastructure, authentication, configuration, and scheduling - but no Confluence API client. The `ConfluenceSynchronizationService.synchronize()` is a stub that only acquires a token. We need a client that can search pages by label, fetch page content, fetch child pages, and handle pagination and rate limiting for both Cloud and Data Center instances.
 
 ## Solution
 
 ### Overview
 
-Implement a `ConfluenceApiClient` class that provides the public API for all Confluence REST interactions. The client uses composition to delegate instance-type-specific logic (URL construction, response parsing, child page fetching) to thin adapter classes — `CloudApiAdapter` for Cloud and `DataCenterApiAdapter` for Data Center.
+Implement a `ConfluenceApiClient` class that provides the public API for all Confluence REST interactions. The client uses composition to delegate instance-type-specific logic (URL construction, response parsing, child page fetching) to thin adapter classes - `CloudApiAdapter` for Cloud and `DataCenterApiAdapter` for Data Center.
 
-A tenant is always either Cloud or Data Center, never both — so each tenant gets exactly one adapter. The factory selects the adapter based on `config.confluence.instanceType`.
+A tenant is always either Cloud or Data Center, never both - so each tenant gets exactly one adapter. The factory selects the adapter based on `config.confluence.instanceType`.
 
-Each tenant gets its own `ConfluenceApiClient` instance via the existing `ServiceRegistry` pattern. The client owns a **per-tenant Bottleneck rate limiter** configured from `config.confluence.apiRateLimitPerMinute`. This single rate limiter governs **all** Confluence HTTP requests for that tenant — search, page fetches, child page fetches, and the Cloud adapter's N+1 per-child fetches. Every request to Confluence flows through `makeRateLimitedRequest()`, which schedules via Bottleneck before executing.
+Each tenant gets its own `ConfluenceApiClient` instance via the existing `ServiceRegistry` pattern. The client owns a **per-tenant Bottleneck rate limiter** configured from `config.confluence.apiRateLimitPerMinute`. This single rate limiter governs **all** Confluence HTTP requests for that tenant - search, page fetches, child page fetches, and the Cloud adapter's N+1 per-child fetches. Every request to Confluence flows through `makeRateLimitedRequest()`, which schedules via Bottleneck before executing.
 
 The adapters are pure translation layers with no HTTP or rate-limiting concerns of their own. When the Cloud adapter needs to make additional HTTP calls (N+1 child page fetches), it receives the client's `makeRateLimitedRequest` as an injected function, ensuring those calls are also governed by the same per-tenant rate limiter.
 
@@ -39,18 +39,18 @@ src/confluence-api/
 Managed per-tenant by `ServiceRegistry`. Constructor receives `ServiceRegistry` (for auth + logger) and `ConfluenceConfig` (for rate limit, base URL, and labels).
 
 The client reads these config values from `ConfluenceConfig`:
-- `apiRateLimitPerMinute` — Bottleneck reservoir size (e.g. `100`)
-- `ingestSingleLabel` — label for single-page sync (e.g. `ai-ingest`)
-- `ingestAllLabel` — label for recursive sync (e.g. `ai-ingest-all`)
-- `baseUrl` — Confluence instance URL (passed to adapter for URL construction)
+- `apiRateLimitPerMinute` - Bottleneck reservoir size (e.g. `100`)
+- `ingestSingleLabel` - label for single-page sync (e.g. `ai-ingest`)
+- `ingestAllLabel` - label for recursive sync (e.g. `ai-ingest-all`)
+- `baseUrl` - Confluence instance URL (passed to adapter for URL construction)
 
 Public methods:
-- `searchPagesByLabel(): Promise<ConfluencePage[]>` — CQL search with full pagination. Labels are read from config, not passed as parameters. The CQL query is constructed by the client: `((label="{ingestSingleLabel}") OR (label="{ingestAllLabel}")) AND (space.type=global OR space.type=collaboration) AND type != attachment`
-- `getPageById(pageId: string): Promise<ConfluencePage | null>` — Single page with body, version, space, labels
-- `getChildPages(parentId: string, contentType: ContentType): Promise<ConfluencePage[]>` — All direct children (delegates to adapter)
+- `searchPagesByLabel(): Promise<ConfluencePage[]>` - CQL search with full pagination. Labels are read from config, not passed as parameters. The CQL query is constructed by the client: `((label="{ingestSingleLabel}") OR (label="{ingestAllLabel}")) AND (space.type=global OR space.type=collaboration) AND type != attachment`
+- `getPageById(pageId: string): Promise<ConfluencePage | null>` - Single page with body, version, space, labels
+- `getChildPages(parentId: string, contentType: ContentType): Promise<ConfluencePage[]>` - All direct children (delegates to adapter)
 
 Internal infrastructure:
-- `makeRateLimitedRequest<T>(url: string): Promise<{ status: number; headers: Record<string, string>; body: T }>` — undici request with Bottleneck scheduling, auth header injection, 429 retry logic. **This is the single chokepoint for all Confluence HTTP traffic for the tenant.** All public methods and adapter callbacks route through it.
+- `makeRateLimitedRequest<T>(url: string): Promise<{ status: number; headers: Record<string, string>; body: T }>` - undici request with Bottleneck scheduling, auth header injection, and interceptor-based retry behavior. **This is the single chokepoint for all Confluence HTTP traffic for the tenant.** All public methods and adapter callbacks route through it.
 - Bottleneck limiter: reservoir = `apiRateLimitPerMinute`, refresh every 60s. One limiter per tenant instance.
 - undici `request()` for HTTP calls
 - Auth header from `ConfluenceAuth.acquireToken()` (existing service)
@@ -60,7 +60,7 @@ Internal infrastructure:
 Defines the variant interface:
 
 ```typescript
-// Interface (not abstract class) — the adapter is an internal constructor argument passed by
+// Interface (not abstract class) - the adapter is an internal constructor argument passed by
 // the factory, not a ServiceRegistry key. Abstract classes are only used when runtime identity
 // is needed for ServiceRegistry lookups.
 interface ConfluenceApiAdapter {
@@ -81,19 +81,19 @@ interface ConfluenceApiAdapter {
 - Search URL: `{baseUrl}/wiki/rest/api/content/search?cql={cql}&expand=metadata.labels,version,space&limit={limit}&start={start}`
 - Get page URL: `{baseUrl}/wiki/rest/api/content/search?cql=id={pageId}&expand=body.storage,version,space,metadata.labels`
 - Parse page response: unwrap `results[0]` from search response
-- Page web URL: `{baseUrl}/wiki{page._links.webui}` — always the canonical Confluence Cloud URL
+- Page web URL: `{baseUrl}/wiki{page._links.webui}` - always the canonical Confluence Cloud URL
 - Child pages: V2 API with content-type-specific endpoints, then per-child CQL fetch for full metadata (N+1 pattern using injected `httpGet`):
   - Page parent: `/wiki/api/v2/pages/{id}/direct-children?limit=250`
   - Folder parent: `/wiki/api/v2/folders/{id}/direct-children?limit=250`
   - Database parent: `/wiki/api/v2/databases/{id}/direct-children?limit=250`
-  - Per-child detail fetch: `/wiki/rest/api/content/search?cql=id={childId}&expand=metadata.labels,version,space` (no body expand — body is fetched separately during ingestion via `getPageById`)
+  - Per-child detail fetch: `/wiki/rest/api/content/search?cql=id={childId}&expand=metadata.labels,version,space` (no body expand - body is fetched separately during ingestion via `getPageById`)
 
 #### DataCenterApiAdapter
 
 - Search URL: `{baseUrl}/rest/api/content/search?cql={cql}&expand=metadata.labels,version,space&os_authType=basic&limit={limit}&start={start}`
 - Get page URL: `{baseUrl}/rest/api/content/{pageId}?os_authType=basic&expand=body.storage,version,space,metadata.labels`
 - Parse page response: direct object (no unwrapping)
-- Page web URL: `{baseUrl}/pages/viewpage.action?pageId={id}` — always the canonical Data Center page URL
+- Page web URL: `{baseUrl}/pages/viewpage.action?pageId={id}` - always the canonical Data Center page URL
 - Child pages: V1 API (`/rest/api/content/{id}/child/page?os_authType=basic&expand=metadata.labels,version,space`), full data returned directly
 - Note: Data Center URLs include `os_authType=basic` query parameter required by the DC REST API
 
@@ -137,9 +137,10 @@ interface PaginatedResponse<T> {
 
 ### Error Handling
 
-- No custom error types — re-throw standard errors with contextual logging via `sanitizeError()`.
-- **429 retry policy:** On HTTP 429, parse `Retry-After` header (seconds). Wait the specified duration, retry. Max 3 retries per request. Default 30s backoff if header missing. Log each retry attempt.
-- All other HTTP errors: fail fast, log with tenant-scoped logger.
+- No custom error types - re-throw standard errors with contextual logging via `sanitizeError()`.
+- Retry and redirect policy: use undici `interceptors.retry()` and `interceptors.redirect()` with default options.
+- Retry behavior is handled by undici defaults, including support for `Retry-After` when provided.
+- All non-retried HTTP errors: fail fast, log with tenant-scoped logger.
 - Log Confluence rate limit response headers (`X-RateLimit-Remaining`, `X-RateLimit-Limit`) as warnings when present.
 - Pagination: if a page fetch fails mid-pagination, throw (let the caller decide whether to use partial results).
 
@@ -147,14 +148,14 @@ interface PaginatedResponse<T> {
 
 Unit tests for all components using existing test patterns (Vitest, `@suites/unit`):
 
-- **ConfluenceApiClient tests:** Mock adapter and undici. Verify rate-limited request flow, pagination loop, auth header injection, 429 retry behavior.
+- **ConfluenceApiClient tests:** Mock adapter and undici. Verify rate-limited request flow, pagination loop, auth header injection, and dispatcher wiring with retry + redirect interceptors.
 - **CloudApiAdapter tests:** Verify URL construction, response parsing, N+1 child fetch logic (mock the injected `httpGet`).
 - **DataCenterApiAdapter tests:** Verify URL construction, response parsing, direct child page response handling.
 - **ConfluenceApiClientFactory tests:** Verify correct adapter selection based on config.
 
 ## Out of Scope
 
-- Synchronization orchestration (separate ticket) — the client just fetches data.
+- Synchronization orchestration (separate ticket) - the client just fetches data.
 - Unique API integration / ingestion calls.
 - Content processing (HTML stripping, label extraction).
 - File attachment handling.
@@ -163,12 +164,12 @@ Unit tests for all components using existing test patterns (Vitest, `@suites/uni
 
 ## Tasks
 
-1. **Define types and adapter interface** — Create `confluence-api.types.ts` with `ConfluencePage`, `ContentType` (page/folder/database), `PaginatedResponse` types. Create `confluence-api-adapter.ts` abstract class with the variant method signatures.
+1. **Define types and adapter interface** - Create `confluence-api.types.ts` with `ConfluencePage`, `ContentType` (page/folder/database), `PaginatedResponse` types. Create `confluence-api-adapter.ts` abstract class with the variant method signatures.
 
-2. **Implement DataCenterApiAdapter** — Implement URL construction (with `os_authType=basic`), response parsing, and child page fetching for Data Center. Simpler of the two adapters (no folders/databases, no N+1). Add unit tests.
+2. **Implement DataCenterApiAdapter** - Implement URL construction (with `os_authType=basic`), response parsing, and child page fetching for Data Center. Simpler of the two adapters (no folders/databases, no N+1). Add unit tests.
 
-3. **Implement CloudApiAdapter** — Implement URL construction, response parsing, and the N+1 child page fetching pattern for Cloud (V2 API for children with separate endpoints for pages/folders/databases, per-child CQL fetch for full metadata). Add unit tests.
+3. **Implement CloudApiAdapter** - Implement URL construction, response parsing, and the N+1 child page fetching pattern for Cloud (V2 API for children with separate endpoints for pages/folders/databases, per-child CQL fetch for full metadata). Add unit tests.
 
-4. **Implement ConfluenceApiClient** — Main client class with Bottleneck rate limiter, undici HTTP requests, auth header injection, pagination loop, and 429 retry logic. Delegates to adapter for variant behavior. Add unit tests.
+4. **Implement ConfluenceApiClient** - Main client class with Bottleneck rate limiter, undici HTTP requests, auth header injection, pagination loop, and retry/redirect interceptors. Delegates to adapter for variant behavior. Add unit tests.
 
-5. **Implement ConfluenceApiClientFactory and registration** — Factory that creates the client with the correct adapter based on config. Register in `TenantRegistry` service initialization. Add unit tests.
+5. **Implement ConfluenceApiClientFactory and registration** - Factory that creates the client with the correct adapter based on config. Register in `TenantRegistry` service initialization. Add unit tests.
