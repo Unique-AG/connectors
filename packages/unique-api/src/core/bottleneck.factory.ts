@@ -1,4 +1,3 @@
-import { sanitizeError } from '@unique-ag/utils';
 import { Injectable, Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 
@@ -39,10 +38,7 @@ export class BottleneckFactory {
 
     // Log errors
     limiter.on('error', (error) => {
-      this.logger.error({
-        msg: `${contextName}: Rate limit bottleneck error`,
-        error: sanitizeError(error),
-      });
+      this.logger.error(`${contextName}: Rate limit bottleneck error`, error);
     });
   }
 }

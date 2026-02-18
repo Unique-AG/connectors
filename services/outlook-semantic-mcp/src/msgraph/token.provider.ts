@@ -6,10 +6,8 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { serializeError } from 'serialize-error-cjs';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import { userProfiles } from '../drizzle/schema';
-import { normalizeError } from '../utils/normalize-error';
 
 export class TokenProvider implements AuthenticationProvider {
   private readonly logger = new Logger(TokenProvider.name);
@@ -134,13 +132,13 @@ export class TokenProvider implements AuthenticationProvider {
       return tokenData.access_token;
     } catch (error) {
       this.logger.error(
+        'Failed to refresh Microsoft Graph API access token for user',
         {
           userProfileId: this.userProfileId,
-          error: serializeError(normalizeError(error)),
           tokenRefreshFailed: true,
           errorSource: 'microsoft_graph_api',
         },
-        'Failed to refresh Microsoft Graph API access token for user',
+        error,
       );
       throw new Error(
         `Token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`,

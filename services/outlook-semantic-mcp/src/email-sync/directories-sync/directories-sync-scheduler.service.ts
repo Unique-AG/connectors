@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { sanitizeError } from '~/utils/normalize-error';
 import { SyncDirectoriesForSubscriptionsCommand } from './sync-directories-for-subscriptions.command';
 
 @Injectable()
@@ -46,10 +45,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
 
       await this.syncDirectoriesForSubscriptionsCommand.run();
     } catch (error) {
-      this.logger.error({
-        msg: 'An unexpected error occurred during the scheduled scan',
-        error: sanitizeError(error),
-      });
+      this.logger.error('An unexpected error occurred during the scheduled scan', error);
     }
   }
 
@@ -61,10 +57,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
         job.stop();
       });
     } catch (error) {
-      this.logger.error({
-        msg: 'Error stopping cron jobs',
-        error: sanitizeError(error),
-      });
+      this.logger.error('Error stopping cron jobs', error);
     }
   }
 }

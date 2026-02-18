@@ -1,12 +1,14 @@
 import assert from 'node:assert';
 import { chunk } from 'remeda';
-import { sanitizeError } from './normalize-error';
 
 export interface BatchProcessorOptions<TInput, TOutput> {
   items: TInput[];
   batchSize: number;
   processor: (batch: TInput[], batchIndex: number) => Promise<TOutput[]>;
-  logger: { debug: (msg: string) => void; error: (obj: object) => void };
+  logger: {
+    debug: (...args: unknown[]) => void;
+    error: (...args: unknown[]) => void;
+  };
   logPrefix?: string;
 }
 
@@ -39,12 +41,14 @@ export async function processInBatches<TInput, TOutput>({
       const results = await processor(batch, index);
       allResults.push(...results);
     } catch (error) {
-      logger.error({
-        msg: `${logPrefix} Failed to process batch ${index + 1}`,
-        batchIndex: index,
-        batchSize: batch.length,
-        error: sanitizeError(error),
-      });
+      logger.error(
+        {
+          msg: `${logPrefix} Failed to process batch ${index + 1}`,
+          batchIndex: index,
+          batchSize: batch.length,
+        },
+        error,
+      );
       throw error;
     }
   }

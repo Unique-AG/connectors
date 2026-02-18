@@ -1,4 +1,4 @@
-import { getErrorCodeFromGraphqlRequest, sanitizeError } from '@unique-ag/utils';
+import { getErrorCodeFromGraphqlRequest } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { chunk } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
@@ -265,12 +265,14 @@ export class FilesService implements UniqueApiFiles {
             );
             successCount += 1;
           } catch (singleError) {
-            this.logger.error({
-              msg: `${logPrefix} Failed to add single file access`,
-              scopeId,
-              permission,
-              error: sanitizeError(singleError),
-            });
+            this.logger.error(
+              {
+                msg: `${logPrefix} Failed to add single file access`,
+                scopeId,
+                permission,
+              },
+              singleError,
+            );
           }
         }
       }
@@ -323,12 +325,14 @@ export class FilesService implements UniqueApiFiles {
             });
             successCount += 1;
           } catch (singleError) {
-            this.logger.error({
-              msg: `${logPrefix} Failed to remove single file access`,
-              scopeId,
-              permission,
-              error: sanitizeError(singleError),
-            });
+            this.logger.error(
+              {
+                msg: `${logPrefix} Failed to remove single file access`,
+                scopeId,
+                permission,
+              },
+              singleError,
+            );
           }
         }
       }

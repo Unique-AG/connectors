@@ -1,7 +1,5 @@
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
-import { serializeError } from 'serialize-error-cjs';
-import { normalizeError } from '../utils/normalize-error';
 import { TokenProvider } from './token.provider';
 
 export class TokenRefreshMiddleware implements Middleware {
@@ -126,12 +124,12 @@ export class TokenRefreshMiddleware implements Middleware {
       }
     } catch (error) {
       this.logger.error(
+        'Failed to refresh token or retry Microsoft Graph request for user',
         {
-          error: serializeError(normalizeError(error)),
           userProfileId: this.userProfileId,
           tokenRefreshFailed: true,
         },
-        'Failed to refresh token or retry Microsoft Graph request for user',
+        error,
       );
       // Keep the original 401 response if refresh fails
       // The calling code will handle the authentication error appropriately

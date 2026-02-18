@@ -20,7 +20,6 @@ import { partition } from 'remeda';
 import { serializeError } from 'serialize-error-cjs';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
-import { normalizeError } from '~/utils/normalize-error';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
 import { MessageEventDto } from './mail-ingestion/dtos/messag-event.dto';
 import { FullSyncCommand } from './mail-ingestion/full-sync.command';
@@ -119,7 +118,7 @@ export class MailSubscriptionController {
     if (failed.length > 0) {
       failed.forEach((fail) => {
         this.logger.warn(
-          { error: serializeError(normalizeError(fail.reason)) },
+          { error: serializeError(fail.reason) },
           'Failed to publish reauthorization event to message queue',
         );
         // span?.recordException(fail.reason)
