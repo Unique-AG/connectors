@@ -12,7 +12,7 @@ export interface DiscoveredPage {
   labels: string[];
 }
 
-export interface ProcessedPage {
+export interface FetchedPage {
   id: string;
   title: string;
   body: string;
