@@ -37,6 +37,7 @@
     "@unique-ag/instrumentation": "workspace:*",
     "@unique-ag/logger": "workspace:*",
     "@unique-ag/probe": "workspace:*",
+    "bottleneck": "^2.19.5",
     "cron": "^4.3.5",
     "js-yaml": "^4.1.0",
     "nestjs-otel": "^7.0.1",

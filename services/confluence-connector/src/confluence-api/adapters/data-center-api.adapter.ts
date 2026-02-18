@@ -1,6 +1,7 @@
 import { isString } from 'remeda';
 import type { ConfluenceApiAdapter } from '../confluence-api-adapter';
-import type { ConfluencePage, ContentType, PaginatedResponse } from '../types/confluence-api.types';
+import { paginateAll } from '../paginate';
+import type { ConfluencePage, ContentType } from '../types/confluence-api.types';
 
 const CHILD_PAGE_LIMIT = 50;
 
@@ -31,17 +32,7 @@ export class DataCenterApiAdapter implements ConfluenceApiAdapter {
     _contentType: ContentType,
     httpGet: <T>(url: string) => Promise<T>,
   ): Promise<ConfluencePage[]> {
-    const pages: ConfluencePage[] = [];
-    let url: string | undefined =
-      `${this.baseUrl}/rest/api/content/${parentId}/child/page?os_authType=basic&expand=metadata.labels,version,space&limit=${CHILD_PAGE_LIMIT}`;
-
-    while (url) {
-      const response: PaginatedResponse<ConfluencePage> =
-        await httpGet<PaginatedResponse<ConfluencePage>>(url);
-      pages.push(...response.results);
-      url = response._links.next ? `${this.baseUrl}${response._links.next}` : undefined;
-    }
-
-    return pages;
+    const url = `${this.baseUrl}/rest/api/content/${parentId}/child/page?os_authType=basic&expand=metadata.labels,version,space&limit=${CHILD_PAGE_LIMIT}`;
+    return paginateAll<ConfluencePage>(url, this.baseUrl, httpGet);
   }
 }
