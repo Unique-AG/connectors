@@ -6,9 +6,9 @@ import { fromString, parseTypeId, typeid } from 'typeid-js';
 import * as z from 'zod';
 import { SubscriptionRemoveService } from '../subscription-remove.service';
 
-const StopKbIntegrationInputSchema = z.object({});
+const RemoveInboxConnectionInputSchema = z.object({});
 
-const StopKbIntegrationOutputSchema = z.object({
+const RemoveInboxConnectionOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   subscription: z
@@ -20,7 +20,7 @@ const StopKbIntegrationOutputSchema = z.object({
 });
 
 @Injectable()
-export class StopKbIntegrationTool {
+export class RemoveInboxConnectionTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
@@ -29,14 +29,14 @@ export class StopKbIntegrationTool {
   ) {}
 
   @Tool({
-    name: 'stop_kb_integration',
-    title: 'Stop Knowledge Base Integration',
+    name: 'remove_inbox_connection',
+    title: 'Remove Inbox Connection',
     description:
-      'Stop the knowledge base integration to cease ingesting Microsoft Teams meeting transcripts. This removes the subscription with Microsoft Graph.',
-    parameters: StopKbIntegrationInputSchema,
-    outputSchema: StopKbIntegrationOutputSchema,
+      'Remove the inbox connection to cease ingesting Microsoft Outlook emails. This removes the subscription with Microsoft Graph.',
+    parameters: RemoveInboxConnectionInputSchema,
+    outputSchema: RemoveInboxConnectionOutputSchema,
     annotations: {
-      title: 'Stop Knowledge Base Integration',
+      title: 'Remove Inbox Connection',
       readOnlyHint: false,
       destructiveHint: true,
       idempotentHint: true,
@@ -45,12 +45,12 @@ export class StopKbIntegrationTool {
     _meta: {
       'unique.app/icon': 'stop',
       'unique.app/system-prompt':
-        'Stops the knowledge base integration for meeting transcripts. After stopping, new meeting transcripts will no longer be ingested. Use verify_kb_integration_status first to check if it is running.',
+        'Removes the inbox connection for outlook emails. After removing, new emails will no longer be ingested. Use verify_inbox_connection first to check if it is running.',
     },
   })
   @Span()
-  public async stopKbIntegration(
-    _input: z.infer<typeof StopKbIntegrationInputSchema>,
+  public async removeInboxConnection(
+    _input: z.infer<typeof RemoveInboxConnectionInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {
@@ -60,7 +60,7 @@ export class StopKbIntegrationTool {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
 
-    this.logger.log({ userProfileId }, 'Stopping knowledge base integration for user');
+    this.logger.log({ userProfileId }, 'Removing inbox connection for user');
 
     const tid = fromString(userProfileId, 'user_profile');
     const pid = parseTypeId(tid);
@@ -71,13 +71,13 @@ export class StopKbIntegrationTool {
 
     const messages: Record<typeof status, string> = {
       removed:
-        'Knowledge base integration stopped successfully. New meeting transcripts will no longer be ingested.',
-      not_found: 'Knowledge base integration is not active. Nothing to stop.',
+        'Inbox connection removed successfully. New emails will no longer be ingested.',
+      not_found: 'No active inbox connection found. Nothing to remove.',
     };
 
     this.logger.log(
       { userProfileId, subscriptionId: subscription?.id, status },
-      'Knowledge base integration stop operation completed',
+      'Inbox connection removal operation completed',
     );
 
     return {

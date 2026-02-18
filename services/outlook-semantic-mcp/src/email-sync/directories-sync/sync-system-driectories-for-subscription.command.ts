@@ -1,6 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
-import { Span, TraceService } from 'nestjs-otel';
+import { Inject, Injectable } from "@nestjs/common";
+import { sql } from "drizzle-orm";
+import { Span, TraceService } from "nestjs-otel";
 import {
   DRIZZLE,
   DrizzleDatabase,
@@ -8,22 +8,28 @@ import {
   SystemDirectoriesIgnoredForSync,
   SystemDirectoryType,
   UserProfile,
-} from '~/drizzle';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { GetSubscriptionAndUserProfileQuery } from '../subscription-utils/get-subscription-and-user-profile.query';
-import { GraphOutlookDirectory, graphOutlookDirectory } from './microsoft-graph.dtos';
+} from "~/drizzle";
+import { GraphClientFactory } from "~/msgraph/graph-client.factory";
+import { GetSubscriptionAndUserProfileQuery } from "../subscription-utils/get-subscription-and-user-profile.query";
+import {
+  GraphOutlookDirectory,
+  graphOutlookDirectory,
+} from "./microsoft-graph.dtos";
 
-const MAP_SYSTEM_DIRECTORY_TO_MS_GRAPH_API_NAME: Record<SystemDirectoryType, string> = {
-  Archive: 'archive',
-  'Deleted Items': 'deleteditems',
-  Drafts: 'drafts',
-  Inbox: 'inbox',
-  'Junk Email': 'junkemail',
-  Outbox: 'outbox',
-  'Sent Items': 'sentitems',
-  'Conversation History': 'conversationhistory',
-  'Recoverable Items Deletions': 'recoverableitemsdeletions',
-  Clutter: 'clutter',
+const MAP_SYSTEM_DIRECTORY_TO_MS_GRAPH_API_NAME: Record<
+  SystemDirectoryType,
+  string
+> = {
+  Archive: "archive",
+  "Deleted Items": "deleteditems",
+  Drafts: "drafts",
+  Inbox: "inbox",
+  "Junk Email": "junkemail",
+  Outbox: "outbox",
+  "Sent Items": "sentitems",
+  "Conversation History": "conversationhistory",
+  "Recoverable Items Deletions": "recoverableitemsdeletions",
+  Clutter: "clutter",
 };
 
 interface GraphDirectoryInfo {
@@ -32,7 +38,7 @@ interface GraphDirectoryInfo {
 }
 
 @Injectable()
-export class SyncSystemDirectoriesCommand {
+export class SyncSystemDirectoriesForSubscriptionCommand {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly trace: TraceService,
@@ -43,10 +49,13 @@ export class SyncSystemDirectoriesCommand {
   @Span()
   public async run(subscriptionId: string): Promise<void> {
     const span = this.trace.getSpan();
-    const { userProfile } = await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
+    const { userProfile } =
+      await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
 
     span?.addEvent(`Start system folders sync`);
-    const microsoftGraphDirectories = await this.fetchMicrosoftSystemFolders(userProfile.id);
+    const microsoftGraphDirectories = await this.fetchMicrosoftSystemFolders(
+      userProfile.id,
+    );
     span?.addEvent(`Finished reading microsoft graph system directories`);
 
     await this.syncSystemFolders({
@@ -57,9 +66,11 @@ export class SyncSystemDirectoriesCommand {
   }
 
   @Span()
-  private async fetchMicrosoftSystemFolders(userProfileId: string): Promise<GraphDirectoryInfo[]> {
+  private async fetchMicrosoftSystemFolders(
+    userProfileId: string,
+  ): Promise<GraphDirectoryInfo[]> {
     const span = this.trace.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId.toString());
+    span?.setAttribute("user_profile_id", userProfileId.toString());
 
     span?.addEvent(`Start fetching system directories from microsoft graph`);
     const client = this.graphClientFactory.createClientForUser(userProfileId);
@@ -67,7 +78,9 @@ export class SyncSystemDirectoriesCommand {
     for (const [directoryType, apiName] of Object.entries(
       MAP_SYSTEM_DIRECTORY_TO_MS_GRAPH_API_NAME,
     )) {
-      const directoryResponse = await client.api(`me/mailFolders/${apiName}`).get();
+      const directoryResponse = await client
+        .api(`me/mailFolders/${apiName}`)
+        .get();
       microsoftGraphDirectories.push({
         type: directoryType as SystemDirectoryType,
         directoryInfo: graphOutlookDirectory.parse(directoryResponse),

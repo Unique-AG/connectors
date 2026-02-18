@@ -1,30 +1,33 @@
-import assert from 'node:assert';
-import { UniqueApiClient } from '@unique-ag/unique-api';
-import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
-import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
-import { Span } from 'nestjs-otel';
-import { isNonNullish } from 'remeda';
-import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/drizzle';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { getRootScopePath } from '~/unique/get-root-scope-path';
-import { InjectUniqueApi } from '~/unique/unique-api.module';
-import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
-import { SyncDirectoriesWithDeltaCommand } from '../directories-sync/sync-directories-with-delta.command';
-import { GetSubscriptionAndUserProfileQuery } from '../subscription-utils/get-subscription-and-user-profile.query';
-import { MessageEventDto } from './dtos/messag-event.dto';
+import assert from "node:assert";
+import { UniqueApiClient } from "@unique-ag/unique-api";
+import { AmqpConnection } from "@golevelup/nestjs-rabbitmq";
+import { Inject, Injectable } from "@nestjs/common";
+import { eq } from "drizzle-orm";
+import { Span } from "nestjs-otel";
+import { isNonNullish } from "remeda";
+import { MAIN_EXCHANGE } from "~/amqp/amqp.constants";
+import { DRIZZLE, DrizzleDatabase, subscriptions } from "~/drizzle";
+import { GraphClientFactory } from "~/msgraph/graph-client.factory";
+import { getRootScopePath } from "~/unique/get-root-scope-path";
+import { InjectUniqueApi } from "~/unique/unique-api.module";
+import {
+  INGESTION_SOURCE_KIND,
+  INGESTION_SOURCE_NAME,
+} from "~/utils/source-kind-and-name";
+import { SyncDirectoriesCommand } from "../directories-sync/sync-directories.command";
+import { GetSubscriptionAndUserProfileQuery } from "../subscription-utils/get-subscription-and-user-profile.query";
+import { MessageEventDto } from "./dtos/messag-event.dto";
 import {
   FileDiffGraphMessage,
   FileDiffGraphMessageFields,
   fileDiffGraphMessageResponseSchema,
-} from './dtos/microsoft-graph.dtos';
+} from "./dtos/microsoft-graph.dtos";
 import {
   SubscriptionMailFilters,
   subscriptionMailFilters,
-} from './dtos/subscription-mail-filters.dto';
-import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
-import { IngestionPriority } from './utils/ingestion-queue.utils';
+} from "./dtos/subscription-mail-filters.dto";
+import { getUniqueKeyForMessage } from "./utils/get-unique-key-for-message";
+import { IngestionPriority } from "./utils/ingestion-queue.utils";
 
 @Injectable()
 export class FullSyncCommand {
@@ -32,14 +35,14 @@ export class FullSyncCommand {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly amqp: AmqpConnection,
     private readonly getSubscriptionAndUserProfileQuery: GetSubscriptionAndUserProfileQuery,
-    private readonly syncDirectoriesWithDeltaCommand: SyncDirectoriesWithDeltaCommand,
+    private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
   @Span()
   public async run(subscriptionId: string): Promise<void> {
-    await this.syncDirectoriesWithDeltaCommand.run(subscriptionId);
+    await this.syncDirectoriesCommand.run(subscriptionId);
     const { userProfile, subscription } =
       await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
     const twoDaysAgo = new Date();
@@ -77,18 +80,20 @@ export class FullSyncCommand {
       INGESTION_SOURCE_NAME,
     );
 
-    const filesRecord = allGraphEmails.reduce<Record<string, FileDiffGraphMessage>>((acc, item) => {
+    const filesRecord = allGraphEmails.reduce<
+      Record<string, FileDiffGraphMessage>
+    >((acc, item) => {
       acc[getUniqueKeyForMessage(userProfile.email, item)] = item;
       return acc;
     }, {});
-    for (const fileKey of [...filleDiffResponse.updatedFiles, ...filleDiffResponse.newFiles].slice(
-      0,
-      1,
-    )) {
+    for (const fileKey of [
+      ...filleDiffResponse.updatedFiles,
+      ...filleDiffResponse.newFiles,
+    ].slice(0, 1)) {
       const message = filesRecord[fileKey];
       assert.ok(message, `Missing message for file key: ${fileKey}`);
       const event = MessageEventDto.encode({
-        type: 'unique.outlook-semantic-mcp.mail-notification.new-message',
+        type: "unique.outlook-semantic-mcp.mail-notification.new-message",
         payload: { messageId: message.id, userProfileId: userProfile.id },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
@@ -100,7 +105,7 @@ export class FullSyncCommand {
       const message = filesRecord[fileKey];
       assert.ok(message, `Missing message for file key: ${fileKey}`);
       const event = MessageEventDto.encode({
-        type: 'unique.outlook-semantic-mcp.mail-notification.message-metadata-changed',
+        type: "unique.outlook-semantic-mcp.mail-notification.message-metadata-changed",
         payload: {
           key: fileKey,
           messageId: message.id,
@@ -111,9 +116,13 @@ export class FullSyncCommand {
         priority: IngestionPriority.Low,
       });
     }
-    const filesToDelete = await this.uniqueApi.files.getByKeys(filleDiffResponse.deletedFiles);
+    const filesToDelete = await this.uniqueApi.files.getByKeys(
+      filleDiffResponse.deletedFiles,
+    );
     if (filesToDelete.length) {
-      await this.uniqueApi.files.deleteByIds(filesToDelete.map((file) => file.id));
+      await this.uniqueApi.files.deleteByIds(
+        filesToDelete.map((file) => file.id),
+      );
     }
   }
 
@@ -128,7 +137,7 @@ export class FullSyncCommand {
 
     let emailsRaw = await client
       .api(`me/messages`)
-      .header('Prefer', 'IdType="ImmutableId"')
+      .header("Prefer", 'IdType="ImmutableId"')
       .select(FileDiffGraphMessageFields)
       .filter(`createdDateTime gt ${filters.dateFrom.toISOString()}`)
       .orderby(`createdDateTime desc`)
@@ -137,10 +146,10 @@ export class FullSyncCommand {
     let emailResponse = fileDiffGraphMessageResponseSchema.parse(emailsRaw);
     const emails: FileDiffGraphMessage[] = emailResponse.value;
 
-    while (emailResponse['@odata.nextLink']) {
+    while (emailResponse["@odata.nextLink"]) {
       emailsRaw = await client
-        .api(emailResponse['@odata.nextLink'])
-        .header('Prefer', 'IdType="ImmutableId"')
+        .api(emailResponse["@odata.nextLink"])
+        .header("Prefer", 'IdType="ImmutableId"')
         .get();
       emailResponse = fileDiffGraphMessageResponseSchema.parse(emailsRaw);
       emails.push(...emailResponse.value);

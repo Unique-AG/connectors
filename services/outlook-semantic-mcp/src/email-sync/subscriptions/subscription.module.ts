@@ -6,9 +6,9 @@ import { SubscriptionReauthorizeService } from './subscription-reauthorize.servi
 import { SubscriptionRemoveService } from './subscription-remove.service';
 import { MailSubscriptionUtilsService } from './subscription-utils.service';
 import {
-  StartKbIntegrationTool,
-  StopKbIntegrationTool,
-  VerifyKbIntegrationStatusTool,
+  ConnectInboxTool,
+  RemoveInboxConnectionTool,
+  VerifyInboxConnectionTool,
 } from './tools';
 
 @Module({
@@ -18,10 +18,9 @@ import {
     SubscriptionCreateService,
     SubscriptionReauthorizeService,
     SubscriptionRemoveService,
-    // KB Integration MCP Tools
-    VerifyKbIntegrationStatusTool,
-    StartKbIntegrationTool,
-    StopKbIntegrationTool,
+    VerifyInboxConnectionTool,
+    ConnectInboxTool,
+    RemoveInboxConnectionTool,
   ],
   exports: [
     MailSubscriptionUtilsService,

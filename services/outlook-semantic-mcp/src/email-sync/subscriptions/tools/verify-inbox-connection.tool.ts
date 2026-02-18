@@ -6,12 +6,12 @@ import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 
-const VerifyKbIntegrationStatusInputSchema = z.object({});
+const VerifyInboxConnectionInputSchema = z.object({});
 
 const SubscriptionStatusSchema = z.enum(['active', 'expiring_soon', 'expired', 'not_configured']);
 type SubscriptionStatus = z.infer<typeof SubscriptionStatusSchema>;
 
-const VerifyKbIntegrationStatusOutputSchema = z.object({
+const VerifyInboxConnectionOutputSchema = z.object({
   status: SubscriptionStatusSchema,
   message: z.string(),
   subscription: z
@@ -26,7 +26,7 @@ const VerifyKbIntegrationStatusOutputSchema = z.object({
 });
 
 @Injectable()
-export class VerifyKbIntegrationStatusTool {
+export class VerifyInboxConnectionTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
@@ -35,14 +35,14 @@ export class VerifyKbIntegrationStatusTool {
   ) {}
 
   @Tool({
-    name: 'verify_kb_integration_status',
-    title: 'Verify Knowledge Base Integration Status',
+    name: 'verify_inbox_connection',
+    title: 'Verify Inbox Connection',
     description:
-      'Check the status of the knowledge base integration for Microsoft Teams meeting transcripts. Returns whether ingestion is active, expiring soon, expired, or not configured.',
-    parameters: VerifyKbIntegrationStatusInputSchema,
-    outputSchema: VerifyKbIntegrationStatusOutputSchema,
+      'Check the status of the inbox connection for Microsoft Outlook emails. Returns whether ingestion is active, expiring soon, expired, or not configured.',
+    parameters: VerifyInboxConnectionInputSchema,
+    outputSchema: VerifyInboxConnectionOutputSchema,
     annotations: {
-      title: 'Verify Knowledge Base Integration Status',
+      title: 'Verify Inbox Connection',
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: true,
@@ -51,12 +51,12 @@ export class VerifyKbIntegrationStatusTool {
     _meta: {
       'unique.app/icon': 'status',
       'unique.app/system-prompt':
-        'Returns the current status of the knowledge base integration for meeting transcripts. Use this to verify if transcription ingestion is running before suggesting to start or stop it.',
+        'Returns the current status of the inbox connection for outlook emails. Use this to verify if email ingestion is running before suggesting to connect or remove the inbox connection.',
     },
   })
   @Span()
-  public async verifyKbIntegrationStatus(
-    _input: z.infer<typeof VerifyKbIntegrationStatusInputSchema>,
+  public async verifyInboxConnection(
+    _input: z.infer<typeof VerifyInboxConnectionInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {
@@ -66,7 +66,7 @@ export class VerifyKbIntegrationStatusTool {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
 
-    this.logger.debug({ userProfileId }, 'Checking knowledge base integration status for user');
+    this.logger.debug({ userProfileId }, 'Checking inbox connection status for user');
 
     const subscription = await this.db.query.subscriptions.findFirst({
       where: and(
@@ -76,11 +76,11 @@ export class VerifyKbIntegrationStatusTool {
     });
 
     if (!subscription) {
-      this.logger.debug({ userProfileId }, 'No transcript subscription found for user');
+      this.logger.debug({ userProfileId }, 'No mail subscription found for user');
       return {
         status: 'not_configured' as SubscriptionStatus,
         message:
-          'Knowledge base integration is not configured. Use start_kb_integration to begin ingesting meeting transcripts.',
+          'Inbox connection is not configured. Use connect_inbox to begin ingesting emails.',
         subscription: null,
       };
     }
@@ -99,19 +99,19 @@ export class VerifyKbIntegrationStatusTool {
     if (diffFromNow < 0) {
       status = 'expired';
       message =
-        'Knowledge base integration subscription has expired. Use start_kb_integration to restart ingestion.';
+        'Inbox connection subscription has expired. Use connect_inbox to restart ingestion.';
     } else if (minutesUntilExpiration <= 15) {
       status = 'expiring_soon';
-      message = `Knowledge base integration is active but expiring in ${minutesUntilExpiration} minutes. It will be automatically renewed.`;
+      message = `Inbox connection is active but expiring in ${minutesUntilExpiration} minutes. It will be automatically renewed.`;
     } else {
       status = 'active';
       message =
-        'Knowledge base integration is active and running. Meeting transcripts are being ingested.';
+        'Inbox connection is active and running. Emails are being ingested.';
     }
 
     this.logger.debug(
       { userProfileId, status, expiresAt, minutesUntilExpiration },
-      'Knowledge base integration status retrieved',
+      'Inbox connection status retrieved',
     );
 
     return {
