@@ -12,6 +12,13 @@ export interface DiscoveredPage {
   labels: string[];
 }
 
+export interface FileDiffResult {
+  newPageIds: string[];
+  updatedPageIds: string[];
+  deletedPageIds: string[];
+  movedPageIds: string[];
+}
+
 export interface FetchedPage {
   id: string;
   title: string;
