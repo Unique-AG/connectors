@@ -1,5 +1,7 @@
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable } from '@nestjs/common';
+import { Span } from 'nestjs-otel';
+import { traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import {
   GraphOutlookDirectory,
@@ -11,6 +13,7 @@ import {
 export class FetchAllDirectoriesFromOutlookQuery {
   public constructor(private readonly graphClientFactory: GraphClientFactory) {}
 
+  @Span()
   public async run(userProfileId: string): Promise<GraphOutlookDirectory[]> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
@@ -18,6 +21,8 @@ export class FetchAllDirectoriesFromOutlookQuery {
       apiUrl: `me/mailFolders`,
       client,
     });
+
+    traceEvent('directories fetched', { count: rootDirectories.length });
 
     const shouldExpandDirectory = (directory: GraphOutlookDirectory) =>
       directory.childFolderCount > 0 &&

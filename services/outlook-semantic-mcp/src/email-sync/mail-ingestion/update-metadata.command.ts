@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { Span } from 'nestjs-otel';
+import { traceAttrs } from '~/email-sync/tracing.utils';
 import { GetMessageDetailsQuery } from './get-message-details.query';
 import { getMetadataFromMessage } from './utils/get-metadata-from-message';
 
@@ -6,6 +8,7 @@ import { getMetadataFromMessage } from './utils/get-metadata-from-message';
 export class UpdateMetadataCommand {
   public constructor(private readonly getMessageDetailsQuery: GetMessageDetailsQuery) {}
 
+  @Span()
   public async run({
     userProfileId,
     messageId,
@@ -14,6 +17,7 @@ export class UpdateMetadataCommand {
     messageId: string;
     key: string;
   }): Promise<void> {
+    traceAttrs({ user_profile_id: userProfileId, message_id: messageId });
     const message = await this.getMessageDetailsQuery.run({
       userProfileId,
       messageId,
