@@ -16,17 +16,23 @@ const CONTENT_TYPE_V2_PATH: Record<ContentType, string> = {
 };
 
 export class CloudApiAdapter implements ConfluenceApiAdapter {
-  public constructor(private readonly baseUrl: string) {}
+  public readonly apiBaseUrl: string;
+
+  public constructor(
+    apiBaseUrl: string,
+    private readonly siteBaseUrl: string,
+  ) {
+    this.apiBaseUrl = apiBaseUrl;
+  }
 
   public buildSearchUrl(cql: string, limit: number, start: number): string {
-    return `${this.baseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&limit=${limit}&start=${start}`;
+    return `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&limit=${limit}&start=${start}`;
   }
 
   public buildGetPageUrl(pageId: string): string {
-    return `${this.baseUrl}/wiki/rest/api/content/search?cql=id%3D${pageId}&expand=body.storage,version,space,metadata.labels`;
+    return `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=id%3D${pageId}&expand=body.storage,version,space,metadata.labels`;
   }
 
-  // Cloud fetches single pages via CQL search, so the response is always a PaginatedResponse
   public parseSinglePageResponse(body: unknown): ConfluencePage | null {
     if (!isPlainObject(body) || !isArray(body.results)) {
       return null;
@@ -39,7 +45,7 @@ export class CloudApiAdapter implements ConfluenceApiAdapter {
   }
 
   public buildPageWebUrl(page: ConfluencePage): string {
-    return `${this.baseUrl}/wiki${page._links.webui}`;
+    return `${this.siteBaseUrl}/wiki${page._links.webui}`;
   }
 
   public async fetchChildPages(
@@ -48,19 +54,18 @@ export class CloudApiAdapter implements ConfluenceApiAdapter {
     httpGet: <T>(url: string) => Promise<T>,
   ): Promise<ConfluencePage[]> {
     const segment = CONTENT_TYPE_V2_PATH[contentType];
-    const url = `${this.baseUrl}/wiki/api/v2/${segment}/${parentId}/direct-children?limit=${CHILDREN_LIMIT}`;
-    const childRefs = await fetchAllPaginated<CloudChildReference>(url, this.baseUrl, httpGet);
+    const url = `${this.apiBaseUrl}/wiki/api/v2/${segment}/${parentId}/direct-children?limit=${CHILDREN_LIMIT}`;
+    const childRefs = await fetchAllPaginated<CloudChildReference>(url, this.apiBaseUrl, httpGet);
     return await this.fetchChildDetails(childRefs, httpGet);
   }
 
-  // Sequential for now — can be parallelized with p-limit if N+1 becomes a bottleneck
   private async fetchChildDetails(
     childRefs: CloudChildReference[],
     httpGet: <T>(url: string) => Promise<T>,
   ): Promise<ConfluencePage[]> {
     const pages: ConfluencePage[] = [];
     for (const child of childRefs) {
-      const detailUrl = `${this.baseUrl}/wiki/rest/api/content/search?cql=id%3D${child.id}&expand=metadata.labels,version,space`;
+      const detailUrl = `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=id%3D${child.id}&expand=metadata.labels,version,space`;
       const detail = await httpGet<PaginatedResponse<ConfluencePage>>(detailUrl);
       const page = detail.results[0];
       if (page) {

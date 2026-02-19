@@ -46,7 +46,7 @@ export class ConfluenceApiClient {
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
 
     const initialUrl = this.adapter.buildSearchUrl(cql, SEARCH_PAGE_SIZE, 0);
-    return fetchAllPaginated<ConfluencePage>(initialUrl, this.config.baseUrl, (url) =>
+    return fetchAllPaginated<ConfluencePage>(initialUrl, this.adapter.apiBaseUrl, (url) =>
       this.makeRateLimitedRequest(url),
     );
   }

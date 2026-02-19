@@ -36,6 +36,12 @@ const baseConfluenceFields = z.object({
 export const ConfluenceConfigSchema = z.discriminatedUnion('instanceType', [
   baseConfluenceFields.extend({
     instanceType: z.literal('cloud'),
+    cloudId: z
+      .string()
+      .min(1)
+      .describe(
+        'Atlassian Cloud site ID — retrieve from https://<your-domain>.atlassian.net/_edge/tenant_info',
+      ),
     auth: oauth2loAuth,
   }),
   baseConfluenceFields.extend({

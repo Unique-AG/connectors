@@ -6,7 +6,11 @@ import type { ConfluencePage, ContentType } from '../types/confluence-api.types'
 const CHILD_PAGE_LIMIT = 50;
 
 export class DataCenterApiAdapter implements ConfluenceApiAdapter {
-  public constructor(private readonly baseUrl: string) {}
+  public readonly apiBaseUrl: string;
+
+  public constructor(private readonly baseUrl: string) {
+    this.apiBaseUrl = baseUrl;
+  }
 
   public buildSearchUrl(cql: string, limit: number, start: number): string {
     return `${this.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&os_authType=basic&limit=${limit}&start=${start}`;

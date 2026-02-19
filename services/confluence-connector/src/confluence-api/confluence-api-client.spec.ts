@@ -69,6 +69,7 @@ const makeServiceRegistry = (): ServiceRegistry =>
   }) as unknown as ServiceRegistry;
 
 const makeAdapter = (overrides: Partial<ConfluenceApiAdapter> = {}): ConfluenceApiAdapter => ({
+  apiBaseUrl: BASE_URL,
   buildSearchUrl: vi.fn(
     (cql: string, limit: number, start: number) =>
       `${BASE_URL}/rest/api/content/search?cql=${encodeURIComponent(cql)}&limit=${limit}&start=${start}`,

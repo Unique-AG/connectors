@@ -3,7 +3,8 @@ import type { ConfluencePage, PaginatedResponse } from '../types/confluence-api.
 import { ContentType } from '../types/confluence-api.types';
 import { CloudApiAdapter } from './cloud-api.adapter';
 
-const BASE_URL = 'https://mysite.atlassian.net';
+const API_BASE_URL = 'https://api.atlassian.com/ex/confluence/cloud-id-123';
+const SITE_BASE_URL = 'https://mysite.atlassian.net';
 
 const makePage = (id: string): ConfluencePage => ({
   id,
@@ -18,13 +19,13 @@ const makePage = (id: string): ConfluencePage => ({
 type HttpGet = <T>(url: string) => Promise<T>;
 
 describe('CloudApiAdapter', () => {
-  const adapter = new CloudApiAdapter(BASE_URL);
+  const adapter = new CloudApiAdapter(API_BASE_URL, SITE_BASE_URL);
 
   describe('buildSearchUrl', () => {
     it('builds a search URL without os_authType', () => {
       const url = adapter.buildSearchUrl('space=SP', 25, 0);
       expect(url).toBe(
-        'https://mysite.atlassian.net/wiki/rest/api/content/search?cql=space%3DSP&expand=metadata.labels,version,space&limit=25&start=0',
+        'https://api.atlassian.com/ex/confluence/cloud-id-123/wiki/rest/api/content/search?cql=space%3DSP&expand=metadata.labels,version,space&limit=25&start=0',
       );
     });
 
@@ -44,7 +45,7 @@ describe('CloudApiAdapter', () => {
     it('builds a CQL search URL for the given page id', () => {
       const url = adapter.buildGetPageUrl('12345');
       expect(url).toBe(
-        'https://mysite.atlassian.net/wiki/rest/api/content/search?cql=id%3D12345&expand=body.storage,version,space,metadata.labels',
+        'https://api.atlassian.com/ex/confluence/cloud-id-123/wiki/rest/api/content/search?cql=id%3D12345&expand=body.storage,version,space,metadata.labels',
       );
     });
   });
@@ -98,10 +99,10 @@ describe('CloudApiAdapter', () => {
 
       expect(result).toEqual([child]);
       expect(httpGet).toHaveBeenCalledWith(
-        'https://mysite.atlassian.net/wiki/api/v2/pages/parent-1/direct-children?limit=250',
+        'https://api.atlassian.com/ex/confluence/cloud-id-123/wiki/api/v2/pages/parent-1/direct-children?limit=250',
       );
       expect(httpGet).toHaveBeenCalledWith(
-        'https://mysite.atlassian.net/wiki/rest/api/content/search?cql=id%3Dc1&expand=metadata.labels,version,space',
+        'https://api.atlassian.com/ex/confluence/cloud-id-123/wiki/rest/api/content/search?cql=id%3Dc1&expand=metadata.labels,version,space',
       );
     });
 
@@ -113,7 +114,7 @@ describe('CloudApiAdapter', () => {
       await adapter.fetchChildPages('parent-1', ContentType.FOLDER, httpGet);
 
       expect(httpGet).toHaveBeenCalledWith(
-        'https://mysite.atlassian.net/wiki/api/v2/folders/parent-1/direct-children?limit=250',
+        'https://api.atlassian.com/ex/confluence/cloud-id-123/wiki/api/v2/folders/parent-1/direct-children?limit=250',
       );
     });
 
@@ -125,7 +126,7 @@ describe('CloudApiAdapter', () => {
       await adapter.fetchChildPages('parent-1', ContentType.DATABASE, httpGet);
 
       expect(httpGet).toHaveBeenCalledWith(
-        'https://mysite.atlassian.net/wiki/api/v2/databases/parent-1/direct-children?limit=250',
+        'https://api.atlassian.com/ex/confluence/cloud-id-123/wiki/api/v2/databases/parent-1/direct-children?limit=250',
       );
     });
 
@@ -190,7 +191,7 @@ describe('CloudApiAdapter', () => {
       expect(httpGet).toHaveBeenCalledTimes(4);
       expect(httpGet).toHaveBeenNthCalledWith(
         2,
-        'https://mysite.atlassian.net/wiki/api/v2/pages/parent-1/direct-children?cursor=abc',
+        'https://api.atlassian.com/ex/confluence/cloud-id-123/wiki/api/v2/pages/parent-1/direct-children?cursor=abc',
       );
     });
   });

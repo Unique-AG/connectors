@@ -10,6 +10,7 @@
 
 confluence:
   instanceType: cloud
+  cloudId: your-cloud-id  # Get from https://<your-domain>.atlassian.net/_edge/tenant_info
   baseUrl: https://your-domain.atlassian.net
   auth:
     mode: oauth_2lo

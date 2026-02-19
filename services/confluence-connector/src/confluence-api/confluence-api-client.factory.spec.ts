@@ -17,6 +17,7 @@ const mockServiceRegistry = {
 
 const baseFields = {
   baseUrl: 'https://confluence.example.com',
+  cloudId: 'cloud-id-123',
   apiRateLimitPerMinute: 100,
   ingestSingleLabel: 'sync',
   ingestAllLabel: 'sync-all',
@@ -69,6 +70,11 @@ describe('ConfluenceApiClientFactory', () => {
 
     // biome-ignore lint/style/noNonNullAssertion: test assertion — call is guaranteed by the line above
     const adapterArg = vi.mocked(ConfluenceApiClient).mock.calls[0]![0] as CloudApiAdapter;
-    expect(adapterArg.buildSearchUrl('test', 10, 0)).toContain('https://confluence.example.com');
+    expect(adapterArg.buildSearchUrl('test', 10, 0)).toContain(
+      'https://api.atlassian.com/ex/confluence/cloud-id-123',
+    );
+    expect(adapterArg.buildPageWebUrl({ _links: { webui: '/test' } } as never)).toContain(
+      'https://confluence.example.com',
+    );
   });
 });
