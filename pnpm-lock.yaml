@@ -349,9 +349,6 @@ importers:
       remeda:
         specifier: ^2.32.0
         version: 2.32.0
-      serialize-error-cjs:
-        specifier: ^0.2.0
-        version: 0.2.0
     devDependencies:
       '@swc/core':
         specifier: ^1.13.5

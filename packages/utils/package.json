@@ -16,8 +16,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "remeda": "^2.32.0",
-    "serialize-error-cjs": "^0.2.0"
+    "remeda": "^2.32.0"
   },
   "devDependencies": {
     "@swc/core": "^1.13.5",

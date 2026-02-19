@@ -100,5 +100,5 @@ export interface ContentUpdateMetadataResponse {
 }
 
 export interface ContentUpdateMetadataMutationResponse {
-  contentUpsert: ContentUpdateMetadataResponse;
+  contentUpdateMetadata: ContentUpdateMetadataResponse;
 }

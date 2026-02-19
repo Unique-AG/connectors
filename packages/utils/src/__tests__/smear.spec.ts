@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { smear } from '../smear';
+import { smear } from '../smeared';
 
 describe('smear', () => {
   it('returns __erroneous__ for null input', () => {

@@ -36,8 +36,8 @@ export class FileIngestionService implements UniqueIngestionFacade {
       ContentUpdateMetadataMutationInput
     >(CONTENT_UPDATE_METADATA_MUTATION, request);
 
-    assert.ok(result?.contentUpsert?.id, 'Invalid response from Unique API metadata update');
-    return result.contentUpsert;
+    assert.ok(result?.contentUpdateMetadata, 'Invalid response from Unique API metadata update');
+    return result.contentUpdateMetadata;
   }
 
   public async registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse> {
