@@ -36,6 +36,13 @@
       "when": 1770974656880,
       "tag": "0004_eminent_caretaker",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771505775161,
+      "tag": "0005_fast_squirrel_girl",
+      "breakpoints": true
     }
   ]
 }

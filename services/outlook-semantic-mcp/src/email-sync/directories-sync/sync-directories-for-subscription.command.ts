@@ -68,7 +68,7 @@ export class SyncDirectoriesForSubscriptionCommand {
 
     await this.db
       .update(directoriesSync)
-      .set({ lastDirectorySyncRunnedAt: new Date() })
+      .set({ lastDirectorySyncRanAt: new Date() })
       .where(eq(directoriesSync.userProfileId, userProfile.id))
       .execute();
   }

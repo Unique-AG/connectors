@@ -39,7 +39,7 @@ export class SyncDirectoriesCommand {
       .update(directoriesSync)
       .set({
         deltaLink,
-        lastDeltaSyncRunedAt: new Date(),
+        lastDeltaSyncRanAt: new Date(),
       })
       .where(eq(directoriesSync.id, syncStatsId))
       .execute();

@@ -16,7 +16,7 @@ export class SyncDirectoriesForSubscriptionsCommand {
       .select()
       .from(subscriptions)
       .leftJoin(directoriesSync, eq(subscriptions.userProfileId, directoriesSync.userProfileId))
-      .orderBy(sql`${directoriesSync.lastDeltaSyncRunedAt.name} desc nulls first`)
+      .orderBy(sql`${directoriesSync.lastDeltaSyncRanAt.name} desc nulls first`)
       .limit(10)
       .execute();
 

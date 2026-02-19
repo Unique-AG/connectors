@@ -9,9 +9,10 @@ export const directoriesSync = pgTable('directories_sync', {
     .primaryKey()
     .$default(() => typeid('directories_sync').toString()),
   deltaLink: varchar(`delta_link`),
-  lastDeltaSyncRunedAt: timestamp(`last_delta_sync_runed_at`),
+  lastDeltaSyncRanAt: timestamp(`last_delta_sync_ran_at`),
   lastDeltaChangeDetectedAt: timestamp(`last_delta_change_detected_at`),
-  lastDirectorySyncRunnedAt: timestamp(`last_directory_sync_runned_at`),
+  // TODO: Fix this
+  lastDirectorySyncRanAt: timestamp(`last_directory_sync_ran_at`),
 
   // References
   userProfileId: varchar(`user_profile_id`)
