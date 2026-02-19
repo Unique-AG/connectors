@@ -123,14 +123,12 @@ export class TokenRefreshMiddleware implements Middleware {
         );
       }
     } catch (error) {
-      this.logger.error(
-        'Failed to refresh token or retry Microsoft Graph request for user',
-        {
-          userProfileId: this.userProfileId,
-          tokenRefreshFailed: true,
-        },
+      this.logger.error({
+        msg: 'Failed to refresh token or retry Microsoft Graph request for user',
+        userProfileId: this.userProfileId,
+        tokenRefreshFailed: true,
         error,
-      );
+      });
       // Keep the original 401 response if refresh fails
       // The calling code will handle the authentication error appropriately
     }

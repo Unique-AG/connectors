@@ -31,14 +31,14 @@ export class BottleneckFactory {
 
     // Log dropped requests (queue overflow)
     limiter.on('dropped', () => {
-      this.logger.error(
-        `${contextName}: Rate limit request dropped due to rate limiter queue overflow`,
-      );
+      this.logger.error({
+        msg: `${contextName}: Rate limit request dropped due to rate limiter queue overflow`,
+      });
     });
 
     // Log errors
     limiter.on('error', (error) => {
-      this.logger.error(`${contextName}: Rate limit bottleneck error`, error);
+      this.logger.error({ msg: `${contextName}: Rate limit bottleneck error`, error });
     });
   }
 }

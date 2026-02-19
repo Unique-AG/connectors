@@ -173,10 +173,10 @@ export class SubscriptionCreateService {
 
     if (!userProfile) {
       traceEvent('user profile not found');
-      this.logger.error(
-        { userProfileId: userProfileId.toString() },
-        'Cannot proceed: user profile does not exist in database',
-      );
+      this.logger.error({
+        msg: 'Cannot proceed: user profile does not exist in database',
+        userProfileId: userProfileId.toString(),
+      });
       assert.fail(`${userProfileId} could not be found on DB`);
     }
 

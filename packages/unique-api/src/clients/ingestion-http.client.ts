@@ -162,7 +162,7 @@ export class IngestionHttpClient {
         });
       }
 
-      this.logger.error('Failed ingestion HTTP request', error);
+      this.logger.error({ msg: 'Failed ingestion HTTP request', error });
 
       throw error;
     }

@@ -268,14 +268,12 @@ export class FilesService implements UniqueFilesFacade {
             );
             successCount += 1;
           } catch (singleError) {
-            this.logger.error(
-              {
-                msg: `${logPrefix} Failed to add single file access`,
-                scopeId,
-                permission,
-              },
-              singleError,
-            );
+            this.logger.error({
+              msg: `${logPrefix} Failed to add single file access`,
+              scopeId,
+              permission,
+              error: singleError,
+            });
           }
         }
       }
@@ -328,14 +326,12 @@ export class FilesService implements UniqueFilesFacade {
             });
             successCount += 1;
           } catch (singleError) {
-            this.logger.error(
-              {
-                msg: `${logPrefix} Failed to remove single file access`,
-                scopeId,
-                permission,
-              },
-              singleError,
-            );
+            this.logger.error({
+              msg: `${logPrefix} Failed to remove single file access`,
+              scopeId,
+              permission,
+              error: singleError,
+            });
           }
         }
       }

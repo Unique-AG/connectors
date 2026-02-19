@@ -23,17 +23,15 @@ export class GraphErrorFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
 
     const formattedCode = exception.code ? `[${exception.code ?? ''}] ` : ' ';
-    this.logger.error(
-      {
-        statusCode: exception.statusCode,
-        code: exception.code,
-        requestId: exception.requestId,
-        date: exception.date,
-        body: exception.body,
-        message: exception.message,
-      },
-      `${formattedCode}Microsoft Graph API: ${exception.message}`,
-    );
+    this.logger.error({
+      msg: `${formattedCode}Microsoft Graph API: ${exception.message}`,
+      statusCode: exception.statusCode,
+      code: exception.code,
+      requestId: exception.requestId,
+      date: exception.date,
+      body: exception.body,
+      message: exception.message,
+    });
 
     // Always return 500 regardless of the Graph API's actual status code (e.g., 401/403).
     // These errors occur during internal async processing, so from the client's perspective

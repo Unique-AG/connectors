@@ -41,14 +41,12 @@ export async function processInBatches<TInput, TOutput>({
       const results = await processor(batch, index);
       allResults.push(...results);
     } catch (error) {
-      logger.error(
-        {
-          msg: `${logPrefix} Failed to process batch ${index + 1}`,
-          batchIndex: index,
-          batchSize: batch.length,
-        },
+      logger.error({
+        msg: `${logPrefix} Failed to process batch ${index + 1}`,
+        batchIndex: index,
+        batchSize: batch.length,
         error,
-      );
+      });
       throw error;
     }
   }

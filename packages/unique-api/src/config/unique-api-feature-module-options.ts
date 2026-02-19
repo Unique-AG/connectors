@@ -13,11 +13,21 @@ export const uniqueApiFeatureModuleOptionsSchema = z.object({
     ),
   scopeManagment: z.object({
     rateLimitPerMinute: z.number().prefault(1000),
-    baseUrl: z.string().describe('Base URL for Unique scope management service'),
+    baseUrl: z
+      .string()
+      .describe('Base URL for Unique scope management service')
+      .refine((url) => !url.endsWith('/'), {
+        message: `Scope management url should not end with trailing slash`,
+      }),
   }),
   ingestion: z.object({
     rateLimitPerMinute: z.number().prefault(1000),
-    baseUrl: z.string().describe('Base URL for Unique ingestion service'),
+    baseUrl: z
+      .string()
+      .describe('Base URL for Unique ingestion service')
+      .refine((url) => !url.endsWith('/'), {
+        message: `Ingestion url should not end with trailing slash`,
+      }),
   }),
   metadata: z
     .object({

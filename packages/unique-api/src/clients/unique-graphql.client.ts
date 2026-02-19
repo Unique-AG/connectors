@@ -148,7 +148,7 @@ export class UniqueGraphqlClient {
         });
       }
 
-      this.logger.error(`Failed ${this.config.target} request (${operationName})`, error);
+      this.logger.error({ msg: `Failed ${this.config.target} request (${operationName})`, error });
 
       throw error;
     }

@@ -145,16 +145,14 @@ export class MetricsMiddleware implements Middleware {
         method,
       });
 
-      this.logger.error(
-        'Microsoft Graph API request failed with an error',
-        {
-          method,
-          endpoint,
-          duration,
-          requestFailed: true,
-        },
+      this.logger.error({
+        msg: 'Microsoft Graph API request failed with an error',
+        method,
+        endpoint,
+        duration,
+        requestFailed: true,
         error,
-      );
+      });
 
       throw error;
     }
