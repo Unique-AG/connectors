@@ -23,11 +23,11 @@ import {
   type UpdateScopeMutationResult,
 } from './scopes.queries';
 import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
-import { UniqueApiScopes } from './unique-scopes.facade';
+import { UniqueApiScopesFacade } from './unique-scopes.facade';
 
 const BATCH_SIZE = 100;
 
-export class ScopesService implements UniqueApiScopes {
+export class ScopesService implements UniqueApiScopesFacade {
   public constructor(
     private readonly scopeManagementClient: UniqueGraphqlClient,
     private readonly logger: Logger,

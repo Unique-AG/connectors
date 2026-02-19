@@ -1,6 +1,6 @@
 import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
 
-export interface UniqueApiScopes {
+export interface UniqueApiScopesFacade {
   createFromPaths(
     paths: string[],
     opts?: { includePermissions?: boolean; inheritAccess?: boolean },

@@ -54,11 +54,13 @@ class UniqueApiFeature extends uniqueApiFeatureModuleOptionsHost.ConfigurableMod
 export const UniqueApiModule = {
   forRoot: (options: UniqueApiRootModuleInputOptions): DynamicModule => {
     const dynamicModule = UniqueApiRoot.forRoot(options);
+    const coreProviders = createCoreProviders();
+
     return {
       ...dynamicModule,
       global: true,
-      providers: [...(dynamicModule?.providers ?? []), ...createCoreProviders()],
-      exports: [...(dynamicModule?.exports ?? []), ...createCoreProviders()],
+      providers: [...(dynamicModule?.providers ?? []), ...coreProviders],
+      exports: [...(dynamicModule?.exports ?? []), ...coreProviders],
     };
   },
 
@@ -66,13 +68,15 @@ export const UniqueApiModule = {
     options: ConfigurableModuleAsyncOptions<UniqueApiRootModuleInputOptions>,
   ): DynamicModule => {
     const dynamicModule = UniqueApiRoot.forRootAsync(options);
+    const coreProviders = createCoreProviders();
 
     return {
       ...dynamicModule,
       global: true,
-      providers: [...(dynamicModule.providers ?? []), ...createCoreProviders()],
+      providers: [...(dynamicModule.providers ?? []), ...coreProviders],
       exports: [
         ...(dynamicModule.exports ?? []),
+        ...coreProviders,
         UNIQUE_API_CLIENT_FACTORY,
         UNIQUE_API_CLIENT_REGISTRY,
         UNIQUE_API_METRICS,

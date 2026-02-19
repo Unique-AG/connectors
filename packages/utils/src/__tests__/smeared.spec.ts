@@ -226,13 +226,31 @@ describe('Smeared', () => {
       expect(result).not.toContain('mydoc');
     });
 
-    it('preserves slash structure', () => {
+    it('unsmeared path preserves slash structure', () => {
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.DISCLOSE;
+
+      const path = new Smeared('/a/b/c', false);
+      const result = smearPath(path);
+
+      expect(result).toBe('/a/b/c');
+    });
+
+    it('smeared path preserves slash structure', () => {
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.CONCEAL;
+
+      const path = new Smeared('/a/b/c', true);
+      const result = smearPath(path);
+
+      expect(result).toBe('/[Smeared]/[Smeared]/[Smeared]');
+    });
+
+    it('it propagates the past object active regardles of env', () => {
       process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.DISCLOSE;
 
       const path = new Smeared('/a/b/c', true);
       const result = smearPath(path);
 
-      expect(result).toBe('/a/b/c');
+      expect(result).toBe('/[Smeared]/[Smeared]/[Smeared]');
     });
   });
 

@@ -4,7 +4,7 @@ export type { UniqueApiClientRegistry } from '../core/unique-api-client.registry
 export type { UniqueFilesFacade } from '../files/unique-files.facade';
 export type { UniqueGroupsFacade } from '../groups/unique-groups.facade';
 export type { UniqueIngestionFacade } from '../ingestion/unique-ingestion.facade';
-export type { UniqueApiScopes } from '../scopes/unique-scopes.facade';
+export type { UniqueApiScopesFacade as UniqueApiScopes } from '../scopes/unique-scopes.facade';
 export type { UniqueUsersFacade } from '../users/unique-users.facade';
 export type { UniqueApiClient } from './unique-api-client.types';
 export type { UniqueAccessType, UniqueEntityType } from './unique-entity.types';

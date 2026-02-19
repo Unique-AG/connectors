@@ -117,6 +117,7 @@ export class FileIngestionService implements UniqueIngestionFacade {
 
     const { statusCode, body } = await this.ingestionHttpClient.request({
       method: 'POST',
+      // The ingestionServiceBaseUrl can have already part of the path when running in external mode
       path: `${ingestionUrl.pathname}/v2/content/file-diff`,
       body: JSON.stringify(diffRequest),
     });

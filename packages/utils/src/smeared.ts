@@ -42,7 +42,16 @@ export function createSmeared(value: string): Smeared {
 }
 
 export function smearPath(path: Smeared) {
-  return path.value.split('/').map(createSmeared).join('/');
+  return path.value
+    .split('/')
+    .map((segment) => {
+      // This thing preserves multiple slashes / trailing slashes.
+      if (segment.length === 0) {
+        return '';
+      }
+      return new Smeared(segment, path.active);
+    })
+    .join('/');
 }
 
 /**
