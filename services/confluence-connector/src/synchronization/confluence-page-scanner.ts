@@ -1,7 +1,7 @@
 import type pino from 'pino';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
-import { ConfluenceApiClient, ContentType } from '../confluence-api';
 import type { ConfluencePage } from '../confluence-api';
+import { ConfluenceApiClient, ContentType } from '../confluence-api';
 import type { ServiceRegistry } from '../tenant';
 import { sanitizeError } from '../utils/normalize-error';
 import type { DiscoveredPage } from './sync.types';
