@@ -10,7 +10,6 @@ export {
 } from './process-in-batches';
 export { Redacted } from './redacted';
 export { sanitizePath } from './sanitize-path';
-export { smear } from './smear';
 export {
   createSmeared,
   isSmearingActive,
