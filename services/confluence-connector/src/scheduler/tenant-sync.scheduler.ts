@@ -61,17 +61,19 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  // Logger and services are resolved per-call because TenantSyncScheduler is a single instance for all tenants
   private async syncTenant(tenant: TenantContext): Promise<void> {
     await this.tenantRegistry.run(tenant, async () => {
       const logger = this.serviceRegistry.getServiceLogger(TenantSyncScheduler);
-
+      const confluenceSyncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
+      
       if (this.isShuttingDown) {
         logger.info('Skipping sync due to shutdown');
         return;
       }
 
       try {
-        await this.serviceRegistry.getService(ConfluenceSynchronizationService).synchronize();
+        await confluenceSyncService.synchronize();
       } catch (error) {
         logger.error({
           msg: 'Unexpected sync error',
