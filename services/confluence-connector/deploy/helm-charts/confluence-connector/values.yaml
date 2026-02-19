@@ -109,7 +109,7 @@ connectorConfig:
         # -- Confluence instance type: cloud or data-center
         instanceType: cloud
         # -- base url of the Confluence instance
-        # example (cloud): https://acme.atlassian.net/wiki
+        # example (cloud): https://acme.atlassian.net
         # example (data-center): https://confluence.acme.com
         baseUrl: unset_default_value
         auth:
@@ -118,7 +118,6 @@ connectorConfig:
           mode: oauth_2lo
           # -- OAuth 2.0 (2LO) application client ID
           clientId: unset_default_value
-          # clientSecret is loaded from a secret, see connector.envVars
         # -- Number of Confluence API requests allowed per minute
         apiRateLimitPerMinute: 100
         # -- Label to trigger single-page sync
@@ -162,7 +161,6 @@ connectorConfig:
           # -- Zitadel project ID
           # example: 225317577440629999
           projectId: unset_default_value
-          # clientSecret is loaded from a secret, see connector.envVars
 
       processing:
         # -- timeout in seconds for a page processing step before it will stop and skip processing the page

@@ -135,7 +135,7 @@ describe('tenant-config-loader', () => {
     return {
       confluence: {
         instanceType: 'cloud',
-        baseUrl: 'https://acme.atlassian.net/wiki',
+        baseUrl: 'https://acme.atlassian.net',
         auth: oauth2loAuth,
         ...baseConfluenceFields,
       },
@@ -354,7 +354,7 @@ describe('tenant-config-loader', () => {
       const { name, config } = assertFirstElement(result);
       expect(name).toBe('acme');
       expect(config.confluence.instanceType).toBe('cloud');
-      expect(config.confluence.baseUrl).toBe('https://acme.atlassian.net/wiki');
+      expect(config.confluence.baseUrl).toBe('https://acme.atlassian.net');
       expect(config.confluence.auth.mode).toBe(AuthMode.OAUTH_2LO);
       const auth = config.confluence.auth as Extract<
         typeof config.confluence.auth,
@@ -392,7 +392,7 @@ describe('tenant-config-loader', () => {
       const tenant1Config = {
         confluence: {
           instanceType: 'cloud',
-          baseUrl: 'https://tenant1.atlassian.net/wiki',
+          baseUrl: 'https://tenant1.atlassian.net',
           auth: oauth2loAuth,
           ...baseConfluenceFields,
         },
@@ -560,7 +560,7 @@ describe('tenant-config-loader', () => {
       const config = {
         confluence: {
           instanceType: 'cloud',
-          baseUrl: 'https://acme.atlassian.net/wiki',
+          baseUrl: 'https://acme.atlassian.net',
           auth: patAuth,
           ...baseConfluenceFields,
         },
@@ -577,7 +577,7 @@ describe('tenant-config-loader', () => {
       const config = {
         confluence: {
           instanceType: 'cloud',
-          baseUrl: 'https://acme.atlassian.net/wiki',
+          baseUrl: 'https://acme.atlassian.net',
           auth: { mode: 'unknown_mode' },
           ...baseConfluenceFields,
         },

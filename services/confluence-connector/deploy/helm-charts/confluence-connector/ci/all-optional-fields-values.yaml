@@ -4,7 +4,7 @@ connectorConfig:
     - name: default
       confluence:
         instanceType: cloud
-        baseUrl: https://acme.atlassian.net/wiki
+        baseUrl: https://acme.atlassian.net
         auth:
           mode: oauth_2lo
           clientId: test-client-id
