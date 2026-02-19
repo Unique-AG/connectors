@@ -2,9 +2,10 @@ import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { Span, TraceService } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
+import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionRemovedEventDto } from './subscription.dtos';
@@ -27,16 +28,16 @@ export class SubscriptionRemoveService {
 
   public constructor(
     private readonly amqp: AmqpConnection,
-    private readonly trace: TraceService,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
   ) {}
 
   @Span()
   public async enqueueSubscriptionRemoved(subscriptionId: string): Promise<void> {
-    const span = this.trace.getSpan();
-    span?.setAttribute('subscription_id', subscriptionId);
-    span?.setAttribute('operation', 'enqueue_removal');
+    traceAttrs({
+      subscription_id: subscriptionId,
+      operation: 'enqueue_removal',
+    });
 
     this.logger.debug({ subscriptionId }, 'Enqueuing subscription removal event for processing');
 
@@ -47,8 +48,8 @@ export class SubscriptionRemoveService {
 
     const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
 
-    span?.setAttribute('published', published);
-    span?.addEvent('event published to AMQP', {
+    traceAttrs({ published });
+    traceEvent('event published to AMQP', {
       exchangeName: MAIN_EXCHANGE.name,
       eventType: payload.type,
       published,
@@ -68,9 +69,10 @@ export class SubscriptionRemoveService {
 
   @Span()
   public async removeByUserProfileId(userProfileId: UserProfileTypeID): Promise<RemoveResult> {
-    const span = this.trace.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId.toString());
-    span?.setAttribute('operation', 'remove_subscription_by_user');
+    traceAttrs({
+      user_profile_id: userProfileId.toString(),
+      operation: 'remove_subscription_by_user',
+    });
 
     const existingSubscription = await this.db.query.subscriptions.findFirst({
       where: and(
@@ -80,7 +82,7 @@ export class SubscriptionRemoveService {
     });
 
     if (!existingSubscription) {
-      span?.addEvent('no subscription found for user');
+      traceEvent('no subscription found for user');
       this.logger.debug({ userProfileId }, 'No active subscription found for user');
       return { status: 'not_found', subscription: null };
     }
@@ -90,9 +92,10 @@ export class SubscriptionRemoveService {
 
   @Span()
   public async remove(subscriptionId: string): Promise<RemoveResult> {
-    const span = this.trace.getSpan();
-    span?.setAttribute('subscription_id', subscriptionId);
-    span?.setAttribute('operation', 'remove_subscription');
+    traceAttrs({
+      subscription_id: subscriptionId,
+      operation: 'remove_subscription',
+    });
 
     this.logger.log({ subscriptionId }, 'Beginning Microsoft Graph subscription removal process');
 
@@ -101,7 +104,7 @@ export class SubscriptionRemoveService {
       .where(and(eq(subscriptions.subscriptionId, subscriptionId)))
       .returning();
 
-    span?.addEvent('deleted managed subscription', {
+    traceEvent('deleted managed subscription', {
       subscriptionId,
       count: deletedSubscriptions.length,
     });
@@ -113,12 +116,12 @@ export class SubscriptionRemoveService {
 
     const deletedSubscription = deletedSubscriptions.at(0);
     if (!deletedSubscription) {
-      span?.addEvent('no subscription found to delete');
+      traceEvent('no subscription found to delete');
       this.logger.debug({ subscriptionId }, 'No matching subscription found in database to delete');
       return { status: 'not_found', subscription: null };
     }
 
-    span?.setAttribute('user_profile_id', deletedSubscription.userProfileId);
+    traceAttrs({ user_profile_id: deletedSubscription.userProfileId });
     this.logger.debug(
       { subscriptionId, userProfileId: deletedSubscription.userProfileId },
       'Sending deletion request to Microsoft Graph API for subscription',
@@ -134,7 +137,7 @@ export class SubscriptionRemoveService {
       .header('Prefer', 'IdType="ImmutableId"')
       .delete()) as unknown;
 
-    span?.addEvent('Graph API subscription deleted');
+    traceEvent('Graph API subscription deleted');
     this.logger.log(
       { subscriptionId },
       'Successfully removed subscription from Microsoft Graph API',

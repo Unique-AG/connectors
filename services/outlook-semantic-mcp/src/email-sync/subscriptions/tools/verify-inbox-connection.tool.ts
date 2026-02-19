@@ -2,9 +2,10 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { Span, TraceService } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
+import { traceAttrs } from '~/email-sync/tracing.utils';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 
 const VerifyInboxConnectionInputSchema = z.object({});
@@ -30,10 +31,7 @@ const VerifyInboxConnectionOutputSchema = z.object({
 export class VerifyInboxConnectionTool {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(
-    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    private readonly traceService: TraceService,
-  ) {}
+  public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
   @Tool({
     name: 'verify_inbox_connection',
@@ -64,8 +62,7 @@ export class VerifyInboxConnectionTool {
     const userProfileId = request.user?.userProfileId;
     if (!userProfileId) throw new UnauthorizedException('User not authenticated');
 
-    const span = this.traceService.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId);
+    traceAttrs({ user_profile_id: userProfileId });
 
     this.logger.debug({ userProfileId }, 'Checking inbox connection status for user');
     const userProfileTypeid = convertUserProfileIdToTypeId(userProfileId);
@@ -91,8 +88,10 @@ export class VerifyInboxConnectionTool {
     const diffFromNow = expiresAt.getTime() - now.getTime();
     const minutesUntilExpiration = Math.floor(diffFromNow / (1000 * 60));
 
-    span?.setAttribute('subscription.expires_at', expiresAt.toISOString());
-    span?.setAttribute('subscription.minutes_until_expiration', minutesUntilExpiration);
+    traceAttrs({
+      'subscription.expires_at': expiresAt.toISOString(),
+      'subscription.minutes_until_expiration': minutesUntilExpiration,
+    });
 
     let status: SubscriptionStatus;
     let message: string;

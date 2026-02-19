@@ -1,9 +1,10 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { Span, TraceService } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { RemoveRootScopeAndDirectoriesCommand } from '~/email-sync/directories-sync/remove-root-scope-and-directories.command';
+import { traceAttrs } from '~/email-sync/tracing.utils';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionRemoveService } from '../subscription-remove.service';
 
@@ -25,7 +26,6 @@ export class RemoveInboxConnectionTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly traceService: TraceService,
     private readonly removeRootScopeAndDirectoriesCommand: RemoveRootScopeAndDirectoriesCommand,
     private readonly subscriptionRemove: SubscriptionRemoveService,
   ) {}
@@ -59,8 +59,7 @@ export class RemoveInboxConnectionTool {
     const userProfileId = request.user?.userProfileId;
     if (!userProfileId) throw new UnauthorizedException('User not authenticated');
 
-    const span = this.traceService.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId);
+    traceAttrs({ user_profile_id: userProfileId });
 
     this.logger.log({ userProfileId }, 'Removing inbox connection for user');
 

@@ -1,8 +1,8 @@
 import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { TraceService } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, Subscription, subscriptions, UserProfile } from '~/drizzle';
+import { traceAttrs } from '~/email-sync/tracing.utils';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '../../utils/non-nullish-props';
 import { GetUserProfileQuery } from './get-user-profile.query';
@@ -11,7 +11,6 @@ import { GetUserProfileQuery } from './get-user-profile.query';
 export class GetSubscriptionAndUserProfileQuery {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    private readonly trace: TraceService,
     private readonly getUserProfileQuery: GetUserProfileQuery,
   ) {}
 
@@ -19,8 +18,7 @@ export class GetSubscriptionAndUserProfileQuery {
     subscription: Subscription;
     userProfile: NonNullishProps<UserProfile, 'email'>;
   }> {
-    const span = this.trace.getSpan();
-    span?.setAttribute('subscription_id', subscriptionId.toString());
+    traceAttrs({ subscription_id: subscriptionId.toString() });
     const subscription = await this.db.query.subscriptions.findFirst({
       where: eq(subscriptions.subscriptionId, subscriptionId),
     });

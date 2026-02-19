@@ -2,9 +2,10 @@ import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { Span, TraceService } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
+import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import {
   ReauthorizationRequiredEventDto,
@@ -19,7 +20,6 @@ export class SubscriptionReauthorizeService {
 
   public constructor(
     private readonly amqp: AmqpConnection,
-    private readonly trace: TraceService,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly utils: MailSubscriptionUtilsService,
@@ -27,9 +27,10 @@ export class SubscriptionReauthorizeService {
 
   @Span()
   public async enqueueReauthorizationRequired(subscriptionId: string): Promise<void> {
-    const span = this.trace.getSpan();
-    span?.setAttribute('subscription_id', subscriptionId);
-    span?.setAttribute('operation', 'enqueue_reauthorization');
+    traceAttrs({
+      subscription_id: subscriptionId,
+      operation: 'enqueue_reauthorization',
+    });
 
     this.logger.debug(
       { subscriptionId },
@@ -43,8 +44,8 @@ export class SubscriptionReauthorizeService {
 
     const published = await this.amqp.publish(MAIN_EXCHANGE.name, payload.type, payload, {});
 
-    span?.setAttribute('published', published);
-    span?.addEvent('event published to AMQP', {
+    traceAttrs({ published });
+    traceEvent('event published to AMQP', {
       exchangeName: MAIN_EXCHANGE.name,
       eventType: payload.type,
       published,
@@ -64,9 +65,10 @@ export class SubscriptionReauthorizeService {
 
   @Span()
   public async reauthorize(subscriptionId: string): Promise<void> {
-    const span = this.trace.getSpan();
-    span?.setAttribute('subscription_id', subscriptionId);
-    span?.setAttribute('operation', 'reauthorize_subscription');
+    traceAttrs({
+      subscription_id: subscriptionId,
+      operation: 'reauthorize_subscription',
+    });
 
     this.logger.log(
       { subscriptionId },
@@ -81,7 +83,7 @@ export class SubscriptionReauthorizeService {
     });
 
     if (!subscription) {
-      span?.addEvent('subscription not found for reauthorization');
+      traceEvent('subscription not found for reauthorization');
 
       this.logger.warn(
         { subscriptionId },
@@ -90,8 +92,10 @@ export class SubscriptionReauthorizeService {
       return;
     }
 
-    span?.setAttribute('user_profile_id', subscription.userProfileId);
-    span?.setAttribute('subscription.id', subscription.id);
+    traceAttrs({
+      user_profile_id: subscription.userProfileId,
+      'subscription.id': subscription.id,
+    });
 
     this.logger.debug(
       {
@@ -108,7 +112,7 @@ export class SubscriptionReauthorizeService {
       expirationDateTime: nextScheduledExpiration,
     });
 
-    span?.addEvent('reauthorize subscription payload prepared', {
+    traceEvent('reauthorize subscription payload prepared', {
       expirationDateTime: payload.expirationDateTime,
     });
 
@@ -131,7 +135,7 @@ export class SubscriptionReauthorizeService {
       .patch(payload)) as unknown;
     const graphSubscription = await Subscription.parseAsync(graphResponse);
 
-    span?.addEvent('Graph API subscription updated', {
+    traceEvent('Graph API subscription updated', {
       newExpirationDateTime: graphSubscription.expirationDateTime.toISOString(),
     });
 
@@ -156,11 +160,11 @@ export class SubscriptionReauthorizeService {
 
     const updated = updates.at(0);
     if (!updated) {
-      span?.addEvent('failed to update managed subscription in DB');
+      traceEvent('failed to update managed subscription in DB');
       assert.fail('subscription was not updated');
     }
 
-    span?.addEvent('managed subscription updated', { id: updated.id });
+    traceEvent('managed subscription updated', { id: updated.id });
     this.logger.log(
       { id: updated.id },
       'Successfully updated managed subscription record with new expiration',

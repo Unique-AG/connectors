@@ -15,11 +15,11 @@ import {
   Post,
   UseInterceptors,
 } from '@nestjs/common';
-import { TraceService } from 'nestjs-otel';
 import { partition } from 'remeda';
 import { serializeError } from 'serialize-error-cjs';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
+import { traceAttrs, traceError, traceEvent } from '~/email-sync/tracing.utils';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
 import { MessageEventDto } from './mail-ingestion/dtos/messag-event.dto';
 import { FullSyncCommand } from './mail-ingestion/full-sync.command';
@@ -41,7 +41,6 @@ export class MailSubscriptionController {
     private readonly subscriptionReauthorize: SubscriptionReauthorizeService,
     private readonly subscriptionRemove: SubscriptionRemoveService,
     private readonly utils: MailSubscriptionUtilsService,
-    private readonly trace: TraceService,
     private readonly amqpConnection: AmqpConnection,
     private readonly fullSyncCommand: FullSyncCommand,
   ) {}
@@ -59,12 +58,11 @@ export class MailSubscriptionController {
       'Received lifecycle notification webhook from Microsoft Graph',
     );
 
-    const span = this.trace.getSpan();
     const reauthorizationRequests = event.value
       .filter((notification) => {
         const isTrusted = this.utils.isWebhookTrustedViaState(notification.clientState);
         if (!isTrusted) {
-          span?.addEvent('lifecycle notification invalid');
+          traceEvent('lifecycle notification invalid');
           this.logger.warn(
             { lifecycleNotification: notification },
             'Discarding lifecycle notification due to invalid authentication state',
@@ -84,7 +82,7 @@ export class MailSubscriptionController {
           }
 
           default: {
-            span?.addEvent('lifecycle notification unsupported', {
+            traceEvent('lifecycle notification unsupported', {
               type: notification.lifecycleEvent,
             });
             this.logger.warn(
@@ -105,7 +103,7 @@ export class MailSubscriptionController {
     const successful = publishings.filter((result) => result.status === 'fulfilled');
     const failed = publishings.filter((result) => result.status === 'rejected');
 
-    span?.addEvent('notifications published', {
+    traceEvent('notifications published', {
       successful: successful.length,
       failed: failed.length,
     });
@@ -121,7 +119,7 @@ export class MailSubscriptionController {
           { error: serializeError(fail.reason) },
           'Failed to publish reauthorization event to message queue',
         );
-        // span?.recordException(fail.reason)
+        traceError(fail.reason);
       });
       throw new InternalServerErrorException(
         { errors: failed.map((v) => v.reason) },
@@ -145,21 +143,21 @@ export class MailSubscriptionController {
       'Received change notification webhook from Microsoft Graph',
     );
 
-    const span = this.trace.getSpan();
     const [notificationsToIgnore, notificationsToProcess] = partition(
       event.value,
       (notification) => notification.changeType === 'deleted',
     );
 
-    span?.setAttribute(`notifications_to_process_count`, notificationsToProcess.length);
-    span?.setAttribute(`notifications_to_ignore_count`, notificationsToIgnore.length);
+    traceAttrs({
+      notifications_to_process_count: notificationsToProcess.length,
+      notifications_to_ignore_count: notificationsToIgnore.length,
+    });
 
     if (!notificationsToProcess.length) {
-      span?.addEvent(`No notifications to process`);
+      traceEvent('No notifications to process');
       return;
     }
 
-    span?.addEvent(`No notifications to process`);
     for (const notification of notificationsToProcess) {
       assert.ok(
         notification.resourceData,

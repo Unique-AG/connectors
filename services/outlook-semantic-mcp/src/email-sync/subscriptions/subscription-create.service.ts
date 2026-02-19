@@ -2,8 +2,9 @@ import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { Span, TraceService } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import { DRIZZLE, type DrizzleDatabase, subscriptions, userProfiles } from '~/drizzle';
+import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { MAIN_EXCHANGE } from '../../amqp/amqp.constants';
@@ -32,8 +33,7 @@ export class SubscriptionCreateService {
   private readonly logger = new Logger(SubscriptionCreateService.name);
 
   public constructor(
-    private readonly trace: TraceService,
-    private amqp: AmqpConnection,
+    private readonly amqp: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly utils: MailSubscriptionUtilsService,
@@ -44,9 +44,10 @@ export class SubscriptionCreateService {
     userProfileId: UserProfileTypeID,
     filters: { dateFrom: string },
   ): Promise<SubscribeResult> {
-    const span = this.trace.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId.toString());
-    span?.setAttribute('operation', 'create_subscription');
+    traceAttrs({
+      user_profile_id: userProfileId.toString(),
+      operation: 'create_subscription',
+    });
 
     this.logger.log(
       { userProfileId: userProfileId.toString() },
@@ -61,7 +62,7 @@ export class SubscriptionCreateService {
     });
 
     if (existingSubscription) {
-      span?.addEvent('found managed subscription', {
+      traceEvent('found managed subscription', {
         id: existingSubscription.id,
       });
       this.logger.debug(
@@ -73,8 +74,10 @@ export class SubscriptionCreateService {
       const now = new Date();
       const diffFromNow = expiresAt.getTime() - now.getTime();
 
-      span?.setAttribute('subscription.expiresAt', expiresAt.toISOString());
-      span?.setAttribute('subscription.diffFromNowMs', diffFromNow);
+      traceAttrs({
+        'subscription.expiresAt': expiresAt.toISOString(),
+        'subscription.diffFromNowMs': diffFromNow,
+      });
 
       this.logger.debug(
         { id: existingSubscription.id, expiresAt, now: now, diffFromNow },
@@ -88,13 +91,13 @@ export class SubscriptionCreateService {
       // or just keep it as is.
       const minimalTimeForLifecycleNotificationsInMinutes = 15;
       if (diffFromNow < 0) {
-        span?.addEvent('subscription expired, deleting');
+        traceEvent('subscription expired, deleting');
 
         const result = await this.db
           .delete(subscriptions)
           .where(eq(subscriptions.id, existingSubscription.id));
 
-        span?.addEvent('expired managed subscription deleted', {
+        traceEvent('expired managed subscription deleted', {
           id: existingSubscription.id,
           count: result.rowCount ?? NaN,
         });
@@ -114,7 +117,7 @@ export class SubscriptionCreateService {
         // but there might be an edge case where this event gets picked up while a renewal is already in progress or
         // is about to happen very soon - this is a very unlikely edge case (never happened in prod),
         // but to be safe we just skip creating a new subscription here and let it naturally renew later or eventually expire.
-        span?.addEvent('subscription expiration below renewal threshold', {
+        traceEvent('subscription expiration below renewal threshold', {
           id: existingSubscription.id,
           thresholdMinutes: minimalTimeForLifecycleNotificationsInMinutes,
         });
@@ -130,7 +133,7 @@ export class SubscriptionCreateService {
       }
 
       // NOTE: here we have enough time left on the subscription, so we do nothing
-      span?.addEvent('subscription valid, skipping creation');
+      traceEvent('subscription valid, skipping creation');
 
       this.logger.debug(
         { id: existingSubscription.id },
@@ -138,7 +141,7 @@ export class SubscriptionCreateService {
       );
       return { status: 'already_active', subscription: existingSubscription };
     }
-    span?.addEvent('no existing subscription found');
+    traceEvent('no existing subscription found');
     return await this.createNewSubscription({
       userProfileId: userProfileId.toString(),
       filters,
@@ -152,7 +155,6 @@ export class SubscriptionCreateService {
     userProfileId: string;
     filters: { dateFrom: string };
   }): Promise<SubscribeResult> {
-    const span = this.trace.getSpan();
     this.logger.debug(
       {},
       'No existing subscription found, proceeding with new subscription creation',
@@ -170,7 +172,7 @@ export class SubscriptionCreateService {
     });
 
     if (!userProfile) {
-      span?.addEvent('user profile not found');
+      traceEvent('user profile not found');
       this.logger.error(
         { userProfileId: userProfileId.toString() },
         'Cannot proceed: user profile does not exist in database',
@@ -178,7 +180,9 @@ export class SubscriptionCreateService {
       assert.fail(`${userProfileId} could not be found on DB`);
     }
 
-    span?.setAttribute('user_profile.provider_user_id', userProfile.providerUserId);
+    traceAttrs({
+      'user_profile.provider_user_id': userProfile.providerUserId,
+    });
     this.logger.debug(
       { providerUserId: userProfile.providerUserId },
       'Successfully retrieved user profile from database',
@@ -193,7 +197,7 @@ export class SubscriptionCreateService {
       expirationDateTime: nextScheduledExpiration,
     });
 
-    span?.addEvent('new subscription payload prepared', {
+    traceEvent('new subscription payload prepared', {
       notificationUrl: payload.notificationUrl,
       lifecycleNotificationUrl: payload.lifecycleNotificationUrl,
       expirationDateTime: payload.expirationDateTime,
@@ -220,8 +224,8 @@ export class SubscriptionCreateService {
       .post(payload)) as unknown;
     const graphSubscription = await Subscription.parseAsync(graphResponse);
 
-    span?.setAttribute('graph_subscription.id', graphSubscription.id);
-    span?.addEvent('Graph API subscription created', {
+    traceAttrs({ 'graph_subscription.id': graphSubscription.id });
+    traceEvent('Graph API subscription created', {
       subscriptionId: graphSubscription.id,
     });
 
@@ -245,11 +249,11 @@ export class SubscriptionCreateService {
 
     const created = newManagedSubscriptions.at(0);
     if (!created) {
-      span?.addEvent('failed to create managed subscription in DB');
+      traceEvent('failed to create managed subscription in DB');
       assert.fail('subscription was not created');
     }
 
-    span?.addEvent('new managed subscription created', { id: created.id });
+    traceEvent('new managed subscription created', { id: created.id });
     this.logger.log({ id: created.id }, 'Successfully created new managed subscription record');
 
     const subscriptionCreated = LifecycleEventDto.encode({

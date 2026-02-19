@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { Span, TraceService } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import {
   DRIZZLE,
   DrizzleDatabase,
@@ -9,6 +9,7 @@ import {
   SystemDirectoryType,
   UserProfile,
 } from '~/drizzle';
+import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
@@ -36,33 +37,30 @@ interface GraphDirectoryInfo {
 export class SyncSystemDirectoriesForSubscriptionCommand {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    private readonly trace: TraceService,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
   ) {}
 
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
-    const span = this.trace.getSpan();
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
 
-    span?.addEvent(`Start system folders sync`);
+    traceEvent('Start system folders sync');
     const microsoftGraphDirectories = await this.fetchMicrosoftSystemFolders(userProfile.id);
-    span?.addEvent(`Finished reading microsoft graph system directories`);
+    traceEvent('Finished reading microsoft graph system directories');
 
     await this.syncSystemFolders({
       microsoftGraphDirectories,
       userProfile,
     });
-    span?.addEvent(`System folders sync finished`);
+    traceEvent('System folders sync finished');
   }
 
   @Span()
   private async fetchMicrosoftSystemFolders(userProfileId: string): Promise<GraphDirectoryInfo[]> {
-    const span = this.trace.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId.toString());
+    traceAttrs({ user_profile_id: userProfileId.toString() });
 
-    span?.addEvent(`Start fetching system directories from microsoft graph`);
+    traceEvent('Start fetching system directories from microsoft graph');
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const microsoftGraphDirectories: GraphDirectoryInfo[] = [];
     for (const [directoryType, apiName] of Object.entries(
@@ -74,7 +72,7 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
         directoryInfo: graphOutlookDirectory.parse(directoryResponse),
       });
     }
-    span?.addEvent(`Finish fetching system directories from microsoft graph`);
+    traceEvent('Finish fetching system directories from microsoft graph');
     return microsoftGraphDirectories;
   }
 
