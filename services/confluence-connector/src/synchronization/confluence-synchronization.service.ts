@@ -1,7 +1,12 @@
+import pLimit from 'p-limit';
 import type pino from 'pino';
-import { getCurrentTenant } from '../tenant/tenant-context.storage';
+import { getCurrentTenant } from '../tenant';
+import { extractFileUrls } from '../utils/html-link-parser';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
+import { FileDiffService } from './file-diff.service';
+import { IngestionService } from './ingestion.service';
+import type { FetchedPage } from './sync.types';
 
 export class ConfluenceSynchronizationService {
   public constructor(
@@ -23,23 +28,84 @@ export class ConfluenceSynchronizationService {
       this.logger.info('Starting sync');
 
       const discoveredPages = await this.scanner.discoverPages();
+      this.logger.info({ count: discoveredPages.length }, 'Discovery completed');
+
+      const diff = await this.fileDiffService.computeDiff(discoveredPages);
       this.logger.info(
-        { count: discoveredPages.length },
-        `Discovery completed  ${JSON.stringify(discoveredPages, null, 4)}`,
+        {
+          new: diff.newPageIds.length,
+          updated: diff.updatedPageIds.length,
+          deleted: diff.deletedPageIds.length,
+          moved: diff.movedPageIds.length,
+        },
+        'File diff completed',
       );
 
-      // this is for demo purpose only. We will change this once we start implementing ingestion
-      const fetchedPages = await this.contentFetcher.fetchPagesContent(discoveredPages);
-      this.logger.info(
-        { count: fetchedPages.length },
-        `Fetching completed ${JSON.stringify(fetchedPages, null, 4)}`,
+      const pageIdsToFetch = new Set([...diff.newPageIds, ...diff.updatedPageIds]);
+      const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
+
+      const fetchedPages = await this.contentFetcher.fetchPagesContent(pagesToFetch);
+      this.logger.info({ count: fetchedPages.length }, 'Content fetching completed');
+
+      const concurrency = Math.max(1, tenant.config.processing.concurrency);
+      const fileIngestionEnabled = tenant.config.ingestion.ingestFiles === IngestFiles.Enabled;
+      const allowedExtensions = tenant.config.ingestion.allowedFileExtensions ?? [];
+      const confluenceBaseUrl = tenant.config.confluence.baseUrl;
+
+      await this.ingestPagesWithConcurrency(
+        fetchedPages,
+        concurrency,
+        fileIngestionEnabled,
+        allowedExtensions,
+        confluenceBaseUrl,
       );
+
+      if (diff.deletedKeys.length > 0) {
+        await this.ingestionService.deleteContent(diff.deletedKeys);
+        this.logger.info({ count: diff.deletedKeys.length }, 'Deleted content processed');
+      }
 
       this.logger.info('Sync completed');
     } catch (error) {
       this.logger.error({ err: error, msg: 'Sync failed' });
     } finally {
       tenant.isScanning = false;
+    }
+  }
+
+  private async ingestPagesWithConcurrency(
+    pages: FetchedPage[],
+    concurrency: number,
+    fileIngestionEnabled: boolean,
+    allowedExtensions: string[],
+    confluenceBaseUrl: string,
+  ): Promise<void> {
+    const limit = pLimit(concurrency);
+
+    await Promise.all(
+      pages.map((page) =>
+        limit(() =>
+          this.ingestPageAndFiles(page, fileIngestionEnabled, allowedExtensions, confluenceBaseUrl),
+        ),
+      ),
+    );
+
+    this.logger.info({ count: pages.length }, 'Page ingestion completed');
+  }
+
+  private async ingestPageAndFiles(
+    page: FetchedPage,
+    fileIngestionEnabled: boolean,
+    allowedExtensions: string[],
+    confluenceBaseUrl: string,
+  ): Promise<void> {
+    await this.ingestionService.ingestPage(page);
+
+    if (fileIngestionEnabled && page.body) {
+      const fileUrls = extractFileUrls(page.body, allowedExtensions, confluenceBaseUrl);
+      if (fileUrls.length > 0) {
+        await this.ingestionService.ingestFiles(page, fileUrls);
+      }
     }
   }
 }

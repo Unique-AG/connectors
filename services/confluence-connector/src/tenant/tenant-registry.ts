@@ -8,6 +8,10 @@ import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-a
 import { ConfluenceContentFetcher } from '../synchronization/confluence-content-fetcher';
 import { ConfluencePageScanner } from '../synchronization/confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
+import { FileDiffService } from '../synchronization/file-diff.service';
+import { IngestionService } from '../synchronization/ingestion.service';
+import { MockUniqueApiClient } from '../unique-api/mock-unique-api-client';
+import { UniqueApiClient } from '../unique-api/types/unique-api-client.types';
 import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
 import { tenantStorage } from './tenant-context.storage';
@@ -66,6 +70,21 @@ export class TenantRegistry implements OnModuleInit {
         this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
 
         const syncLogger = this.serviceRegistry.getServiceLogger(ConfluenceSynchronizationService);
+        this.serviceRegistry.register(
+          tenantName,
+          UniqueApiClient,
+          new MockUniqueApiClient(tenantLogger),
+        );
+        this.serviceRegistry.register(
+          tenantName,
+          FileDiffService,
+          new FileDiffService(config.confluence, config.ingestion, this.serviceRegistry),
+        );
+        this.serviceRegistry.register(
+          tenantName,
+          IngestionService,
+          new IngestionService(config.confluence, config.ingestion, this.serviceRegistry),
+        );
         this.serviceRegistry.register(
           tenantName,
           ConfluenceSynchronizationService,
