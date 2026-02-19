@@ -1,5 +1,6 @@
 import type pino from 'pino';
 import type { ConfluenceConfig } from '../config';
+import type { ConfluencePage } from '../confluence-api';
 import { ConfluenceApiClient } from '../confluence-api';
 import type { ServiceRegistry } from '../tenant';
 import { sanitizeError } from '../utils/normalize-error';
@@ -32,7 +33,7 @@ export class ConfluenceContentFetcher {
   }
 
   private async fetchPage(page: DiscoveredPage): Promise<FetchedPage | null> {
-    let fullPage;
+    let fullPage: ConfluencePage | null;
     try {
       fullPage = await this.apiClient.getPageById(page.id);
     } catch (error) {
@@ -77,8 +78,6 @@ export class ConfluenceContentFetcher {
       this.confluenceConfig.ingestAllLabel,
     ];
 
-    return labels
-      .map((label) => label.name)
-      .filter((name) => !ingestLabels.includes(name));
+    return labels.map((label) => label.name).filter((name) => !ingestLabels.includes(name));
   }
 }

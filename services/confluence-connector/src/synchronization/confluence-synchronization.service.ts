@@ -29,10 +29,16 @@ export class ConfluenceSynchronizationService {
       this.logger.info('Starting sync');
 
       const discoveredPages = await this.scanner.discoverPages();
-      this.logger.info({ count: discoveredPages.length, pages: JSON.stringify(discoveredPages, null, 4) }, 'Discovery completed');
+      this.logger.info(
+        { count: discoveredPages.length, pages: JSON.stringify(discoveredPages, null, 4) },
+        'Discovery completed',
+      );
 
       const fetchedPages = await this.contentFetcher.fetchPagesContent(discoveredPages);
-      this.logger.info({ count: fetchedPages.length, pages: JSON.stringify(fetchedPages, null, 4) }, 'Fetching completed');
+      this.logger.info(
+        { count: fetchedPages.length, pages: JSON.stringify(fetchedPages, null, 4) },
+        'Fetching completed',
+      );
 
       this.logger.info('Sync completed');
     } catch (error) {
