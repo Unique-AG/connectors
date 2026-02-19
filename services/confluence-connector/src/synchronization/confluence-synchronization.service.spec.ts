@@ -152,9 +152,7 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('resets isScanning and logs errors when content fetcher fails', async () => {
-      vi.mocked(mockContentFetcher.fetchPagesContent).mockRejectedValue(
-        new Error('fetch failure'),
-      );
+      vi.mocked(mockContentFetcher.fetchPagesContent).mockRejectedValue(new Error('fetch failure'));
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
