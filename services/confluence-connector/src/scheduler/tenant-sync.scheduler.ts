@@ -61,7 +61,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  // Logger and services are resolved per-call because TenantSyncScheduler is a single instance for all tenants
+  // services are resolved per-call because TenantSyncScheduler is a single instance for all tenants so we can't set services in the constructor
   private async syncTenant(tenant: TenantContext): Promise<void> {
     await this.tenantRegistry.run(tenant, async () => {
       const logger = this.serviceRegistry.getServiceLogger(TenantSyncScheduler);

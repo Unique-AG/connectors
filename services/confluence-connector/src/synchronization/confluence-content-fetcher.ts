@@ -32,6 +32,7 @@ export class ConfluenceContentFetcher {
     return fetched;
   }
 
+  // there's also a way to fetch pages content in bulk. When we implement the processing pipeline we decide if we want to use it
   private async fetchPage(page: DiscoveredPage): Promise<FetchedPage | null> {
     let fullPage: ConfluencePage | null;
     try {

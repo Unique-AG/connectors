@@ -22,6 +22,7 @@ export class ConfluencePageScanner {
   public async discoverPages(): Promise<DiscoveredPage[]> {
     const labeledPages = await this.apiClient.searchPagesByLabel();
     const discovered: DiscoveredPage[] = [];
+    const discoveredIds = new Set<string>();
 
     for (const page of labeledPages) {
       if (this.isLimitReached(discovered.length)) {
@@ -33,10 +34,16 @@ export class ConfluencePageScanner {
         continue;
       }
 
+      // in case a page is marked for ingesting it's child pages we deduplicate child pages that are also labeled for ingestion
+      if (discoveredIds.has(page.id)) {
+        continue;
+      }
+
+      discoveredIds.add(page.id);
       discovered.push(this.toDiscoveredPage(page));
 
       if (this.hasIngestAllLabel(page)) {
-        await this.expandChildren(page, discovered);
+        await this.expandChildren(page, discovered, discoveredIds);
       }
     }
 
@@ -47,6 +54,7 @@ export class ConfluencePageScanner {
   private async expandChildren(
     parent: ConfluencePage,
     discovered: DiscoveredPage[],
+    discoveredIds: Set<string>,
   ): Promise<void> {
     let children: ConfluencePage[];
     try {
@@ -69,8 +77,13 @@ export class ConfluencePageScanner {
         continue;
       }
 
+      if (discoveredIds.has(child.id)) {
+        continue;
+      }
+
+      discoveredIds.add(child.id);
       discovered.push(this.toDiscoveredPage(child));
-      await this.expandChildren(child, discovered);
+      await this.expandChildren(child, discovered, discoveredIds);
     }
   }
 
