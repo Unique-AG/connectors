@@ -34,6 +34,7 @@ export class ConfluenceSynchronizationService {
         `Discovery completed  ${JSON.stringify(discoveredPages, null, 4)}`,
       );
 
+      // this is for demo purpose only. We will change this once we start implementing ingestion
       const fetchedPages = await this.contentFetcher.fetchPagesContent(discoveredPages);
       this.logger.info(
         { count: fetchedPages.length },
