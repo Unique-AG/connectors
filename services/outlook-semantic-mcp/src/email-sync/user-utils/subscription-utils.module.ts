@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DrizzleModule } from '~/drizzle/drizzle.module';
+import { DrizzleModule } from '~/db/drizzle.module';
 import { GetSubscriptionAndUserProfileQuery } from './get-subscription-and-user-profile.query';
 import { GetUserProfileQuery } from './get-user-profile.query';
 

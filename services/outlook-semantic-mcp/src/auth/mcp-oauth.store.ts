@@ -14,14 +14,14 @@ import { Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { eq, lt } from 'drizzle-orm';
 import { typeid } from 'typeid-js';
-import { DrizzleDatabase } from '../drizzle/drizzle.module';
+import { DrizzleDatabase } from '../db/drizzle.module';
 import {
   authorizationCodes,
   oauthClients,
   oauthSessions,
   tokens,
   userProfiles,
-} from '../drizzle/schema';
+} from '../db/schema';
 import {
   fromDrizzleAuthCodeRow,
   fromDrizzleOAuthClientRow,

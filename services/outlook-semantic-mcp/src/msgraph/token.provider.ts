@@ -6,8 +6,8 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { DrizzleDatabase } from '../drizzle/drizzle.module';
-import { userProfiles } from '../drizzle/schema';
+import { DrizzleDatabase } from '../db/drizzle.module';
+import { userProfiles } from '../db/schema';
 
 export class TokenProvider implements AuthenticationProvider {
   private readonly logger = new Logger(TokenProvider.name);

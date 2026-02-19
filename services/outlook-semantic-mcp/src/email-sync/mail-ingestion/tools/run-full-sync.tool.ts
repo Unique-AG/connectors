@@ -5,7 +5,7 @@ import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/commo
 import { eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
-import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/drizzle';
+import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { FullSyncCommand } from '~/email-sync/mail-ingestion/full-sync.command';
 
 const InputSchema = z.object({});

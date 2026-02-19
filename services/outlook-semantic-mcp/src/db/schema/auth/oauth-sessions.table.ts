@@ -1,11 +1,11 @@
-import { pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
-import { typeid } from "typeid-js";
-import { timestamps } from "../../timestamps.columns";
+import { pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { typeid } from 'typeid-js';
+import { timestamps } from '../../timestamps.columns';
 
-export const oauthSessions = pgTable("oauth_sessions", {
+export const oauthSessions = pgTable('oauth_sessions', {
   id: varchar(`id`)
     .primaryKey()
-    .$default(() => typeid("oauth_session").toString()),
+    .$default(() => typeid('oauth_session').toString()),
   sessionId: varchar(`session_id`).notNull().unique(),
   state: varchar(`state`).notNull(),
   clientId: varchar(`client_id`),

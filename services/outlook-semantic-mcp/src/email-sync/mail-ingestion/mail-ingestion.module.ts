@@ -1,5 +1,5 @@
 import { Module, Provider } from '@nestjs/common';
-import { DrizzleModule } from '~/drizzle/drizzle.module';
+import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';

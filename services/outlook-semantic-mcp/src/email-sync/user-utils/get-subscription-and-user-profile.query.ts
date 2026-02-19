@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { DRIZZLE, DrizzleDatabase, Subscription, subscriptions, UserProfile } from '~/drizzle';
+import { DRIZZLE, DrizzleDatabase, Subscription, subscriptions, UserProfile } from '~/db';
 import { traceAttrs } from '~/email-sync/tracing.utils';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '../../utils/non-nullish-props';

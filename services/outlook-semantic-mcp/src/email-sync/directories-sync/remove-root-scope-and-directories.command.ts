@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { DRIZZLE, DrizzleDatabase, directories, directoriesSync, userProfiles } from '~/drizzle';
+import { DRIZZLE, DrizzleDatabase, directories, directoriesSync, userProfiles } from '~/db';
 import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';

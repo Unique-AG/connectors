@@ -32,7 +32,7 @@ import {
   microsoftConfig,
   uniqueConfig,
 } from './config';
-import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
+import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
 import { MailSubscriptionModule } from './email-sync/mail-subscription.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';

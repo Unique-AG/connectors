@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/drizzle';
+import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { getRootScopePath } from '~/unique/get-root-scope-path';

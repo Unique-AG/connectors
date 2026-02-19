@@ -1,16 +1,16 @@
-import { relations } from "drizzle-orm";
-import { jsonb, pgTable, unique, varchar } from "drizzle-orm/pg-core";
-import { typeid } from "typeid-js";
-import { timestamps } from "../timestamps.columns";
-import { authorizationCodes } from "./auth/authorization-codes.table";
-import { tokens } from "./auth/tokens.table";
+import { relations } from 'drizzle-orm';
+import { jsonb, pgTable, unique, varchar } from 'drizzle-orm/pg-core';
+import { typeid } from 'typeid-js';
+import { timestamps } from '../timestamps.columns';
+import { authorizationCodes } from './auth/authorization-codes.table';
+import { tokens } from './auth/tokens.table';
 
 export const userProfiles = pgTable(
-  "user_profiles",
+  'user_profiles',
   {
     id: varchar()
       .primaryKey()
-      .$default(() => typeid("user_profile").toString()),
+      .$default(() => typeid('user_profile').toString()),
     provider: varchar(`provider`).notNull(),
     providerUserId: varchar(`provider_user_id`).notNull(),
     username: varchar(`username`).notNull(),

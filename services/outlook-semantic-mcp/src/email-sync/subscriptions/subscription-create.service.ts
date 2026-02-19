@@ -3,7 +3,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, type DrizzleDatabase, subscriptions, userProfiles } from '~/drizzle';
+import { DRIZZLE, type DrizzleDatabase, subscriptions, userProfiles } from '~/db';
 import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';

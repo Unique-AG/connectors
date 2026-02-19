@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
-import { DRIZZLE, DrizzleDatabase, directoriesSync, subscriptions } from '~/drizzle';
+import { DRIZZLE, DrizzleDatabase, directoriesSync, subscriptions } from '~/db';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SyncDirectoriesCommand } from './sync-directories.command';
 

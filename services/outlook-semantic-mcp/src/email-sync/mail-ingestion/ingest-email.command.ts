@@ -5,7 +5,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish, omit } from 'remeda';
-import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/drizzle';
+import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/db';
 import { traceAttrs } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { getRootScopeExternalId } from '~/unique/get-root-scope-path';

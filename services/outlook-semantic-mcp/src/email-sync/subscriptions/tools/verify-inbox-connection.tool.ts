@@ -4,7 +4,7 @@ import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/commo
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
+import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/db';
 import { traceAttrs } from '~/email-sync/tracing.utils';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 

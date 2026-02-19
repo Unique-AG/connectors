@@ -8,7 +8,7 @@ import {
   SystemDirectoriesIgnoredForSync,
   SystemDirectoryType,
   UserProfile,
-} from '~/drizzle';
+} from '~/db';
 import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';

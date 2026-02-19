@@ -10,7 +10,7 @@ import {
   directories,
   directoriesSync,
   SystemDirectoriesIgnoredForSync,
-} from '~/drizzle';
+} from '~/db';
 import { traceAttrs } from '~/email-sync/tracing.utils';
 import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';

@@ -4,7 +4,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
+import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/db';
 import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import {

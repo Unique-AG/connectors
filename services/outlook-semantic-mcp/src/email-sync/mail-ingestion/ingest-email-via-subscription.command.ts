@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/drizzle';
+import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { traceAttrs } from '~/email-sync/tracing.utils';
 import { IngestEmailCommand } from './ingest-email.command';
 
