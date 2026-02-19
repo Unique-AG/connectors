@@ -75,20 +75,30 @@ export class TenantRegistry implements OnModuleInit {
           UniqueApiClient,
           new MockUniqueApiClient(tenantLogger),
         );
-        this.serviceRegistry.register(
-          tenantName,
-          FileDiffService,
-          new FileDiffService(config.confluence, config.ingestion, this.serviceRegistry),
+        const fileDiffService = new FileDiffService(
+          config.confluence,
+          config.ingestion,
+          this.serviceRegistry,
         );
-        this.serviceRegistry.register(
-          tenantName,
-          IngestionService,
-          new IngestionService(config.confluence, config.ingestion, this.serviceRegistry),
+        this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
+
+        const ingestionService = new IngestionService(
+          config.confluence,
+          config.ingestion,
+          this.serviceRegistry,
         );
+        this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
+
         this.serviceRegistry.register(
           tenantName,
           ConfluenceSynchronizationService,
-          new ConfluenceSynchronizationService(scanner, fetcher, syncLogger),
+          new ConfluenceSynchronizationService(
+            scanner,
+            fetcher,
+            fileDiffService,
+            ingestionService,
+            syncLogger,
+          ),
         );
       });
 

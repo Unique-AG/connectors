@@ -574,6 +574,7 @@ describe('tenant-config-loader', () => {
       const config = {
         confluence: {
           instanceType: 'cloud',
+          cloudId: 'test-cloud-id',
           baseUrl: 'https://acme.atlassian.net',
           auth: patAuth,
           ...baseConfluenceFields,
@@ -592,6 +593,7 @@ describe('tenant-config-loader', () => {
       const config = {
         confluence: {
           instanceType: 'cloud',
+          cloudId: 'test-cloud-id',
           baseUrl: 'https://acme.atlassian.net',
           auth: { mode: 'unknown_mode' },
           ...baseConfluenceFields,

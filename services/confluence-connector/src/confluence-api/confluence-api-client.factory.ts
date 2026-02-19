@@ -7,6 +7,8 @@ import { CloudConfluenceApiClient } from './cloud-api-client';
 import { ConfluenceApiClient } from './confluence-api-client';
 import { DataCenterConfluenceApiClient } from './data-center-api-client';
 
+const ATLASSIAN_API_GATEWAY = 'https://api.atlassian.com/ex/confluence';
+
 @Injectable()
 export class ConfluenceApiClientFactory {
   public constructor(private readonly serviceRegistry: ServiceRegistry) {}

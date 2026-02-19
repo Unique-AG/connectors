@@ -1,17 +1,20 @@
 import pLimit from 'p-limit';
 import type pino from 'pino';
+import { IngestFiles } from '../constants/ingestion.constants';
 import { getCurrentTenant } from '../tenant';
 import { extractFileUrls } from '../utils/html-link-parser';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
-import { FileDiffService } from './file-diff.service';
-import { IngestionService } from './ingestion.service';
+import type { FileDiffService } from './file-diff.service';
+import type { IngestionService } from './ingestion.service';
 import type { FetchedPage } from './sync.types';
 
 export class ConfluenceSynchronizationService {
   public constructor(
     private readonly scanner: ConfluencePageScanner,
     private readonly contentFetcher: ConfluenceContentFetcher,
+    private readonly fileDiffService: FileDiffService,
+    private readonly ingestionService: IngestionService,
     private readonly logger: pino.Logger,
   ) {}
 
