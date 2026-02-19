@@ -16,13 +16,11 @@ import { UniqueContentService } from '~/unique/unique-content.service';
 const FindTranscriptsInputSchema = z.object({
   query: z.string().describe('Search query to find relevant content within transcripts'),
   subject: z.string().optional().describe('Filter by meeting subject (partial match)'),
-  dateFrom: z
-    .iso
+  dateFrom: z.iso
     .datetime()
     .optional()
     .describe('Filter transcripts from this datetime (ISO 8601, e.g., 2024-01-15T00:00:00.000Z)'),
-  dateTo: z
-    .iso
+  dateTo: z.iso
     .datetime()
     .optional()
     .describe('Filter transcripts until this datetime (ISO 8601, e.g., 2024-01-31T23:59:59.999Z)'),
@@ -133,7 +131,10 @@ export class FindTranscriptsTool {
       const participantNames = metadata?.participant_names;
       const participants =
         typeof participantNames === 'string'
-          ? participantNames.split(',').map((p) => p.trim()).filter(Boolean)
+          ? participantNames
+              .split(',')
+              .map((p) => p.trim())
+              .filter(Boolean)
           : undefined;
 
       return {
