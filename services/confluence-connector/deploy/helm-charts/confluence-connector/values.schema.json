@@ -133,7 +133,7 @@
           "description": "List of tenant configurations",
           "items": {
             "type": "object",
-            "required": ["name", "confluence", "unique", "processing"],
+            "required": ["name", "confluence", "unique", "processing", "ingestion"],
             "properties": {
               "name": {
                 "type": "string",
@@ -350,6 +350,36 @@
                   "maxPagesToScan": {
                     "type": ["integer", "null"],
                     "description": "Maximum number of pages to scan (for testing). Unlimited if not set"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "ingestion": {
+                "type": "object",
+                "description": "Ingestion configuration",
+                "required": ["ingestionMode", "scopeId", "ingestFiles"],
+                "properties": {
+                  "ingestionMode": {
+                    "type": "string",
+                    "enum": ["flat", "recursive"],
+                    "description": "Ingestion traversal mode"
+                  },
+                  "scopeId": {
+                    "type": "string",
+                    "description": "Root scope ID for ingestion"
+                  },
+                  "ingestFiles": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
+                    "description": "Whether file attachment ingestion is enabled"
+                  },
+                  "allowedFileExtensions": {
+                    "type": "array",
+                    "description": "File extensions to ingest (required when ingestFiles is enabled)",
+                    "items": {
+                      "type": "string"
+                    },
+                    "examples": [["pdf", "docx", "xlsx"]]
                   }
                 },
                 "additionalProperties": false

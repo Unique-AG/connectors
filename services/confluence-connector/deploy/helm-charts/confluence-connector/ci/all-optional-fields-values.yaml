@@ -28,3 +28,7 @@ connectorConfig:
         concurrency: 1
         scanIntervalCron: "*/30 * * * *"
         maxPagesToScan: 5000
+      ingestion:
+        ingestionMode: flat
+        scopeId: test-scope-id
+        ingestFiles: disabled

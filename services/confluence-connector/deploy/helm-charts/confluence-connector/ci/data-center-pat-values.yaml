@@ -22,3 +22,10 @@ connectorConfig:
         stepTimeoutSeconds: 600
         concurrency: 1
         scanIntervalCron: "0 */2 * * *"
+      ingestion:
+        ingestionMode: flat
+        scopeId: test-scope-id
+        ingestFiles: enabled
+        allowedFileExtensions:
+          - pdf
+          - docx
