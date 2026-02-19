@@ -183,10 +183,7 @@ describe('ConfluencePageScanner', () => {
 
     expect(result).toEqual([]);
     expect(apiClient.getChildPages).not.toHaveBeenCalled();
-    expect(mockTenantLogger.info).toHaveBeenCalledWith(
-      { count: 0 },
-      'Page discovery completed',
-    );
+    expect(mockTenantLogger.info).toHaveBeenCalledWith({ count: 0 }, 'Page discovery completed');
   });
 
   it('rejects when searchPagesByLabel fails', async () => {
