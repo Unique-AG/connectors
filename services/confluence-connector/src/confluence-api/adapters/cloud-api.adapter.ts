@@ -1,6 +1,6 @@
 import { isArray, isPlainObject, isString } from 'remeda';
 import type { ConfluenceApiAdapter } from '../confluence-api-adapter';
-import { paginateAll } from '../paginate';
+import { fetchAllPaginated } from '../confluence-fetch-paginated';
 import type { ConfluencePage, ContentType, PaginatedResponse } from '../types/confluence-api.types';
 
 interface CloudChildReference {
@@ -49,7 +49,7 @@ export class CloudApiAdapter implements ConfluenceApiAdapter {
   ): Promise<ConfluencePage[]> {
     const segment = CONTENT_TYPE_V2_PATH[contentType];
     const url = `${this.baseUrl}/wiki/api/v2/${segment}/${parentId}/direct-children?limit=${CHILDREN_LIMIT}`;
-    const childRefs = await paginateAll<CloudChildReference>(url, this.baseUrl, httpGet);
+    const childRefs = await fetchAllPaginated<CloudChildReference>(url, this.baseUrl, httpGet);
     return await this.fetchChildDetails(childRefs, httpGet);
   }
 

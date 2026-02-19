@@ -1,6 +1,6 @@
 import { isString } from 'remeda';
 import type { ConfluenceApiAdapter } from '../confluence-api-adapter';
-import { paginateAll } from '../paginate';
+import { fetchAllPaginated } from '../confluence-fetch-paginated';
 import type { ConfluencePage, ContentType } from '../types/confluence-api.types';
 
 const CHILD_PAGE_LIMIT = 50;
@@ -33,6 +33,6 @@ export class DataCenterApiAdapter implements ConfluenceApiAdapter {
     httpGet: <T>(url: string) => Promise<T>,
   ): Promise<ConfluencePage[]> {
     const url = `${this.baseUrl}/rest/api/content/${parentId}/child/page?os_authType=basic&expand=metadata.labels,version,space&limit=${CHILD_PAGE_LIMIT}`;
-    return paginateAll<ConfluencePage>(url, this.baseUrl, httpGet);
+    return fetchAllPaginated<ConfluencePage>(url, this.baseUrl, httpGet);
   }
 }
