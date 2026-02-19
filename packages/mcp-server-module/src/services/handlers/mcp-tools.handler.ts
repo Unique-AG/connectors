@@ -135,7 +135,7 @@ export class McpToolsHandler extends McpHandlerBase {
 
         const transformedResult = this.formatToolResult(result, toolInfo.metadata.outputSchema);
 
-        this.logger.debug('CallToolRequestSchema result');
+        this.logger.debug(transformedResult, 'CallToolRequestSchema result');
 
         return transformedResult;
       } catch (error) {
