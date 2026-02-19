@@ -115,9 +115,11 @@ Only the facades needed for ingestion (`ingestion`, `files`) need implementation
 
 ### Error Handling
 
+**Assertion style**: Use `assert.ok` and `assert.fail` (from `node:assert`) for invariant checks and abort-on-error patterns, consistent with SharePoint connector conventions.
+
 **File-diff errors**: If the file-diff call fails, the sync cycle aborts for that tenant. No partial processing.
 
-**Safety check**: If file-diff returns deletions for all pages and no new/updated pages, abort to prevent accidental full-scope wipe.
+**Safety check**: If file-diff returns deletions for all pages and no new/updated pages, abort via `assert.fail` to prevent accidental full-scope wipe (same pattern as SharePoint's `validateNoAccidentalFullDeletion`).
 
 **Per-page ingestion errors**: If registration, upload, or finalization fails for a page, log the error and skip that page. Continue with other pages. Next sync cycle will pick it up via file-diff.
 
