@@ -164,3 +164,33 @@ export const REMOVE_ACCESSES_MUTATION = gql`
     )
   }
 `;
+
+export const CONTENT_ID_BY_SCOPE_AND_METADATA_KET = gql`
+  query ContentByScopeAndMetadata(
+    $scopeId: String!
+    $metadataKey: String!
+    $metadataValue: JSON!
+  ) {
+    content(
+      where: {
+        ownerId: { equals: $scopeId }
+        ownerType: { equals: SCOPE }
+        metadata: { path: [$metadataKey], equals: $metadataValue }
+      }
+    ) {
+      id
+    }
+  }
+`;
+
+export interface ContentByScopeAndMetadataKeyInput {
+  scopeId: string;
+  metadataKey: string;
+  metadataValue: unknown;
+}
+
+export interface ContentByScopeAndMetadataKeyResult {
+  content: {
+    id: string;
+  }[];
+}

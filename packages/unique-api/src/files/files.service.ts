@@ -8,7 +8,10 @@ import {
   type AddAccessesMutationResult,
   CONTENT_DELETE_BY_IDS_MUTATION,
   CONTENT_DELETE_MUTATION,
+  CONTENT_ID_BY_SCOPE_AND_METADATA_KET,
   CONTENT_UPDATE_MUTATION,
+  type ContentByScopeAndMetadataKeyInput,
+  type ContentByScopeAndMetadataKeyResult,
   type ContentDeleteByContentIdsMutationInput,
   type ContentDeleteByContentIdsMutationResult,
   type ContentDeleteMutationInput,
@@ -339,5 +342,22 @@ export class FilesService implements UniqueFilesFacade {
     }
 
     return successCount;
+  }
+
+  public async getIdsByScopeAndMetadataKey(
+    scopeId: string,
+    metadataKey: string,
+    metadataValue: unknown,
+  ): Promise<string[]> {
+    const result = await this.ingestionClient.request<
+      ContentByScopeAndMetadataKeyResult,
+      ContentByScopeAndMetadataKeyInput
+    >(CONTENT_ID_BY_SCOPE_AND_METADATA_KET, {
+      scopeId,
+      metadataKey,
+      metadataValue,
+    });
+
+    return result.content.map((item) => item?.id);
   }
 }

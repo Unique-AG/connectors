@@ -17,7 +17,7 @@ export class SyncDirectoriesCommand {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
-    private readonly syncDirectoriesCommand: SyncDirectoriesForSubscriptionCommand,
+    private readonly syncDirectoriesForSubscriptionCommand: SyncDirectoriesForSubscriptionCommand,
   ) {}
 
   @Span()
@@ -27,7 +27,7 @@ export class SyncDirectoriesCommand {
       userProfile.id,
     );
     if (shouldSyncDirectories) {
-      await this.syncDirectoriesCommand.run(userProfileTypeId);
+      await this.syncDirectoriesForSubscriptionCommand.run(userProfileTypeId);
     }
     // We do not check the delta link because microsoft returns the same delta link as the current one.
     await this.db

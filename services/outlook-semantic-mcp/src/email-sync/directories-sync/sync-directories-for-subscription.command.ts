@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { count, eq, inArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -10,6 +11,8 @@ import {
   directoriesSync,
   SystemDirectoriesIgnoredForSync,
 } from '~/drizzle';
+import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
+import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 import { CreateRootScopeCommand } from './create-root-scope.command';
@@ -23,6 +26,7 @@ const USER_DIRECTORY_TYPE: DirectoryType = 'User Defined Directory';
 export class SyncDirectoriesForSubscriptionCommand {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     private readonly fetchAllDirectoriesFromOutlookQuery: FetchAllDirectoriesFromOutlookQuery,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly syncSystemDirectoriesCommand: SyncSystemDirectoriesForSubscriptionCommand,
@@ -56,6 +60,7 @@ export class SyncDirectoriesForSubscriptionCommand {
 
     await this.removeExtraDirectories({
       userProfileId: userProfile.id,
+      providerUserId: userProfile.providerUserId,
       microsoftDirectories,
     });
 
@@ -132,9 +137,11 @@ export class SyncDirectoriesForSubscriptionCommand {
 
   private async removeExtraDirectories({
     userProfileId,
+    providerUserId,
     microsoftDirectories,
   }: {
     userProfileId: string;
+    providerUserId: string;
     microsoftDirectories: GraphOutlookDirectory[];
   }) {
     const {
@@ -152,8 +159,22 @@ export class SyncDirectoriesForSubscriptionCommand {
       .set({ ignoreForSync: true })
       .where(inArray(directories.id, directoryIdsToMarkAsIgnored));
 
-    for (const _id of providerParentIdsToDeleteInUnique) {
-      // TODO: Call unique to delete all meta keys with values in providerParentIdsToDeleteInUnique
+    const rootScope = await this.uniqueApi.scopes.getByExternalId(
+      getRootScopeExternalId(providerUserId),
+    );
+    if (!rootScope) {
+      return;
+    }
+
+    for (const providerDirectoryId of providerParentIdsToDeleteInUnique) {
+      const contentIds = await this.uniqueApi.files.getIdsByScopeAndMetadataKey(
+        rootScope.id,
+        'parentFolderId',
+        providerDirectoryId,
+      );
+      if (contentIds.length) {
+        await this.uniqueApi.files.deleteByIds(contentIds);
+      }
     }
   }
 
