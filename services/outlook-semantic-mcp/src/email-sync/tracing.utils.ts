@@ -1,5 +1,5 @@
-import type { Attributes } from "@opentelemetry/api";
-import { SpanStatusCode, trace } from "@opentelemetry/api";
+import type { Attributes } from '@opentelemetry/api';
+import { SpanStatusCode, trace } from '@opentelemetry/api';
 
 export function traceAttrs(attrs: Attributes): void {
   const span = trace.getActiveSpan();
