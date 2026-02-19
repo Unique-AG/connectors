@@ -1,29 +1,20 @@
 import z from 'zod';
 
 const SubscriptionMessageChanged = z.object({
-  type: z.literal('unique.outlook-semantic-mcp.mail-notification.subscription-message-changed'),
+  type: z.literal('unique.outlook-semantic-mcp.mail-event.live-change-notification-received'),
   payload: z.object({ subscriptionId: z.string(), messageId: z.string() }),
 });
 
-const FullSyncNewMessage = z.object({
-  type: z.literal('unique.outlook-semantic-mcp.mail-notification.new-message'),
+const FullSyncMessageChanged = z.object({
+  type: z.literal('unique.outlook-semantic-mcp.mail-event.full-sync-change-notification-scheduled'),
   payload: z.object({
     userProfileId: z.string(),
     messageId: z.string(),
   }),
 });
 
-const FullSyncMessageMetadataChanged = z.object({
-  type: z.literal('unique.outlook-semantic-mcp.mail-notification.message-metadata-changed'),
-  payload: z.object({
-    userProfileId: z.string(),
-    messageId: z.string(),
-    key: z.string(),
-  }),
-});
-
+// TODO: rename file
 export const MessageEventDto = z.discriminatedUnion('type', [
   SubscriptionMessageChanged,
-  FullSyncNewMessage,
-  FullSyncMessageMetadataChanged,
+  FullSyncMessageChanged,
 ]);

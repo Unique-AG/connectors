@@ -10,6 +10,7 @@ export interface UniqueFilesFacade {
   deleteByKeyPrefix(keyPrefix: string): Promise<number>;
   addAccesses(scopeId: string, fileAccesses: FileAccessInput[]): Promise<number>;
   removeAccesses(scopeId: string, fileAccesses: FileAccessInput[]): Promise<number>;
+  // TODO: Check if we can avoid passing the scope id
   getIdsByScopeAndMetadataKey(
     scopeId: string,
     metadataKey: string,

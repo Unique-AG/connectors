@@ -23,6 +23,7 @@ export class SyncDirectoriesCommand {
 
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
+    // TODO: check the mark for sync +
     traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
     const { shouldSyncDirectories, deltaLink, syncStatsId } = await this.runDeltaQuery(

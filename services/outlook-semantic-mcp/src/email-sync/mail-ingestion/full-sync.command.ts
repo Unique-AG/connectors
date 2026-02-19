@@ -1,10 +1,10 @@
 import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNullish } from 'remeda';
+import { indexBy, isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
@@ -30,6 +30,8 @@ import { IngestionPriority } from './utils/ingestion-queue.utils';
 
 @Injectable()
 export class FullSyncCommand {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly amqp: AmqpConnection,
@@ -51,7 +53,6 @@ export class FullSyncCommand {
       isNonNullish(subscription.lastFullSyncRunAt) &&
       subscription.lastFullSyncRunAt > twoDaysAgo
     ) {
-      // TODO: uncomment.
       return;
     }
     await this.db
@@ -75,7 +76,6 @@ export class FullSyncCommand {
 
     const filleDiffResponse = await this.uniqueApi.ingestion.performFileDiff(
       filesList,
-      // TODO: FIll
       getRootScopePath(userProfile.email),
       INGESTION_SOURCE_KIND,
       INGESTION_SOURCE_NAME,
@@ -87,18 +87,14 @@ export class FullSyncCommand {
       moved: filleDiffResponse.movedFiles.length,
     });
 
-    const filesRecord = allGraphEmails.reduce<Record<string, FileDiffGraphMessage>>((acc, item) => {
-      acc[getUniqueKeyForMessage(userProfile.email, item)] = item;
-      return acc;
-    }, {});
-    for (const fileKey of [...filleDiffResponse.updatedFiles, ...filleDiffResponse.newFiles].slice(
-      0,
-      1,
-    )) {
+    const filesRecord = indexBy(allGraphEmails, (item) =>
+      getUniqueKeyForMessage(userProfile.email, item),
+    );
+    for (const fileKey of [...filleDiffResponse.updatedFiles, ...filleDiffResponse.newFiles]) {
       const message = filesRecord[fileKey];
       assert.ok(message, `Missing message for file key: ${fileKey}`);
       const event = MessageEventDto.encode({
-        type: 'unique.outlook-semantic-mcp.mail-notification.new-message',
+        type: 'unique.outlook-semantic-mcp.mail-event.full-sync-change-notification-scheduled',
         payload: { messageId: message.id, userProfileId: userProfile.id },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
@@ -106,19 +102,10 @@ export class FullSyncCommand {
       });
     }
 
-    for (const fileKey of filleDiffResponse.movedFiles) {
-      const message = filesRecord[fileKey];
-      assert.ok(message, `Missing message for file key: ${fileKey}`);
-      const event = MessageEventDto.encode({
-        type: 'unique.outlook-semantic-mcp.mail-notification.message-metadata-changed',
-        payload: {
-          key: fileKey,
-          messageId: message.id,
-          userProfileId: userProfile.id,
-        },
-      });
-      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
-        priority: IngestionPriority.Low,
+    if (filleDiffResponse.movedFiles.length) {
+      this.logger.error({
+        msg: `We found moved files: ${filleDiffResponse.movedFiles.length}`,
+        keys: filleDiffResponse.movedFiles.join(', '),
       });
     }
     const filesToDelete = await this.uniqueApi.files.getByKeys(filleDiffResponse.deletedFiles);

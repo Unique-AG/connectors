@@ -1,4 +1,4 @@
 export const IngestionPriority = {
-  Low: 2,
-  High: 3,
+  Low: 1,
+  High: 2,
 } as const;

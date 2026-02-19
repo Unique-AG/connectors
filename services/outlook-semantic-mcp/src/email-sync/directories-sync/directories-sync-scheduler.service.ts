@@ -27,7 +27,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
 
   private setupScheduledScan(): void {
     const job = new CronJob(`*/5 * * * *`, () => {
-      void this.runScheduledScan();
+      this.runScheduledScan();
     });
 
     this.schedulerRegistry.addCronJob('sharepoint-scan', job);

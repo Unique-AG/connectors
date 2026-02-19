@@ -9,7 +9,6 @@ import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { MessageEventDto } from './mail-ingestion/dtos/messag-event.dto';
 import { IngestEmailCommand } from './mail-ingestion/ingest-email.command';
 import { IngestEmailViaSubscriptionCommand } from './mail-ingestion/ingest-email-via-subscription.command';
-import { UpdateMetadataCommand } from './mail-ingestion/update-metadata.command';
 import { IngestionPriority } from './mail-ingestion/utils/ingestion-queue.utils';
 
 @Injectable()
@@ -19,13 +18,12 @@ export class IngestionListener {
   public constructor(
     private readonly ingestEmailViaSubscriptionCommand: IngestEmailViaSubscriptionCommand,
     private readonly ingestEmailCommand: IngestEmailCommand,
-    private readonly updateMetadataCommand: UpdateMetadataCommand,
   ) {}
 
   @RabbitSubscribe({
     exchange: MAIN_EXCHANGE.name,
-    queue: 'unique.outlook-semantic-mcp.mail-notifications',
-    routingKey: ['unique.outlook-semantic-mcp.mail-notification.*'],
+    queue: 'unique.outlook-semantic-mcp.mail-events',
+    routingKey: ['unique.outlook-semantic-mcp.mail-event.*'],
     createQueueIfNotExists: true,
     queueOptions: {
       deadLetterExchange: DEAD_EXCHANGE.name,
@@ -38,12 +36,10 @@ export class IngestionListener {
     this.logger.log(`Email ingestion requested: ${event.type}`);
 
     switch (event.type) {
-      case 'unique.outlook-semantic-mcp.mail-notification.subscription-message-changed':
+      case 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received':
         return await this.ingestEmailViaSubscriptionCommand.run(event.payload);
-      case 'unique.outlook-semantic-mcp.mail-notification.new-message':
+      case 'unique.outlook-semantic-mcp.mail-event.full-sync-change-notification-scheduled':
         return await this.ingestEmailCommand.run(event.payload);
-      case 'unique.outlook-semantic-mcp.mail-notification.message-metadata-changed':
-        return await this.updateMetadataCommand.run(event.payload);
     }
   }
 }

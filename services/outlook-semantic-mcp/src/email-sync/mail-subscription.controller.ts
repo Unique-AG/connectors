@@ -164,7 +164,7 @@ export class MailSubscriptionController {
         `Missing resource data from notification: ${JSON.stringify(notification)}`,
       );
       const payload = await MessageEventDto.encodeAsync({
-        type: 'unique.outlook-semantic-mcp.mail-notification.subscription-message-changed',
+        type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
         payload: {
           subscriptionId: notification.subscriptionId,
           messageId: notification.resourceData.id,

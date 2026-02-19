@@ -57,12 +57,14 @@ export class IngestEmailCommand {
       where: eq(directories.providerDirectoryId, graphMessage.parentFolderId),
     });
 
+    if (isNullish(parentDirectory)) {
+      // TODO: Mark that we should run the folder sync even if delta query returns false in db on the next folder sync.
+      //
+    }
+
     // Parent directory should exist because once he connects we run a full directory sync. If it's not there
     // we thrust that the full sync will catch this email. TODO: Check with Michat if we should Throw error.
-    if (isNullish(parentDirectory) || parentDirectory.ignoreForSync) {
-      if (isNullish(parentDirectory)) {
-        // TODO: This should not normally happen unless the full sync is able to read the perma deleted messages via api - TODO: report this events.
-      }
+    if (parentDirectory?.ignoreForSync) {
       if (isNonNullish(file)) {
         await this.uniqueApi.files.delete(file.id);
       }

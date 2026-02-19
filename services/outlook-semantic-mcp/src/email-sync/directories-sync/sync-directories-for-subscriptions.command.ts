@@ -16,6 +16,7 @@ export class SyncDirectoriesForSubscriptionsCommand {
       .select()
       .from(subscriptions)
       .leftJoin(directoriesSync, eq(subscriptions.userProfileId, directoriesSync.userProfileId))
+      // TODO: add where which filters only anctive subscribtions.
       .orderBy(sql`${directoriesSync.lastDeltaSyncRanAt.name} desc nulls first`)
       .limit(10)
       .execute();

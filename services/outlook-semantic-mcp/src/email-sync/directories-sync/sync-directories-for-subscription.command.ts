@@ -1,8 +1,9 @@
 import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
-import { count, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, not, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
+import { prop } from 'remeda';
 import {
   DirectoryType,
   DRIZZLE,
@@ -87,6 +88,7 @@ export class SyncDirectoriesForSubscriptionCommand {
       }));
 
     while (queue.length) {
+      // TODO: Add comment on how this works.
       const nextQueue = await Promise.all(
         queue.flatMap(({ parentId, directory }) =>
           this.updateDirectory({
@@ -146,20 +148,42 @@ export class SyncDirectoriesForSubscriptionCommand {
     providerUserId: string;
     microsoftDirectories: GraphOutlookDirectory[];
   }) {
-    const {
-      idsToDeleteInDatabase,
-      providerParentIdsToDeleteInUnique,
-      directoryIdsToMarkAsIgnored,
-    } = await this.getDirectoriesToRemove({
-      userProfileId,
-      microsoftDirectories,
-    });
-    await this.db.delete(directories).where(inArray(directories.id, idsToDeleteInDatabase));
+    const { idsToDeleteInDatabase, providerParentIdsToDeleteInUnique, ignoredDirectoryIds } =
+      await this.getDirectoriesToRemove({
+        userProfileId,
+        microsoftDirectories,
+      });
+    await this.db
+      .delete(directories)
+      .where(
+        and(
+          eq(directories.userProfileId, userProfileId),
+          inArray(directories.id, idsToDeleteInDatabase),
+        ),
+      )
+      .execute();
 
     await this.db
       .update(directories)
       .set({ ignoreForSync: true })
-      .where(inArray(directories.id, directoryIdsToMarkAsIgnored));
+      .where(
+        and(
+          eq(directories.userProfileId, userProfileId),
+          inArray(directories.id, ignoredDirectoryIds),
+        ),
+      )
+      .execute();
+
+    await this.db
+      .update(directories)
+      .set({ ignoreForSync: false })
+      .where(
+        and(
+          eq(directories.userProfileId, userProfileId),
+          not(inArray(directories.id, ignoredDirectoryIds)),
+        ),
+      )
+      .execute();
 
     const rootScope = await this.uniqueApi.scopes.getByExternalId(
       getRootScopeExternalId(providerUserId),
@@ -169,6 +193,7 @@ export class SyncDirectoriesForSubscriptionCommand {
     }
 
     for (const providerDirectoryId of providerParentIdsToDeleteInUnique) {
+      // TODO: check if we can avoid the scopeId and pass a record<string, stirng>
       const contentIds = await this.uniqueApi.files.getIdsByScopeAndMetadataKey(
         rootScope.id,
         'parentFolderId',
@@ -188,7 +213,7 @@ export class SyncDirectoriesForSubscriptionCommand {
     microsoftDirectories: GraphOutlookDirectory[];
   }): Promise<{
     idsToDeleteInDatabase: string[];
-    directoryIdsToMarkAsIgnored: string[];
+    ignoredDirectoryIds: string[];
     providerParentIdsToDeleteInUnique: string[];
   }> {
     const collectIdsRecurive = (directories: GraphOutlookDirectory[]): string[] => {
@@ -206,28 +231,31 @@ export class SyncDirectoriesForSubscriptionCommand {
         item.internalType === USER_DIRECTORY_TYPE &&
         !currentDirectories.has(item.providerDirectoryId),
     );
-    let queue = databaseDirectories.filter((item) =>
-      SystemDirectoriesIgnoredForSync.includes(item.internalType),
-    );
 
     const providerParentIdsToDeleteInUnique = toDeleteInDatabase.map(
       (item) => item.providerDirectoryId,
     );
 
-    const directoryIdsToMarkAsIgnored = [];
+    const ignoredDirectoryIds = [];
 
-    while (queue.length) {
-      providerParentIdsToDeleteInUnique.push(...queue.map((item) => item.providerDirectoryId));
-      const parentIdsToIgnore = queue.map((item) => item.id);
-      queue = databaseDirectories.filter(
+    let directoriesIgnoredForSync = databaseDirectories.filter((item) =>
+      SystemDirectoriesIgnoredForSync.includes(item.internalType),
+    );
+
+    while (directoriesIgnoredForSync.length) {
+      providerParentIdsToDeleteInUnique.push(
+        ...directoriesIgnoredForSync.map((item) => item.providerDirectoryId),
+      );
+      const parentIdsToIgnore = directoriesIgnoredForSync.map((item) => item.id);
+      directoriesIgnoredForSync = databaseDirectories.filter(
         (item) => item.parentId && parentIdsToIgnore.includes(item.parentId),
       );
-      directoryIdsToMarkAsIgnored.push(...parentIdsToIgnore);
+      ignoredDirectoryIds.push(...parentIdsToIgnore);
     }
 
     return {
-      idsToDeleteInDatabase: toDeleteInDatabase.map((item) => item.id),
-      directoryIdsToMarkAsIgnored,
+      idsToDeleteInDatabase: toDeleteInDatabase.map(prop('id')),
+      ignoredDirectoryIds,
       providerParentIdsToDeleteInUnique,
     };
   }
