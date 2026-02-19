@@ -289,7 +289,7 @@ importers:
         specifier: ^11.1.6
         version: 11.1.6(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
       '@nestjs/schedule':
-        specifier: ^6.1.0
+        specifier: ^6.0.0
         version: 6.1.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
       '@opentelemetry/api':
         specifier: ^1.9.0
@@ -310,7 +310,7 @@ importers:
         specifier: ^2.19.5
         version: 2.19.5
       cron:
-        specifier: ^4.3.5
+        specifier: ^4.3.0
         version: 4.3.5
       js-yaml:
         specifier: ^4.1.0
