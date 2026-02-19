@@ -32,7 +32,7 @@ function createDispatcherResponse(statusCode: number, body: object): Dispatcher.
 }
 
 const externalConfig: UniqueAuthConfig = {
-  mode: 'external',
+  serviceAuthMode: 'external',
   zitadelOauthTokenUrl: 'https://zitadel.example.com/oauth/v2/token',
   zitadelClientId: 'client-id',
   zitadelClientSecret: 'client-secret',
@@ -40,9 +40,9 @@ const externalConfig: UniqueAuthConfig = {
 };
 
 const clusterLocalConfig: UniqueAuthConfig = {
-  mode: 'cluster_local',
+  serviceAuthMode: 'cluster_local',
   serviceId: 'my-service',
-  extraHeaders: { 'x-custom': 'value' },
+  serviceExtraHeaders: { 'x-custom': 'value' },
 };
 
 describe('UniqueAuth', () => {

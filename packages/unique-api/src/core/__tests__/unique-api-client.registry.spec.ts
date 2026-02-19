@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { UniqueApiFeatureModuleOptions } from '../../config/unique-api-feature-module-options';
 import type { UniqueApiClient, UniqueApiClientFactory } from '../../types';
-import { UniqueApiFeatureModuleOptions } from '../config/for-feature-config';
 import { UniqueApiClientRegistryImpl } from '../unique-api-client.registry';
 
 function createMockClient(overrides?: Partial<UniqueApiClient>): UniqueApiClient {

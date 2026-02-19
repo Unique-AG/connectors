@@ -98,7 +98,10 @@ export class UniqueAuth implements UniqueAuthFacade {
 
       return tokenData.access_token;
     } catch (error) {
-      this.logger.error('Failed to acquire Unique API token from Zitadel', error);
+      this.logger.error({
+        msg: 'Failed to acquire Unique API token from Zitadel',
+        error,
+      });
       throw error;
     }
   }
