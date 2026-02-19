@@ -5,6 +5,7 @@ import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import { DirectoriesSync, directoriesSync } from '~/drizzle';
 import { DRIZZLE, DrizzleDatabase } from '~/drizzle/drizzle.module';
+import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
@@ -22,10 +23,14 @@ export class SyncDirectoriesCommand {
 
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
+    traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
     const { shouldSyncDirectories, deltaLink, syncStatsId } = await this.runDeltaQuery(
       userProfile.id,
     );
+    traceEvent('delta sync completed', {
+      should_sync_directories: shouldSyncDirectories,
+    });
     if (shouldSyncDirectories) {
       await this.syncDirectoriesForSubscriptionCommand.run(userProfileTypeId);
     }

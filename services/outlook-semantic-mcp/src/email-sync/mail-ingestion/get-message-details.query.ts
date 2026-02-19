@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import { traceAttrs } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { GraphMessageFields, graphMessageSchema } from './dtos/microsoft-graph.dtos';
 
@@ -11,6 +12,7 @@ export class GetMessageDetailsQuery {
 
   @Span()
   public async run({ userProfileId, messageId }: { userProfileId: string; messageId: string }) {
+    traceAttrs({ message_id: messageId });
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const messageRaw = await client
       .api(`me/messages/${messageId}`)

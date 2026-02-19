@@ -7,6 +7,7 @@ import { Span } from 'nestjs-otel';
 import { isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/drizzle';
+import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { getRootScopePath } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
@@ -40,6 +41,7 @@ export class FullSyncCommand {
 
   @Span()
   public async run(subscriptionId: string): Promise<void> {
+    traceAttrs({ subscription_id: subscriptionId });
     const { userProfile, subscription } =
       await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
     await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
@@ -64,6 +66,7 @@ export class FullSyncCommand {
       userProfileId: userProfile.id,
       filters,
     });
+    traceEvent('emails fetched', { count: allGraphEmails.length });
     const filesList = allGraphEmails.map((item) => ({
       key: getUniqueKeyForMessage(userProfile.email, item),
       url: item.webLink,
@@ -77,6 +80,12 @@ export class FullSyncCommand {
       INGESTION_SOURCE_KIND,
       INGESTION_SOURCE_NAME,
     );
+    traceEvent('file diff completed', {
+      new: filleDiffResponse.newFiles.length,
+      updated: filleDiffResponse.updatedFiles.length,
+      deleted: filleDiffResponse.deletedFiles.length,
+      moved: filleDiffResponse.movedFiles.length,
+    });
 
     const filesRecord = allGraphEmails.reduce<Record<string, FileDiffGraphMessage>>((acc, item) => {
       acc[getUniqueKeyForMessage(userProfile.email, item)] = item;

@@ -11,6 +11,7 @@ import {
   directoriesSync,
   SystemDirectoriesIgnoredForSync,
 } from '~/drizzle';
+import { traceAttrs } from '~/email-sync/tracing.utils';
 import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -35,6 +36,7 @@ export class SyncDirectoriesForSubscriptionCommand {
 
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
+    traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
     await this.createRootScopeCommand.run({
       userProfileEmail: userProfile.email,

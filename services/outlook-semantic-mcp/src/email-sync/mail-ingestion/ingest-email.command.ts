@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/drizzle';
+import { traceAttrs } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
@@ -36,6 +37,7 @@ export class IngestEmailCommand {
     userProfileId: string;
     messageId: string;
   }): Promise<void> {
+    traceAttrs({ user_profile_id: userProfileId, message_id: messageId });
     const userProfile = await this.db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });
