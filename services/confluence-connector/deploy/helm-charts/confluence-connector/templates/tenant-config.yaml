@@ -60,5 +60,14 @@ data:
       {{- if $tenant.processing.maxPagesToScan }}
       maxPagesToScan: {{ $tenant.processing.maxPagesToScan }}
       {{- end }}
+    # Ingestion Configuration
+    ingestion:
+      ingestionMode: {{ $tenant.ingestion.ingestionMode | quote }}
+      scopeId: {{ $tenant.ingestion.scopeId | quote }}
+      ingestFiles: {{ $tenant.ingestion.ingestFiles | quote }}
+      {{- if $tenant.ingestion.allowedFileExtensions }}
+      allowedFileExtensions:
+        {{- toYaml $tenant.ingestion.allowedFileExtensions | nindent 8 }}
+      {{- end }}
   {{- end }}
 {{- end }}

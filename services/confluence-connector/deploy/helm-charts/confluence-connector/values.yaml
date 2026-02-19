@@ -171,3 +171,16 @@ connectorConfig:
         scanIntervalCron: "*/15 * * * *"
         # -- maximum number of pages to scan per run (null/empty for unlimited, useful for testing)
         # maxPagesToScan: 100
+
+      ingestion:
+        # -- Ingestion traversal mode: flat or recursive
+        ingestionMode: flat
+        # -- Root scope ID for ingestion
+        scopeId: unset_default_value
+        # -- Whether file attachment ingestion is enabled (enabled/disabled)
+        ingestFiles: enabled
+        # -- File extensions to ingest (required when ingestFiles is enabled)
+        allowedFileExtensions:
+          - pdf
+          - docx
+          - xlsx

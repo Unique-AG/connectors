@@ -6,6 +6,7 @@ import { load } from 'js-yaml';
 import { isPlainObject } from 'remeda';
 import { z } from 'zod';
 import { ConfluenceConfigSchema } from './confluence.schema';
+import { IngestionConfigSchema } from './ingestion.schema';
 import { ProcessingConfigSchema } from './processing.schema';
 import { UniqueConfigSchema } from './unique.schema';
 
@@ -28,6 +29,7 @@ const TenantConfigSchema = z.object({
   confluence: ConfluenceConfigSchema,
   unique: UniqueConfigSchema,
   processing: ProcessingConfigSchema,
+  ingestion: IngestionConfigSchema,
 });
 export type TenantConfig = z.infer<typeof TenantConfigSchema>;
 
