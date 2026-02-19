@@ -16,6 +16,7 @@ export interface FileDiffResult {
   newPageIds: string[];
   updatedPageIds: string[];
   deletedPageIds: string[];
+  deletedKeys: string[];
   movedPageIds: string[];
 }
 
