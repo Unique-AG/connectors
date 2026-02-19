@@ -24,7 +24,7 @@ export class UniqueAuth implements UniqueAuthFacade {
     }
 
     assert.strictEqual(
-      this.config.mode,
+      this.config.serviceAuthMode,
       'external',
       'getToken() called but auth mode is not "external"',
     );
@@ -40,10 +40,10 @@ export class UniqueAuth implements UniqueAuthFacade {
   }
 
   public async getAuthHeaders(): Promise<Record<string, string>> {
-    if (this.config.mode === 'cluster_local') {
+    if (this.config.serviceAuthMode === 'cluster_local') {
       return {
         'x-service-id': this.config.serviceId,
-        ...this.config.extraHeaders,
+        ...this.config.serviceExtraHeaders,
       };
     }
     const token = await this.getToken();

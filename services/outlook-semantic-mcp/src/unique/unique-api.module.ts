@@ -18,25 +18,8 @@ const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANT
   imports: [ConfigModule],
   inject: [uniqueConfig.KEY],
   useFactory: (config: UniqueConfig): UniqueApiFeatureModuleInputOptions => {
-    let auth: UniqueApiFeatureModuleInputOptions['auth'];
-    if (config.serviceAuthMode === 'external') {
-      auth = {
-        mode: 'external',
-        zitadelOauthTokenUrl: config.zitadelOauthTokenUrl,
-        zitadelClientId: config.zitadelClientId,
-        zitadelClientSecret: config.zitadelClientSecret,
-        zitadelProjectId: config.zitadelProjectId,
-      };
-    } else {
-      auth = {
-        mode: 'cluster_local',
-        extraHeaders: config.serviceExtraHeaders,
-        serviceId: config.serviceId,
-      };
-    }
-
     return {
-      auth,
+      auth: config,
       ingestion: { baseUrl: config.ingestionServiceBaseUrl },
       scopeManagment: { baseUrl: config.scopeManagementServiceBaseUrl },
     };

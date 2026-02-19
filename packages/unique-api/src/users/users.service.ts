@@ -11,11 +11,12 @@ import {
 } from './users.queries';
 import type { SimpleUser } from './users.types';
 
+const BATCH_SIZE = 100;
+
 export class UsersService implements UniqueUsersFacade {
   public constructor(
     private readonly scopeManagementClient: UniqueGraphqlClient,
     private readonly logger: Logger,
-    private readonly options: { defaultBatchSize: number },
   ) {}
 
   public async listAll(): Promise<SimpleUser[]> {
@@ -31,7 +32,7 @@ export class UsersService implements UniqueUsersFacade {
         ListUsersQueryInput
       >(LIST_USERS_QUERY, {
         skip,
-        take: this.options.defaultBatchSize,
+        take: BATCH_SIZE,
         where: {
           active: {
             equals: true,
@@ -40,8 +41,8 @@ export class UsersService implements UniqueUsersFacade {
       });
       users.push(...batchResult.listUsers.nodes.map(pick(['id', 'email'])));
       batchCount = batchResult.listUsers.nodes.length;
-      skip += this.options.defaultBatchSize;
-    } while (batchCount === this.options.defaultBatchSize);
+      skip += BATCH_SIZE;
+    } while (batchCount === BATCH_SIZE);
 
     return users;
   }

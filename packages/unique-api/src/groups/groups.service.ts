@@ -24,11 +24,12 @@ import {
 import type { Group, GroupWithMembers } from './groups.types';
 import { UniqueGroupsFacade } from './unique-groups.facade';
 
+const BATCH_SIZE = 100;
+
 export class GroupsService implements UniqueGroupsFacade {
   public constructor(
     private readonly scopeManagementClient: UniqueGraphqlClient,
     private readonly logger: Logger,
-    private readonly options: { defaultBatchSize: number },
   ) {}
 
   public async listByExternalIdPrefix(externalIdPrefix: string): Promise<GroupWithMembers[]> {
@@ -51,7 +52,7 @@ export class GroupsService implements UniqueGroupsFacade {
           },
         },
         skip,
-        take: this.options.defaultBatchSize,
+        take: BATCH_SIZE,
       });
       groups.push(
         ...batchResult.listGroups.map((group) => ({
@@ -60,8 +61,8 @@ export class GroupsService implements UniqueGroupsFacade {
         })),
       );
       batchCount = batchResult.listGroups.length;
-      skip += this.options.defaultBatchSize;
-    } while (batchCount === this.options.defaultBatchSize);
+      skip += BATCH_SIZE;
+    } while (batchCount === BATCH_SIZE);
 
     return groups;
   }

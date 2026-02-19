@@ -25,11 +25,12 @@ import {
 import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
 import { UniqueApiScopes } from './unique-scopes.facade';
 
+const BATCH_SIZE = 100;
+
 export class ScopesService implements UniqueApiScopes {
   public constructor(
     private readonly scopeManagementClient: UniqueGraphqlClient,
     private readonly logger: Logger,
-    private readonly options: { defaultBatchSize: number },
   ) {}
 
   public async createFromPaths(
@@ -49,7 +50,7 @@ export class ScopesService implements UniqueApiScopes {
 
     const allScopes = await processInBatches({
       items: paths,
-      batchSize: this.options.defaultBatchSize,
+      batchSize: BATCH_SIZE,
       processor: async (batch) => {
         const variables: GenerateScopesBasedOnPathsMutationInput = {
           paths: batch,
@@ -152,7 +153,7 @@ export class ScopesService implements UniqueApiScopes {
         PaginatedScopeQueryInput
       >(PAGINATED_SCOPE_QUERY, {
         skip,
-        take: this.options.defaultBatchSize,
+        take: BATCH_SIZE,
         where: {
           parentId: {
             equals: parentId,
@@ -161,8 +162,8 @@ export class ScopesService implements UniqueApiScopes {
       });
       scopes.push(...batchResult.paginatedScope.nodes);
       batchCount = batchResult.paginatedScope.nodes.length;
-      skip += this.options.defaultBatchSize;
-    } while (batchCount === this.options.defaultBatchSize);
+      skip += BATCH_SIZE;
+    } while (batchCount === BATCH_SIZE);
 
     return scopes;
   }

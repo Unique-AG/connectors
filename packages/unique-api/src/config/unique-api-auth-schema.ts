@@ -2,10 +2,10 @@ import { z } from 'zod/v4';
 
 // ==== Config for local in-cluster communication with Unique API services ====
 const authClusterLocalConfig = z.object({
-  mode: z
+  serviceAuthMode: z
     .literal('cluster_local')
     .describe('Authentication mode to use for accessing Unique API services'),
-  extraHeaders: z
+  serviceExtraHeaders: z
     .record(z.string(), z.string())
     .refine(
       (headers) => {
@@ -27,7 +27,7 @@ const authClusterLocalConfig = z.object({
 
 // ==== Config for external communication with Unique API services via app key ====
 const authExternalConfig = z.object({
-  mode: z
+  serviceAuthMode: z
     .literal('external')
     .describe('Authentication mode to use for accessing Unique API services'),
   zitadelOauthTokenUrl: z.string().describe(`Zitadel oauth token url`),
@@ -37,7 +37,7 @@ const authExternalConfig = z.object({
 });
 // ==== Config common for both cluster_local and external authentication modes ====
 
-export const UniqueAuthSchema = z.discriminatedUnion('mode', [
+export const UniqueAuthSchema = z.discriminatedUnion('serviceAuthMode', [
   authClusterLocalConfig,
   authExternalConfig,
 ]);

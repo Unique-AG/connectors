@@ -76,20 +76,13 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       // Scope management was moved to ingestion.
       ingestionClient,
       this.logger,
-      {
-        defaultBatchSize: config.scopeManagment.batchSize,
-      },
     );
 
     const files = new FilesService(ingestionClient, this.logger);
 
-    const users = new UsersService(scopeManagementClient, this.logger, {
-      defaultBatchSize: config.users.batchSize,
-    });
+    const users = new UsersService(scopeManagementClient, this.logger);
 
-    const groups = new GroupsService(scopeManagementClient, this.logger, {
-      defaultBatchSize: config.users.batchSize,
-    });
+    const groups = new GroupsService(scopeManagementClient, this.logger);
 
     const ingestion = new FileIngestionService(
       ingestionClient,

@@ -3,12 +3,6 @@ import { Dispatcher } from 'undici';
 import { z } from 'zod/v4';
 import { UniqueAuthSchema } from './unique-api-auth-schema';
 
-const serviceDefaults = z.object({
-  batchSize: z.number().optional().prefault(100),
-});
-
-const optionalServiceDefaults = serviceDefaults.prefault({ batchSize: 100 });
-
 export const uniqueApiFeatureModuleOptionsSchema = z.object({
   auth: UniqueAuthSchema,
   dispatcher: z
@@ -19,16 +13,12 @@ export const uniqueApiFeatureModuleOptionsSchema = z.object({
     ),
   scopeManagment: z.object({
     rateLimitPerMinute: z.number().prefault(1000),
-    batchSize: z.number().prefault(100),
     baseUrl: z.string().describe('Base URL for Unique scope management service'),
   }),
   ingestion: z.object({
     rateLimitPerMinute: z.number().prefault(1000),
-    batchSize: z.number().prefault(100),
     baseUrl: z.string().describe('Base URL for Unique ingestion service'),
   }),
-  users: optionalServiceDefaults,
-  groups: optionalServiceDefaults,
   metadata: z
     .object({
       clientName: z.string().optional(),
