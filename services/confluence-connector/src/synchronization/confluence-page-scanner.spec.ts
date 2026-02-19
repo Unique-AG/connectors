@@ -265,6 +265,28 @@ describe('ConfluencePageScanner', () => {
     );
   });
 
+  it('deduplicates pages that appear in both the CQL scan and child expansion', async () => {
+    const tenant = createTenant('dedup-tenant');
+    const parent = makePage('parent', { labels: ['ai-ingest-all'] });
+    const labeledChild = makePage('labeled-child', { labels: ['ai-ingest'] });
+
+    const apiClient = {
+      searchPagesByLabel: vi.fn().mockResolvedValue([parent, labeledChild]),
+      getChildPages: vi.fn().mockImplementation(async (parentId: string) => {
+        if (parentId === 'parent') return [labeledChild];
+        return [];
+      }),
+      buildPageWebUrl: vi.fn(
+        (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
+      ),
+    };
+
+    const scanner = createScanner(tenant, apiClient);
+    const result = await scanner.discoverPages();
+
+    expect(result.map((page) => page.id)).toEqual(['parent', 'labeled-child']);
+  });
+
   it('continues discovery when child fetching fails for one parent', async () => {
     const tenant = createTenant('error-tenant');
     const failingParent = makePage('failing-parent', { labels: ['ai-ingest-all'] });
