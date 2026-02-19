@@ -21,7 +21,7 @@ const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANT
     return {
       auth: config,
       ingestion: { baseUrl: config.ingestionServiceBaseUrl },
-      scopeManagment: { baseUrl: config.scopeManagementServiceBaseUrl },
+      scopeManagement: { baseUrl: config.scopeManagementServiceBaseUrl },
     };
   },
 });

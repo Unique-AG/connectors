@@ -15,7 +15,7 @@ const authClusterLocalConfig = z.object({
       },
       {
         message: 'Must contain x-company-id and x-user-id headers',
-        path: ['extraHeaders'],
+        path: ['serviceExtraHeaders'],
       },
     )
     .describe(

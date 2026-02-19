@@ -11,7 +11,7 @@ export const uniqueApiFeatureModuleOptionsSchema = z.object({
     .describe(
       `Custom provided dispatcher in case you need to change the default implementation of the dispatcher`,
     ),
-  scopeManagment: z.object({
+  scopeManagement: z.object({
     rateLimitPerMinute: z.number().prefault(1000),
     baseUrl: z
       .string()

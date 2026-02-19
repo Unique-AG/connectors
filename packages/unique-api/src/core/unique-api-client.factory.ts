@@ -39,8 +39,8 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       this.bottleneckFactory,
       {
         target: 'scopeManagement',
-        baseUrl: config.scopeManagment.baseUrl,
-        rateLimitPerMinute: config.scopeManagment.rateLimitPerMinute,
+        baseUrl: config.scopeManagement.baseUrl,
+        rateLimitPerMinute: config.scopeManagement.rateLimitPerMinute,
         clientName: config.metadata.clientName,
       },
     );
