@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.1.0...sharepoint-connector@2.1.1) (2026-02-16)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** resolve externalId conflict when folders move within a drive ([#274](https://github.com/Unique-AG/connectors/issues/274)) ([98d44fd](https://github.com/Unique-AG/connectors/commit/98d44fd346191d69096d8966be65f365fb0e657d))
+
 ## [2.1.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.0.0...sharepoint-connector@2.1.0) (2026-02-09)
 
 
