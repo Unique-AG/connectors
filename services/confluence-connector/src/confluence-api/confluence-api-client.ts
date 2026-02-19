@@ -39,7 +39,11 @@ export class ConfluenceApiClient {
   }
 
   public async searchPagesByLabel(): Promise<ConfluencePage[]> {
-    const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND (space.type=global OR space.type=collaboration) AND type != attachment`;
+    const spaceTypeFilter =
+      this.config.instanceType === 'cloud'
+        ? '(space.type=global OR space.type=collaboration)'
+        : 'space.type=global';
+    const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
     const initialUrl = this.adapter.buildSearchUrl(cql, SEARCH_PAGE_SIZE, 0);
     return paginateAll<ConfluencePage>(initialUrl, this.config.baseUrl, (url) =>
       this.makeRateLimitedRequest(url),
