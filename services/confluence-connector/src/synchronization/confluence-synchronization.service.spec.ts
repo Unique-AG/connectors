@@ -111,26 +111,18 @@ describe('ConfluenceSynchronizationService', () => {
       expect(mockContentFetcher.fetchPagesContent).toHaveBeenCalledWith(discoveredPagesFixture);
 
       const discoverLog = mockTenantLogger.info.mock.calls.find(
-        (call) => call[1] === 'Discovery completed',
+        (call) => typeof call[1] === 'string' && call[1].startsWith('Discovery completed'),
       );
       expect(discoverLog).toBeDefined();
-      expect(discoverLog?.[0]).toMatchObject({
-        count: discoveredPagesFixture.length,
-        pages: expect.any(String),
-      });
-      const discoverPages = JSON.parse(discoverLog![0].pages as string) as DiscoveredPage[];
-      expect(discoverPages).toContainEqual(expect.objectContaining({ id: '1' }));
+      expect(discoverLog?.[0]).toMatchObject({ count: discoveredPagesFixture.length });
+      expect(discoverLog?.[1]).toContain('"id": "1"');
 
       const fetchLog = mockTenantLogger.info.mock.calls.find(
-        (call) => call[1] === 'Fetching completed',
+        (call) => typeof call[1] === 'string' && call[1].startsWith('Fetching completed'),
       );
       expect(fetchLog).toBeDefined();
-      expect(fetchLog?.[0]).toMatchObject({
-        count: fetchedPagesFixture.length,
-        pages: expect.any(String),
-      });
-      const fetchPages = JSON.parse(fetchLog![0].pages as string) as FetchedPage[];
-      expect(fetchPages).toContainEqual(expect.objectContaining({ id: '1' }));
+      expect(fetchLog?.[0]).toMatchObject({ count: fetchedPagesFixture.length });
+      expect(fetchLog?.[1]).toContain('"id": "1"');
 
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync completed');
     });
