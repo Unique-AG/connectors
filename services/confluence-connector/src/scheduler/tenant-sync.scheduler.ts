@@ -65,15 +65,15 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
   private async syncTenant(tenant: TenantContext): Promise<void> {
     await this.tenantRegistry.run(tenant, async () => {
       const logger = this.serviceRegistry.getServiceLogger(TenantSyncScheduler);
-      const confluenceSyncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
-      
+      const syncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
+
       if (this.isShuttingDown) {
         logger.info('Skipping sync due to shutdown');
         return;
       }
 
       try {
-        await confluenceSyncService.synchronize();
+        await syncService.synchronize();
       } catch (error) {
         logger.error({
           msg: 'Unexpected sync error',
