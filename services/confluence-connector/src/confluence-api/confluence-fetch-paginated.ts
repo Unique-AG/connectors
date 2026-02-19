@@ -1,6 +1,6 @@
 import type { PaginatedResponse } from './types/confluence-api.types';
 
-export async function paginateAll<T>(
+export async function fetchAllPaginated<T>(
   initialUrl: string,
   baseUrl: string,
   httpGet: <R>(url: string) => Promise<R>,

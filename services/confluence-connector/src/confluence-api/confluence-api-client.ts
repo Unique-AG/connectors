@@ -8,7 +8,7 @@ import type { ServiceRegistry } from '../tenant/service-registry';
 import { handleErrorStatus } from '../utils/http-util';
 import { sanitizeError } from '../utils/normalize-error';
 import type { ConfluenceApiAdapter } from './confluence-api-adapter';
-import { paginateAll } from './paginate';
+import { fetchAllPaginated } from './confluence-fetch-paginated';
 import type { ConfluencePage, ContentType } from './types/confluence-api.types';
 
 const SEARCH_PAGE_SIZE = 25;
@@ -44,8 +44,9 @@ export class ConfluenceApiClient {
         ? '(space.type=global OR space.type=collaboration)'
         : 'space.type=global';
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
+
     const initialUrl = this.adapter.buildSearchUrl(cql, SEARCH_PAGE_SIZE, 0);
-    return paginateAll<ConfluencePage>(initialUrl, this.config.baseUrl, (url) =>
+    return fetchAllPaginated<ConfluencePage>(initialUrl, this.config.baseUrl, (url) =>
       this.makeRateLimitedRequest(url),
     );
   }
@@ -88,7 +89,7 @@ export class ConfluenceApiClient {
     const remaining = headers['x-ratelimit-remaining'];
     const limit = headers['x-ratelimit-limit'];
     if (remaining !== undefined || limit !== undefined) {
-      this.logger.warn({
+      this.logger.info({
         msg: 'Confluence rate limit headers',
         'x-ratelimit-remaining': remaining,
         'x-ratelimit-limit': limit,
@@ -99,7 +100,7 @@ export class ConfluenceApiClient {
   private setupThrottlingMonitoring(): void {
     this.limiter.on('depleted', (empty) => {
       if (empty) {
-        this.logger.warn('Confluence API: Rate limit reservoir depleted - queuing requests');
+        this.logger.info('Confluence API: Rate limit reservoir depleted - queuing requests');
       }
     });
 
