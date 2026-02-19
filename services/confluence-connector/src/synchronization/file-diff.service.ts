@@ -6,9 +6,8 @@ import { getSourceKind, IngestFiles } from '../constants/ingestion.constants';
 import type { ServiceRegistry } from '../tenant';
 import type { FileDiffItem, FileDiffResponse } from '../unique-api/types/ingestion.types';
 import { UniqueApiClient } from '../unique-api/types/unique-api-client.types';
+import { parseHrefs, stripQueryAndFragment } from '../utils/html-link-parser';
 import type { DiscoveredPage, FileDiffResult } from './sync.types';
-
-const HREF_REGEX = /href=["']([^"']*)["']/g;
 
 export class FileDiffService {
   private readonly uniqueApiClient: UniqueApiClient;
@@ -79,18 +78,18 @@ export class FileDiffService {
   }
 
   private extractLinkedFileItems(page: DiscoveredPage, htmlBody: string): FileDiffItem[] {
-    const hrefs = this.parseHrefs(htmlBody);
+    const hrefs = parseHrefs(htmlBody);
     const allowedExtensions = this.ingestionConfig.allowedFileExtensions ?? [];
 
     return hrefs
       .filter((href) => {
-        const cleanUrl = this.stripQueryAndFragment(href);
+        const cleanUrl = stripQueryAndFragment(href);
         const extension = cleanUrl.split('.').pop()?.toLowerCase();
         return extension !== undefined && allowedExtensions.includes(extension);
       })
       .map((href) => {
         const absoluteUrl = new URL(href, this.confluenceConfig.baseUrl).toString();
-        const cleanUrl = this.stripQueryAndFragment(href);
+        const cleanUrl = stripQueryAndFragment(href);
         const filename = cleanUrl.split('/').pop() ?? href;
         return {
           key: `${page.id}_${filename}`,
@@ -98,22 +97,6 @@ export class FileDiffService {
           updatedAt: page.versionTimestamp,
         };
       });
-  }
-
-  private parseHrefs(html: string): string[] {
-    const matches = html.matchAll(HREF_REGEX);
-    const seen = new Set<string>();
-    const hrefs: string[] = [];
-
-    for (const match of matches) {
-      const href = match[1];
-      if (href && !seen.has(href)) {
-        seen.add(href);
-        hrefs.push(href);
-      }
-    }
-
-    return hrefs;
   }
 
   private validateNoAccidentalFullDeletion(
@@ -165,16 +148,6 @@ export class FileDiffService {
       pageIds.add(underscoreIndex === -1 ? key : key.substring(0, underscoreIndex));
     }
     return [...pageIds];
-  }
-
-  private stripQueryAndFragment(url: string): string {
-    const queryIndex = url.indexOf('?');
-    const fragmentIndex = url.indexOf('#');
-    const endIndex = Math.min(
-      queryIndex === -1 ? url.length : queryIndex,
-      fragmentIndex === -1 ? url.length : fragmentIndex,
-    );
-    return url.substring(0, endIndex);
   }
 
   private isFileIngestionEnabled(): boolean {

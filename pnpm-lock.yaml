@@ -419,6 +419,9 @@ importers:
       nestjs-pino:
         specifier: ^4.4.0
         version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
+      p-limit:
+        specifier: ^2.3.0
+        version: 2.3.0
       pino:
         specifier: ^10.3.1
         version: 10.3.1

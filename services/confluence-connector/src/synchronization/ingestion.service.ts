@@ -4,43 +4,21 @@ import type pino from 'pino';
 import { request } from 'undici';
 import type { ConfluenceConfig } from '../config';
 import type { IngestionConfig } from '../config/ingestion.schema';
-import { getSourceKind } from '../constants/ingestion.constants';
+import {
+  DEFAULT_MIME_TYPE,
+  getSourceKind,
+  MIME_TYPES,
+  OWNER_TYPE,
+  SOURCE_OWNER_TYPE,
+} from '../constants/ingestion.constants';
 import type { ServiceRegistry } from '../tenant';
 import type {
   ContentRegistrationRequest,
-  IngestionApiResponse,
   IngestionFinalizationRequest,
 } from '../unique-api/types/ingestion.types';
 import { UniqueApiClient } from '../unique-api/types/unique-api-client.types';
 import { sanitizeError } from '../utils/normalize-error';
 import type { FetchedPage } from './sync.types';
-
-const OWNER_TYPE = 'SCOPE';
-const SOURCE_OWNER_TYPE = 'COMPANY';
-
-const MIME_TYPES: Record<string, string> = {
-  pdf: 'application/pdf',
-  doc: 'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xls: 'application/vnd.ms-excel',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  ppt: 'application/vnd.ms-powerpoint',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  txt: 'text/plain',
-  csv: 'text/csv',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  svg: 'image/svg+xml',
-  zip: 'application/zip',
-  xml: 'application/xml',
-  json: 'application/json',
-  html: 'text/html',
-  htm: 'text/html',
-};
-
-const DEFAULT_MIME_TYPE = 'application/octet-stream';
 
 export class IngestionService {
   private readonly uniqueApiClient: UniqueApiClient;
@@ -81,7 +59,7 @@ export class IngestionService {
 
       const finalizationRequest = this.buildFinalizationRequest(
         registrationRequest,
-        registrationResponse,
+        registrationResponse.readUrl,
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
 
@@ -117,7 +95,7 @@ export class IngestionService {
 
         const finalizationRequest = this.buildFinalizationRequest(
           registrationRequest,
-          registrationResponse,
+          registrationResponse.readUrl,
         );
         await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
 
@@ -213,7 +191,7 @@ export class IngestionService {
 
   private buildFinalizationRequest(
     registration: ContentRegistrationRequest,
-    response: IngestionApiResponse,
+    readUrl: string,
   ): IngestionFinalizationRequest {
     return {
       key: registration.key,
@@ -225,7 +203,7 @@ export class IngestionService {
       sourceOwnerType: registration.sourceOwnerType,
       sourceName: registration.sourceName,
       sourceKind: registration.sourceKind,
-      fileUrl: response.readUrl,
+      fileUrl: readUrl,
       url: registration.url,
       baseUrl: registration.baseUrl,
       metadata: registration.metadata,
