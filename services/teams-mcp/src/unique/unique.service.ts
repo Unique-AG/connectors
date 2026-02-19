@@ -132,7 +132,7 @@ export class UniqueService {
         mimeType: 'text/vtt',
         title: meeting.subject || 'Untitled Meeting',
         byteSize: 1,
-        metadata: this.buildContentMetadata(meeting),
+        metadata: this.buildContentMetadata(meeting, [...participants.map((p) => p.id), owner.id]),
       },
     });
 
@@ -175,7 +175,7 @@ export class UniqueService {
             ingestionConfig: {
               uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
             },
-            metadata: this.buildContentMetadata(meeting),
+            metadata: this.buildContentMetadata(meeting, [...participants.map((p) => p.id), owner.id]),
           },
         });
         await this.contentService.uploadToStorage(
@@ -237,11 +237,16 @@ export class UniqueService {
 
   private buildContentMetadata(
     meeting: { startDateTime: Date; contentCorrelationId: string; participants: { name: string; email: string }[] },
+    participantIds: string[],
   ): Record<string, string> {
     const metadata: Record<string, string> = {
       date: meeting.startDateTime.toISOString(),
       content_correlation_id: meeting.contentCorrelationId,
     };
+
+    if (participantIds.length > 0) {
+      metadata.participant_user_profile_ids = participantIds.join(',');
+    }
 
     // Filter out empty names/emails before joining
     const names = meeting.participants.map((p) => p.name).filter(Boolean);

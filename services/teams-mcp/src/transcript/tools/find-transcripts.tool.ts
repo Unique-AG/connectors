@@ -161,7 +161,7 @@ export class FindTranscriptsTool {
 
   private buildSearchRequest(
     rootScopeId: string,
-    _userProfileId: string,
+    userProfileId: string,
     input: z.infer<typeof FindTranscriptsInputSchema>,
   ): PublicSearchRequest {
     const conditions: MetadataFilter[] = [
@@ -177,7 +177,12 @@ export class FindTranscriptsTool {
         operator: UniqueQLOperator.EQUALS,
         value: 'text/vtt',
       },
-      // NOTE: Permission are enforced by KB assignments, no need to add additional filter here
+      // User filter: only return transcripts from meetings the user participated in
+      {
+        path: ['metadata', 'participant_user_profile_ids'],
+        operator: UniqueQLOperator.CONTAINS,
+        value: userProfileId,
+      },
     ];
 
     if (input.subject) {
