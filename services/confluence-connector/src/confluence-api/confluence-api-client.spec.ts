@@ -288,7 +288,7 @@ describe('ConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
           msg: 'Confluence rate limit headers',
           'x-ratelimit-remaining': '50',
