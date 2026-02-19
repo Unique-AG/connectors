@@ -153,6 +153,7 @@ export class FileDiffService {
       newPageIds: this.extractPageIds(diffResponse.newFiles),
       updatedPageIds: this.extractPageIds(diffResponse.updatedFiles),
       deletedPageIds: this.extractPageIds(diffResponse.deletedFiles),
+      deletedKeys: [...diffResponse.deletedFiles],
       movedPageIds: this.extractPageIds(diffResponse.movedFiles),
     };
   }
