@@ -16,11 +16,11 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@proventuslabs/nestjs-zod": "^2.0.0",
     "@unique-ag/utils": "workspace:*",
     "bottleneck": "^2.19.5",
     "graphql": "^16.11.0",
     "graphql-request": "^7.2.0",
-    "@proventuslabs/nestjs-zod": "^2.0.0",
     "remeda": "^2.32.0",
     "undici": "^7.18.2",
     "zod": "^4.1.5"

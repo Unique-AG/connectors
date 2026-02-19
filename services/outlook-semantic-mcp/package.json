@@ -37,8 +37,8 @@
     "@nestjs/core": "^11.1.6",
     "@nestjs/event-emitter": "^3.0.1",
     "@nestjs/platform-express": "^11.1.6",
-    "@nestjs/swagger": "^11.2.0",
     "@nestjs/schedule": "^6.0.0",
+    "@nestjs/swagger": "^11.2.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/instrumentation-pg": "^0.58.0",
     "@proventuslabs/nestjs-zod": "^2.0.0",
@@ -64,12 +64,12 @@
     "passport-microsoft": "^2.1.0",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
+    "remeda": "^2.32.0",
     "rxjs": "^7.8.2",
     "serialize-error-cjs": "^0.2.0",
     "typeid-js": "^1.2.0",
-    "zod": "^4.1.5",
-    "remeda": "^2.32.0",
-    "undici": "^7.18.2"
+    "undici": "^7.18.2",
+    "zod": "^4.1.5"
   },
   "devDependencies": {
     "@microsoft/microsoft-graph-types": "^2.40.0",
