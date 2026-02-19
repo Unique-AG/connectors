@@ -40,7 +40,7 @@ export interface IngestionFinalizationRequest {
   title: string;
   mimeType: string;
   ownerType: string;
-  byteSize: number;
+  byteSize?: number;
   scopeId: string;
   sourceOwnerType: string;
   sourceName: string;

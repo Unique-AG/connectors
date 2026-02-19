@@ -4,7 +4,7 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNullish, isNullish } from 'remeda';
+import { isNonNullish, isNullish, omit } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/drizzle';
 import { traceAttrs } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -136,16 +136,14 @@ export class IngestEmailCommand {
       .header(`Prefer`, `IdType="ImmutableId"`)
       .getStream();
     const contentStream = responseUntyped as ReadableStream<Uint8Array<ArrayBuffer>>;
-    const { byteSize } = await this.uploadFileForIngestionCommand.run({
+    await this.uploadFileForIngestionCommand.run({
       uploadUrl: content.writeUrl,
       content: contentStream,
       mimeType: createContentRequest.mimeType,
     });
-    this.logger.log(`Stream Upload finished: ${content.id}, byteSize: ${byteSize}`);
 
     await this.uniqueApi.ingestion.finalizeIngestion({
-      ...createContentRequest,
-      byteSize: byteSize,
+      ...omit(createContentRequest, ['byteSize']),
       fileUrl: content.readUrl,
       url: content.readUrl,
       baseUrl: graphMessage.webLink,

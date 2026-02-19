@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Readable } from 'node:stream';
 import { UniqueConfig } from '~/config';
 import { HttpClientService } from '~/http-client/http-client.service';
 
@@ -15,22 +14,12 @@ export class UploadFileForIngestionCommand {
     private readonly httpClientService: HttpClientService,
   ) {}
 
-  public async run({ uploadUrl, content, mimeType }: UploadFileForIngestionInput): Promise<{
-    byteSize: number;
-  }> {
+  public async run({ uploadUrl, content, mimeType }: UploadFileForIngestionInput): Promise<void> {
     const url = new URL(this.correctWriteUrl(uploadUrl));
     const path = `${url.pathname}${url.search}`;
 
-    let byteSize = 0;
-
-    const outputStream = content.pipeThrough(
-      new TransformStream({
-        transform: (chunk, controller) => {
-          byteSize += chunk.length;
-          controller.enqueue(chunk);
-        },
-      }),
-    );
+    // TODO: Understand why this works because it seems the unidici library makes the request
+    // than node-ingestion returns 500 than unidici does a retry and the retry succeds.
     await this.httpClientService.request({
       method: 'PUT',
       path,
@@ -39,14 +28,12 @@ export class UploadFileForIngestionCommand {
         'Content-Type': mimeType || 'application/octet-stream',
         'x-ms-blob-type': 'BlockBlob',
       },
-      body: Readable.from(outputStream),
-      // @ts-expect-error: this is nodejs fetch and requires `half` to be specified as per fetch WHATWG
-      // and nodejs types get merged with browser types which do not have such property
-      // - see https://undici.nodejs.org/#/?id=requestduplex
+      // @ts-expect-error: The type of content is supported it's a ReadableStream but somehow he confuses
+      // the node types with the browser types. The body has to be a ReadableStream and not a Readable
+      // from node for the upload to work.
+      body: content,
       duplex: 'half',
     });
-
-    return { byteSize };
   }
 
   // HACK:
