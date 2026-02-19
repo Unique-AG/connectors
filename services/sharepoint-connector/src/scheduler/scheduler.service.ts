@@ -5,7 +5,6 @@ import { CronJob } from 'cron';
 import { Config } from '../config';
 import { SharepointSynchronizationService } from '../sharepoint-synchronization/sharepoint-synchronization.service';
 import { sanitizeError } from '../utils/normalize-error';
-
 @Injectable()
 export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);

@@ -7,9 +7,7 @@ export class HttpClientService {
   private readonly httpAgent: Dispatcher;
 
   public constructor(private readonly proxyService: ProxyService) {
-    const baseDispatcher = this.proxyService.getDispatcher({
-      mode: 'for-external-only',
-    });
+    const baseDispatcher = this.proxyService.getDispatcher({ mode: 'for-external-only' });
     this.httpAgent = baseDispatcher.compose([interceptors.retry(), interceptors.redirect()]);
   }
 

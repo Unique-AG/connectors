@@ -94,9 +94,7 @@ export class SubscriptionCreateService {
     });
 
     if (existingSubscription) {
-      span?.addEvent('found managed subscription', {
-        id: existingSubscription.id,
-      });
+      span?.addEvent('found managed subscription', { id: existingSubscription.id });
       this.logger.debug(
         { id: existingSubscription.id },
         'Located existing managed subscription in database',
