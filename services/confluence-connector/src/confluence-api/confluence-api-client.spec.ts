@@ -165,6 +165,49 @@ describe('ConfluenceApiClient', () => {
         0,
       );
     });
+
+    it('uses only global spaces for data-center', async () => {
+      client = new ConfluenceApiClient(
+        adapter,
+        makeConfig({ instanceType: 'data-center' }),
+        makeServiceRegistry(),
+      );
+      vi.mocked(request).mockResolvedValueOnce(
+        mockUndiciResponse(200, { results: [], _links: {} }),
+      );
+
+      await client.searchPagesByLabel();
+
+      expect(adapter.buildSearchUrl).toHaveBeenCalledWith(
+        expect.stringContaining('space.type=global'),
+        25,
+        0,
+      );
+      expect(adapter.buildSearchUrl).not.toHaveBeenCalledWith(
+        expect.stringContaining('space.type=collaboration'),
+        25,
+        0,
+      );
+    });
+
+    it('includes collaboration spaces for cloud', async () => {
+      client = new ConfluenceApiClient(
+        adapter,
+        makeConfig({ instanceType: 'cloud' }),
+        makeServiceRegistry(),
+      );
+      vi.mocked(request).mockResolvedValueOnce(
+        mockUndiciResponse(200, { results: [], _links: {} }),
+      );
+
+      await client.searchPagesByLabel();
+
+      expect(adapter.buildSearchUrl).toHaveBeenCalledWith(
+        expect.stringContaining('space.type=collaboration'),
+        25,
+        0,
+      );
+    });
   });
 
   describe('getPageById', () => {
