@@ -16,10 +16,10 @@ data:
         mode: {{ $tenant.confluence.auth.mode | quote }}
         {{- if eq $tenant.confluence.auth.mode "oauth_2lo" }}
         clientId: {{ $tenant.confluence.auth.clientId | quote }}
-        # clientSecret is loaded from environment variable (secret)
+        clientSecret: "os.environ/CONFLUENCE_CLIENT_SECRET"
         {{- end }}
         {{- if eq $tenant.confluence.auth.mode "pat" }}
-        # token is loaded from environment variable (secret)
+        token: "os.environ/CONFLUENCE_PAT"
         {{- end }}
       apiRateLimitPerMinute: {{ $tenant.confluence.apiRateLimitPerMinute }}
       ingestSingleLabel: {{ $tenant.confluence.ingestSingleLabel | quote }}
@@ -37,7 +37,7 @@ data:
       zitadelOauthTokenUrl: {{ $tenant.unique.zitadel.oauthTokenUrl | quote }}
       zitadelProjectId: {{ $tenant.unique.zitadel.projectId | quote }}
       zitadelClientId: {{ $tenant.unique.zitadel.clientId | quote }}
-      # zitadelClientSecret is loaded from environment variable (secret)
+      zitadelClientSecret: "os.environ/ZITADEL_CLIENT_SECRET"
       {{- end }}
       ingestionServiceBaseUrl: {{ $tenant.unique.ingestionServiceBaseUrl | quote }}
       scopeManagementServiceBaseUrl: {{ $tenant.unique.scopeManagementServiceBaseUrl | quote }}

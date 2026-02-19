@@ -4,7 +4,7 @@
 # where authentication uses OAuth 2.0 two-legged (2LO), and the Unique platform
 # is accessed within the same Kubernetes cluster using service headers.
 #
-# Secrets are injected from environment variables at startup:
+# Secrets are resolved from environment variables at startup via "os.environ/VAR_NAME" references:
 #   - CONFLUENCE_CLIENT_SECRET -> confluence.auth.clientSecret
 
 confluence:
@@ -13,7 +13,7 @@ confluence:
   auth:
     mode: oauth_2lo
     clientId: your-confluence-app-client-id
-    # clientSecret: injected from CONFLUENCE_CLIENT_SECRET env var
+    clientSecret: os.environ/CONFLUENCE_CLIENT_SECRET
   apiRateLimitPerMinute: 50
   ingestSingleLabel: ai-ingest
   ingestAllLabel: ai-ingest-all

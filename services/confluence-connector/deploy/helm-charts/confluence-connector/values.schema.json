@@ -159,7 +159,7 @@
                   "baseUrl": {
                     "type": "string",
                     "description": "Confluence base URL",
-                    "examples": ["https://acme.atlassian.net/wiki", "https://confluence.acme.com"]
+                    "examples": ["https://acme.atlassian.net", "https://confluence.acme.com"]
                   },
                   "auth": {
                     "type": "object",
