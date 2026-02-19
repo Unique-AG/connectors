@@ -3,6 +3,7 @@ import { defaultLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
+import { UniqueApiModule } from '@unique-ag/unique-api';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -31,8 +32,8 @@ import {
   microsoftConfig,
   uniqueConfig,
 } from './config';
-import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
-import { SubscriptionModule } from './email-sync/subscriptions/subscription.module';
+import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
+import { MailSubscriptionModule } from './email-sync/mail-subscription.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
@@ -137,7 +138,13 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     MsGraphModule,
     AMQPModule,
-    SubscriptionModule,
+    UniqueApiModule.forRoot({
+      observability: {
+        metricPrefix: 'spc_unique',
+        loggerContext: 'UniqueApi',
+      },
+    }),
+    MailSubscriptionModule,
   ],
   controllers: [ManifestController],
   providers: [

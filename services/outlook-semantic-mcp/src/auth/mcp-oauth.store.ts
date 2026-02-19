@@ -13,16 +13,15 @@ import {
 import { Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { eq, lt } from 'drizzle-orm';
-import { serializeError } from 'serialize-error-cjs';
 import { typeid } from 'typeid-js';
-import { DrizzleDatabase } from '../drizzle/drizzle.module';
+import { DrizzleDatabase } from '../db/drizzle.module';
 import {
   authorizationCodes,
   oauthClients,
   oauthSessions,
   tokens,
   userProfiles,
-} from '../drizzle/schema';
+} from '../db/schema';
 import {
   fromDrizzleAuthCodeRow,
   fromDrizzleOAuthClientRow,
@@ -31,7 +30,6 @@ import {
   toDrizzleOAuthClientInsert,
   toDrizzleSessionInsert,
 } from '../utils/case-converter';
-import { normalizeError } from '../utils/normalize-error';
 
 export class McpOAuthStore implements IOAuthStore {
   private readonly logger = new Logger(this.constructor.name);
@@ -102,11 +100,13 @@ export class McpOAuthStore implements IOAuthStore {
     try {
       await this.drizzle.delete(authorizationCodes).where(eq(authorizationCodes.code, code));
     } catch (error) {
-      this.logger.warn({
-        message: 'Failed to delete expired authorization code from database',
-        error: serializeError(normalizeError(error)),
-        operation: 'cleanup_auth_code',
-      });
+      this.logger.warn(
+        {
+          message: 'Failed to delete expired authorization code from database',
+          operation: 'cleanup_auth_code',
+        },
+        error,
+      );
     }
   }
 
@@ -132,11 +132,13 @@ export class McpOAuthStore implements IOAuthStore {
     try {
       await this.drizzle.delete(oauthSessions).where(eq(oauthSessions.sessionId, sessionId));
     } catch (error) {
-      this.logger.warn({
-        message: 'Failed to delete expired OAuth session from database',
-        error: serializeError(normalizeError(error)),
-        operation: 'cleanup_oauth_session',
-      });
+      this.logger.warn(
+        {
+          message: 'Failed to delete expired OAuth session from database',
+          operation: 'cleanup_oauth_session',
+        },
+        error,
+      );
     }
   }
 

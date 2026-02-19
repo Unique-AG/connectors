@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TraceService } from 'nestjs-otel';
 import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';
+import { traceAttrs } from '~/email-sync/tracing.utils';
 import type { Redacted } from '~/utils/redacted';
 
 @Injectable()
@@ -11,7 +11,6 @@ export class MailSubscriptionUtilsService {
 
   public constructor(
     private readonly config: ConfigService<AppConfigNamespaced & MicrosoftConfigNamespaced, true>,
-    private readonly trace: TraceService,
   ) {}
 
   public isWebhookTrustedViaState(state: Redacted<string> | null): boolean {
@@ -25,8 +24,7 @@ export class MailSubscriptionUtilsService {
       { isTrusted, hasState: state !== null },
       'Validating webhook authenticity using client state verification',
     );
-    const span = this.trace.getSpan();
-    span?.setAttribute('is_trusted', isTrusted);
+    traceAttrs({ is_trusted: isTrusted });
 
     return isTrusted;
   }
@@ -35,7 +33,9 @@ export class MailSubscriptionUtilsService {
     notificationUrl: URL;
     lifecycleNotificationUrl: URL;
   } {
-    const publicWebhookUrl = this.config.get('microsoft.publicWebhookUrl', { infer: true });
+    const publicWebhookUrl = this.config.get('microsoft.publicWebhookUrl', {
+      infer: true,
+    });
 
     const notificationUrl = new URL(
       path.join(publicWebhookUrl.pathname, 'mail-subscription/notification'),

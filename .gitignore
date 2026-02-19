@@ -4,6 +4,7 @@
 node_modules
 .pnp
 .pnp.js
+.pnpm-store
 deno.lock
 
 # Local env files
@@ -61,3 +62,7 @@ services/**/src/tenant-configs/*
 
 # Nix
 result
+
+# Zed config
+.zed
+.claude/

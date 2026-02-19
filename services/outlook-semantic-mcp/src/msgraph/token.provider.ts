@@ -6,10 +6,8 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { serializeError } from 'serialize-error-cjs';
-import { DrizzleDatabase } from '../drizzle/drizzle.module';
-import { userProfiles } from '../drizzle/schema';
-import { normalizeError } from '../utils/normalize-error';
+import { DrizzleDatabase } from '../db/drizzle.module';
+import { userProfiles } from '../db/schema';
 
 export class TokenProvider implements AuthenticationProvider {
   private readonly logger = new Logger(TokenProvider.name);
@@ -93,16 +91,14 @@ export class TokenProvider implements AuthenticationProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        this.logger.error(
-          {
-            status: response.status,
-            errorText,
-            userProfileId: this.userProfileId,
-            tokenRefreshFailed: true,
-            errorSource: 'microsoft_graph_api',
-          },
-          'Microsoft Graph API rejected token refresh request',
-        );
+        this.logger.error({
+          msg: 'Microsoft Graph API rejected token refresh request',
+          status: response.status,
+          errorText,
+          userProfileId: this.userProfileId,
+          tokenRefreshFailed: true,
+          errorSource: 'microsoft_graph_api',
+        });
         assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
@@ -133,15 +129,13 @@ export class TokenProvider implements AuthenticationProvider {
       );
       return tokenData.access_token;
     } catch (error) {
-      this.logger.error(
-        {
-          userProfileId: this.userProfileId,
-          error: serializeError(normalizeError(error)),
-          tokenRefreshFailed: true,
-          errorSource: 'microsoft_graph_api',
-        },
-        'Failed to refresh Microsoft Graph API access token for user',
-      );
+      this.logger.error({
+        msg: 'Failed to refresh Microsoft Graph API access token for user',
+        userProfileId: this.userProfileId,
+        tokenRefreshFailed: true,
+        errorSource: 'microsoft_graph_api',
+        error,
+      });
       throw new Error(
         `Token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );

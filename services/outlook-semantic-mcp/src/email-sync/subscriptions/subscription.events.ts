@@ -1,12 +1,10 @@
 import z from 'zod/v4';
-import { typeid } from '~/utils/zod';
 
 // SECTION - Lifecycle events
-
-const SubscriptionRequestedEvent = {
-  type: 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-requested',
-  schema: z.object({ userProfileId: typeid('user_profile') }),
-} as const;
+const SubscriptionCreatedEvent = {
+  type: 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created',
+  schema: z.object({ subscriptionId: z.string() }),
+};
 
 const SubscriptionRemovedEvent = {
   type: 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-removed',
@@ -24,35 +22,10 @@ const ReauthorizationRequiredEvent = {
 } as const;
 
 export const lifecycle = {
-  SubscriptionRequestedEvent,
   SubscriptionRemovedEvent,
+  SubscriptionCreatedEvent,
   MissedEvent,
   ReauthorizationRequiredEvent,
 } as const;
 
 // !SECTION - Lifecycle events
-
-// SECTION - Change events
-
-const CreatedEvent = {
-  type: 'unique.outlook-semantic-mcp.mail.change-notification.created',
-  schema: z.object({ subscriptionId: z.string(), resource: z.string() }),
-} as const;
-
-const UpdatedEvent = {
-  type: 'unique.outlook-semantic-mcp.mail.change-notification.updated',
-  schema: z.object({ subscriptionId: z.string(), resource: z.string() }),
-} as const;
-
-const DeletedEvent = {
-  type: 'unique.outlook-semantic-mcp.mail.change-notification.deleted',
-  schema: z.object({ subscriptionId: z.string(), resource: z.string() }),
-} as const;
-
-export const change = {
-  CreatedEvent,
-  UpdatedEvent,
-  DeletedEvent,
-} as const;
-
-// !SECTION - Change events
