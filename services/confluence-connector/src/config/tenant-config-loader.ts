@@ -109,12 +109,12 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
         continue;
       }
 
+      const config = TenantConfigSchema.parse(rawConfig);
+
       if (status === TenantStatus.INACTIVE) {
         logger.log(`Tenant '${entry.name}' is inactive, skipping`);
         continue;
       }
-
-      const config = TenantConfigSchema.parse(rawConfig);
 
       activeConfigs.push({ name: entry.name, config });
     } catch (error) {
