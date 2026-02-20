@@ -157,20 +157,15 @@ export class ChangeNotificationCollectionDto extends createZodDto(ChangeNotifica
 /**
  * See docs on {@link https://learn.microsoft.com/en-us/graph/change-notifications-lifecycle-events?tabs=http#structure-of-a-lifecycle-notification structure of a lifecycle notification}.
  */
-export const LifecycleChangeNotification = z
-  .object({
-    subscriptionId: z.string(),
-    subscriptionExpirationDateTime: isoDatetimeToDate({ offset: true }),
-    organizationId: z.string(), // NOTE: this would be the tenantId, but API returns it as organizationId
-    clientState: redacted(z.string()).nullable(),
-    resourceData: ChangeNotificationResourceData.nullish(),
-    encryptedContent: ChangeNotificationEncryptedContent.nullish(),
-    lifecycleEvent: LifecycleEventType,
-  })
-  .transform((values) => ({
-    ...values,
-    tenantId: values.organizationId,
-  }));
+export const LifecycleChangeNotification = z.object({
+  subscriptionId: z.string(),
+  subscriptionExpirationDateTime: isoDatetimeToDate({ offset: true }),
+  tenantId: z.string(),
+  clientState: redacted(z.string()).nullable(),
+  resourceData: ChangeNotificationResourceData.nullish(),
+  encryptedContent: ChangeNotificationEncryptedContent.nullish(),
+  lifecycleEvent: LifecycleEventType,
+});
 export type LifecycleChangeNotification = z.infer<typeof LifecycleChangeNotification>;
 
 /**
