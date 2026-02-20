@@ -186,8 +186,9 @@ mcpConfig:
     apiBaseUrl: unset_default_value
     # -- The Public API version to use
     apiVersion: "2023-12-06"
-    # -- The root scope path where to upload transcripts and recordings
-    rootScopePath: Teams-MCP
+    # -- The root scope ID under which to create transcript and recording folders
+    # @default -- (required)
+    rootScopeId: ""
     # -- Concurrency limit for fetching users when resolving scope accesses
     userFetchConcurrency: 5
 

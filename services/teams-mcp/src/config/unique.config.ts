@@ -63,10 +63,10 @@ const baseConfig = z.object({
     .string()
     .default('2023-12-06')
     .describe('The Public API version to use (maps to `x-api-version`).'),
-  rootScopePath: z
+  rootScopeId: z
     .string()
-    .default('Teams-MCP')
-    .describe('The root scope path where to upload transcripts and recordings.'),
+    .min(1, 'rootScopeId cannot be empty')
+    .describe('The root scope ID under which to create transcript and recording folders.'),
   userFetchConcurrency: z.coerce
     .number()
     .int()
