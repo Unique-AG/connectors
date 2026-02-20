@@ -15,7 +15,7 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
 import { SyncDirectoriesCommand } from '../directories-sync/sync-directories.command';
 import { GetSubscriptionAndUserProfileQuery } from '../user-utils/get-subscription-and-user-profile.query';
-import { MessageEventDto } from './dtos/messag-event.dto';
+import { MessageEventDto } from './dtos/message-event.dto';
 import {
   FileDiffGraphMessage,
   FileDiffGraphMessageFields,

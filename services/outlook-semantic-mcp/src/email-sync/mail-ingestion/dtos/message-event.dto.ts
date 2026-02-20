@@ -13,7 +13,6 @@ const FullSyncMessageChanged = z.object({
   }),
 });
 
-// TODO: rename file
 export const MessageEventDto = z.discriminatedUnion('type', [
   SubscriptionMessageChanged,
   FullSyncMessageChanged,

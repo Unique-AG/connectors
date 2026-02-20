@@ -1,4 +1,5 @@
 import { Module, Provider } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
@@ -20,6 +21,7 @@ const QUERIES: Provider[] = [GetMessageDetailsQuery];
 
 @Module({
   imports: [
+    ConfigModule,
     DrizzleModule,
     MsGraphModule,
     SubscriptionUtilsModule,

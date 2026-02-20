@@ -4,9 +4,9 @@ import {
   UniqueApiModule,
 } from '@unique-ag/unique-api';
 import { Inject, Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { HttpClientModule, HttpClientService } from '~/http-client/http-client.service';
-import { UniqueConfig, uniqueConfig } from '../config';
+import { UniqueConfigNamespaced } from '../config';
 import { UploadFileForIngestionCommand } from './upload-file-for-ingestion.command';
 
 const OUTLOOK_SEMANTIC_MCP_TOKEN_NAME = 'outlook-semantic-mcp';
@@ -16,12 +16,15 @@ export const InjectUniqueApi = () =>
 
 const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANTIC_MCP_TOKEN_NAME, {
   imports: [ConfigModule],
-  inject: [uniqueConfig.KEY],
-  useFactory: (config: UniqueConfig): UniqueApiFeatureModuleInputOptions => {
+  inject: [ConfigService],
+  useFactory: (
+    configService: ConfigService<UniqueConfigNamespaced, true>,
+  ): UniqueApiFeatureModuleInputOptions => {
+    const uniqueConfig = configService.get('unique', { infer: true });
     return {
-      auth: config,
-      ingestion: { baseUrl: config.ingestionServiceBaseUrl },
-      scopeManagement: { baseUrl: config.scopeManagementServiceBaseUrl },
+      auth: uniqueConfig,
+      ingestion: { baseUrl: uniqueConfig.ingestionServiceBaseUrl },
+      scopeManagement: { baseUrl: uniqueConfig.scopeManagementServiceBaseUrl },
     };
   },
 });
@@ -30,13 +33,16 @@ const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANT
   imports: [ConfigModule, UNIQUE_API_FEATURE_MODULE, HttpClientModule],
   providers: [
     {
-      inject: [uniqueConfig.KEY, HttpClientService],
+      inject: [ConfigService, HttpClientService],
       provide: UploadFileForIngestionCommand,
       useFactory: (
-        config: UniqueConfig,
+        configService: ConfigService<UniqueConfigNamespaced, true>,
         service: HttpClientService,
       ): UploadFileForIngestionCommand => {
-        return new UploadFileForIngestionCommand(config, service);
+        return new UploadFileForIngestionCommand(
+          configService.get('unique', { infer: true }),
+          service,
+        );
       },
     },
   ],

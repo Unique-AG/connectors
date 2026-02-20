@@ -1,0 +1,1 @@
+ALTER TYPE "public"."directory_internal_type" ADD VALUE 'Unknown Directory: Created during email ingestion';

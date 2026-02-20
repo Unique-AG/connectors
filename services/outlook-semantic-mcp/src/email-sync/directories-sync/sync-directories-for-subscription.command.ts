@@ -1,7 +1,6 @@
-import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, inArray, not, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, not } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { prop } from 'remeda';
 import {
@@ -21,6 +20,7 @@ import { CreateRootScopeCommand } from './create-root-scope.command';
 import { FetchAllDirectoriesFromOutlookQuery } from './fetch-all-directories-from-outlook.query';
 import { GraphOutlookDirectory } from './microsoft-graph.dtos';
 import { SyncSystemDirectoriesForSubscriptionCommand } from './sync-system-driectories-for-subscription.command';
+import { UpsertDirectoryCommand } from './upsert-directory.command';
 
 const USER_DIRECTORY_TYPE: DirectoryType = 'User Defined Directory';
 
@@ -33,6 +33,7 @@ export class SyncDirectoriesForSubscriptionCommand {
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly syncSystemDirectoriesCommand: SyncSystemDirectoriesForSubscriptionCommand,
     private readonly createRootScopeCommand: CreateRootScopeCommand,
+    private readonly upsertDirectoryCommand: UpsertDirectoryCommand,
   ) {}
 
   @Span()
@@ -47,9 +48,10 @@ export class SyncDirectoriesForSubscriptionCommand {
     const totalDirectories = await this.db
       .select({ count: count() })
       .from(directories)
-      .where(eq(directories.userProfileId, userProfile.id));
+      .where(eq(directories.userProfileId, userProfile.id))
+      .execute();
 
-    // Normally it should not happen but we want to be sure we have the system directories correctly defined first.
+    // We only sync the system directories once.
     if (!totalDirectories.length || totalDirectories.at(0)?.count === 0) {
       await this.syncSystemDirectoriesCommand.run(userProfileTypeId);
     }
@@ -81,16 +83,18 @@ export class SyncDirectoriesForSubscriptionCommand {
     userProfileId: string;
     microsoftDirectories: GraphOutlookDirectory[];
   }): Promise<void> {
-    let queue: { directory: GraphOutlookDirectory; parentId: null | string }[] =
-      microsoftDirectories.map((directory) => ({
-        directory,
-        parentId: null,
-      }));
+    let currentDirectoriesToProcess: {
+      directory: GraphOutlookDirectory;
+      parentId: null | string;
+    }[] = microsoftDirectories.map((directory) => ({
+      directory,
+      parentId: null,
+    }));
 
-    while (queue.length) {
-      // TODO: Add comment on how this works.
+    // We traverse a graph from root level by level and upsert in our database the new nodes.
+    while (currentDirectoriesToProcess.length) {
       const nextQueue = await Promise.all(
-        queue.flatMap(({ parentId, directory }) =>
+        currentDirectoriesToProcess.flatMap(({ parentId, directory }) =>
           this.updateDirectory({
             userProfileId,
             parentId,
@@ -98,7 +102,7 @@ export class SyncDirectoriesForSubscriptionCommand {
           }),
         ),
       );
-      queue = nextQueue.flat();
+      currentDirectoriesToProcess = nextQueue.flat();
     }
   }
 
@@ -111,26 +115,12 @@ export class SyncDirectoriesForSubscriptionCommand {
     userProfileId: string;
     directory: GraphOutlookDirectory;
   }): Promise<{ parentId: string | null; directory: GraphOutlookDirectory }[]> {
-    const newDirectories = await this.db
-      .insert(directories)
-      .values({
-        userProfileId,
-        parentId,
-        displayName: directory.displayName,
-        internalType: USER_DIRECTORY_TYPE,
-        providerDirectoryId: directory.id,
-      })
-      .onConflictDoUpdate({
-        target: [directories.userProfileId, directories.providerDirectoryId],
-        set: {
-          parentId: sql.raw(`excluded.${directories.parentId.name}`),
-          displayName: sql.raw(`excluded.${directories.displayName.name}`),
-        },
-      })
-      .returning();
-
-    const newDirectory = newDirectories.at(0);
-    assert.ok(newDirectory, `Counld not create new directory`);
+    const newDirectory = await this.upsertDirectoryCommand.run({
+      parentId,
+      userProfileId,
+      directory: { ...directory, type: USER_DIRECTORY_TYPE },
+      updateOnConflict: true,
+    });
     return (
       directory.childFolders?.map((child) => ({
         parentId: newDirectory.id,

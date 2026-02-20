@@ -2,9 +2,11 @@ import assert from 'node:assert';
 import { UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish, omit } from 'remeda';
+import { UniqueConfigNamespaced } from '~/config';
 import { DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/db';
 import { traceAttrs } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -12,6 +14,7 @@ import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UploadFileForIngestionCommand } from '~/unique/upload-file-for-ingestion.command';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
+import { UpsertDirectoryCommand } from '../directories-sync/upsert-directory.command';
 import { GraphMessage } from './dtos/microsoft-graph.dtos';
 import { GetMessageDetailsQuery } from './get-message-details.query';
 import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
@@ -24,9 +27,11 @@ export class IngestEmailCommand {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
+    private readonly configService: ConfigService<UniqueConfigNamespaced, true>,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getMessageDetailsQuery: GetMessageDetailsQuery,
     private readonly uploadFileForIngestionCommand: UploadFileForIngestionCommand,
+    private readonly upsertDirectoryCommand: UpsertDirectoryCommand,
   ) {}
 
   @Span()
@@ -53,18 +58,26 @@ export class IngestEmailCommand {
     const files = await this.uniqueApi.files.getByKeys([fileKey]);
     const file = files.at(0);
 
-    const parentDirectory = await this.db.query.directories.findFirst({
+    let parentDirectory = await this.db.query.directories.findFirst({
       where: eq(directories.providerDirectoryId, graphMessage.parentFolderId),
     });
 
     if (isNullish(parentDirectory)) {
-      // TODO: Mark that we should run the folder sync even if delta query returns false in db on the next folder sync.
-      //
+      // If the directory is missing we upsert it but the type of directory is a special directory type
+      // which will force the directory sync scheduler to run a full sync.
+      parentDirectory = await this.upsertDirectoryCommand.run({
+        parentId: null,
+        userProfileId,
+        updateOnConflict: false,
+        directory: {
+          id: graphMessage.parentFolderId,
+          displayName: `__Unknown Directory Name__`,
+          type: 'Unknown Directory: Created during email ingestion',
+        },
+      });
     }
 
-    // Parent directory should exist because once he connects we run a full directory sync. If it's not there
-    // we thrust that the full sync will catch this email. TODO: Check with Michat if we should Throw error.
-    if (parentDirectory?.ignoreForSync) {
+    if (parentDirectory.ignoreForSync) {
       if (isNonNullish(file)) {
         await this.uniqueApi.files.delete(file.id);
       }
@@ -125,8 +138,7 @@ export class IngestEmailCommand {
       sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
-      // TODO: MAKE A CONFIG FOR THIS.
-      storeInternally: true,
+      storeInternally: this.configService.get('unique.storeInternally', { infer: true }),
     };
 
     const content = await this.uniqueApi.ingestion.registerContent(createContentRequest);

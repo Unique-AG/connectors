@@ -1,9 +1,9 @@
 import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNullish } from 'remeda';
-import { DirectoriesSync, directoriesSync } from '~/db';
+import { isNonNullish, isNullish } from 'remeda';
+import { DirectoriesSync, directories, directoriesSync } from '~/db';
 import { DRIZZLE, DrizzleDatabase } from '~/db/drizzle.module';
 import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -23,16 +23,16 @@ export class SyncDirectoriesCommand {
 
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
-    // TODO: check the mark for sync +
     traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
+    const shouldForceDirectoriesSync = await this.shouldForceDirectoriesSyncForUser(userProfile.id);
     const { shouldSyncDirectories, deltaLink, syncStatsId } = await this.runDeltaQuery(
       userProfile.id,
     );
     traceEvent('delta sync completed', {
       should_sync_directories: shouldSyncDirectories,
     });
-    if (shouldSyncDirectories) {
+    if (shouldSyncDirectories || shouldForceDirectoriesSync) {
       await this.syncDirectoriesForSubscriptionCommand.run(userProfileTypeId);
     }
     // We do not check the delta link because microsoft returns the same delta link as the current one.
@@ -94,6 +94,22 @@ export class SyncDirectoriesCommand {
       deltaLink: directroriesResponse['@odata.deltaLink'] ?? null,
       syncStatsId: syncStats.id,
     };
+  }
+
+  private async shouldForceDirectoriesSyncForUser(userProfileId: string): Promise<boolean> {
+    const syncDefinedDirectoryCondition = and(
+      eq(directories.userProfileId, userProfileId),
+      eq(directories.internalType, `Unknown Directory: Created during email ingestion`),
+    );
+    const directoryDefinedDuringIngestion = await this.db.query.directories.findFirst({
+      where: syncDefinedDirectoryCondition,
+    });
+    this.db
+      .update(directories)
+      .set({ internalType: 'User Defined Directory' })
+      .where(syncDefinedDirectoryCondition)
+      .execute();
+    return isNonNullish(directoryDefinedDuringIngestion);
   }
 
   private async findOrCreateStats(userProfileId: string): Promise<DirectoriesSync> {

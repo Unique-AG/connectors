@@ -12,6 +12,7 @@ import { SyncDirectoriesForSubscriptionCommand } from './sync-directories-for-su
 import { SyncDirectoriesForSubscriptionsCommand } from './sync-directories-for-subscriptions.command';
 import { SyncSystemDirectoriesForSubscriptionCommand } from './sync-system-driectories-for-subscription.command';
 import { RunDirectorySyncTool } from './tools/run-directory-sync.tool';
+import { UpsertDirectoryCommand } from './upsert-directory.command';
 
 const QUERIES = [FetchAllDirectoriesFromOutlookQuery];
 
@@ -21,7 +22,11 @@ const COMMANDS = [
   SyncDirectoriesForSubscriptionsCommand,
   CreateRootScopeCommand,
 ];
-const PUBLIC_COMMANDS = [SyncDirectoriesCommand, RemoveRootScopeAndDirectoriesCommand];
+const PUBLIC_COMMANDS = [
+  SyncDirectoriesCommand,
+  RemoveRootScopeAndDirectoriesCommand,
+  UpsertDirectoryCommand,
+];
 
 @Module({
   imports: [DrizzleModule, MsGraphModule, SubscriptionUtilsModule, UniqueApiFeatureModule],

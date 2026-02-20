@@ -5,6 +5,7 @@ import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 
 const directoryTypes = [
+  // Outlook system directories
   'Archive',
   'Deleted Items',
   'Drafts',
@@ -15,14 +16,22 @@ const directoryTypes = [
   'Conversation History',
   'Recoverable Items Deletions',
   'Clutter',
+  // Custom directories defined by the user in Outlook
   'User Defined Directory',
+  // Special directory type which we use during sync of emails. In case an email comes and
+  // it's not part of a directory which we know we will ingest the email and create the unknown
+  // directory in our database for that email.
+  'Unknown Directory: Created during email ingestion',
 ] as const;
 
 export const directoryType = pgEnum('directory_internal_type', directoryTypes);
 
 export type DirectoryType = (typeof directoryTypes)[number];
 
-export type SystemDirectoryType = Exclude<DirectoryType, 'User Defined Directory'>;
+export type SystemDirectoryType = Exclude<
+  DirectoryType,
+  'User Defined Directory' | 'Unknown Directory: Created during email ingestion'
+>;
 
 export const SystemDirectoriesIgnoredForSync: DirectoryType[] = [
   'Deleted Items',
