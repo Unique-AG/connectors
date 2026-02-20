@@ -27,7 +27,7 @@ export class UploadFileForIngestionCommand {
         // docs it should not work without the contentLength up front there is another request which we
         // can use to upload it in chunks properly without knowing the content length.
         'Content-Length': `${contentLength}`,
-        'Content-Type': mimeType,
+        'Content-Type': mimeType || 'application/octet-stream',
         'x-ms-blob-type': 'BlockBlob',
       },
       body: content,

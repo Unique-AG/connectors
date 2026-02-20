@@ -39,7 +39,7 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
-  ) { }
+  ) {}
 
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
@@ -106,6 +106,7 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
           parentId: sql.raw(`excluded.${directories.parentId.name}`),
           displayName: sql.raw(`excluded.${directories.displayName.name}`),
         },
-      }).execute();
+      })
+      .execute();
   }
 }

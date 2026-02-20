@@ -37,7 +37,6 @@ export const SystemDirectoriesIgnoredForSync: DirectoryType[] = [
   'Deleted Items',
   'Junk Email',
   'Recoverable Items Deletions',
-  'Clutter',
 ];
 
 export type Directory = typeof directories.$inferSelect;
