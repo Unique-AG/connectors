@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.4...teams-mcp@0.2.5) (2026-02-20)
+
+
+### Features
+
+* **teams-mcp:** add semantic transcript search with reference support ([#254](https://github.com/Unique-AG/connectors/issues/254)) ([d5a05e0](https://github.com/Unique-AG/connectors/commit/d5a05e0d7f6357dae26d900a88eb008868f52bf9))
+
 ## [0.2.4](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.3...teams-mcp@0.2.4) (2026-02-12)
 
 
