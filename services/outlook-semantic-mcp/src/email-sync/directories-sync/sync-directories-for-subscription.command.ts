@@ -148,6 +148,8 @@ export class SyncDirectoriesForSubscriptionCommand {
       .where(
         and(
           eq(directories.userProfileId, userProfileId),
+          // This condition is already enforced but we double enforce it on the delete statement.
+          eq(directories.internalType, 'User Defined Directory'),
           inArray(directories.id, idsToDeleteInDatabase),
         ),
       )
@@ -202,8 +204,12 @@ export class SyncDirectoriesForSubscriptionCommand {
     userProfileId: string;
     microsoftDirectories: GraphOutlookDirectory[];
   }): Promise<{
+    // User defined directories which should be deleted in database.
     idsToDeleteInDatabase: string[];
+    // All directories under the deleted items and other folders like junk email.
     ignoredDirectoryIds: string[];
+    // All user defined directories which should be deleted in database or ignored for sync are here
+    // basically we have to check them in unique.
     providerParentIdsToDeleteInUnique: string[];
   }> {
     const collectIdsRecurive = (directories: GraphOutlookDirectory[]): string[] => {
@@ -218,6 +224,7 @@ export class SyncDirectoriesForSubscriptionCommand {
     });
     const toDeleteInDatabase = databaseDirectories.filter(
       (item) =>
+        // We only delete user defined directories
         item.internalType === USER_DIRECTORY_TYPE &&
         !currentDirectories.has(item.providerDirectoryId),
     );
@@ -234,7 +241,7 @@ export class SyncDirectoriesForSubscriptionCommand {
 
     while (directoriesIgnoredForSync.length) {
       providerParentIdsToDeleteInUnique.push(
-        ...directoriesIgnoredForSync.map((item) => item.providerDirectoryId),
+        ...directoriesIgnoredForSync.map(prop('providerDirectoryId')),
       );
       const parentIdsToIgnore = directoriesIgnoredForSync.map((item) => item.id);
       directoriesIgnoredForSync = databaseDirectories.filter(

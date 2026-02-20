@@ -1,37 +1,39 @@
 import assert from 'node:assert';
-import { UniqueConfig } from '~/config';
-import { HttpClientService } from '~/http-client/http-client.service';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { UniqueConfigNamespaced } from '~/config';
 
 export interface UploadFileForIngestionInput {
   uploadUrl: string;
+  contentLength: number;
   content: ReadableStream;
   mimeType: string;
 }
 
+@Injectable()
 export class UploadFileForIngestionCommand {
-  public constructor(
-    private readonly uniqueConfig: UniqueConfig,
-    private readonly httpClientService: HttpClientService,
-  ) {}
+  public constructor(private configService: ConfigService<UniqueConfigNamespaced, true>) {}
 
-  public async run({ uploadUrl, content, mimeType }: UploadFileForIngestionInput): Promise<void> {
-    const url = new URL(this.correctWriteUrl(uploadUrl));
-    const path = `${url.pathname}${url.search}`;
-
-    // TODO: Understand why this works because it seems the unidici library makes the request
-    // than node-ingestion returns 500 than unidici does a retry and the retry succeds.
-    await this.httpClientService.request({
+  public async run({
+    uploadUrl,
+    contentLength,
+    content,
+    mimeType,
+  }: UploadFileForIngestionInput): Promise<void> {
+    await fetch(this.correctWriteUrl(uploadUrl), {
       method: 'PUT',
-      path,
-      origin: url.origin,
       headers: {
-        'Content-Type': mimeType || 'application/octet-stream',
+        // TODO: Check why this works in Teams-MCP without the content length because it seems from azure
+        // docs it should not work without the contentLength up front there is another request which we
+        // can use to upload it in chunks properly without knowing the content length.
+        'Content-Length': `${contentLength}`,
+        'Content-Type': mimeType,
         'x-ms-blob-type': 'BlockBlob',
       },
+      body: content,
       // @ts-expect-error: The type of content is supported it's a ReadableStream but somehow he confuses
       // the node types with the browser types. The body has to be a ReadableStream and not a Readable
       // from node for the upload to work.
-      body: content,
       duplex: 'half',
     });
   }
@@ -44,12 +46,13 @@ export class UploadFileForIngestionCommand {
   // writeUrl configurable, but for now this hack lets us avoid hairpinning issues in the internal
   // upload flows.
   private correctWriteUrl(writeUrl: string): string {
-    if (this.uniqueConfig.serviceAuthMode === 'external') {
+    const uniqueConfig = this.configService.get('unique', { infer: true });
+    if (uniqueConfig.serviceAuthMode === 'external') {
       return writeUrl;
     }
     const url = new URL(writeUrl);
     const key = url.searchParams.get('key');
     assert.ok(key, 'writeUrl is missing key parameter');
-    return `${this.uniqueConfig.ingestionServiceBaseUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
+    return `${uniqueConfig.ingestionServiceBaseUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
   }
 }

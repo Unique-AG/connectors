@@ -145,13 +145,11 @@ export class IngestEmailCommand {
 
     this.logger.log(`Register content finished: ${content.id}`);
 
-    const responseUntyped = await client
-      .api(`me/messages/${messageId}/$value`)
-      .header(`Prefer`, `IdType="ImmutableId"`)
-      .getStream();
-    const contentStream = responseUntyped as ReadableStream<Uint8Array<ArrayBuffer>>;
+    const contentLength = await this.getContentLength({ messageId, client });
+    const contentStream = await this.getEmlFileStrem({ messageId, client });
     await this.uploadFileForIngestionCommand.run({
       uploadUrl: content.writeUrl,
+      contentLength,
       content: contentStream,
       mimeType: createContentRequest.mimeType,
     });
@@ -163,5 +161,34 @@ export class IngestEmailCommand {
       baseUrl: graphMessage.webLink,
     });
     this.logger.log(`Ingestion finished: ${content.id}`);
+  }
+
+  private async getContentLength({
+    messageId,
+    client,
+  }: {
+    messageId: string;
+    client: Client;
+  }): Promise<number> {
+    const emlFileStream = await this.getEmlFileStrem({ messageId, client });
+    // We read the chunks because the api fails concistenly without it.
+    let contentLength = 0;
+    for await (const chunk of emlFileStream) {
+      contentLength += chunk.length;
+    }
+    return contentLength;
+  }
+
+  private async getEmlFileStrem({
+    messageId,
+    client,
+  }: {
+    messageId: string;
+    client: Client;
+  }): Promise<ReadableStream<Uint8Array<ArrayBuffer>>> {
+    return (await client
+      .api(`me/messages/${messageId}/$value`)
+      .header(`Prefer`, `IdType="ImmutableId"`)
+      .getStream()) as Promise<ReadableStream<Uint8Array<ArrayBuffer>>>;
   }
 }

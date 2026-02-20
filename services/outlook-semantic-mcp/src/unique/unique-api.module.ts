@@ -5,7 +5,6 @@ import {
 } from '@unique-ag/unique-api';
 import { Inject, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { HttpClientModule, HttpClientService } from '~/http-client/http-client.service';
 import { UniqueConfigNamespaced } from '../config';
 import { UploadFileForIngestionCommand } from './upload-file-for-ingestion.command';
 
@@ -30,22 +29,8 @@ const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANT
 });
 
 @Module({
-  imports: [ConfigModule, UNIQUE_API_FEATURE_MODULE, HttpClientModule],
-  providers: [
-    {
-      inject: [ConfigService, HttpClientService],
-      provide: UploadFileForIngestionCommand,
-      useFactory: (
-        configService: ConfigService<UniqueConfigNamespaced, true>,
-        service: HttpClientService,
-      ): UploadFileForIngestionCommand => {
-        return new UploadFileForIngestionCommand(
-          configService.get('unique', { infer: true }),
-          service,
-        );
-      },
-    },
-  ],
+  imports: [ConfigModule, UNIQUE_API_FEATURE_MODULE],
+  providers: [UploadFileForIngestionCommand],
   exports: [UNIQUE_API_FEATURE_MODULE, UploadFileForIngestionCommand],
 })
 export class UniqueApiFeatureModule {}
