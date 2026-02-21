@@ -8,8 +8,8 @@ import { DirectorySyncSchedulerService } from './directories-sync-scheduler.serv
 import { FetchAllDirectoriesFromOutlookQuery } from './fetch-all-directories-from-outlook.query';
 import { RemoveRootScopeAndDirectoriesCommand } from './remove-root-scope-and-directories.command';
 import { SyncDirectoriesCommand } from './sync-directories.command';
-import { SyncDirectoriesForSubscriptionCommand } from './sync-directories-for-subscription.command';
 import { SyncDirectoriesForSubscriptionsCommand } from './sync-directories-for-subscriptions.command';
+import { SyncDirectoriesForUserProfileCommand } from './sync-directories-for-user-profile.command';
 import { SyncSystemDirectoriesForSubscriptionCommand } from './sync-system-driectories-for-subscription.command';
 import { RunDirectorySyncTool } from './tools/run-directory-sync.tool';
 import { UpsertDirectoryCommand } from './upsert-directory.command';
@@ -17,7 +17,7 @@ import { UpsertDirectoryCommand } from './upsert-directory.command';
 const QUERIES = [FetchAllDirectoriesFromOutlookQuery];
 
 const COMMANDS = [
-  SyncDirectoriesForSubscriptionCommand,
+  SyncDirectoriesForUserProfileCommand,
   SyncSystemDirectoriesForSubscriptionCommand,
   SyncDirectoriesForSubscriptionsCommand,
   CreateRootScopeCommand,

@@ -1,5 +1,6 @@
 import assert from 'node:assert';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Attributes } from '@opentelemetry/api';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish } from 'remeda';
@@ -10,30 +11,67 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 import { graphOutlookDirectoriesDeltaResponse } from './microsoft-graph.dtos';
-import { SyncDirectoriesForSubscriptionCommand } from './sync-directories-for-subscription.command';
+import { SyncDirectoriesForUserProfileCommand } from './sync-directories-for-user-profile.command';
 
 @Injectable()
 export class SyncDirectoriesCommand {
+  private readonly logger = new Logger(SyncDirectoriesCommand.name);
+
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
-    private readonly syncDirectoriesForSubscriptionCommand: SyncDirectoriesForSubscriptionCommand,
+    private readonly syncDirectoriesForUserProfileCommand: SyncDirectoriesForUserProfileCommand,
   ) {}
 
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
     traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
+    this.logger.log({
+      userProfileTypeId: userProfileTypeId.toString(),
+      msg: `Starting directories sync`,
+    });
+
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
+    traceAttrs({ user_profile_id: userProfile.id });
+    this.logger.log({
+      userProfileTypeId: userProfileTypeId.toString(),
+      userProfileId: userProfile.id,
+      msg: `Resolved user profile`,
+    });
+
     const shouldForceDirectoriesSync = await this.shouldForceDirectoriesSyncForUser(userProfile.id);
+    traceAttrs({ should_force_directories_sync: shouldForceDirectoriesSync });
+    this.logger.log({
+      userProfileId: userProfile.id,
+      shouldForceDirectoriesSync,
+      msg: `Checked force sync condition`,
+    });
+
     const { shouldSyncDirectories, deltaLink, syncStatsId } = await this.runDeltaQuery(
       userProfile.id,
     );
     traceEvent('delta sync completed', {
       should_sync_directories: shouldSyncDirectories,
+      delta_link_present: isNonNullish(deltaLink),
     });
+    const logContext: Attributes = {
+      userProfileTypeId: userProfileTypeId.toString(),
+      userProfileId: userProfile.id,
+      shouldSyncDirectories,
+      shouldForceDirectoriesSync,
+      syncStatsId,
+    };
+    traceAttrs({ ...logContext, delta_link_present: isNonNullish(deltaLink) });
     if (shouldSyncDirectories || shouldForceDirectoriesSync) {
-      await this.syncDirectoriesForSubscriptionCommand.run(userProfileTypeId);
+      traceEvent(`Run directories sync`);
+      this.logger.log({ ...logContext, msg: `Run directories sync` });
+      await this.syncDirectoriesForUserProfileCommand.run(userProfileTypeId);
+      traceEvent('directories sync completed');
+      this.logger.log({ ...logContext, msg: `Directories sync completed` });
+    } else {
+      traceEvent(`Skip directories sync`);
+      this.logger.log({ ...logContext, msg: `Skip directories sync` });
     }
     // We do not check the delta link because microsoft returns the same delta link as the current one.
     await this.db
@@ -44,6 +82,11 @@ export class SyncDirectoriesCommand {
       })
       .where(eq(directoriesSync.id, syncStatsId))
       .execute();
+    this.logger.log({
+      ...logContext,
+      deltaLinkPresent: isNonNullish(deltaLink),
+      msg: `Updated delta sync stats`,
+    });
   }
 
   private async runDeltaQuery(userProfileId: string): Promise<{
@@ -52,6 +95,14 @@ export class SyncDirectoriesCommand {
     syncStatsId: string;
   }> {
     const syncStats = await this.findOrCreateStats(userProfileId);
+    const isInitialSync = !syncStats.deltaLink;
+    traceAttrs({ delta_query_is_initial_sync: isInitialSync, sync_stats_id: syncStats.id });
+    this.logger.log({
+      userProfileId,
+      syncStatsId: syncStats.id,
+      isInitialSync,
+      msg: `Running delta query`,
+    });
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
@@ -61,9 +112,20 @@ export class SyncDirectoriesCommand {
 
     let directroriesResponse = graphOutlookDirectoriesDeltaResponse.parse(directoriesDeltaResult);
     let shouldSyncDirectories = false;
+    let pageCount = 1;
 
     if (directroriesResponse.value.length > 0) {
       shouldSyncDirectories = true;
+      traceEvent('delta changes detected', {
+        page: pageCount,
+        change_count: directroriesResponse.value.length,
+      });
+      this.logger.log({
+        userProfileId,
+        syncStatsId: syncStats.id,
+        changeCount: directroriesResponse.value.length,
+        msg: `Delta changes detected`,
+      });
       await this.db
         .update(directoriesSync)
         .set({ lastDeltaChangeDetectedAt: new Date() })
@@ -72,9 +134,14 @@ export class SyncDirectoriesCommand {
     }
 
     while (directroriesResponse['@odata.nextLink']) {
+      pageCount++;
       const previousNextLink = directroriesResponse['@odata.nextLink'];
       directoriesDeltaResult = await client.api(directroriesResponse['@odata.nextLink']).get();
       directroriesResponse = graphOutlookDirectoriesDeltaResponse.parse(directoriesDeltaResult);
+      traceEvent('delta query page fetched', {
+        page: pageCount,
+        change_count: directroriesResponse.value.length,
+      });
 
       if (directroriesResponse['@odata.nextLink']) {
         // We advance the query but we stop advancing on the last response because we want to run the sync and put the
@@ -88,6 +155,18 @@ export class SyncDirectoriesCommand {
           .execute();
       }
     }
+
+    traceAttrs({
+      delta_query_page_count: pageCount,
+      delta_query_should_sync: shouldSyncDirectories,
+    });
+    this.logger.log({
+      userProfileId,
+      syncStatsId: syncStats.id,
+      pageCount,
+      shouldSyncDirectories,
+      msg: `Delta query completed`,
+    });
 
     return {
       shouldSyncDirectories,

@@ -1,5 +1,5 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, inArray, not } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { prop } from 'remeda';
@@ -11,7 +11,7 @@ import {
   directoriesSync,
   SystemDirectoriesIgnoredForSync,
 } from '~/db';
-import { traceAttrs } from '~/email-sync/tracing.utils';
+import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -25,7 +25,9 @@ import { UpsertDirectoryCommand } from './upsert-directory.command';
 const USER_DIRECTORY_TYPE: DirectoryType = 'User Defined Directory';
 
 @Injectable()
-export class SyncDirectoriesForSubscriptionCommand {
+export class SyncDirectoriesForUserProfileCommand {
+  private readonly logger = new Logger(SyncDirectoriesForUserProfileCommand.name);
+
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
@@ -39,7 +41,19 @@ export class SyncDirectoriesForSubscriptionCommand {
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
     traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
+    this.logger.log({
+      userProfileTypeId: userProfileTypeId.toString(),
+      msg: `Starting full directories sync for user profile`,
+    });
+
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
+    traceAttrs({ user_profile_id: userProfile.id });
+    this.logger.log({
+      userProfileTypeId: userProfileTypeId.toString(),
+      userProfileId: userProfile.id,
+      msg: `Resolved user profile`,
+    });
+
     await this.createRootScopeCommand.run({
       userProfileEmail: userProfile.email,
       userProviderUserId: userProfile.providerUserId,
@@ -51,29 +65,48 @@ export class SyncDirectoriesForSubscriptionCommand {
       .where(eq(directories.userProfileId, userProfile.id))
       .execute();
 
+    const existingDirectoryCount = totalDirectories.at(0)?.count ?? 0;
+    traceAttrs({ existing_directory_count: existingDirectoryCount });
+
     // We only sync the system directories once.
-    if (!totalDirectories.length || totalDirectories.at(0)?.count === 0) {
+    if (!totalDirectories.length || existingDirectoryCount === 0) {
+      traceEvent('syncing system directories');
+      this.logger.log({
+        userProfileId: userProfile.id,
+        msg: `No existing directories found, syncing system directories`,
+      });
       await this.syncSystemDirectoriesCommand.run(userProfileTypeId);
     }
 
     const microsoftDirectories = await this.fetchAllDirectoriesFromOutlookQuery.run(userProfile.id);
+    traceEvent('microsoft directories fetched', { count: microsoftDirectories.length });
+    this.logger.log({
+      userProfileId: userProfile.id,
+      microsoftDirectoryCount: microsoftDirectories.length,
+      msg: `Fetched directories from Microsoft`,
+    });
 
     await this.upsertDirectories({
       userProfileId: userProfile.id,
       microsoftDirectories,
     });
+    traceEvent('directories upserted');
+    this.logger.log({ userProfileId: userProfile.id, msg: `Directories upserted` });
 
     await this.removeExtraDirectories({
       userProfileId: userProfile.id,
       providerUserId: userProfile.providerUserId,
       microsoftDirectories,
     });
+    traceEvent('extra directories removed');
+    this.logger.log({ userProfileId: userProfile.id, msg: `Extra directories removed` });
 
     await this.db
       .update(directoriesSync)
       .set({ lastDirectorySyncRanAt: new Date() })
       .where(eq(directoriesSync.userProfileId, userProfile.id))
       .execute();
+    this.logger.log({ userProfileId: userProfile.id, msg: `Directories sync completed` });
   }
 
   private async upsertDirectories({
@@ -143,6 +176,19 @@ export class SyncDirectoriesForSubscriptionCommand {
         userProfileId,
         microsoftDirectories,
       });
+    traceEvent('directories to remove computed', {
+      delete_count: idsToDeleteInDatabase.length,
+      ignore_count: ignoredDirectoryIds.length,
+      unique_delete_count: providerParentIdsToDeleteInUnique.length,
+    });
+    this.logger.log({
+      userProfileId,
+      deleteCount: idsToDeleteInDatabase.length,
+      ignoreCount: ignoredDirectoryIds.length,
+      uniqueDeleteCount: providerParentIdsToDeleteInUnique.length,
+      msg: `Removing extra directories`,
+    });
+
     await this.db
       .delete(directories)
       .where(
@@ -181,6 +227,10 @@ export class SyncDirectoriesForSubscriptionCommand {
       getRootScopeExternalId(providerUserId),
     );
     if (!rootScope) {
+      this.logger.warn({
+        userProfileId,
+        msg: `Root scope not found, skipping unique file deletion`,
+      });
       return;
     }
 
@@ -192,6 +242,12 @@ export class SyncDirectoriesForSubscriptionCommand {
         providerDirectoryId,
       );
       if (contentIds.length) {
+        this.logger.log({
+          userProfileId,
+          providerDirectoryId,
+          fileCount: contentIds.length,
+          msg: `Deleting files from unique for removed directory`,
+        });
         await this.uniqueApi.files.deleteByIds(contentIds);
       }
     }
