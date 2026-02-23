@@ -20,10 +20,14 @@ export class UploadFileForIngestionCommand {
     content,
     mimeType,
   }: UploadFileForIngestionInput): Promise<void> {
+    // We use fetch instead of unidici because while testing upload without contentLength the unidici library
+    // managed to create broken files on azure because the initial upload call was returning 500 and unidici
+    // retried and then we succeded because they sent only the first chunk of bites. In order to minimise broken
+    // files it's safer to use plain fetch without any magic underneath.
     await fetch(this.correctWriteUrl(uploadUrl), {
       method: 'PUT',
       headers: {
-        // TODO: Check why this works in Teams-MCP without the content length because it seems from azure
+        // UN-17418: Check why this works in Teams-MCP without the content length because it seems from azure
         // docs it should not work without the contentLength up front there is another request which we
         // can use to upload it in chunks properly without knowing the content length.
         'Content-Length': `${contentLength}`,

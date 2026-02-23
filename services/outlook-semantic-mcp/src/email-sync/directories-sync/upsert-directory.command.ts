@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { Directory, DirectoryType, DRIZZLE, DrizzleDatabase, directories } from '~/db';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class UpsertDirectoryCommand {
     directory: { id: string; displayName: string; type: DirectoryType };
     updateOnConflict: boolean;
   }): Promise<Directory> {
-    const initilUpdateQuery = this.db.insert(directories).values({
+    const initialUpdateQuery = this.db.insert(directories).values({
       userProfileId,
       parentId,
       displayName: directory.displayName,
@@ -27,10 +27,10 @@ export class UpsertDirectoryCommand {
     });
 
     const updateQuery = !updateOnConflict
-      ? initilUpdateQuery.onConflictDoNothing({
+      ? initialUpdateQuery.onConflictDoNothing({
           target: [directories.userProfileId, directories.providerDirectoryId],
         })
-      : initilUpdateQuery.onConflictDoUpdate({
+      : initialUpdateQuery.onConflictDoUpdate({
           target: [directories.userProfileId, directories.providerDirectoryId],
           set: {
             parentId: sql.raw(`excluded.${directories.parentId.name}`),
@@ -38,13 +38,8 @@ export class UpsertDirectoryCommand {
           },
         });
 
-    await updateQuery.execute();
-    const newDirectory = await this.db.query.directories.findFirst({
-      where: and(
-        eq(directories.userProfileId, userProfileId),
-        eq(directories.providerDirectoryId, directory.id),
-      ),
-    });
+    const newDirectories = await updateQuery.returning();
+    const newDirectory = newDirectories.at(0);
     assert.ok(newDirectory, `Counld not create new directory`);
     return newDirectory;
   }

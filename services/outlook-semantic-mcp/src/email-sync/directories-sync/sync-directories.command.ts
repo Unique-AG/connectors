@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes } from '@opentelemetry/api';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish } from 'remeda';
 import { DirectoriesSync, directories, directoriesSync } from '~/db';
@@ -40,6 +40,17 @@ export class SyncDirectoriesCommand {
       msg: `Resolved user profile`,
     });
 
+    // We have an internal mechanism which can force a sync even if delta query returns nothing.
+    // This internal mechanism is used to avoid triggering a full sync because we could not identify
+    // the parent directory of an email which lands in our webhook. The logic there happens
+    // in the following way.
+    // 1. Email lands in our webhook
+    // 2. We check if we have the parent directory
+    // 2.1 => If we don't have the parent directory we insert a new special directory with a special type and sync the email
+    // 2.2 => If we have the directory the sync happens normally.
+    // Once the logic above is triggere on the next scheduled delta sync we look if we have any special directory inserted
+    // if we find one we force a directory sync to ensure we sync only the necesary folders. Normaly delta query should
+    // detect the new directory but as a failback we run the sync anyway using this logic.
     const shouldForceDirectoriesSync = await this.shouldForceDirectoriesSyncForUser(userProfile.id);
     traceAttrs({ should_force_directories_sync: shouldForceDirectoriesSync });
     this.logger.log({
@@ -176,19 +187,25 @@ export class SyncDirectoriesCommand {
   }
 
   private async shouldForceDirectoriesSyncForUser(userProfileId: string): Promise<boolean> {
-    const syncDefinedDirectoryCondition = and(
-      eq(directories.userProfileId, userProfileId),
-      eq(directories.internalType, `Unknown Directory: Created during email ingestion`),
-    );
-    const directoryDefinedDuringIngestion = await this.db.query.directories.findFirst({
-      where: syncDefinedDirectoryCondition,
+    const directoryDefinedDuringIngestion = await this.db.query.directories.findMany({
+      where: and(
+        eq(directories.userProfileId, userProfileId),
+        eq(directories.internalType, `Unknown Directory: Created during email ingestion`),
+      ),
     });
-    this.db
-      .update(directories)
-      .set({ internalType: 'User Defined Directory' })
-      .where(syncDefinedDirectoryCondition)
-      .execute();
-    return isNonNullish(directoryDefinedDuringIngestion);
+    if (directoryDefinedDuringIngestion.length) {
+      await this.db
+        .update(directories)
+        .set({ internalType: 'User Defined Directory' })
+        .where(
+          inArray(
+            directories.id,
+            directoryDefinedDuringIngestion.map((item) => item.id),
+          ),
+        )
+        .execute();
+    }
+    return directoryDefinedDuringIngestion.length > 0;
   }
 
   private async findOrCreateStats(userProfileId: string): Promise<DirectoriesSync> {

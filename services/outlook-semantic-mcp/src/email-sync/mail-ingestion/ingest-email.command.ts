@@ -186,10 +186,12 @@ export class IngestEmailCommand {
     this.logger.debug({ ...logContext, msg: `Register content: Finished` });
 
     const contentLength = await this.getContentLength({ messageId, client });
-    const contentStream = await this.getEmlFileStrem({ messageId, client });
+    const contentStream = await this.getEmlFileStream({ messageId, client });
     this.logger.debug({ ...logContext, msg: `File Upload: Started` });
     await this.uploadFileForIngestionCommand.run({
       uploadUrl: content.writeUrl,
+      // We read the content length consuming the stream because our upload email
+      // fails without it and it expects it up front.
       contentLength,
       content: contentStream,
       mimeType: createContentRequest.mimeType,
@@ -214,8 +216,7 @@ export class IngestEmailCommand {
     messageId: string;
     client: Client;
   }): Promise<number> {
-    const emlFileStream = await this.getEmlFileStrem({ messageId, client });
-    // We read the chunks because the api fails concistenly without it.
+    const emlFileStream = await this.getEmlFileStream({ messageId, client });
     let contentLength = 0;
     for await (const chunk of emlFileStream) {
       contentLength += chunk.length;
@@ -223,7 +224,7 @@ export class IngestEmailCommand {
     return contentLength;
   }
 
-  private async getEmlFileStrem({
+  private async getEmlFileStream({
     messageId,
     client,
   }: {
