@@ -71,3 +71,20 @@ export const redacted = <S extends z.core.$ZodType>(schema: S) =>
     decode: (value) => new Redacted(value),
     encode: (redacted) => redacted.value,
   });
+
+export const enabledDisabledBoolean = (
+  description: string,
+): z.ZodPipe<
+  z.ZodDefault<
+    z.ZodEnum<{
+      enabled: 'enabled';
+      disabled: 'disabled';
+    }>
+  >,
+  z.ZodTransform<boolean, 'enabled' | 'disabled'>
+> =>
+  z
+    .enum(['enabled', 'disabled'])
+    .default('enabled')
+    .describe(description)
+    .transform((value) => value === 'enabled');

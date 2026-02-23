@@ -1,6 +1,7 @@
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import { sumBy } from 'remeda';
 import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import {
@@ -117,13 +118,10 @@ export class FetchAllDirectoriesFromOutlookQuery {
   }
 
   private countDirectories(directories: GraphOutlookDirectory[]): number {
-    let count = directories.length;
-    for (const dir of directories) {
-      if (dir.childFolders) {
-        count += this.countDirectories(dir.childFolders);
-      }
-    }
-    return count;
+    return sumBy(
+      directories,
+      (dir) => 1 + (dir.childFolders ? this.countDirectories(dir.childFolders) : 0),
+    );
   }
 
   private async expandDirectory({
