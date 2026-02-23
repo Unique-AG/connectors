@@ -38,6 +38,8 @@ export class UpsertDirectoryCommand {
           },
         });
 
+    // We use .execute() instead of returning() because typescript types are wrong if we use
+    // onConflictDoNothing => It always returns an array with no results. So we have to save and then read again.
     await upsertQuery.execute();
     const newDirectory = await this.db.query.directories.findFirst({
       where: and(

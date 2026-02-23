@@ -193,19 +193,28 @@ export class SyncDirectoriesCommand {
         eq(directories.internalType, `Unknown Directory: Created during email ingestion`),
       ),
     });
-    if (directoryDefinedDuringIngestion.length) {
-      await this.db
-        .update(directories)
-        .set({ internalType: 'User Defined Directory' })
-        .where(
+    if (!directoryDefinedDuringIngestion.length) {
+      return false;
+    }
+
+    // We mark the directories as user defined imediately to avoid a race condition since we do
+    // not execute this in a transaction. We still have a posibility of failure because of some
+    // microsoft api failure. We should maybe block this operation differently to ensure
+    // the data correctness but for now we want to observe if we are overthinking this issue.
+    await this.db
+      .update(directories)
+      .set({ internalType: 'User Defined Directory' })
+      .where(
+        and(
+          eq(directories.userProfileId, userProfileId),
           inArray(
             directories.id,
             directoryDefinedDuringIngestion.map((item) => item.id),
           ),
-        )
-        .execute();
-    }
-    return directoryDefinedDuringIngestion.length > 0;
+        ),
+      )
+      .execute();
+    return true;
   }
 
   private async findOrCreateStats(userProfileId: string): Promise<DirectoriesSync> {
