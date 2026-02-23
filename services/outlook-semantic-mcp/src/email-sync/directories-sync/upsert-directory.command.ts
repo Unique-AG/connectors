@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Directory, DirectoryType, DRIZZLE, DrizzleDatabase, directories } from '~/db';
 
 @Injectable()
@@ -38,8 +38,13 @@ export class UpsertDirectoryCommand {
           },
         });
 
-    const newDirectories = await updateQuery.returning();
-    const newDirectory = newDirectories.at(0);
+    await updateQuery.execute();
+    const newDirectory = await this.db.query.directories.findFirst({
+      where: and(
+        eq(directories.userProfileId, userProfileId),
+        eq(directories.providerDirectoryId, directory.id),
+      ),
+    });
     assert.ok(newDirectory, `Counld not create new directory`);
     return newDirectory;
   }

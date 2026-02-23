@@ -183,7 +183,6 @@ export class IngestEmailCommand {
     this.logger.debug({ ...logContext, msg: `Register content: Started` });
     const content = await this.uniqueApi.ingestion.registerContent(createContentRequest);
     logContext.uniqueContentId = content.id;
-    logContext.uniqueWriteUrl = content.writeUrl;
     this.logger.debug({ ...logContext, msg: `Register content: Finished` });
 
     const contentLength = await this.getContentLength({ messageId, client });

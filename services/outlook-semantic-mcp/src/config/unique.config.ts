@@ -67,7 +67,11 @@ export const UniqueConfigSchema = z
     z.object({
       ingestionServiceBaseUrl: z.string().describe('Base URL for Unique ingestion service'),
       scopeManagementServiceBaseUrl: z.string().describe('Base URL for Scope Management service'),
-      storeInternally: z.coerce.boolean().prefault(true).describe('Store emails internaly'),
+      storeInternally: z
+        .string()
+        .prefault('true')
+        .transform((value) => value === 'true')
+        .describe('Store emails internaly'),
     }),
   );
 
