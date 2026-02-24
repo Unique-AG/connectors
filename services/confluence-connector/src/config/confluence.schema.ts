@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   coercedPositiveIntSchema,
   envRequiredSecretSchema,
+  requiredStringSchema,
   urlWithoutTrailingSlashSchema,
 } from '../utils/zod.util';
 
@@ -36,6 +37,7 @@ const baseConfluenceFields = z.object({
 export const ConfluenceConfigSchema = z.discriminatedUnion('instanceType', [
   baseConfluenceFields.extend({
     instanceType: z.literal('cloud'),
+    cloudId: requiredStringSchema.describe('Atlassian Cloud ID (UUID) for the Confluence site'),
     auth: oauth2loAuth,
   }),
   baseConfluenceFields.extend({

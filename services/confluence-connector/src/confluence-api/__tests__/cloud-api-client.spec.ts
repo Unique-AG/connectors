@@ -28,6 +28,8 @@ import { CloudConfluenceApiClient } from '../cloud-api-client';
 import { type ConfluencePage, ContentType } from '../types/confluence-api.types';
 
 const BASE_URL = 'https://cloud.example.com';
+const CLOUD_ID = 'test-cloud-id';
+const API_BASE_URL = `https://api.atlassian.com/ex/confluence/${CLOUD_ID}`;
 
 const mockLogger = {
   info: vi.fn(),
@@ -41,6 +43,7 @@ const mockAuth = { acquireToken: vi.fn().mockResolvedValue('cloud-token') };
 
 const mockConfig: ConfluenceConfig = {
   baseUrl: BASE_URL,
+  cloudId: CLOUD_ID,
   apiRateLimitPerMinute: 100,
   ingestSingleLabel: 'sync',
   ingestAllLabel: 'sync-all',
@@ -100,13 +103,13 @@ describe('CloudConfluenceApiClient', () => {
       expect(decodedUrl).toContain('type != attachment');
     });
 
-    it('uses /wiki/rest/api/content/search without os_authType', async () => {
+    it('uses api.atlassian.com/ex/confluence/{cloudId} base URL without os_authType', async () => {
       mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
 
       await client.searchPagesByLabel();
 
       const url = mockedRequest.mock.calls[0]?.[0] as string;
-      expect(url).toContain('/wiki/rest/api/content/search');
+      expect(url).toContain(`${API_BASE_URL}/wiki/rest/api/content/search`);
       expect(url).not.toContain('os_authType');
     });
 
@@ -129,7 +132,7 @@ describe('CloudConfluenceApiClient', () => {
       await client.getPageById('77');
 
       const url = mockedRequest.mock.calls[0]?.[0] as string;
-      expect(url).toContain('/wiki/rest/api/content/search');
+      expect(url).toContain(`${API_BASE_URL}/wiki/rest/api/content/search`);
       expect(url).toContain('cql=id%3D77');
       expect(url).toContain('expand=body.storage,version,space,metadata.labels');
     });
@@ -216,13 +219,13 @@ describe('CloudConfluenceApiClient', () => {
       expect(decodedUrl).toContain('type != attachment');
     });
 
-    it('uses /wiki/rest/api/content/search endpoint', async () => {
+    it('uses api.atlassian.com/ex/confluence/{cloudId} base URL', async () => {
       mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
 
       await client.getDescendantPages(['5']);
 
       const url = mockedRequest.mock.calls[0]?.[0] as string;
-      expect(url).toContain('/wiki/rest/api/content/search');
+      expect(url).toContain(`${API_BASE_URL}/wiki/rest/api/content/search`);
     });
 
     it('paginates results via _links.next', async () => {
@@ -243,7 +246,7 @@ describe('CloudConfluenceApiClient', () => {
       expect(result[0]?.id).toBe('p1');
       expect(result[1]?.id).toBe('p2');
       const paginatedUrl = mockedRequest.mock.calls[1]?.[0] as string;
-      expect(paginatedUrl).toBe(`${BASE_URL}${nextPath}`);
+      expect(paginatedUrl).toBe(`${API_BASE_URL}${nextPath}`);
     });
   });
 

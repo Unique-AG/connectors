@@ -1,3 +1,6 @@
+import type pino from 'pino';
+import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
+import type { ConfluenceConfig } from '../config';
 import { ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
 import {
@@ -7,23 +10,33 @@ import {
 } from './types/confluence-api.types';
 
 const SEARCH_PAGE_SIZE = 25;
+const ATLASSIAN_API_BASE = 'https://api.atlassian.com/ex/confluence';
+
+type CloudConfig = Extract<ConfluenceConfig, { instanceType: 'cloud' }>;
 
 export class CloudConfluenceApiClient extends ConfluenceApiClient {
+  private readonly apiBaseUrl: string;
+
+  public constructor(config: CloudConfig, confluenceAuth: ConfluenceAuth, logger: pino.Logger) {
+    super(config, confluenceAuth, logger);
+    this.apiBaseUrl = `${ATLASSIAN_API_BASE}/${config.cloudId}`;
+  }
+
   public async searchPagesByLabel(): Promise<ConfluencePage[]> {
     const spaceTypeFilter = '(space.type=global OR space.type=collaboration)';
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
-    const url = `${this.baseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&limit=${SEARCH_PAGE_SIZE}&start=0`;
+    const url = `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&limit=${SEARCH_PAGE_SIZE}&start=0`;
 
     return fetchAllPaginated(
       url,
-      this.baseUrl,
+      this.apiBaseUrl,
       (requestUrl) => this.makeRateLimitedRequest(requestUrl),
       confluencePageSchema,
     );
   }
 
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
-    const url = `${this.baseUrl}/wiki/rest/api/content/search?cql=id%3D${pageId}&expand=body.storage,version,space,metadata.labels`;
+    const url = `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=id%3D${pageId}&expand=body.storage,version,space,metadata.labels`;
     const raw = await this.makeRateLimitedRequest(url);
     const response = paginatedResponseSchema(confluencePageSchema).parse(raw);
     return response.results[0] ?? null;
@@ -34,11 +47,11 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     if (rootIds.length === 0) return [];
 
     const cql = `ancestor IN (${rootIds.join(',')}) AND type != attachment`;
-    const url = `${this.baseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&limit=${SEARCH_PAGE_SIZE}`;
+    const url = `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&limit=${SEARCH_PAGE_SIZE}`;
 
     return fetchAllPaginated(
       url,
-      this.baseUrl,
+      this.apiBaseUrl,
       (requestUrl) => this.makeRateLimitedRequest(requestUrl),
       confluencePageSchema,
     );

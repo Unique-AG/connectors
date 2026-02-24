@@ -10,7 +10,8 @@
 
 confluence:
   instanceType: cloud
-  baseUrl: https://your-domain.atlassian.net
+  baseUrl: https://your-domain.atlassian.net # used for page web links (API calls go via api.atlassian.com)
+  cloudId: your-cloud-id
   auth:
     mode: oauth_2lo
     clientId: your-oauth-client-id
