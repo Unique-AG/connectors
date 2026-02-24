@@ -92,7 +92,7 @@ describe('CloudConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('(space.type=global OR space.type=collaboration)');
       expect(decodedUrl).toContain('label="sync"');
@@ -105,7 +105,7 @@ describe('CloudConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       expect(url).toContain('/wiki/rest/api/content/search');
       expect(url).not.toContain('os_authType');
     });
@@ -115,7 +115,7 @@ describe('CloudConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       expect(url).toContain('limit=25');
     });
   });
@@ -128,7 +128,7 @@ describe('CloudConfluenceApiClient', () => {
 
       await client.getPageById('77');
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       expect(url).toContain('/wiki/rest/api/content/search');
       expect(url).toContain('cql=id%3D77');
       expect(url).toContain('expand=body.storage,version,space,metadata.labels');
@@ -186,15 +186,14 @@ describe('CloudConfluenceApiClient', () => {
       expect(mockedRequest).not.toHaveBeenCalled();
     });
 
-    it('uses CQL ancestor=<id> for a single root ID', async () => {
+    it('uses CQL ancestor IN (...) for a single root ID', async () => {
       mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
 
       await client.getDescendantPages(['42']);
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
-      expect(decodedUrl).toContain('ancestor=42');
-      expect(decodedUrl).not.toContain('ancestor IN');
+      expect(decodedUrl).toContain('ancestor IN (42)');
     });
 
     it('uses CQL ancestor IN (...) for multiple root IDs', async () => {
@@ -202,7 +201,7 @@ describe('CloudConfluenceApiClient', () => {
 
       await client.getDescendantPages(['10', '20']);
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('ancestor IN (10,20)');
     });
@@ -212,7 +211,7 @@ describe('CloudConfluenceApiClient', () => {
 
       await client.getDescendantPages(['99']);
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('type != attachment');
     });
@@ -222,7 +221,7 @@ describe('CloudConfluenceApiClient', () => {
 
       await client.getDescendantPages(['5']);
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       expect(url).toContain('/wiki/rest/api/content/search');
     });
 
@@ -241,9 +240,9 @@ describe('CloudConfluenceApiClient', () => {
       const result = await client.getDescendantPages(['5']);
 
       expect(result).toHaveLength(2);
-      expect(result[0]!.id).toBe('p1');
-      expect(result[1]!.id).toBe('p2');
-      const paginatedUrl = mockedRequest.mock.calls[1]![0] as string;
+      expect(result[0]?.id).toBe('p1');
+      expect(result[1]?.id).toBe('p2');
+      const paginatedUrl = mockedRequest.mock.calls[1]?.[0] as string;
       expect(paginatedUrl).toBe(`${BASE_URL}${nextPath}`);
     });
   });

@@ -48,7 +48,7 @@ export const paginatedResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) =
     }),
   });
 
-export type PaginatedResponse<T> = {
+export interface PaginatedResponse<T> {
   results: T[];
   _links: { next?: string };
-};
+}

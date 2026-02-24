@@ -92,7 +92,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('label="sync"');
       expect(decodedUrl).toContain('label="sync-all"');
@@ -105,7 +105,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       expect(url).toContain('/rest/api/content/search');
       expect(url).toContain('os_authType=basic');
     });
@@ -115,7 +115,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).not.toContain('collaboration');
     });
@@ -125,7 +125,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       expect(url).toContain('limit=25');
     });
   });
@@ -136,7 +136,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.getPageById('42');
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       expect(url).toContain('/rest/api/content/42');
       expect(url).toContain('os_authType=basic');
       expect(url).toContain('expand=body.storage,version,space,metadata.labels');
@@ -192,14 +192,14 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(mockedRequest).not.toHaveBeenCalled();
     });
 
-    it('uses CQL ancestor=<id> with os_authType=basic for single root ID', async () => {
+    it('uses CQL ancestor IN (...) with os_authType=basic for single root ID', async () => {
       mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
 
       await client.getDescendantPages(['55']);
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
-      expect(decodedUrl).toContain('ancestor=55');
+      expect(decodedUrl).toContain('ancestor IN (55)');
       expect(url).toContain('os_authType=basic');
     });
 
@@ -208,7 +208,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.getDescendantPages(['10', '20']);
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('ancestor IN (10,20)');
     });
@@ -218,7 +218,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.getDescendantPages(['99']);
 
-      const url = mockedRequest.mock.calls[0]![0] as string;
+      const url = mockedRequest.mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('type != attachment');
     });
@@ -236,8 +236,8 @@ describe('DataCenterConfluenceApiClient', () => {
       const results = await client.getDescendantPages(['55']);
 
       expect(results).toHaveLength(2);
-      expect(results[0]!.id).toBe('10');
-      expect(results[1]!.id).toBe('11');
+      expect(results[0]?.id).toBe('10');
+      expect(results[1]?.id).toBe('11');
     });
   });
 
