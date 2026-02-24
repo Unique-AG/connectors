@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../config';
 import { ServiceRegistry } from '../tenant/service-registry';
-import { CloudApiAdapter } from './adapters/cloud-api.adapter';
-import { DataCenterApiAdapter } from './adapters/data-center-api.adapter';
-import { ConfluenceApiClient } from './confluence-api-client';
+import { CloudConfluenceApiClient } from './cloud-api-client';
 import { ConfluenceApiClientFactory } from './confluence-api-client.factory';
+import { DataCenterConfluenceApiClient } from './data-center-api-client';
 
-vi.mock('./confluence-api-client', () => ({
-  ConfluenceApiClient: vi.fn(),
+vi.mock('./cloud-api-client', () => ({
+  CloudConfluenceApiClient: vi.fn(),
+}));
+vi.mock('./data-center-api-client', () => ({
+  DataCenterConfluenceApiClient: vi.fn(),
 }));
 
 const mockServiceRegistry = {
@@ -23,7 +25,7 @@ const baseFields = {
 };
 
 describe('ConfluenceApiClientFactory', () => {
-  it('creates a client with CloudApiAdapter for cloud config', () => {
+  it('creates CloudConfluenceApiClient for cloud config', () => {
     const factory = new ConfluenceApiClientFactory(mockServiceRegistry);
     const config = {
       ...baseFields,
@@ -33,14 +35,10 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(ConfluenceApiClient).toHaveBeenCalledWith(
-      expect.any(CloudApiAdapter),
-      config,
-      mockServiceRegistry,
-    );
+    expect(CloudConfluenceApiClient).toHaveBeenCalledWith(config, mockServiceRegistry);
   });
 
-  it('creates a client with DataCenterApiAdapter for data-center config', () => {
+  it('creates DataCenterConfluenceApiClient for data-center config', () => {
     const factory = new ConfluenceApiClientFactory(mockServiceRegistry);
     const config = {
       ...baseFields,
@@ -50,14 +48,14 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(ConfluenceApiClient).toHaveBeenCalledWith(
-      expect.any(DataCenterApiAdapter),
-      config,
-      mockServiceRegistry,
-    );
+    expect(DataCenterConfluenceApiClient).toHaveBeenCalledWith(config, mockServiceRegistry);
   });
 
-  it('passes baseUrl to the adapter', () => {
+  it('returns the created client instance', () => {
+    const mockClient = {};
+    vi.mocked(CloudConfluenceApiClient).mockImplementation(
+      () => mockClient as unknown as CloudConfluenceApiClient,
+    );
     const factory = new ConfluenceApiClientFactory(mockServiceRegistry);
     const config = {
       ...baseFields,
@@ -65,10 +63,8 @@ describe('ConfluenceApiClientFactory', () => {
       auth: { mode: 'oauth_2lo', clientId: 'id', clientSecret: { expose: () => 's' } },
     } as unknown as ConfluenceConfig;
 
-    factory.create(config);
+    const result = factory.create(config);
 
-    // biome-ignore lint/style/noNonNullAssertion: test assertion — call is guaranteed by the line above
-    const adapterArg = vi.mocked(ConfluenceApiClient).mock.calls[0]![0] as CloudApiAdapter;
-    expect(adapterArg.buildSearchUrl('test', 10, 0)).toContain('https://confluence.example.com');
+    expect(result).toBe(mockClient);
   });
 });
