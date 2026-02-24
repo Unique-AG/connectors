@@ -4,7 +4,6 @@ import { CronJob } from 'cron';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import type { TenantContext } from '../tenant';
 import { ServiceRegistry, TenantRegistry } from '../tenant';
-import { sanitizeError } from '../utils/normalize-error';
 
 @Injectable()
 export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
@@ -41,7 +40,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error({
         msg: 'Error stopping cron jobs',
-        error: sanitizeError(error),
+        error,
       });
     }
   }
@@ -77,7 +76,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       } catch (error) {
         logger.error({
           msg: 'Unexpected sync error',
-          error: sanitizeError(error),
+          error,
         });
       }
     });

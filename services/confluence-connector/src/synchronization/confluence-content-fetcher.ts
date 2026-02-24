@@ -3,7 +3,6 @@ import type { ConfluenceConfig } from '../config';
 import type { ConfluencePage } from '../confluence-api';
 import { ConfluenceApiClient } from '../confluence-api';
 import type { ServiceRegistry } from '../tenant';
-import { sanitizeError } from '../utils/normalize-error';
 import type { DiscoveredPage, FetchedPage } from './sync.types';
 
 export class ConfluenceContentFetcher {
@@ -39,7 +38,7 @@ export class ConfluenceContentFetcher {
       fullPage = await this.apiClient.getPageById(page.id);
     } catch (error) {
       this.logger.warn(
-        { pageId: page.id, title: page.title, error: sanitizeError(error) },
+        { pageId: page.id, title: page.title, error },
         'Failed to fetch page, possibly deleted in the meantime',
       );
       return null;

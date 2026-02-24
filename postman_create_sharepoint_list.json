@@ -1,0 +1,224 @@
+{
+  "info": {
+    "name": "Create SharePoint QA Sites List",
+    "description": "Creates a SharePoint list with custom columns for managing sites to sync to Unique",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "site_id",
+      "value": "YOUR_TARGET_SITE_ID",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "YOUR_ACCESS_TOKEN",
+      "type": "string"
+    },
+    {
+      "key": "list_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "app_client_id",
+      "value": "YOUR_APPLICATION_CLIENT_ID",
+      "type": "string"
+    },
+    {
+      "key": "app_display_name",
+      "value": "YOUR_APPLICATION_NAME",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Grant Sites.Selected Permission to Application",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"roles\": [\"write\"],\n  \"grantedToIdentities\": [\n    {\n      \"application\": {\n        \"id\": \"{{app_client_id}}\",\n        \"displayName\": \"{{app_display_name}}\"\n      }\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "https://graph.microsoft.com/v1.0/sites/{{site_id}}/permissions",
+          "protocol": "https",
+          "host": ["graph", "microsoft", "com"],
+          "path": ["v1.0", "sites", "{{site_id}}", "permissions"]
+        },
+        "description": "Grants Sites.Selected permission to an application for this SharePoint site.\n\nAvailable roles:\n- read: Read-only access\n- write: Read and write access\n- manage: Manage lists and libraries\n- fullcontrol: Full control\n\nYou need to set:\n- app_client_id: The Application (client) ID from Azure AD\n- app_display_name: The display name of your application\n\nNote: This requires admin consent and the calling token must have Sites.FullControl.All permission."
+      },
+      "response": []
+    },
+    {
+      "name": "1. Create List",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    const response = pm.response.json();",
+              "    pm.collectionVariables.set('list_id', response.id);",
+              "    console.log('List created with ID:', response.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"displayName\": \"QA Sites to Sync to Unique\",\n  \"list\": {\n    \"template\": \"genericList\"\n  }\n}"
+        },
+        "url": {
+          "raw": "https://graph.microsoft.com/v1.0/sites/{{site_id}}/lists",
+          "protocol": "https",
+          "host": ["graph", "microsoft", "com"],
+          "path": ["v1.0", "sites", "{{site_id}}", "lists"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2. Add All Columns (Batch Request)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"requests\": [\n    {\n      \"id\": \"1\",\n      \"method\": \"POST\",\n      \"url\": \"/sites/{{site_id}}/lists/{{list_id}}/columns\",\n      \"body\": {\n        \"name\": \"Url\",\n        \"displayName\": \"siteId\",\n        \"text\": {\n          \"allowMultipleLines\": false,\n          \"maxLength\": 255\n        }\n      },\n      \"headers\": {\n        \"Content-Type\": \"application/json\"\n      }\n    },\n    {\n      \"id\": \"2\",\n      \"method\": \"POST\",\n      \"url\": \"/sites/{{site_id}}/lists/{{list_id}}/columns\",\n      \"body\": {\n        \"name\": \"syncColumnName\",\n        \"displayName\": \"syncColumnName\",\n        \"text\": {\n          \"allowMultipleLines\": false,\n          \"maxLength\": 255\n        }\n      },\n      \"headers\": {\n        \"Content-Type\": \"application/json\"\n      }\n    },\n    {\n      \"id\": \"3\",\n      \"method\": \"POST\",\n      \"url\": \"/sites/{{site_id}}/lists/{{list_id}}/columns\",\n      \"body\": {\n        \"name\": \"ingestionMode\",\n        \"displayName\": \"ingestionMode\",\n        \"choice\": {\n          \"allowTextEntry\": false,\n          \"choices\": [\n            \"recursive\",\n            \"flat\"\n          ],\n          \"displayAs\": \"dropDownMenu\"\n        },\n        \"defaultValue\": {\n          \"value\": \"recursive\"\n        }\n      },\n      \"headers\": {\n        \"Content-Type\": \"application/json\"\n      }\n    },\n    {\n      \"id\": \"4\",\n      \"method\": \"POST\",\n      \"url\": \"/sites/{{site_id}}/lists/{{list_id}}/columns\",\n      \"body\": {\n        \"name\": \"maxFilesToIngest\",\n        \"displayName\": \"maxFilesToIngest\",\n        \"number\": {\n          \"decimalPlaces\": \"none\",\n          \"displayAs\": \"number\"\n        }\n      },\n      \"headers\": {\n        \"Content-Type\": \"application/json\"\n      }\n    },\n    {\n      \"id\": \"5\",\n      \"method\": \"POST\",\n      \"url\": \"/sites/{{site_id}}/lists/{{list_id}}/columns\",\n      \"body\": {\n        \"name\": \"storeInternally\",\n        \"displayName\": \"storeInternally\",\n        \"required\": true,\n        \"choice\": {\n          \"allowTextEntry\": false,\n          \"choices\": [\n            \"enabled\",\n            \"disabled\"\n          ],\n          \"displayAs\": \"dropDownMenu\"\n        },\n        \"defaultValue\": {\n          \"value\": \"enabled\"\n        }\n      },\n      \"headers\": {\n        \"Content-Type\": \"application/json\"\n      }\n    },\n    {\n      \"id\": \"6\",\n      \"method\": \"POST\",\n      \"url\": \"/sites/{{site_id}}/lists/{{list_id}}/columns\",\n      \"body\": {\n        \"name\": \"syncStatus\",\n        \"displayName\": \"syncStatus\",\n        \"choice\": {\n          \"allowTextEntry\": false,\n          \"choices\": [\n            \"active\",\n            \"inactive\",\n            \"deleted\"\n          ],\n          \"displayAs\": \"dropDownMenu\"\n        },\n        \"defaultValue\": {\n          \"value\": \"active\"\n        }\n      },\n      \"headers\": {\n        \"Content-Type\": \"application/json\"\n      }\n    },\n    {\n      \"id\": \"7\",\n      \"method\": \"POST\",\n      \"url\": \"/sites/{{site_id}}/lists/{{list_id}}/columns\",\n      \"body\": {\n        \"name\": \"syncMode\",\n        \"displayName\": \"syncMode\",\n        \"choice\": {\n          \"allowTextEntry\": false,\n          \"choices\": [\n            \"content_only\",\n            \"content_and_permissions\"\n          ],\n          \"displayAs\": \"dropDownMenu\"\n        },\n        \"defaultValue\": {\n          \"value\": \"content_only\"\n        }\n      },\n      \"headers\": {\n        \"Content-Type\": \"application/json\"\n      }\n    },\n    {\n      \"id\": \"8\",\n      \"method\": \"POST\",\n      \"url\": \"/sites/{{site_id}}/lists/{{list_id}}/columns\",\n      \"body\": {\n        \"name\": \"uniqueScopeId\",\n        \"displayName\": \"uniqueScopeId\",\n        \"text\": {\n          \"allowMultipleLines\": false,\n          \"maxLength\": 255\n        }\n      },\n      \"headers\": {\n        \"Content-Type\": \"application/json\"\n      }\n    },\n    {\n      \"id\": \"9\",\n      \"method\": \"POST\",\n      \"url\": \"/sites/{{site_id}}/lists/{{list_id}}/columns\",\n      \"body\": {\n        \"name\": \"permissionsInheritanceMode\",\n        \"displayName\": \"permissionsInheritanceMode\",\n        \"choice\": {\n          \"allowTextEntry\": false,\n          \"choices\": [\n            \"inherit_scopes_and_files\",\n            \"inherit_scopes\",\n            \"inherit_files\",\n            \"none\"\n          ],\n          \"displayAs\": \"dropDownMenu\"\n        }\n      },\n      \"headers\": {\n        \"Content-Type\": \"application/json\"\n      }\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "https://graph.microsoft.com/v1.0/$batch",
+          "protocol": "https",
+          "host": ["graph", "microsoft", "com"],
+          "path": ["v1.0", "$batch"]
+        },
+        "description": "Creates all 9 custom columns in a single batch request. This is more efficient than making 9 separate requests."
+      },
+      "response": []
+    },
+    {
+      "name": "3. Add List Item - Wealth Management",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fields\": {\n    \"Title\": \"Wealth Management\",\n    \"Url\": \"af2b5be6-a37d-4992-ab8f-988b0134007e\",\n    \"uniqueScopeId\": \"scope_bwewfn86usebgg9qwmpc19hn\",\n    \"ingestionMode\": \"recursive\",\n    \"syncStatus\": \"deleted\",\n    \"syncMode\": \"content_and_permissions\",\n    \"syncColumnName\": \"FinanceGPTKnowledge\",\n    \"maxFilesToIngest\": 10000,\n    \"storeInternally\": \"enabled\",\n    \"permissionsInheritanceMode\": \"inherit_scopes_and_files\"\n  }\n}"
+        },
+        "url": {
+          "raw": "https://graph.microsoft.com/v1.0/sites/{{site_id}}/lists/{{list_id}}/items",
+          "protocol": "https",
+          "host": ["graph", "microsoft", "com"],
+          "path": ["v1.0", "sites", "{{site_id}}", "lists", "{{list_id}}", "items"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "12. Add List Item - Advisory",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fields\": {\n    \"Title\": \"Advisory\",\n    \"Url\": \"b2063f3-57ba-40f2-a849-dc52f13c6a2e\",\n    \"uniqueScopeId\": \"scope_rfvpvmj8p9854xnob7dz2oj9\",\n    \"ingestionMode\": \"recursive\",\n    \"syncStatus\": \"deleted\",\n    \"syncMode\": \"content_and_permissions\",\n    \"syncColumnName\": \"FinanceGPTKnowledge\",\n    \"storeInternally\": \"enabled\"\n  }\n}"
+        },
+        "url": {
+          "raw": "https://graph.microsoft.com/v1.0/sites/{{site_id}}/lists/{{list_id}}/items",
+          "protocol": "https",
+          "host": ["graph", "microsoft", "com"],
+          "path": ["v1.0", "sites", "{{site_id}}", "lists", "{{list_id}}", "items"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "13. Add List Item - Investment Banking",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fields\": {\n    \"Title\": \"Investment Banking\",\n    \"Url\": \"386baaf1-bb11-4994-8bce-b4cd15748713\",\n    \"uniqueScopeId\": \"scope_dea89l58jjzx2icig0xl90zj\",\n    \"ingestionMode\": \"recursive\",\n    \"syncStatus\": \"deleted\",\n    \"syncMode\": \"content_and_permissions\",\n    \"syncColumnName\": \"FinanceGPTKnowledge\",\n    \"storeInternally\": \"enabled\"\n  }\n}"
+        },
+        "url": {
+          "raw": "https://graph.microsoft.com/v1.0/sites/{{site_id}}/lists/{{list_id}}/items",
+          "protocol": "https",
+          "host": ["graph", "microsoft", "com"],
+          "path": ["v1.0", "sites", "{{site_id}}", "lists", "{{list_id}}", "items"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "14. Add List Item - BugBash",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fields\": {\n    \"Title\": \"BugBash\",\n    \"Url\": \"1d045c6a-f230-48fd-b826-7cf8601d7729\",\n    \"uniqueScopeId\": \"scope_j1kl1ej9egoon1wtz4i686tf\",\n    \"ingestionMode\": \"recursive\",\n    \"syncStatus\": \"deleted\",\n    \"syncMode\": \"content_and_permissions\",\n    \"syncColumnName\": \"FinanceGPTKnowledge\",\n    \"storeInternally\": \"enabled\"\n  }\n}"
+        },
+        "url": {
+          "raw": "https://graph.microsoft.com/v1.0/sites/{{site_id}}/lists/{{list_id}}/items",
+          "protocol": "https",
+          "host": ["graph", "microsoft", "com"],
+          "path": ["v1.0", "sites", "{{site_id}}", "lists", "{{list_id}}", "items"]
+        }
+      },
+      "response": []
+    }
+  ]
+}

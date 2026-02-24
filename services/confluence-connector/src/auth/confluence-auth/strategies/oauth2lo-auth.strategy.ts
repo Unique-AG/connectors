@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { AuthMode, ConfluenceConfig } from '../../../config';
 import { ServiceRegistry } from '../../../tenant/service-registry';
 import { handleErrorStatus } from '../../../utils/http-util';
-import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenCache } from '../../token-cache';
 import type { TokenResult } from '../../token-result';
 import { ConfluenceAuth } from '../confluence-auth.abstract';
@@ -62,7 +61,7 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
     } catch (error) {
       logger.error({
         msg: `Failed to acquire Confluence ${this.instanceType} token via OAuth 2.0 2LO`,
-        error: sanitizeError(error),
+        error,
       });
 
       throw error;

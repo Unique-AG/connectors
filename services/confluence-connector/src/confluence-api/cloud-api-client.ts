@@ -19,6 +19,9 @@ const CONTENT_TYPE_V2_PATH: Record<ContentType, string> = {
   page: 'pages',
   folder: 'folders',
   database: 'databases',
+  blogpost: 'blogposts',
+  whiteboard: 'whiteboards',
+  embed: 'embeds',
 };
 
 export class CloudConfluenceApiClient extends ConfluenceApiClient {

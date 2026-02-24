@@ -1,0 +1,26 @@
+{
+  "folders": [
+    {
+      "path": "/Users/lorand/workspace/unique/connectors"
+    },
+    {
+      "path": "/Users/lorand/workspace/unique/monorepo/gitops-resources"
+    },
+    {
+      "path": "/Users/lorand/workspace/unique/monorepo/next/packages"
+    },
+    {
+      "path": "/Users/lorand/workspace/unique/monorepo/node/apps/confluence-connector"
+    },
+    {
+      "path": "/Users/lorand/workspace/unique/infrastructure"
+    },
+    {
+      "path": "../monorepo/next/services/node-ingestion"
+    },
+    {
+      "path": "../monorepo/next/services/node-scope-management"
+    }
+  ],
+  "settings": {}
+}

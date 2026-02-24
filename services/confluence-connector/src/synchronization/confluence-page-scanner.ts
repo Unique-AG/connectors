@@ -3,7 +3,6 @@ import type { ConfluenceConfig, ProcessingConfig } from '../config';
 import type { ConfluencePage } from '../confluence-api';
 import { ConfluenceApiClient, ContentType } from '../confluence-api';
 import type { ServiceRegistry } from '../tenant';
-import { sanitizeError } from '../utils/normalize-error';
 import type { DiscoveredPage } from './sync.types';
 
 const SKIPPED_CONTENT_TYPES = [ContentType.DATABASE, ContentType.BLOGPOST, ContentType.WHITEBOARD, ContentType.EMBED];
@@ -44,7 +43,7 @@ export class ConfluencePageScanner {
       children = await this.apiClient.getChildPages(parent.id, parent.type);
     } catch (error) {
       this.logger.warn(
-        { parentId: parent.id, title: parent.title, error: sanitizeError(error) },
+        { parentId: parent.id, title: parent.title, error },
         'Failed to fetch child pages, skipping children',
       );
       return;

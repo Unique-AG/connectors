@@ -1,0 +1,1987 @@
+WEBVTT
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/5-0
+00:00:03.245 --> 00:00:07.965
+<v Lorand Sandor>Yeah, where it will.
+I never manually use it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/7-0
+00:00:06.445 --> 00:00:09.915
+<v Michal Simka>You will.
+I think you will get the mail and stuff</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/6-0
+00:00:09.325 --> 00:00:11.005
+<v Lorand Sandor>Nice. Nice.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/7-1
+00:00:09.915 --> 00:00:14.425
+<v Michal Simka>or something like that.
+For sure you get the mail 30 days before</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/7-2
+00:00:14.425 --> 00:00:20.046
+<v Michal Simka>it's supposed to be permanently deleted.
+So Floyd is getting this mail every day</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/8-0
+00:00:19.925 --> 00:00:25.535
+<v Lorand Sandor>So then I will be heavily relying on
+factories.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/7-3
+00:00:20.046 --> 00:00:21.365
+<v Michal Simka>because of dailies.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/8-1
+00:00:25.535 --> 00:00:34.885
+<v Lorand Sandor>Then we need to most probably also cash
+these clients, right? So that we don't.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/9-0
+00:00:32.285 --> 00:00:35.837
+<v Michal Simka>Yeah, but yes, yes, yes.
+But this you can do like in this in this</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/9-1
+00:00:35.837 --> 00:00:39.336
+<v Michal Simka>tenant thing here, right?
+Because you can just basically you can</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/9-2
+00:00:39.336 --> 00:00:43.211
+<v Michal Simka>initialize this thing once, right?
+You don't have to like to create the</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/9-3
+00:00:43.211 --> 00:00:46.871
+<v Michal Simka>whole context every time.
+You can basically just do a thing when OK</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/9-4
+00:00:46.871 --> 00:00:50.747
+<v Michal Simka>this you still have this tenant thingy
+then on initialization loads the</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/9-5
+00:00:50.747 --> 00:00:51.285
+<v Michal Simka>conflicts.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/12-0
+00:00:51.725 --> 00:00:55.260
+<v Michal Simka>Initialize the object,
+initialize the client and all that kind</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/12-1
+00:00:55.260 --> 00:00:59.581
+<v Michal Simka>of like the dependency that you have.
+You structure in some sensible way and</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/12-2
+00:00:59.581 --> 00:01:03.060
+<v Michal Simka>then you put it like a.
+You put it in your map from this this</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/12-3
+00:01:03.060 --> 00:01:07.661
+<v Michal Simka>name into this into this context object
+and then you basically just have a method</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/11-0
+00:01:05.765 --> 00:01:06.125
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/12-4
+00:01:07.661 --> 00:01:11.645
+<v Michal Simka>kind of like a execute with execute with
+context. You pass the string.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/13-0
+00:01:11.885 --> 00:01:16.148
+<v Michal Simka>Or whatever else for the tenant and then
+whatever in the callback has the async</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/13-1
+00:01:16.148 --> 00:01:20.252
+<v Michal Simka>local search initialized and you can
+either use some kind of like top level,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/13-2
+00:01:20.252 --> 00:01:24.355
+<v Michal Simka>some top level method because async local
+storage can kind of live wherever.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/13-3
+00:01:24.355 --> 00:01:28.565
+<v Michal Simka>So we can like make top level methods to
+kind of like getting stuff from this.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/15-0
+00:01:28.605 --> 00:01:33.072
+<v Michal Simka>From this context or like just kind of
+like to inject the question is like yeah</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/15-1
+00:01:33.072 --> 00:01:37.371
+<v Michal Simka>do you want to inject whole context or
+you also can do a thing when you just</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/15-2
+00:01:37.371 --> 00:01:41.726
+<v Michal Simka>kind of like within the context you for
+example have the thing where you just</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/15-3
+00:01:41.726 --> 00:01:44.965
+<v Michal Simka>have like an object from like class name
+to the instance.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/17-0
+00:01:45.485 --> 00:01:51.087
+<v Michal Simka>So you can kind of just or like kind of
+like or like a class object or something</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/17-1
+00:01:51.087 --> 00:01:54.546
+<v Michal Simka>like that.
+I don't know how like actually uses to</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/17-2
+00:01:54.546 --> 00:02:00.010
+<v Michal Simka>because with map you can in in you with
+words ******* words because in map you</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/17-3
+00:02:00.010 --> 00:02:05.405
+<v Michal Simka>can basically index by anything right?
+So we can literally just take a class.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/20-0
+00:02:05.445 --> 00:02:09.709
+<v Michal Simka>And make a map from that class into that
+class into the instance.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/16-0
+00:02:05.965 --> 00:02:06.245
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/20-1
+00:02:09.709 --> 00:02:12.810
+<v Michal Simka>And then you can basically just say like,
+yeah,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/18-0
+00:02:10.405 --> 00:02:10.645
+<v Lorand Sandor>Hmm.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/20-2
+00:02:12.810 --> 00:02:16.880
+<v Michal Simka>inject me this dependency and then just
+pass the class, right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/20-3
+00:02:16.880 --> 00:02:21.015
+<v Michal Simka>And then it just returns you the instance
+of this class, right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/19-0
+00:02:19.365 --> 00:02:20.205
+<v Lorand Sandor>Yeah, yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/20-4
+00:02:21.015 --> 00:02:25.085
+<v Michal Simka>And you can map it pretty easily mapped.
+It is sensibly typed.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/21-0
+00:02:25.165 --> 00:02:28.292
+<v Michal Simka>You can then like just have like these
+dependencies with the service.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/21-1
+00:02:28.292 --> 00:02:31.420
+<v Michal Simka>You can have like a second method for
+whatever or just have basically</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/21-2
+00:02:31.420 --> 00:02:34.726
+<v Michal Simka>dependencies as one thing and like
+whatever config as just a second thing</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/21-3
+00:02:34.726 --> 00:02:38.300
+<v Michal Simka>and kind of like OK and when you get the
+config you get the whole thing because</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/21-4
+00:02:38.300 --> 00:02:40.445
+<v Michal Simka>it's a bunch of like some strings and you
+just.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/23-0
+00:02:40.445 --> 00:02:43.962
+<v Michal Simka>And you just destruct your object taking
+whatever you need.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/23-1
+00:02:43.962 --> 00:02:48.768
+<v Michal Simka>I don't know how much data you have there.
+Dependency will be quite a bit because</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/23-2
+00:02:48.768 --> 00:02:52.167
+<v Michal Simka>you will have there kind of like some
+unique API clients,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/23-3
+00:02:52.167 --> 00:02:56.094
+<v Michal Simka>the the confluence client,
+you have want to have the logger there,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/23-4
+00:02:56.094 --> 00:02:59.845
+<v Michal Simka>you want to have something else there and
+blah blah blah right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/22-0
+00:02:59.965 --> 00:03:00.285
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/24-0
+00:03:00.285 --> 00:03:04.019
+<v Michal Simka>So we can put these kind of like a bit
+separately to just kind of like OK,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/24-1
+00:03:04.019 --> 00:03:06.858
+<v Michal Simka>I need a logger,
+I just inject the logger and you and in</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/24-2
+00:03:06.858 --> 00:03:10.592
+<v Michal Simka>sub method you can also just kind of like
+you know, oh inject me a logger.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/24-3
+00:03:10.592 --> 00:03:13.132
+<v Michal Simka>It is just one line in there and you use
+it right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/24-4
+00:03:13.132 --> 00:03:16.866
+<v Michal Simka>And there's like no problem with that
+really within the execution context,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/24-5
+00:03:16.866 --> 00:03:17.165
+<v Michal Simka>right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/25-0
+00:03:17.605 --> 00:03:17.645
+<v Michal Simka>Uh.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/26-0
+00:03:18.245 --> 00:03:23.445
+<v Lorand Sandor>Like how you wrote it here like get me a
+logger like tenant context dot get logger.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/29-0
+00:03:23.485 --> 00:03:27.474
+<v Michal Simka>Yeah, or get logger or like yeah,
+yeah like get and then you just pass</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/29-1
+00:03:27.474 --> 00:03:32.138
+<v Michal Simka>literally like a logger class because by
+this class you actually indexed it in the</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/27-0
+00:03:31.485 --> 00:03:31.685
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/29-2
+00:03:32.138 --> 00:03:36.689
+<v Michal Simka>map and you will just get the instance
+that you have for this for this execution</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/29-3
+00:03:36.689 --> 00:03:39.386
+<v Michal Simka>context, right? And as I said,
+kind of like it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/29-4
+00:03:39.386 --> 00:03:42.645
+<v Michal Simka>Like I think local storage is kind of
+like it. It can be.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/28-0
+00:03:39.885 --> 00:03:40.205
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/31-0
+00:03:42.925 --> 00:03:45.570
+<v Michal Simka>It is.
+It can be abused in a way that kind of</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/31-1
+00:03:45.570 --> 00:03:49.479
+<v Michal Simka>like it is not really meant to be stuff
+that kind of like you know,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/31-2
+00:03:49.479 --> 00:03:53.389
+<v Michal Simka>all stores data and changes a lot.
+But this is not the case for us.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/31-3
+00:03:53.389 --> 00:03:58.161
+<v Michal Simka>We just kind of like set the context and
+want to access it deeper in there because</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/30-0
+00:03:56.565 --> 00:03:56.845
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/31-4
+00:03:58.161 --> 00:04:02.645
+<v Michal Simka>like passing it down is the in JS it's
+kind of cumbersome in bunch of places.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/32-0
+00:04:02.925 --> 00:04:06.685
+<v Michal Simka>But it's just kind of like the the
+context of what we are doing there, yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/34-0
+00:04:08.205 --> 00:04:13.502
+<v Lorand Sandor>Cool, cool.
+I think we have a plan then to use this</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/34-1
+00:04:13.502 --> 00:04:18.290
+<v Lorand Sandor>async context. It sounds good.
+It sounds good.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/33-0
+00:04:14.805 --> 00:04:15.285
+<v Michal Simka>Mhm.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/34-2
+00:04:18.290 --> 00:04:23.485
+<v Lorand Sandor>I'm going to work on it right now.
+Make a request.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/37-0
+00:04:20.205 --> 00:04:23.620
+<v Michal Simka>Uh, OK, OK,
+let's just go quickly for the comments if</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/37-1
+00:04:23.620 --> 00:04:28.490
+<v Michal Simka>we are not missing something briefly
+because I just like I have like active,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/35-0
+00:04:26.445 --> 00:04:27.645
+<v Lorand Sandor>Uh, yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/37-2
+00:04:28.490 --> 00:04:31.462
+<v Michal Simka>inactive, deleted. Uh,
+because we have active,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/37-3
+00:04:31.462 --> 00:04:35.446
+<v Michal Simka>inactive for the sites, right?
+And here we have like a tenant,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/36-0
+00:04:33.885 --> 00:04:34.125
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/37-4
+00:04:35.446 --> 00:04:36.205
+<v Michal Simka>so to speak.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/38-0
+00:04:36.205 --> 00:04:42.364
+<v Michal Simka>But then the question is also kind of
+like in a way of kind of like what this</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/38-1
+00:04:42.364 --> 00:04:45.285
+<v Michal Simka>like tenant means for us in a way of.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/39-0
+00:04:45.125 --> 00:04:46.765
+<v Lorand Sandor>Confluence. Um.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/40-0
+00:04:48.485 --> 00:04:52.573
+<v Lorand Sandor>Conference instance.
+I would say it's a tenant because we</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/40-1
+00:04:52.573 --> 00:04:57.365
+<v Lorand Sandor>don't really have like this big division
+with spaces with the site.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/41-0
+00:04:55.565 --> 00:04:57.975
+<v Michal Simka>Yeah, but The thing is, but the thing,
+yeah,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/41-1
+00:04:57.975 --> 00:05:01.992
+<v Michal Simka>but like then come like for the for the
+like if someone will say OK, yeah,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/41-2
+00:05:01.992 --> 00:05:06.383
+<v Michal Simka>like from this confluence instance I want
+to think this space then what they have</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/41-3
+00:05:06.383 --> 00:05:08.365
+<v Michal Simka>to market or like how does this work?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/42-0
+00:05:08.245 --> 00:05:12.365
+<v Lorand Sandor>I think they just mark files in that
+space, right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/44-0
+00:05:11.765 --> 00:05:14.805
+<v Michal Simka>So we basically look through all the
+spaces. I mean,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/44-1
+00:05:14.805 --> 00:05:19.450
+<v Michal Simka>so this is the part of kind of like I'm
+not entirely sure because the problem we</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/44-2
+00:05:19.450 --> 00:05:22.661
+<v Michal Simka>can run into quickly that I don't know
+whether we will,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/44-3
+00:05:22.661 --> 00:05:26.733
+<v Michal Simka>but like just having it on top of my mind
+is in this kind of like, oh,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/44-4
+00:05:26.733 --> 00:05:30.805
+<v Michal Simka>like we actually have like this space
+that has like 20,000 swords and.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/47-0
+00:05:31.325 --> 00:05:35.389
+<v Michal Simka>But by the way, but we still,
+but we still retrieve it by filtering on</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/43-0
+00:05:31.925 --> 00:05:32.525
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/47-1
+00:05:35.389 --> 00:05:38.366
+<v Michal Simka>labels, right?
+So it kind of doesn't matter, right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/45-0
+00:05:36.125 --> 00:05:36.845
+<v Lorand Sandor>Yes.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/47-2
+00:05:38.366 --> 00:05:40.885
+<v Michal Simka>And you can query it across all the
+spaces.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/46-0
+00:05:38.605 --> 00:05:39.045
+<v Lorand Sandor>Yes.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/49-0
+00:05:41.805 --> 00:05:45.805
+<v Lorand Sandor>This I don't know. I haven't looked.
+Shame on me.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/48-0
+00:05:45.125 --> 00:05:45.765
+<v Michal Simka>OK, OK.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/50-0
+00:05:47.245 --> 00:05:49.639
+<v Michal Simka>So there's like it,
+but like this kind of like,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/50-1
+00:05:49.639 --> 00:05:53.131
+<v Michal Simka>but this is kind of like a detail there,
+like we can still like work.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/50-2
+00:05:53.131 --> 00:05:56.872
+<v Michal Simka>What is there exactly? We can still,
+we can still refine this idea without</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/50-3
+00:05:56.872 --> 00:06:00.513
+<v Michal Simka>affecting that much this part of
+implementation because you know if this</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/50-4
+00:06:00.513 --> 00:06:03.306
+<v Michal Simka>is like you know,
+per Confluence client or per space or</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/50-5
+00:06:03.306 --> 00:06:03.805
+<v Michal Simka>something.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/51-0
+00:06:03.965 --> 00:06:10.404
+<v Michal Simka>This we can probably still adjust without
+too much of a problem, right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/51-1
+00:06:10.404 --> 00:06:14.965
+<v Michal Simka>So this should be fine I think.
+So let's just not.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/52-0
+00:06:13.325 --> 00:06:18.785
+<v Lorand Sandor>Sync pages API wrapper and then sync
+single pages API wrapper.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/52-1
+00:06:18.785 --> 00:06:25.978
+<v Lorand Sandor>These are the two main methods and then
+it just does like search CQL equals label,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/52-2
+00:06:25.978 --> 00:06:29.445
+<v Lorand Sandor>single ingest label or all ingest label.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/53-0
+00:06:30.245 --> 00:06:33.005
+<v Lorand Sandor>And type space type global.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/54-0
+00:06:34.325 --> 00:06:35.685
+<v Michal Simka>Ace type global.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/55-0
+00:06:37.525 --> 00:06:41.125
+<v Lorand Sandor>And that's that's it space type global.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/56-0
+00:06:41.725 --> 00:06:45.239
+<v Michal Simka>Uh, OK,
+so we can basically just globally search</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/56-1
+00:06:45.239 --> 00:06:45.885
+<v Michal Simka>for this.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/57-0
+00:06:46.125 --> 00:06:51.334
+<v Lorand Sandor>Paste type Global is used to avoid
+getting pages from personal access from</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/59-0
+00:06:51.165 --> 00:06:54.307
+<v Michal Simka>Uh uh,
+so basically you get all about the person,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/57-1
+00:06:51.334 --> 00:06:52.445
+<v Lorand Sandor>personal spaces.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/59-1
+00:06:54.307 --> 00:06:58.391
+<v Michal Simka>which should make sense. OK, OK,
+so but then that's interesting.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/59-2
+00:06:58.391 --> 00:07:02.602
+<v Michal Simka>So you only can like you just start from
+scope that's interesting.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/59-3
+00:07:02.602 --> 00:07:05.744
+<v Michal Simka>But this is from oh,
+but OK for the global scope.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/58-0
+00:07:04.765 --> 00:07:06.085
+<v Lorand Sandor>On global scopes.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/59-4
+00:07:05.744 --> 00:07:09.388
+<v Michal Simka>But this is still kind of like you have
+service accounts.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/59-5
+00:07:09.388 --> 00:07:11.085
+<v Michal Simka>You still have to get give.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/61-0
+00:07:11.445 --> 00:07:16.860
+<v Michal Simka>Accesses to basically get it from global
+scope that are not that the current user</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/61-1
+00:07:16.860 --> 00:07:21.878
+<v Michal Simka>has access to is either the user that
+from the personal access token or the</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/61-2
+00:07:21.878 --> 00:07:26.765
+<v Michal Simka>service user which also probably has to
+get some kind of access I assume.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/62-0
+00:07:26.845 --> 00:07:31.845
+<v Michal Simka>OK, OK, so then then it sounds.
+Then it sounds.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/60-0
+00:07:27.125 --> 00:07:27.605
+<v Lorand Sandor>Yes.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/62-1
+00:07:31.845 --> 00:07:36.845
+<v Michal Simka>This sound is sensibles sensibles.
+It soundest.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/64-0
+00:07:35.605 --> 00:07:38.707
+<v Lorand Sandor>So then at tenant I will do it as you
+said,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/64-1
+00:07:38.707 --> 00:07:43.855
+<v Lorand Sandor>because it's like eventually after doing
+some thinking I got to the same</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/64-2
+00:07:43.855 --> 00:07:48.861
+<v Lorand Sandor>conclusion that the idea is good to have
+active, inactive and deleted.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/63-0
+00:07:47.925 --> 00:07:48.045
+<v Michal Simka>But.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/64-3
+00:07:48.861 --> 00:07:53.374
+<v Lorand Sandor>If you mark it as deleted,
+we start the deletion process of the</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/64-4
+00:07:53.374 --> 00:07:54.925
+<v Lorand Sandor>files and you mark it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/65-0
+00:07:55.245 --> 00:07:58.725
+<v Lorand Sandor>In the tenant config, not config. Yeah,
+in the tenant config basically.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/66-0
+00:07:58.285 --> 00:08:00.982
+<v Michal Simka>Yeah, yeah.
+And if we get another source where we</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/66-1
+00:08:00.982 --> 00:08:03.948
+<v Michal Simka>configure this,
+then we'll get another source where we</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/66-2
+00:08:03.948 --> 00:08:08.047
+<v Michal Simka>configure this and this is fine. OK, good.
+That sounds good then. And yeah,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/66-3
+00:08:08.047 --> 00:08:12.361
+<v Michal Simka>like I mean then I kind of like you know
+with also like with probably with your</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/66-4
+00:08:12.361 --> 00:08:16.460
+<v Michal Simka>client is just a thought for later
+they're like you for example have like a</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/66-5
+00:08:16.460 --> 00:08:17.485
+<v Michal Simka>multiple instances.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/67-0
+00:08:18.045 --> 00:08:20.402
+<v Michal Simka>Think into a single single unique
+instance.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/67-1
+00:08:20.402 --> 00:08:24.687
+<v Michal Simka>We can also like think there are also
+later as kind of like oh like can we like</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/67-2
+00:08:24.687 --> 00:08:28.276
+<v Michal Simka>detect that the conflicts are the same
+and we just like, you know,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/67-3
+00:08:28.276 --> 00:08:31.919
+<v Michal Simka>make a single client so the right
+limiting and **** is together and</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/67-4
+00:08:31.919 --> 00:08:33.365
+<v Michal Simka>something like that, right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/68-0
+00:08:33.485 --> 00:08:38.096
+<v Michal Simka>But this is the thing that we can work
+because like for starters you can anyway,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/68-1
+00:08:38.096 --> 00:08:41.227
+<v Michal Simka>for example, oh,
+we have 4 instances for like a divide</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/68-2
+00:08:41.227 --> 00:08:44.471
+<v Michal Simka>thread limiting by 4 or something and it
+should be fine.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/68-3
+00:08:44.471 --> 00:08:48.000
+<v Michal Simka>But but this is but these are details for
+later, maybe later.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/70-0
+00:08:47.685 --> 00:08:54.309
+<v Lorand Sandor>Like I could have the unique rate
+limiting should be together, that's right.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/68-4
+00:08:48.000 --> 00:08:49.765
+<v Michal Simka>Don't worry about it right now.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/70-1
+00:08:54.309 --> 00:09:01.363
+<v Lorand Sandor>But then I could like the confluence rate
+limiting should be per instance per per</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/69-0
+00:08:54.645 --> 00:08:54.765
+<v Michal Simka>OK.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/71-0
+00:09:01.005 --> 00:09:06.497
+<v Michal Simka>Yeah, yeah. But yeah, but this is like,
+but this is a detail that we can like</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/70-2
+00:09:01.363 --> 00:09:01.965
+<v Lorand Sandor>tenant.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/71-1
+00:09:06.497 --> 00:09:11.285
+<v Michal Simka>look into at later point. No problem. OK,
+then there's like a yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/73-0
+00:09:06.965 --> 00:09:10.806
+<v Lorand Sandor>We can, yeah.
+And then a good point is the cron,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/73-1
+00:09:10.806 --> 00:09:15.039
+<v Lorand Sandor>the cron job.
+Do we want it to be per tenant or do we</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/72-0
+00:09:13.485 --> 00:09:14.005
+<v Michal Simka>Mhm.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/73-2
+00:09:15.039 --> 00:09:16.685
+<v Lorand Sandor>want it to be global?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/74-0
+00:09:17.325 --> 00:09:20.325
+<v Michal Simka>I only I thought about it.
+I'm just kind of like.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/75-0
+00:09:21.645 --> 00:09:25.885
+<v Michal Simka>I don't even know if we care that much
+because like when you think about it like</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/75-1
+00:09:25.885 --> 00:09:29.235
+<v Michal Simka>it's basically like in essentially it's
+kind of the same right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/75-2
+00:09:29.235 --> 00:09:33.422
+<v Michal Simka>Because it will have to hang on this.
+You probably will need to have like a one</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/75-3
+00:09:33.422 --> 00:09:36.615
+<v Michal Simka>service for the Chrome,
+like we need to have service for the</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/75-4
+00:09:36.615 --> 00:09:40.645
+<v Michal Simka>Chrome and then like one service and like
+manages to sync their like see oh.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/76-0
+00:09:41.485 --> 00:09:44.150
+<v Michal Simka>This stuff is thinking,
+this stuff is not thinking.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/76-1
+00:09:44.150 --> 00:09:47.942
+<v Michal Simka>So it's just a matter of kind of like
+this service is singleton for sure.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/76-2
+00:09:47.942 --> 00:09:51.581
+<v Michal Simka>So like if it calls it again,
+then it like kind of doesn't have like 1</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/76-3
+00:09:51.581 --> 00:09:55.066
+<v Michal Simka>cron that like does every minute.
+And on the other hand, like yeah,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/76-4
+00:09:55.066 --> 00:09:58.705
+<v Michal Simka>you can with separate crons.
+The upside is like you can like literally</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/76-5
+00:09:58.705 --> 00:10:01.165
+<v Michal Simka>configure of kind of like OK,
+this has changed.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/78-0
+00:10:01.165 --> 00:10:04.978
+<v Michal Simka>Changes rarely.
+It can like sing like once a day or</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/78-1
+00:10:04.978 --> 00:10:08.352
+<v Michal Simka>whatever data,
+but this one is important too.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/77-0
+00:10:06.445 --> 00:10:06.605
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/79-0
+00:10:08.165 --> 00:10:13.089
+<v Lorand Sandor>Like that's the difference if you have
+like different clients who pay less or</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/78-2
+00:10:08.352 --> 00:10:10.845
+<v Michal Simka>So like so multiple crons can can.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/82-0
+00:10:12.085 --> 00:10:16.725
+<v Michal Simka>So yeah, so I mean,
+so if we can easily do like different</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/79-1
+00:10:13.089 --> 00:10:13.405
+<v Lorand Sandor>more.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/82-1
+00:10:16.725 --> 00:10:22.005
+<v Michal Simka>crons then I would say let's do,
+let's do separate ones. I don't,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/82-2
+00:10:22.005 --> 00:10:27.125
+<v Michal Simka>I don't see a strong reason why not at
+this point to be honest.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/80-0
+00:10:23.285 --> 00:10:24.365
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/81-0
+00:10:26.525 --> 00:10:26.845
+<v Lorand Sandor>Cool.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/82-3
+00:10:27.125 --> 00:10:31.125
+<v Michal Simka>So that I think that that I think should
+be fine.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/84-0
+00:10:31.405 --> 00:10:35.153
+<v Michal Simka>So this is like this is the wording of
+the Chrome logger and metrics.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/84-1
+00:10:35.153 --> 00:10:39.545
+<v Michal Simka>So I mentioned it's kind of like like the
+logger which you probably you also need</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/84-2
+00:10:39.545 --> 00:10:43.454
+<v Michal Simka>to scope the metrics right that you
+probably should have the should have</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/84-3
+00:10:43.454 --> 00:10:47.791
+<v Michal Simka>basically like metrics that are kind of
+like bound that you can that you already</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/84-4
+00:10:47.791 --> 00:10:51.165
+<v Michal Simka>have like the data for the OR like tenant
+bound to this right.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/83-0
+00:10:51.245 --> 00:10:51.565
+<v Lorand Sandor>Yep.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/85-0
+00:10:51.245 --> 00:10:55.659
+<v Michal Simka>You can probably just make it think of
+kind of like some partial application or</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/85-1
+00:10:55.659 --> 00:10:58.197
+<v Michal Simka>something.
+They're probably something simple.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/85-2
+00:10:58.197 --> 00:11:02.445
+<v Michal Simka>You can also look in that kind of.
+They have also some carrying stuff there.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/87-0
+00:11:01.125 --> 00:11:11.485
+<v Lorand Sandor>Remeda. OK, I saw a question on this.
+I saw Niku has the at span decorators.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/86-0
+00:11:03.405 --> 00:11:06.245
+<v Michal Simka>You can like.
+I mean you can also see there, but.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/89-0
+00:11:12.005 --> 00:11:12.285
+<v Lorand Sandor>There's.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/91-0
+00:11:12.845 --> 00:11:15.453
+<v Michal Simka>Yeah,
+like he's doing because he's doing tele,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/91-1
+00:11:15.453 --> 00:11:18.949
+<v Michal Simka>because he was copying from team CP and
+Valaric reality there.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/91-2
+00:11:18.949 --> 00:11:22.834
+<v Michal Simka>So he's adding the telemetric.
+I would say that's a sense that a good</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/91-3
+00:11:22.834 --> 00:11:26.829
+<v Michal Simka>thing, but I will do it as kind of like,
+OK, once we have **** running,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/91-4
+00:11:26.829 --> 00:11:30.325
+<v Michal Simka>we can add it then kind of to focus here
+because we have like.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/90-0
+00:11:27.365 --> 00:11:28.645
+<v Lorand Sandor>OK. Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/94-0
+00:11:30.565 --> 00:11:35.328
+<v Michal Simka>Already a bit of like a breath breath
+filling on our necks with Confluence</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/94-1
+00:11:35.328 --> 00:11:38.821
+<v Michal Simka>connector there.
+So let's just not overcomplicate that</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/93-0
+00:11:36.805 --> 00:11:38.405
+<v Lorand Sandor>Yeah, yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/94-2
+00:11:38.821 --> 00:11:42.631
+<v Michal Simka>because neither me or you have yet much
+experience with it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/94-3
+00:11:42.631 --> 00:11:47.902
+<v Michal Simka>So we'll anyway waste time try to use it.
+So let's start by just rolling with what</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/94-4
+00:11:47.902 --> 00:11:50.125
+<v Michal Simka>we know here and improving upon it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/96-0
+00:11:50.125 --> 00:11:53.071
+<v Michal Simka>The metrics we have couple only proxies.
+Yeah,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/95-0
+00:11:51.805 --> 00:11:53.125
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/96-1
+00:11:53.071 --> 00:11:58.210
+<v Michal Simka>this is just a mention of kind of like it
+to not make this some the registry some</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/96-2
+00:11:58.210 --> 00:12:02.534
+<v Michal Simka>kind of like to God of an object and
+actually like a proxy to store.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/96-3
+00:12:02.534 --> 00:12:06.294
+<v Michal Simka>How do we do it?
+Why do we care about validating that here?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/96-4
+00:12:06.294 --> 00:12:09.365
+<v Michal Simka>Yeah,
+the multi tenancy thing that kind of like.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/100-0
+00:12:09.725 --> 00:12:13.791
+<v Michal Simka>Extracting the end variable, right?
+That was just a mention I made there that</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/97-0
+00:12:13.565 --> 00:12:14.165
+<v Lorand Sandor>Mm-hmm.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/100-1
+00:12:13.791 --> 00:12:16.814
+<v Michal Simka>kind of you made it.
+If it's not set then we like then we</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/100-2
+00:12:16.814 --> 00:12:19.264
+<v Michal Simka>throw.
+But on the other hand why would it care</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/100-3
+00:12:19.264 --> 00:12:21.558
+<v Michal Simka>about it?
+Because it kind of if you made it</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/100-4
+00:12:21.558 --> 00:12:25.155
+<v Michal Simka>required then it's required.
+If you don't make it optional then yeah</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/98-0
+00:12:24.205 --> 00:12:24.405
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/100-5
+00:12:25.155 --> 00:12:29.325
+<v Michal Simka>so it's it's kind of like up to schema to
+do something with it right from your.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/99-0
+00:12:29.205 --> 00:12:29.525
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/101-0
+00:12:29.485 --> 00:12:32.171
+<v Michal Simka>This can just basically grab it from the
+end, right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/101-1
+00:12:32.171 --> 00:12:36.125
+<v Michal Simka>Be sure no conflicts to and first start
+up in case of conflicts standing from</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/101-2
+00:12:36.125 --> 00:12:38.558
+<v Michal Simka>special character or something like that.
+Yeah,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/101-3
+00:12:38.558 --> 00:12:41.042
+<v Michal Simka>this is just a matter of kind of like,
+you know,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/101-4
+00:12:41.042 --> 00:12:44.894
+<v Michal Simka>I don't know like how you're like
+extracting the name of the tenant, right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/101-5
+00:12:44.894 --> 00:12:47.124
+<v Michal Simka>Just to basically have some like,
+you know,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/101-6
+00:12:47.124 --> 00:12:49.405
+<v Michal Simka>paranoia check that kind of like if
+there's.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/102-0
+00:12:49.485 --> 00:12:52.881
+<v Michal Simka>Or do one like this like error out and
+like we'll do nothing.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/102-1
+00:12:52.881 --> 00:12:55.565
+<v Michal Simka>There is something we're we're should go
+in and.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/103-0
+00:12:56.725 --> 00:13:00.845
+<v Lorand Sandor>So we stop immediately.
+We stop like if somebody had.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/104-0
+00:12:59.085 --> 00:13:04.019
+<v Michal Simka>I would, I would treat it as I would,
+I would treat it as misconfiguration and</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/105-0
+00:13:03.565 --> 00:13:08.192
+<v Lorand Sandor>Yeah, yeah, OK.
+And I would look for names if it's like</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/104-1
+00:13:04.019 --> 00:13:07.205
+<v Michal Simka>they say like for misconfiguration we
+stop, we do.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/105-1
+00:13:08.192 --> 00:13:12.075
+<v Lorand Sandor>if it's if it's two names.
+If it's not unique,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/105-2
+00:13:12.075 --> 00:13:18.685
+<v Lorand Sandor>I will throw an error if it's a crazy
+name with invalid characters like emojis.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/106-0
+00:13:19.205 --> 00:13:20.965
+<v Lorand Sandor>I should also throw an error.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/108-0
+00:13:22.685 --> 00:13:25.401
+<v Michal Simka>I mean questions whether do do we care
+about it?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/107-0
+00:13:22.925 --> 00:13:25.845
+<v Lorand Sandor>There should be a simple regex to check
+if it like.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/108-1
+00:13:25.401 --> 00:13:29.890
+<v Michal Simka>Because we just for us it's just a string.
+Like you make it like a ******* heart</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/108-2
+00:13:29.890 --> 00:13:31.165
+<v Michal Simka>emoji. What do we care?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/109-0
+00:13:32.805 --> 00:13:38.509
+<v Lorand Sandor>OK, we we don't really care.
+It's gonna be ugly debugging logs and</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/109-1
+00:13:38.509 --> 00:13:39.445
+<v Lorand Sandor>stuff, but.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/112-0
+00:13:38.845 --> 00:13:41.714
+<v Michal Simka>Yeah, sure.
+I mean so you can you can also like make</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/112-1
+00:13:41.714 --> 00:13:45.936
+<v Michal Simka>some kind of like simple validation to
+come like it should be like a ZAZ like</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/110-0
+00:13:43.005 --> 00:13:44.245
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/112-2
+00:13:45.936 --> 00:13:49.780
+<v Michal Simka>number something dashes and you just kind
+of like OK, we don't accept,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/111-0
+00:13:47.085 --> 00:13:48.725
+<v Lorand Sandor>09 ashes, yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/112-3
+00:13:49.780 --> 00:13:53.515
+<v Michal Simka>we don't load anything freaking else
+don't care about that ********.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/112-4
+00:13:53.515 --> 00:13:56.925
+<v Michal Simka>So for me it's fine as well just kind of
+like as a sanity for.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/114-0
+00:13:56.925 --> 00:14:01.294
+<v Michal Simka>For we don't trust,
+we trust no one and and checking what the</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/113-0
+00:14:00.285 --> 00:14:01.765
+<v Lorand Sandor>Yeah, yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/114-1
+00:14:01.294 --> 00:14:04.817
+<v Michal Simka>hell they're putting there.
+So sure works for me.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/114-2
+00:14:04.817 --> 00:14:09.539
+<v Michal Simka>Tenant the same as a PC.
+Sure some huge code like I wrote the same</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/114-3
+00:14:09.539 --> 00:14:14.965
+<v Michal Simka>comment four times. Jesus Christ,
+I like I must have read it in like 3 runs.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/115-0
+00:14:15.405 --> 00:14:19.379
+<v Michal Simka>This is new Legger schedules name are the
+but property in Grafana.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/115-1
+00:14:19.379 --> 00:14:23.828
+<v Michal Simka>Yeah I'm just kind of like when you I
+know I'm curious kind of let me just</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/115-2
+00:14:23.828 --> 00:14:27.209
+<v Michal Simka>check briefly because there's actually in
+in lucky this.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/115-3
+00:14:27.209 --> 00:14:31.835
+<v Michal Simka>So is unique graph QL client but this is
+like this is a string or a property.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/115-4
+00:14:31.835 --> 00:14:34.445
+<v Michal Simka>This is not a property right?
+This is just.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/118-0
+00:14:34.445 --> 00:14:38.398
+<v Michal Simka>Unique GraphQL client. Yeah,
+but this is also OK.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/116-0
+00:14:35.805 --> 00:14:36.405
+<v Lorand Sandor>Should be searchable.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/118-1
+00:14:38.398 --> 00:14:44.170
+<v Michal Simka>But then but then you do a logger,
+but you still want to do a logger per</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/118-2
+00:14:44.170 --> 00:14:48.677
+<v Michal Simka>service, right?
+So you kind of like to have a logger per</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/118-3
+00:14:48.677 --> 00:14:51.365
+<v Michal Simka>service, but kind of with a bound.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/121-0
+00:14:51.565 --> 00:14:54.938
+<v Michal Simka>With a bound tenant,
+right that you have a property that kind</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/117-0
+00:14:51.845 --> 00:14:52.205
+<v Lorand Sandor>Context.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/121-1
+00:14:54.938 --> 00:14:58.691
+<v Michal Simka>of like they already have like a property
+for a tenant there, right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/119-0
+00:14:57.445 --> 00:14:58.885
+<v Lorand Sandor>Yes, yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/121-2
+00:14:58.691 --> 00:15:01.629
+<v Michal Simka>It's ideally it would be something like
+that I guess.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/120-0
+00:15:01.165 --> 00:15:01.925
+<v Lorand Sandor>Yep, Yep.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/121-3
+00:15:01.629 --> 00:15:04.186
+<v Michal Simka>So so new logger probably is not solving
+that.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/121-4
+00:15:04.186 --> 00:15:07.885
+<v Michal Simka>So like probably worth looking into what
+you can do there sensibly.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/122-0
+00:15:08.045 --> 00:15:12.609
+<v Michal Simka>Because it's yeah like I'm just thinking
+about it still want to have this kind of</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/122-1
+00:15:12.609 --> 00:15:15.948
+<v Michal Simka>like this nice thing. OK,
+oh this happened in this service.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/122-2
+00:15:15.948 --> 00:15:18.397
+<v Michal Simka>So kind of need a logger per service
+there,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/122-3
+00:15:18.397 --> 00:15:22.182
+<v Michal Simka>but it's still kind of like wanted kind
+of like bound for a tenant.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/122-4
+00:15:22.182 --> 00:15:23.685
+<v Michal Simka>So maybe like for a tenant.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/123-0
+00:15:24.205 --> 00:15:28.595
+<v Michal Simka>You kinda. I'm.
+I'm not sure there to be perfectly honest,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/123-1
+00:15:28.595 --> 00:15:31.645
+<v Michal Simka>kind of like what to do with that aspect.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/125-0
+00:15:31.725 --> 00:15:39.223
+<v Lorand Sandor>What I was looking at initially was to
+use the logger dot children dot child to</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/124-0
+00:15:34.125 --> 00:15:35.285
+<v Michal Simka>Mm-hmm.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/125-1
+00:15:39.223 --> 00:15:44.285
+<v Lorand Sandor>add it there and then but as we're going
+to use this.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/126-0
+00:15:43.245 --> 00:15:48.725
+<v Michal Simka>Async local storage. Uh,
+but so that kind of a.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/127-0
+00:15:46.685 --> 00:15:50.630
+<v Lorand Sandor>Yes, I will have a look.
+I will bring certain to see what options</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/127-1
+00:15:50.630 --> 00:15:53.439
+<v Lorand Sandor>do we have there.
+But the the output is clear.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/127-2
+00:15:53.439 --> 00:15:56.965
+<v Lorand Sandor>We should really have like loggers per
+service per tenant.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/129-0
+00:15:58.085 --> 00:16:00.552
+<v Michal Simka>Yes,
+in a way like a tenant probably can be</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/128-0
+00:15:59.085 --> 00:15:59.645
+<v Lorand Sandor>That's it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/129-1
+00:16:00.552 --> 00:16:03.803
+<v Michal Simka>just a property.
+So you can like yeah like oh like tenant</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/129-2
+00:16:03.803 --> 00:16:08.288
+<v Michal Simka>equals something and like yeah for this
+one we can see what's going on for them</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/129-3
+00:16:08.288 --> 00:16:10.979
+<v Michal Simka>easily, right.
+I still have like this like this</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/129-4
+00:16:10.979 --> 00:16:12.325
+<v Michal Simka>namespace for a service.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/130-0
+00:16:13.245 --> 00:16:18.050
+<v Michal Simka>So then the question is kind of like,
+what's what's exactly what's exactly a</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/130-1
+00:16:18.050 --> 00:16:21.545
+<v Michal Simka>thing there. Yeah,
+like we're thinking I would like not</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/130-2
+00:16:21.545 --> 00:16:24.416
+<v Michal Simka>spend like like days and night for a
+starter.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/130-3
+00:16:24.416 --> 00:16:27.973
+<v Michal Simka>You can probably just start with
+something simple there,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/130-4
+00:16:27.973 --> 00:16:29.845
+<v Michal Simka>but but it's definitely worth.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/131-0
+00:16:30.485 --> 00:16:35.296
+<v Michal Simka>Worth thinking about.
+I mean you can also like do something</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/131-1
+00:16:35.296 --> 00:16:41.389
+<v Michal Simka>funny like kind of like you know that you
+have a logger service but you are</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/131-2
+00:16:41.389 --> 00:16:47.884
+<v Michal Simka>supposed to but you are supposed to like
+pass it through some methods on this on</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/131-3
+00:16:47.884 --> 00:16:48.285
+<v Michal Simka>this.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/133-0
+00:16:50.125 --> 00:16:54.424
+<v Michal Simka>Like some function on async local storage,
+they just kind of like enriches it</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/133-1
+00:16:54.424 --> 00:16:58.281
+<v Michal Simka>already or something like that.
+Or or maybe that you actually have to</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/133-2
+00:16:58.281 --> 00:17:02.580
+<v Michal Simka>pass the service every time you inject a
+logger specifically because of that.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/133-3
+00:17:02.580 --> 00:17:06.824
+<v Michal Simka>Because there's also like not like a huge
+downside of kind of like you know,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/132-0
+00:17:04.845 --> 00:17:04.885
+<v Lorand Sandor>Oh.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/133-4
+00:17:06.824 --> 00:17:09.965
+<v Michal Simka>calling like get logger,
+you pass a service, you pass a.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/136-0
+00:17:09.965 --> 00:17:14.691
+<v Michal Simka>And then the tenant is get from that and
+you can then kind of cache it inside also</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/136-1
+00:17:14.691 --> 00:17:17.880
+<v Michal Simka>as an option.
+You basically kind of like have have like</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/136-2
+00:17:17.880 --> 00:17:22.378
+<v Michal Simka>a specific kind of like yeah like get
+logger or something and then you have to</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/134-0
+00:17:21.805 --> 00:17:22.845
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/136-3
+00:17:22.378 --> 00:17:24.485
+<v Michal Simka>pass the the the object to the class.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/135-0
+00:17:23.805 --> 00:17:25.925
+<v Lorand Sandor>Service. Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/137-0
+00:17:25.525 --> 00:17:28.982
+<v Michal Simka>And then you basically come like you can
+get the class name and work with that.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/137-1
+00:17:28.982 --> 00:17:30.970
+<v Michal Simka>It's kind of like, yeah,
+slightly cumbersome,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/137-2
+00:17:30.970 --> 00:17:34.514
+<v Michal Simka>but it's not like terribly cumbersome to
+be honest. So. So that's also an option.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/137-3
+00:17:34.514 --> 00:17:36.761
+<v Michal Simka>You know,
+this is an option you can just start with</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/137-4
+00:17:36.761 --> 00:17:40.089
+<v Michal Simka>and we can then think of kind of like can
+we improve it because there's also</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/137-5
+00:17:40.089 --> 00:17:41.645
+<v Michal Simka>something that could easily replace.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/138-0
+00:17:41.725 --> 00:17:47.897
+<v Lorand Sandor>Will I be able to do to get the logger in
+the in the constructor or will that will</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/138-1
+00:17:47.897 --> 00:17:52.805
+<v Lorand Sandor>not work with async local storage again
+if I if I have a service?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/141-0
+00:17:51.245 --> 00:17:55.510
+<v Michal Simka>So then the thing that like so you won't
+be able you construct right because</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/139-0
+00:17:54.205 --> 00:17:54.565
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/141-1
+00:17:55.510 --> 00:17:59.997
+<v Michal Simka>services will still be singletons right.
+So you can so that's why I'm saying you</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/141-2
+00:17:59.997 --> 00:18:04.484
+<v Michal Simka>can also like do a thing when you just
+kind of like you know initialise a logger</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/140-0
+00:18:00.245 --> 00:18:01.845
+<v Lorand Sandor>I pass it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/141-3
+00:18:04.484 --> 00:18:08.085
+<v Michal Simka>in service and you have a function in the
+in the how to call it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/143-0
+00:18:08.365 --> 00:18:12.721
+<v Michal Simka>And in the in whatever you're like
+context that is just takes you kind of</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/143-1
+00:18:12.721 --> 00:18:17.547
+<v Michal Simka>like a get get tenant logger or something
+and you just pass in the or logger from</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/143-2
+00:18:17.547 --> 00:18:22.138
+<v Michal Simka>service which you can call differently
+like a raw logger or just kind of like</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/143-3
+00:18:22.138 --> 00:18:25.316
+<v Michal Simka>pure service.
+Just some name that is kind of you know</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/143-4
+00:18:25.316 --> 00:18:27.965
+<v Michal Simka>not just logger to not instinctively use
+it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/144-0
+00:18:28.205 --> 00:18:31.746
+<v Michal Simka>Or something like that.
+They're kind of we can, we can, we can.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/142-0
+00:18:28.365 --> 00:18:29.845
+<v Lorand Sandor>Yeah, yeah, yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/144-1
+00:18:31.746 --> 00:18:35.730
+<v Michal Simka>Either of these two methods I think are
+like a sensible starting point.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/144-2
+00:18:35.730 --> 00:18:40.323
+<v Michal Simka>Then we can think of improving basically
+as a next step and see whether because we</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/144-3
+00:18:40.323 --> 00:18:44.805
+<v Michal Simka>can see maybe it's actually just kind of
+like, yeah, find them up, no one cares.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/146-0
+00:18:46.365 --> 00:18:51.856
+<v Lorand Sandor>Yeah, I will.
+I will look a bit into that to make it</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/145-0
+00:18:48.245 --> 00:18:48.285
+<v Michal Simka>Uh.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/148-0
+00:18:50.045 --> 00:18:54.382
+<v Michal Simka>So that is the load. That is the logger.
+As I wrote some it should be schema</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/146-1
+00:18:51.856 --> 00:18:52.685
+<v Lorand Sandor>look OK.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/148-1
+00:18:54.382 --> 00:18:59.114
+<v Michal Simka>decides whether missing value is an error.
+Sure that one thing that we should maybe</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/147-0
+00:18:54.805 --> 00:18:56.405
+<v Lorand Sandor>Meet three twists.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/148-2
+00:18:59.114 --> 00:19:03.394
+<v Michal Simka>do is basically think loaded from
+environment like this should be reducted.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/148-3
+00:19:03.394 --> 00:19:07.957
+<v Michal Simka>Yeah like what the other things come like
+I should do a thing that comes like it</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/148-4
+00:19:07.957 --> 00:19:09.365
+<v Michal Simka>stop going for like this.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/151-0
+00:19:09.725 --> 00:19:13.172
+<v Michal Simka>OS environment or something.
+I would like by default like wrap in</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/151-1
+00:19:13.172 --> 00:19:17.454
+<v Michal Simka>redacted and then just make it basically
+that you can pass an option to not to do</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/149-0
+00:19:13.365 --> 00:19:13.445
+<v Lorand Sandor>Hey.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/150-0
+00:19:16.405 --> 00:19:16.645
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/151-2
+00:19:17.454 --> 00:19:19.752
+<v Michal Simka>that.
+So kind of like because default stuff</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/151-3
+00:19:19.752 --> 00:19:23.564
+<v Michal Simka>will be like yeah this **** should be
+redacted and we see oh actually it</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/151-4
+00:19:23.564 --> 00:19:26.645
+<v Michal Simka>shouldn't sure.
+Then you explicitly say that it shouldn't.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/153-0
+00:19:27.885 --> 00:19:32.378
+<v Lorand Sandor>OK, OK, so you say OK, OK, OK,
+I will add this option,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/152-0
+00:19:31.565 --> 00:19:33.085
+<v Michal Simka>Because this because.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/153-1
+00:19:32.378 --> 00:19:35.645
+<v Lorand Sandor>but do we ever need to unredact secrets?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/156-0
+00:19:35.405 --> 00:19:38.751
+<v Michal Simka>No, no, no, no, no.
+Because this is the idea of kind of like</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/156-1
+00:19:38.751 --> 00:19:42.975
+<v Michal Simka>for whatever reason you are loading from
+environment something that is not a</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/156-2
+00:19:42.975 --> 00:19:45.662
+<v Michal Simka>secret and you want to have it available,
+right?</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/154-0
+00:19:43.165 --> 00:19:44.485
+<v Lorand Sandor>Yeah, yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/156-3
+00:19:45.662 --> 00:19:50.106
+<v Michal Simka>But then you but then the idea is kind of
+like that you like explicitly say this</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/155-0
+00:19:45.965 --> 00:19:46.005
+<v Lorand Sandor>Oh.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/156-4
+00:19:50.106 --> 00:19:50.325
+<v Michal Simka>one.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/157-0
+00:19:51.285 --> 00:19:52.125
+<v Michal Simka>You can unreact.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/158-0
+00:19:53.565 --> 00:19:58.325
+<v Lorand Sandor>So that I mark in sod or with the prefix.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/159-0
+00:19:55.965 --> 00:20:00.315
+<v Michal Simka>I know but but but but wait wait but but
+that will be but that will be anyway kind</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/159-1
+00:20:00.315 --> 00:20:04.508
+<v Michal Simka>of like yeah but true because because you
+have to explicitly say that you parse</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/159-2
+00:20:04.508 --> 00:20:06.918
+<v Michal Simka>right.
+So we'll anyway do it only for secret.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/159-3
+00:20:06.918 --> 00:20:09.329
+<v Michal Simka>So yeah so whatever.
+**** it always reducted.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/159-4
+00:20:09.329 --> 00:20:10.325
+<v Michal Simka>Don't listen to me.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/160-0
+00:20:11.045 --> 00:20:11.605
+<v Lorand Sandor>Hmm.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/162-0
+00:20:11.485 --> 00:20:15.542
+<v Michal Simka>Yeah and those are like all comments.
+So like yeah I think with this you can</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/162-1
+00:20:15.542 --> 00:20:19.177
+<v Michal Simka>like just go and roll and and start
+implementing stuff there in this</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/162-2
+00:20:19.177 --> 00:20:23.181
+<v Michal Simka>structure and I think it will be.
+I think this should be sensible there and</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/161-0
+00:20:20.805 --> 00:20:21.045
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/162-3
+00:20:23.181 --> 00:20:27.343
+<v Michal Simka>you can like it once you have like first
+thing running and some whatever first</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/162-4
+00:20:27.343 --> 00:20:30.925
+<v Michal Simka>doubts about all this is more complicated
+or something just like a.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/164-0
+00:20:31.445 --> 00:20:36.685
+<v Michal Simka>Don't hesitate to call and let's let's
+let's huddle over that and see.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/163-0
+00:20:34.365 --> 00:20:35.725
+<v Lorand Sandor>We'll connect it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/165-0
+00:20:37.085 --> 00:20:40.274
+<v Lorand Sandor>Papa,
+I will connect it straight to the two</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/165-1
+00:20:40.274 --> 00:20:46.000
+<v Lorand Sandor>instances that we have to confluence data
+center and the cloud the dog for the</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/168-0
+00:20:45.325 --> 00:20:47.672
+<v Michal Simka>Oh yeah,
+because we have dog hood cloud and we</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/165-2
+00:20:46.000 --> 00:20:46.725
+<v Lorand Sandor>instances.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/168-1
+00:20:47.672 --> 00:20:51.218
+<v Michal Simka>have this one. Yeah, awesome.
+And you can sync both into the into your</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/166-0
+00:20:49.045 --> 00:20:49.285
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/168-2
+00:20:51.218 --> 00:20:54.913
+<v Michal Simka>local machine and then to QA. And yeah,
+that sounds perfect to be honest.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/168-3
+00:20:54.913 --> 00:20:59.108
+<v Michal Simka>And then you already have like two things
+to test that like this stuff is actually,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/168-4
+00:20:59.108 --> 00:21:01.555
+<v Michal Simka>yeah,
+in parallel and like how this whole stuff,</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/167-0
+00:20:59.365 --> 00:21:02.685
+<v Lorand Sandor>Yep, it's gonna really work out. Yep.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/168-5
+00:21:01.555 --> 00:21:01.805
+<v Michal Simka>yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/169-0
+00:21:01.885 --> 00:21:07.245
+<v Michal Simka>That sounds great. That sounds perfect.
+Good. We in the sync, I guess.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/170-0
+00:21:06.365 --> 00:21:11.136
+<v Lorand Sandor>Cool. Awesome. Yes.
+Thanks a lot for checking the pull</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/170-1
+00:21:11.136 --> 00:21:13.045
+<v Lorand Sandor>request with the plan.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/172-0
+00:21:13.405 --> 00:21:15.743
+<v Michal Simka>No problem.
+So I like I I haven't read like the</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/172-1
+00:21:15.743 --> 00:21:19.445
+<v Michal Simka>revised document but you like you know
+better than the machine there so you</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/172-2
+00:21:19.445 --> 00:21:23.244
+<v Michal Simka>should be fine. So why can you just?
+I don't know if you want to approve that</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/171-0
+00:21:21.445 --> 00:21:21.605
+<v Lorand Sandor>Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/172-3
+00:21:23.244 --> 00:21:26.605
+<v Michal Simka>one. I just wanted to show this one.
+I will just work on it further.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/173-0
+00:21:26.645 --> 00:21:28.925
+<v Lorand Sandor>discuss. Yeah.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/174-0
+00:21:27.605 --> 00:21:30.060
+<v Michal Simka>OK, sure.
+Then I'll like just leave it as there.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/174-1
+00:21:30.060 --> 00:21:32.965
+<v Michal Simka>I could close it or whatever do do what
+you want with it.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/176-0
+00:21:30.125 --> 00:21:34.765
+<v Lorand Sandor>Yeah, yeah, yeah.
+I will just probably either make another</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/176-1
+00:21:34.765 --> 00:21:38.698
+<v Lorand Sandor>pull request,
+close this one and push to the same</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/176-2
+00:21:38.698 --> 00:21:41.765
+<v Lorand Sandor>branch anyways, but cool. Thanks a lot.</v>
+
+bc3cf126-209f-4f73-8a8d-54d890b3128e/177-0
+00:21:43.885 --> 00:21:45.125
+<v Lorand Sandor>That's working.</v>

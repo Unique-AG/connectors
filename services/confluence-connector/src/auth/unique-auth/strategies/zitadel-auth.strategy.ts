@@ -3,7 +3,6 @@ import { request } from 'undici';
 import { UniqueAuthMode, type UniqueConfig } from '../../../config';
 import { ServiceRegistry } from '../../../tenant/service-registry';
 import { handleErrorStatus } from '../../../utils/http-util';
-import { sanitizeError } from '../../../utils/normalize-error';
 import { TokenCache } from '../../token-cache';
 import { UniqueAuth } from '../unique-auth.abstract';
 
@@ -74,7 +73,7 @@ export class ZitadelAuthStrategy extends UniqueAuth {
       const logger = this.serviceRegistry.getServiceLogger(ZitadelAuthStrategy);
       logger.error({
         msg: 'Failed to acquire Unique API token from Zitadel',
-        error: sanitizeError(error),
+        error,
       });
       throw error;
     }

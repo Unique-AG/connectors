@@ -6,7 +6,6 @@ import { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract
 import type { ConfluenceConfig } from '../config';
 import type { ServiceRegistry } from '../tenant/service-registry';
 import { handleErrorStatus } from '../utils/http-util';
-import { sanitizeError } from '../utils/normalize-error';
 import type { ConfluencePage, ContentType } from './types/confluence-api.types';
 
 
@@ -88,7 +87,7 @@ export abstract class ConfluenceApiClient {
     this.limiter.on('error', (error) => {
       this.logger.error({
         msg: 'Confluence API: Bottleneck error',
-        error: sanitizeError(error),
+        error,
       });
     });
   }
