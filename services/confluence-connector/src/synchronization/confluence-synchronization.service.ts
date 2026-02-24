@@ -1,6 +1,5 @@
 import type pino from 'pino';
 import { getCurrentTenant } from '../tenant/tenant-context.storage';
-import { sanitizeError } from '../utils/normalize-error';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
 
@@ -38,7 +37,7 @@ export class ConfluenceSynchronizationService {
 
       this.logger.info('Sync completed');
     } catch (error) {
-      this.logger.error({ msg: 'Sync failed', error: sanitizeError(error) });
+      this.logger.error(error, 'Sync failed');
     } finally {
       tenant.isScanning = false;
     }

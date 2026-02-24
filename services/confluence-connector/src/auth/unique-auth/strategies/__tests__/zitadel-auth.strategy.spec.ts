@@ -185,7 +185,7 @@ describe('ZitadelAuthStrategy', () => {
       );
     });
 
-    it('logs error via sanitizeError before rethrowing', async () => {
+    it('logs error before rethrowing', async () => {
       mockRequest.mockRejectedValue(new Error('network failure'));
       const strategy = new ZitadelAuthStrategy(createExternalConfig(), mockLogger);
 
@@ -193,10 +193,10 @@ describe('ZitadelAuthStrategy', () => {
 
       expect(loggerErrorMock).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
-      const loggedPayload = loggerErrorMock.mock.calls[0]![0];
-      expect(loggedPayload.msg).toBe('Failed to acquire Unique API token from Zitadel');
-      expect(loggedPayload.error).toBeTypeOf('object');
-      expect(loggedPayload.error).toHaveProperty('message', 'network failure');
+      const [loggedError, loggedMsg] = loggerErrorMock.mock.calls[0]!;
+      expect(loggedMsg).toBe('Failed to acquire Unique API token from Zitadel');
+      expect(loggedError).toBeInstanceOf(Error);
+      expect(loggedError).toHaveProperty('message', 'network failure');
     });
   });
 });

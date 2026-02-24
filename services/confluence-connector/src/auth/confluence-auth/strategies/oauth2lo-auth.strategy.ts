@@ -58,10 +58,10 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
     try {
       return await this.requestToken();
     } catch (error) {
-      this.logger.error({
-        msg: `Failed to acquire Confluence ${this.instanceType} token via OAuth 2.0 2LO`,
+      this.logger.error(
         error,
-      });
+        `Failed to acquire Confluence ${this.instanceType} token via OAuth 2.0 2LO`,
+      );
 
       throw error;
     }

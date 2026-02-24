@@ -168,7 +168,7 @@ describe('OAuth2LoAuthStrategy', () => {
   });
 
   describe('error handling', () => {
-    it('logs the error with sanitizeError before rethrowing', async () => {
+    it('logs the error before rethrowing', async () => {
       mockRequest.mockRejectedValueOnce(new Error('getaddrinfo ENOTFOUND'));
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
@@ -177,10 +177,10 @@ describe('OAuth2LoAuthStrategy', () => {
 
       expect(loggerErrorMock).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
-      const loggedPayload = loggerErrorMock.mock.calls[0]![0];
-      expect(loggedPayload.msg).toBe('Failed to acquire Confluence cloud token via OAuth 2.0 2LO');
-      expect(loggedPayload.error).toBeTypeOf('object');
-      expect(loggedPayload.error).toHaveProperty('message');
+      const [loggedError, loggedMsg] = loggerErrorMock.mock.calls[0]!;
+      expect(loggedMsg).toBe('Failed to acquire Confluence cloud token via OAuth 2.0 2LO');
+      expect(loggedError).toBeInstanceOf(Error);
+      expect(loggedError).toHaveProperty('message');
     });
 
     it('throws the original network error', async () => {
