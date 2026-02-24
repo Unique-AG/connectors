@@ -228,8 +228,8 @@ describe('ConfluencePageScanner', () => {
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'page-child']);
     expect(mockTenantLogger.info).toHaveBeenCalledWith(
-      { pageId: 'db-child', title: 'Page db-child' },
-      'Skipping database child page',
+      { pageId: 'db-child', title: 'Page db-child', type: 'database' },
+      'Skipping non-page content type',
     );
   });
 
