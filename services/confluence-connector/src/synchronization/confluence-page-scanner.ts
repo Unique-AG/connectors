@@ -18,60 +18,62 @@ export class ConfluencePageScanner {
     const labeledPages = await this.apiClient.searchPagesByLabel();
     const discovered: DiscoveredPage[] = [];
     const discoveredIds = new Set<string>();
+    const ingestAllRootIds: string[] = [];
 
     for (const page of labeledPages) {
-      await this.processPage(page, discovered, discoveredIds, false);
+      if (this.isLimitReached(discovered.length)) break;
+
+      if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
+        this.logger.info({ pageId: page.id, title: page.title, type: page.type }, 'Skipping non-page content type');
+        continue;
+      }
+
+      if (discoveredIds.has(page.id)) continue;
+
+      discoveredIds.add(page.id);
+      discovered.push(this.toDiscoveredPage(page));
+
+      if (this.hasIngestAllLabel(page)) {
+        ingestAllRootIds.push(page.id);
+      }
+    }
+
+    if (ingestAllRootIds.length > 0) {
+      await this.expandDescendants(ingestAllRootIds, discovered, discoveredIds);
     }
 
     this.logger.info({ count: discovered.length }, 'Page discovery completed');
     return discovered;
   }
 
-  private async expandChildren(
-    parent: ConfluencePage,
+  private async expandDescendants(
+    rootIds: string[],
     discovered: DiscoveredPage[],
     discoveredIds: Set<string>,
   ): Promise<void> {
-    let children: ConfluencePage[];
+    let descendants: ConfluencePage[];
     try {
-      children = await this.apiClient.getChildPages(parent.id, parent.type);
+      descendants = await this.apiClient.getDescendantPages(rootIds);
     } catch (error) {
       this.logger.warn(
-        { parentId: parent.id, title: parent.title, error },
-        'Failed to fetch child pages, skipping children',
+        { rootIds, error },
+        'Failed to fetch descendant pages, skipping descendants',
       );
       return;
     }
 
-    for (const child of children) {
-      await this.processPage(child, discovered, discoveredIds, true);
-    }
-  }
+    for (const page of descendants) {
+      if (this.isLimitReached(discovered.length)) break;
 
-  private async processPage(
-    page: ConfluencePage,
-    discovered: DiscoveredPage[],
-    discoveredIds: Set<string>,
-    expandAll: boolean,
-  ): Promise<void> {
-    if (this.isLimitReached(discovered.length)) {
-      return;
-    }
+      if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
+        this.logger.info({ pageId: page.id, title: page.title, type: page.type }, 'Skipping non-page content type');
+        continue;
+      }
 
-    if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
-      this.logger.info({ pageId: page.id, title: page.title, type: page.type }, 'Skipping non-page content type');
-      return;
-    }
+      if (discoveredIds.has(page.id)) continue;
 
-    if (discoveredIds.has(page.id)) {
-      return;
-    }
-
-    discoveredIds.add(page.id);
-    discovered.push(this.toDiscoveredPage(page));
-
-    if (expandAll || this.hasIngestAllLabel(page)) {
-      await this.expandChildren(page, discovered, discoveredIds);
+      discoveredIds.add(page.id);
+      discovered.push(this.toDiscoveredPage(page));
     }
   }
 

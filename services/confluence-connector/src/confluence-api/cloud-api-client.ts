@@ -1,28 +1,12 @@
-import { z } from 'zod';
 import { ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
 import {
   confluencePageSchema,
   paginatedResponseSchema,
   type ConfluencePage,
-  type ContentType,
 } from './types/confluence-api.types';
 
-const cloudChildReferenceSchema = z.object({
-  id: z.string(),
-});
-
 const SEARCH_PAGE_SIZE = 25;
-const CHILDREN_LIMIT = 250;
-
-const CONTENT_TYPE_V2_PATH: Record<ContentType, string> = {
-  page: 'pages',
-  folder: 'folders',
-  database: 'databases',
-  blogpost: 'blogposts',
-  whiteboard: 'whiteboards',
-  embed: 'embeds',
-};
 
 export class CloudConfluenceApiClient extends ConfluenceApiClient {
   public async searchPagesByLabel(): Promise<ConfluencePage[]> {
@@ -43,36 +27,26 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return response.results[0] ?? null;
   }
 
-  public async getChildPages(
-    parentId: string,
-    contentType: ContentType,
-  ): Promise<ConfluencePage[]> {
-    const segment = CONTENT_TYPE_V2_PATH[contentType];
-    const url = `${this.baseUrl}/wiki/api/v2/${segment}/${parentId}/direct-children?limit=${CHILDREN_LIMIT}`;
-    const childRefs = await fetchAllPaginated(
-      url,
-      this.baseUrl,
-      (requestUrl) => this.makeRateLimitedRequest(requestUrl),
-      cloudChildReferenceSchema,
+  // Uses V1 CQL `ancestor` instead of V2 GET /pages?id=... because the V2 bulk pages
+  // endpoint does not return labels (include-labels is not supported). Labels are required
+  // by the page scanner for ingestAllLabel checks. The only V2 labels endpoint is per-page
+  // (GET /pages/{id}/labels), which would recreate the N+1 problem.
+  public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {
+    if (rootIds.length === 0) return [];
+
+    const ancestorClause = rootIds.length === 1
+      ? `ancestor=${rootIds[0]}`
+      : `ancestor IN (${rootIds.join(',')})`;
+    const cql = `${ancestorClause} AND type != attachment`;
+    const url = `${this.baseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&limit=${SEARCH_PAGE_SIZE}`;
+
+    return fetchAllPaginated(url, this.baseUrl, (requestUrl) =>
+      this.makeRateLimitedRequest(requestUrl),
+      confluencePageSchema,
     );
-    return this.fetchChildDetails(childRefs);
   }
 
   public buildPageWebUrl(page: ConfluencePage): string {
     return `${this.baseUrl}/wiki${page._links.webui}`;
-  }
-
-  private async fetchChildDetails(childRefs: z.infer<typeof cloudChildReferenceSchema>[]): Promise<ConfluencePage[]> {
-    const pages: ConfluencePage[] = [];
-    for (const child of childRefs) {
-      const detailUrl = `${this.baseUrl}/wiki/rest/api/content/search?cql=id%3D${child.id}&expand=metadata.labels,version,space`;
-      const raw = await this.makeRateLimitedRequest(detailUrl);
-      const detail = paginatedResponseSchema(confluencePageSchema).parse(raw);
-      const page = detail.results[0];
-      if (page) {
-        pages.push(page);
-      }
-    }
-    return pages;
   }
 }

@@ -1,8 +1,7 @@
 import { ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
-import { confluencePageSchema, type ConfluencePage, type ContentType } from './types/confluence-api.types';
+import { confluencePageSchema, type ConfluencePage } from './types/confluence-api.types';
 
-const CHILD_PAGE_LIMIT = 50;
 const SEARCH_PAGE_SIZE = 25;
 
 export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
@@ -24,11 +23,14 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     return result.success ? result.data : null;
   }
 
-  public async getChildPages(
-    parentId: string,
-    _contentType: ContentType,
-  ): Promise<ConfluencePage[]> {
-    const url = `${this.baseUrl}/rest/api/content/${parentId}/child/page?os_authType=basic&expand=metadata.labels,version,space&limit=${CHILD_PAGE_LIMIT}`;
+  public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {
+    if (rootIds.length === 0) return [];
+
+    const ancestorClause = rootIds.length === 1
+      ? `ancestor=${rootIds[0]}`
+      : `ancestor IN (${rootIds.join(',')})`;
+    const cql = `${ancestorClause} AND type != attachment`;
+    const url = `${this.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&os_authType=basic&limit=${SEARCH_PAGE_SIZE}`;
 
     return fetchAllPaginated(url, this.baseUrl, (requestUrl) =>
       this.makeRateLimitedRequest(requestUrl),

@@ -25,7 +25,7 @@ vi.mock('../../utils/normalize-error', () => ({
 import { request } from 'undici';
 import type { ConfluenceConfig } from '../../config';
 import { DataCenterConfluenceApiClient } from '../data-center-api-client';
-import { ContentType } from '../types/confluence-api.types';
+import { type ConfluencePage, ContentType } from '../types/confluence-api.types';
 
 const BASE_URL = 'https://dc.example.com';
 
@@ -184,47 +184,56 @@ describe('DataCenterConfluenceApiClient', () => {
     });
   });
 
-  describe('getChildPages', () => {
-    it('uses V1 /child/page endpoint with os_authType=basic', async () => {
+  describe('getDescendantPages', () => {
+    it('returns empty array for empty rootIds', async () => {
+      const result = await client.getDescendantPages([]);
+
+      expect(result).toEqual([]);
+      expect(mockedRequest).not.toHaveBeenCalled();
+    });
+
+    it('uses CQL ancestor=<id> with os_authType=basic for single root ID', async () => {
       mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
 
-      await client.getChildPages('55', ContentType.PAGE);
+      await client.getDescendantPages(['55']);
 
       const url = mockedRequest.mock.calls[0]![0] as string;
-      expect(url).toContain('/rest/api/content/55/child/page');
+      const decodedUrl = decodeURIComponent(url);
+      expect(decodedUrl).toContain('ancestor=55');
       expect(url).toContain('os_authType=basic');
     });
 
-    it('ignores contentType parameter — always uses /child/page', async () => {
+    it('uses CQL ancestor IN (...) for multiple root IDs', async () => {
       mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
 
-      await client.getChildPages('55', ContentType.FOLDER);
+      await client.getDescendantPages(['10', '20']);
 
       const url = mockedRequest.mock.calls[0]![0] as string;
-      expect(url).toContain('/child/page');
-      expect(url).not.toContain('folders');
+      const decodedUrl = decodeURIComponent(url);
+      expect(decodedUrl).toContain('ancestor IN (10,20)');
     });
 
-    it('uses limit=50 for child pages', async () => {
+    it('includes type != attachment in CQL', async () => {
       mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
 
-      await client.getChildPages('55', ContentType.PAGE);
+      await client.getDescendantPages(['99']);
 
       const url = mockedRequest.mock.calls[0]![0] as string;
-      expect(url).toContain('limit=50');
+      const decodedUrl = decodeURIComponent(url);
+      expect(decodedUrl).toContain('type != attachment');
     });
 
-    it('returns paginated child pages', async () => {
+    it('paginates results via _links.next', async () => {
       const page1 = {
-        results: [makePage({ id: '10' })],
-        _links: { next: '/rest/api/content/55/child/page?cursor=x' },
+        results: [makePage({ id: '10' }) as ConfluencePage],
+        _links: { next: '/rest/api/content/search?cql=ancestor%3D55&start=25' },
       };
-      const page2 = { results: [makePage({ id: '11' })], _links: {} };
+      const page2 = { results: [makePage({ id: '11' }) as ConfluencePage], _links: {} };
 
       mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, page1));
       mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, page2));
 
-      const results = await client.getChildPages('55', ContentType.PAGE);
+      const results = await client.getDescendantPages(['55']);
 
       expect(results).toHaveLength(2);
       expect(results[0]!.id).toBe('10');

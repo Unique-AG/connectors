@@ -5,7 +5,7 @@ import type { IncomingHttpHeaders } from 'undici/types/header';
 import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
 import { handleErrorStatus } from '../utils/http-util';
-import type { ConfluencePage, ContentType } from './types/confluence-api.types';
+import type { ConfluencePage } from './types/confluence-api.types';
 
 
 export abstract class ConfluenceApiClient {
@@ -39,10 +39,7 @@ export abstract class ConfluenceApiClient {
 
   public abstract getPageById(pageId: string): Promise<ConfluencePage | null>;
 
-  public abstract getChildPages(
-    parentId: string,
-    contentType: ContentType,
-  ): Promise<ConfluencePage[]>;
+  public abstract getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]>;
 
   public abstract buildPageWebUrl(page: ConfluencePage): string;
 

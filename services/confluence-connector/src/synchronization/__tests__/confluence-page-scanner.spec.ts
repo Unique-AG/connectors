@@ -53,7 +53,7 @@ function makePage(
 }
 
 function createScanner(
-  apiClient: Pick<ConfluenceApiClient, 'searchPagesByLabel' | 'getChildPages' | 'buildPageWebUrl'>,
+  apiClient: Pick<ConfluenceApiClient, 'searchPagesByLabel' | 'getDescendantPages' | 'buildPageWebUrl'>,
   processingConfig: ProcessingConfig = baseProcessingConfig,
 ): ConfluencePageScanner {
   return new ConfluencePageScanner(
@@ -69,19 +69,14 @@ describe('ConfluencePageScanner', () => {
     vi.clearAllMocks();
   });
 
-  it('discovers labeled pages and recursively expands ingest-all children', async () => {
+  it('discovers labeled pages and expands ingest-all descendants', async () => {
     const parent = makePage('parent', { labels: ['ai-ingest-all'] });
     const child = makePage('child', { labels: ['engineering'] });
     const standalone = makePage('standalone', { labels: ['ai-ingest'] });
 
     const apiClient = {
       searchPagesByLabel: vi.fn().mockResolvedValue([parent, standalone]),
-      getChildPages: vi.fn().mockImplementation(async (parentId: string) => {
-        if (parentId === 'parent') {
-          return [child];
-        }
-        return [];
-      }),
+      getDescendantPages: vi.fn().mockResolvedValue([child]),
       buildPageWebUrl: vi.fn(
         (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
       ),
@@ -90,9 +85,8 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
-    expect(result.map((page) => page.id)).toEqual(['parent', 'child', 'standalone']);
-    expect(apiClient.getChildPages).toHaveBeenCalledWith('parent', ContentType.PAGE);
-    expect(apiClient.getChildPages).toHaveBeenCalledWith('child', ContentType.PAGE);
+    expect(result.map((page) => page.id)).toEqual(['parent', 'standalone', 'child']);
+    expect(apiClient.getDescendantPages).toHaveBeenCalledWith(['parent']);
   });
 
   it('skips database pages', async () => {
@@ -104,7 +98,7 @@ describe('ConfluencePageScanner', () => {
 
     const apiClient = {
       searchPagesByLabel: vi.fn().mockResolvedValue([database, page]),
-      getChildPages: vi.fn().mockResolvedValue([]),
+      getDescendantPages: vi.fn().mockResolvedValue([]),
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
@@ -114,7 +108,7 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.map((item) => item.id)).toEqual(['page-root']);
-    expect(apiClient.getChildPages).not.toHaveBeenCalled();
+    expect(apiClient.getDescendantPages).not.toHaveBeenCalled();
   });
 
   it('respects maxPagesToScan limit', async () => {
@@ -127,7 +121,7 @@ describe('ConfluencePageScanner', () => {
 
     const apiClient = {
       searchPagesByLabel: vi.fn().mockResolvedValue([first, second]),
-      getChildPages: vi.fn().mockResolvedValue([]),
+      getDescendantPages: vi.fn().mockResolvedValue([]),
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
@@ -146,7 +140,7 @@ describe('ConfluencePageScanner', () => {
   it('returns empty array and logs completion when searchPagesByLabel returns no pages', async () => {
     const apiClient = {
       searchPagesByLabel: vi.fn().mockResolvedValue([]),
-      getChildPages: vi.fn().mockResolvedValue([]),
+      getDescendantPages: vi.fn().mockResolvedValue([]),
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
@@ -156,14 +150,14 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result).toEqual([]);
-    expect(apiClient.getChildPages).not.toHaveBeenCalled();
+    expect(apiClient.getDescendantPages).not.toHaveBeenCalled();
     expect(mockTenantLogger.info).toHaveBeenCalledWith({ count: 0 }, 'Page discovery completed');
   });
 
   it('rejects when searchPagesByLabel fails', async () => {
     const apiClient = {
       searchPagesByLabel: vi.fn().mockRejectedValue(new Error('search API error')),
-      getChildPages: vi.fn().mockResolvedValue([]),
+      getDescendantPages: vi.fn().mockResolvedValue([]),
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
@@ -184,12 +178,7 @@ describe('ConfluencePageScanner', () => {
 
     const apiClient = {
       searchPagesByLabel: vi.fn().mockResolvedValue([parent]),
-      getChildPages: vi.fn().mockImplementation(async (parentId: string) => {
-        if (parentId === 'parent') {
-          return [databaseChild, pageChild];
-        }
-        return [];
-      }),
+      getDescendantPages: vi.fn().mockResolvedValue([databaseChild, pageChild]),
       buildPageWebUrl: vi.fn(
         (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
       ),
@@ -205,9 +194,9 @@ describe('ConfluencePageScanner', () => {
     );
   });
 
-  it('honors maxPagesToScan limit during child expansion', async () => {
+  it('honors maxPagesToScan limit during descendant expansion', async () => {
     const parent = makePage('parent', { labels: ['ai-ingest-all'] });
-    const child = makePage('child', { labels: ['ai-ingest-all'] });
+    const child = makePage('child', { labels: ['engineering'] });
     const grandchild = makePage('grandchild', { labels: ['engineering'] });
     const limitedConfig: ProcessingConfig = {
       ...baseProcessingConfig,
@@ -216,11 +205,7 @@ describe('ConfluencePageScanner', () => {
 
     const apiClient = {
       searchPagesByLabel: vi.fn().mockResolvedValue([parent]),
-      getChildPages: vi.fn().mockImplementation(async (parentId: string) => {
-        if (parentId === 'parent') return [child];
-        if (parentId === 'child') return [grandchild];
-        return [];
-      }),
+      getDescendantPages: vi.fn().mockResolvedValue([child, grandchild]),
       buildPageWebUrl: vi.fn(
         (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
       ),
@@ -236,16 +221,13 @@ describe('ConfluencePageScanner', () => {
     );
   });
 
-  it('deduplicates pages that appear in both the CQL scan and child expansion', async () => {
+  it('deduplicates pages that appear in both the CQL scan and descendant expansion', async () => {
     const parent = makePage('parent', { labels: ['ai-ingest-all'] });
     const labeledChild = makePage('labeled-child', { labels: ['ai-ingest'] });
 
     const apiClient = {
       searchPagesByLabel: vi.fn().mockResolvedValue([parent, labeledChild]),
-      getChildPages: vi.fn().mockImplementation(async (parentId: string) => {
-        if (parentId === 'parent') return [labeledChild];
-        return [];
-      }),
+      getDescendantPages: vi.fn().mockResolvedValue([labeledChild]),
       buildPageWebUrl: vi.fn(
         (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
       ),
@@ -257,13 +239,13 @@ describe('ConfluencePageScanner', () => {
     expect(result.map((page) => page.id)).toEqual(['parent', 'labeled-child']);
   });
 
-  it('continues discovery when child fetching fails for one parent', async () => {
-    const failingParent = makePage('failing-parent', { labels: ['ai-ingest-all'] });
+  it('continues discovery when descendant fetching fails', async () => {
+    const ingestAllPage = makePage('ingest-all-page', { labels: ['ai-ingest-all'] });
     const healthyPage = makePage('healthy-page', { labels: ['ai-ingest'] });
 
     const apiClient = {
-      searchPagesByLabel: vi.fn().mockResolvedValue([failingParent, healthyPage]),
-      getChildPages: vi.fn().mockRejectedValue(new Error('child lookup failed')),
+      searchPagesByLabel: vi.fn().mockResolvedValue([ingestAllPage, healthyPage]),
+      getDescendantPages: vi.fn().mockRejectedValue(new Error('descendant lookup failed')),
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
@@ -272,10 +254,10 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
-    expect(result.map((item) => item.id)).toEqual(['failing-parent', 'healthy-page']);
+    expect(result.map((item) => item.id)).toEqual(['ingest-all-page', 'healthy-page']);
     expect(mockTenantLogger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ parentId: 'failing-parent', error: expect.anything() }),
-      'Failed to fetch child pages, skipping children',
+      expect.objectContaining({ rootIds: ['ingest-all-page'], error: expect.anything() }),
+      'Failed to fetch descendant pages, skipping descendants',
     );
   });
 });
