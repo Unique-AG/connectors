@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { FetchFn } from '@qfetch/qfetch';
 import { Span, TraceService } from 'nestjs-otel';
 import {
   type PublicGetUsersRequest,
@@ -6,14 +7,14 @@ import {
   type PublicUserResult,
   PublicUsersResultSchema,
 } from './unique.dtos';
-import { UniqueApiClient } from './unique-api.client';
+import { UNIQUE_FETCH } from './unique.consts';
 
 @Injectable()
 export class UniqueUserService {
   private readonly logger = new Logger(UniqueUserService.name);
 
   public constructor(
-    private readonly api: UniqueApiClient,
+    @Inject(UNIQUE_FETCH) private readonly fetch: FetchFn,
     private readonly trace: TraceService,
   ) {}
 
@@ -36,7 +37,9 @@ export class UniqueUserService {
       );
 
       try {
-        const result = PublicUsersResultSchema.parse(await this.api.get('users', params));
+        const query = new URLSearchParams(params).toString();
+        const response = await this.fetch(`users?${query}`);
+        const result = PublicUsersResultSchema.parse(await response.json());
         return result.users.at(0) ?? null;
       } catch (err) {
         this.logger.warn({ err }, 'Failed to locate user in Unique system');

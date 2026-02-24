@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { FetchFn } from '@qfetch/qfetch';
 import { Span, TraceService } from 'nestjs-otel';
 import {
   PublicAddScopeAccessRequestSchema,
@@ -9,14 +10,14 @@ import {
   type PublicScopeAccessSchema,
   type Scope,
 } from './unique.dtos';
-import { UniqueApiClient } from './unique-api.client';
+import { UNIQUE_FETCH } from './unique.consts';
 
 @Injectable()
 export class UniqueScopeService {
   private readonly logger = new Logger(UniqueScopeService.name);
 
   public constructor(
-    private readonly api: UniqueApiClient,
+    @Inject(UNIQUE_FETCH) private readonly fetch: FetchFn,
     private readonly trace: TraceService,
   ) {}
 
@@ -42,11 +43,15 @@ export class UniqueScopeService {
       'Creating new organizational scope in Unique API',
     );
 
-    const body = await this.api.post('folder', payload);
+    const response = await this.fetch('folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
     const result = PublicCreateScopeResultSchema.refine(
       (s) => s.createdFolders.length > 0,
       'no scopes were created',
-    ).parse(body);
+    ).parse(await response.json());
 
     // biome-ignore lint/style/noNonNullAssertion: we assert with zod above
     const createdScope = result.createdFolders[0]!;
@@ -81,8 +86,12 @@ export class UniqueScopeService {
       'Configuring user access permissions for organizational scope',
     );
 
-    const body = await this.api.patch('folder/add-access', payload);
-    const result = PublicAddScopeAccessResultSchema.parse(body);
+    const response = await this.fetch('folder/add-access', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = PublicAddScopeAccessResultSchema.parse(await response.json());
 
     this.logger.log(
       { scopeId, accessesAdded: accesses.length },

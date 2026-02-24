@@ -1,5 +1,6 @@
 import assert from 'node:assert';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { FetchFn } from '@qfetch/qfetch';
 import { Span, TraceService } from 'nestjs-otel';
 import {
   type ContentInfoItem,
@@ -19,14 +20,14 @@ import {
   type SearchResultItem,
   SearchType,
 } from './unique.dtos';
-import { UniqueApiClient } from './unique-api.client';
+import { UNIQUE_FETCH } from './unique.consts';
 
 @Injectable()
 export class UniqueContentService {
   private readonly logger = new Logger(UniqueContentService.name);
 
   public constructor(
-    private readonly api: UniqueApiClient,
+    @Inject(UNIQUE_FETCH) private readonly fetch: FetchFn,
     private readonly trace: TraceService,
   ) {}
 
@@ -54,8 +55,12 @@ export class UniqueContentService {
       'Creating or updating content record in Unique system',
     );
 
-    const body = await this.api.post('content/upsert', payload);
-    const result = PublicContentUpsertResultSchema.parse(body);
+    const response = await this.fetch('content/upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = PublicContentUpsertResultSchema.parse(await response.json());
 
     this.logger.log(
       {
@@ -126,8 +131,12 @@ export class UniqueContentService {
       'Querying content information from Unique system',
     );
 
-    const body = await this.api.post('content/infos', payload);
-    const result = PublicContentInfosResultSchema.parse(body);
+    const response = await this.fetch('content/infos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = PublicContentInfosResultSchema.parse(await response.json());
 
     span?.setAttribute('result_count', result.contents.length);
     span?.setAttribute('total', result.total ?? result.contents.length);
@@ -182,8 +191,12 @@ export class UniqueContentService {
       'Executing content search in Unique system',
     );
 
-    const body = await this.api.post('search/search', payload);
-    const result = PublicSearchResultSchema.parse(body);
+    const response = await this.fetch('search/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = PublicSearchResultSchema.parse(await response.json());
 
     span?.setAttribute('result_count', result.data.length);
 
