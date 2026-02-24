@@ -7,25 +7,22 @@ import type { ConfluenceConfig } from '../config';
 import type { ServiceRegistry } from '../tenant/service-registry';
 import { handleErrorStatus } from '../utils/http-util';
 import { sanitizeError } from '../utils/normalize-error';
-import type { ConfluenceApiAdapter } from './confluence-api-adapter';
-import { fetchAllPaginated } from './confluence-fetch-paginated';
 import type { ConfluencePage, ContentType } from './types/confluence-api.types';
 
-const SEARCH_PAGE_SIZE = 25;
-
-export class ConfluenceApiClient {
+export abstract class ConfluenceApiClient {
   private readonly confluenceAuth: ConfluenceAuth;
-  private readonly logger: pino.Logger;
+  protected readonly logger: pino.Logger;
   private readonly limiter: Bottleneck;
   private readonly dispatcher: Dispatcher;
+  protected readonly baseUrl: string;
 
   public constructor(
-    private readonly adapter: ConfluenceApiAdapter,
-    private readonly config: ConfluenceConfig,
+    protected readonly config: ConfluenceConfig,
     serviceRegistry: ServiceRegistry,
   ) {
     this.confluenceAuth = serviceRegistry.getService(ConfluenceAuth);
     this.logger = serviceRegistry.getServiceLogger(ConfluenceApiClient);
+    this.baseUrl = config.baseUrl;
 
     this.dispatcher = new Agent().compose([interceptors.redirect(), interceptors.retry()]);
 
@@ -38,39 +35,18 @@ export class ConfluenceApiClient {
     this.setupThrottlingMonitoring();
   }
 
-  public async searchPagesByLabel(): Promise<ConfluencePage[]> {
-    const spaceTypeFilter =
-      this.config.instanceType === 'cloud'
-        ? '(space.type=global OR space.type=collaboration)'
-        : 'space.type=global';
-    const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
+  public abstract searchPagesByLabel(): Promise<ConfluencePage[]>;
 
-    const initialUrl = this.adapter.buildSearchUrl(cql, SEARCH_PAGE_SIZE, 0);
-    return fetchAllPaginated<ConfluencePage>(initialUrl, this.config.baseUrl, (url) =>
-      this.makeRateLimitedRequest(url),
-    );
-  }
+  public abstract getPageById(pageId: string): Promise<ConfluencePage | null>;
 
-  public async getPageById(pageId: string): Promise<ConfluencePage | null> {
-    const url = this.adapter.buildGetPageUrl(pageId);
-    const body = await this.makeRateLimitedRequest<unknown>(url);
-    return this.adapter.parseSinglePageResponse(body);
-  }
-
-  public async getChildPages(
+  public abstract getChildPages(
     parentId: string,
     contentType: ContentType,
-  ): Promise<ConfluencePage[]> {
-    return this.adapter.fetchChildPages(parentId, contentType, (url) =>
-      this.makeRateLimitedRequest(url),
-    );
-  }
+  ): Promise<ConfluencePage[]>;
 
-  public buildPageWebUrl(page: ConfluencePage): string {
-    return this.adapter.buildPageWebUrl(page);
-  }
+  public abstract buildPageWebUrl(page: ConfluencePage): string;
 
-  private async makeRateLimitedRequest<T>(url: string): Promise<T> {
+  protected async makeRateLimitedRequest<T>(url: string): Promise<T> {
     return await this.limiter.schedule(async () => {
       const token = await this.confluenceAuth.acquireToken();
       const response = await request(url, {
