@@ -108,6 +108,8 @@ connectorConfig:
       confluence:
         # -- Confluence instance type: cloud or data-center
         instanceType: cloud
+        # -- Atlassian Cloud ID (UUID) for the Confluence site (required for cloud instances)
+        cloudId: unset_default_value
         # -- base url of the Confluence instance
         # example (cloud): https://acme.atlassian.net
         # example (data-center): https://confluence.acme.com

@@ -156,6 +156,10 @@
                     "enum": ["cloud", "data-center"],
                     "description": "Confluence instance type: cloud or data-center"
                   },
+                  "cloudId": {
+                    "type": "string",
+                    "description": "Atlassian Cloud ID (UUID) for the Confluence site. Required when instanceType is cloud."
+                  },
                   "baseUrl": {
                     "type": "string",
                     "description": "Confluence base URL",
@@ -228,6 +232,18 @@
                           "const": "data-center"
                         }
                       }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "instanceType": {
+                          "const": "cloud"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": ["cloudId"]
                     }
                   }
                 ],

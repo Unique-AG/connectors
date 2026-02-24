@@ -78,9 +78,9 @@ spec:
 | connector.image.tag | string | `"2.0.0-alpha.0"` |  |
 | connector.ports.application | int | `51349` |  |
 | connector.ports.metrics | int | `51350` |  |
-| connector.resources.limits.memory | string | `"1024Mi"` |  |
+| connector.resources.limits.memory | string | `"768Mi"` |  |
 | connector.resources.requests.cpu | string | `"500m"` |  |
-| connector.resources.requests.memory | string | `"960Mi"` |  |
+| connector.resources.requests.memory | string | `"512Mi"` |  |
 | connector.routes.paths.default.enabled | bool | `false` |  |
 | connector.service.enabled | bool | `false` |  |
 | connector.serviceAccount.enabled | bool | `true` |  |
@@ -95,6 +95,7 @@ spec:
 | connectorConfig.tenants[0].confluence.auth.clientId | string | `"unset_default_value"` | OAuth 2.0 (2LO) application client ID |
 | connectorConfig.tenants[0].confluence.auth.mode | string | `"oauth_2lo"` | authentication mode possible values: oauth_2lo |
 | connectorConfig.tenants[0].confluence.baseUrl | string | `"unset_default_value"` | base url of the Confluence instance example (cloud): https://acme.atlassian.net example (data-center): https://confluence.acme.com |
+| connectorConfig.tenants[0].confluence.cloudId | string | `"unset_default_value"` | Atlassian Cloud ID (UUID) for the Confluence site (required for cloud instances) |
 | connectorConfig.tenants[0].confluence.ingestAllLabel | string | `"ai-ingest-all"` | Label to trigger full sync of all labeled pages |
 | connectorConfig.tenants[0].confluence.ingestSingleLabel | string | `"ai-ingest"` | Label to trigger single-page sync |
 | connectorConfig.tenants[0].confluence.instanceType | string | `"cloud"` | Confluence instance type: cloud or data-center |

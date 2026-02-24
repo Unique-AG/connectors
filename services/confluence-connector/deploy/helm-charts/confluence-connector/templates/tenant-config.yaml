@@ -11,6 +11,9 @@ data:
     # Confluence Configuration
     confluence:
       instanceType: {{ $tenant.confluence.instanceType | quote }}
+      {{- if eq $tenant.confluence.instanceType "cloud" }}
+      cloudId: {{ $tenant.confluence.cloudId | quote }}
+      {{- end }}
       baseUrl: {{ $tenant.confluence.baseUrl | quote }}
       auth:
         mode: {{ $tenant.confluence.auth.mode | quote }}
