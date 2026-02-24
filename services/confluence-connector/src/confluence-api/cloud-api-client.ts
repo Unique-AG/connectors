@@ -27,10 +27,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return response.results[0] ?? null;
   }
 
-  // Uses V1 CQL `ancestor` instead of V2 GET /pages?id=... because the V2 bulk pages
-  // endpoint does not return labels (include-labels is not supported). Labels are required
-  // by the page scanner for ingestAllLabel checks. The only V2 labels endpoint is per-page
-  // (GET /pages/{id}/labels), which would recreate the N+1 problem.
+  // V1 CQL `ancestor` returns all descendants at any depth with labels; V2 bulk pages lacks label support.
   public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {
     if (rootIds.length === 0) return [];
 
