@@ -47,16 +47,16 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
   }
 
   private registerCronJob(tenant: TenantContext): void {
+    const cronExpression = tenant.config.processing.scanIntervalCron;
+
+    const job = new CronJob(cronExpression, () => {
+      void this.syncTenant(tenant);
+    });
+    this.schedulerRegistry.addCronJob(`sync:${tenant.name}`, job);
+    job.start();
+
     this.tenantRegistry.run(tenant, () => {
       const logger = this.serviceRegistry.getServiceLogger(TenantSyncScheduler);
-      const cronExpression = tenant.config.processing.scanIntervalCron;
-
-      const job = new CronJob(cronExpression, () => {
-        void this.syncTenant(tenant);
-      });
-      this.schedulerRegistry.addCronJob(`sync:${tenant.name}`, job);
-
-      job.start();
       logger.info(`Scheduled sync with cron: ${cronExpression}`);
     });
   }
