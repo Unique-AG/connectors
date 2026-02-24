@@ -63,14 +63,18 @@ export class ConfluencePageScanner {
     }
 
     for (const page of descendants) {
-      if (this.isLimitReached(discovered.length)) break;
+      if (this.isLimitReached(discovered.length)) {
+        break;
+      }
 
       if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
-        this.logger.info({ pageId: page.id, title: page.title, type: page.type }, 'Skipping non-page content type');
+        this.logger.debug({ pageId: page.id, title: page.title, type: page.type }, 'Skipping non-page content type');
         continue;
       }
 
-      if (discoveredIds.has(page.id)) continue;
+      if (discoveredIds.has(page.id)) {
+        continue;
+      }
 
       discoveredIds.add(page.id);
       discovered.push(this.toDiscoveredPage(page));
