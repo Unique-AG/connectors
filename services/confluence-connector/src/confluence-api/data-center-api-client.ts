@@ -26,10 +26,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
   public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {
     if (rootIds.length === 0) return [];
 
-    const ancestorClause = rootIds.length === 1
-      ? `ancestor=${rootIds[0]}`
-      : `ancestor IN (${rootIds.join(',')})`;
-    const cql = `${ancestorClause} AND type != attachment`;
+    const cql = `ancestor IN (${rootIds.join(',')}) AND type != attachment`;
     const url = `${this.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&os_authType=basic&limit=${SEARCH_PAGE_SIZE}`;
 
     return fetchAllPaginated(url, this.baseUrl, (requestUrl) =>
