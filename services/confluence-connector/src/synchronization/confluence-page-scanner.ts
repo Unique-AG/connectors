@@ -6,6 +6,8 @@ import type { ServiceRegistry } from '../tenant';
 import { sanitizeError } from '../utils/normalize-error';
 import type { DiscoveredPage } from './sync.types';
 
+const SKIPPED_CONTENT_TYPES = [ContentType.DATABASE, ContentType.BLOGPOST, ContentType.WHITEBOARD, ContentType.EMBED];
+
 export class ConfluencePageScanner {
   private readonly apiClient: ConfluenceApiClient;
   private readonly logger: pino.Logger;
@@ -63,8 +65,7 @@ export class ConfluencePageScanner {
       return;
     }
 
-    const skippedTypes = [ContentType.DATABASE, ContentType.BLOGPOST, ContentType.WHITEBOARD, ContentType.EMBED];
-    if (skippedTypes.includes(page.type)) {
+    if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
       this.logger.info({ pageId: page.id, title: page.title, type: page.type }, 'Skipping non-page content type');
       return;
     }
