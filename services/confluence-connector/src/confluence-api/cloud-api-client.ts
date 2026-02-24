@@ -1,11 +1,16 @@
-import { isArray, isPlainObject, isString } from 'remeda';
+import { z } from 'zod';
 import { ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
-import type { ConfluencePage, ContentType, PaginatedResponse } from './types/confluence-api.types';
+import {
+  confluencePageSchema,
+  paginatedResponseSchema,
+  type ConfluencePage,
+  type ContentType,
+} from './types/confluence-api.types';
 
-interface CloudChildReference {
-  id: string;
-}
+const cloudChildReferenceSchema = z.object({
+  id: z.string(),
+});
 
 const SEARCH_PAGE_SIZE = 25;
 const CHILDREN_LIMIT = 250;
@@ -22,23 +27,17 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
     const url = `${this.baseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&limit=${SEARCH_PAGE_SIZE}&start=0`;
 
-    return fetchAllPaginated<ConfluencePage>(url, this.baseUrl, (requestUrl) =>
+    return fetchAllPaginated(url, this.baseUrl, (requestUrl) =>
       this.makeRateLimitedRequest(requestUrl),
+      confluencePageSchema,
     );
   }
 
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
     const url = `${this.baseUrl}/wiki/rest/api/content/search?cql=id%3D${pageId}&expand=body.storage,version,space,metadata.labels`;
-    const body: unknown = await this.makeRateLimitedRequest(url);
-
-    if (!isPlainObject(body) || !isArray(body.results)) {
-      return null;
-    }
-    const first = body.results[0];
-    if (!isPlainObject(first) || !isString(first.id)) {
-      return null;
-    }
-    return first as unknown as ConfluencePage;
+    const raw = await this.makeRateLimitedRequest(url);
+    const response = paginatedResponseSchema(confluencePageSchema).parse(raw);
+    return response.results[0] ?? null;
   }
 
   public async getChildPages(
@@ -47,10 +46,11 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
   ): Promise<ConfluencePage[]> {
     const segment = CONTENT_TYPE_V2_PATH[contentType];
     const url = `${this.baseUrl}/wiki/api/v2/${segment}/${parentId}/direct-children?limit=${CHILDREN_LIMIT}`;
-    const childRefs = await fetchAllPaginated<CloudChildReference>(
+    const childRefs = await fetchAllPaginated(
       url,
       this.baseUrl,
       (requestUrl) => this.makeRateLimitedRequest(requestUrl),
+      cloudChildReferenceSchema,
     );
     return this.fetchChildDetails(childRefs);
   }
@@ -59,12 +59,12 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return `${this.baseUrl}/wiki${page._links.webui}`;
   }
 
-  private async fetchChildDetails(childRefs: CloudChildReference[]): Promise<ConfluencePage[]> {
+  private async fetchChildDetails(childRefs: z.infer<typeof cloudChildReferenceSchema>[]): Promise<ConfluencePage[]> {
     const pages: ConfluencePage[] = [];
     for (const child of childRefs) {
       const detailUrl = `${this.baseUrl}/wiki/rest/api/content/search?cql=id%3D${child.id}&expand=metadata.labels,version,space`;
-      const detail =
-        await this.makeRateLimitedRequest<PaginatedResponse<ConfluencePage>>(detailUrl);
+      const raw = await this.makeRateLimitedRequest(detailUrl);
+      const detail = paginatedResponseSchema(confluencePageSchema).parse(raw);
       const page = detail.results[0];
       if (page) {
         pages.push(page);

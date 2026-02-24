@@ -9,6 +9,7 @@ import { handleErrorStatus } from '../utils/http-util';
 import { sanitizeError } from '../utils/normalize-error';
 import type { ConfluencePage, ContentType } from './types/confluence-api.types';
 
+
 export abstract class ConfluenceApiClient {
   private readonly confluenceAuth: ConfluenceAuth;
   protected readonly logger: pino.Logger;
@@ -46,7 +47,7 @@ export abstract class ConfluenceApiClient {
 
   public abstract buildPageWebUrl(page: ConfluencePage): string;
 
-  protected async makeRateLimitedRequest<T>(url: string): Promise<T> {
+  protected async makeRateLimitedRequest(url: string): Promise<unknown> {
     return await this.limiter.schedule(async () => {
       const token = await this.confluenceAuth.acquireToken();
       const response = await request(url, {
@@ -57,7 +58,7 @@ export abstract class ConfluenceApiClient {
 
       this.logRateLimitHeaders(response.headers);
       await handleErrorStatus(response.statusCode, response.body, url);
-      return (await response.body.json()) as T;
+      return response.body.json();
     });
   }
 
