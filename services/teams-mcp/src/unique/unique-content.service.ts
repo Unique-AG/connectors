@@ -168,7 +168,10 @@ export class UniqueContentService {
   }
 
   @Span()
-  public async search(request: PublicSearchRequest): Promise<PublicSearchResult> {
+  public async search(
+    request: PublicSearchRequest,
+    scopeContext?: { userId: string; companyId: string },
+  ): Promise<PublicSearchResult> {
     const span = this.trace.getSpan();
     span?.setAttribute('search_type', request.searchType);
     span?.setAttribute('has_scope_ids', !!request.scopeIds?.length);
@@ -193,7 +196,13 @@ export class UniqueContentService {
 
     const response = await this.fetch('search/search', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(scopeContext && {
+          'x-user-id': scopeContext.userId,
+          'x-company-id': scopeContext.companyId,
+        }),
+      },
       body: JSON.stringify(payload),
     });
     const result = PublicSearchResultSchema.parse(await response.json());
@@ -212,6 +221,7 @@ export class UniqueContentService {
   public async searchByScope(
     searchString: string,
     scopeIds: string[],
+    scopeContext?: { userId: string; companyId: string },
     options?: {
       limit?: number;
       page?: number;
@@ -227,7 +237,7 @@ export class UniqueContentService {
       scoreThreshold: options?.scoreThreshold,
     };
 
-    const result = await this.search(request);
+    const result = await this.search(request, scopeContext);
     return result.data;
   }
 
@@ -235,6 +245,7 @@ export class UniqueContentService {
   public async searchByContent(
     searchString: string,
     contentIds: string[],
+    scopeContext?: { userId: string; companyId: string },
     options?: {
       limit?: number;
       page?: number;
@@ -250,7 +261,7 @@ export class UniqueContentService {
       scoreThreshold: options?.scoreThreshold,
     };
 
-    const result = await this.search(request);
+    const result = await this.search(request, scopeContext);
     return result.data;
   }
 }
