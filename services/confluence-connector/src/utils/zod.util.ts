@@ -9,7 +9,7 @@ export const urlWithoutTrailingSlashSchema = (description: string, message: stri
 
 export const coercedPositiveIntSchema = z.coerce.number().int().positive();
 export const coercedPositiveNumberSchema = z.coerce.number().positive();
-export const requiredStringSchema = z.string().trim().min(1);
+export const requiredStringSchema = z.string().trim().nonempty();
 
 const ENV_REF_PREFIX = 'os.environ/';
 
@@ -19,8 +19,8 @@ const envResolvableStringSchema = z.string().transform((val) => {
   return process.env[varName] ?? '';
 });
 
-export const envResolvableRedactedStringSchema = envResolvableStringSchema
-  .pipe(z.string().min(1))
+export const envRequiredSecretSchema = envResolvableStringSchema
+  .pipe(z.string().nonempty())
   .transform((val) => new Redacted(val));
 
-export const envResolvablePlainStringSchema = envResolvableStringSchema.pipe(z.string().min(1));
+export const envRequiredPlainSchema = envResolvableStringSchema.pipe(z.string().nonempty());

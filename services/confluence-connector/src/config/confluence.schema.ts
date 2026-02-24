@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
   coercedPositiveIntSchema,
-  envResolvableRedactedStringSchema,
+  envRequiredSecretSchema,
   urlWithoutTrailingSlashSchema,
 } from '../utils/zod.util';
 
@@ -13,12 +13,12 @@ export const AuthMode = {
 const oauth2loAuth = z.object({
   mode: z.literal(AuthMode.OAUTH_2LO).describe('OAuth 2.0 two-legged (client credentials)'),
   clientId: z.string().min(1),
-  clientSecret: envResolvableRedactedStringSchema,
+  clientSecret: envRequiredSecretSchema,
 });
 
 const patAuth = z.object({
   mode: z.literal(AuthMode.PAT).describe('Personal Access Token (Data Center only)'),
-  token: envResolvableRedactedStringSchema,
+  token: envRequiredSecretSchema,
 });
 
 const baseConfluenceFields = z.object({

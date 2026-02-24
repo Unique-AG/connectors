@@ -73,6 +73,7 @@ export abstract class ConfluenceApiClient {
     }
   }
 
+  // TODO: extract BottleneckFactory to shared utils (bottleneck as optional peer dep, separate file like zod helpers)
   private setupThrottlingMonitoring(): void {
     this.limiter.on('depleted', (empty) => {
       if (empty) {
