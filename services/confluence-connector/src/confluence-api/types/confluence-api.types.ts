@@ -14,7 +14,7 @@ export const confluencePageSchema = z.object({
   title: z.string(),
   type: z.enum(ContentType),
   space: z.object({
-    id: z.string(),
+    id: z.coerce.string(),
     key: z.string(),
     name: z.string(),
   }),
