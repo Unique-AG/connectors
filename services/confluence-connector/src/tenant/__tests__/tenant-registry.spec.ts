@@ -35,13 +35,13 @@ vi.mock('nestjs-pino', async () => {
   };
 });
 
-vi.mock('../config/tenant-config-loader', () => ({
+vi.mock('../../config/tenant-config-loader', () => ({
   getTenantConfigs: vi.fn(),
 }));
 
-vi.mock('../auth/confluence-auth/confluence-auth.factory');
-vi.mock('../auth/unique-auth/unique-auth.factory');
-vi.mock('../confluence-api/confluence-api-client.factory');
+vi.mock('../../auth/confluence-auth/confluence-auth.factory');
+vi.mock('../../auth/unique-auth/unique-auth.factory');
+vi.mock('../../confluence-api/confluence-api-client.factory');
 
 function createMockTenantConfig(): TenantConfig {
   return {

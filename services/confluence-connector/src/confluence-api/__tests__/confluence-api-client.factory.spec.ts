@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ConfluenceAuth } from '../../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../../config';
 import { ServiceRegistry } from '../../tenant/service-registry';
+import { RateLimitedHttpClient } from '../../utils/rate-limited-http-client';
 import { CloudConfluenceApiClient } from '../cloud-api-client';
 import { ConfluenceApiClientFactory } from '../confluence-api-client.factory';
 import { DataCenterConfluenceApiClient } from '../data-center-api-client';
@@ -11,6 +12,9 @@ vi.mock('../cloud-api-client', () => ({
 }));
 vi.mock('../data-center-api-client', () => ({
   DataCenterConfluenceApiClient: vi.fn(),
+}));
+vi.mock('../../utils/rate-limited-http-client', () => ({
+  RateLimitedHttpClient: vi.fn(),
 }));
 
 const mockAuth = { acquireToken: vi.fn() } as unknown as ConfluenceAuth;
@@ -39,7 +43,12 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(CloudConfluenceApiClient).toHaveBeenCalledWith(config, mockAuth, mockLogger);
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(mockLogger, 100);
+    expect(CloudConfluenceApiClient).toHaveBeenCalledWith(
+      config,
+      mockAuth,
+      expect.any(RateLimitedHttpClient),
+    );
   });
 
   it('creates DataCenterConfluenceApiClient for data-center config', () => {
@@ -52,7 +61,12 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(DataCenterConfluenceApiClient).toHaveBeenCalledWith(config, mockAuth, mockLogger);
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(mockLogger, 100);
+    expect(DataCenterConfluenceApiClient).toHaveBeenCalledWith(
+      config,
+      mockAuth,
+      expect.any(RateLimitedHttpClient),
+    );
   });
 
   it('returns the created client instance', () => {

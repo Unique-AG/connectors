@@ -1,29 +1,6 @@
-import type { Dispatcher } from 'undici';
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
-
-vi.mock('undici', () => ({
-  Agent: class MockAgent {
-    public compose() {
-      return {};
-    }
-  },
-  interceptors: { redirect: () => ({}), retry: () => ({}) },
-  request: vi.fn(),
-}));
-
-vi.mock('bottleneck', () => ({
-  default: class MockBottleneck {
-    public on = vi.fn();
-    public schedule = vi.fn(<T>(fn: () => Promise<T>) => fn());
-  },
-}));
-
-vi.mock('../../utils/normalize-error', () => ({
-  sanitizeError: vi.fn((e: unknown) => e),
-}));
-
-import { request } from 'undici';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
+import type { RateLimitedHttpClient } from '../../utils/rate-limited-http-client';
 import { CloudConfluenceApiClient } from '../cloud-api-client';
 import { type ConfluencePage, ContentType } from '../types/confluence-api.types';
 
@@ -31,15 +8,11 @@ const BASE_URL = 'https://cloud.example.com';
 const CLOUD_ID = 'test-cloud-id';
 const API_BASE_URL = `https://api.atlassian.com/ex/confluence/${CLOUD_ID}`;
 
-const mockLogger = {
-  info: vi.fn(),
-  warn: vi.fn(),
-  error: vi.fn(),
-  debug: vi.fn(),
-  child: vi.fn(),
-};
-
 const mockAuth = { acquireToken: vi.fn().mockResolvedValue('cloud-token') };
+
+const mockHttpClient = {
+  rateLimitedRequest: vi.fn(),
+} as unknown as RateLimitedHttpClient;
 
 const mockConfig: ConfluenceConfig = {
   baseUrl: BASE_URL,
@@ -50,23 +23,6 @@ const mockConfig: ConfluenceConfig = {
   instanceType: 'cloud',
   auth: { mode: 'oauth_2lo', clientId: 'cid', clientSecret: { expose: () => 'sec' } },
 } as unknown as ConfluenceConfig;
-
-function mockUndiciResponse(
-  statusCode: number,
-  body: unknown,
-  headers: Record<string, string> = {},
-): Dispatcher.ResponseData {
-  return {
-    statusCode,
-    headers,
-    body: {
-      json: vi.fn().mockResolvedValue(body),
-      text: vi.fn().mockResolvedValue(JSON.stringify(body)),
-    },
-  } as unknown as Dispatcher.ResponseData;
-}
-
-const mockedRequest = request as Mock;
 
 function makePage(overrides: Record<string, unknown> = {}): ConfluencePage {
   return {
@@ -86,16 +42,19 @@ describe('CloudConfluenceApiClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new CloudConfluenceApiClient(mockConfig, mockAuth as never, mockLogger as never);
+    client = new CloudConfluenceApiClient(mockConfig as never, mockAuth as never, mockHttpClient);
   });
 
   describe('searchPagesByLabel', () => {
     it('constructs CQL with global and collaboration space type filter', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0]?.[0] as string;
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('(space.type=global OR space.type=collaboration)');
       expect(decodedUrl).toContain('label="sync"');
@@ -104,34 +63,41 @@ describe('CloudConfluenceApiClient', () => {
     });
 
     it('uses api.atlassian.com/ex/confluence/{cloudId} base URL without os_authType', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0]?.[0] as string;
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).toContain(`${API_BASE_URL}/wiki/rest/api/content/search`);
       expect(url).not.toContain('os_authType');
     });
 
     it('uses limit=25 for search', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0]?.[0] as string;
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).toContain('limit=25');
     });
   });
 
   describe('getPageById', () => {
     it('uses CQL search endpoint with id filter', async () => {
-      mockedRequest.mockResolvedValueOnce(
-        mockUndiciResponse(200, { results: [makePage({ id: '77' })], _links: {} }),
-      );
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [makePage({ id: '77' })],
+        _links: {},
+      });
 
       await client.getPageById('77');
 
-      const url = mockedRequest.mock.calls[0]?.[0] as string;
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).toContain(`${API_BASE_URL}/wiki/rest/api/content/search`);
       expect(url).toContain('cql=id%3D77');
       expect(url).toContain('expand=body.storage,version,space,metadata.labels');
@@ -139,7 +105,10 @@ describe('CloudConfluenceApiClient', () => {
 
     it('returns first result from paginated response', async () => {
       const page = makePage({ id: '77', title: 'Found' });
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [page], _links: {} }));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [page],
+        _links: {},
+      });
 
       const result = await client.getPageById('77');
 
@@ -147,15 +116,16 @@ describe('CloudConfluenceApiClient', () => {
     });
 
     it('returns null for non-object body', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, 'not-an-object'));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce('not-an-object');
 
-      const result = await client.getPageById('1');
-
-      expect(result).toBeNull();
+      await expect(client.getPageById('1')).rejects.toThrow();
     });
 
     it('returns null for empty results array', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
 
       const result = await client.getPageById('1');
 
@@ -163,21 +133,18 @@ describe('CloudConfluenceApiClient', () => {
     });
 
     it('returns null when first result has no string id', async () => {
-      mockedRequest.mockResolvedValueOnce(
-        mockUndiciResponse(200, { results: [{ id: 123, title: 'Bad' }], _links: {} }),
-      );
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [{ id: 123, title: 'Bad' }],
+        _links: {},
+      });
 
-      const result = await client.getPageById('1');
-
-      expect(result).toBeNull();
+      await expect(client.getPageById('1')).rejects.toThrow();
     });
 
     it('returns null when body has no results property', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { data: [] }));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({ data: [] });
 
-      const result = await client.getPageById('1');
-
-      expect(result).toBeNull();
+      await expect(client.getPageById('1')).rejects.toThrow();
     });
   });
 
@@ -186,66 +153,79 @@ describe('CloudConfluenceApiClient', () => {
       const result = await client.getDescendantPages([]);
 
       expect(result).toEqual([]);
-      expect(mockedRequest).not.toHaveBeenCalled();
+      expect(mockHttpClient.rateLimitedRequest).not.toHaveBeenCalled();
     });
 
     it('uses CQL ancestor IN (...) for a single root ID', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
 
       await client.getDescendantPages(['42']);
 
-      const url = mockedRequest.mock.calls[0]?.[0] as string;
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('ancestor IN (42)');
     });
 
     it('uses CQL ancestor IN (...) for multiple root IDs', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
 
       await client.getDescendantPages(['10', '20']);
 
-      const url = mockedRequest.mock.calls[0]?.[0] as string;
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('ancestor IN (10,20)');
     });
 
     it('includes type != attachment in CQL', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
 
       await client.getDescendantPages(['99']);
 
-      const url = mockedRequest.mock.calls[0]?.[0] as string;
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('type != attachment');
     });
 
     it('uses api.atlassian.com/ex/confluence/{cloudId} base URL', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, { results: [], _links: {} }));
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
 
       await client.getDescendantPages(['5']);
 
-      const url = mockedRequest.mock.calls[0]?.[0] as string;
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).toContain(`${API_BASE_URL}/wiki/rest/api/content/search`);
     });
 
     it('paginates results via _links.next', async () => {
       const nextPath = '/wiki/rest/api/content/search?cql=ancestor%3D5&start=25';
-      mockedRequest.mockResolvedValueOnce(
-        mockUndiciResponse(200, {
+      vi.mocked(mockHttpClient.rateLimitedRequest)
+        .mockResolvedValueOnce({
           results: [makePage({ id: 'p1' })],
           _links: { next: nextPath },
-        }),
-      );
-      mockedRequest.mockResolvedValueOnce(
-        mockUndiciResponse(200, { results: [makePage({ id: 'p2' })], _links: {} }),
-      );
+        })
+        .mockResolvedValueOnce({
+          results: [makePage({ id: 'p2' })],
+          _links: {},
+        });
 
       const result = await client.getDescendantPages(['5']);
 
       expect(result).toHaveLength(2);
       expect(result[0]?.id).toBe('p1');
       expect(result[1]?.id).toBe('p2');
-      const paginatedUrl = mockedRequest.mock.calls[1]?.[0] as string;
+      const paginatedUrl = vi.mocked(mockHttpClient.rateLimitedRequest).mock
+        .calls[1]?.[0] as string;
       expect(paginatedUrl).toBe(`${API_BASE_URL}${nextPath}`);
     });
   });

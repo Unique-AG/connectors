@@ -1,3 +1,6 @@
+import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
+import type { ConfluenceConfig } from '../config';
+import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import { ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
 import { type ConfluencePage, confluencePageSchema } from './types/confluence-api.types';
@@ -5,22 +8,30 @@ import { type ConfluencePage, confluencePageSchema } from './types/confluence-ap
 const SEARCH_PAGE_SIZE = 25;
 
 export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
+  public constructor(
+    private readonly config: ConfluenceConfig,
+    private readonly confluenceAuth: ConfluenceAuth,
+    private readonly httpClient: RateLimitedHttpClient,
+  ) {
+    super();
+  }
+
   public async searchPagesByLabel(): Promise<ConfluencePage[]> {
     const spaceTypeFilter = 'space.type=global';
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
-    const url = `${this.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&os_authType=basic&limit=${SEARCH_PAGE_SIZE}&start=0`;
+    const url = `${this.config.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&os_authType=basic&limit=${SEARCH_PAGE_SIZE}&start=0`;
 
     return fetchAllPaginated(
       url,
-      this.baseUrl,
-      (requestUrl) => this.makeRateLimitedRequest(requestUrl),
+      this.config.baseUrl,
+      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
       confluencePageSchema,
     );
   }
 
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
-    const url = `${this.baseUrl}/rest/api/content/${pageId}?os_authType=basic&expand=body.storage,version,space,metadata.labels`;
-    const raw = await this.makeRateLimitedRequest(url);
+    const url = `${this.config.baseUrl}/rest/api/content/${pageId}?os_authType=basic&expand=body.storage,version,space,metadata.labels`;
+    const raw = await this.makeAuthenticatedRequest(url);
     const result = confluencePageSchema.safeParse(raw);
     return result.success ? result.data : null;
   }
@@ -29,17 +40,22 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     if (rootIds.length === 0) return [];
 
     const cql = `ancestor IN (${rootIds.join(',')}) AND type != attachment`;
-    const url = `${this.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&os_authType=basic&limit=${SEARCH_PAGE_SIZE}`;
+    const url = `${this.config.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&os_authType=basic&limit=${SEARCH_PAGE_SIZE}`;
 
     return fetchAllPaginated(
       url,
-      this.baseUrl,
-      (requestUrl) => this.makeRateLimitedRequest(requestUrl),
+      this.config.baseUrl,
+      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
       confluencePageSchema,
     );
   }
 
   public buildPageWebUrl(page: ConfluencePage): string {
-    return `${this.baseUrl}/pages/viewpage.action?pageId=${page.id}`;
+    return `${this.config.baseUrl}/pages/viewpage.action?pageId=${page.id}`;
+  }
+
+  private async makeAuthenticatedRequest(url: string): Promise<unknown> {
+    const token = await this.confluenceAuth.acquireToken();
+    return this.httpClient.rateLimitedRequest(url, { Authorization: `Bearer ${token}` });
   }
 }

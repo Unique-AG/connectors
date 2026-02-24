@@ -1,6 +1,6 @@
-import type pino from 'pino';
 import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
+import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import { ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
 import {
@@ -17,8 +17,12 @@ type CloudConfig = Extract<ConfluenceConfig, { instanceType: 'cloud' }>;
 export class CloudConfluenceApiClient extends ConfluenceApiClient {
   private readonly apiBaseUrl: string;
 
-  public constructor(config: CloudConfig, confluenceAuth: ConfluenceAuth, logger: pino.Logger) {
-    super(config, confluenceAuth, logger);
+  public constructor(
+    private readonly config: CloudConfig,
+    private readonly confluenceAuth: ConfluenceAuth,
+    private readonly httpClient: RateLimitedHttpClient,
+  ) {
+    super();
     this.apiBaseUrl = `${ATLASSIAN_API_BASE}/${config.cloudId}`;
   }
 
@@ -30,14 +34,14 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return fetchAllPaginated(
       url,
       this.apiBaseUrl,
-      (requestUrl) => this.makeRateLimitedRequest(requestUrl),
+      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
       confluencePageSchema,
     );
   }
 
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
     const url = `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=id%3D${pageId}&expand=body.storage,version,space,metadata.labels`;
-    const raw = await this.makeRateLimitedRequest(url);
+    const raw = await this.makeAuthenticatedRequest(url);
     const response = paginatedResponseSchema(confluencePageSchema).parse(raw);
     return response.results[0] ?? null;
   }
@@ -52,12 +56,17 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return fetchAllPaginated(
       url,
       this.apiBaseUrl,
-      (requestUrl) => this.makeRateLimitedRequest(requestUrl),
+      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
       confluencePageSchema,
     );
   }
 
   public buildPageWebUrl(page: ConfluencePage): string {
-    return `${this.baseUrl}/wiki${page._links.webui}`;
+    return `${this.config.baseUrl}/wiki${page._links.webui}`;
+  }
+
+  private async makeAuthenticatedRequest(url: string): Promise<unknown> {
+    const token = await this.confluenceAuth.acquireToken();
+    return this.httpClient.rateLimitedRequest(url, { Authorization: `Bearer ${token}` });
   }
 }
