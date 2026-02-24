@@ -59,13 +59,12 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return `${this.baseUrl}/wiki${page._links.webui}`;
   }
 
-  private async fetchChildDetails(
-    childRefs: CloudChildReference[],
-  ): Promise<ConfluencePage[]> {
+  private async fetchChildDetails(childRefs: CloudChildReference[]): Promise<ConfluencePage[]> {
     const pages: ConfluencePage[] = [];
     for (const child of childRefs) {
       const detailUrl = `${this.baseUrl}/wiki/rest/api/content/search?cql=id%3D${child.id}&expand=metadata.labels,version,space`;
-      const detail = await this.makeRateLimitedRequest<PaginatedResponse<ConfluencePage>>(detailUrl);
+      const detail =
+        await this.makeRateLimitedRequest<PaginatedResponse<ConfluencePage>>(detailUrl);
       const page = detail.results[0];
       if (page) {
         pages.push(page);
