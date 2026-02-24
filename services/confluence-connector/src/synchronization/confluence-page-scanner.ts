@@ -25,26 +25,7 @@ export class ConfluencePageScanner {
     const discoveredIds = new Set<string>();
 
     for (const page of labeledPages) {
-      if (this.isLimitReached(discovered.length)) {
-        break;
-      }
-
-      if (page.type === ContentType.DATABASE) {
-        this.logger.info({ pageId: page.id, title: page.title }, 'Skipping database page');
-        continue;
-      }
-
-      // in case a page is marked for ingesting it's child pages we deduplicate child pages that are also labeled for ingestion
-      if (discoveredIds.has(page.id)) {
-        continue;
-      }
-
-      discoveredIds.add(page.id);
-      discovered.push(this.toDiscoveredPage(page));
-
-      if (this.hasIngestAllLabel(page)) {
-        await this.expandChildren(page, discovered, discoveredIds);
-      }
+      await this.processPage(page, discovered, discoveredIds, false);
     }
 
     this.logger.info({ count: discovered.length }, 'Page discovery completed');
@@ -68,22 +49,35 @@ export class ConfluencePageScanner {
     }
 
     for (const child of children) {
-      if (this.isLimitReached(discovered.length)) {
-        return;
-      }
+      await this.processPage(child, discovered, discoveredIds, true);
+    }
+  }
 
-      if (child.type === ContentType.DATABASE) {
-        this.logger.info({ pageId: child.id, title: child.title }, 'Skipping database child page');
-        continue;
-      }
+  private async processPage(
+    page: ConfluencePage,
+    discovered: DiscoveredPage[],
+    discoveredIds: Set<string>,
+    expandAll: boolean,
+  ): Promise<void> {
+    if (this.isLimitReached(discovered.length)) {
+      return;
+    }
 
-      if (discoveredIds.has(child.id)) {
-        continue;
-      }
+    const skippedTypes = [ContentType.DATABASE, ContentType.BLOGPOST, ContentType.WHITEBOARD, ContentType.EMBED];
+    if (skippedTypes.includes(page.type)) {
+      this.logger.info({ pageId: page.id, title: page.title, type: page.type }, 'Skipping non-page content type');
+      return;
+    }
 
-      discoveredIds.add(child.id);
-      discovered.push(this.toDiscoveredPage(child));
-      await this.expandChildren(child, discovered, discoveredIds);
+    if (discoveredIds.has(page.id)) {
+      return;
+    }
+
+    discoveredIds.add(page.id);
+    discovered.push(this.toDiscoveredPage(page));
+
+    if (expandAll || this.hasIngestAllLabel(page)) {
+      await this.expandChildren(page, discovered, discoveredIds);
     }
   }
 

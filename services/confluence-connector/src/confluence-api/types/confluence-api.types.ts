@@ -4,9 +4,9 @@ export enum ContentType {
   PAGE = 'page',
   FOLDER = 'folder',
   DATABASE = 'database',
-  // BLOGPOST = 'blogpost',
-  // WHITEBOARD = 'whiteboard',
-  // EMBED = 'embed',
+  BLOGPOST = 'blogpost',
+  WHITEBOARD = 'whiteboard',
+  EMBED = 'embed',
 }
 
 export const confluencePageSchema = z.object({
