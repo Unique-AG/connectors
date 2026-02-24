@@ -7,7 +7,6 @@ import type { ConfluenceConfig } from '../config';
 import { handleErrorStatus } from '../utils/http-util';
 import type { ConfluencePage } from './types/confluence-api.types';
 
-
 export abstract class ConfluenceApiClient {
   private readonly confluenceAuth: ConfluenceAuth;
   protected readonly logger: pino.Logger;

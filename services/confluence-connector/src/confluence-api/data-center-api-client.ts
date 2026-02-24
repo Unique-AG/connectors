@@ -1,6 +1,6 @@
 import { ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
-import { confluencePageSchema, type ConfluencePage } from './types/confluence-api.types';
+import { type ConfluencePage, confluencePageSchema } from './types/confluence-api.types';
 
 const SEARCH_PAGE_SIZE = 25;
 
@@ -10,8 +10,10 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
     const url = `${this.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&os_authType=basic&limit=${SEARCH_PAGE_SIZE}&start=0`;
 
-    return fetchAllPaginated(url, this.baseUrl, (requestUrl) =>
-      this.makeRateLimitedRequest(requestUrl),
+    return fetchAllPaginated(
+      url,
+      this.baseUrl,
+      (requestUrl) => this.makeRateLimitedRequest(requestUrl),
       confluencePageSchema,
     );
   }
@@ -29,8 +31,10 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     const cql = `ancestor IN (${rootIds.join(',')}) AND type != attachment`;
     const url = `${this.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&os_authType=basic&limit=${SEARCH_PAGE_SIZE}`;
 
-    return fetchAllPaginated(url, this.baseUrl, (requestUrl) =>
-      this.makeRateLimitedRequest(requestUrl),
+    return fetchAllPaginated(
+      url,
+      this.baseUrl,
+      (requestUrl) => this.makeRateLimitedRequest(requestUrl),
       confluencePageSchema,
     );
   }

@@ -189,9 +189,7 @@ describe('ZitadelAuthStrategy', () => {
       mockRequest.mockRejectedValue(new Error('network failure'));
       const strategy = new ZitadelAuthStrategy(createExternalConfig(), mockLogger);
 
-      await expect(strategy.getHeaders()).rejects.toThrow(
-        'network failure',
-      );
+      await expect(strategy.getHeaders()).rejects.toThrow('network failure');
 
       expect(loggerErrorMock).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce

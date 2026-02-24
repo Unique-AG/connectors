@@ -243,9 +243,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(
-        /access_token/,
-      );
+      await expect(strategy.acquireToken()).rejects.toThrow(/access_token/);
     });
 
     it('throws ZodError on malformed response missing expires_in', async () => {
@@ -253,9 +251,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(
-        /expires_in/,
-      );
+      await expect(strategy.acquireToken()).rejects.toThrow(/expires_in/);
     });
 
     it('throws ZodError on malformed response missing both fields', async () => {
@@ -263,9 +259,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(
-        /access_token/,
-      );
+      await expect(strategy.acquireToken()).rejects.toThrow(/access_token/);
     });
 
     it('throws on non-JSON response body', async () => {
@@ -279,9 +273,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(
-        'invalid json',
-      );
+      await expect(strategy.acquireToken()).rejects.toThrow('invalid json');
     });
   });
 });

@@ -1,7 +1,6 @@
 import type pino from 'pino';
 import type { ConfluenceConfig } from '../config';
-import type { ConfluencePage } from '../confluence-api';
-import type { ConfluenceApiClient } from '../confluence-api';
+import type { ConfluenceApiClient, ConfluencePage } from '../confluence-api';
 import type { DiscoveredPage, FetchedPage } from './sync.types';
 
 export class ConfluenceContentFetcher {

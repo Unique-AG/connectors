@@ -4,7 +4,12 @@ import type { ConfluencePage } from '../confluence-api';
 import { type ConfluenceApiClient, ContentType } from '../confluence-api';
 import type { DiscoveredPage } from './sync.types';
 
-const SKIPPED_CONTENT_TYPES = [ContentType.DATABASE, ContentType.BLOGPOST, ContentType.WHITEBOARD, ContentType.EMBED];
+const SKIPPED_CONTENT_TYPES = [
+  ContentType.DATABASE,
+  ContentType.BLOGPOST,
+  ContentType.WHITEBOARD,
+  ContentType.EMBED,
+];
 
 export class ConfluencePageScanner {
   public constructor(
@@ -24,7 +29,10 @@ export class ConfluencePageScanner {
       if (this.isLimitReached(discovered.length)) break;
 
       if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
-        this.logger.info({ pageId: page.id, title: page.title, type: page.type }, 'Skipping non-page content type');
+        this.logger.info(
+          { pageId: page.id, title: page.title, type: page.type },
+          'Skipping non-page content type',
+        );
         continue;
       }
 
@@ -68,7 +76,10 @@ export class ConfluencePageScanner {
       }
 
       if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
-        this.logger.debug({ pageId: page.id, title: page.title, type: page.type }, 'Skipping non-page content type');
+        this.logger.debug(
+          { pageId: page.id, title: page.title, type: page.type },
+          'Skipping non-page content type',
+        );
         continue;
       }
 

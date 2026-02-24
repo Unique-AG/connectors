@@ -53,7 +53,10 @@ function makePage(
 }
 
 function createScanner(
-  apiClient: Pick<ConfluenceApiClient, 'searchPagesByLabel' | 'getDescendantPages' | 'buildPageWebUrl'>,
+  apiClient: Pick<
+    ConfluenceApiClient,
+    'searchPagesByLabel' | 'getDescendantPages' | 'buildPageWebUrl'
+  >,
   processingConfig: ProcessingConfig = baseProcessingConfig,
 ): ConfluencePageScanner {
   return new ConfluencePageScanner(
