@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
 import { ServiceRegistry } from '../tenant/service-registry';
 import { CloudConfluenceApiClient } from './cloud-api-client';
@@ -10,8 +11,10 @@ export class ConfluenceApiClientFactory {
   public constructor(private readonly serviceRegistry: ServiceRegistry) {}
 
   public create(config: ConfluenceConfig): ConfluenceApiClient {
+    const confluenceAuth = this.serviceRegistry.getService(ConfluenceAuth);
+    const logger = this.serviceRegistry.getServiceLogger(ConfluenceApiClient);
     return config.instanceType === 'cloud'
-      ? new CloudConfluenceApiClient(config, this.serviceRegistry)
-      : new DataCenterConfluenceApiClient(config, this.serviceRegistry);
+      ? new CloudConfluenceApiClient(config, confluenceAuth, logger)
+      : new DataCenterConfluenceApiClient(config, confluenceAuth, logger);
   }
 }

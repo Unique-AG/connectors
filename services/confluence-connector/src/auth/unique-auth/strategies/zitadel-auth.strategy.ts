@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
+import type pino from 'pino';
 import { request } from 'undici';
 import { UniqueAuthMode, type UniqueConfig } from '../../../config';
-import { ServiceRegistry } from '../../../tenant/service-registry';
 import { handleErrorStatus } from '../../../utils/http-util';
 import { TokenCache } from '../../token-cache';
 import { UniqueAuth } from '../unique-auth.abstract';
@@ -18,15 +18,15 @@ interface ZitadelTokenResponse {
  * Business logic will be replaced with the shared Unique auth library
  */
 export class ZitadelAuthStrategy extends UniqueAuth {
-  private readonly serviceRegistry: ServiceRegistry;
+  private readonly logger: pino.Logger;
   private readonly tokenCache: TokenCache;
   private readonly tokenUrl: string;
   private readonly basicAuth: string;
   private readonly scope: string;
 
-  public constructor(config: ExternalConfig, serviceRegistry: ServiceRegistry) {
+  public constructor(config: ExternalConfig, logger: pino.Logger) {
     super();
-    this.serviceRegistry = serviceRegistry;
+    this.logger = logger;
     this.tokenCache = new TokenCache();
     this.tokenUrl = config.zitadelOauthTokenUrl;
 
@@ -70,8 +70,7 @@ export class ZitadelAuthStrategy extends UniqueAuth {
         expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
       };
     } catch (error) {
-      const logger = this.serviceRegistry.getServiceLogger(ZitadelAuthStrategy);
-      logger.error({
+      this.logger.error({
         msg: 'Failed to acquire Unique API token from Zitadel',
         error,
       });

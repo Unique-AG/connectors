@@ -18,7 +18,8 @@ export class UniqueAuthFactory {
       }
       case UniqueAuthMode.EXTERNAL: {
         logger.info('Using Zitadel external authentication for Unique services');
-        return new ZitadelAuthStrategy(uniqueConfig, this.serviceRegistry);
+        const strategyLogger = this.serviceRegistry.getServiceLogger(ZitadelAuthStrategy);
+        return new ZitadelAuthStrategy(uniqueConfig, strategyLogger);
       }
       default: {
         throw new Error(`Unsupported Unique auth mode`);

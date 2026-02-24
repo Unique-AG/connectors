@@ -2,9 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../config';
 import type { ConfluencePage } from '../confluence-api';
 import { ConfluenceApiClient, ContentType } from '../confluence-api';
-import { ServiceRegistry } from '../tenant/service-registry';
-import type { TenantContext } from '../tenant/tenant-context.interface';
-import { tenantStorage } from '../tenant/tenant-context.storage';
 import { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { DiscoveredPage } from './sync.types';
 
@@ -26,16 +23,6 @@ const baseConfluenceConfig: ConfluenceConfig = {
     token: { expose: () => 'secret' },
   },
 } as unknown as ConfluenceConfig;
-
-function createTenant(name: string): TenantContext {
-  return {
-    name,
-    config: {
-      confluence: baseConfluenceConfig,
-    },
-    isScanning: false,
-  } as unknown as TenantContext;
-}
 
 function makeDiscoveredPage(id: string, overrides: Partial<DiscoveredPage> = {}): DiscoveredPage {
   return {
@@ -79,21 +66,12 @@ function makeFullPage(
 }
 
 function createFetcher(
-  tenant: TenantContext,
   apiClient: Pick<ConfluenceApiClient, 'getPageById'>,
 ): ConfluenceContentFetcher {
-  const serviceRegistry = new ServiceRegistry();
-  const mockBaseLogger = { child: () => mockTenantLogger };
-  serviceRegistry.registerTenantLogger(tenant.name, mockBaseLogger as never);
-  serviceRegistry.register(
-    tenant.name,
-    ConfluenceApiClient,
+  return new ConfluenceContentFetcher(
+    baseConfluenceConfig,
     apiClient as unknown as ConfluenceApiClient,
-  );
-
-  return tenantStorage.run(
-    tenant,
-    () => new ConfluenceContentFetcher(baseConfluenceConfig, serviceRegistry),
+    mockTenantLogger as never,
   );
 }
 
@@ -103,7 +81,6 @@ describe('ConfluenceContentFetcher', () => {
   });
 
   it('fetches page content and builds fetched page metadata', async () => {
-    const tenant = createTenant('fetcher-tenant');
     const discoveredPage = makeDiscoveredPage('1');
     const apiClient = {
       getPageById: vi
@@ -113,7 +90,7 @@ describe('ConfluenceContentFetcher', () => {
         ),
     };
 
-    const fetcher = createFetcher(tenant, apiClient);
+    const fetcher = createFetcher(apiClient);
     const result = await fetcher.fetchPagesContent([discoveredPage]);
 
     expect(result).toEqual([
@@ -135,7 +112,6 @@ describe('ConfluenceContentFetcher', () => {
   });
 
   it('omits metadata when page has only ingest labels', async () => {
-    const tenant = createTenant('ingest-only-tenant');
     const discoveredPage = makeDiscoveredPage('1');
     const apiClient = {
       getPageById: vi
@@ -143,7 +119,7 @@ describe('ConfluenceContentFetcher', () => {
         .mockResolvedValue(makeFullPage('1', { labels: ['ai-ingest', 'ai-ingest-all'] })),
     };
 
-    const fetcher = createFetcher(tenant, apiClient);
+    const fetcher = createFetcher(apiClient);
     const result = await fetcher.fetchPagesContent([discoveredPage]);
 
     expect(result).toHaveLength(1);
@@ -151,13 +127,12 @@ describe('ConfluenceContentFetcher', () => {
   });
 
   it('skips pages that are missing in Confluence', async () => {
-    const tenant = createTenant('missing-tenant');
     const discoveredPage = makeDiscoveredPage('missing');
     const apiClient = {
       getPageById: vi.fn().mockResolvedValue(null),
     };
 
-    const fetcher = createFetcher(tenant, apiClient);
+    const fetcher = createFetcher(apiClient);
     const result = await fetcher.fetchPagesContent([discoveredPage]);
 
     expect(result).toEqual([]);
@@ -168,13 +143,12 @@ describe('ConfluenceContentFetcher', () => {
   });
 
   it('skips pages with empty body', async () => {
-    const tenant = createTenant('empty-body-tenant');
     const discoveredPage = makeDiscoveredPage('empty');
     const apiClient = {
       getPageById: vi.fn().mockResolvedValue(makeFullPage('empty', { body: '' })),
     };
 
-    const fetcher = createFetcher(tenant, apiClient);
+    const fetcher = createFetcher(apiClient);
     const result = await fetcher.fetchPagesContent([discoveredPage]);
 
     expect(result).toEqual([]);
@@ -185,7 +159,6 @@ describe('ConfluenceContentFetcher', () => {
   });
 
   it('continues processing after getPageById error', async () => {
-    const tenant = createTenant('error-tenant');
     const failingPage = makeDiscoveredPage('fail');
     const successfulPage = makeDiscoveredPage('ok');
     const apiClient = {
@@ -195,7 +168,7 @@ describe('ConfluenceContentFetcher', () => {
         .mockResolvedValueOnce(makeFullPage('ok', { labels: ['engineering'] })),
     };
 
-    const fetcher = createFetcher(tenant, apiClient);
+    const fetcher = createFetcher(apiClient);
     const result = await fetcher.fetchPagesContent([failingPage, successfulPage]);
 
     expect(result.map((page) => page.id)).toEqual(['ok']);

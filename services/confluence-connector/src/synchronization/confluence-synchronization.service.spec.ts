@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentType } from '../confluence-api';
-import type { ServiceRegistry } from '../tenant';
 import type { TenantContext } from '../tenant/tenant-context.interface';
 import { tenantStorage } from '../tenant/tenant-context.storage';
-import { ConfluenceContentFetcher } from './confluence-content-fetcher';
-import { ConfluencePageScanner } from './confluence-page-scanner';
+import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
+import type { ConfluencePageScanner } from './confluence-page-scanner';
 import { ConfluenceSynchronizationService } from './confluence-synchronization.service';
 import type { DiscoveredPage, FetchedPage } from './sync.types';
 
@@ -54,24 +53,14 @@ function createMockTenant(name: string, overrides: Partial<TenantContext> = {}):
 }
 
 function createService(
-  tenant: TenantContext,
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
   contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPagesContent'>,
 ): ConfluenceSynchronizationService {
-  const serviceRegistry = {
-    getService: vi.fn((token: unknown) => {
-      if (token === ConfluencePageScanner) {
-        return scanner;
-      }
-      if (token === ConfluenceContentFetcher) {
-        return contentFetcher;
-      }
-      throw new Error('Unexpected service token');
-    }),
-    getServiceLogger: vi.fn().mockReturnValue(mockTenantLogger),
-  } as unknown as ServiceRegistry;
-
-  return tenantStorage.run(tenant, () => new ConfluenceSynchronizationService(serviceRegistry));
+  return new ConfluenceSynchronizationService(
+    scanner as ConfluencePageScanner,
+    contentFetcher as ConfluenceContentFetcher,
+    mockTenantLogger as never,
+  );
 }
 
 describe('ConfluenceSynchronizationService', () => {
@@ -89,7 +78,7 @@ describe('ConfluenceSynchronizationService', () => {
     mockContentFetcher = {
       fetchPagesContent: vi.fn().mockResolvedValue(fetchedPagesFixture),
     };
-    service = createService(tenant, mockScanner, mockContentFetcher);
+    service = createService(mockScanner, mockContentFetcher);
   });
 
   describe('synchronize', () => {

@@ -1,21 +1,15 @@
 import type pino from 'pino';
 import type { ConfluenceConfig } from '../config';
 import type { ConfluencePage } from '../confluence-api';
-import { ConfluenceApiClient } from '../confluence-api';
-import type { ServiceRegistry } from '../tenant';
+import type { ConfluenceApiClient } from '../confluence-api';
 import type { DiscoveredPage, FetchedPage } from './sync.types';
 
 export class ConfluenceContentFetcher {
-  private readonly apiClient: ConfluenceApiClient;
-  private readonly logger: pino.Logger;
-
   public constructor(
     private readonly confluenceConfig: ConfluenceConfig,
-    serviceRegistry: ServiceRegistry,
-  ) {
-    this.apiClient = serviceRegistry.getService(ConfluenceApiClient);
-    this.logger = serviceRegistry.getServiceLogger(ConfluenceContentFetcher);
-  }
+    private readonly apiClient: ConfluenceApiClient,
+    private readonly logger: pino.Logger,
+  ) {}
 
   public async fetchPagesContent(pages: DiscoveredPage[]): Promise<FetchedPage[]> {
     const fetched: FetchedPage[] = [];

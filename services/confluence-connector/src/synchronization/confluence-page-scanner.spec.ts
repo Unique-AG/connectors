@@ -2,9 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
 import type { ConfluencePage } from '../confluence-api';
 import { ConfluenceApiClient, ContentType } from '../confluence-api';
-import { ServiceRegistry } from '../tenant/service-registry';
-import type { TenantContext } from '../tenant/tenant-context.interface';
-import { tenantStorage } from '../tenant/tenant-context.storage';
 import { ConfluencePageScanner } from './confluence-page-scanner';
 
 const mockTenantLogger = vi.hoisted(() => ({
@@ -32,17 +29,6 @@ const baseProcessingConfig: ProcessingConfig = {
   scanIntervalCron: '*/5 * * * *',
 };
 
-function createTenant(name: string): TenantContext {
-  return {
-    name,
-    config: {
-      confluence: baseConfluenceConfig,
-      processing: baseProcessingConfig,
-    },
-    isScanning: false,
-  } as unknown as TenantContext;
-}
-
 function makePage(
   id: string,
   options: {
@@ -67,22 +53,14 @@ function makePage(
 }
 
 function createScanner(
-  tenant: TenantContext,
   apiClient: Pick<ConfluenceApiClient, 'searchPagesByLabel' | 'getChildPages' | 'buildPageWebUrl'>,
   processingConfig: ProcessingConfig = baseProcessingConfig,
 ): ConfluencePageScanner {
-  const serviceRegistry = new ServiceRegistry();
-  const mockBaseLogger = { child: () => mockTenantLogger };
-  serviceRegistry.registerTenantLogger(tenant.name, mockBaseLogger as never);
-  serviceRegistry.register(
-    tenant.name,
-    ConfluenceApiClient,
+  return new ConfluencePageScanner(
+    baseConfluenceConfig,
+    processingConfig,
     apiClient as unknown as ConfluenceApiClient,
-  );
-
-  return tenantStorage.run(
-    tenant,
-    () => new ConfluencePageScanner(baseConfluenceConfig, processingConfig, serviceRegistry),
+    mockTenantLogger as never,
   );
 }
 
@@ -92,7 +70,6 @@ describe('ConfluencePageScanner', () => {
   });
 
   it('discovers labeled pages and recursively expands ingest-all children', async () => {
-    const tenant = createTenant('scanner-tenant');
     const parent = makePage('parent', { labels: ['ai-ingest-all'] });
     const child = makePage('child', { labels: ['engineering'] });
     const standalone = makePage('standalone', { labels: ['ai-ingest'] });
@@ -110,7 +87,7 @@ describe('ConfluencePageScanner', () => {
       ),
     };
 
-    const scanner = createScanner(tenant, apiClient);
+    const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'child', 'standalone']);
@@ -119,7 +96,6 @@ describe('ConfluencePageScanner', () => {
   });
 
   it('skips database pages', async () => {
-    const tenant = createTenant('database-tenant');
     const database = makePage('db-root', {
       type: ContentType.DATABASE,
       labels: ['ai-ingest-all'],
@@ -134,7 +110,7 @@ describe('ConfluencePageScanner', () => {
       ),
     };
 
-    const scanner = createScanner(tenant, apiClient);
+    const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
     expect(result.map((item) => item.id)).toEqual(['page-root']);
@@ -142,7 +118,6 @@ describe('ConfluencePageScanner', () => {
   });
 
   it('respects maxPagesToScan limit', async () => {
-    const tenant = createTenant('limit-tenant');
     const first = makePage('first', { labels: ['ai-ingest'] });
     const second = makePage('second', { labels: ['ai-ingest'] });
     const limitedConfig: ProcessingConfig = {
@@ -158,7 +133,7 @@ describe('ConfluencePageScanner', () => {
       ),
     };
 
-    const scanner = createScanner(tenant, apiClient, limitedConfig);
+    const scanner = createScanner(apiClient, limitedConfig);
     const result = await scanner.discoverPages();
 
     expect(result.map((item) => item.id)).toEqual(['first']);
@@ -169,7 +144,6 @@ describe('ConfluencePageScanner', () => {
   });
 
   it('returns empty array and logs completion when searchPagesByLabel returns no pages', async () => {
-    const tenant = createTenant('empty-tenant');
     const apiClient = {
       searchPagesByLabel: vi.fn().mockResolvedValue([]),
       getChildPages: vi.fn().mockResolvedValue([]),
@@ -178,7 +152,7 @@ describe('ConfluencePageScanner', () => {
       ),
     };
 
-    const scanner = createScanner(tenant, apiClient);
+    const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
     expect(result).toEqual([]);
@@ -187,7 +161,6 @@ describe('ConfluencePageScanner', () => {
   });
 
   it('rejects when searchPagesByLabel fails', async () => {
-    const tenant = createTenant('search-fail-tenant');
     const apiClient = {
       searchPagesByLabel: vi.fn().mockRejectedValue(new Error('search API error')),
       getChildPages: vi.fn().mockResolvedValue([]),
@@ -196,13 +169,12 @@ describe('ConfluencePageScanner', () => {
       ),
     };
 
-    const scanner = createScanner(tenant, apiClient);
+    const scanner = createScanner(apiClient);
 
     await expect(scanner.discoverPages()).rejects.toThrow('search API error');
   });
 
   it('excludes database child when parent has ingest-all', async () => {
-    const tenant = createTenant('database-child-tenant');
     const parent = makePage('parent', { labels: ['ai-ingest-all'] });
     const databaseChild = makePage('db-child', {
       type: ContentType.DATABASE,
@@ -223,7 +195,7 @@ describe('ConfluencePageScanner', () => {
       ),
     };
 
-    const scanner = createScanner(tenant, apiClient);
+    const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'page-child']);
@@ -234,7 +206,6 @@ describe('ConfluencePageScanner', () => {
   });
 
   it('honors maxPagesToScan limit during child expansion', async () => {
-    const tenant = createTenant('limit-expansion-tenant');
     const parent = makePage('parent', { labels: ['ai-ingest-all'] });
     const child = makePage('child', { labels: ['ai-ingest-all'] });
     const grandchild = makePage('grandchild', { labels: ['engineering'] });
@@ -255,7 +226,7 @@ describe('ConfluencePageScanner', () => {
       ),
     };
 
-    const scanner = createScanner(tenant, apiClient, limitedConfig);
+    const scanner = createScanner(apiClient, limitedConfig);
     const result = await scanner.discoverPages();
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'child']);
@@ -266,7 +237,6 @@ describe('ConfluencePageScanner', () => {
   });
 
   it('deduplicates pages that appear in both the CQL scan and child expansion', async () => {
-    const tenant = createTenant('dedup-tenant');
     const parent = makePage('parent', { labels: ['ai-ingest-all'] });
     const labeledChild = makePage('labeled-child', { labels: ['ai-ingest'] });
 
@@ -281,14 +251,13 @@ describe('ConfluencePageScanner', () => {
       ),
     };
 
-    const scanner = createScanner(tenant, apiClient);
+    const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'labeled-child']);
   });
 
   it('continues discovery when child fetching fails for one parent', async () => {
-    const tenant = createTenant('error-tenant');
     const failingParent = makePage('failing-parent', { labels: ['ai-ingest-all'] });
     const healthyPage = makePage('healthy-page', { labels: ['ai-ingest'] });
 
@@ -300,7 +269,7 @@ describe('ConfluencePageScanner', () => {
       ),
     };
 
-    const scanner = createScanner(tenant, apiClient);
+    const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
     expect(result.map((item) => item.id)).toEqual(['failing-parent', 'healthy-page']);

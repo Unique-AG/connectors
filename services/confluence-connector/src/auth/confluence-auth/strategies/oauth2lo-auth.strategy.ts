@@ -1,7 +1,7 @@
+import type pino from 'pino';
 import { request } from 'undici';
 import { z } from 'zod';
 import { AuthMode, ConfluenceConfig } from '../../../config';
-import { ServiceRegistry } from '../../../tenant/service-registry';
 import { handleErrorStatus } from '../../../utils/http-util';
 import { TokenCache } from '../../token-cache';
 import type { TokenResult } from '../../token-result';
@@ -25,7 +25,7 @@ const tokenResponseSchema = z.object({
 });
 
 export class OAuth2LoAuthStrategy extends ConfluenceAuth {
-  private readonly serviceRegistry: ServiceRegistry;
+  private readonly logger: pino.Logger;
   private readonly tokenCache = new TokenCache();
   private readonly clientId: string;
   private readonly clientSecret: string;
@@ -35,10 +35,10 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
   public constructor(
     authConfig: OAuth2LoAuthConfig,
     connectionConfig: OAuth2LoConnectionConfig,
-    serviceRegistry: ServiceRegistry,
+    logger: pino.Logger,
   ) {
     super();
-    this.serviceRegistry = serviceRegistry;
+    this.logger = logger;
     this.clientId = authConfig.clientId;
     this.clientSecret = authConfig.clientSecret.value;
     this.instanceType = connectionConfig.instanceType;
@@ -53,13 +53,12 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
   }
 
   private async fetchToken(): Promise<TokenResult> {
-    const logger = this.serviceRegistry.getServiceLogger(OAuth2LoAuthStrategy);
-    logger.info(`Acquiring Confluence ${this.instanceType} token via OAuth 2.0 2LO`);
+    this.logger.info(`Acquiring Confluence ${this.instanceType} token via OAuth 2.0 2LO`);
 
     try {
       return await this.requestToken();
     } catch (error) {
-      logger.error({
+      this.logger.error({
         msg: `Failed to acquire Confluence ${this.instanceType} token via OAuth 2.0 2LO`,
         error,
       });

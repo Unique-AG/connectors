@@ -49,25 +49,22 @@ export class TenantRegistry implements OnModuleInit {
           UniqueAuth,
           this.uniqueAuthFactory.create(config.unique),
         );
-        this.serviceRegistry.register(
-          tenantName,
-          ConfluenceApiClient,
-          this.confluenceApiClientFactory.create(config.confluence),
-        );
-        this.serviceRegistry.register(
-          tenantName,
-          ConfluencePageScanner,
-          new ConfluencePageScanner(config.confluence, config.processing, this.serviceRegistry),
-        );
-        this.serviceRegistry.register(
-          tenantName,
-          ConfluenceContentFetcher,
-          new ConfluenceContentFetcher(config.confluence, this.serviceRegistry),
-        );
+        const apiClient = this.confluenceApiClientFactory.create(config.confluence);
+        this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
+
+        const scannerLogger = this.serviceRegistry.getServiceLogger(ConfluencePageScanner);
+        const scanner = new ConfluencePageScanner(config.confluence, config.processing, apiClient, scannerLogger);
+        this.serviceRegistry.register(tenantName, ConfluencePageScanner, scanner);
+
+        const fetcherLogger = this.serviceRegistry.getServiceLogger(ConfluenceContentFetcher);
+        const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient, fetcherLogger);
+        this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
+
+        const syncLogger = this.serviceRegistry.getServiceLogger(ConfluenceSynchronizationService);
         this.serviceRegistry.register(
           tenantName,
           ConfluenceSynchronizationService,
-          new ConfluenceSynchronizationService(this.serviceRegistry),
+          new ConfluenceSynchronizationService(scanner, fetcher, syncLogger),
         );
       });
 

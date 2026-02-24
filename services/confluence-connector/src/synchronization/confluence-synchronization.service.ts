@@ -1,19 +1,14 @@
 import type pino from 'pino';
-import type { ServiceRegistry } from '../tenant';
 import { getCurrentTenant } from '../tenant/tenant-context.storage';
-import { ConfluenceContentFetcher } from './confluence-content-fetcher';
-import { ConfluencePageScanner } from './confluence-page-scanner';
+import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
+import type { ConfluencePageScanner } from './confluence-page-scanner';
 
 export class ConfluenceSynchronizationService {
-  private readonly scanner: ConfluencePageScanner;
-  private readonly contentFetcher: ConfluenceContentFetcher;
-  private readonly logger: pino.Logger;
-
-  public constructor(serviceRegistry: ServiceRegistry) {
-    this.scanner = serviceRegistry.getService(ConfluencePageScanner);
-    this.contentFetcher = serviceRegistry.getService(ConfluenceContentFetcher);
-    this.logger = serviceRegistry.getServiceLogger(ConfluenceSynchronizationService);
-  }
+  public constructor(
+    private readonly scanner: ConfluencePageScanner,
+    private readonly contentFetcher: ConfluenceContentFetcher,
+    private readonly logger: pino.Logger,
+  ) {}
 
   public async synchronize(): Promise<void> {
     const tenant = getCurrentTenant();

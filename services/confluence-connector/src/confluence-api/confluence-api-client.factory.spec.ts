@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
 import { ServiceRegistry } from '../tenant/service-registry';
 import { CloudConfluenceApiClient } from './cloud-api-client';
@@ -12,9 +13,12 @@ vi.mock('./data-center-api-client', () => ({
   DataCenterConfluenceApiClient: vi.fn(),
 }));
 
+const mockAuth = { acquireToken: vi.fn() } as unknown as ConfluenceAuth;
+const mockLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
 const mockServiceRegistry = {
-  getService: vi.fn(),
-  getServiceLogger: vi.fn().mockReturnValue({ warn: vi.fn(), error: vi.fn() }),
+  getService: vi.fn().mockReturnValue(mockAuth),
+  getServiceLogger: vi.fn().mockReturnValue(mockLogger),
 } as unknown as ServiceRegistry;
 
 const baseFields = {
@@ -35,7 +39,7 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(CloudConfluenceApiClient).toHaveBeenCalledWith(config, mockServiceRegistry);
+    expect(CloudConfluenceApiClient).toHaveBeenCalledWith(config, mockAuth, mockLogger);
   });
 
   it('creates DataCenterConfluenceApiClient for data-center config', () => {
@@ -48,7 +52,7 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(DataCenterConfluenceApiClient).toHaveBeenCalledWith(config, mockServiceRegistry);
+    expect(DataCenterConfluenceApiClient).toHaveBeenCalledWith(config, mockAuth, mockLogger);
   });
 
   it('returns the created client instance', () => {

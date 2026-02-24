@@ -24,7 +24,6 @@ vi.mock('../../utils/normalize-error', () => ({
 
 import { request } from 'undici';
 import type { ConfluenceConfig } from '../../config';
-import type { ServiceRegistry } from '../../tenant/service-registry';
 import { CloudConfluenceApiClient } from '../cloud-api-client';
 import { type ConfluencePage, ContentType } from '../types/confluence-api.types';
 
@@ -39,11 +38,6 @@ const mockLogger = {
 };
 
 const mockAuth = { acquireToken: vi.fn().mockResolvedValue('cloud-token') };
-
-const mockServiceRegistry = {
-  getService: vi.fn().mockReturnValue(mockAuth),
-  getServiceLogger: vi.fn().mockReturnValue(mockLogger),
-} as unknown as ServiceRegistry;
 
 const mockConfig: ConfluenceConfig = {
   baseUrl: BASE_URL,
@@ -89,7 +83,7 @@ describe('CloudConfluenceApiClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new CloudConfluenceApiClient(mockConfig, mockServiceRegistry);
+    client = new CloudConfluenceApiClient(mockConfig, mockAuth as never, mockLogger as never);
   });
 
   describe('searchPagesByLabel', () => {

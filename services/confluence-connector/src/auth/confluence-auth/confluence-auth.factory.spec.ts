@@ -61,7 +61,7 @@ describe('ConfluenceAuthFactory', () => {
       const token = await auth.acquireToken();
 
       expect(token).toBe('oauth-token');
-      expect(OAuth2LoAuthStrategy).toHaveBeenCalledWith(config.auth, config, mockServiceRegistry);
+      expect(OAuth2LoAuthStrategy).toHaveBeenCalledWith(config.auth, config, expect.any(Object));
     });
 
     it('creates auth for PAT data-center config', async () => {

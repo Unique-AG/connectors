@@ -1,5 +1,6 @@
 import type Dispatcher from 'undici/types/dispatcher';
 
+// to extract into shared utils package
 export async function handleErrorStatus(
   statusCode: number,
   responseBody: Dispatcher.BodyMixin,

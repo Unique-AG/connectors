@@ -24,7 +24,6 @@ vi.mock('../../utils/normalize-error', () => ({
 
 import { request } from 'undici';
 import type { ConfluenceConfig } from '../../config';
-import type { ServiceRegistry } from '../../tenant/service-registry';
 import { DataCenterConfluenceApiClient } from '../data-center-api-client';
 import { ContentType } from '../types/confluence-api.types';
 
@@ -39,11 +38,6 @@ const mockLogger = {
 };
 
 const mockAuth = { acquireToken: vi.fn().mockResolvedValue('dc-token') };
-
-const mockServiceRegistry = {
-  getService: vi.fn().mockReturnValue(mockAuth),
-  getServiceLogger: vi.fn().mockReturnValue(mockLogger),
-} as unknown as ServiceRegistry;
 
 const mockConfig: ConfluenceConfig = {
   baseUrl: BASE_URL,
@@ -89,7 +83,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new DataCenterConfluenceApiClient(mockConfig, mockServiceRegistry);
+    client = new DataCenterConfluenceApiClient(mockConfig, mockAuth as never, mockLogger as never);
   });
 
   describe('searchPagesByLabel', () => {

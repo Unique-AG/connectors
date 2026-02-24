@@ -1,24 +1,18 @@
 import type pino from 'pino';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
 import type { ConfluencePage } from '../confluence-api';
-import { ConfluenceApiClient, ContentType } from '../confluence-api';
-import type { ServiceRegistry } from '../tenant';
+import { type ConfluenceApiClient, ContentType } from '../confluence-api';
 import type { DiscoveredPage } from './sync.types';
 
 const SKIPPED_CONTENT_TYPES = [ContentType.DATABASE, ContentType.BLOGPOST, ContentType.WHITEBOARD, ContentType.EMBED];
 
 export class ConfluencePageScanner {
-  private readonly apiClient: ConfluenceApiClient;
-  private readonly logger: pino.Logger;
-
   public constructor(
     private readonly confluenceConfig: ConfluenceConfig,
     private readonly processingConfig: ProcessingConfig,
-    serviceRegistry: ServiceRegistry,
-  ) {
-    this.apiClient = serviceRegistry.getService(ConfluenceApiClient);
-    this.logger = serviceRegistry.getServiceLogger(ConfluencePageScanner);
-  }
+    private readonly apiClient: ConfluenceApiClient,
+    private readonly logger: pino.Logger,
+  ) {}
 
   public async discoverPages(): Promise<DiscoveredPage[]> {
     const labeledPages = await this.apiClient.searchPagesByLabel();

@@ -14,7 +14,8 @@ export class ConfluenceAuthFactory {
     switch (config.auth.mode) {
       case AuthMode.OAUTH_2LO: {
         logger.info(`Using OAuth 2.0 2LO authentication for ${config.instanceType} instance`);
-        return new OAuth2LoAuthStrategy(config.auth, config, this.serviceRegistry);
+        const strategyLogger = this.serviceRegistry.getServiceLogger(OAuth2LoAuthStrategy);
+        return new OAuth2LoAuthStrategy(config.auth, config, strategyLogger);
       }
       case AuthMode.PAT: {
         logger.info('Using PAT authentication for data-center instance');

@@ -2,9 +2,8 @@ import Bottleneck from 'bottleneck';
 import type pino from 'pino';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
 import type { IncomingHttpHeaders } from 'undici/types/header';
-import { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
+import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
-import type { ServiceRegistry } from '../tenant/service-registry';
 import { handleErrorStatus } from '../utils/http-util';
 import type { ConfluencePage, ContentType } from './types/confluence-api.types';
 
@@ -18,10 +17,11 @@ export abstract class ConfluenceApiClient {
 
   public constructor(
     protected readonly config: ConfluenceConfig,
-    serviceRegistry: ServiceRegistry,
+    confluenceAuth: ConfluenceAuth,
+    logger: pino.Logger,
   ) {
-    this.confluenceAuth = serviceRegistry.getService(ConfluenceAuth);
-    this.logger = serviceRegistry.getServiceLogger(ConfluenceApiClient);
+    this.confluenceAuth = confluenceAuth;
+    this.logger = logger;
     this.baseUrl = config.baseUrl;
 
     this.dispatcher = new Agent().compose([interceptors.redirect(), interceptors.retry()]);

@@ -27,7 +27,6 @@ vi.mock('../../utils/normalize-error', () => ({
 
 import { request } from 'undici';
 import type { ConfluenceConfig } from '../../config';
-import type { ServiceRegistry } from '../../tenant/service-registry';
 import { DataCenterConfluenceApiClient } from '../data-center-api-client';
 import type { ConfluencePage } from '../types/confluence-api.types';
 
@@ -43,11 +42,6 @@ const mockLogger = {
 };
 
 const mockAuth = { acquireToken: vi.fn().mockResolvedValue(MOCK_TOKEN) };
-
-const mockServiceRegistry = {
-  getService: vi.fn().mockReturnValue(mockAuth),
-  getServiceLogger: vi.fn().mockReturnValue(mockLogger),
-} as unknown as ServiceRegistry;
 
 const mockConfig: ConfluenceConfig = {
   baseUrl: BASE_URL,
@@ -94,7 +88,7 @@ describe('ConfluenceApiClient (base class behavior)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.acquireToken.mockResolvedValue(MOCK_TOKEN);
-    client = new DataCenterConfluenceApiClient(mockConfig, mockServiceRegistry);
+    client = new DataCenterConfluenceApiClient(mockConfig, mockAuth as never, mockLogger as never);
   });
 
   describe('auth header injection', () => {
