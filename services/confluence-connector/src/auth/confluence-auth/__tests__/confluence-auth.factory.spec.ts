@@ -50,6 +50,7 @@ describe('ConfluenceAuthFactory', () => {
       const config: ConfluenceConfig = {
         ...baseFields,
         instanceType: 'cloud',
+        cloudId: 'test-cloud-id',
         auth: {
           mode: AuthMode.OAUTH_2LO,
           clientId: 'client-id',
@@ -100,6 +101,7 @@ describe('ConfluenceAuthFactory', () => {
       const config: ConfluenceConfig = {
         ...baseFields,
         instanceType: 'cloud',
+        cloudId: 'test-cloud-id',
         auth: {
           mode: AuthMode.OAUTH_2LO,
           clientId: 'client-id',

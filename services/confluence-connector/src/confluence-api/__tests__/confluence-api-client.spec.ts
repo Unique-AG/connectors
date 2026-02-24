@@ -50,10 +50,9 @@ describe('ConfluenceApiClient (auth integration)', () => {
 
       await client.getPageById('1');
 
-      expect(mockHttpClient.rateLimitedRequest).toHaveBeenCalledWith(
-        expect.any(String),
-        { Authorization: `Bearer ${MOCK_TOKEN}` },
-      );
+      expect(mockHttpClient.rateLimitedRequest).toHaveBeenCalledWith(expect.any(String), {
+        Authorization: `Bearer ${MOCK_TOKEN}`,
+      });
     });
 
     it('acquires a fresh token before each request', async () => {
