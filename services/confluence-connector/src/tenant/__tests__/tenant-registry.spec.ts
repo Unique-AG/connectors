@@ -1,13 +1,13 @@
 import type pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
-import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
-import { UniqueAuth, UniqueAuthFactory } from '../auth/unique-auth';
-import type { NamedTenantConfig, TenantConfig } from '../config/tenant-config-loader';
-import { getTenantConfigs } from '../config/tenant-config-loader';
-import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
-import { ServiceRegistry } from './service-registry';
-import { tenantStorage } from './tenant-context.storage';
-import { TenantRegistry } from './tenant-registry';
+import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-auth';
+import { UniqueAuth, UniqueAuthFactory } from '../../auth/unique-auth';
+import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
+import { getTenantConfigs } from '../../config/tenant-config-loader';
+import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../../confluence-api';
+import { ServiceRegistry } from '../service-registry';
+import { tenantStorage } from '../tenant-context.storage';
+import { TenantRegistry } from '../tenant-registry';
 
 const { mockChildLogger, mockRoot } = vi.hoisted(() => {
   const mockChildLogger = {

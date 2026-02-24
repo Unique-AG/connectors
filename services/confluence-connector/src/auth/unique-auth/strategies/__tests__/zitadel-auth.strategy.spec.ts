@@ -1,9 +1,9 @@
 import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { UniqueAuthMode } from '../../../config';
-import { Redacted } from '../../../utils/redacted';
-import { UniqueAuth } from '../unique-auth.abstract';
-import { ZitadelAuthStrategy } from './zitadel-auth.strategy';
+import { UniqueAuthMode } from '../../../../config';
+import { Redacted } from '../../../../utils/redacted';
+import { UniqueAuth } from '../../unique-auth.abstract';
+import { ZitadelAuthStrategy } from '../zitadel-auth.strategy';
 
 const { mockRequest } = vi.hoisted(() => ({
   mockRequest: vi.fn(),

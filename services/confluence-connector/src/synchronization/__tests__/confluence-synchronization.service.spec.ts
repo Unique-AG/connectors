@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ContentType } from '../confluence-api';
-import type { TenantContext } from '../tenant/tenant-context.interface';
-import { tenantStorage } from '../tenant/tenant-context.storage';
-import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
-import type { ConfluencePageScanner } from './confluence-page-scanner';
-import { ConfluenceSynchronizationService } from './confluence-synchronization.service';
-import type { DiscoveredPage, FetchedPage } from './sync.types';
+import { ContentType } from '../../confluence-api';
+import type { TenantContext } from '../../tenant/tenant-context.interface';
+import { tenantStorage } from '../../tenant/tenant-context.storage';
+import type { ConfluenceContentFetcher } from '../confluence-content-fetcher';
+import type { ConfluencePageScanner } from '../confluence-page-scanner';
+import { ConfluenceSynchronizationService } from '../confluence-synchronization.service';
+import type { DiscoveredPage, FetchedPage } from '../sync.types';
 
 const mockTenantLogger = vi.hoisted(() => ({
   info: vi.fn(),

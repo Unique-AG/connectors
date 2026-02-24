@@ -1,8 +1,8 @@
 import type pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthMode } from '../../../config/confluence.schema';
-import { Redacted } from '../../../utils/redacted';
-import { OAuth2LoAuthStrategy } from './oauth2lo-auth.strategy';
+import { AuthMode } from '../../../../config/confluence.schema';
+import { Redacted } from '../../../../utils/redacted';
+import { OAuth2LoAuthStrategy } from '../oauth2lo-auth.strategy';
 
 const { mockRequest } = vi.hoisted(() => ({
   mockRequest: vi.fn(),

@@ -1,21 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AuthMode, type ConfluenceConfig } from '../../config';
-import type { TenantConfig } from '../../config/tenant-config-loader';
-import { ServiceRegistry } from '../../tenant/service-registry';
-import type { TenantContext } from '../../tenant/tenant-context.interface';
-import { tenantStorage } from '../../tenant/tenant-context.storage';
-import { Redacted } from '../../utils/redacted';
-import { ConfluenceAuthFactory } from './confluence-auth.factory';
-import { OAuth2LoAuthStrategy } from './strategies/oauth2lo-auth.strategy';
-import { PatAuthStrategy } from './strategies/pat-auth.strategy';
+import { AuthMode, type ConfluenceConfig } from '../../../config';
+import type { TenantConfig } from '../../../config/tenant-config-loader';
+import { ServiceRegistry } from '../../../tenant/service-registry';
+import type { TenantContext } from '../../../tenant/tenant-context.interface';
+import { tenantStorage } from '../../../tenant/tenant-context.storage';
+import { Redacted } from '../../../utils/redacted';
+import { ConfluenceAuthFactory } from '../confluence-auth.factory';
+import { OAuth2LoAuthStrategy } from '../strategies/oauth2lo-auth.strategy';
+import { PatAuthStrategy } from '../strategies/pat-auth.strategy';
 
-vi.mock('./strategies/oauth2lo-auth.strategy', () => ({
+vi.mock('../strategies/oauth2lo-auth.strategy', () => ({
   OAuth2LoAuthStrategy: vi.fn().mockImplementation(() => ({
     acquireToken: vi.fn().mockResolvedValue('oauth-token'),
   })),
 }));
 
-vi.mock('./strategies/pat-auth.strategy', () => ({
+vi.mock('../strategies/pat-auth.strategy', () => ({
   PatAuthStrategy: vi.fn().mockImplementation(() => ({
     acquireToken: vi.fn().mockResolvedValue('pat-token'),
   })),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { smear } from './logging.util';
+import { smear } from '../logging.util';
 
 describe('smear', () => {
   it('returns __erroneous__ for null input', () => {

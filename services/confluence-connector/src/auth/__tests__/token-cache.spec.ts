@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TokenCache } from './token-cache';
-import type { TokenResult } from './token-result';
+import { TokenCache } from '../token-cache';
+import type { TokenResult } from '../token-result';
 
 describe('TokenCache', () => {
   beforeEach(() => {

@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
-import type { ConfluenceConfig } from '../config';
-import { ServiceRegistry } from '../tenant/service-registry';
-import { CloudConfluenceApiClient } from './cloud-api-client';
-import { ConfluenceApiClientFactory } from './confluence-api-client.factory';
-import { DataCenterConfluenceApiClient } from './data-center-api-client';
+import type { ConfluenceAuth } from '../../auth/confluence-auth/confluence-auth.abstract';
+import type { ConfluenceConfig } from '../../config';
+import { ServiceRegistry } from '../../tenant/service-registry';
+import { CloudConfluenceApiClient } from '../cloud-api-client';
+import { ConfluenceApiClientFactory } from '../confluence-api-client.factory';
+import { DataCenterConfluenceApiClient } from '../data-center-api-client';
 
-vi.mock('./cloud-api-client', () => ({
+vi.mock('../cloud-api-client', () => ({
   CloudConfluenceApiClient: vi.fn(),
 }));
-vi.mock('./data-center-api-client', () => ({
+vi.mock('../data-center-api-client', () => ({
   DataCenterConfluenceApiClient: vi.fn(),
 }));
 

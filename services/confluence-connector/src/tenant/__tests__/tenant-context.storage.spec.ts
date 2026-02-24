@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { TenantContext } from './tenant-context.interface';
-import { getCurrentTenant, tenantStorage } from './tenant-context.storage';
+import type { TenantContext } from '../tenant-context.interface';
+import { getCurrentTenant, tenantStorage } from '../tenant-context.storage';
 
 function createMockTenant(overrides: Partial<TenantContext> = {}): TenantContext {
   return {

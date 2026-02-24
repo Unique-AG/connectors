@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { UniqueAuthMode } from '../../../config';
-import { UniqueAuth } from '../unique-auth.abstract';
-import { ClusterLocalAuthStrategy } from './cluster-local-auth.strategy';
+import { UniqueAuthMode } from '../../../../config';
+import { UniqueAuth } from '../../unique-auth.abstract';
+import { ClusterLocalAuthStrategy } from '../cluster-local-auth.strategy';
 
 function createConfig() {
   return {

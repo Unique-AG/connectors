@@ -1,11 +1,11 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
-import { ServiceRegistry } from '../tenant/service-registry';
-import type { TenantContext } from '../tenant/tenant-context.interface';
-import { tenantStorage } from '../tenant/tenant-context.storage';
-import { TenantRegistry } from '../tenant/tenant-registry';
-import { TenantSyncScheduler } from './tenant-sync.scheduler';
+import { ConfluenceSynchronizationService } from '../../synchronization/confluence-synchronization.service';
+import { ServiceRegistry } from '../../tenant/service-registry';
+import type { TenantContext } from '../../tenant/tenant-context.interface';
+import { tenantStorage } from '../../tenant/tenant-context.storage';
+import { TenantRegistry } from '../../tenant/tenant-registry';
+import { TenantSyncScheduler } from '../tenant-sync.scheduler';
 
 const mockTenantLogger = vi.hoisted(() => ({
   info: vi.fn(),

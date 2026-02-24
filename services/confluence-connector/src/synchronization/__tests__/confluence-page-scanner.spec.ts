@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConfluenceConfig, ProcessingConfig } from '../config';
-import type { ConfluencePage } from '../confluence-api';
-import { ConfluenceApiClient, ContentType } from '../confluence-api';
-import { ConfluencePageScanner } from './confluence-page-scanner';
+import type { ConfluenceConfig, ProcessingConfig } from '../../config';
+import type { ConfluencePage } from '../../confluence-api';
+import { ConfluenceApiClient, ContentType } from '../../confluence-api';
+import { ConfluencePageScanner } from '../confluence-page-scanner';
 
 const mockTenantLogger = vi.hoisted(() => ({
   info: vi.fn(),

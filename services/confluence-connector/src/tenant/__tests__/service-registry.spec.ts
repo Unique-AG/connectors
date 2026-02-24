@@ -1,8 +1,8 @@
 import pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
-import { ServiceRegistry } from './service-registry';
-import type { TenantContext } from './tenant-context.interface';
-import { tenantStorage } from './tenant-context.storage';
+import { ServiceRegistry } from '../service-registry';
+import type { TenantContext } from '../tenant-context.interface';
+import { tenantStorage } from '../tenant-context.storage';
 
 abstract class FooService {
   public abstract doFoo(): string;

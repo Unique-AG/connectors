@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { dump } from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthMode } from './confluence.schema';
+import { AuthMode } from '../confluence.schema';
 
 vi.mock('node:fs', () => ({
   globSync: vi.fn(),
@@ -105,7 +105,7 @@ describe('tenant-config-loader', () => {
   async function loadModule() {
     vi.resetModules();
     const fs = await import('node:fs');
-    const mod = await import('./tenant-config-loader');
+    const mod = await import('../tenant-config-loader');
     return { globSync: vi.mocked(fs.globSync), readFileSync: vi.mocked(fs.readFileSync), ...mod };
   }
 

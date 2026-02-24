@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { AuthMode } from '../../../config/confluence.schema';
-import type { TenantContext } from '../../../tenant/tenant-context.interface';
-import { tenantStorage } from '../../../tenant/tenant-context.storage';
-import { Redacted } from '../../../utils/redacted';
-import { PatAuthStrategy } from './pat-auth.strategy';
+import { AuthMode } from '../../../../config/confluence.schema';
+import type { TenantContext } from '../../../../tenant/tenant-context.interface';
+import { tenantStorage } from '../../../../tenant/tenant-context.storage';
+import { Redacted } from '../../../../utils/redacted';
+import { PatAuthStrategy } from '../pat-auth.strategy';
 
 const mockTenant: TenantContext = {
   name: 'test-tenant',

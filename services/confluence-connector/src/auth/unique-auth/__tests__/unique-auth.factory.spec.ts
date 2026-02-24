@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { UniqueAuthMode } from '../../config';
-import { ServiceRegistry } from '../../tenant/service-registry';
-import type { TenantContext } from '../../tenant/tenant-context.interface';
-import { tenantStorage } from '../../tenant/tenant-context.storage';
-import { Redacted } from '../../utils/redacted';
-import { ClusterLocalAuthStrategy } from './strategies/cluster-local-auth.strategy';
-import { ZitadelAuthStrategy } from './strategies/zitadel-auth.strategy';
-import { UniqueAuthFactory } from './unique-auth.factory';
+import { UniqueAuthMode } from '../../../config';
+import { ServiceRegistry } from '../../../tenant/service-registry';
+import type { TenantContext } from '../../../tenant/tenant-context.interface';
+import { tenantStorage } from '../../../tenant/tenant-context.storage';
+import { Redacted } from '../../../utils/redacted';
+import { ClusterLocalAuthStrategy } from '../strategies/cluster-local-auth.strategy';
+import { ZitadelAuthStrategy } from '../strategies/zitadel-auth.strategy';
+import { UniqueAuthFactory } from '../unique-auth.factory';
 
 const baseFields = {
   ingestionServiceBaseUrl: 'https://ingestion.example.com',

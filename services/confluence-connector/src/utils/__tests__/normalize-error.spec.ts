@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeError, sanitizeError } from './normalize-error';
+import { normalizeError, sanitizeError } from '../normalize-error';
 
 describe('normalizeError', () => {
   it('returns Error instances unchanged', () => {
