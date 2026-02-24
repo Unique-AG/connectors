@@ -75,7 +75,7 @@ function makePage(overrides: Record<string, unknown> = {}) {
   return {
     id: '100',
     title: 'Test Page',
-    type: 'page',
+    type: ContentType.PAGE,
     space: { id: 's1', key: 'SP', name: 'Space' },
     version: { when: '2024-01-01' },
     _links: { webui: '/pages/viewpage.action?pageId=100' },
@@ -98,7 +98,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0][0] as string;
+      const url = mockedRequest.mock.calls[0]![0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('label="sync"');
       expect(decodedUrl).toContain('label="sync-all"');
@@ -111,7 +111,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0][0] as string;
+      const url = mockedRequest.mock.calls[0]![0] as string;
       expect(url).toContain('/rest/api/content/search');
       expect(url).toContain('os_authType=basic');
     });
@@ -121,7 +121,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0][0] as string;
+      const url = mockedRequest.mock.calls[0]![0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).not.toContain('collaboration');
     });
@@ -131,7 +131,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.searchPagesByLabel();
 
-      const url = mockedRequest.mock.calls[0][0] as string;
+      const url = mockedRequest.mock.calls[0]![0] as string;
       expect(url).toContain('limit=25');
     });
   });
@@ -142,7 +142,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.getPageById('42');
 
-      const url = mockedRequest.mock.calls[0][0] as string;
+      const url = mockedRequest.mock.calls[0]![0] as string;
       expect(url).toContain('/rest/api/content/42');
       expect(url).toContain('os_authType=basic');
       expect(url).toContain('expand=body.storage,version,space,metadata.labels');
@@ -196,7 +196,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.getChildPages('55', ContentType.PAGE);
 
-      const url = mockedRequest.mock.calls[0][0] as string;
+      const url = mockedRequest.mock.calls[0]![0] as string;
       expect(url).toContain('/rest/api/content/55/child/page');
       expect(url).toContain('os_authType=basic');
     });
@@ -206,7 +206,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.getChildPages('55', ContentType.FOLDER);
 
-      const url = mockedRequest.mock.calls[0][0] as string;
+      const url = mockedRequest.mock.calls[0]![0] as string;
       expect(url).toContain('/child/page');
       expect(url).not.toContain('folders');
     });
@@ -216,7 +216,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       await client.getChildPages('55', ContentType.PAGE);
 
-      const url = mockedRequest.mock.calls[0][0] as string;
+      const url = mockedRequest.mock.calls[0]![0] as string;
       expect(url).toContain('limit=50');
     });
 
@@ -233,8 +233,8 @@ describe('DataCenterConfluenceApiClient', () => {
       const results = await client.getChildPages('55', ContentType.PAGE);
 
       expect(results).toHaveLength(2);
-      expect(results[0].id).toBe('10');
-      expect(results[1].id).toBe('11');
+      expect(results[0]!.id).toBe('10');
+      expect(results[1]!.id).toBe('11');
     });
   });
 
@@ -242,9 +242,7 @@ describe('DataCenterConfluenceApiClient', () => {
     it('builds viewpage URL with page id', () => {
       const page = makePage({ id: '99' });
 
-      const url = client.buildPageWebUrl(
-        page as ReturnType<typeof makePage> & { id: string; _links: { webui: string } },
-      );
+      const url = client.buildPageWebUrl(page);
 
       expect(url).toBe(`${BASE_URL}/pages/viewpage.action?pageId=99`);
     });

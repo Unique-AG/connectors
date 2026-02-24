@@ -248,7 +248,7 @@ describe('CloudConfluenceApiClient', () => {
       const result = await client.getChildPages('10', ContentType.PAGE);
 
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('c1');
+      expect(result[0]!.id).toBe('c1');
     });
 
     it('paginates direct-children endpoint', async () => {
