@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { LogsDiagnosticDataPolicy } from '../config/app.config';
-import { createSmeared, isSmearingActive, Smeared } from './smeared';
+import { LogsDiagnosticDataPolicy } from '../../config/app.config';
+import { createSmeared, isSmearingActive, Smeared } from '../smeared';
 
 describe('Smeared', () => {
   describe('constructor and getters', () => {

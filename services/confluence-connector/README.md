@@ -2,8 +2,6 @@
 
 Take content from Confluence and send it to Unique AI for RAG ingestion.
 
-> **Status:** Scaffold — not yet feature-complete.
-
 ## Development
 
 ```bash

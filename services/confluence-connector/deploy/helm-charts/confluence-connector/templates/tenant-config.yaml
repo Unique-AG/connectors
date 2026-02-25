@@ -11,11 +11,19 @@ data:
     # Confluence Configuration
     confluence:
       instanceType: {{ $tenant.confluence.instanceType | quote }}
+      {{- if eq $tenant.confluence.instanceType "cloud" }}
+      cloudId: {{ $tenant.confluence.cloudId | quote }}
+      {{- end }}
       baseUrl: {{ $tenant.confluence.baseUrl | quote }}
       auth:
         mode: {{ $tenant.confluence.auth.mode | quote }}
+        {{- if eq $tenant.confluence.auth.mode "oauth_2lo" }}
         clientId: {{ $tenant.confluence.auth.clientId | quote }}
-        # clientSecret is loaded from environment variable (secret)
+        clientSecret: "os.environ/CONFLUENCE_CLIENT_SECRET"
+        {{- end }}
+        {{- if eq $tenant.confluence.auth.mode "pat" }}
+        token: "os.environ/CONFLUENCE_PAT"
+        {{- end }}
       apiRateLimitPerMinute: {{ $tenant.confluence.apiRateLimitPerMinute }}
       ingestSingleLabel: {{ $tenant.confluence.ingestSingleLabel | quote }}
       ingestAllLabel: {{ $tenant.confluence.ingestAllLabel | quote }}
@@ -32,7 +40,7 @@ data:
       zitadelOauthTokenUrl: {{ $tenant.unique.zitadel.oauthTokenUrl | quote }}
       zitadelProjectId: {{ $tenant.unique.zitadel.projectId | quote }}
       zitadelClientId: {{ $tenant.unique.zitadel.clientId | quote }}
-      # zitadelClientSecret is loaded from environment variable (secret)
+      zitadelClientSecret: "os.environ/ZITADEL_CLIENT_SECRET"
       {{- end }}
       ingestionServiceBaseUrl: {{ $tenant.unique.ingestionServiceBaseUrl | quote }}
       scopeManagementServiceBaseUrl: {{ $tenant.unique.scopeManagementServiceBaseUrl | quote }}

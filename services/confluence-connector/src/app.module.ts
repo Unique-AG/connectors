@@ -6,15 +6,19 @@ import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
-import { AppConfig, appConfig, confluenceConfig, processingConfig, uniqueConfig } from './config';
+import { type AppConfig, appConfig } from './config';
+import { SchedulerModule } from './scheduler/scheduler.module';
+import { TenantModule } from './tenant';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       ignoreEnvFile: true,
-      load: [appConfig, confluenceConfig, processingConfig, uniqueConfig],
+      load: [appConfig],
     }),
+    TenantModule,
+    SchedulerModule,
     LoggerModule.forRootAsync({
       useFactory(appConfigValue: AppConfig) {
         return {
