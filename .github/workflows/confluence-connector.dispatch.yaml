@@ -1,0 +1,21 @@
+name: "[confluence-connector] Manual Release Re-Run"
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      existing-version:
+        description: "Existing version of the service"
+        required: true
+        type: string
+
+jobs:
+  manual-release:
+    uses: ./.github/workflows/_template-cd.yaml
+    secrets: inherit
+    with:
+      service-name: confluence-connector
+      service-version: ${{ inputs.existing-version }}
+      dockerfile: services/confluence-connector/deploy/Dockerfile

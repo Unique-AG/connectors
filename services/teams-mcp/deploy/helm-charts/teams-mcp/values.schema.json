@@ -221,10 +221,9 @@
               "description": "The Public API version to use",
               "default": "2023-12-06"
             },
-            "rootScopePath": {
+            "rootScopeId": {
               "type": "string",
-              "description": "The root scope path where to upload transcripts",
-              "default": "Teams-MCP"
+              "description": "The root scope ID under which to create transcript and recording folders"
             },
             "serviceExtraHeaders": {
               "type": "object",
@@ -259,7 +258,7 @@
               "description": "Organisation ID where the Zitadel Service User is created (external mode)"
             }
           },
-          "required": ["serviceAuthMode", "apiBaseUrl"]
+          "required": ["serviceAuthMode", "apiBaseUrl", "rootScopeId"]
         },
         "auth": {
           "type": "object",

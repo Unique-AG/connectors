@@ -6,18 +6,21 @@ import { SubscriptionCreateService } from './subscription-create.service';
 import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscription-remove.service';
 import {
+  FindTranscriptsTool,
   StartKbIntegrationTool,
   StopKbIntegrationTool,
   VerifyKbIntegrationStatusTool,
 } from './tools';
 import { TranscriptController } from './transcript.controller';
 import { TranscriptCreatedService } from './transcript-created.service';
+import { TranscriptRecordingService } from './transcript-recording.service';
 import { TranscriptUtilsService } from './transcript-utils.service';
 
 @Module({
   imports: [DrizzleModule, MsGraphModule, UniqueModule],
   providers: [
     TranscriptUtilsService,
+    TranscriptRecordingService,
     SubscriptionCreateService,
     SubscriptionReauthorizeService,
     SubscriptionRemoveService,
@@ -26,6 +29,8 @@ import { TranscriptUtilsService } from './transcript-utils.service';
     VerifyKbIntegrationStatusTool,
     StartKbIntegrationTool,
     StopKbIntegrationTool,
+    // Transcript Search Tool
+    FindTranscriptsTool,
   ],
   controllers: [TranscriptController],
 })

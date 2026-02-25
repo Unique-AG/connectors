@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import type { Config } from '../config';
 export const EXTERNAL_ID_PREFIX = 'spc:' as const;
+export const PENDING_DELETE_PREFIX = 'spc:pending-delete:' as const;
 
 const SHAREPOINT_SITE_NAME_REGEX = /\/sites\/((?![a-f0-9-]{36}(?:\/|$))[^/]+)\//gi;
 const SHAREPOINT_SITE_ID_REGEX = /\/sites\/([a-f0-9-]{36})(?=\/|$)/gi;

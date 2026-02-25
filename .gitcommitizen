@@ -26,7 +26,9 @@ revert = Reverts a previous commit
 # Services
 factset-mcp = services/factset-mcp/**
 outlook-mcp = services/outlook-mcp/**
+outlook-semantic-mcp = services/outlook-semantic-mcp/**
 sharepoint-connector = services/sharepoint-connector/**
+confluence-connector = services/confluence-connector/**
 teams-mcp = services/teams-mcp/**
 
 # Packages
@@ -36,6 +38,8 @@ logger = packages/logger/**
 mcp-oauth = packages/mcp-oauth/**
 mcp-server-module = packages/mcp-server-module/**
 probe = packages/probe/**
+utils = packages/utils/**
+unique-api = packages/unique-api/**
 
 # Special scopes
 ci = .github/**

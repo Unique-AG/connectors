@@ -1,5 +1,5 @@
 import { AuthorizationCode, OAuthClient, OAuthSession } from '@unique-ag/mcp-oauth';
-import { authorizationCodes, oauthClients, oauthSessions } from '../drizzle/schema';
+import { authorizationCodes, oauthClients, oauthSessions } from '../db/schema';
 
 export function toDrizzleOAuthClientInsert(client: OAuthClient): typeof oauthClients.$inferInsert {
   return {

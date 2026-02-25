@@ -16,7 +16,7 @@ import { ConfigService } from '@nestjs/config';
 import { MetricService } from 'nestjs-otel';
 import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';
 import { SCOPES } from '../auth/microsoft.provider';
-import { DRIZZLE, DrizzleDatabase } from '../drizzle/drizzle.module';
+import { DRIZZLE, DrizzleDatabase } from '../db/drizzle.module';
 import { MetricsMiddleware } from './metrics.middleware';
 import { TokenProvider } from './token.provider';
 import { TokenRefreshMiddleware } from './token-refresh.middleware';
@@ -36,8 +36,12 @@ export class GraphClientFactory {
     private readonly encryptionService: AesGcmEncryptionService,
     private readonly metricService: MetricService,
   ) {
-    this.clientId = this.configService.get('microsoft.clientId', { infer: true });
-    this.clientSecret = this.configService.get('microsoft.clientSecret', { infer: true }).value;
+    this.clientId = this.configService.get('microsoft.clientId', {
+      infer: true,
+    });
+    this.clientSecret = this.configService.get('microsoft.clientSecret', {
+      infer: true,
+    }).value;
     this.scopes = SCOPES;
   }
 
@@ -90,7 +94,9 @@ export class GraphClientFactory {
     // Pass the first middleware in the chain to initialize the client
     const clientOptions: ClientOptions = {
       middleware: middlewares[0],
-      debugLogging: this.configService.get('app.isDebuggingOn', { infer: true }),
+      debugLogging: this.configService.get('app.isDebuggingOn', {
+        infer: true,
+      }),
     };
 
     return Client.initWithMiddleware(clientOptions);

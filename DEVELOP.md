@@ -8,6 +8,18 @@ docker-compose up -d
 
 ### Prerequisites
 
+**Option A: Nix (recommended)**
+
+If you have [Nix](https://nixos.org/) with flakes enabled:
+
+```bash
+nix develop
+```
+
+This provides all required tools (Node.js, pnpm, terraform, kubectl, helm, etc.) with pinned versions.
+
+**Option B: Manual setup**
+
 - Node.js >= 22
 - pnpm (specified version in `package.json` `packageManager` field)
 
@@ -211,6 +223,65 @@ These files use wildcards and **don't** need per-service updates:
 ### Python Services
 
 - **[edgar-mcp](./services/edgar-mcp/)** - SEC EDGAR MCP server
+
+## Nix Development Environment
+
+The repository includes a Nix flake (`flake.nix`) that provides a reproducible development environment.
+
+### Usage
+
+```bash
+# Enter the development shell
+nix develop
+
+# Or use direnv for automatic activation
+# Add "use flake" to .envrc
+```
+
+### Included Tools
+
+| Category | Tools |
+|----------|-------|
+| Node.js | Node.js 24.x, pnpm (via corepack) |
+| Infrastructure | terraform, kubectl, helm, azure-cli, devtunnel |
+| Utilities | jq, yq, zsh |
+
+> **Note:** `turbo` and `biome` are installed via pnpm (`node_modules/.bin`).
+
+### Extending for New Languages
+
+The flake uses a single devShell by design. When adding new language support (e.g., Python):
+
+1. Add the language packages to the appropriate category in `flake.nix`
+2. The shared tools (infrastructure, utilities) remain available to all services
+
+This approach keeps the development experience consistent across the monorepo while allowing services to use different languages.
+
+### Multiple DevShells (Optional)
+
+If isolated environments become necessary (e.g., conflicting tool versions or reducing shell startup time), the flake can expose multiple devShells:
+
+```nix
+devShells = {
+  default = pkgs.mkShell {
+    buildInputs = sharedPkgs ++ nodePkgs ++ infraPkgs;
+  };
+  python = pkgs.mkShell {
+    buildInputs = sharedPkgs ++ pythonPkgs ++ infraPkgs;
+  };
+  # Or per-service:
+  # teams-mcp = pkgs.mkShell { ... };
+};
+```
+
+Usage:
+
+```bash
+nix develop          # default (Node.js)
+nix develop .#python # Python environment
+```
+
+Prefer the single devShell approach unless there's a concrete need for separation.
 
 ## Contributing
 

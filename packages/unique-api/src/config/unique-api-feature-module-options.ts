@@ -1,0 +1,49 @@
+import { ZodConfigurableModuleBuilder } from '@proventuslabs/nestjs-zod';
+import { Dispatcher } from 'undici';
+import { z } from 'zod/v4';
+import { UniqueAuthSchema } from './unique-api-auth-schema';
+
+export const uniqueApiFeatureModuleOptionsSchema = z.object({
+  auth: UniqueAuthSchema,
+  dispatcher: z
+    .instanceof(Dispatcher)
+    .optional()
+    .describe(
+      `Custom provided dispatcher in case you need to change the default implementation of the dispatcher`,
+    ),
+  scopeManagement: z.object({
+    rateLimitPerMinute: z.number().prefault(1000),
+    baseUrl: z
+      .string()
+      .describe('Base URL for Unique scope management service')
+      .refine((url) => !url.endsWith('/'), {
+        message: `Scope management url should not end with trailing slash`,
+      }),
+  }),
+  ingestion: z.object({
+    rateLimitPerMinute: z.number().prefault(1000),
+    baseUrl: z
+      .string()
+      .describe('Base URL for Unique ingestion service')
+      .refine((url) => !url.endsWith('/'), {
+        message: `Ingestion url should not end with trailing slash`,
+      }),
+  }),
+  metadata: z
+    .object({
+      clientName: z.string().optional(),
+      tenantKey: z.string().optional(),
+    })
+    .prefault({}),
+});
+
+export type UniqueApiFeatureModuleOptions = z.infer<typeof uniqueApiFeatureModuleOptionsSchema>;
+
+export const uniqueApiFeatureModuleOptionsHost = new ZodConfigurableModuleBuilder(
+  uniqueApiFeatureModuleOptionsSchema,
+)
+  .setClassMethodName('forFeature')
+  .build();
+
+export type UniqueApiFeatureModuleInputOptions =
+  typeof uniqueApiFeatureModuleOptionsHost.OPTIONS_INPUT_TYPE;

@@ -117,6 +117,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -153,6 +154,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -189,6 +191,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -218,6 +221,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -263,6 +267,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -317,6 +322,7 @@ describe('ContentSyncService', () => {
           scopeId: 'scope-id',
           maxFilesToIngest: 2,
         },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -360,6 +366,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -401,6 +408,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -442,6 +450,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -468,6 +477,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -501,6 +511,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -535,6 +546,7 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({

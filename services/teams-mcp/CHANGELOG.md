@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.5](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.4...teams-mcp@0.2.5) (2026-02-20)
+
+
+### Features
+
+* **teams-mcp:** add semantic transcript search with reference support ([#254](https://github.com/Unique-AG/connectors/issues/254)) ([d5a05e0](https://github.com/Unique-AG/connectors/commit/d5a05e0d7f6357dae26d900a88eb008868f52bf9))
+
+## [0.2.4](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.3...teams-mcp@0.2.4) (2026-02-12)
+
+
+### Features
+
+* **teams-mcp:** add recording permission and update documentation ([#273](https://github.com/Unique-AG/connectors/issues/273)) ([4dd5f04](https://github.com/Unique-AG/connectors/commit/4dd5f04e3b0e4a059592caba0527d8554196753b))
+* **teams-mcp:** add recording storage as accompanying artifact to transcripts ([#267](https://github.com/Unique-AG/connectors/issues/267)) ([e913293](https://github.com/Unique-AG/connectors/commit/e91329372fcc8541824322c03540674c253f1d00))
+
 ## [0.2.3](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.2...teams-mcp@0.2.3) (2026-01-26)
 
 

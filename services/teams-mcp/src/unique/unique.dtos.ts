@@ -36,10 +36,21 @@ export type PublicUsersResult = z.infer<typeof PublicUsersResultSchema>;
 
 // SECTION - CreateScope endpoint types
 
-export const PublicCreateScopeRequestSchema = z.object({
+const CreateScopeByPathsSchema = z.object({
   paths: z.array(z.string()),
-  inheritAccess: z.boolean(),
+  inheritAccess: z.boolean().default(true),
 });
+
+const CreateScopeByParentSchema = z.object({
+  parentScopeId: z.string(),
+  relativePaths: z.array(z.string()),
+  inheritAccess: z.boolean().default(true),
+});
+
+export const PublicCreateScopeRequestSchema = z.union([
+  CreateScopeByPathsSchema,
+  CreateScopeByParentSchema,
+]);
 export type PublicCreateScopeRequest = z.infer<typeof PublicCreateScopeRequestSchema>;
 
 export const ScopeSchema = z.object({
@@ -182,3 +193,137 @@ export const PublicContentUpsertResultSchema = z.object({
 export type PublicContentUpsertResult = z.infer<typeof PublicContentUpsertResultSchema>;
 
 // !SECTION - ContentUpsert endpoint types
+
+// SECTION - ContentInfos endpoint types (UniqueQL)
+
+export enum UniqueQLOperator {
+  EQUALS = 'equals',
+  NOT_EQUALS = 'notEquals',
+  GREATER_THAN = 'greaterThan',
+  GREATER_THAN_OR_EQUAL = 'greaterThanOrEqual',
+  LESS_THAN = 'lessThan',
+  LESS_THAN_OR_EQUAL = 'lessThanOrEqual',
+  IN = 'in',
+  NOT_IN = 'notIn',
+  CONTAINS = 'contains',
+  NOT_CONTAINS = 'notContains',
+  IS_NULL = 'isNull',
+  IS_NOT_NULL = 'isNotNull',
+  IS_EMPTY = 'isEmpty',
+  IS_NOT_EMPTY = 'isNotEmpty',
+  NESTED = 'nested',
+}
+
+export const UniqueQLConditionSchema = z.object({
+  path: z.array(z.string()),
+  operator: z.enum(UniqueQLOperator),
+  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
+});
+export type UniqueQLCondition = z.infer<typeof UniqueQLConditionSchema>;
+
+type MetadataFilterInput =
+  | UniqueQLCondition
+  | { and: MetadataFilterInput[] }
+  | { or: MetadataFilterInput[] };
+
+export const MetadataFilterSchema: z.ZodType<MetadataFilterInput> = z.union([
+  UniqueQLConditionSchema,
+  z.object({ and: z.lazy(() => z.array(MetadataFilterSchema)) }),
+  z.object({ or: z.lazy(() => z.array(MetadataFilterSchema)) }),
+]);
+export type MetadataFilter = z.infer<typeof MetadataFilterSchema>;
+
+export const PublicContentInfosRequestSchema = z.object({
+  metadataFilter: MetadataFilterSchema.optional(),
+  skip: z.number().int().min(0).default(0),
+  take: z.number().int().min(1).max(250).default(50),
+});
+export type PublicContentInfosRequest = z.infer<typeof PublicContentInfosRequestSchema>;
+
+export const ContentInfoItemSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  title: z.string().nullable(),
+  description: z.string().nullable().optional(),
+  mimeType: z.string().nullable(),
+  url: z.string().nullable().optional(),
+  ownerId: z.string().nullable().optional(),
+  parentId: z.string().nullable().optional(),
+  folderIdPath: z.string().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+  readUrl: z.string().nullable().optional(),
+  createdAt: z.iso.datetime().optional(),
+  updatedAt: z.iso.datetime().optional(),
+});
+export type ContentInfoItem = z.infer<typeof ContentInfoItemSchema>;
+
+export const PublicContentInfosResultSchema = z
+  .object({
+    contentInfos: z.array(ContentInfoItemSchema),
+    totalCount: z.number().optional(),
+    object: z.literal('content-infos').optional(),
+  })
+  .transform((data) => ({
+    contents: data.contentInfos,
+    total: data.totalCount,
+  }));
+export type PublicContentInfosResult = z.output<typeof PublicContentInfosResultSchema>;
+
+// !SECTION - ContentInfos endpoint types
+
+// SECTION - Search endpoint types
+
+export enum SearchType {
+  VECTOR = 'VECTOR',
+  COMBINED = 'COMBINED',
+  FULL_TEXT = 'FULL_TEXT',
+  POSTGRES_FULL_TEXT = 'POSTGRES_FULL_TEXT',
+}
+
+export const RerankerRequestSchema = z.object({
+  deploymentName: z.string(),
+  options: z.record(z.string(), z.string()).optional(),
+});
+export type RerankerRequest = z.infer<typeof RerankerRequestSchema>;
+
+export const PublicSearchRequestSchema = z.object({
+  searchString: z.string(),
+  searchType: z.enum(SearchType),
+  chatId: z.string().optional(),
+  scopeIds: z.array(z.string()).optional(),
+  contentIds: z.array(z.string()).optional(),
+  chatOnly: z.boolean().optional(),
+  limit: z.number().int().min(1).max(1000).optional(),
+  page: z.number().int().min(0).optional(),
+  scoreThreshold: z.number().min(0).max(1).optional(),
+  language: z.string().optional(),
+  metaDataFilter: MetadataFilterSchema.optional(),
+  reranker: RerankerRequestSchema.optional(),
+});
+export type PublicSearchRequest = z.infer<typeof PublicSearchRequestSchema>;
+
+export const SearchResultItemSchema = z.object({
+  object: z.literal('search.search'),
+  id: z.string(),
+  chunkId: z.string(),
+  text: z.string(),
+  url: z.string().nullable(),
+  title: z.string().nullable(),
+  key: z.string(),
+  metadata: z.unknown().nullable(),
+  order: z.number(),
+  startPage: z.number(),
+  endPage: z.number(),
+  internallyStoredAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export type SearchResultItem = z.infer<typeof SearchResultItemSchema>;
+
+export const PublicSearchResultSchema = z.object({
+  object: z.literal('list'),
+  data: z.array(SearchResultItemSchema),
+});
+export type PublicSearchResult = z.infer<typeof PublicSearchResultSchema>;
+
+// !SECTION - Search endpoint types

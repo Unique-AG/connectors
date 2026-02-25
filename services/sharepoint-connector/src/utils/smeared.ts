@@ -18,6 +18,10 @@ export class Smeared {
     public readonly active: boolean,
   ) {}
 
+  public transform(transformer: (value: string) => string): Smeared {
+    return new Smeared(transformer(this.value), this.active);
+  }
+
   public toString(): string {
     return this.active ? smear(this.value) : this.value;
   }

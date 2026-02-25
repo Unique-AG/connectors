@@ -2,7 +2,7 @@ import { createZodDto } from 'nestjs-zod';
 import { type Join, type Split } from 'type-fest';
 import z from 'zod/v4';
 import { isoDatetimeToDate, redacted, stringToURL } from '~/utils/zod';
-import { change, lifecycle } from './subscription.events';
+import { lifecycle } from './subscription.events';
 
 // SECTION - Microsoft Graph types
 
@@ -250,12 +250,10 @@ export type BatchResponse = z.infer<typeof BatchResponse>;
 
 // SECTION - Lifecycle Events
 
-export const SubscriptionRequestedEventDto = lifecycle.SubscriptionRequestedEvent.schema.safeExtend(
-  {
-    type: z.literal(lifecycle.SubscriptionRequestedEvent.type),
-  },
-);
-export type SubscriptionRequestedEventDto = z.output<typeof SubscriptionRequestedEventDto>;
+export const SubscriptionCreatedEventDto = lifecycle.SubscriptionCreatedEvent.schema.safeExtend({
+  type: z.literal(lifecycle.SubscriptionCreatedEvent.type),
+});
+// unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created
 
 export const SubscriptionRemovedEventDto = lifecycle.SubscriptionRemovedEvent.schema.safeExtend({
   type: z.literal(lifecycle.SubscriptionRemovedEvent.type),
@@ -274,37 +272,11 @@ export const ReauthorizationRequiredEventDto =
 export type ReauthorizationRequiredEventDto = z.output<typeof ReauthorizationRequiredEventDto>;
 
 export const LifecycleEventDto = z.discriminatedUnion('type', [
-  SubscriptionRequestedEventDto,
   SubscriptionRemovedEventDto,
   MissedEventDto,
   ReauthorizationRequiredEventDto,
+  SubscriptionCreatedEventDto,
 ]);
 export type LifecycleEventDto = z.output<typeof LifecycleEventDto>;
 
 // !SECTION - Lifecycle Events
-
-// SECTION - Change Events
-
-export const CreatedEventDto = change.CreatedEvent.schema.safeExtend({
-  type: z.literal(change.CreatedEvent.type),
-});
-export type CreatedEventDto = z.output<typeof CreatedEventDto>;
-
-export const UpdatedEventDto = change.UpdatedEvent.schema.safeExtend({
-  type: z.literal(change.UpdatedEvent.type),
-});
-export type UpdatedEventDto = z.output<typeof UpdatedEventDto>;
-
-export const DeletedEventDto = change.DeletedEvent.schema.safeExtend({
-  type: z.literal(change.DeletedEvent.type),
-});
-export type DeletedEventDto = z.output<typeof DeletedEventDto>;
-
-export const ChangeEventDto = z.discriminatedUnion('type', [
-  CreatedEventDto,
-  UpdatedEventDto,
-  DeletedEventDto,
-]);
-export type ChangeEventDto = z.output<typeof ChangeEventDto>;
-
-// !SECTION - Change Events

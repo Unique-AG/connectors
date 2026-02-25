@@ -22,6 +22,27 @@
       "when": 1770636402834,
       "tag": "0002_heavy_xavin",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770881985234,
+      "tag": "0003_sad_mephisto",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770974656880,
+      "tag": "0004_eminent_caretaker",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771505775161,
+      "tag": "0005_fast_squirrel_girl",
+      "breakpoints": true
     }
   ]
 }

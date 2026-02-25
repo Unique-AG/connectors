@@ -2,8 +2,6 @@ import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
-import { serializeError } from 'serialize-error-cjs';
-import { normalizeError } from '../utils/normalize-error';
 
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
@@ -147,16 +145,14 @@ export class MetricsMiddleware implements Middleware {
         method,
       });
 
-      this.logger.error(
-        {
-          method,
-          endpoint,
-          duration,
-          error: serializeError(normalizeError(error)),
-          requestFailed: true,
-        },
-        'Microsoft Graph API request failed with an error',
-      );
+      this.logger.error({
+        msg: 'Microsoft Graph API request failed with an error',
+        method,
+        endpoint,
+        duration,
+        requestFailed: true,
+        error,
+      });
 
       throw error;
     }

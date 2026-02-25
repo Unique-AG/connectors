@@ -108,6 +108,27 @@
         }
       ]
     },
+    "services/confluence-connector": {
+      "prerelease": true,
+      "prerelease-type": "alpha",
+      "versioning": "prerelease",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/confluence-connector/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/confluence-connector/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/confluence-connector/values.yaml"
+        }
+      ]
+    },
     "services/edgar-mcp": {
       "release-type": "python",
       "prerelease": true,
