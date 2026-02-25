@@ -20,13 +20,33 @@ export class ConfluencePageScanner {
   ) {}
 
   public async discoverPages(): Promise<DiscoveredPage[]> {
-    const labeledPages = await this.apiClient.searchPagesByLabel();
-    const discovered: DiscoveredPage[] = [];
     const discoveredIds = new Set<string>();
-    const ingestAllRootIds: string[] = [];
+    const labeledPages = await this.apiClient.searchPagesByLabel();
 
-    for (const page of labeledPages) {
-      if (this.isLimitReached(discovered.length)) {
+    const filteredPageIds = this.filterIngestablePages(labeledPages, discoveredIds);
+
+    const ingestAllRootIds = labeledPages
+      .filter((page) => this.hasIngestAllLabel(page))
+      .map((page) => page.id);
+
+    let filteredDescendantPageIds: DiscoveredPage[] = [];
+    if (ingestAllRootIds.length > 0) {
+      const descendants = await this.fetchAllDescendants(ingestAllRootIds);
+      filteredDescendantPageIds = this.filterIngestablePages(descendants, discoveredIds);
+    }
+
+    const discovered = [...filteredPageIds, ...filteredDescendantPageIds];
+    this.logger.info({ count: discovered.length }, 'Page discovery completed');
+    return discovered;
+  }
+
+  private filterIngestablePages(
+    pages: ConfluencePage[],
+    discoveredIds: Set<string>,
+  ): DiscoveredPage[] {
+    const result: DiscoveredPage[] = [];
+    for (const page of pages) {
+      if (this.isLimitReached(discoveredIds.size)) {
         break;
       }
 
@@ -38,61 +58,27 @@ export class ConfluencePageScanner {
         continue;
       }
 
+      // as discoveredIds is a set this is redundant check but is kept for explicitness
       if (discoveredIds.has(page.id)) {
         continue;
       }
 
       discoveredIds.add(page.id);
-      discovered.push(this.toDiscoveredPage(page));
-
-      if (this.hasIngestAllLabel(page)) {
-        ingestAllRootIds.push(page.id);
-      }
+      result.push(this.toDiscoveredPage(page));
     }
-
-    if (ingestAllRootIds.length > 0) {
-      await this.expandDescendants(ingestAllRootIds, discovered, discoveredIds);
-    }
-
-    this.logger.info({ count: discovered.length }, 'Page discovery completed');
-    return discovered;
+    return result;
   }
 
-  private async expandDescendants(
-    rootIds: string[],
-    discovered: DiscoveredPage[],
-    discoveredIds: Set<string>,
-  ): Promise<void> {
-    let descendants: ConfluencePage[];
+  private async fetchAllDescendants(rootIds: string[]): Promise<ConfluencePage[]> {
     try {
-      descendants = await this.apiClient.getDescendantPages(rootIds);
+      return await this.apiClient.getDescendantPages(rootIds);
     } catch (error) {
-      this.logger.warn(
+      this.logger.error(
         { rootIds, error },
         'Failed to fetch descendant pages, skipping descendants',
       );
-      return;
-    }
-
-    for (const page of descendants) {
-      if (this.isLimitReached(discovered.length)) {
-        break;
-      }
-
-      if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
-        this.logger.debug(
-          { pageId: page.id, title: page.title, type: page.type },
-          'Skipping non-page content type',
-        );
-        continue;
-      }
-
-      if (discoveredIds.has(page.id)) {
-        continue;
-      }
-
-      discoveredIds.add(page.id);
-      discovered.push(this.toDiscoveredPage(page));
+      // do not crash the application because of this, continue 
+      return [];
     }
   }
 

@@ -92,10 +92,10 @@ describe('ConfluencePageScanner', () => {
     expect(apiClient.getDescendantPages).toHaveBeenCalledWith(['parent']);
   });
 
-  it('skips database pages', async () => {
+  it('skips database pages from discovery results', async () => {
     const database = makePage('db-root', {
       type: ContentType.DATABASE,
-      labels: ['ai-ingest-all'],
+      labels: ['ai-ingest'],
     });
     const page = makePage('page-root', { labels: ['ai-ingest'] });
 
@@ -112,6 +112,28 @@ describe('ConfluencePageScanner', () => {
 
     expect(result.map((item) => item.id)).toEqual(['page-root']);
     expect(apiClient.getDescendantPages).not.toHaveBeenCalled();
+  });
+
+  it('expands descendants EVEN when ai-ingest-all is on a skipped content type', async () => {
+    const database = makePage('db-root', {
+      type: ContentType.DATABASE,
+      labels: ['ai-ingest-all'],
+    });
+    const child = makePage('child-page', { labels: ['engineering'] });
+
+    const apiClient = {
+      searchPagesByLabel: vi.fn().mockResolvedValue([database]),
+      getDescendantPages: vi.fn().mockResolvedValue([child]),
+      buildPageWebUrl: vi.fn(
+        (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
+      ),
+    };
+
+    const scanner = createScanner(apiClient);
+    const result = await scanner.discoverPages();
+
+    expect(result.map((item) => item.id)).toEqual(['child-page']);
+    expect(apiClient.getDescendantPages).toHaveBeenCalledWith(['db-root']);
   });
 
   it('respects maxPagesToScan limit', async () => {
@@ -191,7 +213,7 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'page-child']);
-    expect(mockTenantLogger.debug).toHaveBeenCalledWith(
+    expect(mockTenantLogger.info).toHaveBeenCalledWith(
       { pageId: 'db-child', title: 'Page db-child', type: 'database' },
       'Skipping non-page content type',
     );
