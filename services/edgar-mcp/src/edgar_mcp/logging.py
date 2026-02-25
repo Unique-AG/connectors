@@ -23,16 +23,18 @@ def configure_logging(config: AppConfig) -> None:
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", key="time"),
     ]
+    runtime_processors: list[Processor] = []
 
     if config.app_env == "development":
         renderer = structlog.dev.ConsoleRenderer(colors=True, pad_level=False)
     else:
+        runtime_processors.append(structlog.processors.format_exc_info)
         renderer = structlog.processors.JSONRenderer()
 
     level = LOG_LEVEL_MAP.get(config.log_level, logging.INFO)
 
     structlog.configure(
-        processors=[*shared_processors, renderer],
+        processors=[*shared_processors, *runtime_processors, renderer],
         wrapper_class=structlog.make_filtering_bound_logger(level),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(),
