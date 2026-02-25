@@ -10,11 +10,11 @@ export async function fetchAllPaginated<T>(
   const schema = paginatedResponseSchema(itemSchema);
   const results: T[] = [];
   let url: string | undefined = initialUrl;
- 
+
   while (url) {
     const rawRespose = await httpGet(url);
     const response = schema.parse(rawRespose);
-   
+
     results.push(...response.results);
     url = response._links.next ? `${baseUrl}${response._links.next}` : undefined;
   }
