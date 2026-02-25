@@ -120,3 +120,30 @@ class TestLogging:
         log_entry = cast(dict[str, str], json.loads(output.strip()))
 
         assert "logger" not in log_entry
+
+    def test_formats_exc_info_in_production_json(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Production JSON logs include rendered exception details."""
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("LOG_LEVEL", "info")
+
+        captured = io.StringIO()
+        monkeypatch.setattr(sys, "stdout", captured)
+
+        from edgar_mcp.config import AppConfig
+        from edgar_mcp.logging import configure_logging, get_logger
+
+        configure_logging(AppConfig())
+        logger = get_logger("test")
+        try:
+            raise ValueError("boom")
+        except ValueError:
+            logger.error("failed", exc_info=True)
+
+        output = captured.getvalue()
+        log_entry = cast(dict[str, str], json.loads(output.strip()))
+
+        assert "exception" in log_entry
+        assert "ValueError: boom" in log_entry["exception"]
+        assert log_entry.get("exc_info") is None
