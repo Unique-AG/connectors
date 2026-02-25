@@ -75,7 +75,7 @@ describe('CloudConfluenceApiClient', () => {
       expect(url).not.toContain('os_authType');
     });
 
-    it('uses limit=25 for search', async () => {
+    it('uses limit=100 for search', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -84,7 +84,7 @@ describe('CloudConfluenceApiClient', () => {
       await client.searchPagesByLabel();
 
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
-      expect(url).toContain('limit=25');
+      expect(url).toContain('limit=100');
     });
   });
 

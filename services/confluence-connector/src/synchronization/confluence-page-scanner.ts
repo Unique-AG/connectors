@@ -78,7 +78,7 @@ export class ConfluencePageScanner {
         { rootIds, error },
         'Failed to fetch descendant pages, skipping descendants',
       );
-      // do not crash the application because of this, continue
+      // continue
       return [];
     }
   }

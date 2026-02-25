@@ -1,18 +1,20 @@
 import type { z } from 'zod';
 import { paginatedResponseSchema } from './types/confluence-api.types';
 
-export async function fetchAllPaginated<T extends z.ZodTypeAny>(
+export async function fetchAllPaginated<T>(
   initialUrl: string,
   baseUrl: string,
   httpGet: (url: string) => Promise<unknown>,
-  itemSchema: T,
-): Promise<z.infer<T>[]> {
+  itemSchema: z.ZodType<T>,
+): Promise<T[]> {
   const schema = paginatedResponseSchema(itemSchema);
-  const results: z.infer<T>[] = [];
+  const results: T[] = [];
   let url: string | undefined = initialUrl;
+ 
   while (url) {
-    const raw = await httpGet(url);
-    const response = schema.parse(raw);
+    const rawRespose = await httpGet(url);
+    const response = schema.parse(rawRespose);
+   
     results.push(...response.results);
     url = response._links.next ? `${baseUrl}${response._links.next}` : undefined;
   }
