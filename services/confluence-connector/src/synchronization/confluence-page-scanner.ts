@@ -30,7 +30,7 @@ export class ConfluencePageScanner {
 
     if (ingestAllRootPageIds.length > 0) {
       // we are fetching descendants on content marked with ai-ingest-all label regardless of the content type
-      const descendants = await this.fetchAllDescendants(ingestAllRootPageIds);
+      const descendants = await this.apiClient.getDescendantPages(ingestAllRootPageIds);
       const mappedDescendantPages = this.mapToDiscoveredPages(descendants, seenPageIds);
       discoveredPages.push(...mappedDescendantPages);
     }
@@ -77,19 +77,6 @@ export class ConfluencePageScanner {
     }
 
     return discoveredPages;
-  }
-
-  private async fetchAllDescendants(rootIds: string[]): Promise<ConfluencePage[]> {
-    try {
-      return await this.apiClient.getDescendantPages(rootIds);
-    } catch (error) {
-      this.logger.error(
-        { rootIds, error },
-        'Failed to fetch descendant pages, skipping descendants',
-      );
-      // continue
-      return [];
-    }
   }
 
   private hasIngestAllLabel(page: ConfluencePage): boolean {
