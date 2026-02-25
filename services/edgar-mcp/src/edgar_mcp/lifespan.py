@@ -25,8 +25,8 @@ async def _safe_shutdown(name: str, fn: Callable[[], Awaitable[None]]) -> None:
     """Safely shutdown a component, logging any errors."""
     try:
         await fn()
-    except Exception as e:
-        logger.error("Shutdown error", component=name, error=str(e))
+    except Exception:
+        logger.error("Shutdown error", component=name, exc_info=True)
 
 
 @asynccontextmanager

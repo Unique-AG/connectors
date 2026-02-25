@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from typing import ClassVar
 from urllib.parse import quote_plus
@@ -11,15 +11,12 @@ PKG_VERSION = pkg_version("edgar-mcp")
 
 def _validate_required_fields(
     fields: dict[str, str | None], url_field: str = "URL"
-) -> list[str]:
+) -> None:
     """Validate that required fields are not None.
 
     Args:
         fields: Mapping of field names to their values.
         url_field: Name of the URL field for error message (e.g., "DB_URL", "RABBITMQ_URL").
-
-    Returns:
-        List of missing field names.
 
     Raises:
         ValueError: If any required fields are missing.
@@ -29,10 +26,9 @@ def _validate_required_fields(
         raise ValueError(
             f"{url_field} not set; missing required fields: {', '.join(missing)}"
         )
-    return missing
 
 
-class AppEnv(str, Enum):
+class AppEnv(StrEnum):
     """Application environment."""
 
     DEVELOPMENT = "development"
@@ -40,7 +36,7 @@ class AppEnv(str, Enum):
     TEST = "test"
 
 
-class LogLevel(str, Enum):
+class LogLevel(StrEnum):
     """Logging level."""
 
     FATAL = "fatal"
@@ -50,7 +46,7 @@ class LogLevel(str, Enum):
     DEBUG = "debug"
 
 
-class DiagnosticsDataPolicy(str, Enum):
+class DiagnosticsDataPolicy(StrEnum):
     """Diagnostics data policy."""
 
     CONCEAL = "conceal"
