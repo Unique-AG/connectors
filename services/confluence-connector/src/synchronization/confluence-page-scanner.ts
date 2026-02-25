@@ -20,34 +20,32 @@ export class ConfluencePageScanner {
   ) {}
 
   public async discoverPages(): Promise<DiscoveredPage[]> {
-    const discoveredIds = new Set<string>();
+    const seenPageIds = new Set<string>();
     const labeledPages = await this.apiClient.searchPagesByLabel();
-
-    const filteredPages = this.mapToDiscoveredPages(labeledPages, discoveredIds);
+    const discoveredPages = this.mapToDiscoveredPages(labeledPages, seenPageIds);
 
     const ingestAllRootPageIds = labeledPages
       .filter((page) => this.hasIngestAllLabel(page))
       .map((page) => page.id);
 
-    let filteredDescendantPages: DiscoveredPage[] = [];
     if (ingestAllRootPageIds.length > 0) {
       // we are fetching descendants on content marked with ai-ingest-all label regardless of the content type
       const descendants = await this.fetchAllDescendants(ingestAllRootPageIds);
-      filteredDescendantPages = this.mapToDiscoveredPages(descendants, discoveredIds);
+      const mappedDescendantPages = this.mapToDiscoveredPages(descendants, seenPageIds);
+      discoveredPages.push(...mappedDescendantPages);
     }
 
-    const discovered = [...filteredPages, ...filteredDescendantPages];
-    this.logger.info({ count: discovered.length }, 'Page discovery completed');
-    return discovered;
+    this.logger.info({ count: discoveredPages.length }, 'Page discovery completed');
+    return discoveredPages;
   }
 
   private mapToDiscoveredPages(
     pages: ConfluencePage[],
-    discoveredIds: Set<string>,
+    seenPageIds: Set<string>,
   ): DiscoveredPage[] {
     const discoveredPages: DiscoveredPage[] = [];
     for (const page of pages) {
-      if (this.isLimitReached(discoveredIds.size)) {
+      if (this.isLimitReached(seenPageIds.size)) {
         break;
       }
 
@@ -59,11 +57,11 @@ export class ConfluencePageScanner {
         continue;
       }
 
-      if (discoveredIds.has(page.id)) {
+      if (seenPageIds.has(page.id)) {
         continue;
       }
 
-      discoveredIds.add(page.id);
+      seenPageIds.add(page.id);
 
       discoveredPages.push({
         id: page.id,
