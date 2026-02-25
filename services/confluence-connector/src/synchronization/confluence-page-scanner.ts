@@ -31,6 +31,7 @@ export class ConfluencePageScanner {
 
     let filteredDescendantPageIds: DiscoveredPage[] = [];
     if (ingestAllRootIds.length > 0) {
+      // we are fetching descendants on content marked with ai-ingest-all label regardless of the content type
       const descendants = await this.fetchAllDescendants(ingestAllRootIds);
       filteredDescendantPageIds = this.filterIngestablePages(descendants, discoveredIds);
     }
