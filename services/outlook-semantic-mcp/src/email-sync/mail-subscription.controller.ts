@@ -16,7 +16,6 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { partition } from 'remeda';
-import { serializeError } from 'serialize-error-cjs';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { traceAttrs, traceError, traceEvent } from '~/email-sync/tracing.utils';
@@ -115,10 +114,10 @@ export class MailSubscriptionController {
     // NOTE: if we fail any, we reject this webhook as microsoft will send this again later
     if (failed.length > 0) {
       failed.forEach((fail) => {
-        this.logger.warn(
-          { err: serializeError(fail.reason) },
-          'Failed to publish reauthorization event to message queue',
-        );
+        this.logger.warn({
+          msg: 'Failed to publish reauthorization event to message queue',
+          err: fail.reason,
+        });
         traceError(fail.reason);
       });
       throw new InternalServerErrorException(
