@@ -26,7 +26,9 @@ export class ConfluencePageScanner {
     const ingestAllRootIds: string[] = [];
 
     for (const page of labeledPages) {
-      if (this.isLimitReached(discovered.length)) break;
+      if (this.isLimitReached(discovered.length)) {
+        break;
+      }
 
       if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
         this.logger.info(
@@ -36,7 +38,9 @@ export class ConfluencePageScanner {
         continue;
       }
 
-      if (discoveredIds.has(page.id)) continue;
+      if (discoveredIds.has(page.id)) {
+        continue;
+      }
 
       discoveredIds.add(page.id);
       discovered.push(this.toDiscoveredPage(page));

@@ -100,48 +100,6 @@ describe('RateLimitedHttpClient', () => {
     });
   });
 
-  describe('rate limit header logging', () => {
-    it('logs when x-ratelimit-remaining header is present', async () => {
-      mockedRequest.mockResolvedValueOnce(
-        mockUndiciResponse(200, {}, { 'x-ratelimit-remaining': '42' }),
-      );
-
-      await client.rateLimitedRequest('https://example.com', {});
-
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.objectContaining({
-          msg: 'Rate limit headers',
-          'x-ratelimit-remaining': '42',
-        }),
-      );
-    });
-
-    it('logs when x-ratelimit-limit header is present', async () => {
-      mockedRequest.mockResolvedValueOnce(
-        mockUndiciResponse(200, {}, { 'x-ratelimit-limit': '100' }),
-      );
-
-      await client.rateLimitedRequest('https://example.com', {});
-
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.objectContaining({
-          msg: 'Rate limit headers',
-          'x-ratelimit-limit': '100',
-        }),
-      );
-    });
-
-    it('does not log rate limit info when headers are absent', async () => {
-      mockedRequest.mockResolvedValueOnce(mockUndiciResponse(200, {}));
-
-      await client.rateLimitedRequest('https://example.com', {});
-
-      expect(mockLogger.info).not.toHaveBeenCalledWith(
-        expect.objectContaining({ msg: 'Rate limit headers' }),
-      );
-    });
-  });
-
   describe('throttle monitoring', () => {
     it('registers depleted, dropped, and error event handlers', () => {
       const registeredEvents = mockBottleneckOn.mock.calls.map((call) => call[0]);

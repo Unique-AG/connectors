@@ -1,7 +1,6 @@
 import Bottleneck from 'bottleneck';
 import type pino from 'pino';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
-import type { IncomingHttpHeaders } from 'undici/types/header';
 import { handleErrorStatus } from './http-util';
 
 // TODO: extract to shared utils package (bottleneck as optional peer dep)
@@ -32,22 +31,9 @@ export class RateLimitedHttpClient {
         dispatcher: this.dispatcher,
       });
 
-      this.logRateLimitHeaders(response.headers);
       await handleErrorStatus(response.statusCode, response.body, url);
       return response.body.json();
     });
-  }
-
-  private logRateLimitHeaders(headers: IncomingHttpHeaders): void {
-    const remaining = headers['x-ratelimit-remaining'];
-    const limit = headers['x-ratelimit-limit'];
-    if (remaining !== undefined || limit !== undefined) {
-      this.logger.info({
-        msg: 'Rate limit headers',
-        'x-ratelimit-remaining': remaining,
-        'x-ratelimit-limit': limit,
-      });
-    }
   }
 
   private setupThrottlingMonitoring(): void {
