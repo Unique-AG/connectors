@@ -116,7 +116,7 @@ export class MailSubscriptionController {
     if (failed.length > 0) {
       failed.forEach((fail) => {
         this.logger.warn(
-          { error: serializeError(fail.reason) },
+          { err: serializeError(fail.reason) },
           'Failed to publish reauthorization event to message queue',
         );
         traceError(fail.reason);

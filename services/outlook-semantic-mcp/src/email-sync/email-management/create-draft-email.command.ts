@@ -77,11 +77,11 @@ export class CreateDraftEmailCommand {
         draftId: message.id,
         message: 'Draft email created successfully.',
       };
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         userProfileId: userProfileIdString,
         msg: 'Failed to create draft email via Microsoft Graph',
-        error,
+        err,
       });
       throw new InternalServerErrorException('Failed to create draft email via Microsoft Graph');
     }

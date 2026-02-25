@@ -122,12 +122,12 @@ export class TokenRefreshMiddleware implements Middleware {
           'Microsoft Graph request failed even after successful token refresh',
         );
       }
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         msg: 'Failed to refresh token or retry Microsoft Graph request for user',
         userProfileId: this.userProfileId,
         tokenRefreshFailed: true,
-        error,
+        err,
       });
       // Keep the original 401 response if refresh fails
       // The calling code will handle the authentication error appropriately

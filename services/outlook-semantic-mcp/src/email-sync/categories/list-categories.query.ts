@@ -59,11 +59,11 @@ export class ListCategoriesQuery {
       const client = this.graphClientFactory.createClientForUser(userProfileIdString);
       const response = await client.api('me/outlook/masterCategories').get();
       return response.value ?? [];
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         userProfileId: userProfileIdString,
         msg: 'Failed to fetch categories from Microsoft Graph',
-        error,
+        err,
       });
       throw new InternalServerErrorException('Failed to fetch categories from Microsoft Graph');
     }
