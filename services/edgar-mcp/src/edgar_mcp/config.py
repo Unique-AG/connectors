@@ -1,5 +1,6 @@
+from enum import Enum
 from importlib.metadata import version as pkg_version
-from typing import ClassVar, Literal
+from typing import ClassVar
 from urllib.parse import quote_plus
 
 from pydantic import Field, model_validator
@@ -7,19 +8,63 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PKG_VERSION = pkg_version("edgar-mcp")
 
-AppEnv = Literal["development", "production", "test"]
-LogLevel = Literal["fatal", "error", "warn", "info", "debug"]
-DiagnosticsDataPolicy = Literal["conceal", "disclose"]
+
+def _validate_required_fields(
+    fields: dict[str, str | None], url_field: str = "URL"
+) -> list[str]:
+    """Validate that required fields are not None.
+
+    Args:
+        fields: Mapping of field names to their values.
+        url_field: Name of the URL field for error message (e.g., "DB_URL", "RABBITMQ_URL").
+
+    Returns:
+        List of missing field names.
+
+    Raises:
+        ValueError: If any required fields are missing.
+    """
+    missing = [name for name, val in fields.items() if val is None]
+    if missing:
+        raise ValueError(
+            f"{url_field} not set; missing required fields: {', '.join(missing)}"
+        )
+    return missing
+
+
+class AppEnv(str, Enum):
+    """Application environment."""
+
+    DEVELOPMENT = "development"
+    PRODUCTION = "production"
+    TEST = "test"
+
+
+class LogLevel(str, Enum):
+    """Logging level."""
+
+    FATAL = "fatal"
+    ERROR = "error"
+    WARN = "warn"
+    INFO = "info"
+    DEBUG = "debug"
+
+
+class DiagnosticsDataPolicy(str, Enum):
+    """Diagnostics data policy."""
+
+    CONCEAL = "conceal"
+    DISCLOSE = "disclose"
 
 
 class AppConfig(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict()
 
-    app_env: AppEnv = "production"
+    app_env: AppEnv = AppEnv.PRODUCTION
     version: str = PKG_VERSION
     port: int = Field(default=9542, ge=0, le=65535)
-    log_level: LogLevel = "info"
-    logs_diagnostics_data_policy: DiagnosticsDataPolicy = "conceal"
+    log_level: LogLevel = LogLevel.INFO
+    logs_diagnostics_data_policy: DiagnosticsDataPolicy = DiagnosticsDataPolicy.CONCEAL
 
 
 class DatabaseConfig(BaseSettings):
@@ -41,18 +86,15 @@ class DatabaseConfig(BaseSettings):
                 self.url = self.url.replace("postgresql://", "postgresql+asyncpg://", 1)
             return self
 
-        missing = [
-            name
-            for name, val in [
-                ("DB_HOST", self.host),
-                ("DB_NAME", self.name),
-                ("DB_USER", self.user),
-                ("DB_PASSWORD", self.password),
-            ]
-            if val is None
-        ]
-        if missing:
-            raise ValueError(f"DB_URL not set; missing required fields: {', '.join(missing)}")
+        _validate_required_fields(
+            {
+                "DB_HOST": self.host,
+                "DB_NAME": self.name,
+                "DB_USER": self.user,
+                "DB_PASSWORD": self.password,
+            },
+            url_field="DB_URL",
+        )
 
         assert self.user is not None
         assert self.password is not None
@@ -89,17 +131,14 @@ class RabbitMqConfig(BaseSettings):
                 )
             return self
 
-        missing = [
-            name
-            for name, val in [
-                ("RABBITMQ_HOST", self.host),
-                ("RABBITMQ_USER", self.user),
-                ("RABBITMQ_PASSWORD", self.password),
-            ]
-            if val is None
-        ]
-        if missing:
-            raise ValueError(f"RABBITMQ_URL not set; missing required fields: {', '.join(missing)}")
+        _validate_required_fields(
+            {
+                "RABBITMQ_HOST": self.host,
+                "RABBITMQ_USER": self.user,
+                "RABBITMQ_PASSWORD": self.password,
+            },
+            url_field="RABBITMQ_URL",
+        )
 
         assert self.user is not None
         assert self.password is not None
