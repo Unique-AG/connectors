@@ -23,7 +23,7 @@ describe('buildSearchFilter', () => {
     expect(result).toEqual({
       and: [
         {
-          path: ['metadata', 'receivedDateTime'],
+          path: ['receivedDateTime'],
           operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
           value: '2024-01-01',
         },
@@ -39,7 +39,7 @@ describe('buildSearchFilter', () => {
     expect(result).toEqual({
       and: [
         {
-          path: ['metadata', 'receivedDateTime'],
+          path: ['receivedDateTime'],
           operator: UniqueQLOperator.LESS_THAN_OR_EQUAL,
           value: '2024-12-31',
         },
@@ -55,7 +55,7 @@ describe('buildSearchFilter', () => {
     expect(result).toEqual({
       and: [
         {
-          path: ['metadata', 'from.emailAddress'],
+          path: ['from.emailAddress'],
           operator: UniqueQLOperator.EQUALS,
           value: 'alice@example.com',
         },
@@ -78,12 +78,12 @@ describe('buildSearchFilter', () => {
         {
           or: [
             {
-              path: ['metadata', 'from.emailAddress'],
+              path: ['from.emailAddress'],
               operator: UniqueQLOperator.EQUALS,
               value: 'alice@example.com',
             },
             {
-              path: ['metadata', 'from.emailAddress'],
+              path: ['from.emailAddress'],
               operator: UniqueQLOperator.EQUALS,
               value: 'bob@example.com',
             },
@@ -106,12 +106,12 @@ describe('buildSearchFilter', () => {
         {
           or: [
             {
-              path: ['metadata', 'receivedDateTime'],
+              path: ['receivedDateTime'],
               operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
               value: '2024-01-01',
             },
             {
-              path: ['metadata', 'from.emailAddress'],
+              path: ['from.emailAddress'],
               operator: UniqueQLOperator.EQUALS,
               value: 'alice@example.com',
             },
@@ -130,12 +130,12 @@ describe('buildSearchFilter', () => {
     expect(result).toEqual({
       and: [
         {
-          path: ['metadata', 'receivedDateTime'],
+          path: ['receivedDateTime'],
           operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
           value: '2024-01-01',
         },
         {
-          path: ['metadata', 'parentFolderId'],
+          path: ['parentFolderId'],
           operator: UniqueQLOperator.EQUALS,
           value: 'inbox-id',
         },
@@ -157,17 +157,17 @@ describe('buildSearchFilter', () => {
         {
           or: [
             {
-              path: ['metadata', 'toRecipients.emailAddresses'],
+              path: ['toRecipients.emailAddresses'],
               operator: UniqueQLOperator.EQUALS,
               value: 'carol@example.com',
             },
             {
-              path: ['metadata', 'ccRecipients.emailAddresses'],
+              path: ['ccRecipients.emailAddresses'],
               operator: UniqueQLOperator.EQUALS,
               value: 'dave@example.com',
             },
             {
-              path: ['metadata', 'categories'],
+              path: ['categories'],
               operator: UniqueQLOperator.EQUALS,
               value: 'important',
             },
@@ -183,9 +183,7 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(resultTrue).toEqual({
-      and: [
-        { path: ['metadata', 'hasAttachments'], operator: UniqueQLOperator.EQUALS, value: 'true' },
-      ],
+      and: [{ path: ['hasAttachments'], operator: UniqueQLOperator.EQUALS, value: 'true' }],
     });
 
     const resultFalse = buildSearchFilter([
@@ -193,9 +191,7 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(resultFalse).toEqual({
-      and: [
-        { path: ['metadata', 'hasAttachments'], operator: UniqueQLOperator.EQUALS, value: 'false' },
-      ],
+      and: [{ path: ['hasAttachments'], operator: UniqueQLOperator.EQUALS, value: 'false' }],
     });
   });
 });
