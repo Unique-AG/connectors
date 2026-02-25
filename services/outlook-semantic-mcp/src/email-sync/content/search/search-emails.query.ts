@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { SearchType, type UniqueApiClient } from '@unique-ag/unique-api';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
@@ -23,8 +23,6 @@ export interface SearchEmailResult {
 
 @Injectable()
 export class SearchEmailsQuery {
-  private readonly logger = new Logger(this.constructor.name);
-
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
@@ -47,7 +45,6 @@ export class SearchEmailsQuery {
     assert.ok(rootScope, `Root scope not found for user: ${userProfile.providerUserId}`);
 
     const uniqueQlMetadataFilter = buildSearchFilter(input.conditions);
-    this.logger.log({ msg: `Unique Ql Query`, prompt: input.search, uniqueQlMetadataFilter });
     const searchResult = await this.uniqueApi.content.search({
       prompt: input.search,
       searchType: SearchType.VECTOR,
