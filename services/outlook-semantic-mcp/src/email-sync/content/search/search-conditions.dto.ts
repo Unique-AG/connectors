@@ -9,10 +9,10 @@ const ConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
 
 export const SearchConditionSchema = z
   .object({
-    dateFrom: ConditionFieldSchema(z.string())
+    dateFrom: ConditionFieldSchema(z.iso.datetime())
       .optional()
       .describe('Filter emails received on or after this date (ISO 8601 format).'),
-    dateTo: ConditionFieldSchema(z.string())
+    dateTo: ConditionFieldSchema(z.iso.datetime())
       .optional()
       .describe('Filter emails received on or before this date (ISO 8601 format).'),
     fromSenders: ConditionFieldSchema(z.array(z.string()))
@@ -64,14 +64,14 @@ export const SearchEmailsInputSchema = z.object({
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
 
 const METADATA_PATH: Record<keyof SearchCondition, string[]> = {
-  dateFrom: ['metadata', 'receivedDateTime'],
-  dateTo: ['metadata', 'receivedDateTime'],
-  fromSenders: ['metadata', 'from.emailAddress'],
-  toRecipients: ['metadata', 'toRecipients.emailAddresses'],
-  ccRecipients: ['metadata', 'ccRecipients.emailAddresses'],
-  directories: ['metadata', 'parentFolderId'],
-  hasAttachments: ['metadata', 'hasAttachments'],
-  categories: ['metadata', 'categories'],
+  dateFrom: ['receivedDateTime'],
+  dateTo: ['receivedDateTime'],
+  fromSenders: ['from.emailAddress'],
+  toRecipients: ['toRecipients.emailAddresses'],
+  ccRecipients: ['ccRecipients.emailAddresses'],
+  directories: ['parentFolderId'],
+  hasAttachments: ['hasAttachments'],
+  categories: ['categories'],
 };
 
 function leaf(
