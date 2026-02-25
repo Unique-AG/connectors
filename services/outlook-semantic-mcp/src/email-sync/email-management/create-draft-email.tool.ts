@@ -52,6 +52,7 @@ const CreateDraftEmailInputSchema = z.object({
 const CreateDraftEmailOutputSchema = z.object({
   success: z.boolean(),
   draftId: z.string().optional(),
+  status: z.string().optional(),
   message: z.string(),
 });
 

@@ -60,9 +60,9 @@ export class RunFullSyncTool {
 
     await this.fullSyncCommand.run(subscription.subscriptionId);
 
-    return OutputSchema.encode({
+    return {
       success: true,
       message: `Successfully run`,
-    });
+    };
   }
 }

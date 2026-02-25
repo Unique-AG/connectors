@@ -1,12 +1,28 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/email-sync/subscriptions/get-subscription-status.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 
-export type ListCategoriesResult =
-  | { success: false; message: string }
-  | { success: true; message: string; categories: string[]; count: number };
+const sucessResponse = z.object({
+  success: z.literal(true),
+  message: z.string(),
+  categories: z.array(z.string()),
+  count: z.number(),
+});
+const errorResponse = z.object({
+  success: z.literal(false),
+  message: z.string(),
+  status: z.string().optional(),
+});
+
+export const ListCategoriesQueryOutputSchema = z.discriminatedUnion('success', [
+  sucessResponse,
+  errorResponse,
+]);
+
+export type ListCategoriesResult = z.infer<typeof ListCategoriesQueryOutputSchema>;
 
 @Injectable()
 export class ListCategoriesQuery {

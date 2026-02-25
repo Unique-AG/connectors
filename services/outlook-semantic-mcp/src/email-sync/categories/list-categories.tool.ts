@@ -4,16 +4,9 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { ListCategoriesQuery } from './list-categories.query';
+import { ListCategoriesQuery, ListCategoriesQueryOutputSchema } from './list-categories.query';
 
 const InputSchema = z.object({});
-
-const OutputSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-  categories: z.array(z.string()).optional(),
-  count: z.number().optional(),
-});
 
 @Injectable()
 export class ListCategoriesTool {
@@ -25,7 +18,7 @@ export class ListCategoriesTool {
     description:
       'List all Outlook mail categories available for the user. Returns the display names of all master categories configured in Outlook.',
     parameters: InputSchema,
-    outputSchema: OutputSchema,
+    outputSchema: ListCategoriesQueryOutputSchema,
     annotations: {
       title: 'List Categories',
       readOnlyHint: true,
@@ -44,7 +37,7 @@ export class ListCategoriesTool {
     _input: z.infer<typeof InputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
-  ): Promise<z.infer<typeof OutputSchema>> {
+  ): Promise<z.infer<typeof ListCategoriesQueryOutputSchema>> {
     const userProfileId = extractUserProfileId(request);
     return this.listCategoriesQuery.run(userProfileId);
   }

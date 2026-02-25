@@ -19,9 +19,16 @@ const SearchEmailResultSchema = z.object({
   url: z.string().optional(),
 });
 
-const SearchEmailsOutputSchema = z.object({
+const sucessResponse = z.object({
+  success: z.literal(true),
   results: z.array(SearchEmailResultSchema),
 });
+const errorResponse = z.object({
+  success: z.literal(false),
+  message: z.string(),
+  status: z.string().optional(),
+});
+const SearchEmailsOutputSchema = z.discriminatedUnion('success', [sucessResponse, errorResponse]);
 
 @Injectable()
 export class SearchEmailsTool {
@@ -57,7 +64,7 @@ export class SearchEmailsTool {
     input: z.infer<typeof SearchEmailsInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
-  ) {
+  ): Promise<z.infer<typeof SearchEmailsOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
 
     const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
