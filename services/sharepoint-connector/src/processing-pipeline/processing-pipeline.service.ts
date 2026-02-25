@@ -62,6 +62,10 @@ export class ProcessingPipelineService {
       fileStatus,
     };
 
+    if (pipelineItem.itemType === 'driveItem') {
+      context.fileSize = pipelineItem.item.size;
+    }
+
     const { siteId } = syncContext.siteConfig;
     const logPrefix = `[Site: ${siteId}][CorrelationId: ${correlationId}]`;
     this.logger.log(`${logPrefix} Starting processing pipeline for item: ${pipelineItem.item.id}`);
