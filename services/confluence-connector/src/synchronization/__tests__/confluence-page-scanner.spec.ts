@@ -264,7 +264,7 @@ describe('ConfluencePageScanner', () => {
     expect(result.map((page) => page.id)).toEqual(['parent', 'labeled-child']);
   });
 
-  it('continues discovery when descendant fetching fails', async () => {
+  it('rejects when descendant fetching fails', async () => {
     const ingestAllPage = makePage('ingest-all-page', { labels: ['ai-ingest-all'] });
     const healthyPage = makePage('healthy-page', { labels: ['ai-ingest'] });
 
@@ -277,12 +277,7 @@ describe('ConfluencePageScanner', () => {
     };
 
     const scanner = createScanner(apiClient);
-    const result = await scanner.discoverPages();
 
-    expect(result.map((item) => item.id)).toEqual(['ingest-all-page', 'healthy-page']);
-    expect(mockTenantLogger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ rootIds: ['ingest-all-page'], error: expect.anything() }),
-      'Failed to fetch descendant pages, skipping descendants',
-    );
+    await expect(scanner.discoverPages()).rejects.toThrow('descendant lookup failed');
   });
 });
