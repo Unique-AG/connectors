@@ -1,7 +1,6 @@
 import { IncomingMessage } from 'node:http';
 import path from 'node:path';
 import { RequestMethod } from '@nestjs/common';
-import { stdSerializers } from 'pino';
 import type { Params } from 'nestjs-pino';
 
 export const productionTarget = {
@@ -18,9 +17,6 @@ export const defaultLoggerOptions: Params = {
   pinoHttp: {
     enabled: true,
     level: 'info',
-    serializers: {
-      error: stdSerializers.err,
-    },
     redact: {
       paths: [
         'req.headers.authorization',

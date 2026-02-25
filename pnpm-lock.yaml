@@ -116,9 +116,6 @@ importers:
       nestjs-pino:
         specifier: ^4.4.0
         version: 4.4.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@9.8.0)(rxjs@7.8.2)
-      pino:
-        specifier: ^9.0.0
-        version: 9.8.0
       pino-http:
         specifier: ^10.5.0
         version: 10.5.0
