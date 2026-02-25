@@ -19,16 +19,12 @@ const SearchEmailResultSchema = z.object({
   url: z.string().optional(),
 });
 
-const sucessResponse = z.object({
-  success: z.literal(true),
-  results: z.array(SearchEmailResultSchema),
-});
-const errorResponse = z.object({
-  success: z.literal(false),
-  message: z.string(),
+const SearchEmailsOutputSchema = z.object({
+  success: z.boolean(),
+  message: z.string().optional(),
+  results: z.array(SearchEmailResultSchema).optional(),
   status: z.string().optional(),
 });
-const SearchEmailsOutputSchema = z.discriminatedUnion('success', [sucessResponse, errorResponse]);
 
 @Injectable()
 export class SearchEmailsTool {

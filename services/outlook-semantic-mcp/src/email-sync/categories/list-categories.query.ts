@@ -5,22 +5,13 @@ import { GetSubscriptionStatusQuery } from '~/email-sync/subscriptions/get-subsc
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 
-const sucessResponse = z.object({
-  success: z.literal(true),
-  message: z.string(),
-  categories: z.array(z.string()),
-  count: z.number(),
-});
-const errorResponse = z.object({
-  success: z.literal(false),
+export const ListCategoriesQueryOutputSchema = z.object({
+  success: z.boolean(),
   message: z.string(),
   status: z.string().optional(),
+  categories: z.array(z.string()).optional(),
+  count: z.number().optional(),
 });
-
-export const ListCategoriesQueryOutputSchema = z.discriminatedUnion('success', [
-  sucessResponse,
-  errorResponse,
-]);
 
 export type ListCategoriesResult = z.infer<typeof ListCategoriesQueryOutputSchema>;
 

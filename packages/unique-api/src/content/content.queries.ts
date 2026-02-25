@@ -2,16 +2,16 @@ import { gql } from 'graphql-request';
 import { Content } from './content.dto';
 
 export interface GetContentByIdQueryOutput {
-  getContentById: Content;
+  contentById: Content[];
 }
 
 export interface GetContentByIdQueryInput {
-  contentId: string;
+  contentIds: string[];
 }
 
 export const GET_CONTENT_BY_ID_QUERY = gql`
-  query GetContentById($contentId: String!) {
-    getContentById(contentId: $contentId) {
+  query ContentById($contentIds: [String!]!) {
+    contentById(contentIds: $contentIds) {
       appliedIngestionConfig
       byteSize
       companyId

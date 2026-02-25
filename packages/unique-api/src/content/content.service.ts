@@ -9,7 +9,8 @@ import {
   GetContentByIdQueryOutput,
 } from './content.queries';
 import { PublicSearchRequest, SearchResult, SearchResultSchema } from './search-content.dto';
-import type { UniqueContentFacade } from './unique-content.facade';
+import type { UniqueContentFacade, GetContentByIdRequest } from './unique-content.facade';
+import { first } from 'remeda';
 
 export class ContentService implements UniqueContentFacade {
   public constructor(
@@ -34,13 +35,15 @@ export class ContentService implements UniqueContentFacade {
     return SearchResultSchema.parse(responseData);
   }
 
-  public async getContentById(request: GetContentByIdQueryInput): Promise<Content> {
+  public async getContentById(request: GetContentByIdRequest): Promise<Content> {
     const result = await this.uniqueGraphqlClient.request<
       GetContentByIdQueryOutput,
       GetContentByIdQueryInput
-    >(GET_CONTENT_BY_ID_QUERY, request);
+    >(GET_CONTENT_BY_ID_QUERY, { contentIds: [request.contentId] });
 
-    assert.ok(result?.getContentById, 'Invalid response from Unique API');
-    return ContentSchema.parse(result.getContentById);
+    assert.ok(result?.contentById, 'Invalid response from Unique API');
+    const item = first(result.contentById);
+    assert.ok(item, 'Unique API Content not found');
+    return ContentSchema.parse(item);
   }
 }

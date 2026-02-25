@@ -18,17 +18,12 @@ const UserDirectorySchema: z.ZodType<UserDirectory> = z.lazy(() =>
   }),
 );
 
-const sucessResponse = z.object({
-  success: z.literal(true),
-  message: z.string(),
-  folders: z.array(UserDirectorySchema).optional(),
-});
-const errorResponse = z.object({
-  success: z.literal(false),
+const OutputSchema = z.object({
+  success: z.boolean(),
   message: z.string(),
   status: z.string().optional(),
+  folders: z.array(UserDirectorySchema).optional(),
 });
-const OutputSchema = z.discriminatedUnion('success', [sucessResponse, errorResponse]);
 
 @Injectable()
 export class ListFoldersTool {
