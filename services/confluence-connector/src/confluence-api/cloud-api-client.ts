@@ -1,3 +1,4 @@
+import { chunk } from 'remeda';
 import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
@@ -9,7 +10,8 @@ import {
   paginatedResponseSchema,
 } from './types/confluence-api.types';
 
-const SEARCH_PAGE_SIZE = 25;
+const SEARCH_PAGE_SIZE = 100;
+const ANCESTOR_BATCH_SIZE = 100;
 const ATLASSIAN_API_BASE = 'https://api.atlassian.com/ex/confluence';
 
 type CloudConfig = Extract<ConfluenceConfig, { instanceType: 'cloud' }>;
@@ -50,15 +52,23 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
   public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {
     if (rootIds.length === 0) return [];
 
-    const cql = `ancestor IN (${rootIds.join(',')}) AND type != attachment`;
-    const url = `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&limit=${SEARCH_PAGE_SIZE}`;
+    const batches = chunk(rootIds, ANCESTOR_BATCH_SIZE);
+    const results: ConfluencePage[] = [];
 
-    return fetchAllPaginated(
-      url,
-      this.apiBaseUrl,
-      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
-      confluencePageSchema,
-    );
+    for (const batch of batches) {
+      const cql = `ancestor IN (${batch.join(',')}) AND type != attachment`;
+      const url = `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&limit=${SEARCH_PAGE_SIZE}`;
+
+      const pages = await fetchAllPaginated(
+        url,
+        this.apiBaseUrl,
+        (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
+        confluencePageSchema,
+      );
+      results.push(...pages);
+    }
+
+    return results;
   }
 
   public buildPageWebUrl(page: ConfluencePage): string {

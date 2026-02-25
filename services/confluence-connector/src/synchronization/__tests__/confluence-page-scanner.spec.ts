@@ -280,7 +280,7 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.map((item) => item.id)).toEqual(['ingest-all-page', 'healthy-page']);
-    expect(mockTenantLogger.warn).toHaveBeenCalledWith(
+    expect(mockTenantLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ rootIds: ['ingest-all-page'], error: expect.anything() }),
       'Failed to fetch descendant pages, skipping descendants',
     );
