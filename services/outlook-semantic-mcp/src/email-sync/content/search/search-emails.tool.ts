@@ -77,6 +77,6 @@ export class SearchEmailsTool {
     }
 
     const results = await this.searchEmailsQuery.run(userProfileTypeId.toString(), input);
-    return { results };
+    return { success: true, results };
   }
 }
