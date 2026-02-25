@@ -23,51 +23,62 @@ export class ConfluencePageScanner {
     const discoveredIds = new Set<string>();
     const labeledPages = await this.apiClient.searchPagesByLabel();
 
-    const filteredPageIds = this.filterIngestablePages(labeledPages, discoveredIds);
+    const filteredPages = this.mapToDiscoveredPages(labeledPages, discoveredIds);
 
-    const ingestAllRootIds = labeledPages
+    const ingestAllRootPageIds = labeledPages
       .filter((page) => this.hasIngestAllLabel(page))
       .map((page) => page.id);
 
-    let filteredDescendantPageIds: DiscoveredPage[] = [];
-    if (ingestAllRootIds.length > 0) {
+    let filteredDescendantPages: DiscoveredPage[] = [];
+    if (ingestAllRootPageIds.length > 0) {
       // we are fetching descendants on content marked with ai-ingest-all label regardless of the content type
-      const descendants = await this.fetchAllDescendants(ingestAllRootIds);
-      filteredDescendantPageIds = this.filterIngestablePages(descendants, discoveredIds);
+      const descendants = await this.fetchAllDescendants(ingestAllRootPageIds);
+      filteredDescendantPages = this.mapToDiscoveredPages(descendants, discoveredIds);
     }
 
-    const discovered = [...filteredPageIds, ...filteredDescendantPageIds];
+    const discovered = [...filteredPages, ...filteredDescendantPages];
     this.logger.info({ count: discovered.length }, 'Page discovery completed');
     return discovered;
   }
 
-  private filterIngestablePages(
+  private mapToDiscoveredPages(
     pages: ConfluencePage[],
     discoveredIds: Set<string>,
   ): DiscoveredPage[] {
-    const result: DiscoveredPage[] = [];
+    const discoveredPages: DiscoveredPage[] = [];
     for (const page of pages) {
       if (this.isLimitReached(discoveredIds.size)) {
         break;
       }
 
       if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
-        this.logger.info(
+        this.logger.debug(
           { pageId: page.id, title: page.title, type: page.type },
           'Skipping non-page content type',
         );
         continue;
       }
 
-      // as discoveredIds is a set this is redundant check but is kept for explicitness
       if (discoveredIds.has(page.id)) {
         continue;
       }
 
       discoveredIds.add(page.id);
-      result.push(this.toDiscoveredPage(page));
+
+      discoveredPages.push({
+        id: page.id,
+        title: page.title,
+        type: page.type,
+        spaceId: page.space.id,
+        spaceKey: page.space.key,
+        spaceName: page.space.name,
+        versionTimestamp: page.version.when,
+        webUrl: this.apiClient.buildPageWebUrl(page),
+        labels: page.metadata.labels.results.map((label) => label.name),
+      });
     }
-    return result;
+
+    return discoveredPages;
   }
 
   private async fetchAllDescendants(rootIds: string[]): Promise<ConfluencePage[]> {
@@ -81,20 +92,6 @@ export class ConfluencePageScanner {
       // continue
       return [];
     }
-  }
-
-  private toDiscoveredPage(page: ConfluencePage): DiscoveredPage {
-    return {
-      id: page.id,
-      title: page.title,
-      type: page.type,
-      spaceId: page.space.id,
-      spaceKey: page.space.key,
-      spaceName: page.space.name,
-      versionTimestamp: page.version.when,
-      webUrl: this.apiClient.buildPageWebUrl(page),
-      labels: page.metadata.labels.results.map((label) => label.name),
-    };
   }
 
   private hasIngestAllLabel(page: ConfluencePage): boolean {
