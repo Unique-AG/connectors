@@ -1,4 +1,4 @@
-import z from 'zod';
+import z from 'zod/v4';
 
 const SubscriptionMessageChanged = z.object({
   type: z.literal('unique.outlook-semantic-mcp.mail-event.live-change-notification-received'),

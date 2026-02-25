@@ -8,7 +8,7 @@ import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { MAIN_EXCHANGE } from '../../amqp/amqp.constants';
-import { subscriptionMailFilters } from '../mail-ingestion/dtos/subscription-mail-filters.dto';
+import { subscriptionMailFilters } from '../../db/schema/subscription/subscription-mail-filters.dto';
 import {
   CreateSubscriptionRequestSchema,
   LifecycleEventDto,

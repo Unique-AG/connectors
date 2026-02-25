@@ -21,8 +21,8 @@ import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { traceAttrs, traceError, traceEvent } from '~/email-sync/tracing.utils';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
+import { FullSyncCommand } from './full-sync/full-sync.command';
 import { MessageEventDto } from './mail-ingestion/dtos/message-event.dto';
-import { FullSyncCommand } from './mail-ingestion/full-sync.command';
 import { IngestionPriority } from './mail-ingestion/utils/ingestion-queue.utils';
 import {
   ChangeNotificationCollectionDto,

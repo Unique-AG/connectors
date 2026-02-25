@@ -1,4 +1,5 @@
 import type { UniqueAuthFacade } from '../auth/unique-auth.facade';
+import type { UniqueContentFacade } from '../content/unique-content.facade';
 import type { UniqueFilesFacade } from '../files/unique-files.facade';
 import type { UniqueGroupsFacade } from '../groups/unique-groups.facade';
 import type { UniqueIngestionFacade } from '../ingestion/unique-ingestion.facade';
@@ -12,5 +13,6 @@ export interface UniqueApiClient {
   users: UniqueUsersFacade;
   groups: UniqueGroupsFacade;
   ingestion: UniqueIngestionFacade;
+  content: UniqueContentFacade;
   close?(): Promise<void>;
 }

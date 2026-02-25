@@ -1,11 +1,10 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { SyncDirectoriesCommand } from '~/email-sync/directories-sync/sync-directories.command';
-import { traceAttrs } from '~/email-sync/tracing.utils';
-import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
 const ConnectInboxInputSchema = z.object({
@@ -60,14 +59,10 @@ export class ConnectInboxTool {
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {
-    const userProfileId = request.user?.userProfileId;
-    if (!userProfileId) throw new UnauthorizedException('User not authenticated');
-
-    traceAttrs({ user_profile_id: userProfileId });
+    const userProfileTypeid = extractUserProfileId(request);
+    const userProfileId = userProfileTypeid.toString();
 
     this.logger.log({ userProfileId }, 'Starting knowledge base integration for user');
-
-    const userProfileTypeid = convertUserProfileIdToTypeId(userProfileId);
 
     // We first sync all directories because if the webhook receives notifications we should be able to process them.
     await this.syncDirectoriesCommand.run(userProfileTypeid);

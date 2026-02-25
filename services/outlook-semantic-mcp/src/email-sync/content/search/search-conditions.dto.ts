@@ -1,0 +1,120 @@
+import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
+import { z } from 'zod';
+
+const ConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
+  z.object({
+    value: valueSchema.describe('The value to filter by.'),
+    operator: z.nativeEnum(UniqueQLOperator).describe('The comparison operator to apply.'),
+  });
+
+export const SearchConditionSchema = z
+  .object({
+    dateFrom: ConditionFieldSchema(z.string())
+      .optional()
+      .describe('Filter emails received on or after this date (ISO 8601 format).'),
+    dateTo: ConditionFieldSchema(z.string())
+      .optional()
+      .describe('Filter emails received on or before this date (ISO 8601 format).'),
+    fromSenders: ConditionFieldSchema(z.array(z.string()))
+      .optional()
+      .describe('Filter emails sent by any of the given sender email addresses.'),
+    toRecipients: ConditionFieldSchema(z.array(z.string()))
+      .optional()
+      .describe('Filter emails addressed to any of the given recipient email addresses.'),
+    ccRecipients: ConditionFieldSchema(z.array(z.string()))
+      .optional()
+      .describe('Filter emails CC-ed to any of the given email addresses.'),
+    directories: ConditionFieldSchema(z.array(z.string()))
+      .optional()
+      .describe('Filter emails located in any of the given folder IDs.'),
+    hasAttachments: ConditionFieldSchema(z.boolean())
+      .optional()
+      .describe('Filter emails by whether they have attachments.'),
+    categories: ConditionFieldSchema(z.array(z.string()))
+      .optional()
+      .describe('Filter emails tagged with any of the given categories.'),
+  })
+  .refine((obj) => Object.values(obj).some((v) => v !== undefined), {
+    message: 'At least one condition field must be provided',
+  });
+
+export type SearchCondition = z.infer<typeof SearchConditionSchema>;
+
+export const SearchEmailsInputSchema = z.object({
+  search: z.string().describe(`Search query`),
+  conditions: z
+    .array(SearchConditionSchema)
+    .optional()
+    .describe(`Conditions to norrow down the search`),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(10)
+    .describe('Maximum number of results to return. Must be between 1 and 100.'),
+  scoreThreshold: z
+    .number()
+    .min(0)
+    .max(1)
+    .optional()
+    .describe('Minimum relevance score threshold for returned results, between 0 and 1.'),
+});
+
+export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
+
+const METADATA_PATH: Record<keyof SearchCondition, string[]> = {
+  dateFrom: ['metadata', 'receivedDateTime'],
+  dateTo: ['metadata', 'receivedDateTime'],
+  fromSenders: ['metadata', 'from.emailAddress'],
+  toRecipients: ['metadata', 'toRecipients.emailAddresses'],
+  ccRecipients: ['metadata', 'ccRecipients.emailAddresses'],
+  directories: ['metadata', 'parentFolderId'],
+  hasAttachments: ['metadata', 'hasAttachments'],
+  categories: ['metadata', 'categories'],
+};
+
+function leaf(
+  path: string[],
+  operator: UniqueQLOperator,
+  value: string | number | boolean,
+): MetadataFilter {
+  return { path, operator, value };
+}
+
+function orWrap(filters: MetadataFilter[]): MetadataFilter {
+  return filters.length === 1 ? (filters[0] as MetadataFilter) : { or: filters };
+}
+
+function buildConditionGroup(condition: SearchCondition): MetadataFilter {
+  const leaves: MetadataFilter[] = [];
+
+  for (const key of Object.keys(condition) as Array<keyof SearchCondition>) {
+    const field = condition[key];
+    if (field === undefined) continue;
+
+    const path = METADATA_PATH[key];
+    const { operator } = field;
+    const { value } = field;
+
+    if (Array.isArray(value)) {
+      const arrayLeaves = value.map((value: string) => leaf(path, operator, value));
+      leaves.push(orWrap(arrayLeaves));
+    } else {
+      leaves.push(leaf(path, operator, typeof value === 'boolean' ? String(value) : value));
+    }
+  }
+
+  return orWrap(leaves);
+}
+
+// Keys within a single condition are OR-combined; multiple conditions in the array are AND-combined.
+export function buildSearchFilter(
+  conditions: SearchCondition[] | null | undefined,
+): MetadataFilter | undefined {
+  if (!conditions?.length) {
+    return undefined;
+  }
+  const conditionGroups = conditions.map(buildConditionGroup);
+  return { and: [...conditionGroups] };
+}

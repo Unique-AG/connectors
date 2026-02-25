@@ -1,5 +1,15 @@
 export type { UniqueApiFeatureModuleInputOptions } from './config/unique-api-feature-module-options';
 export type { UniqueApiRootModuleInputOptions } from './config/unique-api-root-module-options';
+export type { Content } from './content/content.dto';
+export { ContentSchema } from './content/content.dto';
+export type {
+  MetadataFilter,
+  PublicSearchRequest,
+  SearchResult as PublicSearchResult,
+  SearchResultItem,
+} from './content/search-content.dto';
+export { SearchType, UniqueQLOperator } from './content/search-content.dto';
+export type { UniqueContentFacade } from './content/unique-content.facade';
 export type { UniqueApiMetrics } from './core/observability';
 export {
   getUniqueApiClientToken,

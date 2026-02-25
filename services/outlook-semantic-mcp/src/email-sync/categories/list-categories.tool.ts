@@ -1,0 +1,51 @@
+import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
+import { type Context, Tool } from '@unique-ag/mcp-server-module';
+import { Injectable } from '@nestjs/common';
+import { Span } from 'nestjs-otel';
+import * as z from 'zod';
+import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { ListCategoriesQuery } from './list-categories.query';
+
+const InputSchema = z.object({});
+
+const OutputSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  categories: z.array(z.string()).optional(),
+  count: z.number().optional(),
+});
+
+@Injectable()
+export class ListCategoriesTool {
+  public constructor(private readonly listCategoriesQuery: ListCategoriesQuery) {}
+
+  @Tool({
+    name: 'list_categories',
+    title: 'List Categories',
+    description:
+      'List all Outlook mail categories available for the user. Returns the display names of all master categories configured in Outlook.',
+    parameters: InputSchema,
+    outputSchema: OutputSchema,
+    annotations: {
+      title: 'List Categories',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    _meta: {
+      'unique.app/icon': 'tag',
+      'unique.app/system-prompt':
+        'Returns the list of Outlook mail category names configured for the user. Use category names when filtering emails by category. Call this tool when the user wants to know which categories are available or wants to search emails by category.',
+    },
+  })
+  @Span()
+  public async listCategories(
+    _input: z.infer<typeof InputSchema>,
+    _context: Context,
+    request: McpAuthenticatedRequest,
+  ): Promise<z.infer<typeof OutputSchema>> {
+    const userProfileId = extractUserProfileId(request);
+    return this.listCategoriesQuery.run(userProfileId);
+  }
+}

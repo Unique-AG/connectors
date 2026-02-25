@@ -47,7 +47,7 @@ export class UpsertDirectoryCommand {
         eq(directories.providerDirectoryId, directory.id),
       ),
     });
-    assert.ok(newDirectory, `Counld not create new directory`);
+    assert.ok(newDirectory, `Could not create new directory`);
     return newDirectory;
   }
 }
