@@ -1,4 +1,4 @@
-import { chunk } from 'remeda';
+import { chunk, uniqueBy } from 'remeda';
 import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
@@ -57,7 +57,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
       results.push(...pages);
     }
 
-    return results;
+    return uniqueBy(results, (page) => page.id);
   }
 
   public buildPageWebUrl(page: ConfluencePage): string {

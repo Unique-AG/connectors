@@ -213,7 +213,7 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'page-child']);
-    expect(mockTenantLogger.info).toHaveBeenCalledWith(
+    expect(mockTenantLogger.debug).toHaveBeenCalledWith(
       { pageId: 'db-child', title: 'Page db-child', type: 'database' },
       'Skipping non-page content type',
     );
