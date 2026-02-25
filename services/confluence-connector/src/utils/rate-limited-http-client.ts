@@ -48,7 +48,7 @@ export class RateLimitedHttpClient {
     });
 
     this.limiter.on('error', (error) => {
-      this.logger.error(error, 'Bottleneck error');
+      this.logger.error({ err: error, msg: 'Bottleneck error' });
     });
   }
 }

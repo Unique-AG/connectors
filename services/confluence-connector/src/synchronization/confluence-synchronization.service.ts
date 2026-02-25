@@ -37,7 +37,7 @@ export class ConfluenceSynchronizationService {
 
       this.logger.info('Sync completed');
     } catch (error) {
-      this.logger.error(error, 'Sync failed');
+      this.logger.error({ err: error, msg: 'Sync failed' });
     } finally {
       tenant.isScanning = false;
     }

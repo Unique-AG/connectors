@@ -30,10 +30,12 @@ export class ConfluenceContentFetcher {
     try {
       fullPage = await this.apiClient.getPageById(page.id);
     } catch (error) {
-      this.logger.warn(
-        { pageId: page.id, title: page.title, error },
-        'Failed to fetch page, possibly deleted in the meantime',
-      );
+      this.logger.error({
+        pageId: page.id,
+        title: page.title,
+        err: error,
+        msg: 'Failed to fetch page, possibly deleted in the meantime',
+      });
       return null;
     }
 

@@ -172,9 +172,12 @@ describe('ConfluenceContentFetcher', () => {
     const result = await fetcher.fetchPagesContent([failingPage, successfulPage]);
 
     expect(result.map((page) => page.id)).toEqual(['ok']);
-    expect(mockTenantLogger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ pageId: 'fail', error: expect.anything() }),
-      'Failed to fetch page, possibly deleted in the meantime',
+    expect(mockTenantLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageId: 'fail',
+        err: expect.any(Error),
+        msg: 'Failed to fetch page, possibly deleted in the meantime',
+      }),
     );
   });
 });

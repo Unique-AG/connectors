@@ -127,7 +127,9 @@ describe('ConfluenceSynchronizationService', () => {
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(tenant.isScanning).toBe(false);
-      expect(mockTenantLogger.error).toHaveBeenCalledWith(expect.any(Error), 'Sync failed');
+      expect(mockTenantLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
+      );
     });
 
     it('resets isScanning and logs errors when content fetcher fails', async () => {
@@ -136,7 +138,9 @@ describe('ConfluenceSynchronizationService', () => {
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(tenant.isScanning).toBe(false);
-      expect(mockTenantLogger.error).toHaveBeenCalledWith(expect.any(Error), 'Sync failed');
+      expect(mockTenantLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
+      );
     });
   });
 });

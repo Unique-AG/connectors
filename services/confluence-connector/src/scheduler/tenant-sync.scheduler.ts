@@ -38,10 +38,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
         job.stop();
       }
     } catch (error) {
-      this.logger.error({
-        msg: 'Error stopping cron jobs',
-        error,
-      });
+      this.logger.error({ err: error, msg: 'Error stopping cron jobs' });
     }
   }
 
@@ -74,10 +71,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       try {
         await syncService.synchronize();
       } catch (error) {
-        logger.error({
-          msg: 'Unexpected sync error',
-          error,
-        });
+        logger.error({ err: error, msg: 'Unexpected sync error' });
       }
     });
   }

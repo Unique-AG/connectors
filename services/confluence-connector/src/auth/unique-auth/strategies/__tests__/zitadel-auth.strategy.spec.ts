@@ -193,10 +193,11 @@ describe('ZitadelAuthStrategy', () => {
 
       expect(loggerErrorMock).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
-      const [loggedError, loggedMsg] = loggerErrorMock.mock.calls[0]!;
-      expect(loggedMsg).toBe('Failed to acquire Unique API token from Zitadel');
-      expect(loggedError).toBeInstanceOf(Error);
-      expect(loggedError).toHaveProperty('message', 'network failure');
+      const [loggedObj] = loggerErrorMock.mock.calls[0]!;
+      expect(loggedObj).toMatchObject({
+        err: expect.any(Error),
+        msg: 'Failed to acquire Unique API token from Zitadel',
+      });
     });
   });
 });

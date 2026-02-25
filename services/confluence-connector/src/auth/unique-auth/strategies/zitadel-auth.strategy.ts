@@ -70,7 +70,7 @@ export class ZitadelAuthStrategy extends UniqueAuth {
         expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
       };
     } catch (error) {
-      this.logger.error(error, 'Failed to acquire Unique API token from Zitadel');
+      this.logger.error({ err: error, msg: 'Failed to acquire Unique API token from Zitadel' });
       throw error;
     }
   }
