@@ -4,7 +4,7 @@ import {
   registerConfig,
 } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-import { json } from '~/utils/zod';
+import { enabledDisabledBoolean, json } from '~/utils/zod';
 
 // ==== Config for local in-cluster communication with Unique API services ====
 
@@ -67,6 +67,9 @@ export const UniqueConfigSchema = z
     z.object({
       ingestionServiceBaseUrl: z.string().describe('Base URL for Unique ingestion service'),
       scopeManagementServiceBaseUrl: z.string().describe('Base URL for Scope Management service'),
+      storeInternally: enabledDisabledBoolean(
+        'Whether to store content internally in Unique or not.',
+      ),
     }),
   );
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, sql } from 'drizzle-orm';
+import { eq, gt, sql } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDatabase, directoriesSync, subscriptions } from '~/db';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SyncDirectoriesCommand } from './sync-directories.command';
@@ -16,7 +16,7 @@ export class SyncDirectoriesForSubscriptionsCommand {
       .select()
       .from(subscriptions)
       .leftJoin(directoriesSync, eq(subscriptions.userProfileId, directoriesSync.userProfileId))
-      // TODO: add where which filters only anctive subscribtions.
+      .where(gt(subscriptions.expiresAt, sql`now()`))
       .orderBy(sql`${directoriesSync.lastDeltaSyncRanAt.name} desc nulls first`)
       .limit(10)
       .execute();

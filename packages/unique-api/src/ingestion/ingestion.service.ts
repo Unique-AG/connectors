@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { sanitizePath } from '@unique-ag/utils';
 import type { IngestionHttpClient } from '../clients/ingestion-http.client';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -118,7 +119,10 @@ export class FileIngestionService implements UniqueIngestionFacade {
     const { statusCode, body } = await this.ingestionHttpClient.request({
       method: 'POST',
       // The ingestionServiceBaseUrl can have already part of the path when running in external mode
-      path: `${ingestionUrl.pathname}/v2/content/file-diff`,
+      path: sanitizePath({
+        path: `${ingestionUrl.pathname}/v2/content/file-diff`,
+        prefixWithSlash: true,
+      }),
       body: JSON.stringify(diffRequest),
     });
 

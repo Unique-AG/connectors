@@ -11,7 +11,6 @@ export const directoriesSync = pgTable('directories_sync', {
   deltaLink: varchar(`delta_link`),
   lastDeltaSyncRanAt: timestamp(`last_delta_sync_ran_at`),
   lastDeltaChangeDetectedAt: timestamp(`last_delta_change_detected_at`),
-  // TODO: Fix this
   lastDirectorySyncRanAt: timestamp(`last_directory_sync_ran_at`),
 
   // References

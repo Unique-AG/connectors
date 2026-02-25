@@ -106,6 +106,7 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
           parentId: sql.raw(`excluded.${directories.parentId.name}`),
           displayName: sql.raw(`excluded.${directories.displayName.name}`),
         },
-      });
+      })
+      .execute();
   }
 }

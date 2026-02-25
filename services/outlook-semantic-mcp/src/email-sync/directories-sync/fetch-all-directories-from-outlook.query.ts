@@ -1,7 +1,8 @@
 import { Client } from '@microsoft/microsoft-graph-client';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { traceEvent } from '~/email-sync/tracing.utils';
+import { sumBy } from 'remeda';
+import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import {
   GraphOutlookDirectory,
@@ -11,10 +12,15 @@ import {
 
 @Injectable()
 export class FetchAllDirectoriesFromOutlookQuery {
+  private readonly logger = new Logger(FetchAllDirectoriesFromOutlookQuery.name);
+
   public constructor(private readonly graphClientFactory: GraphClientFactory) {}
 
   @Span()
   public async run(userProfileId: string): Promise<GraphOutlookDirectory[]> {
+    traceAttrs({ user_profile_id: userProfileId });
+    this.logger.log({ userProfileId, msg: `Fetching all directories from Outlook` });
+
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
     const rootDirectories: GraphOutlookDirectory[] = await this.fetchAllDirectories({
@@ -22,7 +28,12 @@ export class FetchAllDirectoriesFromOutlookQuery {
       client,
     });
 
-    traceEvent('directories fetched', { count: rootDirectories.length });
+    traceEvent('root directories fetched', { count: rootDirectories.length });
+    this.logger.log({
+      userProfileId,
+      rootDirectoryCount: rootDirectories.length,
+      msg: `Root directories fetched`,
+    });
 
     const shouldExpandDirectory = (directory: GraphOutlookDirectory) =>
       directory.childFolderCount > 0 &&
@@ -59,6 +70,19 @@ export class FetchAllDirectoriesFromOutlookQuery {
     });
 
     await Promise.all(allPromisses);
+
+    const totalCount = this.countDirectories(rootDirectories);
+    traceEvent('all directories fetched', {
+      total_count: totalCount,
+      root_count: rootDirectories.length,
+    });
+    this.logger.log({
+      userProfileId,
+      totalCount,
+      rootDirectoryCount: rootDirectories.length,
+      msg: `All directories fetched including children`,
+    });
+
     return rootDirectories;
   }
 
@@ -77,17 +101,27 @@ export class FetchAllDirectoriesFromOutlookQuery {
       .get();
     let parsedResult = graphOutlookDirectoriesResponse.parse(graphResponse);
     const output: GraphOutlookDirectory[] = parsedResult.value;
+    let pageCount = 1;
 
     while (parsedResult['@odata.nextLink']) {
+      pageCount++;
       graphResponse = await client
         .api(parsedResult['@odata.nextLink'])
         .header(`Prefer`, `IdType="ImmutableId"`)
         .get();
       parsedResult = graphOutlookDirectoriesResponse.parse(graphResponse);
       output.push(...parsedResult.value);
+      traceEvent('directories page fetched', { page: pageCount, running_total: output.length });
     }
 
     return output;
+  }
+
+  private countDirectories(directories: GraphOutlookDirectory[]): number {
+    return sumBy(
+      directories,
+      (dir) => 1 + (dir.childFolders ? this.countDirectories(dir.childFolders) : 0),
+    );
   }
 
   private async expandDirectory({
