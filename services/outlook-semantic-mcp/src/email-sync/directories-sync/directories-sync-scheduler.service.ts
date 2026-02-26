@@ -15,7 +15,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
 
   public onModuleInit() {
     this.logger.log('Triggering initial scan on service startup...');
-    // void this.runScheduledScan();
+    void this.runScheduledScan();
     this.setupScheduledScan();
   }
 
