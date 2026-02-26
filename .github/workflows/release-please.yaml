@@ -65,10 +65,12 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs['services/sharepoint-connector--release_created'] == 'true' }}
     uses: ./.github/workflows/_template-cd.yaml
+    secrets: inherit
     with:
       service-name: sharepoint-connector
       service-version: ${{ needs.release-please.outputs['services/sharepoint-connector--version'] }}
       dockerfile: services/sharepoint-connector/deploy/Dockerfile
+      docs-path: services/sharepoint-connector/docs
 
   release-teams-mcp:
     needs: release-please
