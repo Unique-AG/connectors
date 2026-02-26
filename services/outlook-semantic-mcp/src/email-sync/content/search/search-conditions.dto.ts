@@ -1,5 +1,5 @@
 import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
-import { omit, pick } from 'remeda';
+import { first, omit, pick } from 'remeda';
 import { z } from 'zod';
 
 const ConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
@@ -46,7 +46,9 @@ export const SearchEmailsInputSchema = z.object({
   conditions: z
     .array(SearchConditionSchema)
     .optional()
-    .describe(`Conditions to norrow down the search`),
+    .describe(
+      `Conditions to narrow down the search, If we pass multiple conditions we apply AND operator between them.`,
+    ),
   limit: z
     .number()
     .int()
@@ -75,16 +77,15 @@ const METADATA_PATH: Record<keyof SearchCondition, string[]> = {
   categories: ['categories'],
 };
 
-function leaf(
-  path: string[],
-  operator: UniqueQLOperator,
-  value: string | number | boolean,
-): MetadataFilter {
-  return { path, operator, value };
-}
-
-function orWrap(filters: MetadataFilter[]): MetadataFilter {
-  return filters.length === 1 ? (filters[0] as MetadataFilter) : { or: filters };
+function wrapConditions(filters: MetadataFilter[], operator: 'and' | 'or'): MetadataFilter {
+  const firstElement = first(filters);
+  if (firstElement && filters.length === 1) {
+    return firstElement;
+  }
+  if (operator === 'and') {
+    return { and: filters };
+  }
+  return { or: filters };
 }
 
 function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
@@ -92,17 +93,25 @@ function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
 
   for (const key of Object.keys(conditions) as Array<keyof SearchCondition>) {
     const field = conditions[key];
-    if (field === undefined) continue;
+    if (field === undefined) {
+      continue;
+    }
 
     const path = METADATA_PATH[key];
     const { operator } = field;
     const { value } = field;
 
     if (Array.isArray(value)) {
-      const arrayLeaves = value.map((value: string) => leaf(path, operator, value));
-      leaves.push(orWrap(arrayLeaves));
+      const arrayLeaves = value.map(
+        (subValue: string): MetadataFilter => ({
+          path,
+          operator,
+          value: subValue,
+        }),
+      );
+      leaves.push(wrapConditions(arrayLeaves, 'or'));
     } else {
-      leaves.push(leaf(path, operator, typeof value === 'boolean' ? String(value) : value));
+      leaves.push({ path, operator, value: typeof value === 'boolean' ? String(value) : value });
     }
   }
 
@@ -116,13 +125,13 @@ function buildConditionGroup(condition: SearchCondition): MetadataFilter {
 
   const dateLeavesConditions = getConditionsArray(pick(condition, dateIntervalFields));
   if (dateLeavesConditions.length) {
-    leaves.push({ and: dateLeavesConditions });
+    leaves.push(wrapConditions(dateLeavesConditions, 'and'));
   }
 
   const otherConditions = getConditionsArray(omit(condition, dateIntervalFields));
   leaves.push(...otherConditions);
 
-  return orWrap(leaves);
+  return wrapConditions(leaves, 'or');
 }
 
 // Keys within a single condition are OR-combined; multiple conditions in the array are AND-combined.
@@ -133,5 +142,5 @@ export function buildSearchFilter(
     return undefined;
   }
   const conditionGroups = conditions.map(buildConditionGroup);
-  return { and: [...conditionGroups] };
+  return wrapConditions(conditionGroups, 'and');
 }

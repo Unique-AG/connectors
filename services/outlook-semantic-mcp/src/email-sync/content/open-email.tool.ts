@@ -1,6 +1,6 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { ContentSchema, UniqueApiClient } from '@unique-ag/unique-api';
+import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
@@ -11,11 +11,27 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 const OpenEmailByIdInputSchema = z.object({
   id: z.string().describe('The content ID returned by the search_emails tool.'),
 });
+
+export const EmailDataChunkSchema = z.object({
+  id: z.string(),
+  startPage: z.number().nullable(),
+  endPage: z.number().nullable(),
+  order: z.number().nullable(),
+  text: z.string(),
+});
+
+export const EmailDataSchema = z.object({
+  id: z.string(),
+  title: z.string().nullable(),
+  metadata: z.unknown().nullable(),
+  chunks: z.array(EmailDataChunkSchema).optional(),
+});
+
 const OpenEmailByIdOutputSchema = z.object({
   success: z.boolean(),
   status: z.string().optional(),
   message: z.string().optional(),
-  emailData: ContentSchema.optional(),
+  emailData: EmailDataSchema.optional(),
 });
 
 @Injectable()

@@ -33,6 +33,11 @@ const TOOLS = [
   CreateDraftEmailTool,
 ];
 
+// We declare all tools / controllers into one module for simplicity, we could declare each tool
+// in the module where it's business logic is but this would break business logic reusability instead
+// we would need separated nestjs modules for controllers / tools to keep the business logic reusable.
+// Right now this creates to much boilerplate once the number of tool will grow we can consider organizing
+// them differently.
 @Module({
   imports: [
     DrizzleModule,

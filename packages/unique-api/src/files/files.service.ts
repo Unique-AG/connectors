@@ -8,7 +8,7 @@ import {
   type AddAccessesMutationResult,
   CONTENT_DELETE_BY_IDS_MUTATION,
   CONTENT_DELETE_MUTATION,
-  CONTENT_ID_BY_SCOPE_AND_METADATA_KET,
+  CONTENT_ID_BY_SCOPE_AND_METADATA_KEY,
   CONTENT_UPDATE_MUTATION,
   type ContentByScopeAndMetadataKeyInput,
   type ContentByScopeAndMetadataKeyResult,
@@ -352,11 +352,12 @@ export class FilesService implements UniqueFilesFacade {
       const batchResult = await this.ingestionClient.request<
         ContentByScopeAndMetadataKeyResult,
         ContentByScopeAndMetadataKeyInput
-      >(CONTENT_ID_BY_SCOPE_AND_METADATA_KET, {
+      >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
         skip,
         take: CONTENT_BATCH_SIZE,
         where: {
           ownerId: { equals: scopeId },
+          ownerType: { equals: 'SCOPE' },
           metadata: {
             path: [metadataKey],
             equals: metadataValue,

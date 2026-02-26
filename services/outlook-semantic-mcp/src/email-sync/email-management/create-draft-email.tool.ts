@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
 import { CreateDraftEmailCommand } from './create-draft-email.command';
 
 const CreateDraftEmailInputSchema = z.object({
@@ -58,7 +59,10 @@ const CreateDraftEmailOutputSchema = z.object({
 
 @Injectable()
 export class CreateDraftEmailTool {
-  public constructor(private readonly createDraftEmailCommand: CreateDraftEmailCommand) {}
+  public constructor(
+    private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
+    private readonly createDraftEmailCommand: CreateDraftEmailCommand,
+  ) {}
 
   @Tool({
     name: 'create_draft_email',
@@ -87,6 +91,10 @@ export class CreateDraftEmailTool {
     request: McpAuthenticatedRequest,
   ) {
     const userProfileTypeId = extractUserProfileId(request);
+    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
+    if (!subscriptionStatus.success) {
+      return subscriptionStatus;
+    }
     return this.createDraftEmailCommand.run(userProfileTypeId, input);
   }
 }

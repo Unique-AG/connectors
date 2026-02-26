@@ -21,13 +21,9 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(result).toEqual({
-      and: [
-        {
-          path: ['receivedDateTime'],
-          operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
-          value: '2024-01-01',
-        },
-      ],
+      path: ['receivedDateTime'],
+      operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
+      value: '2024-01-01',
     });
   });
 
@@ -37,13 +33,9 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(result).toEqual({
-      and: [
-        {
-          path: ['receivedDateTime'],
-          operator: UniqueQLOperator.LESS_THAN_OR_EQUAL,
-          value: '2024-12-31',
-        },
-      ],
+      path: ['receivedDateTime'],
+      operator: UniqueQLOperator.LESS_THAN_OR_EQUAL,
+      value: '2024-12-31',
     });
   });
 
@@ -53,13 +45,9 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(result).toEqual({
-      and: [
-        {
-          path: ['from.emailAddress'],
-          operator: UniqueQLOperator.EQUALS,
-          value: 'alice@example.com',
-        },
-      ],
+      path: ['from.emailAddress'],
+      operator: UniqueQLOperator.EQUALS,
+      value: 'alice@example.com',
     });
   });
 
@@ -74,20 +62,16 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(result).toEqual({
-      and: [
+      or: [
         {
-          or: [
-            {
-              path: ['from.emailAddress'],
-              operator: UniqueQLOperator.EQUALS,
-              value: 'alice@example.com',
-            },
-            {
-              path: ['from.emailAddress'],
-              operator: UniqueQLOperator.EQUALS,
-              value: 'bob@example.com',
-            },
-          ],
+          path: ['from.emailAddress'],
+          operator: UniqueQLOperator.EQUALS,
+          value: 'alice@example.com',
+        },
+        {
+          path: ['from.emailAddress'],
+          operator: UniqueQLOperator.EQUALS,
+          value: 'bob@example.com',
         },
       ],
     });
@@ -102,20 +86,16 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(result).toEqual({
-      and: [
+      or: [
         {
-          or: [
-            {
-              path: ['receivedDateTime'],
-              operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
-              value: '2024-01-01',
-            },
-            {
-              path: ['from.emailAddress'],
-              operator: UniqueQLOperator.EQUALS,
-              value: 'alice@example.com',
-            },
-          ],
+          path: ['receivedDateTime'],
+          operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
+          value: '2024-01-01',
+        },
+        {
+          path: ['from.emailAddress'],
+          operator: UniqueQLOperator.EQUALS,
+          value: 'alice@example.com',
         },
       ],
     });
@@ -153,25 +133,21 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(result).toEqual({
-      and: [
+      or: [
         {
-          or: [
-            {
-              path: ['toRecipients.emailAddresses'],
-              operator: UniqueQLOperator.EQUALS,
-              value: 'carol@example.com',
-            },
-            {
-              path: ['ccRecipients.emailAddresses'],
-              operator: UniqueQLOperator.EQUALS,
-              value: 'dave@example.com',
-            },
-            {
-              path: ['categories'],
-              operator: UniqueQLOperator.EQUALS,
-              value: 'important',
-            },
-          ],
+          path: ['toRecipients.emailAddresses'],
+          operator: UniqueQLOperator.EQUALS,
+          value: 'carol@example.com',
+        },
+        {
+          path: ['ccRecipients.emailAddresses'],
+          operator: UniqueQLOperator.EQUALS,
+          value: 'dave@example.com',
+        },
+        {
+          path: ['categories'],
+          operator: UniqueQLOperator.EQUALS,
+          value: 'important',
         },
       ],
     });
@@ -183,7 +159,9 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(resultTrue).toEqual({
-      and: [{ path: ['hasAttachments'], operator: UniqueQLOperator.EQUALS, value: 'true' }],
+      path: ['hasAttachments'],
+      operator: UniqueQLOperator.EQUALS,
+      value: 'true',
     });
 
     const resultFalse = buildSearchFilter([
@@ -191,7 +169,9 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(resultFalse).toEqual({
-      and: [{ path: ['hasAttachments'], operator: UniqueQLOperator.EQUALS, value: 'false' }],
+      path: ['hasAttachments'],
+      operator: UniqueQLOperator.EQUALS,
+      value: 'false',
     });
   });
 });
