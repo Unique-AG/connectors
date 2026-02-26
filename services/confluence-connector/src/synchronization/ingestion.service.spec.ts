@@ -231,9 +231,9 @@ describe('IngestionService', () => {
       expect.objectContaining({
         pageId: '42',
         title: 'Architecture',
-        error: expect.anything(),
+        err: expect.anything(),
+        msg: 'Failed to ingest page, skipping',
       }),
-      'Failed to ingest page, skipping',
     );
   });
 
@@ -275,9 +275,9 @@ describe('IngestionService', () => {
       expect.objectContaining({
         pageId: '42',
         fileUrl: `${CONFLUENCE_BASE_URL}/files/one.pdf`,
-        error: expect.anything(),
+        err: expect.anything(),
+        msg: 'Failed to ingest file, skipping',
       }),
-      'Failed to ingest file, skipping',
     );
   });
 
@@ -321,9 +321,9 @@ describe('IngestionService', () => {
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         contentKeys: ['k1'],
-        error: expect.anything(),
+        err: expect.anything(),
+        msg: 'Failed to delete content, skipping',
       }),
-      'Failed to delete content, skipping',
     );
   });
 

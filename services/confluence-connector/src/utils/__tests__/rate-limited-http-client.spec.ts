@@ -21,10 +21,6 @@ vi.mock('bottleneck', () => ({
   },
 }));
 
-vi.mock('../normalize-error', () => ({
-  normalizeError: vi.fn((e: unknown) => (e instanceof Error ? e : new Error(String(e)))),
-}));
-
 import { request } from 'undici';
 import { RateLimitedHttpClient } from '../rate-limited-http-client';
 

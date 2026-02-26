@@ -17,7 +17,6 @@ import type {
   IngestionFinalizationRequest,
 } from '../unique-api/types/ingestion.types';
 import { UniqueApiClient } from '../unique-api/types/unique-api-client.types';
-import { sanitizeError } from '../utils/normalize-error';
 import type { FetchedPage } from './sync.types';
 
 export class IngestionService {
@@ -65,10 +64,12 @@ export class IngestionService {
 
       this.logger.info({ pageId: page.id, title: page.title }, 'Page ingested');
     } catch (error) {
-      this.logger.error(
-        { pageId: page.id, title: page.title, error: sanitizeError(error) },
-        'Failed to ingest page, skipping',
-      );
+      this.logger.error({
+        pageId: page.id,
+        title: page.title,
+        err: error,
+        msg: 'Failed to ingest page, skipping',
+      });
     }
   }
 
@@ -101,10 +102,12 @@ export class IngestionService {
 
         this.logger.info({ pageId: page.id, filename, fileUrl }, 'File ingested');
       } catch (error) {
-        this.logger.error(
-          { pageId: page.id, fileUrl, error: sanitizeError(error) },
-          'Failed to ingest file, skipping',
-        );
+        this.logger.error({
+          pageId: page.id,
+          fileUrl,
+          err: error,
+          msg: 'Failed to ingest file, skipping',
+        });
       }
     }
   }
@@ -129,10 +132,7 @@ export class IngestionService {
         'Content deleted',
       );
     } catch (error) {
-      this.logger.error(
-        { contentKeys, error: sanitizeError(error) },
-        'Failed to delete content, skipping',
-      );
+      this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
     }
   }
 
