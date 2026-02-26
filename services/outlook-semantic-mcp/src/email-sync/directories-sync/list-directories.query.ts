@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { Directory, DRIZZLE, type DrizzleDatabase, directories } from '~/db';
 
@@ -18,7 +18,8 @@ export class ListDirectoriesQuery {
     const allDirectories = await this.db.query.directories.findMany({
       where: and(
         eq(directories.userProfileId, userProfileId),
-        or(isNull(directories.ignoreForSync), eq(directories.ignoreForSync, false)),
+        // We filter out directories ignored for sync because they cannot be used in searches.
+        eq(directories.ignoreForSync, false),
       ),
     });
 
@@ -47,7 +48,7 @@ export class ListDirectoriesQuery {
       }));
     };
 
-    // A directory is a root if it has no parent or its parent was filtered out (ignored for sync)
+    // All root directories have parentId as null.
     return buildTreeRecursive(null);
   }
 }

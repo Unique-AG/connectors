@@ -1,7 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import z from 'zod';
-import { GetSubscriptionStatusQuery } from '~/email-sync/subscriptions/get-subscription-status.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 
@@ -19,24 +18,11 @@ export type ListCategoriesResult = z.infer<typeof ListCategoriesQueryOutputSchem
 export class ListCategoriesQuery {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(
-    private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
-    private readonly graphClientFactory: GraphClientFactory,
-  ) {}
+  public constructor(private readonly graphClientFactory: GraphClientFactory) {}
 
   @Span()
   public async run(userProfileId: UserProfileTypeID): Promise<ListCategoriesResult> {
     const userProfileIdString = userProfileId.toString();
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileId);
-
-    if (!subscriptionStatus.success) {
-      this.logger.debug({
-        userProfileId: userProfileIdString,
-        msg: subscriptionStatus.message,
-        status: subscriptionStatus.success,
-      });
-      return subscriptionStatus;
-    }
 
     const categoryItems = await this.getCategoriesFromMicrosoft(userProfileIdString);
     const seen = new Set<string>();

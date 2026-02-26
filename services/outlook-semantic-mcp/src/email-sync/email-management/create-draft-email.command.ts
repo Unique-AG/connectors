@@ -1,6 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { GetSubscriptionStatusQuery } from '~/email-sync/subscriptions/get-subscription-status.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 
@@ -21,10 +20,7 @@ export type CreateDraftEmailResult =
 export class CreateDraftEmailCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(
-    private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
-    private readonly graphClientFactory: GraphClientFactory,
-  ) {}
+  public constructor(private readonly graphClientFactory: GraphClientFactory) {}
 
   @Span()
   public async run(
@@ -32,16 +28,6 @@ export class CreateDraftEmailCommand {
     input: CreateDraftEmailInput,
   ): Promise<CreateDraftEmailResult> {
     const userProfileIdString = userProfileId.toString();
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileId);
-
-    if (!subscriptionStatus.success) {
-      this.logger.debug({
-        userProfileId: userProfileIdString,
-        msg: subscriptionStatus.message,
-        status: subscriptionStatus.success,
-      });
-      return subscriptionStatus;
-    }
 
     const body: Record<string, unknown> = {
       subject: input.subject,

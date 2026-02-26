@@ -1,6 +1,6 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { SearchEmailsInputSchema } from '~/email-sync/content/search/search-conditions.dto';
@@ -28,8 +28,6 @@ const SearchEmailsOutputSchema = z.object({
 
 @Injectable()
 export class SearchEmailsTool {
-  private readonly logger = new Logger(this.constructor.name);
-
   public constructor(
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     private readonly searchEmailsQuery: SearchEmailsQuery,
@@ -65,10 +63,6 @@ export class SearchEmailsTool {
 
     const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
     if (!subscriptionStatus.success) {
-      this.logger.debug({
-        userProfileId: userProfileTypeId.toString(),
-        msg: subscriptionStatus.message,
-      });
       return subscriptionStatus;
     }
 

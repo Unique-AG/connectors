@@ -1,4 +1,5 @@
 import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
+import { omit, pick } from 'remeda';
 import { z } from 'zod';
 
 const ConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
@@ -86,11 +87,11 @@ function orWrap(filters: MetadataFilter[]): MetadataFilter {
   return filters.length === 1 ? (filters[0] as MetadataFilter) : { or: filters };
 }
 
-function buildConditionGroup(condition: SearchCondition): MetadataFilter {
+function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
   const leaves: MetadataFilter[] = [];
 
-  for (const key of Object.keys(condition) as Array<keyof SearchCondition>) {
-    const field = condition[key];
+  for (const key of Object.keys(conditions) as Array<keyof SearchCondition>) {
+    const field = conditions[key];
     if (field === undefined) continue;
 
     const path = METADATA_PATH[key];
@@ -104,6 +105,22 @@ function buildConditionGroup(condition: SearchCondition): MetadataFilter {
       leaves.push(leaf(path, operator, typeof value === 'boolean' ? String(value) : value));
     }
   }
+
+  return leaves;
+}
+
+function buildConditionGroup(condition: SearchCondition): MetadataFilter {
+  const leaves: MetadataFilter[] = [];
+
+  const dateIntervalFields = ['dateFrom', 'dateTo'] as const;
+
+  const dateLeavesConditions = getConditionsArray(pick(condition, dateIntervalFields));
+  if (dateLeavesConditions.length) {
+    leaves.push({ and: dateLeavesConditions });
+  }
+
+  const otherConditions = getConditionsArray(omit(condition, dateIntervalFields));
+  leaves.push(...otherConditions);
 
   return orWrap(leaves);
 }

@@ -50,6 +50,13 @@
       "when": 1771568645742,
       "tag": "0006_goofy_lenny_balinger",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772089562833,
+      "tag": "0007_zippy_mikhail_rasputin",
+      "breakpoints": true
     }
   ]
 }

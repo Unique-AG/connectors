@@ -1,7 +1,7 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { ContentSchema, UniqueApiClient } from '@unique-ag/unique-api';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/email-sync/subscriptions/get-subscription-status.query';
@@ -20,8 +20,6 @@ const OpenEmailByIdOutputSchema = z.object({
 
 @Injectable()
 export class OpenEmailTool {
-  private readonly logger = new Logger(this.constructor.name);
-
   public constructor(
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
@@ -56,10 +54,6 @@ export class OpenEmailTool {
 
     const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
     if (!subscriptionStatus.success) {
-      this.logger.debug({
-        userProfileId: userProfileTypeId.toString(),
-        msg: subscriptionStatus.message,
-      });
       return subscriptionStatus;
     }
 

@@ -70,11 +70,6 @@ export class ListFoldersTool {
     const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
 
     if (!subscriptionStatus.success) {
-      this.logger.debug({
-        userProfileId: userProfileTypeIdString,
-        msg: subscriptionStatus.message,
-        status: subscriptionStatus.success,
-      });
       return subscriptionStatus;
     }
 

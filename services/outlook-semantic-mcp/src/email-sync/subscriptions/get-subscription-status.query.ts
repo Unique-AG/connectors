@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -22,9 +22,23 @@ export type CheckSubscriptionQueryOutput =
 
 @Injectable()
 export class GetSubscriptionStatusQuery {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
   public async run(userProfileTypeID: UserProfileTypeID): Promise<CheckSubscriptionQueryOutput> {
+    const subscriptionStatus = await this.getSubscriptionStatus(userProfileTypeID);
+    this.logger.debug({
+      userProfileId: userProfileTypeID.toString(),
+      msg: subscriptionStatus.message,
+      status: subscriptionStatus.success,
+    });
+    return subscriptionStatus;
+  }
+
+  private async getSubscriptionStatus(
+    userProfileTypeID: UserProfileTypeID,
+  ): Promise<CheckSubscriptionQueryOutput> {
     const subscription = await this.db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.internalType, 'mail_monitoring'),

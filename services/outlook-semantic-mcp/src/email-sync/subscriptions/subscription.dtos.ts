@@ -3,6 +3,7 @@ import { type Join, type Split } from 'type-fest';
 import z from 'zod/v4';
 import { isoDatetimeToDate, redacted, stringToURL } from '~/utils/zod';
 import { lifecycle } from './subscription.events';
+import { isString } from 'remeda';
 
 // SECTION - Microsoft Graph types
 
@@ -171,7 +172,12 @@ export const LifecycleChangeNotification = z
   .transform(({ organizationId, tenantId, ...values }) => ({
     ...values,
     tenantId: tenantId ?? organizationId,
-  }));
+  }))
+  .refine(({ tenantId }) => isString(tenantId) && tenantId.length > 0, {
+    message: 'tenantId must be a string',
+    path: ['tenantId'],
+  });
+
 export type LifecycleChangeNotification = z.infer<typeof LifecycleChangeNotification>;
 
 /**

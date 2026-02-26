@@ -8,7 +8,9 @@ import {
 
 export const extractUserProfileId = (request: McpAuthenticatedRequest): UserProfileTypeID => {
   const userProfileId = request.user?.userProfileId;
-  if (!userProfileId) throw new UnauthorizedException('User not authenticated');
+  if (!userProfileId) {
+    throw new UnauthorizedException('User not authenticated');
+  }
 
   traceAttrs({ user_profile_id: userProfileId });
   return convertUserProfileIdToTypeId(userProfileId);
