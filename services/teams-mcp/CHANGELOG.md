@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.6](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.5...teams-mcp@0.2.6) (2026-02-26)
+
+
+### Features
+
+* **teams-mcp:** add scoped search with cached user identity mapping ([#295](https://github.com/Unique-AG/connectors/issues/295)) ([03d7266](https://github.com/Unique-AG/connectors/commit/03d7266572435866aea708e06b45099f15655315))
+
+
+### Bug Fixes
+
+* **teams-mcp:** support both tenantId and organizationId in lifecycle notifications ([#301](https://github.com/Unique-AG/connectors/issues/301)) ([7868251](https://github.com/Unique-AG/connectors/commit/786825171e9e8ae4a268bfa8166815549996c005))
+* **teams-mcp:** use tenantId directly in lifecycle notification schema ([#290](https://github.com/Unique-AG/connectors/issues/290)) ([4062c72](https://github.com/Unique-AG/connectors/commit/4062c72b4d7827d6ca3e1cc3a7fa6ebc68da4dbe))
+
 ## [0.2.5](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.4...teams-mcp@0.2.5) (2026-02-20)
 
 
