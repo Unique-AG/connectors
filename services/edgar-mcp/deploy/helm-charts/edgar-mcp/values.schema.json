@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "server": {
+      "type": "object",
+      "description": "Configuration for the backend-service dependency",
+      "properties": {
+        "env": {
+          "type": "object",
+          "description": "Environment variables for the edgar-mcp server",
+          "properties": {
+            "APP_ENV": {
+              "type": "string",
+              "enum": ["development", "production", "test"],
+              "description": "Application environment",
+              "default": "production"
+            },
+            "PORT": {
+              "type": "string",
+              "description": "Application port",
+              "default": "51345"
+            },
+            "LOG_LEVEL": {
+              "type": "string",
+              "enum": ["fatal", "error", "warn", "info", "debug"],
+              "description": "Logging level",
+              "default": "info"
+            },
+            "LOGS_DIAGNOSTICS_DATA_POLICY": {
+              "type": "string",
+              "enum": ["conceal", "disclose"],
+              "description": "Controls whether sensitive data is logged in full or redacted",
+              "default": "conceal"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "grafana": {
+      "type": "object",
+      "description": "Grafana dashboard configuration",
+      "properties": {
+        "dashboard": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Grafana dashboard creation"
+            },
+            "folder": {
+              "type": "string",
+              "description": "Grafana folder name for the dashboard"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

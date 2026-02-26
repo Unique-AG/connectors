@@ -27,6 +27,8 @@ jobs:
       "services/teams-mcp--version": ${{ steps.release.outputs['services/teams-mcp--version'] }}
       "services/confluence-connector--release_created": ${{ steps.release.outputs['services/confluence-connector--release_created'] }}
       "services/confluence-connector--version": ${{ steps.release.outputs['services/confluence-connector--version'] }}
+      "services/edgar-mcp--release_created": ${{ steps.release.outputs['services/edgar-mcp--release_created'] }}
+      "services/edgar-mcp--version": ${{ steps.release.outputs['services/edgar-mcp--version'] }}
 
     steps:
       - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
@@ -90,3 +92,12 @@ jobs:
       service-name: confluence-connector
       service-version: ${{ needs.release-please.outputs['services/confluence-connector--version'] }}
       dockerfile: services/confluence-connector/deploy/Dockerfile
+  
+  release-edgar-mcp:
+    needs: release-please
+    if: ${{ needs.release-please.outputs['services/edgar-mcp--release_created'] == 'true' }}
+    uses: ./.github/workflows/_template-cd.yaml
+    with:
+      service-name: edgar-mcp
+      service-version: ${{ needs.release-please.outputs['services/edgar-mcp--version'] }}
+      dockerfile: services/edgar-mcp/deploy/Dockerfile

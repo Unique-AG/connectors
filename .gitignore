@@ -21,6 +21,16 @@ coverage
 # Vercel
 .vercel
 
+# Python
+__pycache__
+*.pyc
+*.pyo
+.venv
+.pytest_cache
+.ruff_cache
+.basedpyright
+*.egg-info
+
 # Editors
 .vscode
 .idea

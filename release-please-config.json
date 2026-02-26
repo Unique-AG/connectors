@@ -3,12 +3,12 @@
   "tag-separator": "@",
   "include-v-in-tag": false,
   "separate-pull-requests": true,
-  "release-type": "node",
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "initial-version": "0.1.0",
   "packages": {
     "services/factset-mcp": {
+      "release-type": "node",
       "extra-files": [
         {
           "type": "yaml",
@@ -27,6 +27,7 @@
       ]
     },
     "services/outlook-mcp": {
+      "release-type": "node",
       "extra-files": [
         {
           "type": "yaml",
@@ -45,6 +46,7 @@
       ]
     },
     "services/sharepoint-connector": {
+      "release-type": "node",
       "extra-files": [
         {
           "type": "yaml",
@@ -63,6 +65,7 @@
       ]
     },
     "services/teams-mcp": {
+      "release-type": "node",
       "prerelease": true,
       "versioning": "prerelease",
       "extra-files": [
@@ -88,16 +91,19 @@
       "extra-files": [
         {
           "type": "yaml",
+
           "path": "deploy/helm-charts/outlook-semantic-mcp/Chart.yaml",
           "jsonpath": "$.version"
         },
         {
           "type": "yaml",
+
           "path": "deploy/helm-charts/outlook-semantic-mcp/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
         {
           "type": "generic",
+
           "path": "deploy/helm-charts/outlook-semantic-mcp/values.yaml"
         }
       ]
@@ -120,6 +126,27 @@
         {
           "type": "generic",
           "path": "deploy/helm-charts/confluence-connector/values.yaml"
+        }
+      ]
+    },
+    "services/edgar-mcp": {
+      "release-type": "python",
+      "prerelease": true,
+      "versioning": "prerelease",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/edgar-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/edgar-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/edgar-mcp/values.yaml"
         }
       ]
     }
