@@ -10,7 +10,6 @@ export const ChunkSchema = z.object({
 
 export const ContentSchema = z.object({
   id: z.string(),
-  key: z.string(),
   title: z.string().nullable(),
   metadata: z.unknown().nullable(),
   chunks: z.array(ChunkSchema).optional(),
