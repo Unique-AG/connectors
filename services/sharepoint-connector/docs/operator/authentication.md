@@ -1,4 +1,6 @@
+<!-- confluence-page-id: 1953366069 -->
 <!-- confluence-space-key: PUBDOC -->
+
 
 ## Overview
 
@@ -12,6 +14,7 @@ The SharePoint Connector authenticates with Microsoft services using Azure AD (M
 | Client Secret | Development/testing only | No |
 
 **Certificate authentication** is the recommended method for production. It uses an X.509 certificate to obtain OAuth2 access tokens from Entra ID.
+**OIDC is currently not supported** for this connector. Client secret remains a fallback for non-production use and is discouraged for enterprise production deployments.
 
 ## Setup Steps
 
@@ -138,6 +141,39 @@ Get-PnPAzureADAppSitePermission -Site "https://<tenant>.sharepoint.com/sites/<si
 
 **Repeat for each site** that should be synced.
 
+#### Alternative: Graph Explorer
+
+Use this option if you prefer granting site permissions through Microsoft Graph directly.
+
+1. Open [Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer) and sign in as a SharePoint/Entra admin.
+2. In **Modify permissions**, consent to `Sites.FullControl.All` (one-time admin action needed to grant `Sites.Selected` app permissions).
+3. Grant site permission (replace placeholders):
+
+```http
+POST https://graph.microsoft.com/v1.0/sites/{site-id}/permissions
+Content-Type: application/json
+
+{
+  "roles": ["read"],
+  "grantedToIdentities": [
+    {
+      "application": {
+        "id": "{app-client-id}",
+        "displayName": "Unique SharePoint Connector"
+      }
+    }
+  ]
+}
+```
+
+4. Verify permission grant:
+
+```http
+GET https://graph.microsoft.com/v1.0/sites/{site-id}/permissions
+```
+
+Expected result: grant creation returns `201 Created`; verification returns `200 OK` and includes your app ID.
+
 ### 5. Grant Library-Specific Access
 
 For more granular control, you can grant access to specific document libraries using `Lists.SelectedOperations.Selected`:
@@ -151,6 +187,42 @@ Grant-PnPAzureADAppSitePermission `
   -Permissions Read `
   -List "Documents"
 ```
+
+#### Alternative: Graph Explorer
+
+1. Open [Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer) and sign in as admin.
+2. In **Modify permissions**, consent to `Sites.Read.All` (one-time admin action for list discovery and grant checks).
+3. Resolve target library ID:
+
+```http
+GET https://graph.microsoft.com/v1.0/sites/{site-id}/lists
+```
+
+Find the target library where `"list": { "template": "documentLibrary" }` and copy its `id`.
+
+4. Grant app access on the library:
+
+```http
+POST https://graph.microsoft.com/v1.0/sites/{site-id}/lists/{list-id}/permissions
+Content-Type: application/json
+
+{
+  "roles": ["read"],
+  "grantedTo": {
+    "application": {
+      "id": "{app-client-id}"
+    }
+  }
+}
+```
+
+5. Verify library permissions:
+
+```http
+GET https://graph.microsoft.com/v1.0/sites/{site-id}/lists/{list-id}/permissions
+```
+
+Expected result: grant creation returns `201 Created`; verification returns `200 OK` and contains your app ID.
 
 ### 6. Create Certificate
 
@@ -175,6 +247,16 @@ openssl pkcs12 -export -out connector.pfx \
   -inkey connector.key -in connector.crt
 ```
 
+##### CSR Field Recommendations
+
+If you run `openssl req` interactively, use these recommendations:
+
+- **Common Name (CN):** Use a stable, descriptive name (for example `unique-sharepoint-connector-app`).
+- **Organization (O):** Optional, but recommended for traceability.
+- **Country/State/OU/Email:** Optional and typically not required by Entra for this flow.
+
+The CN is used as certificate subject in Entra and helps operations teams identify the certificate during rotation.
+
 #### Using PowerShell
 
 ```powershell
@@ -197,13 +279,30 @@ $password = ConvertTo-SecureString -String "YourPassword" -Force -AsPlainText
 Export-PfxCertificate -Cert $cert -FilePath "connector.pfx" -Password $password
 ```
 
+#### Alternative Outputs and Conversion
+
+Different tooling may output `.pfx`, `.p12`, `.cer`, `.crt`, or PEM files. The connector flow requires an asymmetric private key and matching certificate material.
+
+If needed, convert formats with OpenSSL:
+
+```bash
+# Convert PFX/P12 to PEM bundle
+openssl pkcs12 -in connector.pfx -out connector.pem -nodes
+
+# Extract private key (PEM)
+openssl pkey -in connector.pem -out connector.key
+
+# Extract certificate (PEM)
+openssl x509 -in connector.pem -out connector.crt
+```
+
 #### Upload Certificate to Azure AD
 
 1. Go to Azure Portal → **App registrations** → Your app
 2. Select **Certificates & secrets**
 3. Click **Upload certificate**
 4. Upload the `.cer` or `.crt` file
-5. Note the **Thumbprint** displayed
+5. Note the **Thumbprint (SHA)** displayed and store it in your connector configuration where certificate thumbprint is required.
 
 ## Hosting Models
 
@@ -259,6 +358,7 @@ Unique hosts the connector on behalf of the client:
 ### Graph Principal
 
 The connector uses the app registration to obtain OAuth2 tokens:
+Only certificate-based app authentication is supported in this flow (OIDC is not available).
 
 ```mermaid
 sequenceDiagram
@@ -284,6 +384,7 @@ https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token
 ### SharePoint REST Principal
 
 For permission sync, the connector also authenticates with SharePoint REST API:
+Only certificate-based app authentication is supported in this flow (OIDC is not available).
 
 **Token Endpoint:**
 
@@ -332,6 +433,18 @@ When using permission sync, the app principal must be able to read site group me
 1. Re-upload certificate to Azure AD
 2. Generate new certificate if expired
 3. Verify certificate and key match
+
+### RS256 Asymmetric Key Error
+
+**Symptom:** `secretOrPrivateKey must be an asymmetric key when using RS256`
+
+**Cause:**
+- The connector received key material in an unsupported format (for example a plain secret string instead of file-based PEM/asymmetric key content).
+
+**Resolution:**
+1. Provide the private key to the connector as file content in supported PEM/asymmetric format.
+2. Ensure the key matches the uploaded certificate.
+3. If using KeyVault-backed configuration, make sure the secret value contains valid key file content rather than unrelated or transformed text.
 
 ### Permission Denied
 
