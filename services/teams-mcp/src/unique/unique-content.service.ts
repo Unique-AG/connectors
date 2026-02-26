@@ -21,6 +21,7 @@ import {
   type SearchResultItem,
   SearchType,
 } from './unique.dtos';
+import type { UniqueIdentity } from './unique-identity.types';
 
 @Injectable()
 export class UniqueContentService {
@@ -167,8 +168,16 @@ export class UniqueContentService {
     };
   }
 
+  /**
+   * @param scopeContext - When provided, overrides `x-user-id` and `x-company-id` headers
+   *   to scope the search to the given user's permissions. When `undefined`, the search
+   *   runs unscoped with service-level credentials — this is intentional for admin/ingestion flows.
+   */
   @Span()
-  public async search(request: PublicSearchRequest): Promise<PublicSearchResult> {
+  public async search(
+    request: PublicSearchRequest,
+    scopeContext?: UniqueIdentity,
+  ): Promise<PublicSearchResult> {
     const span = this.trace.getSpan();
     span?.setAttribute('search_type', request.searchType);
     span?.setAttribute('has_scope_ids', !!request.scopeIds?.length);
@@ -193,7 +202,13 @@ export class UniqueContentService {
 
     const response = await this.fetch('search/search', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(scopeContext && {
+          'x-user-id': scopeContext.userId,
+          'x-company-id': scopeContext.companyId,
+        }),
+      },
       body: JSON.stringify(payload),
     });
     const result = PublicSearchResultSchema.parse(await response.json());
@@ -208,10 +223,20 @@ export class UniqueContentService {
     return result;
   }
 
+  /** Scoped search — requires a resolved Unique identity. Use this in user-facing tools. */
+  @Span()
+  public async scopedSearch(
+    request: PublicSearchRequest,
+    scopeContext: UniqueIdentity,
+  ): Promise<PublicSearchResult> {
+    return this.search(request, scopeContext);
+  }
+
   @Span()
   public async searchByScope(
     searchString: string,
     scopeIds: string[],
+    scopeContext?: UniqueIdentity,
     options?: {
       limit?: number;
       page?: number;
@@ -227,7 +252,7 @@ export class UniqueContentService {
       scoreThreshold: options?.scoreThreshold,
     };
 
-    const result = await this.search(request);
+    const result = await this.search(request, scopeContext);
     return result.data;
   }
 
@@ -235,6 +260,7 @@ export class UniqueContentService {
   public async searchByContent(
     searchString: string,
     contentIds: string[],
+    scopeContext?: UniqueIdentity,
     options?: {
       limit?: number;
       page?: number;
@@ -250,7 +276,7 @@ export class UniqueContentService {
       scoreThreshold: options?.scoreThreshold,
     };
 
-    const result = await this.search(request);
+    const result = await this.search(request, scopeContext);
     return result.data;
   }
 }

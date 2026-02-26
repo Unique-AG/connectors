@@ -14,6 +14,7 @@ import { UniqueService } from './unique.service';
 import { UniqueContentService } from './unique-content.service';
 import { UniqueScopeService } from './unique-scope.service';
 import { UniqueUserService } from './unique-user.service';
+import { UniqueUserMappingService } from './unique-user-mapping.service';
 
 @Module({
   imports: [DrizzleModule],
@@ -34,6 +35,7 @@ import { UniqueUserService } from './unique-user.service';
       },
     },
     UniqueUserService,
+    UniqueUserMappingService,
     UniqueScopeService,
     UniqueContentService,
     UniqueService,
@@ -43,6 +45,7 @@ import { UniqueUserService } from './unique-user.service';
     UniqueService,
     UniqueContentService,
     UniqueUserService,
+    UniqueUserMappingService,
     UniqueScopeService,
   ],
 })
