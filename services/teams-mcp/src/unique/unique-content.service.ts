@@ -21,6 +21,7 @@ import {
   type SearchResultItem,
   SearchType,
 } from './unique.dtos';
+import type { UniqueIdentity } from './unique-identity.types';
 
 @Injectable()
 export class UniqueContentService {
@@ -167,10 +168,15 @@ export class UniqueContentService {
     };
   }
 
+  /**
+   * @param scopeContext - When provided, overrides `x-user-id` and `x-company-id` headers
+   *   to scope the search to the given user's permissions. When `undefined`, the search
+   *   runs unscoped with service-level credentials — this is intentional for admin/ingestion flows.
+   */
   @Span()
   public async search(
     request: PublicSearchRequest,
-    scopeContext?: { userId: string; companyId: string },
+    scopeContext?: UniqueIdentity,
   ): Promise<PublicSearchResult> {
     const span = this.trace.getSpan();
     span?.setAttribute('search_type', request.searchType);
@@ -217,11 +223,20 @@ export class UniqueContentService {
     return result;
   }
 
+  /** Scoped search — requires a resolved Unique identity. Use this in user-facing tools. */
+  @Span()
+  public async scopedSearch(
+    request: PublicSearchRequest,
+    scopeContext: UniqueIdentity,
+  ): Promise<PublicSearchResult> {
+    return this.search(request, scopeContext);
+  }
+
   @Span()
   public async searchByScope(
     searchString: string,
     scopeIds: string[],
-    scopeContext?: { userId: string; companyId: string },
+    scopeContext?: UniqueIdentity,
     options?: {
       limit?: number;
       page?: number;
@@ -245,7 +260,7 @@ export class UniqueContentService {
   public async searchByContent(
     searchString: string,
     contentIds: string[],
-    scopeContext?: { userId: string; companyId: string },
+    scopeContext?: UniqueIdentity,
     options?: {
       limit?: number;
       page?: number;

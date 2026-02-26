@@ -1,13 +1,10 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import type { UniqueConfigNamespaced } from '~/config';
-import { DRIZZLE, type DrizzleDatabase } from '~/drizzle';
-import { userProfiles } from '~/drizzle/schema/user-profiles.table';
 import {
   type MetadataFilter,
   type PublicSearchRequest,
@@ -15,7 +12,7 @@ import {
   UniqueQLOperator,
 } from '~/unique/unique.dtos';
 import { UniqueContentService } from '~/unique/unique-content.service';
-import { UniqueUserService } from '~/unique/unique-user.service';
+import { UniqueUserMappingService } from '~/unique/unique-user-mapping.service';
 
 const FindTranscriptsInputSchema = z.object({
   query: z.string().describe('Search query to find relevant content within transcripts'),
@@ -72,9 +69,8 @@ export class FindTranscriptsTool {
   public constructor(
     private readonly config: ConfigService<UniqueConfigNamespaced, true>,
     private readonly contentService: UniqueContentService,
-    private readonly userService: UniqueUserService,
+    private readonly userMapping: UniqueUserMappingService,
     private readonly traceService: TraceService,
-    @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
   ) {}
 
   @Tool({
@@ -114,14 +110,13 @@ export class FindTranscriptsTool {
     span?.setAttribute('filter.has_date_to', !!input.dateTo);
     span?.setAttribute('filter.has_participant', !!input.participant);
 
-    // Resolve the authenticated user to a Unique user ID for scoped search
-    const scopeContext = await this.resolveUserScopeContext(userProfileId);
-    span?.setAttribute('unique_user_id', scopeContext?.userId ?? '');
+    const scopeContext = await this.userMapping.resolve(userProfileId);
+    span?.setAttribute('unique_user_id', scopeContext.userId);
 
     this.logger.debug(
       {
         userProfileId,
-        uniqueUserId: scopeContext?.userId,
+        uniqueUserId: scopeContext.userId,
         queryLength: input.query.length,
         hasSubject: !!input.subject,
         hasDateFrom: !!input.dateFrom,
@@ -135,7 +130,7 @@ export class FindTranscriptsTool {
     const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
     const searchRequest = this.buildSearchRequest(rootScopeId, input);
 
-    const result = await this.contentService.search(searchRequest, scopeContext);
+    const result = await this.contentService.scopedSearch(searchRequest, scopeContext);
 
     const results = result.data.map((item) => {
       const metadata = item.metadata as Record<string, unknown> | null;
@@ -238,37 +233,5 @@ export class FindTranscriptsTool {
       scoreThreshold: input.scoreThreshold,
       metaDataFilter: { and: conditions },
     };
-  }
-
-  private async resolveUserScopeContext(
-    userProfileId: string,
-  ): Promise<{ userId: string; companyId: string } | undefined> {
-    const [profile] = await this.drizzle
-      .select({ email: userProfiles.email })
-      .from(userProfiles)
-      .where(eq(userProfiles.id, userProfileId));
-
-    if (!profile?.email) {
-      this.logger.warn(
-        { userProfileId },
-        'No email found for user profile, skipping scope context',
-      );
-      return undefined;
-    }
-
-    const uniqueUser = await this.userService.findUserByEmail(profile.email);
-    if (!uniqueUser) {
-      this.logger.warn(
-        { userProfileId, email: profile.email },
-        'User not found in Unique system, skipping scope context',
-      );
-      return undefined;
-    }
-
-    // TODO: this is not the most reliable way to get the company ID, but we have no other way as of right now
-    const companyId =
-      this.config.get('unique.serviceExtraHeaders', { infer: true })['x-company-id'] ?? '';
-
-    return { userId: uniqueUser.id, companyId };
   }
 }
