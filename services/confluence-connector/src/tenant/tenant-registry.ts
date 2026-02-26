@@ -1,16 +1,19 @@
 import assert from 'node:assert';
-import { Injectable, type OnModuleInit } from '@nestjs/common';
+import {
+  UNIQUE_API_CLIENT_FACTORY,
+  type UniqueApiClientFactory,
+  type UniqueApiFeatureModuleInputOptions,
+} from '@unique-ag/unique-api';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
-import { UniqueAuth, UniqueAuthFactory } from '../auth/unique-auth';
-import { getTenantConfigs } from '../config';
+import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
 import { ConfluenceContentFetcher } from '../synchronization/confluence-content-fetcher';
 import { ConfluencePageScanner } from '../synchronization/confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import { FileDiffService } from '../synchronization/file-diff.service';
 import { IngestionService } from '../synchronization/ingestion.service';
-import { MockUniqueApiClient } from '../unique-api/mock-unique-api-client';
 import { UniqueApiClient } from '../unique-api/types/unique-api-client.types';
 import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
@@ -23,7 +26,7 @@ export class TenantRegistry implements OnModuleInit {
   public constructor(
     private readonly confluenceAuthFactory: ConfluenceAuthFactory,
     private readonly confluenceApiClientFactory: ConfluenceApiClientFactory,
-    private readonly uniqueAuthFactory: UniqueAuthFactory,
+    @Inject(UNIQUE_API_CLIENT_FACTORY) private readonly uniqueApiFactory: UniqueApiClientFactory,
     private readonly serviceRegistry: ServiceRegistry,
   ) {}
 
@@ -48,11 +51,6 @@ export class TenantRegistry implements OnModuleInit {
           ConfluenceAuth,
           this.confluenceAuthFactory.createAuthStrategy(config.confluence),
         );
-        this.serviceRegistry.register(
-          tenantName,
-          UniqueAuth,
-          this.uniqueAuthFactory.create(config.unique),
-        );
         const apiClient = this.confluenceApiClientFactory.create(config.confluence);
         this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
 
@@ -70,10 +68,27 @@ export class TenantRegistry implements OnModuleInit {
         this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
 
         const syncLogger = this.serviceRegistry.getServiceLogger(ConfluenceSynchronizationService);
+        const uniqueClient = this.uniqueApiFactory.create({
+          auth: this.buildUniqueAuthConfig(config.unique),
+          ingestion: {
+            baseUrl: config.unique.ingestionServiceBaseUrl,
+            rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
+          },
+          scopeManagement: {
+            baseUrl: config.unique.scopeManagementServiceBaseUrl,
+            rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
+          },
+          metadata: {
+            clientName: 'confluence-connector',
+            tenantKey: tenantName,
+          },
+        });
+        // The shared package's UniqueApiClient interface and the local abstract class have compatible
+        // runtime facades but slightly divergent type definitions (e.g. UniqueFile.fileAccess).
         this.serviceRegistry.register(
           tenantName,
           UniqueApiClient,
-          new MockUniqueApiClient(tenantLogger),
+          uniqueClient as unknown as UniqueApiClient,
         );
         const fileDiffService = new FileDiffService(
           config.confluence,
@@ -122,5 +137,26 @@ export class TenantRegistry implements OnModuleInit {
 
   public get tenantCount(): number {
     return this.tenants.size;
+  }
+
+  private buildUniqueAuthConfig(
+    uniqueConfig: UniqueConfig,
+  ): UniqueApiFeatureModuleInputOptions['auth'] {
+    switch (uniqueConfig.serviceAuthMode) {
+      case UniqueAuthMode.CLUSTER_LOCAL:
+        return {
+          serviceAuthMode: uniqueConfig.serviceAuthMode,
+          serviceExtraHeaders: uniqueConfig.serviceExtraHeaders,
+          serviceId: 'confluence-connector',
+        };
+      case UniqueAuthMode.EXTERNAL:
+        return {
+          serviceAuthMode: uniqueConfig.serviceAuthMode,
+          zitadelOauthTokenUrl: uniqueConfig.zitadelOauthTokenUrl,
+          zitadelClientId: uniqueConfig.zitadelClientId,
+          zitadelClientSecret: uniqueConfig.zitadelClientSecret.value,
+          zitadelProjectId: uniqueConfig.zitadelProjectId.value,
+        };
+    }
   }
 }
