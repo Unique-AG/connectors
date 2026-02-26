@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { sanitizePath } from '@unique-ag/utils';
+import { first } from 'remeda';
 import { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueHttpClient } from '../clients/unique-http.client';
 import { Content, ContentSchema } from './content.dto';
@@ -9,8 +10,7 @@ import {
   GetContentByIdQueryOutput,
 } from './content.queries';
 import { PublicSearchRequest, SearchResult, SearchResultSchema } from './search-content.dto';
-import type { UniqueContentFacade, GetContentByIdRequest } from './unique-content.facade';
-import { first } from 'remeda';
+import type { GetContentByIdRequest, UniqueContentFacade } from './unique-content.facade';
 
 export class ContentService implements UniqueContentFacade {
   public constructor(
