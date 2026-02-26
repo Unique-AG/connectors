@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ConfluenceConfig } from '../config';
-import { ContentType } from '../confluence-api/types/confluence-api.types';
-import { IngestFiles, IngestionMode } from '../constants/ingestion.constants';
-import type { ServiceRegistry } from '../tenant';
-import type { UniqueApiClient } from '../unique-api/types/unique-api-client.types';
-import { UniqueApiClient as UniqueApiClientToken } from '../unique-api/types/unique-api-client.types';
-import { CONFLUENCE_BASE_URL } from './__mocks__/sync.fixtures';
-import { FileDiffService } from './file-diff.service';
-import type { DiscoveredPage } from './sync.types';
+import type { ConfluenceConfig } from '../../config';
+import { ContentType } from '../../confluence-api/types/confluence-api.types';
+import { IngestFiles, IngestionMode } from '../../constants/ingestion.constants';
+import type { ServiceRegistry } from '../../tenant';
+import type { UniqueApiClient } from '../../unique-api/types/unique-api-client.types';
+import { UniqueApiClient as UniqueApiClientToken } from '../../unique-api/types/unique-api-client.types';
+import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
+import { FileDiffService } from '../file-diff.service';
+import type { DiscoveredPage } from '../sync.types';
 
 const basePage: DiscoveredPage = {
   id: 'p-1',
