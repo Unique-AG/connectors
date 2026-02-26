@@ -4,8 +4,8 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { ListCategoriesQuery, ListCategoriesQueryOutputSchema } from './list-categories.query';
 import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
+import { ListCategoriesQuery, ListCategoriesQueryOutputSchema } from './list-categories.query';
 
 const InputSchema = z.object({});
 

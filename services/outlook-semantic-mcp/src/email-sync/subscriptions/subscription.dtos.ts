@@ -1,9 +1,9 @@
 import { createZodDto } from 'nestjs-zod';
+import { isString } from 'remeda';
 import { type Join, type Split } from 'type-fest';
 import z from 'zod/v4';
 import { isoDatetimeToDate, redacted, stringToURL } from '~/utils/zod';
 import { lifecycle } from './subscription.events';
-import { isString } from 'remeda';
 
 // SECTION - Microsoft Graph types
 
