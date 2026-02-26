@@ -49,4 +49,4 @@ const TOOLS = [
   providers: [MailSubscriptionController, IngestionListener, ...TOOLS],
   controllers: [MailSubscriptionController],
 })
-export class OutlookMcpToolsModules {}
+export class OutlookMcpToolsModule {}
