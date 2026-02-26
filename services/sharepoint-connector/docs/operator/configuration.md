@@ -57,7 +57,7 @@ sharepoint:
     listDisplayName: SharePoint Sites to Sync
 ```
 
-You can use [the CSV import template](./Template%20%5Benv-name%5D%20Sites%20to%20Sync%20to%20Unique.csv) when populating the SharePoint list for `sharepoint_list`-based configuration.
+You can use [the CSV import template](./Template [env-name] Sites to Sync to Unique.csv) when populating the SharePoint list for `sharepoint_list`-based configuration.
 
 ## SharePoint List Configuration
 
