@@ -109,6 +109,36 @@ grafana:
 alerts:
   # -- Enable PrometheusRule resource creation
   enabled: false
+  # -- Default alert definitions
+  defaultAlerts:
+    # -- Enable GraphQL API error rate alerts
+    graphql:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # OutlookSemanticMcpGraphQLErrors: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # OutlookSemanticMcpGraphQLErrors:
+        #   for: "15s"
+        #   severity: "critical"
+        #   threshold: 0.05
+    # -- Enable Unique REST API error rate alerts
+    uniqueApi:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # OutlookSemanticMcpUniqueAPIErrors: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # OutlookSemanticMcpUniqueAPIErrors:
+        #   for: "15s"
+        #   severity: "critical"
+        #   threshold: 0.05
+    # -- Additional labels to add to all default alerts
+    additionalLabels: {}
+      # environment: production
+      # team: backend
 
 # -- Configuration for the deployed Outlook Semantic MCP Server, will be mapped to environment variables
 # Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
