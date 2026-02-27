@@ -6,7 +6,7 @@ import { getInheritanceSettings } from '../../config/sharepoint.schema';
 import { DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { ModerationStatusValue } from '../../constants/moderation-status.constants';
-import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
+import { EnabledDisabledMode } from '../../constants/enabled-disabled-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { SharePointUser } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
@@ -55,7 +55,7 @@ export class ContentRegistrationStep implements IPipelineStep {
       byteSize: context.fileSize ?? 0,
       metadata: this.extractMetadata(context.pipelineItem),
       storeInternally:
-        context.syncContext.siteConfig.storeInternally === StoreInternallyMode.Enabled,
+        context.syncContext.siteConfig.storeInternally === EnabledDisabledMode.Enabled,
     };
 
     context.metadata = contentRegistrationRequest.metadata;

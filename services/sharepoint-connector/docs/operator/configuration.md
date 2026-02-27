@@ -74,6 +74,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | `syncStatus` | Choice | `active`, `inactive`, or `deleted` |
 | `syncMode` | Choice | `content_only` or `content_and_permissions` |
 | `permissionsInheritanceMode` | Choice | Optional inheritance mode |
+| `subsitesScan` | Choice | `enabled` or `disabled` (default: `disabled`) |
 
 ### Benefits of SharePoint List Configuration
 
@@ -95,6 +96,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | `syncStatus` | `active`, `inactive`, `deleted` | Control sync behavior |
 | `syncMode` | `content_only`, `content_and_permissions` | What to sync |
 | `permissionsInheritanceMode` | See below | Inheritance settings (content_only mode) |
+| `subsitesScan` | `enabled`, `disabled` | Recursively discover and sync content from subsites (default: `disabled`) |
 
 ### Permissions Inheritance Modes
 

@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
-import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
+import { EnabledDisabledMode } from '../../constants/enabled-disabled-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { sanitizeError } from '../../utils/normalize-error';
@@ -49,7 +49,7 @@ export class IngestionFinalizationStep implements IPipelineStep {
       url: context.knowledgeBaseUrl,
       baseUrl: this.sharepointBaseUrl,
       storeInternally:
-        context.syncContext.siteConfig.storeInternally === StoreInternallyMode.Enabled,
+        context.syncContext.siteConfig.storeInternally === EnabledDisabledMode.Enabled,
     };
 
     try {

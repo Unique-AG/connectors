@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS } from '../constants/defaults.constants';
 import { IngestionMode } from '../constants/ingestion.constants';
-import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
+import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import type { Redacted } from '../utils/redacted';
 import { createSmeared, Smeared } from '../utils/smeared';
 import {
@@ -133,8 +133,8 @@ export const SiteConfigSchema = z.object({
       'Maximum number of files to ingest per site in a single sync run. If the number of new + updated files exceeds this limit, the sync for that site will fail.',
     ),
   storeInternally: z
-    .enum([StoreInternallyMode.Enabled, StoreInternallyMode.Disabled])
-    .default(StoreInternallyMode.Enabled)
+    .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+    .default(EnabledDisabledMode.Enabled)
     .describe('Whether to store content internally in Unique or not.'),
   syncStatus: z
     .enum(['active', 'inactive', 'deleted'])
@@ -150,6 +150,10 @@ export const SiteConfigSchema = z.object({
         'content_and_permissions: sync both content and permissions',
     ),
   permissionsInheritanceMode: PermissionsInheritanceModeSchema,
+  subsitesScan: z
+    .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+    .default(EnabledDisabledMode.Disabled)
+    .describe('Whether to recursively discover and sync content from subsites.'),
 });
 
 export type SiteConfig = z.infer<typeof SiteConfigSchema>;

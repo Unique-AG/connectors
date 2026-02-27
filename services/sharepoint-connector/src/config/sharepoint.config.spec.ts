@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IngestionMode } from '../constants/ingestion.constants';
-import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
+import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import { SharepointConfigSchema } from './sharepoint.schema';
 
 describe('SharepointConfigSchema', () => {
@@ -16,7 +16,7 @@ describe('SharepointConfigSchema', () => {
         ingestionMode: IngestionMode.Recursive,
         scopeId: 'scope_test123',
         maxFilesToIngest: 1000,
-        storeInternally: StoreInternallyMode.Enabled,
+        storeInternally: EnabledDisabledMode.Enabled,
         syncStatus: 'active' as const,
         syncMode: 'content_and_permissions' as const,
         permissionsInheritanceMode: 'inherit_scopes_and_files' as const,
@@ -99,7 +99,7 @@ describe('SharepointConfigSchema', () => {
             ingestionMode: IngestionMode.Flat,
             scopeId: 'scope_hr',
             maxFilesToIngest: 500,
-            storeInternally: StoreInternallyMode.Disabled,
+            storeInternally: EnabledDisabledMode.Disabled,
             syncStatus: 'inactive' as const,
             syncMode: 'content_only' as const,
             permissionsInheritanceMode: 'inherit_scopes_and_files' as const,
@@ -387,6 +387,21 @@ describe('SharepointConfigSchema', () => {
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
     });
+
+    it('validates subsitesScan enum values', () => {
+      const config = {
+        ...validBaseConfig,
+        auth: clientSecretAuth,
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            subsitesScan: 'invalid-value',
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
   });
 
   describe('site configuration defaults', () => {
@@ -415,9 +430,10 @@ describe('SharepointConfigSchema', () => {
         const site = result.sites[0]!;
 
         expect(site.syncColumnName).toBe('FinanceGPTKnowledge'); // default value
-        expect(site.storeInternally).toBe(StoreInternallyMode.Enabled); // default value
+        expect(site.storeInternally).toBe(EnabledDisabledMode.Enabled); // default value
         expect(site.syncStatus).toBe('active'); // default value
         expect(site.permissionsInheritanceMode).toBe('inherit_scopes_and_files'); // default value
+        expect(site.subsitesScan).toBe('disabled'); // default value
         expect(site.maxFilesToIngest).toBeUndefined(); // optional field
       }
     });

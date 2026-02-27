@@ -211,6 +211,9 @@ connectorConfig:
     #     # Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.
     #     # When unset, defaults to inherit_scopes_and_files; ignored in content_and_permissions.
     #     permissionsInheritanceMode: inherit_scopes_and_files
+    #     # -- Whether to recursively discover and sync content from subsites.
+    #     # Allowed values: enabled, disabled. Default: disabled.
+    #     subsitesScan: disabled
     #   Example: Additional site with different settings
     #   - siteId: 00000000-0000-0000-0000-000000000001
     #     syncColumnName: HRKnowledge
@@ -221,6 +224,7 @@ connectorConfig:
     #     syncStatus: active
     #     syncMode: content_only
     #     permissionsInheritanceMode: inherit_scopes_and_files
+    #     subsitesScan: disabled
 
   unique:
     # -- communication mode for the Unique Services
