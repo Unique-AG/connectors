@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.2.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.1.1...sharepoint-connector@2.2.0) (2026-02-27)
+
+
+### Features
+
+* **sharepoint-connector:** align docs and add PUBDOC page mappings ([#303](https://github.com/Unique-AG/connectors/issues/303)) ([0229e04](https://github.com/Unique-AG/connectors/commit/0229e045b6dd2717910b8800763b71102c11f1e9))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** fill size for drive items ([#296](https://github.com/Unique-AG/connectors/issues/296)) ([fe54e5d](https://github.com/Unique-AG/connectors/commit/fe54e5dd81728466531a60f8ffd70ae34b19f021))
+* **sharepoint-connector:** update the link to configuration list csv template to a non-encoded local path ([#309](https://github.com/Unique-AG/connectors/issues/309)) ([fffa3b2](https://github.com/Unique-AG/connectors/commit/fffa3b200bab1823fa046e96a00fb34f593aec23))
+
 ## [2.1.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.1.0...sharepoint-connector@2.1.1) (2026-02-16)
 
 
