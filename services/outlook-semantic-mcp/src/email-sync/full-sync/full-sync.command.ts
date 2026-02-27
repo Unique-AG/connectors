@@ -28,6 +28,8 @@ import { getUniqueKeyForMessage } from '../mail-ingestion/utils/get-unique-key-f
 import { IngestionPriority } from '../mail-ingestion/utils/ingestion-queue.utils';
 import { GetSubscriptionAndUserProfileQuery } from '../user-utils/get-subscription-and-user-profile.query';
 
+export type FullSyncRunStatus = 'skipped' | 'success';
+
 @Injectable()
 export class FullSyncCommand {
   private readonly logger = new Logger(this.constructor.name);
@@ -42,7 +44,7 @@ export class FullSyncCommand {
   ) {}
 
   @Span()
-  public async run(subscriptionId: string): Promise<void> {
+  public async run(subscriptionId: string): Promise<{ status: FullSyncRunStatus }> {
     traceAttrs({ subscription_id: subscriptionId });
     this.logger.log({ subscriptionId, msg: `Starting full sync` });
 
@@ -73,7 +75,7 @@ export class FullSyncCommand {
         lastFullSyncRunAt: subscription.lastFullSyncRunAt,
         msg: `Full sync skipped: ran recently`,
       });
-      return;
+      return { status: 'skipped' };
     }
     await this.db
       .update(subscriptions)
@@ -167,6 +169,7 @@ export class FullSyncCommand {
       });
       await this.uniqueApi.files.deleteByIds(filesToDelete.map((file) => file.id));
     }
+    return { status: 'success' };
   }
 
   private async fetchAllEmails({

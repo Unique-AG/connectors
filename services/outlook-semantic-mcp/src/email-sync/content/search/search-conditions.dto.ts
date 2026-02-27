@@ -1,11 +1,11 @@
 import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
-import { first, omit, pick } from 'remeda';
+import { first } from 'remeda';
 import { z } from 'zod';
 
 const ConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
   z.object({
     value: valueSchema.describe('The value to filter by.'),
-    operator: z.nativeEnum(UniqueQLOperator).describe('The comparison operator to apply.'),
+    operator: z.enum(UniqueQLOperator).describe('The comparison operator to apply.'),
   });
 
 export const SearchConditionSchema = z
@@ -16,22 +16,22 @@ export const SearchConditionSchema = z
     dateTo: ConditionFieldSchema(z.iso.datetime())
       .optional()
       .describe('Filter emails received on or before this date (ISO 8601 format).'),
-    fromSenders: ConditionFieldSchema(z.array(z.string()))
+    fromSenders: ConditionFieldSchema(z.array(z.email()).or(z.email()))
       .optional()
       .describe('Filter emails sent by any of the given sender email addresses.'),
-    toRecipients: ConditionFieldSchema(z.array(z.string()))
+    toRecipients: ConditionFieldSchema(z.array(z.email()).or(z.email()))
       .optional()
       .describe('Filter emails addressed to any of the given recipient email addresses.'),
-    ccRecipients: ConditionFieldSchema(z.array(z.string()))
+    ccRecipients: ConditionFieldSchema(z.array(z.email()).or(z.email()))
       .optional()
       .describe('Filter emails CC-ed to any of the given email addresses.'),
-    directories: ConditionFieldSchema(z.array(z.string()))
+    directories: ConditionFieldSchema(z.array(z.string()).or(z.string()))
       .optional()
       .describe('Filter emails located in any of the given folder IDs.'),
     hasAttachments: ConditionFieldSchema(z.boolean())
       .optional()
       .describe('Filter emails by whether they have attachments.'),
-    categories: ConditionFieldSchema(z.array(z.string()))
+    categories: ConditionFieldSchema(z.array(z.string()).or(z.string()))
       .optional()
       .describe('Filter emails tagged with any of the given categories.'),
   })
@@ -100,19 +100,7 @@ function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
     const path = METADATA_PATH[key];
     const { operator } = field;
     const { value } = field;
-
-    if (Array.isArray(value)) {
-      const arrayLeaves = value.map(
-        (subValue: string): MetadataFilter => ({
-          path,
-          operator,
-          value: subValue,
-        }),
-      );
-      leaves.push(wrapConditions(arrayLeaves, 'or'));
-    } else {
-      leaves.push({ path, operator, value: typeof value === 'boolean' ? String(value) : value });
-    }
+    leaves.push({ path, operator, value });
   }
 
   return leaves;
@@ -120,18 +108,8 @@ function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
 
 function buildConditionGroup(condition: SearchCondition): MetadataFilter {
   const leaves: MetadataFilter[] = [];
-
-  const dateIntervalFields = ['dateFrom', 'dateTo'] as const;
-
-  const dateLeavesConditions = getConditionsArray(pick(condition, dateIntervalFields));
-  if (dateLeavesConditions.length) {
-    leaves.push(wrapConditions(dateLeavesConditions, 'and'));
-  }
-
-  const otherConditions = getConditionsArray(omit(condition, dateIntervalFields));
-  leaves.push(...otherConditions);
-
-  return wrapConditions(leaves, 'or');
+  leaves.push(...getConditionsArray(condition));
+  return wrapConditions(leaves, 'and');
 }
 
 // Keys within a single condition are OR-combined; multiple conditions in the array are AND-combined.
@@ -142,5 +120,5 @@ export function buildSearchFilter(
     return undefined;
   }
   const conditionGroups = conditions.map(buildConditionGroup);
-  return wrapConditions(conditionGroups, 'and');
+  return wrapConditions(conditionGroups, 'or');
 }

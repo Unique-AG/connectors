@@ -42,7 +42,7 @@ export class SubscriptionCreateService {
   @Span()
   public async subscribe(
     userProfileId: UserProfileTypeID,
-    filters: { dateFrom: string },
+    filters: { dateFrom: Date },
   ): Promise<SubscribeResult> {
     traceAttrs({
       user_profile_id: userProfileId.toString(),
@@ -153,7 +153,7 @@ export class SubscriptionCreateService {
     filters,
   }: {
     userProfileId: string;
-    filters: { dateFrom: string };
+    filters: { dateFrom: Date };
   }): Promise<SubscribeResult> {
     this.logger.debug(
       {},
@@ -242,7 +242,7 @@ export class SubscriptionCreateService {
         userProfileId: userProfileId.toString(),
         subscriptionId: graphSubscription.id,
         filters: subscriptionMailFilters.encode({
-          dateFrom: new Date(filters.dateFrom),
+          dateFrom: filters.dateFrom,
         }),
       })
       .returning();

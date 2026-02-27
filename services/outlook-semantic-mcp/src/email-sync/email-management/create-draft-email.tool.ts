@@ -4,8 +4,8 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
 import { CreateDraftEmailCommand } from './create-draft-email.command';
+import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
 
 const CreateDraftEmailInputSchema = z.object({
   subject: z.string().describe('The subject line of the draft email.'),

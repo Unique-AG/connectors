@@ -7,8 +7,18 @@ import { SyncDirectoriesCommand } from '~/email-sync/directories-sync/sync-direc
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
+const oneYearAgo = () => {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - 1);
+  return date;
+};
+
 const ConnectInboxInputSchema = z.object({
-  dateFrom: z.string().describe('Start date for date range filter (ISO format: YYYY-MM-DD)'),
+  dateFrom: z.iso
+    .date()
+    .transform((value) => new Date(value))
+    .refine((date) => date >= oneYearAgo(), { message: 'Minimum date can be one year ago' })
+    .describe('Start date for date range filter (ISO format: YYYY-MM-DD)'),
 });
 
 const ConnectInboxOutputSchema = z.object({
