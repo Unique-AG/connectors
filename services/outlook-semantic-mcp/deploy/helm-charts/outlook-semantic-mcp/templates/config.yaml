@@ -20,6 +20,11 @@ data:
   {{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
   UNIQUE_INGESTION_SERVICE_BASE_URL: {{ include "chart.ensureTrailingSlash" (dict "url" .Values.mcpConfig.unique.ingestionServiceBaseUrl) | quote }}
   {{- end }}
+  {{- if eq .Values.connectorConfig.unique.authMode "external" }}
+  UNIQUE_ZITADEL_CLIENT_ID: {{ .Values.mcpConfig.unique.zitadel.clientId | quote }}
+  UNIQUE_ZITADEL_OAUTH_TOKEN_URL: {{ .Values.mcpConfig.unique.zitadel.oauthTokenUrl | quote }}
+  UNIQUE_ZITADEL_PROJECT_ID: {{ .Values.mcpConfig.unique.zitadel.projectId | quote }}
+  {{- end }}
   AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.accessTokenExpiresInSeconds | quote }}
   AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.refreshTokenExpiresInSeconds | quote }}
 {{- end }}

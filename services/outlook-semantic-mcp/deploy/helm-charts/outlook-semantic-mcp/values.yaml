@@ -15,8 +15,15 @@ server:
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
-  # -- Environment variables from secrets (required secrets listed at bottom of file)
-  # @see https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars
+  # -- Environment variables from secrets.
+  # Example for loading secrets (uncomment and customize as needed):
+  #   envVars:
+  #     # For Zitadel authentication (required when authMode is 'external')
+  #     - name: UNIQUE_ZITADEL_CLIENT_SECRET
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: outlook-semantic-mcp-zitadel-secret
+  #           key: UNIQUE_ZITADEL_CLIENT_SECRET
   envVars: []
   # -- ConfigMap(s) to load environment variables from.
   # Default assumes release name is "outlook-semantic-mcp" (i.e., chart.fullname resolves to "outlook-semantic-mcp").

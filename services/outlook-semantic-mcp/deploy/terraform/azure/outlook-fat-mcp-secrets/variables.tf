@@ -30,6 +30,7 @@ variable "secrets_placeholders" {
     outlook-semantic-mcp-client-secret = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
     outlook-semantic-mcp-database-url  = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
     outlook-semantic-mcp-amqp-url      = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
+    outlook-semantic-mcp-zitadel-secret = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
   }
 }
 
