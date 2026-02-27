@@ -175,7 +175,7 @@ connectorConfig:
         # maxPagesToScan: 100
 
       ingestion:
-        # -- Ingestion traversal mode: flat or recursive
+        # -- Ingestion traversal mode
         ingestionMode: flat
         # -- Root scope ID for ingestion
         scopeId: unset_default_value

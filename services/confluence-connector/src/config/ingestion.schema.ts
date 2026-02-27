@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { IngestFiles, IngestionMode } from '../constants/ingestion.constants';
 
-const IngestionModeSchema = z.enum([IngestionMode.Flat, IngestionMode.Recursive]);
+const IngestionModeSchema = z.enum([IngestionMode.Flat]);
 
 const IngestFilesSchema = z.enum([IngestFiles.Enabled, IngestFiles.Disabled]);
 
 export const IngestionConfigSchema = z
   .object({
-    ingestionMode: IngestionModeSchema.describe('Ingestion traversal mode: flat or recursive'),
+    ingestionMode: IngestionModeSchema.describe('Ingestion traversal mode'),
     scopeId: z.string().min(1).describe('Root scope ID for ingestion'),
     ingestFiles: IngestFilesSchema.describe('Whether file attachment ingestion is enabled'),
     allowedFileExtensions: z

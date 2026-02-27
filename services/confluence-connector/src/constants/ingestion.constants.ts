@@ -1,9 +1,10 @@
 export const IngestionMode = {
   Flat: 'flat',
-  Recursive: 'recursive',
 } as const;
 
 export type IngestionMode = (typeof IngestionMode)[keyof typeof IngestionMode];
+
+export const CONFC_EXTERNAL_ID_PREFIX = 'confc:' as const;
 
 export const IngestFiles = {
   Enabled: 'enabled',

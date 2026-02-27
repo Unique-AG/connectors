@@ -7,6 +7,7 @@ import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
+import type { ScopeManagementService } from './scope-management.service';
 import type { FetchedPage } from './sync.types';
 
 export class ConfluenceSynchronizationService {
@@ -15,6 +16,7 @@ export class ConfluenceSynchronizationService {
     private readonly contentFetcher: ConfluenceContentFetcher,
     private readonly fileDiffService: FileDiffService,
     private readonly ingestionService: IngestionService,
+    private readonly scopeManagementService: ScopeManagementService,
     private readonly logger: pino.Logger,
   ) {}
 
@@ -29,6 +31,8 @@ export class ConfluenceSynchronizationService {
     tenant.isScanning = true;
     try {
       this.logger.info('Starting sync');
+
+      await this.scopeManagementService.initialize();
 
       const discoveredPages = await this.scanner.discoverPages();
       this.logger.info({ count: discoveredPages.length }, 'Discovery completed');

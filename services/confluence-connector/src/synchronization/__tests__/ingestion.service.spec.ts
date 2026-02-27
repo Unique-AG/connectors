@@ -8,7 +8,10 @@ import type { UniqueApiClient } from '../../unique-api/types/unique-api-client.t
 import { UniqueApiClient as UniqueApiClientToken } from '../../unique-api/types/unique-api-client.types';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { IngestionService } from '../ingestion.service';
+import type { ScopeManagementService } from '../scope-management.service';
 import type { FetchedPage } from '../sync.types';
+
+const TENANT_NAME = 'test-tenant';
 
 const { mockRequest } = vi.hoisted(() => ({
   mockRequest: vi.fn(),
@@ -51,6 +54,7 @@ function makeRegistrationResponse(
 function makeService(): {
   service: IngestionService;
   uniqueApiClient: UniqueApiClient;
+  scopeManagementService: ScopeManagementService;
   logger: {
     info: ReturnType<typeof vi.fn>;
     error: ReturnType<typeof vi.fn>;
@@ -89,13 +93,20 @@ function makeService(): {
     allowedFileExtensions: ['pdf'],
   };
 
+  const scopeManagementService = {
+    ensureSpaceScope: vi.fn().mockResolvedValue('space-scope-1'),
+  } as unknown as ScopeManagementService;
+
   return {
     service: new IngestionService(
       confluenceConfig,
       ingestionConfig as unknown as ConstructorParameters<typeof IngestionService>[1],
+      TENANT_NAME,
+      scopeManagementService,
       serviceRegistry,
     ),
     uniqueApiClient,
+    scopeManagementService,
     logger,
   };
 }
@@ -113,10 +124,10 @@ describe('IngestionService', () => {
 
     expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: `${CONFLUENCE_BASE_URL}/42`,
+        key: `${TENANT_NAME}/SP/42`,
         title: 'Architecture',
         mimeType: 'text/html',
-        scopeId: 'scope-1',
+        scopeId: 'space-scope-1',
         sourceKind: 'ATLASSIAN_CONFLUENCE_CLOUD',
         sourceName: CONFLUENCE_BASE_URL,
         metadata: expect.objectContaining({
@@ -138,7 +149,7 @@ describe('IngestionService', () => {
     );
     expect(uniqueApiClient.ingestion.finalizeIngestion).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: `${CONFLUENCE_BASE_URL}/42`,
+        key: `${TENANT_NAME}/SP/42`,
         fileUrl: 'https://blob.example.com/read',
       }),
     );
@@ -177,15 +188,16 @@ describe('IngestionService', () => {
 
     expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: `${CONFLUENCE_BASE_URL}/42_guide.pdf`,
+        key: `${TENANT_NAME}/SP/42_guide.pdf`,
         title: 'guide.pdf',
         mimeType: 'application/pdf',
         byteSize: 123,
+        scopeId: 'space-scope-1',
       }),
     );
     expect(uniqueApiClient.ingestion.finalizeIngestion).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: `${CONFLUENCE_BASE_URL}/42_guide.pdf`,
+        key: `${TENANT_NAME}/SP/42_guide.pdf`,
         fileUrl: 'https://blob.example.com/file-read',
       }),
     );
@@ -212,7 +224,7 @@ describe('IngestionService', () => {
 
     expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: `${CONFLUENCE_BASE_URL}/42_guide.pdf`,
+        key: `${TENANT_NAME}/SP/42_guide.pdf`,
         byteSize: 0,
       }),
     );

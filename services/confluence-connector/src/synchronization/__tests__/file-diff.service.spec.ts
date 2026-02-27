@@ -9,6 +9,8 @@ import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { FileDiffService } from '../file-diff.service';
 import type { DiscoveredPage } from '../sync.types';
 
+const TENANT_NAME = 'test-tenant';
+
 const basePage: DiscoveredPage = {
   id: 'p-1',
   title: 'Page 1',
@@ -65,6 +67,7 @@ function makeService(
     service: new FileDiffService(
       confluenceConfig,
       ingestionConfig as unknown as ConstructorParameters<typeof FileDiffService>[1],
+      TENANT_NAME,
       serviceRegistry,
     ),
     performFileDiff,
@@ -74,7 +77,7 @@ function makeService(
 describe('FileDiffService', () => {
   it('transforms pages and calls performFileDiff with expected params', async () => {
     const { service, performFileDiff } = makeService(async () => ({
-      newFiles: ['p-1'],
+      newFiles: ['SP/p-1'],
       updatedFiles: [],
       deletedFiles: [],
       movedFiles: [],
@@ -85,12 +88,12 @@ describe('FileDiffService', () => {
     expect(performFileDiff).toHaveBeenCalledWith(
       [
         {
-          key: 'p-1',
+          key: 'SP/p-1',
           url: basePage.webUrl,
           updatedAt: basePage.versionTimestamp,
         },
       ],
-      CONFLUENCE_BASE_URL,
+      TENANT_NAME,
       'ATLASSIAN_CONFLUENCE_CLOUD',
       CONFLUENCE_BASE_URL,
     );
@@ -106,7 +109,7 @@ describe('FileDiffService', () => {
   it('includes linked files when file ingestion is enabled', async () => {
     const { service, performFileDiff } = makeService(
       async () => ({
-        newFiles: ['p-1', 'p-1_guide.pdf'],
+        newFiles: ['SP/p-1', 'SP/p-1_guide.pdf'],
         updatedFiles: [],
         deletedFiles: [],
         movedFiles: [],
@@ -126,17 +129,17 @@ describe('FileDiffService', () => {
     expect(performFileDiff).toHaveBeenCalledWith(
       [
         {
-          key: 'p-1',
+          key: 'SP/p-1',
           url: basePage.webUrl,
           updatedAt: basePage.versionTimestamp,
         },
         {
-          key: 'p-1_guide.pdf',
+          key: 'SP/p-1_guide.pdf',
           url: `${CONFLUENCE_BASE_URL}/files/guide.pdf?download=true`,
           updatedAt: basePage.versionTimestamp,
         },
       ],
-      CONFLUENCE_BASE_URL,
+      TENANT_NAME,
       'ATLASSIAN_CONFLUENCE_CLOUD',
       CONFLUENCE_BASE_URL,
     );
@@ -145,7 +148,7 @@ describe('FileDiffService', () => {
   it('deduplicates repeated file hrefs and strips query/fragment for extension checks', async () => {
     const { service, performFileDiff } = makeService(
       async () => ({
-        newFiles: ['p-1', 'p-1_guide.pdf'],
+        newFiles: ['SP/p-1', 'SP/p-1_guide.pdf'],
         updatedFiles: [],
         deletedFiles: [],
         movedFiles: [],
@@ -170,9 +173,9 @@ describe('FileDiffService', () => {
     expect(submittedItems).toHaveLength(2);
     expect(submittedItems).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ key: 'p-1' }),
+        expect.objectContaining({ key: 'SP/p-1' }),
         expect.objectContaining({
-          key: 'p-1_guide.pdf',
+          key: 'SP/p-1_guide.pdf',
           url: `${CONFLUENCE_BASE_URL}/files/guide.pdf?download=true#section`,
         }),
       ]),
@@ -181,10 +184,10 @@ describe('FileDiffService', () => {
 
   it('returns categorized ids and deleted keys from file diff response', async () => {
     const { service } = makeService(async () => ({
-      newFiles: ['p-1', 'p-1_file.pdf'],
-      updatedFiles: ['p-2'],
-      deletedFiles: ['p-3', 'p-3_old.pdf'],
-      movedFiles: ['p-4', 'p-4_new.pdf'],
+      newFiles: ['SP/p-1', 'SP/p-1_file.pdf'],
+      updatedFiles: ['SP/p-2'],
+      deletedFiles: ['SP/p-3', 'SP/p-3_old.pdf'],
+      movedFiles: ['SP/p-4', 'SP/p-4_new.pdf'],
     }));
 
     const result = await service.computeDiff([{ ...basePage }, { ...basePage, id: 'p-2' }]);
@@ -194,7 +197,7 @@ describe('FileDiffService', () => {
       updatedPageIds: ['p-2'],
       deletedPageIds: ['p-3'],
       movedPageIds: ['p-4'],
-      deletedKeys: ['p-3', 'p-3_old.pdf'],
+      deletedKeys: [`${TENANT_NAME}/SP/p-3`, `${TENANT_NAME}/SP/p-3_old.pdf`],
     });
   });
 
@@ -202,7 +205,7 @@ describe('FileDiffService', () => {
     const { service } = makeService(async () => ({
       newFiles: [],
       updatedFiles: [],
-      deletedFiles: ['p-1'],
+      deletedFiles: ['SP/p-1'],
       movedFiles: [],
     }));
 

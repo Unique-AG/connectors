@@ -361,7 +361,7 @@
                 "properties": {
                   "ingestionMode": {
                     "type": "string",
-                    "enum": ["flat", "recursive"],
+                    "enum": ["flat"],
                     "description": "Ingestion traversal mode"
                   },
                   "scopeId": {

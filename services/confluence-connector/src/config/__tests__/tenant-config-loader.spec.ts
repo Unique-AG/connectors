@@ -608,6 +608,20 @@ describe('tenant-config-loader', () => {
       expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
     });
 
+    it('throws when ingestionMode is recursive', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupSingleConfig(
+        globSync,
+        readFileSync,
+        makeCloudOauth2loConfig({
+          ingestion: { ...baseIngestionConfig, ingestionMode: 'recursive' },
+        }),
+      );
+
+      expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
+    });
+
     it('throws when filename does not have tenant-config suffix', async () => {
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       globSync.mockReturnValue(['/config/acme.yaml']);

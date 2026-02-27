@@ -6,6 +6,7 @@ import type { ConfluencePageScanner } from '../confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../confluence-synchronization.service';
 import type { FileDiffService } from '../file-diff.service';
 import type { IngestionService } from '../ingestion.service';
+import type { ScopeManagementService } from '../scope-management.service';
 import type { FileDiffResult } from '../sync.types';
 import {
   CONFLUENCE_BASE_URL,
@@ -21,6 +22,10 @@ const mockTenantLogger = vi.hoisted(() => ({
   debug: vi.fn(),
 }));
 
+const mockScopeManagementService = {
+  initialize: vi.fn().mockResolvedValue(undefined),
+} as unknown as ScopeManagementService;
+
 function createService(
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
   contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPagesContent'>,
@@ -32,6 +37,7 @@ function createService(
     contentFetcher as ConfluenceContentFetcher,
     fileDiffService as FileDiffService,
     ingestionService as IngestionService,
+    mockScopeManagementService,
     mockTenantLogger as never,
   );
 }
