@@ -1,4 +1,4 @@
-import type { UniqueApiScopes } from '@unique-ag/unique-api';
+import type { UniqueApiScopes, UniqueUsersFacade } from '@unique-ag/unique-api';
 import type { UniqueFilesFacade } from './files.types';
 import type { UniqueIngestionFacade } from './ingestion.types';
 
@@ -7,7 +7,7 @@ export abstract class UniqueApiClient {
   public abstract readonly auth: unknown;
   public abstract readonly scopes: UniqueApiScopes;
   public abstract readonly files: UniqueFilesFacade;
-  public abstract readonly users: unknown;
+  public abstract readonly users: UniqueUsersFacade;
   public abstract readonly groups: unknown;
   public abstract readonly ingestion: UniqueIngestionFacade;
   public async close(): Promise<void> {}

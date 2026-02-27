@@ -14,6 +14,7 @@ function makeService(): {
     getByExternalId: ReturnType<typeof vi.fn>;
     createFromPaths: ReturnType<typeof vi.fn>;
     updateExternalId: ReturnType<typeof vi.fn>;
+    createAccesses: ReturnType<typeof vi.fn>;
   };
 } {
   const scopes = {
@@ -21,9 +22,14 @@ function makeService(): {
     getByExternalId: vi.fn(),
     createFromPaths: vi.fn(),
     updateExternalId: vi.fn(),
+    createAccesses: vi.fn().mockResolvedValue(undefined),
   };
 
-  const uniqueApiClient = { scopes } as unknown as UniqueApiClient;
+  const users = {
+    getCurrentId: vi.fn().mockResolvedValue('service-user-id'),
+  };
+
+  const uniqueApiClient = { scopes, users } as unknown as UniqueApiClient;
   const logger = { info: vi.fn(), debug: vi.fn(), error: vi.fn() } as unknown as pino.Logger;
 
   const ingestionConfig = {

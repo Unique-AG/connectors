@@ -15,6 +15,15 @@ export class ScopeManagementService {
   ) {}
 
   public async initialize(): Promise<void> {
+    const userId = await this.uniqueApiClient.users.getCurrentId();
+
+    // Grant access to root scope before reading it (service account needs permission to query scopes)
+    await this.uniqueApiClient.scopes.createAccesses(this.ingestionConfig.scopeId, [
+      { type: 'MANAGE', entityId: userId, entityType: 'USER' },
+      { type: 'READ', entityId: userId, entityType: 'USER' },
+      { type: 'WRITE', entityId: userId, entityType: 'USER' },
+    ]);
+
     const rootScope = await this.uniqueApiClient.scopes.getById(this.ingestionConfig.scopeId);
     if (!rootScope) {
       throw new Error(`Root scope not found: ${this.ingestionConfig.scopeId}`);
@@ -24,6 +33,11 @@ export class ScopeManagementService {
     let currentScope = rootScope;
 
     while (currentScope.parentId !== null) {
+      // Grant READ access to parent scope before reading it
+      await this.uniqueApiClient.scopes.createAccesses(currentScope.parentId, [
+        { type: 'READ', entityId: userId, entityType: 'USER' },
+      ]);
+
       const parentScope = await this.uniqueApiClient.scopes.getById(currentScope.parentId);
       if (!parentScope) {
         throw new Error(`Parent scope not found: ${currentScope.parentId}`);
