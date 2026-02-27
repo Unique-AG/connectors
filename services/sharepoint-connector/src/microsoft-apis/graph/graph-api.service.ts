@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Readable } from 'node:stream';
 import { Client } from '@microsoft/microsoft-graph-client';
-import type { Drive, List } from '@microsoft/microsoft-graph-types';
+import type { Drive, List, Site } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
@@ -237,6 +237,33 @@ export class GraphApiService {
     } catch (error) {
       this.logger.error({
         msg: `${logPrefix} Failed to fetch lists. Check Sites.Selected permission.`,
+        siteId,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
+  }
+
+  public async getSubsites(siteId: Smeared): Promise<Site[]> {
+    const logPrefix = `[Site: ${siteId}]`;
+
+    try {
+      const allSubsites = await this.paginateGraphApiRequest<Site>(
+        `/sites/${siteId.value}/sites`,
+        (url) =>
+          this.graphClient
+            .api(url)
+            .select('id,name,displayName,webUrl')
+            .top(GRAPH_API_PAGE_SIZE)
+            .get(),
+      );
+
+      this.logger.log(`${logPrefix} Found ${allSubsites.length} subsites`);
+
+      return allSubsites;
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to fetch subsites. Check Sites.Selected permission.`,
         siteId,
         error: sanitizeError(error),
       });

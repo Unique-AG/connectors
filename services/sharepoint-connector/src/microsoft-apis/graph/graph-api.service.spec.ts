@@ -422,6 +422,34 @@ describe('GraphApiService', () => {
     });
   });
 
+  describe('getSubsites', () => {
+    it('fetches subsites for a given site', async () => {
+      const mockSubsites = [
+        { id: 'subsite-1', name: 'SubA', displayName: 'Sub Site A', webUrl: 'https://contoso.sharepoint.com/sites/Parent/SubA' },
+        { id: 'subsite-2', name: 'SubB', displayName: 'Sub Site B', webUrl: 'https://contoso.sharepoint.com/sites/Parent/SubB' },
+      ];
+
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).paginateGraphApiRequest = vi.fn().mockResolvedValue(mockSubsites);
+
+      const result = await service.getSubsites(new Smeared('site-1', false));
+
+      expect(result).toEqual(mockSubsites);
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method call
+      expect((service as any).paginateGraphApiRequest).toHaveBeenCalledWith(
+        '/sites/site-1/sites',
+        expect.any(Function),
+      );
+    });
+
+    it('throws error when fetching subsites fails', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).paginateGraphApiRequest = vi.fn().mockRejectedValue(new Error('API Error'));
+
+      await expect(service.getSubsites(new Smeared('site-1', false))).rejects.toThrow('API Error');
+    });
+  });
+
   describe('getSitePageContent', () => {
     it('retrieves page content with canvas and wiki content', async () => {
       const mockChain = mockGraphClient.api();
