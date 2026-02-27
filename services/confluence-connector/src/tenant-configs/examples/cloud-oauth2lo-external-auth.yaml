@@ -41,8 +41,3 @@ processing:
 ingestion:
   ingestionMode: flat
   scopeId: your-scope-id
-  ingestFiles: enabled
-  allowedFileExtensions:
-    - pdf
-    - docx
-    - xlsx
