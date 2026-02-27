@@ -398,7 +398,7 @@ describe('getUniquePathFromItem', () => {
       'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1/Shared%20Documents/Reports/Q1.pdf',
     );
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('SubsiteScope', false), siteName);
+    const result = getUniquePathFromItem(item, new Smeared('SubsiteScope', false), siteName);
 
     expect(result.value).toBe('/SubsiteScope/WMSub1/Shared Documents/Reports/Q1.pdf');
   });
