@@ -52,9 +52,12 @@ export class ConfluenceSynchronizationService {
       const fetchedPages = await this.contentFetcher.fetchPagesContent(pagesToFetch);
       this.logger.info({ count: fetchedPages.length }, 'Content fetching completed');
 
+      const uniqueSpaceKeys = [...new Set(fetchedPages.map((p) => p.spaceKey))];
+      const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(uniqueSpaceKeys);
+
       const concurrency = Math.max(1, tenant.config.processing.concurrency);
 
-      await this.ingestPagesWithConcurrency(fetchedPages, concurrency);
+      await this.ingestPagesWithConcurrency(fetchedPages, spaceScopes, concurrency);
 
       if (diff.deletedKeys.length > 0) {
         await this.ingestionService.deleteContent(diff.deletedKeys);
@@ -71,12 +74,19 @@ export class ConfluenceSynchronizationService {
 
   private async ingestPagesWithConcurrency(
     pages: FetchedPage[],
+    spaceScopes: Map<string, string>,
     concurrency: number,
   ): Promise<void> {
     const limit = pLimit(concurrency);
 
     await Promise.all(
-      pages.map((page) => limit(() => this.ingestionService.ingestPage(page))),
+      pages.map((page) =>
+        limit(() => {
+          const scopeId = spaceScopes.get(page.spaceKey);
+          if (!scopeId) throw new Error(`No scope resolved for space: ${page.spaceKey}`);
+          return this.ingestionService.ingestPage(page, scopeId);
+        }),
+      ),
     );
 
     this.logger.info({ count: pages.length }, 'Page ingestion completed');

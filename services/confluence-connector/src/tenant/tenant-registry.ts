@@ -14,6 +14,7 @@ import { ConfluencePageScanner } from '../synchronization/confluence-page-scanne
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import { FileDiffService } from '../synchronization/file-diff.service';
 import { IngestionService } from '../synchronization/ingestion.service';
+import { ScopeManagementService } from '../synchronization/scope-management.service';
 import { UniqueApiClient } from '../unique-api/types/unique-api-client.types';
 import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
@@ -90,17 +91,29 @@ export class TenantRegistry implements OnModuleInit {
           UniqueApiClient,
           uniqueClient as unknown as UniqueApiClient,
         );
+        const scopeManagementLogger = this.serviceRegistry.getServiceLogger(ScopeManagementService);
+        const scopeManagementService = new ScopeManagementService(
+          config.ingestion,
+          tenantName,
+          uniqueClient as unknown as UniqueApiClient,
+          scopeManagementLogger,
+        );
+        this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
+
         const fileDiffService = new FileDiffService(
           config.confluence,
           config.ingestion,
+          tenantName,
           this.serviceRegistry,
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
 
+        const ingestionLogger = this.serviceRegistry.getServiceLogger(IngestionService);
         const ingestionService = new IngestionService(
           config.confluence,
-          config.ingestion,
-          this.serviceRegistry,
+          tenantName,
+          uniqueClient as unknown as UniqueApiClient,
+          ingestionLogger,
         );
         this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
 
@@ -112,6 +125,7 @@ export class TenantRegistry implements OnModuleInit {
             fetcher,
             fileDiffService,
             ingestionService,
+            scopeManagementService,
             syncLogger,
           ),
         );

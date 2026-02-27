@@ -1,8 +1,7 @@
+import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestionConfig } from '../../config/ingestion.schema';
-import type { ServiceRegistry } from '../../tenant';
 import type { UniqueApiClient } from '../../unique-api/types/unique-api-client.types';
-import { UniqueApiClient as UniqueApiClientToken } from '../../unique-api/types/unique-api-client.types';
 import { ScopeManagementService } from '../scope-management.service';
 
 const TENANT_NAME = 'dogfood-cloud';
@@ -25,27 +24,29 @@ function makeService(): {
   };
 
   const uniqueApiClient = { scopes } as unknown as UniqueApiClient;
-  const logger = { info: vi.fn(), debug: vi.fn(), error: vi.fn() };
-
-  const serviceRegistry = {
-    getService: vi.fn((token: unknown) => {
-      if (token === UniqueApiClientToken) return uniqueApiClient;
-      throw new Error(`Unexpected token: ${String(token)}`);
-    }),
-    getServiceLogger: vi.fn().mockReturnValue(logger),
-  } as unknown as ServiceRegistry;
+  const logger = { info: vi.fn(), debug: vi.fn(), error: vi.fn() } as unknown as pino.Logger;
 
   const ingestionConfig = {
     scopeId: ROOT_SCOPE_ID,
   } as unknown as IngestionConfig;
 
   return {
-    service: new ScopeManagementService(ingestionConfig, TENANT_NAME, serviceRegistry),
+    service: new ScopeManagementService(ingestionConfig, TENANT_NAME, uniqueApiClient, logger),
     scopes,
   };
 }
 
 describe('ScopeManagementService', () => {
+  async function initializeService(service: ScopeManagementService, scopes: ReturnType<typeof makeService>['scopes']) {
+    scopes.getById.mockResolvedValueOnce({
+      id: ROOT_SCOPE_ID,
+      name: 'Confluence',
+      parentId: null,
+    });
+    await service.initialize();
+    scopes.getById.mockReset();
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -103,16 +104,6 @@ describe('ScopeManagementService', () => {
   });
 
   describe('ensureSpaceScope', () => {
-    async function initializeService(service: ScopeManagementService, scopes: ReturnType<typeof makeService>['scopes']) {
-      scopes.getById.mockResolvedValueOnce({
-        id: ROOT_SCOPE_ID,
-        name: 'Confluence',
-        parentId: null,
-      });
-      await service.initialize();
-      scopes.getById.mockReset();
-    }
-
     it('returns cached scope on second call', async () => {
       const { service, scopes } = makeService();
       await initializeService(service, scopes);
@@ -168,6 +159,81 @@ describe('ScopeManagementService', () => {
       scopes.getByExternalId.mockResolvedValueOnce(null);
 
       await expect(service.ensureSpaceScope('SP')).rejects.toThrow(
+        'ScopeManagementService not initialized',
+      );
+    });
+  });
+
+  describe('ensureSpaceScopes', () => {
+    it('batch-resolves multiple space keys via createFromPaths and sets externalIds', async () => {
+      const { service, scopes } = makeService();
+      await initializeService(service, scopes);
+
+      scopes.createFromPaths.mockResolvedValueOnce([
+        { id: 'scope-eng', name: 'ENG' },
+        { id: 'scope-mkt', name: 'MKT' },
+      ]);
+      scopes.updateExternalId.mockResolvedValue(undefined);
+
+      const result = await service.ensureSpaceScopes(['ENG', 'MKT']);
+
+      expect(result).toEqual(new Map([
+        ['ENG', 'scope-eng'],
+        ['MKT', 'scope-mkt'],
+      ]));
+      expect(scopes.createFromPaths).toHaveBeenCalledWith(
+        ['/Confluence/ENG', '/Confluence/MKT'],
+        { inheritAccess: true },
+      );
+      expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-eng', `confc:${TENANT_NAME}:ENG`);
+      expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-mkt', `confc:${TENANT_NAME}:MKT`);
+    });
+
+    it('deduplicates space keys before creating scopes', async () => {
+      const { service, scopes } = makeService();
+      await initializeService(service, scopes);
+
+      scopes.createFromPaths.mockResolvedValueOnce([{ id: 'scope-sp', name: 'SP' }]);
+      scopes.updateExternalId.mockResolvedValue(undefined);
+
+      const result = await service.ensureSpaceScopes(['SP', 'SP', 'SP']);
+
+      expect(result).toEqual(new Map([['SP', 'scope-sp']]));
+      expect(scopes.createFromPaths).toHaveBeenCalledWith(
+        ['/Confluence/SP'],
+        { inheritAccess: true },
+      );
+      expect(scopes.updateExternalId).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips createFromPaths for already-cached keys and only resolves uncached ones', async () => {
+      const { service, scopes } = makeService();
+      await initializeService(service, scopes);
+
+      // Populate cache for 'SP' via singular ensureSpaceScope
+      scopes.getByExternalId.mockResolvedValueOnce({ id: 'scope-sp', name: 'SP' });
+      await service.ensureSpaceScope('SP');
+
+      // Now call plural with one cached ('SP') and one new ('DEV')
+      scopes.createFromPaths.mockResolvedValueOnce([{ id: 'scope-dev', name: 'DEV', externalId: null }]);
+      scopes.updateExternalId.mockResolvedValue(undefined);
+
+      const result = await service.ensureSpaceScopes(['SP', 'DEV']);
+
+      expect(scopes.createFromPaths).toHaveBeenCalledWith(
+        ['/Confluence/DEV'],
+        { inheritAccess: true },
+      );
+      expect(result).toEqual(new Map([
+        ['SP', 'scope-sp'],
+        ['DEV', 'scope-dev'],
+      ]));
+    });
+
+    it('throws when not initialized', async () => {
+      const { service } = makeService();
+
+      await expect(service.ensureSpaceScopes(['SP'])).rejects.toThrow(
         'ScopeManagementService not initialized',
       );
     });

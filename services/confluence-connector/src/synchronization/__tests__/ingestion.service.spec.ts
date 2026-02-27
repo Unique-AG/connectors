@@ -5,7 +5,6 @@ import type { IngestionApiResponse } from '../../unique-api/types/ingestion.type
 import type { UniqueApiClient } from '../../unique-api/types/unique-api-client.types';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { IngestionService } from '../ingestion.service';
-import type { ScopeManagementService } from '../scope-management.service';
 import type { FetchedPage } from '../sync.types';
 
 const TENANT_NAME = 'test-tenant';
@@ -51,7 +50,6 @@ function makeRegistrationResponse(
 function makeService(): {
   service: IngestionService;
   uniqueApiClient: UniqueApiClient;
-  scopeManagementService: ScopeManagementService;
   logger: {
     info: ReturnType<typeof vi.fn>;
     error: ReturnType<typeof vi.fn>;
@@ -75,20 +73,14 @@ function makeService(): {
     baseUrl: CONFLUENCE_BASE_URL,
   } as unknown as ConfluenceConfig;
 
-  const scopeManagementService = {
-    ensureSpaceScope: vi.fn().mockResolvedValue('space-scope-1'),
-  } as unknown as ScopeManagementService;
-
   return {
     service: new IngestionService(
       confluenceConfig,
       TENANT_NAME,
-      scopeManagementService,
       uniqueApiClient,
       logger as unknown as pino.Logger,
     ),
     uniqueApiClient,
-    scopeManagementService,
     logger,
   };
 }
@@ -102,7 +94,7 @@ describe('IngestionService', () => {
     const { service, uniqueApiClient } = makeService();
     mockRequest.mockResolvedValueOnce({ statusCode: 201 });
 
-    await service.ingestPage(pageFixture);
+    await service.ingestPage(pageFixture, 'space-scope-1');
 
     expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -140,7 +132,7 @@ describe('IngestionService', () => {
   it('skips page ingestion when body is empty', async () => {
     const { service, uniqueApiClient, logger } = makeService();
 
-    await service.ingestPage({ ...pageFixture, body: '' });
+    await service.ingestPage({ ...pageFixture, body: '' }, 'space-scope-1');
 
     expect(uniqueApiClient.ingestion.registerContent).not.toHaveBeenCalled();
     expect(logger.info).toHaveBeenCalledWith(
@@ -155,7 +147,7 @@ describe('IngestionService', () => {
       new Error('register failed'),
     );
 
-    await service.ingestPage(pageFixture);
+    await service.ingestPage(pageFixture, 'space-scope-1');
 
     expect(uniqueApiClient.ingestion.finalizeIngestion).not.toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalledWith(

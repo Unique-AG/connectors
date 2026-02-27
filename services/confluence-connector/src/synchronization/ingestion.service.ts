@@ -12,7 +12,6 @@ import type {
   IngestionFinalizationRequest,
 } from '../unique-api/types';
 import type { UniqueApiClient } from '../unique-api';
-import type { ScopeManagementService } from './scope-management.service';
 import type { FetchedPage } from './sync.types';
 
 export class IngestionService {
@@ -22,7 +21,6 @@ export class IngestionService {
   public constructor(
     private readonly confluenceConfig: ConfluenceConfig,
     private readonly tenantName: string,
-    private readonly scopeManagementService: ScopeManagementService,
     private readonly uniqueApiClient: UniqueApiClient,
     private readonly logger: pino.Logger,
   ) {
@@ -30,7 +28,7 @@ export class IngestionService {
     this.sourceName = this.confluenceConfig.baseUrl;
   }
 
-  public async ingestPage(page: FetchedPage): Promise<void> {
+  public async ingestPage(page: FetchedPage, scopeId: string): Promise<void> {
     if (!page.body) {
       this.logger.info({ pageId: page.id, title: page.title }, 'Skipping page with empty body');
       return;
@@ -39,7 +37,6 @@ export class IngestionService {
     try {
       const htmlBuffer = Buffer.from(page.body, 'utf-8');
       const key = `${this.tenantName}/${page.spaceKey}/${page.id}`;
-      const scopeId = await this.scopeManagementService.ensureSpaceScope(page.spaceKey);
 
       const registrationRequest = this.buildPageRegistrationRequest(
         page,

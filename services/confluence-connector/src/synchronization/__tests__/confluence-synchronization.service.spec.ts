@@ -1,3 +1,4 @@
+import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
@@ -23,6 +24,7 @@ const mockTenantLogger = vi.hoisted(() => ({
 
 const mockScopeManagementService = {
   initialize: vi.fn().mockResolvedValue(undefined),
+  ensureSpaceScopes: vi.fn().mockResolvedValue(new Map([['SP', 'scope-1']])),
 } as unknown as ScopeManagementService;
 
 function createService(
@@ -37,7 +39,7 @@ function createService(
     fileDiffService as FileDiffService,
     ingestionService as IngestionService,
     mockScopeManagementService,
-    mockTenantLogger as never,
+    mockTenantLogger as unknown as pino.Logger,
   );
 }
 
@@ -93,7 +95,7 @@ describe('ConfluenceSynchronizationService', () => {
       expect(mockScanner.discoverPages).toHaveBeenCalledOnce();
       expect(mockFileDiffService.computeDiff).toHaveBeenCalledWith(discoveredPagesFixture);
       expect(mockContentFetcher.fetchPagesContent).toHaveBeenCalledWith(discoveredPagesFixture);
-      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(fetchedPagesFixture[0]);
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(fetchedPagesFixture[0], 'scope-1');
 
       const discoverLog = mockTenantLogger.info.mock.calls.find(
         (call) => typeof call[1] === 'string' && call[1].startsWith('Discovery completed'),
@@ -212,12 +214,15 @@ describe('ConfluenceSynchronizationService', () => {
       ]);
       expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
         expect.objectContaining({ id: '2' }),
+        'scope-1',
       );
       expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
         expect.objectContaining({ id: '3' }),
+        'scope-1',
       );
       expect(mockIngestionService.ingestPage).not.toHaveBeenCalledWith(
         expect.objectContaining({ id: '1' }),
+        expect.anything(),
       );
     });
   });
