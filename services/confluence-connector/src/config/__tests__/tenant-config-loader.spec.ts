@@ -29,7 +29,6 @@ const baseProcessingConfig = {
 const baseIngestionConfig = {
   ingestionMode: 'flat',
   scopeId: 'test-scope-id',
-  ingestFiles: 'disabled',
 };
 
 const clusterLocalUniqueConfig = {

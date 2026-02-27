@@ -27,7 +27,3 @@ connectorConfig:
       ingestion:
         ingestionMode: flat
         scopeId: test-scope-id
-        ingestFiles: enabled
-        allowedFileExtensions:
-          - pdf
-          - docx

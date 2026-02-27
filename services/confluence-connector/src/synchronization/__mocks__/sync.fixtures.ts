@@ -40,10 +40,7 @@ export function createMockTenant(
     config: {
       confluence: { baseUrl: CONFLUENCE_BASE_URL },
       processing: { scanIntervalCron: '*/5 * * * *', concurrency: 2 },
-      ingestion: {
-        ingestFiles: 'disabled',
-        allowedFileExtensions: ['pdf'],
-      },
+      ingestion: {},
     },
     isScanning: false,
     ...overrides,

@@ -179,10 +179,3 @@ connectorConfig:
         ingestionMode: flat
         # -- Root scope ID for ingestion
         scopeId: unset_default_value
-        # -- Whether file attachment ingestion is enabled (enabled/disabled)
-        ingestFiles: enabled
-        # -- File extensions to ingest (required when ingestFiles is enabled)
-        allowedFileExtensions:
-          - pdf
-          - docx
-          - xlsx

@@ -357,7 +357,7 @@
               "ingestion": {
                 "type": "object",
                 "description": "Ingestion configuration",
-                "required": ["ingestionMode", "scopeId", "ingestFiles"],
+                "required": ["ingestionMode", "scopeId"],
                 "properties": {
                   "ingestionMode": {
                     "type": "string",
@@ -367,19 +367,6 @@
                   "scopeId": {
                     "type": "string",
                     "description": "Root scope ID for ingestion"
-                  },
-                  "ingestFiles": {
-                    "type": "string",
-                    "enum": ["enabled", "disabled"],
-                    "description": "Whether file attachment ingestion is enabled"
-                  },
-                  "allowedFileExtensions": {
-                    "type": "array",
-                    "description": "File extensions to ingest (required when ingestFiles is enabled)",
-                    "items": {
-                      "type": "string"
-                    },
-                    "examples": [["pdf", "docx", "xlsx"]]
                   }
                 },
                 "additionalProperties": false
