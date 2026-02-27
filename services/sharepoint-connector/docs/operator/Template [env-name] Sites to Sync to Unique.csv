@@ -1,0 +1,5 @@
+﻿Title,siteId,uniqueScopeId,ingestionMode,syncStatus,syncMode,syncColumnName,maxFilesToIngest,storeInternally
+Wealth Management,af2b5be6-a37d-4992-ab8f-988b0134007e,scope_bwewfn86usebgg9qwmpc19hn,flat,active,content_and_permissions,UniqueAI,"10,000",enabled
+Advisory,2b2063f3-57ba-40f2-a849-dc52f13c6a2e,scope_rfvpvmj8p9854xnob7dz2oj9,flat,inactive,content_only,UniqueAI,"1,000",disabled
+Investment Banking,386baaf1-bb11-4994-8bce-b4cd15748713,scope_dea89l58jjzx2icig0xl90zj,recursive,active,content_only,UniqueAI,500,enabled
+Asset Management,1d045c6a-f230-48fd-b826-7cf8601d7729,scope_j1kl1ej9egoon1wtz4i686tf,recursive,inactive,content_and_permissions,UniqueAI,100,enabled

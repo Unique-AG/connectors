@@ -15,7 +15,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
 
   public onModuleInit() {
     this.logger.log('Triggering initial scan on service startup...');
-    // void this.runScheduledScan();
+    void this.runScheduledScan();
     this.setupScheduledScan();
   }
 
@@ -44,8 +44,8 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
       this.logger.log('Scheduler triggered');
 
       await this.syncDirectoriesForSubscriptionsCommand.run();
-    } catch (error) {
-      this.logger.error({ msg: 'An unexpected error occurred during the scheduled scan', error });
+    } catch (err) {
+      this.logger.error({ msg: 'An unexpected error occurred during the scheduled scan', err });
     }
   }
 
@@ -56,8 +56,8 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
         this.logger.log(`Stopping cron job: ${jobName}`);
         job.stop();
       });
-    } catch (error) {
-      this.logger.error({ msg: 'Error stopping cron jobs', error });
+    } catch (err) {
+      this.logger.error({ msg: 'Error stopping cron jobs', err });
     }
   }
 }

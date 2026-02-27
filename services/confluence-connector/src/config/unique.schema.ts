@@ -2,13 +2,18 @@ import { z } from 'zod';
 import { DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE } from '../constants/defaults.constants';
 import {
   coercedPositiveIntSchema,
-  redactedNonEmptyStringSchema,
+  envRequiredSecretSchema,
   urlWithoutTrailingSlashSchema,
 } from '../utils/zod.util';
 
+export const UniqueAuthMode = {
+  CLUSTER_LOCAL: 'cluster_local',
+  EXTERNAL: 'external',
+} as const;
+
 const clusterLocalConfig = z.object({
   serviceAuthMode: z
-    .literal('cluster_local')
+    .literal(UniqueAuthMode.CLUSTER_LOCAL)
     .describe('Authentication mode to use for accessing Unique API services'),
   serviceExtraHeaders: z
     .record(z.string(), z.string())
@@ -30,14 +35,12 @@ const clusterLocalConfig = z.object({
 
 const externalConfig = z.object({
   serviceAuthMode: z
-    .literal('external')
+    .literal(UniqueAuthMode.EXTERNAL)
     .describe('Authentication mode to use for accessing Unique API services'),
   zitadelOauthTokenUrl: z.url().describe('Zitadel login token'),
-  zitadelProjectId: redactedNonEmptyStringSchema.describe('Zitadel project ID'),
+  zitadelProjectId: envRequiredSecretSchema.describe('Zitadel project ID'),
   zitadelClientId: z.string().describe('Zitadel client ID'),
-  zitadelClientSecret: redactedNonEmptyStringSchema.describe(
-    'Zitadel client secret (injected from ZITADEL_CLIENT_SECRET environment variable)',
-  ),
+  zitadelClientSecret: envRequiredSecretSchema.describe('Zitadel client secret'),
 });
 
 const uniqueBaseConfig = z.object({

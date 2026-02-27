@@ -156,27 +156,47 @@
                     "enum": ["cloud", "data-center"],
                     "description": "Confluence instance type: cloud or data-center"
                   },
+                  "cloudId": {
+                    "type": "string",
+                    "description": "Atlassian Cloud ID (UUID) for the Confluence site. Required when instanceType is cloud."
+                  },
                   "baseUrl": {
                     "type": "string",
                     "description": "Confluence base URL",
-                    "examples": ["https://acme.atlassian.net/wiki", "https://confluence.acme.com"]
+                    "examples": ["https://acme.atlassian.net", "https://confluence.acme.com"]
                   },
                   "auth": {
                     "type": "object",
                     "description": "Confluence authentication configuration",
-                    "required": ["mode", "clientId"],
-                    "properties": {
-                      "mode": {
-                        "type": "string",
-                        "description": "Authentication mode: oauth_2lo (OAuth 2.0 two-legged)",
-                        "enum": ["oauth_2lo"]
+                    "required": ["mode"],
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": ["oauth_2lo"],
+                            "description": "OAuth 2.0 two-legged (client credentials)"
+                          },
+                          "clientId": {
+                            "type": "string",
+                            "description": "OAuth 2.0 (2LO) application client ID"
+                          }
+                        },
+                        "required": ["mode", "clientId"],
+                        "additionalProperties": false
                       },
-                      "clientId": {
-                        "type": "string",
-                        "description": "OAuth 2.0 (2LO) application client ID"
+                      {
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": ["pat"],
+                            "description": "Personal Access Token (Data Center only)"
+                          }
+                        },
+                        "required": ["mode"],
+                        "additionalProperties": false
                       }
-                    },
-                    "additionalProperties": false
+                    ]
                   },
                   "apiRateLimitPerMinute": {
                     "type": "integer",
@@ -191,6 +211,42 @@
                     "description": "Label to trigger full sync of all labeled pages"
                   }
                 },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "auth": {
+                          "type": "object",
+                          "required": ["mode"],
+                          "properties": {
+                            "mode": {
+                              "const": "pat"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "instanceType": {
+                          "const": "data-center"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "instanceType": {
+                          "const": "cloud"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": ["cloudId"]
+                    }
+                  }
+                ],
                 "additionalProperties": false
               },
               "unique": {

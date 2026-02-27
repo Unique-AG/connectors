@@ -6,15 +6,15 @@ import { SubscriptionUtilsModule } from '../user-utils/subscription-utils.module
 import { CreateRootScopeCommand } from './create-root-scope.command';
 import { DirectorySyncSchedulerService } from './directories-sync-scheduler.service';
 import { FetchAllDirectoriesFromOutlookQuery } from './fetch-all-directories-from-outlook.query';
+import { ListDirectoriesQuery } from './list-directories.query';
 import { RemoveRootScopeAndDirectoriesCommand } from './remove-root-scope-and-directories.command';
 import { SyncDirectoriesCommand } from './sync-directories.command';
 import { SyncDirectoriesForSubscriptionsCommand } from './sync-directories-for-subscriptions.command';
 import { SyncDirectoriesForUserProfileCommand } from './sync-directories-for-user-profile.command';
 import { SyncSystemDirectoriesForSubscriptionCommand } from './sync-system-driectories-for-subscription.command';
-import { RunDirectorySyncTool } from './tools/run-directory-sync.tool';
 import { UpsertDirectoryCommand } from './upsert-directory.command';
 
-const QUERIES = [FetchAllDirectoriesFromOutlookQuery];
+const QUERIES = [FetchAllDirectoriesFromOutlookQuery, ListDirectoriesQuery];
 
 const COMMANDS = [
   SyncDirectoriesForUserProfileCommand,
@@ -30,13 +30,7 @@ const PUBLIC_COMMANDS = [
 
 @Module({
   imports: [DrizzleModule, MsGraphModule, SubscriptionUtilsModule, UniqueApiFeatureModule],
-  providers: [
-    ...QUERIES,
-    ...COMMANDS,
-    ...PUBLIC_COMMANDS,
-    DirectorySyncSchedulerService,
-    RunDirectorySyncTool,
-  ],
+  providers: [...QUERIES, ...COMMANDS, ...PUBLIC_COMMANDS, DirectorySyncSchedulerService],
   exports: [...QUERIES, ...COMMANDS, ...PUBLIC_COMMANDS],
 })
 export class DirectoriesSyncModule {}

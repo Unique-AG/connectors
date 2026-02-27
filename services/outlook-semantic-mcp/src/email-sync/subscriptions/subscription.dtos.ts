@@ -1,4 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
+import { isString } from 'remeda';
 import { type Join, type Split } from 'type-fest';
 import z from 'zod/v4';
 import { isoDatetimeToDate, redacted, stringToURL } from '~/utils/zod';
@@ -157,16 +158,26 @@ export class ChangeNotificationCollectionDto extends createZodDto(ChangeNotifica
 /**
  * See docs on {@link https://learn.microsoft.com/en-us/graph/change-notifications-lifecycle-events?tabs=http#structure-of-a-lifecycle-notification structure of a lifecycle notification}.
  */
-export const LifecycleChangeNotification = z.object({
-  subscriptionId: z.string(),
-  subscriptionExpirationDateTime: isoDatetimeToDate({ offset: true }),
-  // NOTE: this used to be called organisationId but it got renamed to tenantId
-  tenantId: z.string(),
-  clientState: redacted(z.string()).nullable(),
-  resourceData: ChangeNotificationResourceData.nullish(),
-  encryptedContent: ChangeNotificationEncryptedContent.nullish(),
-  lifecycleEvent: LifecycleEventType,
-});
+export const LifecycleChangeNotification = z
+  .object({
+    subscriptionId: z.string(),
+    subscriptionExpirationDateTime: isoDatetimeToDate({ offset: true }),
+    tenantId: z.string().optional(),
+    organizationId: z.string().optional(), // NOTE: this would be the tenantId, but API returns it as organizationId
+    clientState: redacted(z.string()).nullable(),
+    resourceData: ChangeNotificationResourceData.nullish(),
+    encryptedContent: ChangeNotificationEncryptedContent.nullish(),
+    lifecycleEvent: LifecycleEventType,
+  })
+  .transform(({ organizationId, tenantId, ...values }) => ({
+    ...values,
+    tenantId: tenantId ?? organizationId,
+  }))
+  .refine(({ tenantId }) => isString(tenantId) && tenantId.length > 0, {
+    message: 'tenantId must be a string',
+    path: ['tenantId'],
+  });
+
 export type LifecycleChangeNotification = z.infer<typeof LifecycleChangeNotification>;
 
 /**

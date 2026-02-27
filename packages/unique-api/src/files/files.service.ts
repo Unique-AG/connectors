@@ -8,7 +8,7 @@ import {
   type AddAccessesMutationResult,
   CONTENT_DELETE_BY_IDS_MUTATION,
   CONTENT_DELETE_MUTATION,
-  CONTENT_ID_BY_SCOPE_AND_METADATA_KET,
+  CONTENT_ID_BY_SCOPE_AND_METADATA_KEY,
   CONTENT_UPDATE_MUTATION,
   type ContentByScopeAndMetadataKeyInput,
   type ContentByScopeAndMetadataKeyResult,
@@ -343,17 +343,33 @@ export class FilesService implements UniqueFilesFacade {
   public async getIdsByScopeAndMetadataKey(
     scopeId: string,
     metadataKey: string,
-    metadataValue: unknown,
+    metadataValue: string,
   ): Promise<string[]> {
-    const result = await this.ingestionClient.request<
-      ContentByScopeAndMetadataKeyResult,
-      ContentByScopeAndMetadataKeyInput
-    >(CONTENT_ID_BY_SCOPE_AND_METADATA_KET, {
-      scopeId,
-      metadataKey,
-      metadataValue,
-    });
-
-    return result.content.map((item) => item?.id);
+    let hasMore = true;
+    let skip = 0;
+    const ids: string[] = [];
+    while (hasMore) {
+      const batchResult = await this.ingestionClient.request<
+        ContentByScopeAndMetadataKeyResult,
+        ContentByScopeAndMetadataKeyInput
+      >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
+        skip,
+        take: CONTENT_BATCH_SIZE,
+        where: {
+          ownerId: { equals: scopeId },
+          ownerType: { equals: 'SCOPE' },
+          metadata: {
+            path: [metadataKey],
+            equals: metadataValue,
+          },
+        },
+      });
+      batchResult.paginatedContent.nodes.forEach((node) => {
+        ids.push(node.id);
+      });
+      skip += CONTENT_BATCH_SIZE;
+      hasMore = CONTENT_BATCH_SIZE === batchResult.paginatedContent.nodes.length;
+    }
+    return ids;
   }
 }

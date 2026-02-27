@@ -1,3 +1,4 @@
+export { asAllOptions } from './as-all-options';
 export {
   createApiMethodExtractor,
   getErrorCodeFromGraphqlRequest,

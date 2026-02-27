@@ -4,7 +4,8 @@ connectorConfig:
     - name: default
       confluence:
         instanceType: cloud
-        baseUrl: https://acme.atlassian.net/wiki
+        cloudId: ce2550cf-da16-47cb-a3fd-4ea7d6d99fc2
+        baseUrl: https://acme.atlassian.net
         auth:
           mode: oauth_2lo
           clientId: test-client-id
@@ -24,6 +25,6 @@ connectorConfig:
           customProperty: value
       processing:
         stepTimeoutSeconds: 300
-        concurrency: 3
+        concurrency: 1
         scanIntervalCron: "*/30 * * * *"
-        maxPagesToScan: 50
+        maxPagesToScan: 5000

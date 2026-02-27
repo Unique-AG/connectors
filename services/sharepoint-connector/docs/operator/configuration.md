@@ -1,4 +1,6 @@
+<!-- confluence-page-id: 1953824805 -->
 <!-- confluence-space-key: PUBDOC -->
+
 
 ## Configuration Overview
 
@@ -54,6 +56,8 @@ sharepoint:
     siteId: your-config-site-id-here
     listDisplayName: SharePoint Sites to Sync
 ```
+
+You can use [the CSV import template](./Template [env-name] Sites to Sync to Unique.csv) when populating the SharePoint list for `sharepoint_list`-based configuration.
 
 ## SharePoint List Configuration
 
@@ -326,3 +330,7 @@ kubectl scale deployment sharepoint-connector --replicas=1 -n sharepoint-connect
 ```
 
 The connector will perform a full sync on the next cycle, re-ingesting all flagged content.
+
+### Further Guidance
+
+A dedicated re-ingestion runbook with extended prerequisites, API request examples, and operational caveats will be linked here in a later documentation update.

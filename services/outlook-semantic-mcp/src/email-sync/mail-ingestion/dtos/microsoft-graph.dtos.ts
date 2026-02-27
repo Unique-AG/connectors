@@ -1,5 +1,5 @@
+import { asAllOptions } from '@unique-ag/utils';
 import z from 'zod/v4';
-import { asAllOptions } from '~/utils/as-all-options';
 
 const graphEmailAddressSchema = z.object({
   address: z.string().optional(),

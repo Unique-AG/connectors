@@ -1,8 +1,18 @@
+<!-- confluence-page-id: 1953366090 -->
 <!-- confluence-space-key: PUBDOC -->
+
 
 ## Overview
 
 This document describes security practices, update policies, and the Software Bill of Materials (SBOM) for the SharePoint Connector.
+
+## Security Updates
+
+Security update cadence and release lifecycle expectations follow the canonical [Upgrade and Release Process](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1385366775/Upgrade+and+Release+Process). Review this policy when planning upgrade windows and patch rollouts.
+
+## Security Reports
+
+If you identify a potential vulnerability, report it through your standard Unique support/security contact and include connector version, affected tenant/environment, and reproduction details. Release handling expectations follow the [Upgrade and Release Process](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1385366775/Upgrade+and+Release+Process).
 
 ## Security Architecture
 

@@ -12,6 +12,7 @@ import {
   UniqueQLOperator,
 } from '~/unique/unique.dtos';
 import { UniqueContentService } from '~/unique/unique-content.service';
+import { UniqueUserMappingService } from '~/unique/unique-user-mapping.service';
 
 const FindTranscriptsInputSchema = z.object({
   query: z.string().describe('Search query to find relevant content within transcripts'),
@@ -68,6 +69,7 @@ export class FindTranscriptsTool {
   public constructor(
     private readonly config: ConfigService<UniqueConfigNamespaced, true>,
     private readonly contentService: UniqueContentService,
+    private readonly userMapping: UniqueUserMappingService,
     private readonly traceService: TraceService,
   ) {}
 
@@ -108,9 +110,13 @@ export class FindTranscriptsTool {
     span?.setAttribute('filter.has_date_to', !!input.dateTo);
     span?.setAttribute('filter.has_participant', !!input.participant);
 
+    const scopeContext = await this.userMapping.resolve(userProfileId);
+    span?.setAttribute('unique_user_id', scopeContext.userId);
+
     this.logger.debug(
       {
         userProfileId,
+        uniqueUserId: scopeContext.userId,
         queryLength: input.query.length,
         hasSubject: !!input.subject,
         hasDateFrom: !!input.dateFrom,
@@ -122,9 +128,9 @@ export class FindTranscriptsTool {
     );
 
     const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
-    const searchRequest = this.buildSearchRequest(rootScopeId, userProfileId, input);
+    const searchRequest = this.buildSearchRequest(rootScopeId, input);
 
-    const result = await this.contentService.search(searchRequest);
+    const result = await this.contentService.scopedSearch(searchRequest, scopeContext);
 
     const results = result.data.map((item) => {
       const metadata = item.metadata as Record<string, unknown> | null;
@@ -162,7 +168,6 @@ export class FindTranscriptsTool {
 
   private buildSearchRequest(
     rootScopeId: string,
-    userProfileId: string,
     input: z.infer<typeof FindTranscriptsInputSchema>,
   ): PublicSearchRequest {
     const conditions: MetadataFilter[] = [
@@ -177,12 +182,6 @@ export class FindTranscriptsTool {
         path: ['mimeType'],
         operator: UniqueQLOperator.EQUALS,
         value: 'text/vtt',
-      },
-      // User filter: only return transcripts from meetings the user participated in
-      {
-        path: ['metadata', 'participant_user_profile_ids'],
-        operator: UniqueQLOperator.CONTAINS,
-        value: userProfileId,
       },
     ];
 
