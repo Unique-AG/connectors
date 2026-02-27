@@ -864,6 +864,36 @@ describe('SharepointSynchronizationService', () => {
     expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
   });
 
+  it('cleans up orphaned scopes using parent site ID when subsites are enabled', async () => {
+    const siteConfig = createMockSiteConfig({
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
+      subsitesScan: 'enabled',
+    });
+    mockSitesConfigurationService.loadSitesConfiguration = vi.fn().mockResolvedValue([siteConfig]);
+
+    mockSubsiteDiscoveryService.discoverAllSubsites.mockResolvedValue([
+      {
+        siteId: new Smeared('subsite-b', false),
+        name: new Smeared('B', false),
+        relativePath: new Smeared('B', false),
+      },
+    ]);
+
+    const subsiteFile: SharepointContentItem = {
+      ...mockFile,
+      siteId: new Smeared('subsite-b', false),
+    };
+    mockGraphApiService.getAllSiteItems = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [mockFile], directories: [] })
+      .mockResolvedValueOnce({ items: [subsiteFile], directories: [] });
+
+    await service.synchronize();
+
+    expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledTimes(1);
+    expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledWith(siteConfig.siteId);
+  });
+
   it('ensures unique scopeIds and logs errors for duplicates', async () => {
     const site1 = createMockSiteConfig({
       siteId: new Smeared('site-1', false),

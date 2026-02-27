@@ -298,9 +298,9 @@ export class SharepointSynchronizationService {
 
     if (context.siteConfig.subsitesScan === EnabledDisabledMode.Enabled) {
       try {
-        const subsiteItems = await this.fetchSubsiteItems(context, logPrefix);
-        items.push(...subsiteItems.items);
-        directories.push(...subsiteItems.directories);
+        const subsiteResult = await this.fetchSubsiteItems(context, logPrefix);
+        items.push(...subsiteResult.items);
+        directories.push(...subsiteResult.directories);
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to discover or fetch subsite items`,
