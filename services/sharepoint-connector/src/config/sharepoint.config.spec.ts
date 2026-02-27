@@ -164,6 +164,42 @@ describe('SharepointConfigSchema', () => {
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
     });
 
+    it('accepts siteId as compound ID (hostname,siteCollectionId,webId)', () => {
+      const compoundId =
+        'dogfoodindustries.sharepoint.com,af2b5be6-a37d-4992-ab8f-988b0134007e,86088ee2-974c-49b8-9689-ba6e04b1807c';
+      const config = {
+        ...validBaseConfig,
+        auth: clientSecretAuth,
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            siteId: compoundId,
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).not.toThrow();
+      const result = SharepointConfigSchema.parse(config);
+      if (result.sitesSource === 'config_file') {
+        expect(result.sites[0]?.siteId.value).toBe(compoundId);
+      }
+    });
+
+    it('rejects siteId with invalid compound format', () => {
+      const config = {
+        ...validBaseConfig,
+        auth: clientSecretAuth,
+        sites: [
+          {
+            ...validBaseConfig.sites[0],
+            siteId: 'hostname.com,not-a-uuid,also-not-a-uuid',
+          },
+        ],
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+
     it('validates syncColumnName is string', () => {
       const config = {
         ...validBaseConfig,

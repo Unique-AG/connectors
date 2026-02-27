@@ -10,6 +10,7 @@ interface Input {
   directories: SharepointDirectoryItem[];
   permissionsMap: Record<string, Membership[]>;
   rootPath: Smeared;
+  siteName: Smeared;
 }
 
 @Injectable()
@@ -17,12 +18,12 @@ export class GetRegularFolderPermissionsQuery {
   private readonly logger = new Logger(this.constructor.name);
 
   public run(input: Input): Map<string, Membership[]> {
-    const { directories, permissionsMap, rootPath } = input;
+    const { directories, permissionsMap, rootPath, siteName } = input;
 
     const result = new Map<string, Membership[]>();
 
     for (const directory of directories) {
-      const folderPath = getUniquePathFromItem(directory, rootPath);
+      const folderPath = getUniquePathFromItem(directory, rootPath, siteName);
 
       if (isTopFolder(folderPath, rootPath)) {
         continue;

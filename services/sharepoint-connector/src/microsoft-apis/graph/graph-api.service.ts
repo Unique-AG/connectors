@@ -452,8 +452,11 @@ export class GraphApiService {
 
   public async getSiteName(siteId: Smeared): Promise<Smeared> {
     const siteWebUrl = await this.getSiteWebUrl(siteId);
-    const siteName =
-      siteWebUrl.split('/').pop() ?? assert.fail(`Site name not found for site ${siteId}`);
+    const { pathname } = new URL(siteWebUrl);
+    const sitesPrefix = '/sites/';
+    const sitesIndex = pathname.indexOf(sitesPrefix);
+    assert.notEqual(sitesIndex, -1, `Site name not found for site ${siteId}`);
+    const siteName = decodeURIComponent(pathname.substring(sitesIndex + sitesPrefix.length));
     return createSmeared(siteName);
   }
 

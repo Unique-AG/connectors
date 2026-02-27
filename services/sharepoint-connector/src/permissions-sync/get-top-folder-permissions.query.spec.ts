@@ -15,6 +15,7 @@ describe('GetTopFolderPermissionsQuery', () => {
 
   const mockSiteId = 'site-123';
   const rootPath = new Smeared('TestSite', false);
+  const siteName = new Smeared('TestSite', false);
 
   const createMockFile = (id: string, webUrl: string): SharepointContentItem => ({
     itemType: 'driveItem',
@@ -166,6 +167,7 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [topFolder],
       permissionsMap,
       rootPath,
+      siteName,
     });
 
     expect(result.get('/TestSite')).toEqual([group]);
@@ -192,6 +194,7 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [topFolder, subFolder],
       permissionsMap,
       rootPath,
+      siteName,
     });
 
     expect(result.get('/TestSite')).toEqual([group]);
@@ -214,6 +217,7 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [subFolder],
       permissionsMap,
       rootPath,
+      siteName,
     });
 
     expect(result.get('/TestSite/Documents')).toEqual([group]);
@@ -241,6 +245,7 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [topFolder],
       permissionsMap,
       rootPath,
+      siteName,
     });
 
     const sitePermissions = result.get('/TestSite');
@@ -283,6 +288,7 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [docsFolder, sharedFolder],
       permissionsMap,
       rootPath,
+      siteName,
     });
 
     expect(result.get('/TestSite/Documents')).toEqual([docsGroup]);
@@ -295,6 +301,7 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [],
       permissionsMap: {},
       rootPath,
+      siteName,
     });
 
     expect(result.get('/TestSite')).toEqual([]);
@@ -326,6 +333,7 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [topFolder],
       permissionsMap,
       rootPath,
+      siteName,
     });
 
     const sitePermissions = result.get('/TestSite');
@@ -354,6 +362,7 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [topFolder],
       permissionsMap,
       rootPath,
+      siteName,
     });
 
     expect(result.get('/TestSite')).toEqual([]);

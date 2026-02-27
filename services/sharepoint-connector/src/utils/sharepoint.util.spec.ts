@@ -49,6 +49,8 @@ function createListItem(webUrl: string): AnySharepointItem {
   } as AnySharepointItem;
 }
 
+const siteName = new Smeared('Site', false);
+
 function createDirectoryItem(webUrl: string): AnySharepointItem {
   return {
     itemType: 'directory',
@@ -79,7 +81,7 @@ describe('getUniqueParentPathFromItem', () => {
       'https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf',
     );
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('MyScope', false));
+    const result = getUniqueParentPathFromItem(item, new Smeared('MyScope', false), siteName);
 
     expect(result.value).toBe("/MyScope/Shared Documents/lorand's files/acer-pdf");
   });
@@ -90,7 +92,11 @@ describe('getUniqueParentPathFromItem', () => {
       'https://contoso.sharepoint.com/sites/Engineering/Documents/project/docs/readme.pdf',
     );
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('EngineeringScope', false));
+    const result = getUniqueParentPathFromItem(
+      item,
+      new Smeared('EngineeringScope', false),
+      siteName,
+    );
 
     expect(result.value).toBe('/EngineeringScope/Documents/project/docs');
   });
@@ -100,7 +106,11 @@ describe('getUniqueParentPathFromItem', () => {
       'https://company.sharepoint.com/sites/Marketing/SitePages/article.aspx',
     );
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('MarketingScope', false));
+    const result = getUniqueParentPathFromItem(
+      item,
+      new Smeared('MarketingScope', false),
+      siteName,
+    );
 
     expect(result.value).toBe('/MarketingScope/SitePages');
   });
@@ -110,7 +120,7 @@ describe('getUniqueParentPathFromItem', () => {
       'https://tenant.sharepoint.com/sites/Team/Shared Documents/2024/Q1',
     );
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('TeamScope', false));
+    const result = getUniqueParentPathFromItem(item, new Smeared('TeamScope', false), siteName);
 
     expect(result.value).toBe('/TeamScope/Shared Documents/2024');
   });
@@ -120,7 +130,7 @@ describe('getUniqueParentPathFromItem', () => {
       'https://company.sharepoint.com/sites/Project/Documents/root-file.pdf',
     );
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('ProjectScope', false));
+    const result = getUniqueParentPathFromItem(item, new Smeared('ProjectScope', false), siteName);
 
     expect(result.value).toBe('/ProjectScope/Documents');
   });
@@ -130,7 +140,7 @@ describe('getUniqueParentPathFromItem', () => {
       'https://tenant.sharepoint.com/sites/TestSite/Shared%20Documents/folder%20with%20spaces/sub-folder/file%20(1).pdf',
     );
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('TestScope', false));
+    const result = getUniqueParentPathFromItem(item, new Smeared('TestScope', false), siteName);
 
     expect(result.value).toBe('/TestScope/Shared Documents/folder with spaces/sub-folder');
   });
@@ -140,7 +150,7 @@ describe('getUniqueParentPathFromItem', () => {
       'https://company.sharepoint.com/sites/Site/Library/path/to/file/document.pdf',
     );
 
-    expect(() => getUniqueParentPathFromItem(item, new Smeared('', false))).toThrow(
+    expect(() => getUniqueParentPathFromItem(item, new Smeared('', false), siteName)).toThrow(
       'rootPath cannot be empty',
     );
   });
@@ -150,7 +160,7 @@ describe('getUniqueParentPathFromItem', () => {
       'https://tenant.sharepoint.com/sites/DeepSite/Documents/level1/level2/level3/level4/deep-file.pdf',
     );
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('DeepScope', false));
+    const result = getUniqueParentPathFromItem(item, new Smeared('DeepScope', false), siteName);
 
     expect(result.value).toBe('/DeepScope/Documents/level1/level2/level3/level4');
   });
@@ -158,7 +168,7 @@ describe('getUniqueParentPathFromItem', () => {
   it('handles rootPath with trailing slash', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('ProjectScope/', false));
+    const result = getUniqueParentPathFromItem(item, new Smeared('ProjectScope/', false), siteName);
 
     expect(result.value).toBe('/ProjectScope/Documents');
   });
@@ -166,7 +176,7 @@ describe('getUniqueParentPathFromItem', () => {
   it('handles rootPath with leading slash', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('/ProjectScope', false));
+    const result = getUniqueParentPathFromItem(item, new Smeared('/ProjectScope', false), siteName);
 
     expect(result.value).toBe('/ProjectScope/Documents');
   });
@@ -174,7 +184,11 @@ describe('getUniqueParentPathFromItem', () => {
   it('handles rootPath with both leading and trailing slashes', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('/ProjectScope/', false));
+    const result = getUniqueParentPathFromItem(
+      item,
+      new Smeared('/ProjectScope/', false),
+      siteName,
+    );
 
     expect(result.value).toBe('/ProjectScope/Documents');
   });
@@ -182,7 +196,11 @@ describe('getUniqueParentPathFromItem', () => {
   it('handles rootPath with multiple consecutive slashes', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('Project//Scope', false));
+    const result = getUniqueParentPathFromItem(
+      item,
+      new Smeared('Project//Scope', false),
+      siteName,
+    );
 
     expect(result.value).toBe('/Project/Scope/Documents');
   });
@@ -190,7 +208,11 @@ describe('getUniqueParentPathFromItem', () => {
   it('handles rootPath with multiple slashes at start and end', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('///ProjectScope///', false));
+    const result = getUniqueParentPathFromItem(
+      item,
+      new Smeared('///ProjectScope///', false),
+      siteName,
+    );
 
     expect(result.value).toBe('/ProjectScope/Documents');
   });
@@ -198,9 +220,38 @@ describe('getUniqueParentPathFromItem', () => {
   it('handles rootPath with multiple slashes in the middle', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniqueParentPathFromItem(item, new Smeared('Project///Scope//Test', false));
+    const result = getUniqueParentPathFromItem(
+      item,
+      new Smeared('Project///Scope//Test', false),
+      siteName,
+    );
 
     expect(result.value).toBe('/Project/Scope/Test/Documents');
+  });
+
+  it(`doesn't strip subsite segments if not present in siteName`, () => {
+    const item = createDriveItem(
+      'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1/Shared%20Documents/Reports/Q1.pdf',
+    );
+
+    const result = getUniqueParentPathFromItem(item, new Smeared('SubsiteScope', false), siteName);
+
+    expect(result.value).toBe('/SubsiteScope/WMSub1/Shared Documents/Reports');
+  });
+
+  it('strips subsite segments from path for a subsite URL', () => {
+    const subsiteName = new Smeared('WealthManagement/WMSub1', false);
+    const item = createDriveItem(
+      'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1/Shared%20Documents/Reports/Q1.pdf',
+    );
+
+    const result = getUniqueParentPathFromItem(
+      item,
+      new Smeared('SubsiteScope', false),
+      subsiteName,
+    );
+
+    expect(result.value).toBe('/SubsiteScope/Shared Documents/Reports');
   });
 });
 
@@ -210,7 +261,7 @@ describe('getUniquePathFromItem', () => {
       'https://dogfoodindustries.sharepoint.com/sites/TestTeamSite/Shared%20Documents/lorand%27s%20files/acer-pdf/Extensa%205635_5635g_5635z_5635zg_5235%20(ba50_mv).pdf',
     );
 
-    const result = getUniquePathFromItem(item, new Smeared('MyScope', false));
+    const result = getUniquePathFromItem(item, new Smeared('MyScope', false), siteName);
 
     expect(result.value).toBe(
       "/MyScope/Shared Documents/lorand's files/acer-pdf/Extensa 5635_5635g_5635z_5635zg_5235 (ba50_mv).pdf",
@@ -223,7 +274,7 @@ describe('getUniquePathFromItem', () => {
       'https://contoso.sharepoint.com/sites/Engineering/Documents/project/docs/readme.pdf',
     );
 
-    const result = getUniquePathFromItem(item, new Smeared('EngineeringScope', false));
+    const result = getUniquePathFromItem(item, new Smeared('EngineeringScope', false), siteName);
 
     expect(result.value).toBe('/EngineeringScope/Documents/project/docs/readme.pdf');
   });
@@ -233,7 +284,7 @@ describe('getUniquePathFromItem', () => {
       'https://company.sharepoint.com/sites/Marketing/SitePages/article.aspx',
     );
 
-    const result = getUniquePathFromItem(item, new Smeared('MarketingScope', false));
+    const result = getUniquePathFromItem(item, new Smeared('MarketingScope', false), siteName);
 
     expect(result.value).toBe('/MarketingScope/SitePages/article.aspx');
   });
@@ -243,7 +294,7 @@ describe('getUniquePathFromItem', () => {
       'https://tenant.sharepoint.com/sites/Team/Shared Documents/2024/Q1',
     );
 
-    const result = getUniquePathFromItem(item, new Smeared('TeamScope', false));
+    const result = getUniquePathFromItem(item, new Smeared('TeamScope', false), siteName);
 
     expect(result.value).toBe('/TeamScope/Shared Documents/2024/Q1');
   });
@@ -253,7 +304,7 @@ describe('getUniquePathFromItem', () => {
       'https://company.sharepoint.com/sites/Project/Documents/root-file.pdf',
     );
 
-    const result = getUniquePathFromItem(item, new Smeared('ProjectScope', false));
+    const result = getUniquePathFromItem(item, new Smeared('ProjectScope', false), siteName);
 
     expect(result.value).toBe('/ProjectScope/Documents/root-file.pdf');
   });
@@ -263,7 +314,7 @@ describe('getUniquePathFromItem', () => {
       'https://tenant.sharepoint.com/sites/TestSite/Shared%20Documents/folder%20with%20spaces/sub-folder/file%20(1).pdf',
     );
 
-    const result = getUniquePathFromItem(item, new Smeared('TestScope', false));
+    const result = getUniquePathFromItem(item, new Smeared('TestScope', false), siteName);
 
     expect(result.value).toBe(
       '/TestScope/Shared Documents/folder with spaces/sub-folder/file (1).pdf',
@@ -275,7 +326,7 @@ describe('getUniquePathFromItem', () => {
       'https://company.sharepoint.com/sites/Site/Library/path/to/file/document.pdf',
     );
 
-    expect(() => getUniquePathFromItem(item, new Smeared('', false))).toThrow(
+    expect(() => getUniquePathFromItem(item, new Smeared('', false), siteName)).toThrow(
       'rootPath cannot be empty',
     );
   });
@@ -285,7 +336,7 @@ describe('getUniquePathFromItem', () => {
       'https://tenant.sharepoint.com/sites/DeepSite/Documents/level1/level2/level3/level4/deep-file.pdf',
     );
 
-    const result = getUniquePathFromItem(item, new Smeared('DeepScope', false));
+    const result = getUniquePathFromItem(item, new Smeared('DeepScope', false), siteName);
 
     expect(result.value).toBe('/DeepScope/Documents/level1/level2/level3/level4/deep-file.pdf');
   });
@@ -293,7 +344,7 @@ describe('getUniquePathFromItem', () => {
   it('handles rootPath with trailing slash', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniquePathFromItem(item, new Smeared('ProjectScope/', false));
+    const result = getUniquePathFromItem(item, new Smeared('ProjectScope/', false), siteName);
 
     expect(result.value).toBe('/ProjectScope/Documents/file.pdf');
   });
@@ -301,7 +352,7 @@ describe('getUniquePathFromItem', () => {
   it('handles rootPath with leading slash', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniquePathFromItem(item, new Smeared('/ProjectScope', false));
+    const result = getUniquePathFromItem(item, new Smeared('/ProjectScope', false), siteName);
 
     expect(result.value).toBe('/ProjectScope/Documents/file.pdf');
   });
@@ -309,7 +360,7 @@ describe('getUniquePathFromItem', () => {
   it('handles rootPath with both leading and trailing slashes', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniquePathFromItem(item, new Smeared('/ProjectScope/', false));
+    const result = getUniquePathFromItem(item, new Smeared('/ProjectScope/', false), siteName);
 
     expect(result.value).toBe('/ProjectScope/Documents/file.pdf');
   });
@@ -317,7 +368,7 @@ describe('getUniquePathFromItem', () => {
   it('handles rootPath with multiple consecutive slashes', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniquePathFromItem(item, new Smeared('Project//Scope', false));
+    const result = getUniquePathFromItem(item, new Smeared('Project//Scope', false), siteName);
 
     expect(result.value).toBe('/Project/Scope/Documents/file.pdf');
   });
@@ -325,7 +376,7 @@ describe('getUniquePathFromItem', () => {
   it('handles rootPath with multiple slashes at start and end', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniquePathFromItem(item, new Smeared('///ProjectScope///', false));
+    const result = getUniquePathFromItem(item, new Smeared('///ProjectScope///', false), siteName);
 
     expect(result.value).toBe('/ProjectScope/Documents/file.pdf');
   });
@@ -333,9 +384,34 @@ describe('getUniquePathFromItem', () => {
   it('handles rootPath with multiple slashes in the middle', () => {
     const item = createDriveItem('https://company.sharepoint.com/sites/Project/Documents/file.pdf');
 
-    const result = getUniquePathFromItem(item, new Smeared('Project///Scope//Test', false));
+    const result = getUniquePathFromItem(
+      item,
+      new Smeared('Project///Scope//Test', false),
+      siteName,
+    );
 
     expect(result.value).toBe('/Project/Scope/Test/Documents/file.pdf');
+  });
+
+  it(`doesn't strip subsite segments if not present in siteName`, () => {
+    const item = createDriveItem(
+      'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1/Shared%20Documents/Reports/Q1.pdf',
+    );
+
+    const result = getUniqueParentPathFromItem(item, new Smeared('SubsiteScope', false), siteName);
+
+    expect(result.value).toBe('/SubsiteScope/WMSub1/Shared Documents/Reports/Q1.pdf');
+  });
+
+  it('strips subsite segments from path for a subsite URL', () => {
+    const subsiteName = new Smeared('WealthManagement/WMSub1', false);
+    const item = createDriveItem(
+      'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1/Shared%20Documents/Reports/Q1.pdf',
+    );
+
+    const result = getUniquePathFromItem(item, new Smeared('SubsiteScope', false), subsiteName);
+
+    expect(result.value).toBe('/SubsiteScope/Shared Documents/Reports/Q1.pdf');
   });
 });
 

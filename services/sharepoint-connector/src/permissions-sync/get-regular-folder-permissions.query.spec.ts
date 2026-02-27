@@ -12,6 +12,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
 
   const mockSiteId = 'site-123';
   const rootPath = new Smeared('TestSite', false);
+  const siteName = new Smeared('TestSite', false);
 
   const createMockDirectory = (id: string, webUrl: string): SharepointDirectoryItem => ({
     itemType: 'directory',
@@ -97,6 +98,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
       directories: [directory],
       permissionsMap: { [permissionsKey]: permissions },
       rootPath,
+      siteName,
     });
 
     expect(result.size).toBe(1);
@@ -122,6 +124,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
       directories: [topFolder1, topFolder2],
       permissionsMap,
       rootPath,
+      siteName,
     });
 
     expect(result.size).toBe(0);
@@ -148,6 +151,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
       directories: [topFolder, regularFolder],
       permissionsMap,
       rootPath,
+      siteName,
     });
 
     expect(result.size).toBe(1);
@@ -167,6 +171,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
       directories: [directory],
       permissionsMap: {},
       rootPath,
+      siteName,
     });
 
     expect(result.size).toBe(0);

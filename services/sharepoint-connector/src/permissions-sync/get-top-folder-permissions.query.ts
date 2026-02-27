@@ -20,6 +20,7 @@ interface Input {
   directories: SharepointDirectoryItem[];
   permissionsMap: Record<string, Membership[]>;
   rootPath: Smeared;
+  siteName: Smeared;
 }
 
 @Injectable()
@@ -27,10 +28,10 @@ export class GetTopFolderPermissionsQuery {
   private readonly logger = new Logger(this.constructor.name);
 
   public run(input: Input): Map<string, GroupMembership[]> {
-    const { items, directories, permissionsMap, rootPath } = input;
+    const { items, directories, permissionsMap, rootPath, siteName } = input;
     const allItems: AnySharepointItem[] = [...items, ...directories];
 
-    const topFolders = this.identifyTopFolders(allItems, rootPath);
+    const topFolders = this.identifyTopFolders(allItems, rootPath, siteName);
     const result = new Map<string, GroupMembership[]>();
 
     for (const topFolderPath of topFolders) {
@@ -39,6 +40,7 @@ export class GetTopFolderPermissionsQuery {
         allItems,
         permissionsMap,
         rootPath,
+        siteName,
       );
       result.set(topFolderPath.value, aggregatedGroups);
     }
@@ -46,14 +48,16 @@ export class GetTopFolderPermissionsQuery {
     return result;
   }
 
-  private identifyTopFolders(items: AnySharepointItem[], rootPath: Smeared): Smeared[] {
+  private identifyTopFolders(
+    items: AnySharepointItem[],
+    rootPath: Smeared,
+    siteName: Smeared,
+  ): Smeared[] {
     const normalizedRootPath = createSmeared(`/${normalizeSlashes(rootPath.value)}`);
 
     return pipe(
       items,
-      // We get the parent path of all the items, to be sure we catch the library folders the items
-      // are in.
-      map((item) => getUniqueParentPathFromItem(item, rootPath)),
+      map((item) => getUniqueParentPathFromItem(item, rootPath, siteName)),
       filter((folderPath) => isTopFolder(folderPath, rootPath)),
       (paths) => [normalizedRootPath, ...paths],
       uniqueBy(prop('value')),
@@ -65,11 +69,12 @@ export class GetTopFolderPermissionsQuery {
     items: AnySharepointItem[],
     permissionsMap: Record<string, Membership[]>,
     rootPath: Smeared,
+    siteName: Smeared,
   ): GroupMembership[] {
     const groupsMap = new Map<string, GroupMembership>();
 
     for (const item of items) {
-      const itemPath = getUniquePathFromItem(item, rootPath);
+      const itemPath = getUniquePathFromItem(item, rootPath, siteName);
 
       if (!this.isDescendantOf(itemPath, topFolderPath)) {
         continue;

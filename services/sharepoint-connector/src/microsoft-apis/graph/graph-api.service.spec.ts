@@ -380,6 +380,48 @@ describe('GraphApiService', () => {
     });
   });
 
+  describe('getSiteName', () => {
+    it('extracts site name from a regular site URL', async () => {
+      vi.spyOn(service, 'getSiteWebUrl').mockResolvedValue(
+        'https://contoso.sharepoint.com/sites/WealthManagement',
+      );
+
+      const result = await service.getSiteName(new Smeared('site-1', false));
+
+      expect(result.value).toBe('WealthManagement');
+    });
+
+    it('extracts full path for a subsite URL', async () => {
+      vi.spyOn(service, 'getSiteWebUrl').mockResolvedValue(
+        'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1',
+      );
+
+      const result = await service.getSiteName(new Smeared('site-1', false));
+
+      expect(result.value).toBe('WealthManagement/WMSub1');
+    });
+
+    it('extracts full path for a deeply nested subsite URL', async () => {
+      vi.spyOn(service, 'getSiteWebUrl').mockResolvedValue(
+        'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1/Nested',
+      );
+
+      const result = await service.getSiteName(new Smeared('site-1', false));
+
+      expect(result.value).toBe('WealthManagement/WMSub1/Nested');
+    });
+
+    it('decodes URL-encoded site names', async () => {
+      vi.spyOn(service, 'getSiteWebUrl').mockResolvedValue(
+        'https://contoso.sharepoint.com/sites/Wealth%20Management',
+      );
+
+      const result = await service.getSiteName(new Smeared('site-1', false));
+
+      expect(result.value).toBe('Wealth Management');
+    });
+  });
+
   describe('getSitePageContent', () => {
     it('retrieves page content with canvas and wiki content', async () => {
       const mockChain = mockGraphClient.api();

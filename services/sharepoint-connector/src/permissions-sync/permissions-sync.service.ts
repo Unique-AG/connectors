@@ -122,6 +122,7 @@ export class PermissionsSyncService {
           directories: sharePoint.directories,
           permissionsMap,
           rootPath: context.rootPath,
+          siteName: context.siteName,
         });
 
         const topFolderPermissions = this.getTopFolderPermissionsQuery.run({
@@ -129,6 +130,7 @@ export class PermissionsSyncService {
           directories: sharePoint.directories,
           permissionsMap,
           rootPath: context.rootPath,
+          siteName: context.siteName,
         });
 
         await this.syncSharepointFolderPermissionsToUniqueCommand.run({

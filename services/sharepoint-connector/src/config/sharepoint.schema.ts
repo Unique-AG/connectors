@@ -93,13 +93,24 @@ export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 // Site Configuration
 // ==========================================
 
+const compoundSiteIdSchema = z.string().refine(
+  (val) => {
+    const parts = val.split(',');
+    if (parts.length !== 3 || !parts[0]) {
+      return false;
+    }
+    return z.uuidv4().safeParse(parts[1]).success && z.uuidv4().safeParse(parts[2]).success;
+  },
+  { message: 'Invalid compound site ID format (expected: hostname,siteCollectionId,webId)' },
+);
+
 export const SiteConfigSchema = z.object({
   siteId: z
     .string()
     .trim()
-    .pipe(z.uuidv4())
+    .pipe(z.union([z.uuidv4(), compoundSiteIdSchema]))
     .transform((val) => createSmeared(val))
-    .describe('SharePoint site ID'),
+    .describe('SharePoint site ID (UUID or compound format: hostname,siteCollectionId,webId)'),
   syncColumnName: z
     .string()
     .trim()

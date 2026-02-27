@@ -230,11 +230,12 @@ export class ScopeManagementService {
   private buildItemIdToScopePathMap(
     items: SharepointContentItem[],
     rootPath: Smeared,
+    siteName: Smeared,
   ): Map<string, string> {
     const itemIdToScopePathMap = new Map<string, string>();
 
     for (const item of items) {
-      const scopePath = getUniqueParentPathFromItem(item, rootPath);
+      const scopePath = getUniqueParentPathFromItem(item, rootPath, siteName);
       itemIdToScopePathMap.set(item.item.id, scopePath.value);
     }
 
@@ -286,7 +287,11 @@ export class ScopeManagementService {
   ): Promise<ScopeWithPath[]> {
     const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
 
-    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
+    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(
+      items,
+      context.rootPath,
+      context.siteName,
+    );
     const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
 
     if (uniqueFolderPaths.size === 0) {
@@ -336,7 +341,11 @@ export class ScopeManagementService {
     context: SharepointSyncContext,
   ): Promise<void> {
     const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
-    const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
+    const pathToExternalIdMap = this.buildPathToExternalIdMap(
+      directories,
+      context.rootPath,
+      context.siteName,
+    );
     // Site pages is a special collection we fetch for ASPX pages, but has no folders.
     pathToExternalIdMap[`${context.rootPath.value}/SitePages`] =
       `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId.value}/sitePages`;
@@ -429,11 +438,12 @@ export class ScopeManagementService {
   private buildPathToExternalIdMap(
     directories: SharepointDirectoryItem[],
     rootPath: Smeared,
+    siteName: Smeared,
   ): Record<string, string> {
     const pathToExternalIdMap: Record<string, string> = {};
 
     for (const directory of directories) {
-      const path = getUniquePathFromItem(directory, rootPath);
+      const path = getUniquePathFromItem(directory, rootPath, siteName);
       if (isAncestorOfRootPath(path.value, rootPath.value) || path.value === rootPath.value) {
         continue;
       }
@@ -470,7 +480,11 @@ export class ScopeManagementService {
     );
 
     // Build item -> path map
-    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
+    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(
+      items,
+      context.rootPath,
+      context.siteName,
+    );
 
     this.logger.debug(
       `${logPrefix} Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries`,
@@ -507,7 +521,7 @@ export class ScopeManagementService {
       return context.siteConfig.scopeId;
     }
 
-    const scopePath = getUniqueParentPathFromItem(item, context.rootPath);
+    const scopePath = getUniqueParentPathFromItem(item, context.rootPath, context.siteName);
 
     // Find scope with this path.
     const scope = scopes.find((scope) => scope.path === scopePath.value);
