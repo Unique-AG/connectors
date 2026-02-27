@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import { ContentType } from '../../confluence-api/types/confluence-api.types';
-import { IngestFiles, IngestionMode } from '../../constants/ingestion.constants';
+import { IngestionMode } from '../../constants/ingestion.constants';
 import type { ServiceRegistry } from '../../tenant';
 import type { UniqueApiClient } from '../../unique-api/types/unique-api-client.types';
 import { UniqueApiClient as UniqueApiClientToken } from '../../unique-api/types/unique-api-client.types';
@@ -25,10 +25,6 @@ const basePage: DiscoveredPage = {
 
 function makeService(
   performFileDiffImpl: UniqueApiClient['ingestion']['performFileDiff'],
-  ingestionOverrides: Partial<{
-    ingestFiles: 'enabled' | 'disabled';
-    allowedFileExtensions: string[];
-  }> = {},
 ): {
   service: FileDiffService;
   performFileDiff: ReturnType<typeof vi.fn>;
@@ -59,8 +55,6 @@ function makeService(
   const ingestionConfig = {
     ingestionMode: IngestionMode.Flat,
     scopeId: 'scope-1',
-    ingestFiles: ingestionOverrides.ingestFiles ?? IngestFiles.Disabled,
-    allowedFileExtensions: ingestionOverrides.allowedFileExtensions ?? ['pdf'],
   };
 
   return {
@@ -104,82 +98,6 @@ describe('FileDiffService', () => {
       movedPageIds: [],
       deletedKeys: [],
     });
-  });
-
-  it('includes linked files when file ingestion is enabled', async () => {
-    const { service, performFileDiff } = makeService(
-      async () => ({
-        newFiles: ['SP/p-1', 'SP/p-1_guide.pdf'],
-        updatedFiles: [],
-        deletedFiles: [],
-        movedFiles: [],
-      }),
-      { ingestFiles: IngestFiles.Enabled, allowedFileExtensions: ['pdf'] },
-    );
-
-    const pageBodies = new Map<string, string>([
-      [
-        'p-1',
-        '<a href="/files/guide.pdf?download=true">PDF</a><a href="https://x/file.txt">TXT</a>',
-      ],
-    ]);
-
-    await service.computeDiff([basePage], pageBodies);
-
-    expect(performFileDiff).toHaveBeenCalledWith(
-      [
-        {
-          key: 'SP/p-1',
-          url: basePage.webUrl,
-          updatedAt: basePage.versionTimestamp,
-        },
-        {
-          key: 'SP/p-1_guide.pdf',
-          url: `${CONFLUENCE_BASE_URL}/files/guide.pdf?download=true`,
-          updatedAt: basePage.versionTimestamp,
-        },
-      ],
-      TENANT_NAME,
-      'ATLASSIAN_CONFLUENCE_CLOUD',
-      CONFLUENCE_BASE_URL,
-    );
-  });
-
-  it('deduplicates repeated file hrefs and strips query/fragment for extension checks', async () => {
-    const { service, performFileDiff } = makeService(
-      async () => ({
-        newFiles: ['SP/p-1', 'SP/p-1_guide.pdf'],
-        updatedFiles: [],
-        deletedFiles: [],
-        movedFiles: [],
-      }),
-      { ingestFiles: IngestFiles.Enabled, allowedFileExtensions: ['pdf'] },
-    );
-
-    const pageBodies = new Map<string, string>([
-      [
-        'p-1',
-        [
-          '<a href="/files/guide.pdf?download=true#section">PDF1</a>',
-          '<a href="/files/guide.pdf?download=true#section">PDF1 duplicate</a>',
-          '<a href="/files/skip.txt?download=true">TXT</a>',
-        ].join(''),
-      ],
-    ]);
-
-    await service.computeDiff([basePage], pageBodies);
-
-    const submittedItems = performFileDiff.mock.calls[0]?.[0] ?? [];
-    expect(submittedItems).toHaveLength(2);
-    expect(submittedItems).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: 'SP/p-1' }),
-        expect.objectContaining({
-          key: 'SP/p-1_guide.pdf',
-          url: `${CONFLUENCE_BASE_URL}/files/guide.pdf?download=true#section`,
-        }),
-      ]),
-    );
   });
 
   it('returns categorized ids and deleted keys from file diff response', async () => {

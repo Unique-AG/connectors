@@ -1,8 +1,6 @@
 import pLimit from 'p-limit';
 import type pino from 'pino';
-import { IngestFiles } from '../constants/ingestion.constants';
 import { getCurrentTenant } from '../tenant';
-import { extractFileUrls } from '../utils/html-link-parser';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
@@ -55,17 +53,8 @@ export class ConfluenceSynchronizationService {
       this.logger.info({ count: fetchedPages.length }, 'Content fetching completed');
 
       const concurrency = Math.max(1, tenant.config.processing.concurrency);
-      const fileIngestionEnabled = tenant.config.ingestion.ingestFiles === IngestFiles.Enabled;
-      const allowedExtensions = tenant.config.ingestion.allowedFileExtensions ?? [];
-      const confluenceBaseUrl = tenant.config.confluence.baseUrl;
 
-      await this.ingestPagesWithConcurrency(
-        fetchedPages,
-        concurrency,
-        fileIngestionEnabled,
-        allowedExtensions,
-        confluenceBaseUrl,
-      );
+      await this.ingestPagesWithConcurrency(fetchedPages, concurrency);
 
       if (diff.deletedKeys.length > 0) {
         await this.ingestionService.deleteContent(diff.deletedKeys);
@@ -83,36 +72,13 @@ export class ConfluenceSynchronizationService {
   private async ingestPagesWithConcurrency(
     pages: FetchedPage[],
     concurrency: number,
-    fileIngestionEnabled: boolean,
-    allowedExtensions: string[],
-    confluenceBaseUrl: string,
   ): Promise<void> {
     const limit = pLimit(concurrency);
 
     await Promise.all(
-      pages.map((page) =>
-        limit(() =>
-          this.ingestPageAndFiles(page, fileIngestionEnabled, allowedExtensions, confluenceBaseUrl),
-        ),
-      ),
+      pages.map((page) => limit(() => this.ingestionService.ingestPage(page))),
     );
 
     this.logger.info({ count: pages.length }, 'Page ingestion completed');
-  }
-
-  private async ingestPageAndFiles(
-    page: FetchedPage,
-    fileIngestionEnabled: boolean,
-    allowedExtensions: string[],
-    confluenceBaseUrl: string,
-  ): Promise<void> {
-    await this.ingestionService.ingestPage(page);
-
-    if (fileIngestionEnabled && page.body) {
-      const fileUrls = extractFileUrls(page.body, allowedExtensions, confluenceBaseUrl);
-      if (fileUrls.length > 0) {
-        await this.ingestionService.ingestFiles(page, fileUrls);
-      }
-    }
   }
 }
