@@ -28,6 +28,7 @@ export type { Group, GroupWithMembers } from './groups/groups.types';
 export type {
   AuthorMetadata,
   ContentMetadata,
+  ContentMetadataValue,
   ContentRegistrationRequest,
   FileDiffItem,
   FileDiffResponse,

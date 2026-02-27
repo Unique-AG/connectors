@@ -1,7 +1,8 @@
-import { isNonNull } from 'remeda';
+import { ContentMetadataValue } from '@unique-ag/unique-api';
+import { filter, isNonNullish, map, pipe } from 'remeda';
 import { GraphMessage } from '../dtos/microsoft-graph.dtos';
 
-export interface MessageMetadata extends Record<string, string> {
+export interface MessageMetadata extends Record<string, ContentMetadataValue> {
   id: string;
   subject: string;
   internetMessageId: string;
@@ -13,19 +14,50 @@ export interface MessageMetadata extends Record<string, string> {
   'from.name': string;
   'sender.emailAddress': string;
   'sender.name': string;
-  'toRecipients.emailAddresses': string;
-  'toRecipients.names': string;
+  'toRecipients.emailAddresses': string[];
+  'toRecipients.names': string[];
   receivedDateTime: string;
-  'ccRecipients.emailAddresses': string;
-  'ccRecipients.names': string;
-  categories: string;
-  isRead: string;
-  isDraft: string;
-  hasAttachments: string;
+  'ccRecipients.emailAddresses': string[];
+  'ccRecipients.names': string[];
+  categories: string[];
+  isRead: boolean;
+  isDraft: boolean;
+  hasAttachments: boolean;
   importance: string;
   inferenceClassification: string;
   'flag.flagStatus': string;
 }
+
+const filterOutNilOrEmptyValues = (
+  input: (string | null | undefined)[] | null | undefined,
+): string[] => {
+  if (!input) {
+    return [];
+  }
+
+  return pipe(
+    input,
+    filter(isNonNullish),
+    map((value) => value.trim()),
+    filter((value) => value.length > 0),
+  );
+};
+
+interface EmailAddress {
+  address?: string | undefined;
+  name?: string | undefined;
+}
+
+const extractFromEmailArray = (
+  input:
+    | {
+        emailAddress?: EmailAddress | undefined;
+      }[]
+    | undefined,
+  prop: keyof EmailAddress,
+): string[] => {
+  return filterOutNilOrEmptyValues(input?.map((item) => item.emailAddress?.[prop]));
+};
 
 export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata => {
   return {
@@ -40,31 +72,15 @@ export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata =
     'from.name': message.from?.emailAddress?.name ?? '',
     'sender.emailAddress': message.sender?.emailAddress?.address ?? '',
     'sender.name': message.sender?.emailAddress?.name ?? '',
-    'toRecipients.emailAddresses':
-      message.toRecipients
-        ?.map((item) => item.emailAddress?.address)
-        .filter(isNonNull)
-        .join(',') ?? '',
-    'toRecipients.names':
-      message.toRecipients
-        ?.map((item) => item.emailAddress?.name)
-        .filter(isNonNull)
-        .join(',') ?? '',
+    'toRecipients.emailAddresses': extractFromEmailArray(message.toRecipients, 'address'),
+    'toRecipients.names': extractFromEmailArray(message.toRecipients, 'name'),
     receivedDateTime: message.receivedDateTime ?? '',
-    'ccRecipients.emailAddresses':
-      message.ccRecipients
-        ?.map((item) => item.emailAddress?.address)
-        .filter(isNonNull)
-        .join(',') ?? '',
-    'ccRecipients.names':
-      message.ccRecipients
-        ?.map((item) => item.emailAddress?.name)
-        .filter(isNonNull)
-        .join(',') ?? '',
-    categories: message.categories?.join(',') ?? '',
-    isRead: `${message.isRead ?? 'false'}`,
-    isDraft: `${message.isDraft ?? 'false'}`,
-    hasAttachments: `${message.hasAttachments ?? 'false'}`,
+    'ccRecipients.emailAddresses': extractFromEmailArray(message.ccRecipients, 'address'),
+    'ccRecipients.names': extractFromEmailArray(message.ccRecipients, 'name'),
+    categories: filterOutNilOrEmptyValues(message.categories),
+    isRead: message.isRead ?? false,
+    isDraft: message.isDraft ?? false,
+    hasAttachments: message.hasAttachments ?? false,
     importance: message.importance ?? '',
     inferenceClassification: message.inferenceClassification ?? '',
     'flag.flagStatus': message.flag?.flagStatus ?? '',
