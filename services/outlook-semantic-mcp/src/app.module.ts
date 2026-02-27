@@ -140,7 +140,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     AMQPModule,
     UniqueApiModule.forRoot({
       observability: {
-        metricPrefix: 'outlook_semantic_mcp_unique',
+        metricPrefix: 'spc_unique',
         loggerContext: 'UniqueApi',
       },
     }),

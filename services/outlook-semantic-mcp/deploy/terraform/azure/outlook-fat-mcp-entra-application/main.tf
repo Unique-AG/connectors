@@ -12,8 +12,7 @@ locals {
     "User.Read",
     "Mail.Read",
     "Mail.ReadBasic",
-    "Mail.ReadWrite",
-    "MailboxSettings.Read"
+    "Mail.ReadWrite"    
   ])
 }
 
