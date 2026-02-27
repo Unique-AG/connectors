@@ -11,7 +11,7 @@ import type { UniqueAuth } from '../auth/unique-auth';
 import { BottleneckFactory } from '../core/bottleneck.factory';
 import type { RequestMetricAttributes, UniqueApiMetrics } from '../core/observability';
 
-export class IngestionHttpClient {
+export class UniqueHttpClient {
   private readonly httpClient: Dispatcher;
   private readonly limiter: Bottleneck;
   private readonly extractApiMethod: ReturnType<typeof createApiMethodExtractor>;
@@ -57,7 +57,7 @@ export class IngestionHttpClient {
         reservoirRefreshAmount: this.options.rateLimitPerMinute,
         reservoirRefreshInterval: 60_000,
       },
-      IngestionHttpClient.name,
+      UniqueHttpClient.name,
     );
   }
 

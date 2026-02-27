@@ -1,9 +1,10 @@
 import { Logger } from '@nestjs/common';
 import { Agent, interceptors } from 'undici';
 import { UniqueAuth } from '../auth/unique-auth';
-import { IngestionHttpClient } from '../clients/ingestion-http.client';
 import { UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import { UniqueHttpClient } from '../clients/unique-http.client';
 import { UniqueApiFeatureModuleOptions } from '../config/unique-api-feature-module-options';
+import { ContentService } from '../content/content.service';
 import { FilesService } from '../files/files.service';
 import { GroupsService } from '../groups/groups.service';
 import { FileIngestionService } from '../ingestion/ingestion.service';
@@ -31,7 +32,7 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
 
     const auth = new UniqueAuth(config.auth, this.metrics, this.logger, dispatcher);
 
-    const scopeManagementClient = new UniqueGraphqlClient(
+    const scopeManagementGraphQlClient = new UniqueGraphqlClient(
       auth,
       this.metrics,
       this.logger,
@@ -45,7 +46,7 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       },
     );
 
-    const ingestionClient = new UniqueGraphqlClient(
+    const ingestionGraphQlClient = new UniqueGraphqlClient(
       auth,
       this.metrics,
       this.logger,
@@ -59,7 +60,7 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       },
     );
 
-    const ingestionHttpClient = new IngestionHttpClient(
+    const ingestionHttpClient = new UniqueHttpClient(
       auth,
       this.metrics,
       this.logger,
@@ -74,19 +75,25 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
 
     const scopes = new ScopesService(
       // Scope management was moved to ingestion.
-      ingestionClient,
+      ingestionGraphQlClient,
       this.logger,
     );
 
-    const files = new FilesService(ingestionClient, this.logger);
+    const files = new FilesService(ingestionGraphQlClient, this.logger);
 
-    const users = new UsersService(scopeManagementClient, this.logger);
+    const users = new UsersService(scopeManagementGraphQlClient, this.logger);
 
-    const groups = new GroupsService(scopeManagementClient, this.logger);
+    const groups = new GroupsService(scopeManagementGraphQlClient, this.logger);
 
     const ingestion = new FileIngestionService(
-      ingestionClient,
+      ingestionGraphQlClient,
       ingestionHttpClient,
+      config.ingestion.baseUrl,
+    );
+
+    const content = new ContentService(
+      ingestionHttpClient,
+      ingestionGraphQlClient,
       config.ingestion.baseUrl,
     );
 
@@ -97,10 +104,11 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       users,
       groups,
       ingestion,
+      content,
       close: async () => {
         await Promise.all([
-          scopeManagementClient.close(),
-          ingestionClient.close(),
+          scopeManagementGraphQlClient.close(),
+          ingestionGraphQlClient.close(),
           ingestionHttpClient.close(),
         ]);
         if (isOwnedDispatcher) {

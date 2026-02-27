@@ -14,6 +14,10 @@ export const userProfiles = pgTable(
     provider: varchar(`provider`).notNull(),
     providerUserId: varchar(`provider_user_id`).notNull(),
     username: varchar(`username`).notNull(),
+    // Service users have no emails, that's why email is nullable in this table. Right now I think we will
+    // never have a null in this column but we inherited this from microsoft graph api, and we want
+    // to move have a first version of the outlook semantic mcp. We should correct the types once we know
+    // exactly what we get from mcp oath.
     email: varchar(`email`),
     displayName: varchar(`display_name`),
     avatarUrl: varchar(`avatar_url`),

@@ -12,7 +12,7 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "debug:mac": "lsof -i tcp:9229 | grep node | awk '{print $2}' | xargs -r kill -9 && nest start --debug",
+    "mac:kill-dangling": "lsof -i tcp:9229 | grep node | awk '{print $2}' | xargs -r kill -9 && ps | grep \"[c]onnectors\" | awk '{print $1}' | xargs -r kill -9",
     "debug": "nest start --debug",
     "codegen": "echo \"No codegen for this server\"",
     "db:generate": "drizzle-kit generate",

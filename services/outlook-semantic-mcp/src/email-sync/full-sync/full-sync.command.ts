@@ -13,20 +13,22 @@ import { getRootScopePath } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
+import {
+  SubscriptionMailFilters,
+  subscriptionMailFilters,
+} from '../../db/schema/subscription/subscription-mail-filters.dto';
 import { SyncDirectoriesCommand } from '../directories-sync/sync-directories.command';
-import { GetSubscriptionAndUserProfileQuery } from '../user-utils/get-subscription-and-user-profile.query';
-import { MessageEventDto } from './dtos/message-event.dto';
+import { MessageEventDto } from '../mail-ingestion/dtos/message-event.dto';
 import {
   FileDiffGraphMessage,
   FileDiffGraphMessageFields,
   fileDiffGraphMessageResponseSchema,
-} from './dtos/microsoft-graph.dtos';
-import {
-  SubscriptionMailFilters,
-  subscriptionMailFilters,
-} from './dtos/subscription-mail-filters.dto';
-import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
-import { IngestionPriority } from './utils/ingestion-queue.utils';
+} from '../mail-ingestion/dtos/microsoft-graph.dtos';
+import { getUniqueKeyForMessage } from '../mail-ingestion/utils/get-unique-key-for-message';
+import { IngestionPriority } from '../mail-ingestion/utils/ingestion-queue.utils';
+import { GetSubscriptionAndUserProfileQuery } from '../user-utils/get-subscription-and-user-profile.query';
+
+export type FullSyncRunStatus = 'skipped' | 'success';
 
 @Injectable()
 export class FullSyncCommand {
@@ -42,7 +44,7 @@ export class FullSyncCommand {
   ) {}
 
   @Span()
-  public async run(subscriptionId: string): Promise<void> {
+  public async run(subscriptionId: string): Promise<{ status: FullSyncRunStatus }> {
     traceAttrs({ subscription_id: subscriptionId });
     this.logger.log({ subscriptionId, msg: `Starting full sync` });
 
@@ -73,7 +75,7 @@ export class FullSyncCommand {
         lastFullSyncRunAt: subscription.lastFullSyncRunAt,
         msg: `Full sync skipped: ran recently`,
       });
-      return;
+      return { status: 'skipped' };
     }
     await this.db
       .update(subscriptions)
@@ -167,6 +169,7 @@ export class FullSyncCommand {
       });
       await this.uniqueApi.files.deleteByIds(filesToDelete.map((file) => file.id));
     }
+    return { status: 'success' };
   }
 
   private async fetchAllEmails({

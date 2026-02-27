@@ -165,32 +165,35 @@ export const REMOVE_ACCESSES_MUTATION = gql`
   }
 `;
 
-export const CONTENT_ID_BY_SCOPE_AND_METADATA_KET = gql`
-  query ContentByScopeAndMetadata(
-    $scopeId: String!
-    $metadataKey: String!
-    $metadataValue: JSON!
-  ) {
-    content(
-      where: {
-        ownerId: { equals: $scopeId }
-        ownerType: { equals: SCOPE }
-        metadata: { path: [$metadataKey], equals: $metadataValue }
+export const CONTENT_ID_BY_SCOPE_AND_METADATA_KEY = gql`
+    query PaginatedContent($skip: Int!, $take: Int!, $where: ContentWhereInput) {
+      paginatedContent(skip: $skip, take: $take, where: $where) {
+        nodes {
+          id
+        }
+        totalCount
       }
-    ) {
-      id
     }
-  }
 `;
 
 export interface ContentByScopeAndMetadataKeyInput {
-  scopeId: string;
-  metadataKey: string;
-  metadataValue: unknown;
+  skip: number;
+  take: number;
+  where: {
+    ownerId: { equals: string };
+    ownerType: { equals: string };
+    metadata: {
+      path: string[];
+      equals: string;
+    };
+  };
 }
 
 export interface ContentByScopeAndMetadataKeyResult {
-  content: {
-    id: string;
-  }[];
+  paginatedContent: {
+    nodes: {
+      id: string;
+    }[];
+    totalCount: number;
+  };
 }

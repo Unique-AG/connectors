@@ -1,11 +1,10 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { RemoveRootScopeAndDirectoriesCommand } from '~/email-sync/directories-sync/remove-root-scope-and-directories.command';
-import { traceAttrs } from '~/email-sync/tracing.utils';
-import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SubscriptionRemoveService } from '../subscription-remove.service';
 
 const RemoveInboxConnectionInputSchema = z.object({});
@@ -56,14 +55,10 @@ export class RemoveInboxConnectionTool {
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {
-    const userProfileId = request.user?.userProfileId;
-    if (!userProfileId) throw new UnauthorizedException('User not authenticated');
-
-    traceAttrs({ user_profile_id: userProfileId });
+    const userProfileTypeid = extractUserProfileId(request);
+    const userProfileId = userProfileTypeid.toString();
 
     this.logger.log({ userProfileId }, 'Removing inbox connection for user');
-
-    const userProfileTypeid = convertUserProfileIdToTypeId(userProfileId);
 
     await this.removeRootScopeAndDirectoriesCommand.run(userProfileTypeid);
     const result = await this.subscriptionRemove.removeByUserProfileId(userProfileTypeid);

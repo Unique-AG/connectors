@@ -8,7 +8,7 @@ import { traceAttrs, traceEvent } from '~/email-sync/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { MAIN_EXCHANGE } from '../../amqp/amqp.constants';
-import { subscriptionMailFilters } from '../mail-ingestion/dtos/subscription-mail-filters.dto';
+import { subscriptionMailFilters } from '../../db/schema/subscription/subscription-mail-filters.dto';
 import {
   CreateSubscriptionRequestSchema,
   LifecycleEventDto,
@@ -42,7 +42,7 @@ export class SubscriptionCreateService {
   @Span()
   public async subscribe(
     userProfileId: UserProfileTypeID,
-    filters: { dateFrom: string },
+    filters: { dateFrom: Date },
   ): Promise<SubscribeResult> {
     traceAttrs({
       user_profile_id: userProfileId.toString(),
@@ -153,7 +153,7 @@ export class SubscriptionCreateService {
     filters,
   }: {
     userProfileId: string;
-    filters: { dateFrom: string };
+    filters: { dateFrom: Date };
   }): Promise<SubscribeResult> {
     this.logger.debug(
       {},
@@ -242,7 +242,7 @@ export class SubscriptionCreateService {
         userProfileId: userProfileId.toString(),
         subscriptionId: graphSubscription.id,
         filters: subscriptionMailFilters.encode({
-          dateFrom: new Date(filters.dateFrom),
+          dateFrom: filters.dateFrom,
         }),
       })
       .returning();

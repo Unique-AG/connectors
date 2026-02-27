@@ -1,12 +1,13 @@
 import assert from 'node:assert';
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { Span, TraceService } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
-import { FullSyncCommand } from '~/email-sync/mail-ingestion/full-sync.command';
+import { FullSyncCommand, FullSyncRunStatus } from '~/email-sync/full-sync/full-sync.command';
+import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 
 const InputSchema = z.object({});
 
@@ -21,7 +22,6 @@ export class RunFullSyncTool {
 
   public constructor(
     @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
-    private readonly traceService: TraceService,
     private readonly fullSyncCommand: FullSyncCommand,
   ) {}
 
@@ -49,11 +49,8 @@ export class RunFullSyncTool {
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {
-    const userProfileId = request.user?.userProfileId;
-    if (!userProfileId) throw new UnauthorizedException('User not authenticated');
-
-    const span = this.traceService.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId);
+    const userProfileTypeid = extractUserProfileId(request);
+    const userProfileId = userProfileTypeid.toString();
 
     this.logger.log({ userProfileId }, 'Starting directory sync');
     const subscription = await this.drizzle.query.subscriptions.findFirst({
@@ -61,11 +58,13 @@ export class RunFullSyncTool {
     });
     assert.ok(subscription, `Missing subscription for userProfile: ${userProfileId}`);
 
-    await this.fullSyncCommand.run(subscription.subscriptionId);
+    const { status } = await this.fullSyncCommand.run(subscription.subscriptionId);
 
-    return {
-      success: true,
-      message: `Successfully run`,
+    const responseByStatus: Record<FullSyncRunStatus, { success: boolean; message: string }> = {
+      skipped: { success: false, message: `Skipped running full sync, it was run recently` },
+      success: { success: true, message: `Successfully run full sync` },
     };
+
+    return responseByStatus[status];
   }
 }

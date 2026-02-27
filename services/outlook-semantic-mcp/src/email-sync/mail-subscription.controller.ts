@@ -16,13 +16,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { partition } from 'remeda';
-import { serializeError } from 'serialize-error-cjs';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { traceAttrs, traceError, traceEvent } from '~/email-sync/tracing.utils';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
+import { FullSyncCommand } from './full-sync/full-sync.command';
 import { MessageEventDto } from './mail-ingestion/dtos/message-event.dto';
-import { FullSyncCommand } from './mail-ingestion/full-sync.command';
 import { IngestionPriority } from './mail-ingestion/utils/ingestion-queue.utils';
 import {
   ChangeNotificationCollectionDto,
@@ -115,10 +114,10 @@ export class MailSubscriptionController {
     // NOTE: if we fail any, we reject this webhook as microsoft will send this again later
     if (failed.length > 0) {
       failed.forEach((fail) => {
-        this.logger.warn(
-          { error: serializeError(fail.reason) },
-          'Failed to publish reauthorization event to message queue',
-        );
+        this.logger.warn({
+          msg: 'Failed to publish reauthorization event to message queue',
+          err: fail.reason,
+        });
         traceError(fail.reason);
       });
       throw new InternalServerErrorException(

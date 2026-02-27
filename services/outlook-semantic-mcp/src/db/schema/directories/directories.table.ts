@@ -54,7 +54,7 @@ export const directories = pgTable(
       onDelete: 'cascade',
       onUpdate: 'cascade',
     }),
-    ignoreForSync: boolean(`ignore_for_sync`),
+    ignoreForSync: boolean(`ignore_for_sync`).default(false).notNull(),
     // References
     userProfileId: varchar(`user_profile_id`)
       .notNull()
