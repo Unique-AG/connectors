@@ -189,20 +189,19 @@ mcpConfig:
     #   x-user-id: "..."
     #   x-company-id: "..."
 
-    # -- The Public API URL
-    # example: https://gateway.unique.app/public/chat/
-    # example: http://node-chat.finance-gpt:8092/public/
-    apiBaseUrl: unset_default_value
-    # -- The Public API version to use
-    apiVersion: "2023-12-06"
-    # -- The root scope path where to upload transcripts
-    rootScopePath: outlook-semantic-mcp
-    # -- Concurrency limit for fetching users when resolving scope accesses
-    userFetchConcurrency: 5
-
-    # -- Base URL for Unique ingestion service (cluster_local mode only)
+    # -- Base URL for Unique ingestion service
     # example: http://node-ingestion.finance-gpt:8091
     ingestionServiceBaseUrl: unset_default_value
+
+    # -- Base URL for Unique scope management
+    # example: http://node-ingestion.finance-gpt:8091
+    scopeManagementServiceBaseUrl: unset_default_value
+
+    # Zitadel config
+    zitadel:
+        clientId: unset_default_value
+        oauthTokenUrl: unset_default_value
+        projectId: unset_default_value
 
   # -- Authentication configuration for the MCP server
   auth:

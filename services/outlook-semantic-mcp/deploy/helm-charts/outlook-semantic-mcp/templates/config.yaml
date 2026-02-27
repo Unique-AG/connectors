@@ -7,24 +7,27 @@ metadata:
     {{- include "chart.labels" . | nindent 4 }}
 data:
   SELF_URL: {{ .Values.mcpConfig.app.selfUrl | quote }}
+
+  # Microsoft config
   MICROSOFT_CLIENT_ID: {{ .Values.mcpConfig.microsoft.clientId | quote }}
   {{- if .Values.mcpConfig.microsoft.publicWebhookUrl }}
   MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
   {{- end }}
+
+  # Unique auth config
   UNIQUE_SERVICE_AUTH_MODE: {{ .Values.mcpConfig.unique.serviceAuthMode | quote }}
-  UNIQUE_API_BASE_URL: {{ include "chart.ensureTrailingSlash" (dict "url" .Values.mcpConfig.unique.apiBaseUrl) | quote }}
-  UNIQUE_API_VERSION: {{ .Values.mcpConfig.unique.apiVersion | quote }}
-  UNIQUE_ROOT_SCOPE_PATH: {{ .Values.mcpConfig.unique.rootScopePath | quote }}
-  UNIQUE_USER_FETCH_CONCURRENCY: {{ .Values.mcpConfig.unique.userFetchConcurrency | quote }}
-  UNIQUE_SERVICE_EXTRA_HEADERS: '{{ .Values.mcpConfig.unique.serviceExtraHeaders | toJson }}'
-  {{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
   UNIQUE_INGESTION_SERVICE_BASE_URL: {{ include "chart.ensureTrailingSlash" (dict "url" .Values.mcpConfig.unique.ingestionServiceBaseUrl) | quote }}
+  UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL: {{ include "chart.ensureTrailingSlash" (dict "url" .Values.mcpConfig.unique.scopeManagementServiceBaseUrl) | quote }}
+  {{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
+  UNIQUE_SERVICE_EXTRA_HEADERS: '{{ .Values.mcpConfig.unique.serviceExtraHeaders | toJson }}'
   {{- end }}
-  {{- if eq .Values.connectorConfig.unique.authMode "external" }}
+  {{- if eq .Values.mcpConfig.unique.serviceAuthMode "external" }}
   UNIQUE_ZITADEL_CLIENT_ID: {{ .Values.mcpConfig.unique.zitadel.clientId | quote }}
   UNIQUE_ZITADEL_OAUTH_TOKEN_URL: {{ .Values.mcpConfig.unique.zitadel.oauthTokenUrl | quote }}
   UNIQUE_ZITADEL_PROJECT_ID: {{ .Values.mcpConfig.unique.zitadel.projectId | quote }}
   {{- end }}
+
+  # Auth token expiration
   AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.accessTokenExpiresInSeconds | quote }}
   AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.refreshTokenExpiresInSeconds | quote }}
 {{- end }}
