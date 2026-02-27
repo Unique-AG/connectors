@@ -1,11 +1,8 @@
-import { Readable } from 'node:stream';
+import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
-import { IngestionMode } from '../../constants/ingestion.constants';
-import type { ServiceRegistry } from '../../tenant';
 import type { IngestionApiResponse } from '../../unique-api/types/ingestion.types';
 import type { UniqueApiClient } from '../../unique-api/types/unique-api-client.types';
-import { UniqueApiClient as UniqueApiClientToken } from '../../unique-api/types/unique-api-client.types';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { IngestionService } from '../ingestion.service';
 import type { ScopeManagementService } from '../scope-management.service';
@@ -73,25 +70,10 @@ function makeService(): {
     },
   } as unknown as UniqueApiClient;
 
-  const serviceRegistry = {
-    getService: vi.fn((token: unknown) => {
-      if (token === UniqueApiClientToken) return uniqueApiClient;
-      throw new Error(`Unexpected token: ${String(token)}`);
-    }),
-    getServiceLogger: vi.fn().mockReturnValue(logger),
-  } as unknown as ServiceRegistry;
-
   const confluenceConfig = {
     instanceType: 'cloud',
     baseUrl: CONFLUENCE_BASE_URL,
   } as unknown as ConfluenceConfig;
-
-  const ingestionConfig = {
-    ingestionMode: IngestionMode.Flat,
-    scopeId: 'scope-1',
-    ingestFiles: 'enabled',
-    allowedFileExtensions: ['pdf'],
-  };
 
   const scopeManagementService = {
     ensureSpaceScope: vi.fn().mockResolvedValue('space-scope-1'),
@@ -100,10 +82,10 @@ function makeService(): {
   return {
     service: new IngestionService(
       confluenceConfig,
-      ingestionConfig as unknown as ConstructorParameters<typeof IngestionService>[1],
       TENANT_NAME,
       scopeManagementService,
-      serviceRegistry,
+      uniqueApiClient,
+      logger as unknown as pino.Logger,
     ),
     uniqueApiClient,
     scopeManagementService,
@@ -167,69 +149,6 @@ describe('IngestionService', () => {
     );
   });
 
-  it('ingests linked files using HEAD + GET stream + PUT upload', async () => {
-    const { service, uniqueApiClient } = makeService();
-    vi.mocked(uniqueApiClient.ingestion.registerContent).mockResolvedValue(
-      makeRegistrationResponse({
-        writeUrl: 'https://blob.example.com/file-write',
-        readUrl: 'https://blob.example.com/file-read',
-      }),
-    );
-    mockRequest
-      .mockResolvedValueOnce({ statusCode: 200, headers: { 'content-length': '123' } }) // HEAD
-      .mockResolvedValueOnce({
-        statusCode: 200,
-        headers: { 'content-length': '123' },
-        body: Readable.from(Buffer.from('file-content')),
-      }) // GET source
-      .mockResolvedValueOnce({ statusCode: 201 }); // PUT writeUrl
-
-    await service.ingestFiles(pageFixture, [`${CONFLUENCE_BASE_URL}/files/guide.pdf?dl=1`]);
-
-    expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: `${TENANT_NAME}/SP/42_guide.pdf`,
-        title: 'guide.pdf',
-        mimeType: 'application/pdf',
-        byteSize: 123,
-        scopeId: 'space-scope-1',
-      }),
-    );
-    expect(uniqueApiClient.ingestion.finalizeIngestion).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: `${TENANT_NAME}/SP/42_guide.pdf`,
-        fileUrl: 'https://blob.example.com/file-read',
-      }),
-    );
-  });
-
-  it('uses byteSize 0 when HEAD request fails for file ingestion', async () => {
-    const { service, uniqueApiClient } = makeService();
-    vi.mocked(uniqueApiClient.ingestion.registerContent).mockResolvedValue(
-      makeRegistrationResponse({
-        writeUrl: 'https://blob.example.com/file-write',
-        readUrl: 'https://blob.example.com/file-read',
-      }),
-    );
-    mockRequest
-      .mockRejectedValueOnce(new Error('HEAD failed')) // HEAD
-      .mockResolvedValueOnce({
-        statusCode: 200,
-        headers: {},
-        body: Readable.from(Buffer.from('file-content')),
-      }) // GET source
-      .mockResolvedValueOnce({ statusCode: 201 }); // PUT writeUrl
-
-    await service.ingestFiles(pageFixture, [`${CONFLUENCE_BASE_URL}/files/guide.pdf`]);
-
-    expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: `${TENANT_NAME}/SP/42_guide.pdf`,
-        byteSize: 0,
-      }),
-    );
-  });
-
   it('logs and skips page ingestion when registration fails', async () => {
     const { service, uniqueApiClient, logger } = makeService();
     vi.mocked(uniqueApiClient.ingestion.registerContent).mockRejectedValue(
@@ -245,50 +164,6 @@ describe('IngestionService', () => {
         title: 'Architecture',
         err: expect.anything(),
         msg: 'Failed to ingest page, skipping',
-      }),
-    );
-  });
-
-  it('continues file ingestion when one file fails', async () => {
-    const { service, uniqueApiClient, logger } = makeService();
-    vi.mocked(uniqueApiClient.ingestion.registerContent)
-      .mockRejectedValueOnce(new Error('first file failed'))
-      .mockResolvedValueOnce(
-        makeRegistrationResponse({
-          writeUrl: 'https://blob.example.com/file-write',
-          readUrl: 'https://blob.example.com/file-read',
-        }),
-      );
-    mockRequest.mockImplementation(async (url: string, options?: { method?: string }) => {
-      if (options?.method === 'HEAD') {
-        return { statusCode: 200, headers: { 'content-length': '10' } };
-      }
-      if (options?.method === 'GET') {
-        return {
-          statusCode: 200,
-          headers: { 'content-length': '10' },
-          body: Readable.from(Buffer.from('second-file')),
-        };
-      }
-      if (options?.method === 'PUT' && url === 'https://blob.example.com/file-write') {
-        return { statusCode: 201 };
-      }
-      throw new Error(`Unexpected request in test: ${options?.method} ${url}`);
-    });
-
-    await service.ingestFiles(pageFixture, [
-      `${CONFLUENCE_BASE_URL}/files/one.pdf`,
-      `${CONFLUENCE_BASE_URL}/files/two.pdf`,
-    ]);
-
-    expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledTimes(2);
-    expect(uniqueApiClient.ingestion.finalizeIngestion).toHaveBeenCalledTimes(1);
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pageId: '42',
-        fileUrl: `${CONFLUENCE_BASE_URL}/files/one.pdf`,
-        err: expect.anything(),
-        msg: 'Failed to ingest file, skipping',
       }),
     );
   });
