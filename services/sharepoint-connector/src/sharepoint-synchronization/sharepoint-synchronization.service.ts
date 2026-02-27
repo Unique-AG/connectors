@@ -5,6 +5,7 @@ import { entries, groupBy } from 'remeda';
 import { ConfigEmitEvent } from '../config/app.config';
 import { ConfigDiagnosticsService } from '../config/config-diagnostics.service';
 import type { SiteConfig } from '../config/sharepoint.schema';
+import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { SyncStep } from '../constants/sync-step.enum';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
@@ -19,11 +20,12 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
-import type { Smeared } from '../utils/smeared';
+import { type Smeared, smearPath } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
 import { SharepointSyncContext } from './sharepoint-sync-context.interface';
+import { SubsiteDiscoveryService } from './subsite-discovery.service';
 
 type SiteSyncResult =
   | { status: 'success' }
@@ -49,6 +51,7 @@ export class SharepointSynchronizationService {
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly configDiagnosticsService: ConfigDiagnosticsService,
+    private readonly subsiteDiscoveryService: SubsiteDiscoveryService,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
   ) {}
@@ -293,6 +296,20 @@ export class SharepointSynchronizationService {
       return { status: 'failure', step: SyncStep.SiteItemsFetch };
     }
 
+    if (context.siteConfig.subsitesScan === EnabledDisabledMode.Enabled) {
+      try {
+        const subsiteItems = await this.fetchSubsiteItems(context, logPrefix);
+        items.push(...subsiteItems.items);
+        directories.push(...subsiteItems.directories);
+      } catch (error) {
+        this.logger.error({
+          msg: `${logPrefix} Failed to discover or fetch subsite items`,
+          error: sanitizeError(error),
+        });
+        return { status: 'failure', step: SyncStep.SubsiteDiscovery };
+      }
+    }
+
     this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
 
     if (items.length === 0) {
@@ -349,5 +366,33 @@ export class SharepointSynchronizationService {
     }
 
     return { status: 'success' };
+  }
+
+  private async fetchSubsiteItems(
+    context: SharepointSyncContext,
+    logPrefix: string,
+  ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
+    const subsites = await this.subsiteDiscoveryService.discoverAllSubsites(
+      context.siteConfig.siteId,
+    );
+
+    this.logger.log(`${logPrefix} Discovered ${subsites.length} subsites`);
+
+    const items: SharepointContentItem[] = [];
+    const directories: SharepointDirectoryItem[] = [];
+
+    for (const subsite of subsites) {
+      this.logger.log(
+        `${logPrefix} Fetching items for subsite ${smearPath(subsite.name)} with ID ${subsite.siteId}`,
+      );
+      const result = await this.graphApiService.getAllSiteItems(
+        subsite.siteId,
+        context.siteConfig.syncColumnName,
+      );
+      items.push(...result.items);
+      directories.push(...result.directories);
+    }
+
+    return { items, directories };
   }
 }

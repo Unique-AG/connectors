@@ -2,6 +2,7 @@ export const SyncStep = {
   SitesConfigLoading: 'sites_config_loading',
   RootScopeInit: 'root_scope_initialization',
   SiteNameFetch: 'site_name_fetch',
+  SubsiteDiscovery: 'subsite_discovery',
   SiteItemsFetch: 'site_items_fetch',
   ScopesCreation: 'scopes_creation',
   ContentSync: 'content_sync',

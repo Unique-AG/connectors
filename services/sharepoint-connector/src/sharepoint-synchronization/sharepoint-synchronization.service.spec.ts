@@ -11,6 +11,7 @@ import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
+import { SubsiteDiscoveryService } from './subsite-discovery.service';
 
 describe('SharepointSynchronizationService', () => {
   let service: SharepointSynchronizationService;
@@ -27,6 +28,9 @@ describe('SharepointSynchronizationService', () => {
     batchCreateScopes: ReturnType<typeof vi.fn>;
     deleteRootScopeRecursively: ReturnType<typeof vi.fn>;
     deleteOrphanedScopes: ReturnType<typeof vi.fn>;
+  };
+  let mockSubsiteDiscoveryService: {
+    discoverAllSubsites: ReturnType<typeof vi.fn>;
   };
 
   const mockFile: SharepointContentItem = {
@@ -132,6 +136,10 @@ describe('SharepointSynchronizationService', () => {
       deleteOrphanedScopes: vi.fn().mockResolvedValue(undefined),
     };
 
+    mockSubsiteDiscoveryService = {
+      discoverAllSubsites: vi.fn().mockResolvedValue([]),
+    };
+
     const mockHistogram = {
       record: vi.fn(),
     };
@@ -147,6 +155,8 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockPermissionsSyncService)
       .mock(ScopeManagementService)
       .impl(() => mockScopeManagementService)
+      .mock(SubsiteDiscoveryService)
+      .impl(() => mockSubsiteDiscoveryService)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -295,6 +305,8 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockPermissionsSyncService)
       .mock(ScopeManagementService)
       .impl(() => mockScopeManagementService)
+      .mock(SubsiteDiscoveryService)
+      .impl(() => mockSubsiteDiscoveryService)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -378,6 +390,8 @@ describe('SharepointSynchronizationService', () => {
       }))
       .mock(ScopeManagementService)
       .impl(() => mockScopeManagementService)
+      .mock(SubsiteDiscoveryService)
+      .impl(() => mockSubsiteDiscoveryService)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -764,6 +778,90 @@ describe('SharepointSynchronizationService', () => {
         }),
       }),
     );
+  });
+
+  it('does not discover subsites when subsitesScan is disabled', async () => {
+    await service.synchronize();
+
+    expect(mockSubsiteDiscoveryService.discoverAllSubsites).not.toHaveBeenCalled();
+  });
+
+  it('includes subsite items when subsitesScan is enabled', async () => {
+    const siteConfig = createMockSiteConfig({
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
+      subsitesScan: 'enabled',
+    });
+    mockSitesConfigurationService.loadSitesConfiguration = vi.fn().mockResolvedValue([siteConfig]);
+
+    mockSubsiteDiscoveryService.discoverAllSubsites.mockResolvedValue([
+      {
+        siteId: new Smeared('subsite-1', false),
+        name: new Smeared('SubA', false),
+        relativePath: new Smeared('SubA', false),
+      },
+    ]);
+
+    const subsiteFile: SharepointContentItem = {
+      ...mockFile,
+      siteId: new Smeared('subsite-1', false),
+    };
+    mockGraphApiService.getAllSiteItems = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [mockFile], directories: [] })
+      .mockResolvedValueOnce({ items: [subsiteFile], directories: [] });
+
+    await service.synchronize();
+
+    expect(mockSubsiteDiscoveryService.discoverAllSubsites).toHaveBeenCalledWith(siteConfig.siteId);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
+    expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
+      [mockFile, subsiteFile],
+      null,
+      expect.anything(),
+    );
+  });
+
+  it('fails site sync when subsite discovery fails', async () => {
+    const siteConfig = createMockSiteConfig({
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
+      subsitesScan: 'enabled',
+    });
+    mockSitesConfigurationService.loadSitesConfiguration = vi.fn().mockResolvedValue([siteConfig]);
+
+    mockSubsiteDiscoveryService.discoverAllSubsites.mockRejectedValue(
+      new Error('Discovery failed'),
+    );
+
+    const result = await service.synchronize();
+
+    expect(result.status).toBe('success');
+    expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
+  });
+
+  it('fails site sync when subsite item fetch fails', async () => {
+    const siteConfig = createMockSiteConfig({
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
+      subsitesScan: 'enabled',
+    });
+    mockSitesConfigurationService.loadSitesConfiguration = vi.fn().mockResolvedValue([siteConfig]);
+
+    mockSubsiteDiscoveryService.discoverAllSubsites.mockResolvedValue([
+      {
+        siteId: new Smeared('subsite-1', false),
+        name: new Smeared('SubA', false),
+        relativePath: new Smeared('SubA', false),
+      },
+    ]);
+
+    mockGraphApiService.getAllSiteItems = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [mockFile], directories: [] })
+      .mockRejectedValueOnce(new Error('Subsite fetch failed'));
+
+    const result = await service.synchronize();
+
+    expect(result.status).toBe('success');
+    expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
   });
 
   it('ensures unique scopeIds and logs errors for duplicates', async () => {
