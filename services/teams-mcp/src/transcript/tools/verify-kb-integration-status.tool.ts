@@ -38,7 +38,7 @@ export class VerifyKbIntegrationStatusTool {
     name: 'verify_kb_integration_status',
     title: 'Verify Knowledge Base Integration Status',
     description:
-      'Check the status of the knowledge base integration for Microsoft Teams meeting transcripts. Returns whether ingestion is active, expiring soon, expired, or not configured.',
+      'Check the status of the knowledge base integration for Microsoft Teams meeting transcripts. Returns whether ingestion is active, expiring soon, expired, or not configured. Note: an inactive integration does not prevent searching — the user can still search transcripts from meetings ingested by other participants.',
     parameters: VerifyKbIntegrationStatusInputSchema,
     outputSchema: VerifyKbIntegrationStatusOutputSchema,
     annotations: {
@@ -51,7 +51,7 @@ export class VerifyKbIntegrationStatusTool {
     _meta: {
       'unique.app/icon': 'status',
       'unique.app/system-prompt':
-        'Returns the current status of the knowledge base integration for meeting transcripts. Use this to verify if transcription ingestion is running before suggesting to start or stop it.',
+        'Returns the current status of the knowledge base integration for meeting transcripts. Use this before suggesting to start or stop integration, but do NOT require it before searching — find_transcripts works independently and returns all transcripts the user has access to as a participant.',
     },
   })
   @Span()

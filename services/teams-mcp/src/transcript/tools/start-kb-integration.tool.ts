@@ -34,7 +34,7 @@ export class StartKbIntegrationTool {
     name: 'start_kb_integration',
     title: 'Start Knowledge Base Integration',
     description:
-      'Start the knowledge base integration to begin ingesting Microsoft Teams meeting transcripts. This creates a subscription with Microsoft Graph to receive notifications when new transcripts are available.',
+      'Start the knowledge base integration to begin ingesting Microsoft Teams meeting transcripts owned by the user. This creates a subscription with Microsoft Graph to receive notifications when new transcripts are available. Note: the user can already search transcripts from meetings ingested by other participants without starting their own integration.',
     parameters: StartKbIntegrationInputSchema,
     outputSchema: StartKbIntegrationOutputSchema,
     annotations: {
@@ -47,7 +47,7 @@ export class StartKbIntegrationTool {
     _meta: {
       'unique.app/icon': 'play',
       'unique.app/system-prompt':
-        'Starts the knowledge base integration for meeting transcripts. Use verify_kb_integration_status first to check if it is already running. If already active, inform the user that ingestion is already running.',
+        'Starts the knowledge base integration for meeting transcripts owned by the user. Use verify_kb_integration_status first to check if it is already running. If already active, inform the user that ingestion is already running. Important: starting integration is only needed to ingest meetings the user owns — they can already search transcripts from meetings where they are a participant (ingested by other users) without this.',
     },
   })
   @Span()
