@@ -425,8 +425,18 @@ describe('GraphApiService', () => {
   describe('getSubsites', () => {
     it('fetches subsites for a given site', async () => {
       const mockSubsites = [
-        { id: 'subsite-1', name: 'SubA', displayName: 'Sub Site A', webUrl: 'https://contoso.sharepoint.com/sites/Parent/SubA' },
-        { id: 'subsite-2', name: 'SubB', displayName: 'Sub Site B', webUrl: 'https://contoso.sharepoint.com/sites/Parent/SubB' },
+        {
+          id: 'subsite-1',
+          name: 'SubA',
+          displayName: 'Sub Site A',
+          webUrl: 'https://contoso.sharepoint.com/sites/Parent/SubA',
+        },
+        {
+          id: 'subsite-2',
+          name: 'SubB',
+          displayName: 'Sub Site B',
+          webUrl: 'https://contoso.sharepoint.com/sites/Parent/SubB',
+        },
       ];
 
       // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing

@@ -1,6 +1,6 @@
 import type { SiteConfig } from '../../config/sharepoint.schema';
-import { IngestionMode } from '../../constants/ingestion.constants';
 import { EnabledDisabledMode } from '../../constants/enabled-disabled-mode.enum';
+import { IngestionMode } from '../../constants/ingestion.constants';
 import { createSmeared } from '../smeared';
 
 export const createMockSiteConfig = (overrides?: Partial<SiteConfig>): SiteConfig => ({

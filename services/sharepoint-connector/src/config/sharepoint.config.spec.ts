@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { IngestionMode } from '../constants/ingestion.constants';
 import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
+import { IngestionMode } from '../constants/ingestion.constants';
 import { SharepointConfigSchema } from './sharepoint.schema';
 
 describe('SharepointConfigSchema', () => {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS } from '../constants/defaults.constants';
-import { IngestionMode } from '../constants/ingestion.constants';
 import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
+import { IngestionMode } from '../constants/ingestion.constants';
 import type { Redacted } from '../utils/redacted';
 import { createSmeared, Smeared } from '../utils/smeared';
 import {

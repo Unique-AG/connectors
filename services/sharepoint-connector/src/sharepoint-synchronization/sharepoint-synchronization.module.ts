@@ -10,6 +10,7 @@ import { FileMoveProcessor } from './file-move-processor.service';
 import { RootScopeMigrationService } from './root-scope-migration.service';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
+import { SubsiteDiscoveryService } from './subsite-discovery.service';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SharepointSynchronizationService } from './sharepoint-synchronization.s
     FileMoveProcessor,
     RootScopeMigrationService,
     ScopeManagementService,
+    SubsiteDiscoveryService,
   ],
   exports: [SharepointSynchronizationService],
 })
