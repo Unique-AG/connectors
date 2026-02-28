@@ -24,3 +24,6 @@ connectorConfig:
         stepTimeoutSeconds: 300
         concurrency: 1
         scanIntervalCron: "*/15 * * * *"
+      ingestion:
+        ingestionMode: flat
+        scopeId: test-scope-id

@@ -37,3 +37,7 @@ processing:
   concurrency: 1
   scanIntervalCron: "*/15 * * * *"
   # maxPagesToScan: 100 # Uncomment to limit pages scanned (useful for testing)
+
+ingestion:
+  ingestionMode: flat
+  scopeId: your-scope-id

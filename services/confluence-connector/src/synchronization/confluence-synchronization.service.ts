@@ -1,12 +1,20 @@
+import pLimit from 'p-limit';
 import type pino from 'pino';
-import { getCurrentTenant } from '../tenant/tenant-context.storage';
+import { getCurrentTenant } from '../tenant';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
+import type { FileDiffService } from './file-diff.service';
+import type { IngestionService } from './ingestion.service';
+import type { ScopeManagementService } from './scope-management.service';
+import type { FetchedPage } from './sync.types';
 
 export class ConfluenceSynchronizationService {
   public constructor(
     private readonly scanner: ConfluencePageScanner,
     private readonly contentFetcher: ConfluenceContentFetcher,
+    private readonly fileDiffService: FileDiffService,
+    private readonly ingestionService: IngestionService,
+    private readonly scopeManagementService: ScopeManagementService,
     private readonly logger: pino.Logger,
   ) {}
 
@@ -22,18 +30,39 @@ export class ConfluenceSynchronizationService {
     try {
       this.logger.info('Starting sync');
 
+      await this.scopeManagementService.initialize();
+
       const discoveredPages = await this.scanner.discoverPages();
+      this.logger.info({ count: discoveredPages.length }, 'Discovery completed');
+
+      const diff = await this.fileDiffService.computeDiff(discoveredPages);
       this.logger.info(
-        { count: discoveredPages.length },
-        `Discovery completed  ${JSON.stringify(discoveredPages, null, 4)}`,
+        {
+          new: diff.newPageIds.length,
+          updated: diff.updatedPageIds.length,
+          deleted: diff.deletedPageIds.length,
+          moved: diff.movedPageIds.length,
+        },
+        'File diff completed',
       );
 
-      // this is for demo purpose only. We will change this once we start implementing ingestion
-      const fetchedPages = await this.contentFetcher.fetchPagesContent(discoveredPages);
-      this.logger.info(
-        { count: fetchedPages.length },
-        `Fetching completed ${JSON.stringify(fetchedPages, null, 4)}`,
-      );
+      const pageIdsToFetch = new Set([...diff.newPageIds, ...diff.updatedPageIds]);
+      const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
+
+      const fetchedPages = await this.contentFetcher.fetchPagesContent(pagesToFetch);
+      this.logger.info({ count: fetchedPages.length }, 'Content fetching completed');
+
+      const uniqueSpaceKeys = [...new Set(fetchedPages.map((p) => p.spaceKey))];
+      const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(uniqueSpaceKeys);
+
+      const concurrency = Math.max(1, tenant.config.processing.concurrency);
+
+      await this.ingestPagesWithConcurrency(fetchedPages, spaceScopes, concurrency);
+
+      if (diff.deletedKeys.length > 0) {
+        await this.ingestionService.deleteContent(diff.deletedKeys);
+        this.logger.info({ count: diff.deletedKeys.length }, 'Deleted content processed');
+      }
 
       this.logger.info('Sync completed');
     } catch (error) {
@@ -41,5 +70,25 @@ export class ConfluenceSynchronizationService {
     } finally {
       tenant.isScanning = false;
     }
+  }
+
+  private async ingestPagesWithConcurrency(
+    pages: FetchedPage[],
+    spaceScopes: Map<string, string>,
+    concurrency: number,
+  ): Promise<void> {
+    const limit = pLimit(concurrency);
+
+    await Promise.all(
+      pages.map((page) =>
+        limit(() => {
+          const scopeId = spaceScopes.get(page.spaceKey);
+          if (!scopeId) throw new Error(`No scope resolved for space: ${page.spaceKey}`);
+          return this.ingestionService.ingestPage(page, scopeId);
+        }),
+      ),
+    );
+
+    this.logger.info({ count: pages.length }, 'Page ingestion completed');
   }
 }

@@ -63,5 +63,9 @@ data:
       {{- if $tenant.processing.maxPagesToScan }}
       maxPagesToScan: {{ $tenant.processing.maxPagesToScan }}
       {{- end }}
+    # Ingestion Configuration
+    ingestion:
+      ingestionMode: {{ $tenant.ingestion.ingestionMode | quote }}
+      scopeId: {{ $tenant.ingestion.scopeId | quote }}
   {{- end }}
 {{- end }}

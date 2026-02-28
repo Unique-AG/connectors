@@ -26,6 +26,11 @@ const baseProcessingConfig = {
   scanIntervalCron: '*/15 * * * *',
 };
 
+const baseIngestionConfig = {
+  ingestionMode: 'flat',
+  scopeId: 'test-scope-id',
+};
+
 const clusterLocalUniqueConfig = {
   serviceAuthMode: 'cluster_local',
   serviceExtraHeaders: {
@@ -142,6 +147,7 @@ describe('tenant-config-loader', () => {
       },
       unique: clusterLocalUniqueConfig,
       processing: baseProcessingConfig,
+      ingestion: baseIngestionConfig,
       ...overrides,
     };
   }
@@ -156,6 +162,7 @@ describe('tenant-config-loader', () => {
       },
       unique: clusterLocalUniqueConfig,
       processing: baseProcessingConfig,
+      ingestion: baseIngestionConfig,
       ...overrides,
     };
   }
@@ -400,6 +407,7 @@ describe('tenant-config-loader', () => {
         },
         unique: clusterLocalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
 
       const tenant2Config = {
@@ -411,6 +419,7 @@ describe('tenant-config-loader', () => {
         },
         unique: clusterLocalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
 
       setupFsMocks(globSync, readFileSync, [
@@ -469,6 +478,7 @@ describe('tenant-config-loader', () => {
         },
         unique: externalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
       setupSingleConfig(globSync, readFileSync, config);
 
@@ -508,6 +518,7 @@ describe('tenant-config-loader', () => {
         },
         unique: externalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
       setupSingleConfig(globSync, readFileSync, config);
 
@@ -562,12 +573,14 @@ describe('tenant-config-loader', () => {
       const config = {
         confluence: {
           instanceType: 'cloud',
+          cloudId: 'test-cloud-id',
           baseUrl: 'https://acme.atlassian.net',
           auth: patAuth,
           ...baseConfluenceFields,
         },
         unique: clusterLocalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupSingleConfig(globSync, readFileSync, config);
@@ -579,15 +592,31 @@ describe('tenant-config-loader', () => {
       const config = {
         confluence: {
           instanceType: 'cloud',
+          cloudId: 'test-cloud-id',
           baseUrl: 'https://acme.atlassian.net',
           auth: { mode: 'unknown_mode' },
           ...baseConfluenceFields,
         },
         unique: clusterLocalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupSingleConfig(globSync, readFileSync, config);
+
+      expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
+    });
+
+    it('throws when ingestionMode is recursive', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupSingleConfig(
+        globSync,
+        readFileSync,
+        makeCloudOauth2loConfig({
+          ingestion: { ...baseIngestionConfig, ingestionMode: 'recursive' },
+        }),
+      );
 
       expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
     });

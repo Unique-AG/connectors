@@ -1,10 +1,10 @@
 import type pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-auth';
-import { UniqueAuth, UniqueAuthFactory } from '../../auth/unique-auth';
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
 import { getTenantConfigs } from '../../config/tenant-config-loader';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../../confluence-api';
+import { UniqueApiClient } from '../../unique-api/types/unique-api-client.types';
 import { ServiceRegistry } from '../service-registry';
 import { tenantStorage } from '../tenant-context.storage';
 import { TenantRegistry } from '../tenant-registry';
@@ -40,7 +40,6 @@ vi.mock('../../config/tenant-config-loader', () => ({
 }));
 
 vi.mock('../../auth/confluence-auth/confluence-auth.factory');
-vi.mock('../../auth/unique-auth/unique-auth.factory');
 vi.mock('../../confluence-api/confluence-api-client.factory');
 
 function createMockTenantConfig(): TenantConfig {
@@ -53,7 +52,13 @@ function createMockTenantConfig(): TenantConfig {
       ingestAllLabel: 'sync-all',
       auth: { mode: 'oauth_2lo', clientId: 'id', clientSecret: 'secret' },
     },
-    unique: {},
+    unique: {
+      serviceAuthMode: 'cluster_local',
+      serviceExtraHeaders: { 'x-company-id': 'company-1', 'x-user-id': 'user-1' },
+      ingestionServiceBaseUrl: 'https://ingestion.example.com',
+      scopeManagementServiceBaseUrl: 'https://scope.example.com',
+      apiRateLimitPerMinute: 100,
+    },
     processing: {},
   } as unknown as TenantConfig;
 }
@@ -62,16 +67,22 @@ function createMockAuth(): ConfluenceAuth {
   return { acquireToken: vi.fn().mockResolvedValue('mock-token') };
 }
 
-function createMockUniqueAuth(): UniqueAuth {
+function createMockUniqueApiClient() {
   return {
-    getHeaders: vi.fn().mockResolvedValue({ Authorization: 'Bearer mock' }),
-    close: vi.fn().mockResolvedValue(undefined),
-  } as unknown as UniqueAuth;
+    auth: {},
+    scopes: {},
+    files: { getByKeys: vi.fn(), getByKeyPrefix: vi.fn(), delete: vi.fn(), deleteByIds: vi.fn() },
+    users: {},
+    groups: {},
+    ingestion: { performFileDiff: vi.fn(), registerContent: vi.fn(), finalizeIngestion: vi.fn() },
+    close: vi.fn(),
+  };
 }
 
 function createRegistry(configs: NamedTenantConfig[]): {
   registry: TenantRegistry;
   serviceRegistry: ServiceRegistry;
+  mockUniqueApiFactory: { create: ReturnType<typeof vi.fn> };
 } {
   vi.mocked(getTenantConfigs).mockReturnValue(configs);
 
@@ -81,18 +92,19 @@ function createRegistry(configs: NamedTenantConfig[]): {
   const mockApiClientFactory = new ConfluenceApiClientFactory({} as ServiceRegistry);
   vi.mocked(mockApiClientFactory.create).mockImplementation(() => ({}) as never);
 
-  const mockUniqueFactory = new UniqueAuthFactory({} as ServiceRegistry);
-  vi.mocked(mockUniqueFactory.create).mockImplementation(() => createMockUniqueAuth());
+  const mockUniqueApiFactory = {
+    create: vi.fn().mockImplementation(() => createMockUniqueApiClient()),
+  };
 
   const serviceRegistry = new ServiceRegistry();
   const registry = new TenantRegistry(
     mockFactory,
     mockApiClientFactory,
-    mockUniqueFactory,
+    mockUniqueApiFactory,
     serviceRegistry,
   );
   registry.onModuleInit();
-  return { registry, serviceRegistry };
+  return { registry, serviceRegistry, mockUniqueApiFactory };
 }
 
 describe('TenantRegistry', () => {
@@ -141,14 +153,13 @@ describe('TenantRegistry', () => {
       const mockApiClientFactory = new ConfluenceApiClientFactory({} as ServiceRegistry);
       vi.mocked(mockApiClientFactory.create).mockReturnValue({} as never);
 
-      const mockUniqueFactory = new UniqueAuthFactory({} as ServiceRegistry);
-      vi.mocked(mockUniqueFactory.create).mockReturnValue(createMockUniqueAuth());
+      const mockUniqueApiFactory = { create: vi.fn().mockReturnValue(createMockUniqueApiClient()) };
 
       const serviceRegistry = new ServiceRegistry();
       const registry = new TenantRegistry(
         mockFactory,
         mockApiClientFactory,
-        mockUniqueFactory,
+        mockUniqueApiFactory,
         serviceRegistry,
       );
       registry.onModuleInit();
@@ -157,35 +168,31 @@ describe('TenantRegistry', () => {
       expect(mockFactory.createAuthStrategy).toHaveBeenCalledWith(configB.confluence);
     });
 
-    it('calls UniqueAuthFactory.create for each tenant', () => {
+    it('calls uniqueApiFactory.create for each tenant with correct config', () => {
       const configA = createMockTenantConfig();
       const configB = createMockTenantConfig();
 
-      vi.mocked(getTenantConfigs).mockReturnValue([
+      const { mockUniqueApiFactory } = createRegistry([
         { name: 'tenant-a', config: configA },
         { name: 'tenant-b', config: configB },
       ]);
 
-      const mockFactory = new ConfluenceAuthFactory({} as ServiceRegistry);
-      vi.mocked(mockFactory.createAuthStrategy).mockReturnValue(createMockAuth());
-
-      const mockApiClientFactory = new ConfluenceApiClientFactory({} as ServiceRegistry);
-      vi.mocked(mockApiClientFactory.create).mockReturnValue({} as never);
-
-      const mockUniqueFactory = new UniqueAuthFactory({} as ServiceRegistry);
-      vi.mocked(mockUniqueFactory.create).mockReturnValue(createMockUniqueAuth());
-
-      const serviceRegistry = new ServiceRegistry();
-      const registry = new TenantRegistry(
-        mockFactory,
-        mockApiClientFactory,
-        mockUniqueFactory,
-        serviceRegistry,
+      expect(mockUniqueApiFactory.create).toHaveBeenCalledTimes(2);
+      expect(mockUniqueApiFactory.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          auth: expect.objectContaining({
+            serviceAuthMode: 'cluster_local',
+            serviceId: 'confluence-connector',
+          }),
+          ingestion: expect.objectContaining({
+            baseUrl: configA.unique.ingestionServiceBaseUrl,
+          }),
+          scopeManagement: expect.objectContaining({
+            baseUrl: configA.unique.scopeManagementServiceBaseUrl,
+          }),
+          metadata: { clientName: 'confluence-connector', tenantKey: 'tenant-a' },
+        }),
       );
-      registry.onModuleInit();
-
-      expect(mockUniqueFactory.create).toHaveBeenCalledWith(configA.unique);
-      expect(mockUniqueFactory.create).toHaveBeenCalledWith(configB.unique);
     });
 
     it('calls ConfluenceApiClientFactory.create for each tenant', () => {
@@ -203,14 +210,13 @@ describe('TenantRegistry', () => {
       const mockApiClientFactory = new ConfluenceApiClientFactory({} as ServiceRegistry);
       vi.mocked(mockApiClientFactory.create).mockReturnValue({} as never);
 
-      const mockUniqueFactory = new UniqueAuthFactory({} as ServiceRegistry);
-      vi.mocked(mockUniqueFactory.create).mockReturnValue(createMockUniqueAuth());
+      const mockUniqueApiFactory = { create: vi.fn().mockReturnValue(createMockUniqueApiClient()) };
 
       const serviceRegistry = new ServiceRegistry();
       const registry = new TenantRegistry(
         mockFactory,
         mockApiClientFactory,
-        mockUniqueFactory,
+        mockUniqueApiFactory,
         serviceRegistry,
       );
       registry.onModuleInit();
@@ -219,7 +225,7 @@ describe('TenantRegistry', () => {
       expect(mockApiClientFactory.create).toHaveBeenCalledWith(configB.confluence);
     });
 
-    it('registers ConfluenceAuth, UniqueAuth, and ConfluenceApiClient in ServiceRegistry for each tenant', () => {
+    it('registers ConfluenceAuth, UniqueApiClient, and ConfluenceApiClient in ServiceRegistry for each tenant', () => {
       const configs: NamedTenantConfig[] = [{ name: 'tenant-a', config: createMockTenantConfig() }];
 
       const { registry, serviceRegistry } = createRegistry(configs);
@@ -227,7 +233,7 @@ describe('TenantRegistry', () => {
 
       tenantStorage.run(tenant, () => {
         expect(serviceRegistry.getService(ConfluenceAuth)).toBeDefined();
-        expect(serviceRegistry.getService(UniqueAuth)).toBeDefined();
+        expect(serviceRegistry.getService(UniqueApiClient)).toBeDefined();
         expect(serviceRegistry.getService(ConfluenceApiClient)).toBeDefined();
       });
     });
