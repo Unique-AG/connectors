@@ -40,6 +40,7 @@ These APIs are used for fetching SharePoint content:
 | `/sites/{siteId}/lists` | GET | Find SitePages list | `Sites.Selected` |
 | `/sites/{siteId}/lists/{listId}/items` | GET | List ASPX pages | `Sites.Selected` |
 | `/sites/{siteId}/lists/{listId}/items/{itemId}` | GET | Get ASPX page content | `Sites.Selected` |
+| `/sites/{siteId}/sites` | GET | Discover child subsites | `Sites.Selected` |
 
 ### Permission Mode
 
