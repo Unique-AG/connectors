@@ -4,6 +4,7 @@ export const SyncStep = {
   SiteNameFetch: 'site_name_fetch',
   SubsiteDiscovery: 'subsite_discovery',
   SiteItemsFetch: 'site_items_fetch',
+  SubsiteItemsFetch: 'subsite_items_fetch',
   ScopesCreation: 'scopes_creation',
   ContentSync: 'content_sync',
   PermissionsSync: 'permissions_sync',

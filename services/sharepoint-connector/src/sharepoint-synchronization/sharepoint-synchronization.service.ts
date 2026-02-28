@@ -25,7 +25,7 @@ import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
 import { SharepointSyncContext } from './sharepoint-sync-context.interface';
-import { SubsiteDiscoveryService } from './subsite-discovery.service';
+import { DiscoveredSubsite, SubsiteDiscoveryService } from './subsite-discovery.service';
 
 type SiteSyncResult =
   | { status: 'success' }
@@ -108,7 +108,7 @@ export class SharepointSynchronizationService {
       // configured as a standalone site will always use a compound ID, and we only need to compare
       // compound IDs when deduplicating against discovered subsites.
       const configuredSubsiteIds = new Set(
-        active.map((site) => site.siteId.value).filter((siteId) => siteId.split(',').length === 3),
+        sites.map((site) => site.siteId.value).filter((siteId) => siteId.split(',').length === 3),
       );
 
       for (const siteConfig of active) {
@@ -289,6 +289,23 @@ export class SharepointSynchronizationService {
     }
     const { context } = initResult;
 
+    let subsites: DiscoveredSubsite[] = [];
+    if (context.siteConfig.subsitesScan === EnabledDisabledMode.Enabled) {
+      try {
+        subsites = await this.discoverSubsites(
+          context,
+          configuredSubsiteIds,
+          logPrefix,
+        );
+      } catch (error) {
+        this.logger.error({
+          msg: `${logPrefix} Failed to discover subsites`,
+          error: sanitizeError(error),
+        });
+        return { status: 'failure', step: SyncStep.SubsiteDiscovery };
+      }
+    }
+
     let items: SharepointContentItem[];
     let directories: SharepointDirectoryItem[];
 
@@ -307,21 +324,17 @@ export class SharepointSynchronizationService {
       return { status: 'failure', step: SyncStep.SiteItemsFetch };
     }
 
-    if (context.siteConfig.subsitesScan === EnabledDisabledMode.Enabled) {
+    if (subsites.length > 0) {
       try {
-        const subsiteResult = await this.fetchSubsiteItems(
-          context,
-          configuredSubsiteIds,
-          logPrefix,
-        );
+        const subsiteResult = await this.fetchItemsForSubsites(subsites, context, logPrefix);
         items.push(...subsiteResult.items);
         directories.push(...subsiteResult.directories);
       } catch (error) {
         this.logger.error({
-          msg: `${logPrefix} Failed to discover or fetch subsite items`,
+          msg: `${logPrefix} Failed to fetch subsite items`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.SubsiteDiscovery };
+        return { status: 'failure', step: SyncStep.SubsiteItemsFetch };
       }
     }
 
@@ -383,11 +396,11 @@ export class SharepointSynchronizationService {
     return { status: 'success' };
   }
 
-  private async fetchSubsiteItems(
+  private async discoverSubsites(
     context: SharepointSyncContext,
     configuredSubsiteIds: Set<string>,
     logPrefix: string,
-  ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
+  ): Promise<DiscoveredSubsite[]> {
     const allSubsites = await this.subsiteDiscoveryService.discoverAllSubsites(
       context.siteConfig.siteId,
     );
@@ -409,6 +422,14 @@ export class SharepointSynchronizationService {
       `${logPrefix} Discovered ${allSubsites.length} subsites, ${subsites.length} to sync`,
     );
 
+    return subsites;
+  }
+
+  private async fetchItemsForSubsites(
+    subsites: DiscoveredSubsite[],
+    context: SharepointSyncContext,
+    logPrefix: string,
+  ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const items: SharepointContentItem[] = [];
     const directories: SharepointDirectoryItem[] = [];
 

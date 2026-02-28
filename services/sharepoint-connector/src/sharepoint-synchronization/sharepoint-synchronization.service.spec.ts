@@ -814,6 +814,16 @@ describe('SharepointSynchronizationService', () => {
 
     expect(mockSubsiteDiscoveryService.discoverAllSubsites).toHaveBeenCalledWith(siteConfig.siteId);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
+    const getAllSiteItemsMock = mockGraphApiService.getAllSiteItems as ReturnType<typeof vi.fn>;
+    expect(mockSubsiteDiscoveryService.discoverAllSubsites.mock.invocationCallOrder[0]).toBeLessThan(
+      getAllSiteItemsMock.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+    );
+    expect(getAllSiteItemsMock).toHaveBeenNthCalledWith(1, siteConfig.siteId, expect.any(String));
+    expect(getAllSiteItemsMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ value: 'subsite-1' }),
+      expect.any(String),
+    );
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       [mockFile, subsiteFile],
       null,
@@ -861,6 +871,7 @@ describe('SharepointSynchronizationService', () => {
     const result = await service.synchronize();
 
     expect(result.status).toBe('success');
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
     expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
   });
 
@@ -917,6 +928,75 @@ describe('SharepointSynchronizationService', () => {
     );
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
       standaloneSiteConfig.siteId,
+      expect.any(String),
+    );
+  });
+
+  it('skips discovered subsites that are configured as inactive or deleted standalone sites', async () => {
+    const parentSiteConfig = createMockSiteConfig({
+      siteId: new Smeared('parent-site-id', false),
+      scopeId: 'parent-scope',
+      subsitesScan: 'enabled',
+    });
+    const inactiveSubsiteConfig = createMockSiteConfig({
+      siteId: new Smeared('host,col,inactive-subsite', false),
+      scopeId: 'inactive-subsite-scope',
+      syncStatus: 'inactive',
+    });
+    const deletedSubsiteConfig = createMockSiteConfig({
+      siteId: new Smeared('host,col,deleted-subsite', false),
+      scopeId: 'deleted-subsite-scope',
+      syncStatus: 'deleted',
+    });
+    mockSitesConfigurationService.loadSitesConfiguration = vi
+      .fn()
+      .mockResolvedValue([parentSiteConfig, inactiveSubsiteConfig, deletedSubsiteConfig]);
+
+    mockSubsiteDiscoveryService.discoverAllSubsites.mockResolvedValue([
+      {
+        siteId: new Smeared('host,col,inactive-subsite', false),
+        name: new Smeared('InactiveSubsite', false),
+        relativePath: new Smeared('InactiveSubsite', false),
+      },
+      {
+        siteId: new Smeared('host,col,deleted-subsite', false),
+        name: new Smeared('DeletedSubsite', false),
+        relativePath: new Smeared('DeletedSubsite', false),
+      },
+      {
+        siteId: new Smeared('host,col,other-subsite', false),
+        name: new Smeared('OtherSubsite', false),
+        relativePath: new Smeared('OtherSubsite', false),
+      },
+    ]);
+
+    const otherSubsiteFile: SharepointContentItem = {
+      ...mockFile,
+      siteId: new Smeared('host,col,other-subsite', false),
+    };
+
+    mockGraphApiService.getAllSiteItems = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [mockFile], directories: [] })
+      .mockResolvedValueOnce({ items: [otherSubsiteFile], directories: [] });
+
+    await service.synchronize();
+
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'host,col,other-subsite' }),
+      expect.any(String),
+    );
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+      parentSiteConfig.siteId,
+      expect.any(String),
+    );
+    expect(mockGraphApiService.getAllSiteItems).not.toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'host,col,inactive-subsite' }),
+      expect.any(String),
+    );
+    expect(mockGraphApiService.getAllSiteItems).not.toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'host,col,deleted-subsite' }),
       expect.any(String),
     );
   });
