@@ -292,11 +292,7 @@ export class SharepointSynchronizationService {
     let subsites: DiscoveredSubsite[] = [];
     if (context.siteConfig.subsitesScan === EnabledDisabledMode.Enabled) {
       try {
-        subsites = await this.discoverSubsites(
-          context,
-          configuredSubsiteIds,
-          logPrefix,
-        );
+        subsites = await this.discoverSubsites(context, configuredSubsiteIds, logPrefix);
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to discover subsites`,

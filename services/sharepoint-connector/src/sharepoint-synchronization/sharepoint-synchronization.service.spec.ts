@@ -815,9 +815,9 @@ describe('SharepointSynchronizationService', () => {
     expect(mockSubsiteDiscoveryService.discoverAllSubsites).toHaveBeenCalledWith(siteConfig.siteId);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
     const getAllSiteItemsMock = mockGraphApiService.getAllSiteItems as ReturnType<typeof vi.fn>;
-    expect(mockSubsiteDiscoveryService.discoverAllSubsites.mock.invocationCallOrder[0]).toBeLessThan(
-      getAllSiteItemsMock.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
-    );
+    expect(
+      mockSubsiteDiscoveryService.discoverAllSubsites.mock.invocationCallOrder[0],
+    ).toBeLessThan(getAllSiteItemsMock.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER);
     expect(getAllSiteItemsMock).toHaveBeenNthCalledWith(1, siteConfig.siteId, expect.any(String));
     expect(getAllSiteItemsMock).toHaveBeenNthCalledWith(
       2,
