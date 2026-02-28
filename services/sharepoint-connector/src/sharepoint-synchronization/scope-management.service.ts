@@ -156,6 +156,11 @@ export class ScopeManagementService {
   public async deleteOrphanedScopes(siteId: Smeared): Promise<void> {
     const logPrefix = `[Site: ${siteId}]`;
 
+    // Note: When subsites are enabled, we do not need to iterate over all discovered subsite IDs.
+    // This is because `markConflictingScope` (which marks scopes for deletion) constructs the
+    // pending-delete prefix using the root site's ID for all items, including those from subsites.
+    // Therefore, querying by the root site's ID prefix is sufficient to find all orphaned scopes
+    // for the entire site tree.
     let orphanedScopes: Scope[];
     try {
       orphanedScopes = await this.uniqueScopesService.listScopesByExternalIdPrefix(
