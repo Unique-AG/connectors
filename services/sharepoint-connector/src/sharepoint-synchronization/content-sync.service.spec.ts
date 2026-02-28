@@ -122,6 +122,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -160,6 +161,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -198,6 +200,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -229,6 +232,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -276,6 +280,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -334,6 +339,7 @@ describe('ContentSyncService', () => {
           maxFilesToIngest: 2,
         },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -380,6 +386,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -424,6 +431,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -468,6 +476,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -495,6 +504,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -530,6 +540,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -565,6 +576,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({

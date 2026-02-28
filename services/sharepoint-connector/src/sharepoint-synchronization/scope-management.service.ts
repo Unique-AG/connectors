@@ -83,11 +83,11 @@ export class ScopeManagementService {
         );
         rootScope.externalId = updatedScope.externalId;
         this.logger.debug(
-          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${buildSiteExternalId(siteId)}`,
+          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${externalId}`,
         );
       } catch (error) {
         this.logger.warn({
-          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${buildSiteExternalId(siteId)}`,
+          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${externalId}`,
           error: sanitizeError(error),
         });
       }
@@ -335,10 +335,8 @@ export class ScopeManagementService {
     return scopesWithPaths;
   }
 
-  /* Sets the external id on newly created scopes.
-   * This is necessary after creating a new scope to make the scope non editable for other users, essentially marking
-   * the scope as externally created.
-   */
+  // Sets the externalId on new scopes so they're non-editable for other users. Makes the scope
+  // externally managed.
   private async updateNewlyCreatedScopesWithExternalId(
     scopes: Scope[],
     paths: string[],
@@ -346,14 +344,7 @@ export class ScopeManagementService {
     context: SharepointSyncContext,
   ): Promise<void> {
     const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
-    const pathToExternalIdMap = this.buildPathToExternalIdMap(
-      directories,
-      context.rootPath,
-      context.siteName,
-    );
-    // Site pages is a special collection we fetch for ASPX pages, but has no folders.
-    pathToExternalIdMap[`${context.rootPath.value}/SitePages`] =
-      `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId.value}/sitePages`;
+    const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context);
 
     for (const [index, scope] of scopes.entries()) {
       if (isNonNullish(scope.externalId)) {
@@ -442,10 +433,24 @@ export class ScopeManagementService {
 
   private buildPathToExternalIdMap(
     directories: SharepointDirectoryItem[],
-    rootPath: Smeared,
-    siteName: Smeared,
+    context: SharepointSyncContext,
   ): Record<string, string> {
+    const { rootPath, siteName, siteConfig, discoveredSubsites } = context;
     const pathToExternalIdMap: Record<string, string> = {};
+
+    const siteIdToPrefix = new Map<string, string>();
+    for (const subsite of discoveredSubsites) {
+      siteIdToPrefix.set(subsite.siteId.value, subsite.relativePath.value);
+      pathToExternalIdMap[`${rootPath.value}/${subsite.relativePath.value}`] ??=
+        `${EXTERNAL_ID_PREFIX}subsite:${subsite.siteId.value}`;
+      // Site pages is a special collection we fetch for ASPX pages, but has no folders.
+      pathToExternalIdMap[`${rootPath.value}/${subsite.relativePath.value}/SitePages`] =
+        `${EXTERNAL_ID_PREFIX}${subsite.siteId.value}/sitePages`;
+    }
+
+    // Site pages is a special collection we fetch for ASPX pages, but has no folders.
+    pathToExternalIdMap[`${rootPath.value}/SitePages`] =
+      `${EXTERNAL_ID_PREFIX}${siteConfig.siteId.value}/sitePages`;
 
     for (const directory of directories) {
       const path = getUniquePathFromItem(directory, rootPath, siteName);
@@ -453,13 +458,18 @@ export class ScopeManagementService {
         continue;
       }
 
-      const pathWithoutRoot = path.value.substring(rootPath.value.length);
-      const segments = pathWithoutRoot.split('/').filter(Boolean);
-      pathToExternalIdMap[path.value] =
+      pathToExternalIdMap[path.value] ??=
         `${EXTERNAL_ID_PREFIX}folder:${directory.siteId.value}/${directory.item.id}`;
-      // siteName is now stripped, so first segment is already the drive
-      pathToExternalIdMap[`${rootPath.value}/${segments[0]}`] ??=
-        `${EXTERNAL_ID_PREFIX}drive:${directory.siteId.value}/${directory.driveId}`;
+
+      const sitePrefix = siteIdToPrefix.get(directory.siteId.value);
+      const siteScopePath = sitePrefix ? `${rootPath.value}/${sitePrefix}` : rootPath.value;
+      const driveRelative = path.value.substring(siteScopePath.length);
+      const segments = driveRelative.split('/').filter(Boolean);
+      // Segments can be empty when a directory resolves to exactly the site scope path.
+      if (segments[0]) {
+        pathToExternalIdMap[`${siteScopePath}/${segments[0]}`] ??=
+          `${EXTERNAL_ID_PREFIX}drive:${directory.siteId.value}/${directory.driveId}`;
+      }
     }
 
     return pathToExternalIdMap;

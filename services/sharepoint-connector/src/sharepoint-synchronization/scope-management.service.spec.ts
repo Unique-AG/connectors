@@ -113,6 +113,7 @@ describe('ScopeManagementService', () => {
       scopeId: 'root-scope-123',
     }),
     isInitialSync: false,
+    discoveredSubsites: [],
   };
 
   let service: ScopeManagementService;
@@ -450,6 +451,213 @@ describe('ScopeManagementService', () => {
       // The logger is globally mocked, so we can check the mock calls
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].log).toHaveBeenCalledWith(expect.stringContaining('[Site:'));
+    });
+
+    describe('subsite external ID assignment', () => {
+      let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+
+      const makeSubsite = (name: string, relativePath: string, siteId: string) => ({
+        siteId: new Smeared(siteId, false),
+        name: new Smeared(name, false),
+        relativePath: new Smeared(relativePath, false),
+      });
+
+      const createSubsiteContentItem = (
+        path: string,
+        siteId: string,
+      ): SharepointContentItem => {
+        const item = createDriveContentItem(path);
+        return {
+          ...item,
+          siteId: new Smeared(siteId, false),
+          syncSiteId: new Smeared('site-123', false),
+        };
+      };
+
+      const createSubsiteDirectoryItem = (
+        webUrl: string,
+        siteId: string,
+        driveId: string,
+        folderId: string,
+      ): SharepointDirectoryItem =>
+        ({
+          itemType: 'directory',
+          siteId: new Smeared(siteId, false),
+          syncSiteId: new Smeared('site-123', false),
+          driveId,
+          driveName: 'Documents',
+          folderPath: '/path',
+          fileName: '',
+          item: {
+            id: folderId,
+            webUrl,
+            listItem: {
+              webUrl: '',
+              id: 'li-1',
+              '@odata.etag': 'e',
+              eTag: 'e',
+              createdDateTime: '2025-01-01T00:00:00Z',
+              lastModifiedDateTime: '2025-01-01T00:00:00Z',
+              fields: {},
+            },
+          },
+        }) as SharepointDirectoryItem;
+
+      beforeEach(async () => {
+        updateScopeExternalIdMock = vi
+          .fn()
+          .mockResolvedValue({ externalId: 'updated-external-id' });
+
+        const { unit } = await TestBed.solitary(ScopeManagementService)
+          .mock<UniqueScopesService>(UniqueScopesService)
+          .impl((stubFn) => ({
+            ...stubFn(),
+            createScopesBasedOnPaths: vi
+              .fn()
+              .mockImplementation((paths: string[]) =>
+                paths.map((path, i) => ({
+                  id: `scope-${i}`,
+                  name: path.split('/').pop(),
+                  parentId: null,
+                  externalId: null,
+                })),
+              ),
+            updateScopeExternalId: updateScopeExternalIdMock,
+          }))
+          .compile();
+
+        service = unit;
+
+        Object.defineProperty(service, 'logger', {
+          value: {
+            log: vi.fn(),
+            error: vi.fn(),
+            warn: vi.fn(),
+            debug: vi.fn(),
+            verbose: vi.fn(),
+          },
+          writable: true,
+        });
+      });
+
+      it('assigns subsite: and drive: for subsite directories', async () => {
+        const subASiteId = 'host.com,col-a,web-a';
+        const context: SharepointSyncContext = {
+          ...mockContext,
+          discoveredSubsites: [makeSubsite('SubA', 'SubA', subASiteId)],
+        };
+        const item = createSubsiteContentItem('SubA/Documents/Reports', subASiteId);
+        const directory = createSubsiteDirectoryItem(
+          'https://example.sharepoint.com/sites/test1/SubA/Documents/Reports',
+          subASiteId,
+          'sub-drive',
+          'sub-folder',
+        );
+
+        await service.batchCreateScopes([item], [directory], context);
+
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:drive:${subASiteId}/sub-drive` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:folder:${subASiteId}/sub-folder` }),
+        );
+      });
+
+      it('strips nested subsite prefix so drive is correctly identified', async () => {
+        const subASiteId = 'host.com,a1,a2';
+        const subBSiteId = 'host.com,b1,b2';
+        const context: SharepointSyncContext = {
+          ...mockContext,
+          discoveredSubsites: [
+            makeSubsite('SubA', 'SubA', subASiteId),
+            makeSubsite('SubB', 'SubA/SubB', subBSiteId),
+          ],
+        };
+        const item = createSubsiteContentItem('SubA/SubB/Docs/Archive', subBSiteId);
+        const directory = createSubsiteDirectoryItem(
+          'https://example.sharepoint.com/sites/test1/SubA/SubB/Docs/Archive',
+          subBSiteId,
+          'nested-drive',
+          'nested-folder',
+        );
+
+        await service.batchCreateScopes([item], [directory], context);
+
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:subsite:${subBSiteId}` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:drive:${subBSiteId}/nested-drive` }),
+        );
+      });
+
+      it('assigns correct IDs for both root-site and subsite directories together', async () => {
+        const subASiteId = 'host.com,col-a,web-a';
+        const context: SharepointSyncContext = {
+          ...mockContext,
+          discoveredSubsites: [makeSubsite('SubA', 'SubA', subASiteId)],
+        };
+        const rootItem = createDriveContentItem('Documents/Folder1');
+        const rootDirectory: SharepointDirectoryItem = {
+          itemType: 'directory',
+          siteId: new Smeared('site-123', false),
+          driveId: 'root-drive',
+          driveName: 'Documents',
+          folderPath: '/Documents/Folder1',
+          fileName: '',
+          item: {
+            id: 'root-folder',
+            webUrl: 'https://example.sharepoint.com/sites/test1/Documents/Folder1',
+          },
+        } as SharepointDirectoryItem;
+        const subsiteItem = createSubsiteContentItem('SubA/Docs/Reports', subASiteId);
+        const subsiteDirectory = createSubsiteDirectoryItem(
+          'https://example.sharepoint.com/sites/test1/SubA/Docs/Reports',
+          subASiteId,
+          'sub-drive',
+          'sub-folder',
+        );
+
+        await service.batchCreateScopes(
+          [rootItem, subsiteItem],
+          [rootDirectory, subsiteDirectory],
+          context,
+        );
+
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: 'spc:drive:site-123/root-drive' }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: 'spc:folder:site-123/root-folder' }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:drive:${subASiteId}/sub-drive` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:folder:${subASiteId}/sub-folder` }),
+        );
+      });
     });
   });
 

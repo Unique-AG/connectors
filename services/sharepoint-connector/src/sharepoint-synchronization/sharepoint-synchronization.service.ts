@@ -267,6 +267,7 @@ export class SharepointSynchronizationService {
         serviceUserId: baseContext.serviceUserId,
         rootPath: baseContext.rootPath,
         isInitialSync: baseContext.isInitialSync,
+        discoveredSubsites: [],
       },
     };
   }
@@ -293,6 +294,7 @@ export class SharepointSynchronizationService {
     if (context.siteConfig.subsitesScan === EnabledDisabledMode.Enabled) {
       try {
         subsites = await this.discoverSubsites(context, configuredSubsiteIds, logPrefix);
+        context.discoveredSubsites = subsites;
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to discover subsites`,

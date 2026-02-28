@@ -147,6 +147,7 @@ describe('ProcessingPipelineService', () => {
     serviceUserId: 'test-user-id',
     rootPath: new Smeared('/Root', false),
     isInitialSync: false,
+    discoveredSubsites: [],
   };
 
   it('processes file through all pipeline steps successfully', async () => {
