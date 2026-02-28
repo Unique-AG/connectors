@@ -864,6 +864,105 @@ describe('SharepointSynchronizationService', () => {
     expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
   });
 
+  it('skips discovered subsites that are already configured as standalone sites', async () => {
+    const parentSiteConfig = createMockSiteConfig({
+      siteId: new Smeared('parent-site-id', false),
+      scopeId: 'parent-scope',
+      subsitesScan: 'enabled',
+    });
+    const standaloneSiteConfig = createMockSiteConfig({
+      siteId: new Smeared('host,col,subsite-web-id', false),
+      scopeId: 'standalone-scope',
+    });
+    mockSitesConfigurationService.loadSitesConfiguration = vi
+      .fn()
+      .mockResolvedValue([parentSiteConfig, standaloneSiteConfig]);
+
+    mockSubsiteDiscoveryService.discoverAllSubsites.mockResolvedValue([
+      {
+        siteId: new Smeared('host,col,subsite-web-id', false),
+        name: new Smeared('SubA', false),
+        relativePath: new Smeared('SubA', false),
+      },
+      {
+        siteId: new Smeared('host,col,other-subsite', false),
+        name: new Smeared('SubB', false),
+        relativePath: new Smeared('SubB', false),
+      },
+    ]);
+
+    const parentFile: SharepointContentItem = { ...mockFile, siteId: parentSiteConfig.siteId };
+    const otherSubsiteFile: SharepointContentItem = {
+      ...mockFile,
+      siteId: new Smeared('host,col,other-subsite', false),
+    };
+    mockGraphApiService.getAllSiteItems = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [parentFile], directories: [] })
+      .mockResolvedValueOnce({ items: [otherSubsiteFile], directories: [] })
+      .mockResolvedValue({ items: [mockFile], directories: [] });
+
+    await service.synchronize();
+
+    // 3 calls: parent site, non-configured subsite (SubB) via discovery, standalone site via its own sync
+    // Without the guard, there would be 4 calls (SubA also fetched via discovery)
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(3);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+      parentSiteConfig.siteId,
+      expect.any(String),
+    );
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'host,col,other-subsite' }),
+      expect.any(String),
+    );
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+      standaloneSiteConfig.siteId,
+      expect.any(String),
+    );
+  });
+
+  // This test case is here for purely documentation purposes. This should never happen that subsite
+  // is configured with simple UUID, because to fetch them via API we need to use the compound ID.
+  it('does not skip subsites when configured sites use plain UUID format', async () => {
+    const parentSiteConfig = createMockSiteConfig({
+      siteId: new Smeared('parent-site-id', false),
+      scopeId: 'parent-scope',
+      subsitesScan: 'enabled',
+    });
+    const uuidSiteConfig = createMockSiteConfig({
+      siteId: new Smeared('some-uuid-site-id', false),
+      scopeId: 'uuid-scope',
+    });
+    mockSitesConfigurationService.loadSitesConfiguration = vi
+      .fn()
+      .mockResolvedValue([parentSiteConfig, uuidSiteConfig]);
+
+    mockSubsiteDiscoveryService.discoverAllSubsites.mockResolvedValue([
+      {
+        siteId: new Smeared('host,col,discovered-subsite', false),
+        name: new Smeared('SubA', false),
+        relativePath: new Smeared('SubA', false),
+      },
+    ]);
+
+    const subsiteFile: SharepointContentItem = {
+      ...mockFile,
+      siteId: new Smeared('host,col,discovered-subsite', false),
+    };
+    mockGraphApiService.getAllSiteItems = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [mockFile], directories: [] })
+      .mockResolvedValueOnce({ items: [subsiteFile], directories: [] })
+      .mockResolvedValue({ items: [mockFile], directories: [] });
+
+    await service.synchronize();
+
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'host,col,discovered-subsite' }),
+      expect.any(String),
+    );
+  });
+
   it('cleans up orphaned scopes using parent site ID when subsites are enabled', async () => {
     const siteConfig = createMockSiteConfig({
       siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),

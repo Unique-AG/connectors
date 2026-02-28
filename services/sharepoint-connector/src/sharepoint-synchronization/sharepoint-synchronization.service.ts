@@ -103,10 +103,18 @@ export class SharepointSynchronizationService {
 
       this.logger.log(`Starting scan of ${active.length} active SharePoint sites...`);
 
+      // Subsites are only addressable via compound IDs (hostname,siteCollectionId,webId) in the
+      // Graph API — a plain UUID (webId alone) cannot retrieve a subsite. Therefore, any subsite
+      // configured as a standalone site will always use a compound ID, and we only need to compare
+      // compound IDs when deduplicating against discovered subsites.
+      const configuredSubsiteIds = new Set(
+        active.map((site) => site.siteId.value).filter((siteId) => siteId.split(',').length === 3),
+      );
+
       for (const siteConfig of active) {
         const siteSyncStartTime = Date.now();
 
-        const result = await this.syncSite(siteConfig);
+        const result = await this.syncSite(siteConfig, configuredSubsiteIds);
         this.recordSiteMetric(siteSyncStartTime, siteConfig.siteId, result);
       }
 
@@ -263,7 +271,10 @@ export class SharepointSynchronizationService {
     };
   }
 
-  private async syncSite(siteConfig: SiteConfig): Promise<SiteSyncResult> {
+  private async syncSite(
+    siteConfig: SiteConfig,
+    configuredSubsiteIds: Set<string>,
+  ): Promise<SiteSyncResult> {
     const logPrefix = `[Site: ${siteConfig.siteId}]`;
     let scopes: ScopeWithPath[] | null = null;
     const siteStartTime = Date.now();
@@ -298,7 +309,11 @@ export class SharepointSynchronizationService {
 
     if (context.siteConfig.subsitesScan === EnabledDisabledMode.Enabled) {
       try {
-        const subsiteResult = await this.fetchSubsiteItems(context, logPrefix);
+        const subsiteResult = await this.fetchSubsiteItems(
+          context,
+          configuredSubsiteIds,
+          logPrefix,
+        );
         items.push(...subsiteResult.items);
         directories.push(...subsiteResult.directories);
       } catch (error) {
@@ -370,13 +385,29 @@ export class SharepointSynchronizationService {
 
   private async fetchSubsiteItems(
     context: SharepointSyncContext,
+    configuredSubsiteIds: Set<string>,
     logPrefix: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
-    const subsites = await this.subsiteDiscoveryService.discoverAllSubsites(
+    const allSubsites = await this.subsiteDiscoveryService.discoverAllSubsites(
       context.siteConfig.siteId,
     );
 
-    this.logger.log(`${logPrefix} Discovered ${subsites.length} subsites`);
+    // We guard against fetching items for subsites that are already configured as standalone sites.
+    // Syncing site twice into different scopes would have most probably a range of issues regarding
+    // permissions, conflicting externalIds and constant moving of items between scopes.
+    const subsites = allSubsites.filter((subsite) => {
+      if (configuredSubsiteIds.has(subsite.siteId.value)) {
+        this.logger.warn(
+          `${logPrefix} Skipping discovered subsite ${subsite.siteId} — it is already configured as a standalone site`,
+        );
+        return false;
+      }
+      return true;
+    });
+
+    this.logger.log(
+      `${logPrefix} Discovered ${allSubsites.length} subsites, ${subsites.length} to sync`,
+    );
 
     const items: SharepointContentItem[] = [];
     const directories: SharepointDirectoryItem[] = [];
