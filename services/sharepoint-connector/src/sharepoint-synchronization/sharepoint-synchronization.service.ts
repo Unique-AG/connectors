@@ -426,6 +426,7 @@ export class SharepointSynchronizationService {
     context: SharepointSyncContext,
     logPrefix: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
+    const syncSiteId = context.siteConfig.siteId;
     const items: SharepointContentItem[] = [];
     const directories: SharepointDirectoryItem[] = [];
 
@@ -437,8 +438,16 @@ export class SharepointSynchronizationService {
         subsite.siteId,
         context.siteConfig.syncColumnName,
       );
-      items.push(...result.items);
-      directories.push(...result.directories);
+      // Key subsite items under the parent siteId so they share the same ingestion key prefix.
+      // This ensures the file diff (scoped to parentSiteId) sees all items and detects deletions
+      // when a subsite is removed or reconfigured as a standalone site. The original siteId stays
+      // intact for API calls (e.g. ASPX page content fetching).
+      for (const item of result.items) {
+        items.push({ ...item, syncSiteId });
+      }
+      for (const dir of result.directories) {
+        directories.push({ ...dir, syncSiteId });
+      }
     }
 
     return { items, directories };

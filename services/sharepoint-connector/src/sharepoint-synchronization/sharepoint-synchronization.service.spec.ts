@@ -825,7 +825,7 @@ describe('SharepointSynchronizationService', () => {
       expect.any(String),
     );
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
-      [mockFile, subsiteFile],
+      [mockFile, { ...subsiteFile, syncSiteId: siteConfig.siteId }],
       null,
       expect.anything(),
     );

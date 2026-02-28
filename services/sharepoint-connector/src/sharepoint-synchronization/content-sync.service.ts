@@ -103,8 +103,8 @@ export class ContentSyncService {
       return;
     }
 
-    const newItems = items.filter((item) => newFileKeys.has(item.item.id));
-    const updatedItems = items.filter((item) => updatedFileKeys.has(item.item.id));
+    const newItems = items.filter((item) => newFileKeys.has(buildFileDiffKey(item)));
+    const updatedItems = items.filter((item) => updatedFileKeys.has(buildFileDiffKey(item)));
 
     const getScopeIdForItem = (itemId: string): string => {
       const scopeId = context.siteConfig.scopeId;
@@ -260,7 +260,7 @@ export class ContentSyncService {
     }
 
     this.logger.log(
-      `${logPrefix} Completed file deletion in Unique: ${totalDeleted}/${deletedFileKeys.length} files deleted files`,
+      `${logPrefix} Completed file deletion in Unique: ${totalDeleted}/${deletedFileKeys.length} files deleted`,
     );
   }
 }

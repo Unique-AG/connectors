@@ -3,6 +3,7 @@ import { DriveItem, ListItem } from './sharepoint.types';
 
 interface BaseItem {
   siteId: Smeared;
+  syncSiteId?: Smeared; // The ID of the top site that subsite items are ingested from
   driveId: string;
   driveName: string;
   folderPath: string;

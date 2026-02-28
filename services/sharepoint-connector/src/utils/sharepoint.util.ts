@@ -20,19 +20,29 @@ export function getItemUrl(sharepointContentItem: SharepointContentItem): string
 }
 
 /**
- * Builds a key for file-diff comparison.
+ * Builds the key portion submitted to the file-diff API.
  *
- * File-diff only compares the last segment of a path (e.g., in "key1/key2/key3", only "key3" is compared).
- * Therefore, we use only the item ID as the key. For a full hierarchical key, see buildIngestionItemKey.
+ * The diff API scopes to items whose full key starts with `partialKey/` (the parent siteId) and
+ * compares the remainder against submitted keys. For main-site items the remainder is just the
+ * itemId; for subsite items it is `subsiteId/itemId`.
  */
 export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): string {
+  if (sharepointContentItem.syncSiteId) {
+    return `${sharepointContentItem.siteId.value}/${sharepointContentItem.item.id}`;
+  }
   return sharepointContentItem.item.id;
 }
 
 /**
  * Builds a unique hierarchical key for ingestion.
+ *
+ * Main-site items:  `{siteId}/{itemId}`
+ * Subsite items:    `{parentSiteId}/{subsiteId}/{itemId}`
  */
 export function buildIngestionItemKey(sharepointContentItem: AnySharepointItem): string {
+  if (sharepointContentItem.syncSiteId) {
+    return `${sharepointContentItem.syncSiteId.value}/${sharepointContentItem.siteId.value}/${sharepointContentItem.item.id}`;
+  }
   return `${sharepointContentItem.siteId.value}/${sharepointContentItem.item.id}`;
 }
 

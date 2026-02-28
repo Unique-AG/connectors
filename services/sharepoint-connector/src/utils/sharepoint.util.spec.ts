@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type {
+  AnySharepointItem,
+  SharepointContentItem,
+} from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import {
+  buildFileDiffKey,
   buildIngestionItemKey,
   getUniqueParentPathFromItem,
   getUniquePathFromItem,
@@ -416,15 +420,46 @@ describe('getUniquePathFromItem', () => {
 });
 
 describe('buildIngestionItemKey', () => {
-  it('uses the raw siteId value instead of the smeared string', () => {
+  it('produces {siteId}/{itemId} for main-site items', () => {
     const siteId = 'bd9c85ee-998f-4665-9c44-73b6f2f3c3c1';
     const item = createDriveItem(
       'https://tenant.sharepoint.com/sites/TestSite/Shared%20Documents/Folder/document.pdf',
     );
     item.siteId = new Smeared(siteId, true);
 
-    const result = buildIngestionItemKey(item);
+    expect(buildIngestionItemKey(item)).toBe(`${siteId}/file123`);
+  });
 
-    expect(result).toBe(`${siteId}/file123`);
+  it('produces {parentSiteId}/{subsiteId}/{itemId} for subsite items', () => {
+    const parentSiteId = 'parent-site-uuid';
+    const subsiteSiteId = 'contoso.sharepoint.com,col-id,web-id';
+    const item = createDriveItem(
+      'https://tenant.sharepoint.com/sites/TestSite/Sub/Shared%20Documents/doc.pdf',
+    );
+    item.siteId = new Smeared(subsiteSiteId, false);
+    item.syncSiteId = new Smeared(parentSiteId, false);
+
+    expect(buildIngestionItemKey(item)).toBe(`${parentSiteId}/${subsiteSiteId}/file123`);
+  });
+});
+
+describe('buildFileDiffKey', () => {
+  it('returns itemId for main-site items', () => {
+    const item = createDriveItem(
+      'https://tenant.sharepoint.com/sites/TestSite/Shared%20Documents/doc.pdf',
+    ) as SharepointContentItem;
+
+    expect(buildFileDiffKey(item)).toBe('file123');
+  });
+
+  it('returns {subsiteId}/{itemId} for subsite items', () => {
+    const subsiteSiteId = 'contoso.sharepoint.com,col-id,web-id';
+    const item = createDriveItem(
+      'https://tenant.sharepoint.com/sites/TestSite/Sub/Shared%20Documents/doc.pdf',
+    ) as SharepointContentItem;
+    item.siteId = new Smeared(subsiteSiteId, false);
+    item.syncSiteId = new Smeared('parent-uuid', false);
+
+    expect(buildFileDiffKey(item)).toBe(`${subsiteSiteId}/file123`);
   });
 });
