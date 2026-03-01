@@ -812,7 +812,10 @@ describe('SharepointSynchronizationService', () => {
 
     await service.synchronize();
 
-    expect(mockSubsiteDiscoveryService.discoverAllSubsites).toHaveBeenCalledWith(siteConfig.siteId);
+    expect(mockSubsiteDiscoveryService.discoverAllSubsites).toHaveBeenCalledWith(
+      siteConfig.siteId,
+      new Smeared('test-site-name', false),
+    );
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
     const getAllSiteItemsMock = mockGraphApiService.getAllSiteItems as ReturnType<typeof vi.fn>;
     expect(

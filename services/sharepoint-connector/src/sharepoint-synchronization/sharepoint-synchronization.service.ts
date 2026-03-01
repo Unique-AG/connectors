@@ -401,6 +401,7 @@ export class SharepointSynchronizationService {
   ): Promise<DiscoveredSubsite[]> {
     const allSubsites = await this.subsiteDiscoveryService.discoverAllSubsites(
       context.siteConfig.siteId,
+      context.siteName,
     );
 
     // We guard against fetching items for subsites that are already configured as standalone sites.
