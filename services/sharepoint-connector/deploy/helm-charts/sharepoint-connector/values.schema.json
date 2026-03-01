@@ -371,6 +371,12 @@
                     ],
                     "description": "Inheritance mode for scopes and files. Only used in content_only sync mode; ignored in content_and_permissions mode.",
                     "default": "inherit_scopes_and_files"
+                  },
+                  "subsitesScan": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
+                    "description": "Whether to recursively discover and sync content from subsites",
+                    "default": "disabled"
                   }
                 },
                 "additionalProperties": false

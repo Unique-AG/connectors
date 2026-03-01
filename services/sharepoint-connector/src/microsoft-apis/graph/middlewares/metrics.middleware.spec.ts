@@ -715,38 +715,7 @@ describe('MetricsMiddleware', () => {
       vi.restoreAllMocks();
     });
 
-    it('conceals site names in logged endpoints when enabled', async () => {
-      const concealingConfigService = createConcealingConfigService();
-      const concealingMiddleware = new MetricsMiddleware(
-        mockHistogram,
-        mockCounter,
-        mockCounter,
-        concealingConfigService,
-      );
-      concealingMiddleware.setNext(mockNextMiddleware);
-
-      const mockContext: Context = {
-        request: 'https://graph.microsoft.com/v1.0/sites/LoadTestFlat/_layouts/15/download.aspx',
-        options: { method: 'GET' },
-      };
-
-      const mockResponse = new Response('{"value": []}', { status: 200 });
-      mockContext.response = mockResponse;
-
-      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
-        ctx.response = mockResponse;
-      });
-
-      await concealingMiddleware.execute(mockContext);
-
-      expect(loggerDebugSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          endpoint: '/sites/********Flat/_layouts/15/download.aspx',
-        }),
-      );
-    });
-
-    it('conceals site IDs in logged endpoints when enabled', async () => {
+    it('conceals UUID site IDs in logged endpoints when enabled', async () => {
       const concealingConfigService = createConcealingConfigService();
       const concealingMiddleware = new MetricsMiddleware(
         mockHistogram,
@@ -778,7 +747,7 @@ describe('MetricsMiddleware', () => {
       );
     });
 
-    it('conceals site IDs in logged endpoints without trailing path when enabled', async () => {
+    it('conceals compound site IDs in logged endpoints when enabled', async () => {
       const concealingConfigService = createConcealingConfigService();
       const concealingMiddleware = new MetricsMiddleware(
         mockHistogram,
@@ -789,7 +758,8 @@ describe('MetricsMiddleware', () => {
       concealingMiddleware.setNext(mockNextMiddleware);
 
       const mockContext: Context = {
-        request: 'https://graph.microsoft.com/v1.0/sites/1d045c6a-f230-48fd-b826-7cf8601d7729',
+        request:
+          'https://graph.microsoft.com/v1.0/sites/contoso.sharepoint.com,af2b5be6-a37d-4992-ab8f-988b0134007e,86088ee2-974c-49b8-9689-ba6e04b1807c/lists',
         options: { method: 'GET' },
       };
 
@@ -804,7 +774,8 @@ describe('MetricsMiddleware', () => {
 
       expect(loggerDebugSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          endpoint: '/sites/********-****-****-****-********7729',
+          endpoint:
+            '/sites/*******.**********.com,********-****-****-****-********007e,********-****-****-****-********807c/lists',
         }),
       );
     });

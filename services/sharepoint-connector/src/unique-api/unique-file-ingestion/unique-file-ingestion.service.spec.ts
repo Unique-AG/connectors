@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { StoreInternallyMode } from '../../constants/store-internally-mode.enum';
+import { EnabledDisabledMode } from '../../constants/enabled-disabled-mode.enum';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { Smeared } from '../../utils/smeared';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
@@ -39,7 +39,7 @@ describe('UniqueFileIngestionService', () => {
         ...stub(),
         get: vi.fn((key: string) => {
           if (key === 'unique') {
-            return { storeInternally: StoreInternallyMode.Enabled };
+            return { storeInternally: EnabledDisabledMode.Enabled };
           }
           return undefined;
         }),
@@ -147,7 +147,7 @@ describe('UniqueFileIngestionService', () => {
           ...stub(),
           get: vi.fn((key: string) => {
             if (key === 'unique') {
-              return { storeInternally: StoreInternallyMode.Enabled };
+              return { storeInternally: EnabledDisabledMode.Enabled };
             }
             if (key === 'unique.ingestionServiceBaseUrl') {
               return 'https://api.unique.app/ingestion';
@@ -206,7 +206,7 @@ describe('UniqueFileIngestionService', () => {
           ...stub(),
           get: vi.fn((key: string) => {
             if (key === 'unique') {
-              return { storeInternally: StoreInternallyMode.Enabled };
+              return { storeInternally: EnabledDisabledMode.Enabled };
             }
             if (key === 'unique.ingestionServiceBaseUrl') {
               return 'https://api.unique.app';

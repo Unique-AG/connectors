@@ -103,6 +103,7 @@ describe('ItemProcessingOrchestratorService', () => {
     serviceUserId: 'test-user-id',
     rootPath: new Smeared('/Root', false),
     isInitialSync: false,
+    discoveredSubsites: [],
   };
 
   it('processes all provided files', async () => {

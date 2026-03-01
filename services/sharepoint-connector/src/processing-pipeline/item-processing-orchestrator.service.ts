@@ -19,7 +19,7 @@ export class ItemProcessingOrchestratorService {
     syncContext: SharepointSyncContext,
     newItems: SharepointContentItem[],
     updatedItems: SharepointContentItem[],
-    getScopeIdForItem: (itemId: string) => string,
+    getScopeIdForItem: (item: SharepointContentItem) => string,
   ): Promise<void> {
     const concurrency = this.configService.get('processing.concurrency', { infer: true });
     const limit = pLimit(concurrency);
@@ -38,14 +38,14 @@ export class ItemProcessingOrchestratorService {
 
     const newItemsPromises = newItems.map((item) =>
       limit(async () => {
-        const scopeId = getScopeIdForItem(item.item.id);
+        const scopeId = getScopeIdForItem(item);
         await this.processingPipelineService.processItem(item, scopeId, 'new', syncContext);
       }),
     );
 
     const updatedItemsPromises = updatedItems.map((item) =>
       limit(async () => {
-        const scopeId = getScopeIdForItem(item.item.id);
+        const scopeId = getScopeIdForItem(item);
         await this.processingPipelineService.processItem(item, scopeId, 'updated', syncContext);
       }),
     );

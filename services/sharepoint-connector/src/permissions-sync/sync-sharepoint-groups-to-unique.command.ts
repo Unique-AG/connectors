@@ -2,7 +2,6 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { type Counter } from '@opentelemetry/api';
 import { difference, filter, isNonNullish, map, pickBy, pipe } from 'remeda';
 import { SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL } from '../metrics';
-import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.service';
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 import { getSharepointConnectorGroupExternalId } from '../unique-api/unique-groups/unique-groups.utils';
@@ -17,6 +16,7 @@ import {
 
 interface Input {
   siteId: Smeared;
+  siteNamesBySiteId: ReadonlyMap<string, Smeared>;
   sharePoint: {
     groupsMap: SharePointGroupsMap;
   };
@@ -39,17 +39,15 @@ export class SyncSharepointGroupsToUniqueCommand {
 
   public constructor(
     private readonly uniqueGroupsService: UniqueGroupsService,
-    private readonly graphApiService: GraphApiService,
     @Inject(SPC_PERMISSIONS_SYNC_GROUP_OPERATIONS_TOTAL)
     private readonly spcPermissionsSyncGroupOperationsTotal: Counter,
   ) {}
 
   public async run(input: Input): Promise<Output> {
-    const { siteId, sharePoint, unique } = input;
+    const { siteId, siteNamesBySiteId, sharePoint, unique } = input;
 
     const logPrefix = `[Site: ${siteId}]`;
 
-    const siteName = await this.graphApiService.getSiteName(siteId);
     const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 
     const sharePointGroups = Object.values(sharePoint.groupsMap);
@@ -71,11 +69,19 @@ export class SyncSharepointGroupsToUniqueCommand {
         `${groupLogPrefix} Syncing sharepoint group ${createSmeared(sharePointGroup.displayName)}`,
       );
 
+      // We only use subsite-specific group name for site groups, because entra groups are same
+      // across all sites and subsites so we use the top-level site name for them
+      const effectiveSiteId = sharePointGroup.id.startsWith('siteGroup:')
+        ? sharePointGroup.siteId
+        : siteId;
+      const groupSiteName =
+        siteNamesBySiteId.get(effectiveSiteId.value) ?? createSmeared(effectiveSiteId.value);
+
       const correspondingUniqueGroup = unique.groupsMap[sharePointGroup.id];
       if (!correspondingUniqueGroup) {
         const newUniqueGroup = await this.createUniqueGroup(
           siteId,
-          siteName,
+          groupSiteName,
           sharePointGroup,
           unique.usersMap,
         );
@@ -92,7 +98,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
       const [didUpdate, updatedUniqueGroup] = await this.syncExistingUniqueGroup(
         correspondingUniqueGroup,
-        siteName,
+        groupSiteName,
         sharePointGroup,
         unique.usersMap,
       );

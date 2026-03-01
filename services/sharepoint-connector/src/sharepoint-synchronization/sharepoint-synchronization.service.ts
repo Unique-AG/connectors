@@ -5,6 +5,7 @@ import { entries, groupBy } from 'remeda';
 import { ConfigEmitEvent } from '../config/app.config';
 import { ConfigDiagnosticsService } from '../config/config-diagnostics.service';
 import type { SiteConfig } from '../config/sharepoint.schema';
+import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { SyncStep } from '../constants/sync-step.enum';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
@@ -19,11 +20,12 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
-import type { Smeared } from '../utils/smeared';
+import { type Smeared, smearPath } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
 import { SharepointSyncContext } from './sharepoint-sync-context.interface';
+import { DiscoveredSubsite, SubsiteDiscoveryService } from './subsite-discovery.service';
 
 type SiteSyncResult =
   | { status: 'success' }
@@ -49,6 +51,7 @@ export class SharepointSynchronizationService {
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly configDiagnosticsService: ConfigDiagnosticsService,
+    private readonly subsiteDiscoveryService: SubsiteDiscoveryService,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
   ) {}
@@ -100,10 +103,18 @@ export class SharepointSynchronizationService {
 
       this.logger.log(`Starting scan of ${active.length} active SharePoint sites...`);
 
+      // Subsites are only addressable via compound IDs (hostname,siteCollectionId,webId) in the
+      // Graph API — a plain UUID (webId alone) cannot retrieve a subsite. Therefore, any subsite
+      // configured as a standalone site will always use a compound ID, and we only need to compare
+      // compound IDs when deduplicating against discovered subsites.
+      const configuredSubsiteIds = new Set(
+        sites.map((site) => site.siteId.value).filter((siteId) => siteId.split(',').length === 3),
+      );
+
       for (const siteConfig of active) {
         const siteSyncStartTime = Date.now();
 
-        const result = await this.syncSite(siteConfig);
+        const result = await this.syncSite(siteConfig, configuredSubsiteIds);
         this.recordSiteMetric(siteSyncStartTime, siteConfig.siteId, result);
       }
 
@@ -256,11 +267,15 @@ export class SharepointSynchronizationService {
         serviceUserId: baseContext.serviceUserId,
         rootPath: baseContext.rootPath,
         isInitialSync: baseContext.isInitialSync,
+        discoveredSubsites: [],
       },
     };
   }
 
-  private async syncSite(siteConfig: SiteConfig): Promise<SiteSyncResult> {
+  private async syncSite(
+    siteConfig: SiteConfig,
+    configuredSubsiteIds: Set<string>,
+  ): Promise<SiteSyncResult> {
     const logPrefix = `[Site: ${siteConfig.siteId}]`;
     let scopes: ScopeWithPath[] | null = null;
     const siteStartTime = Date.now();
@@ -274,6 +289,20 @@ export class SharepointSynchronizationService {
       return { status: 'failure', step: initResult.failureStep };
     }
     const { context } = initResult;
+
+    let subsites: DiscoveredSubsite[] = [];
+    if (context.siteConfig.subsitesScan === EnabledDisabledMode.Enabled) {
+      try {
+        subsites = await this.discoverSubsites(context, configuredSubsiteIds, logPrefix);
+        context.discoveredSubsites = subsites;
+      } catch (error) {
+        this.logger.error({
+          msg: `${logPrefix} Failed to discover subsites`,
+          error: sanitizeError(error),
+        });
+        return { status: 'failure', step: SyncStep.SubsiteDiscovery };
+      }
+    }
 
     let items: SharepointContentItem[];
     let directories: SharepointDirectoryItem[];
@@ -291,6 +320,20 @@ export class SharepointSynchronizationService {
         error: sanitizeError(error),
       });
       return { status: 'failure', step: SyncStep.SiteItemsFetch };
+    }
+
+    if (subsites.length > 0) {
+      try {
+        const subsiteResult = await this.fetchItemsForSubsites(subsites, context, logPrefix);
+        items.push(...subsiteResult.items);
+        directories.push(...subsiteResult.directories);
+      } catch (error) {
+        this.logger.error({
+          msg: `${logPrefix} Failed to fetch subsite items`,
+          error: sanitizeError(error),
+        });
+        return { status: 'failure', step: SyncStep.SubsiteItemsFetch };
+      }
     }
 
     this.logger.log(`${logPrefix} Finished scanning in ${elapsedSecondsLog(siteStartTime)}`);
@@ -349,5 +392,67 @@ export class SharepointSynchronizationService {
     }
 
     return { status: 'success' };
+  }
+
+  private async discoverSubsites(
+    context: SharepointSyncContext,
+    configuredSubsiteIds: Set<string>,
+    logPrefix: string,
+  ): Promise<DiscoveredSubsite[]> {
+    const allSubsites = await this.subsiteDiscoveryService.discoverAllSubsites(
+      context.siteConfig.siteId,
+      context.siteName,
+    );
+
+    // We guard against fetching items for subsites that are already configured as standalone sites.
+    // Syncing site twice into different scopes would have most probably a range of issues regarding
+    // permissions, conflicting externalIds and constant moving of items between scopes.
+    const subsites = allSubsites.filter((subsite) => {
+      if (configuredSubsiteIds.has(subsite.siteId.value)) {
+        this.logger.warn(
+          `${logPrefix} Skipping discovered subsite ${subsite.siteId} — it is already configured as a standalone site`,
+        );
+        return false;
+      }
+      return true;
+    });
+
+    this.logger.log(
+      `${logPrefix} Discovered ${allSubsites.length} subsites, ${subsites.length} to sync`,
+    );
+
+    return subsites;
+  }
+
+  private async fetchItemsForSubsites(
+    subsites: DiscoveredSubsite[],
+    context: SharepointSyncContext,
+    logPrefix: string,
+  ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
+    const syncSiteId = context.siteConfig.siteId;
+    const items: SharepointContentItem[] = [];
+    const directories: SharepointDirectoryItem[] = [];
+
+    for (const subsite of subsites) {
+      this.logger.log(
+        `${logPrefix} Fetching items for subsite ${smearPath(subsite.name)} with ID ${subsite.siteId}`,
+      );
+      const result = await this.graphApiService.getAllSiteItems(
+        subsite.siteId,
+        context.siteConfig.syncColumnName,
+      );
+      // Key subsite items under the parent siteId so they share the same ingestion key prefix.
+      // This ensures the file diff (scoped to parentSiteId) sees all items and detects deletions
+      // when a subsite is removed or reconfigured as a standalone site. The original siteId stays
+      // intact for API calls (e.g. ASPX page content fetching).
+      for (const item of result.items) {
+        items.push({ ...item, syncSiteId });
+      }
+      for (const dir of result.directories) {
+        directories.push({ ...dir, syncSiteId });
+      }
+    }
+
+    return { items, directories };
   }
 }

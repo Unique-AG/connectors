@@ -57,6 +57,8 @@ flowchart TB
 - The design aligns with typical financial-sector network security expectations
 - SharePoint REST API is only needed if permission sync is enabled
 - Site configurations can be loaded from a static YAML file or dynamically from a SharePoint list
+- Subsites can be configured as standalone sites using compound site IDs (`hostname,siteCollectionId,webId`)
+- When `subsitesScan` is enabled per-site, the connector recursively discovers and syncs content from subsites
 
 ### Dynamic Site Configuration
 
@@ -196,6 +198,7 @@ Used to obtain OAuth2 tokens for Microsoft Graph and SharePoint REST APIs.
 | `graph.microsoft.com/v1.0/drives/{driveId}/items/{itemId}/children` | Fetch folder contents |
 | `graph.microsoft.com/v1.0/drives/{driveId}/items/{itemId}/content` | Download file content |
 | `graph.microsoft.com/v1.0/sites/{siteId}/lists` | Fetch site lists (for ASPX pages) |
+| `graph.microsoft.com/v1.0/sites/{siteId}/sites` | Discover child subsites (when subsitesScan enabled) |
 | `graph.microsoft.com/v1.0/drives/{driveId}/items/{itemId}/permissions` | Fetch item permissions |
 | `graph.microsoft.com/v1.0/groups/{groupId}/members` | Fetch group members |
 

@@ -5,6 +5,7 @@ import {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { DiscoveredSubsite } from '../sharepoint-synchronization/subsite-discovery.service';
 import { normalizeSlashes } from '../utils/paths.util';
 import {
   buildIngestionItemKey,
@@ -20,6 +21,8 @@ interface Input {
   directories: SharepointDirectoryItem[];
   permissionsMap: Record<string, Membership[]>;
   rootPath: Smeared;
+  siteName: Smeared;
+  discoveredSubsites: DiscoveredSubsite[];
 }
 
 @Injectable()
@@ -27,10 +30,11 @@ export class GetTopFolderPermissionsQuery {
   private readonly logger = new Logger(this.constructor.name);
 
   public run(input: Input): Map<string, GroupMembership[]> {
-    const { items, directories, permissionsMap, rootPath } = input;
+    const { items, directories, permissionsMap, rootPath, siteName, discoveredSubsites } = input;
+    const subsiteRelativePaths = discoveredSubsites.map(prop('relativePath')).map(prop('value'));
     const allItems: AnySharepointItem[] = [...items, ...directories];
 
-    const topFolders = this.identifyTopFolders(allItems, rootPath);
+    const topFolders = this.identifyTopFolders(allItems, rootPath, siteName, subsiteRelativePaths);
     const result = new Map<string, GroupMembership[]>();
 
     for (const topFolderPath of topFolders) {
@@ -39,6 +43,7 @@ export class GetTopFolderPermissionsQuery {
         allItems,
         permissionsMap,
         rootPath,
+        siteName,
       );
       result.set(topFolderPath.value, aggregatedGroups);
     }
@@ -46,15 +51,18 @@ export class GetTopFolderPermissionsQuery {
     return result;
   }
 
-  private identifyTopFolders(items: AnySharepointItem[], rootPath: Smeared): Smeared[] {
+  private identifyTopFolders(
+    items: AnySharepointItem[],
+    rootPath: Smeared,
+    siteName: Smeared,
+    subsiteRelativePaths: string[],
+  ): Smeared[] {
     const normalizedRootPath = createSmeared(`/${normalizeSlashes(rootPath.value)}`);
 
     return pipe(
       items,
-      // We get the parent path of all the items, to be sure we catch the library folders the items
-      // are in.
-      map((item) => getUniqueParentPathFromItem(item, rootPath)),
-      filter((folderPath) => isTopFolder(folderPath, rootPath)),
+      map((item) => getUniqueParentPathFromItem(item, rootPath, siteName)),
+      filter((folderPath) => isTopFolder(folderPath, rootPath, subsiteRelativePaths)),
       (paths) => [normalizedRootPath, ...paths],
       uniqueBy(prop('value')),
     );
@@ -65,11 +73,12 @@ export class GetTopFolderPermissionsQuery {
     items: AnySharepointItem[],
     permissionsMap: Record<string, Membership[]>,
     rootPath: Smeared,
+    siteName: Smeared,
   ): GroupMembership[] {
     const groupsMap = new Map<string, GroupMembership>();
 
     for (const item of items) {
-      const itemPath = getUniquePathFromItem(item, rootPath);
+      const itemPath = getUniquePathFromItem(item, rootPath, siteName);
 
       if (!this.isDescendantOf(itemPath, topFolderPath)) {
         continue;

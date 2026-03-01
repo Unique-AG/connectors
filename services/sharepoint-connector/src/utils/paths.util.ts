@@ -1,3 +1,5 @@
+import assert from 'node:assert';
+
 export const normalizeSlashes = (value: string): string => {
   // 1. Remove leading/trailing whitespace
   let result = value.trim();
@@ -10,6 +12,18 @@ export const normalizeSlashes = (value: string): string => {
 
   return result;
 };
+
+export function extractSiteNameFromWebUrl(webUrl: string): string {
+  const { pathname } = new URL(webUrl);
+  const sitesPrefix = '/sites/';
+  const sitesIndex = pathname.indexOf(sitesPrefix);
+  assert.notEqual(sitesIndex, -1, `Site name not found in URL`);
+  return normalizeSlashes(decodeURIComponent(pathname.substring(sitesIndex + sitesPrefix.length)));
+}
+
+export function encodeSiteNameForPath(siteName: string): string {
+  return siteName.split('/').map(encodeURIComponent).join('/');
+}
 
 // Returns true if `path` is an ancestor of `rootPath` (i.e., if `rootPath` starts with `{path}/`
 // and they're not equal). `path` and `rootPath` are expected to have normalized slashes.

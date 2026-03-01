@@ -5,9 +5,15 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type { DiscoveredSubsite } from '../sharepoint-synchronization/subsite-discovery.service';
 import { Smeared } from '../utils/smeared';
 import { GetTopFolderPermissionsQuery } from './get-top-folder-permissions.query';
 import type { GroupMembership, Membership } from './types';
+
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return { ...actual, Logger: vi.fn() };
+});
 
 describe('GetTopFolderPermissionsQuery', () => {
   let query: GetTopFolderPermissionsQuery;
@@ -15,6 +21,7 @@ describe('GetTopFolderPermissionsQuery', () => {
 
   const mockSiteId = 'site-123';
   const rootPath = new Smeared('TestSite', false);
+  const siteName = new Smeared('TestSite', false);
 
   const createMockFile = (id: string, webUrl: string): SharepointContentItem => ({
     itemType: 'driveItem',
@@ -119,6 +126,7 @@ describe('GetTopFolderPermissionsQuery', () => {
 
   const createSiteGroupMembership = (id: string, name: string): GroupMembership => ({
     type: 'siteGroup',
+    siteId: new Smeared(mockSiteId, false),
     id,
     name,
   });
@@ -166,6 +174,8 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [topFolder],
       permissionsMap,
       rootPath,
+      siteName,
+      discoveredSubsites: [],
     });
 
     expect(result.get('/TestSite')).toEqual([group]);
@@ -192,6 +202,8 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [topFolder, subFolder],
       permissionsMap,
       rootPath,
+      siteName,
+      discoveredSubsites: [],
     });
 
     expect(result.get('/TestSite')).toEqual([group]);
@@ -214,6 +226,8 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [subFolder],
       permissionsMap,
       rootPath,
+      siteName,
+      discoveredSubsites: [],
     });
 
     expect(result.get('/TestSite/Documents')).toEqual([group]);
@@ -241,6 +255,8 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [topFolder],
       permissionsMap,
       rootPath,
+      siteName,
+      discoveredSubsites: [],
     });
 
     const sitePermissions = result.get('/TestSite');
@@ -283,6 +299,8 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [docsFolder, sharedFolder],
       permissionsMap,
       rootPath,
+      siteName,
+      discoveredSubsites: [],
     });
 
     expect(result.get('/TestSite/Documents')).toEqual([docsGroup]);
@@ -295,6 +313,8 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [],
       permissionsMap: {},
       rootPath,
+      siteName,
+      discoveredSubsites: [],
     });
 
     expect(result.get('/TestSite')).toEqual([]);
@@ -326,6 +346,8 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [topFolder],
       permissionsMap,
       rootPath,
+      siteName,
+      discoveredSubsites: [],
     });
 
     const sitePermissions = result.get('/TestSite');
@@ -333,6 +355,41 @@ describe('GetTopFolderPermissionsQuery', () => {
       (p) => p.type === 'siteGroup' && p.id === 'group-shared',
     );
     expect(matchingGroups).toHaveLength(1);
+  });
+
+  it('treats subsite library-level folders as top folders', () => {
+    const subsiteLibrary = createMockDirectory(
+      'sub-docs',
+      'https://tenant.sharepoint.com/sites/TestSite/SubSite/Documents',
+    );
+    const subsiteFile = createMockFile(
+      'sub-file',
+      'https://tenant.sharepoint.com/sites/TestSite/SubSite/Documents/file.docx',
+    );
+    const group = createSiteGroupMembership('sub-group', 'SubSite Group');
+
+    const permissionsMap = {
+      [`${mockSiteId}/${subsiteLibrary.item.id}`]: [],
+      [`${mockSiteId}/${subsiteFile.item.id}`]: [group],
+    };
+
+    const result = query.run({
+      items: [subsiteFile],
+      directories: [subsiteLibrary],
+      permissionsMap,
+      rootPath,
+      siteName,
+      discoveredSubsites: [
+        {
+          siteId: new Smeared('subsite-id', false),
+          name: new Smeared('SubSite', false),
+          relativePath: new Smeared('SubSite', false),
+        } satisfies DiscoveredSubsite,
+      ],
+    });
+
+    expect(result.get('/TestSite/SubSite')).toEqual([group]);
+    expect(result.get('/TestSite/SubSite/Documents')).toEqual([group]);
   });
 
   it('handles missing permissions gracefully and logs warning', () => {
@@ -354,6 +411,8 @@ describe('GetTopFolderPermissionsQuery', () => {
       directories: [topFolder],
       permissionsMap,
       rootPath,
+      siteName,
+      discoveredSubsites: [],
     });
 
     expect(result.get('/TestSite')).toEqual([]);
