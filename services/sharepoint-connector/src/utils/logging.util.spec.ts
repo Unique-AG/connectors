@@ -1,7 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 import { describe, expect, it } from 'vitest';
 import type { Config } from '../config';
-import { shouldConcealLogs, smear, smearSiteNameFromPath } from './logging.util';
+import {
+  shouldConcealLogs,
+  smear,
+  smearSiteIdFromPath,
+  smearSiteNameFromPath,
+} from './logging.util';
 
 describe('logging utilities', () => {
   describe('smear', () => {
@@ -79,6 +84,52 @@ describe('logging utilities', () => {
     it('handles edge cases', () => {
       expect(smearSiteNameFromPath('/sites//_api/web')).toBe('/sites//_api/web');
       expect(smearSiteNameFromPath('/sites/a/_api/web')).toBe('/sites/[Smeared]/_api/web');
+    });
+  });
+
+  describe('smearSiteIdFromPath', () => {
+    it('smears UUID site IDs in Graph API paths', () => {
+      expect(smearSiteIdFromPath('/sites/1d045c6a-f230-48fd-b826-7cf8601d7729/lists')).toBe(
+        '/sites/********-****-****-****-********7729/lists',
+      );
+    });
+
+    it('smears UUID site IDs without trailing path', () => {
+      expect(smearSiteIdFromPath('/sites/1d045c6a-f230-48fd-b826-7cf8601d7729')).toBe(
+        '/sites/********-****-****-****-********7729',
+      );
+    });
+
+    it('smears compound site IDs by smearing each part', () => {
+      expect(
+        smearSiteIdFromPath(
+          '/sites/contoso.sharepoint.com,af2b5be6-a37d-4992-ab8f-988b0134007e,86088ee2-974c-49b8-9689-ba6e04b1807c/lists',
+        ),
+      ).toBe(
+        '/sites/*******.**********.com,********-****-****-****-********007e,********-****-****-****-********807c/lists',
+      );
+    });
+
+    it('smears compound site IDs without trailing path', () => {
+      expect(
+        smearSiteIdFromPath(
+          '/sites/contoso.sharepoint.com,af2b5be6-a37d-4992-ab8f-988b0134007e,86088ee2-974c-49b8-9689-ba6e04b1807c',
+        ),
+      ).toBe(
+        '/sites/*******.**********.com,********-****-****-****-********007e,********-****-****-****-********807c',
+      );
+    });
+
+    it('leaves paths without /sites/ untouched', () => {
+      expect(smearSiteIdFromPath('/drives/some-drive-id/items')).toBe(
+        '/drives/some-drive-id/items',
+      );
+    });
+
+    it('leaves paths with non-UUID segments after /sites/ untouched', () => {
+      expect(smearSiteIdFromPath('/sites/my-site-name/lists')).toBe(
+        '/sites/my-site-name/lists',
+      );
     });
   });
 

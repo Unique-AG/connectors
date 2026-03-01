@@ -682,6 +682,20 @@ describe('MetricsMiddleware', () => {
   describe('endpoint extraction with sensitive data concealment', () => {
     let loggerDebugSpy: ReturnType<typeof vi.fn>;
 
+    const createConcealingConfigService = (): ConfigService<Config, true> => {
+      return {
+        get: vi.fn().mockImplementation((key: string, _options?: { infer?: boolean }) => {
+          if (key === 'sharepoint.tenantId') {
+            return 'test-tenant-id';
+          }
+          if (key === 'app.logsDiagnosticsDataPolicy') {
+            return 'conceal';
+          }
+          return undefined;
+        }),
+      } as unknown as ConfigService<Config, true>;
+    };
+
     beforeEach(() => {
       loggerDebugSpy = vi.fn();
       // Mock the Logger constructor to return an object with debug method
@@ -699,6 +713,71 @@ describe('MetricsMiddleware', () => {
 
     afterEach(() => {
       vi.restoreAllMocks();
+    });
+
+    it('conceals UUID site IDs in logged endpoints when enabled', async () => {
+      const concealingConfigService = createConcealingConfigService();
+      const concealingMiddleware = new MetricsMiddleware(
+        mockHistogram,
+        mockCounter,
+        mockCounter,
+        concealingConfigService,
+      );
+      concealingMiddleware.setNext(mockNextMiddleware);
+
+      const mockContext: Context = {
+        request:
+          'https://graph.microsoft.com/v1.0/sites/1d045c6a-f230-48fd-b826-7cf8601d7729/lists',
+        options: { method: 'GET' },
+      };
+
+      const mockResponse = new Response('{"value": []}', { status: 200 });
+      mockContext.response = mockResponse;
+
+      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+        ctx.response = mockResponse;
+      });
+
+      await concealingMiddleware.execute(mockContext);
+
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: '/sites/********-****-****-****-********7729/lists',
+        }),
+      );
+    });
+
+    it('conceals compound site IDs in logged endpoints when enabled', async () => {
+      const concealingConfigService = createConcealingConfigService();
+      const concealingMiddleware = new MetricsMiddleware(
+        mockHistogram,
+        mockCounter,
+        mockCounter,
+        concealingConfigService,
+      );
+      concealingMiddleware.setNext(mockNextMiddleware);
+
+      const mockContext: Context = {
+        request:
+          'https://graph.microsoft.com/v1.0/sites/contoso.sharepoint.com,af2b5be6-a37d-4992-ab8f-988b0134007e,86088ee2-974c-49b8-9689-ba6e04b1807c/lists',
+        options: { method: 'GET' },
+      };
+
+      const mockResponse = new Response('{"value": []}', { status: 200 });
+      mockContext.response = mockResponse;
+
+      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+        ctx.response = mockResponse;
+      });
+
+      await concealingMiddleware.execute(mockContext);
+
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint:
+            '/sites/*******.**********.com,********-****-****-****-********007e,********-****-****-****-********807c/lists',
+        }),
+      );
     });
 
     it('does not conceal endpoints in logs when disabled', async () => {

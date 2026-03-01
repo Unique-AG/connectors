@@ -27,6 +27,7 @@ import {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from './types/sharepoint-content-item.interface';
+import { normalizeSlashes } from '../../utils/paths.util';
 
 @Injectable()
 export class GraphApiService {
@@ -484,7 +485,7 @@ export class GraphApiService {
     const sitesIndex = pathname.indexOf(sitesPrefix);
     assert.notEqual(sitesIndex, -1, `Site name not found for site ${siteId}`);
     const siteName = decodeURIComponent(pathname.substring(sitesIndex + sitesPrefix.length));
-    return createSmeared(siteName);
+    return createSmeared(normalizeSlashes(siteName));
   }
 
   private async getDrivesForSite(siteId: Smeared): Promise<Drive[]> {

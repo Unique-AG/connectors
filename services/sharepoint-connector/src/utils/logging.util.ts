@@ -1,10 +1,17 @@
 import { ConfigService } from '@nestjs/config';
+import { regexes } from 'zod';
 import type { Config } from '../config';
 export const EXTERNAL_ID_PREFIX = 'spc:' as const;
 export const PENDING_DELETE_PREFIX = 'spc:pending-delete:' as const;
 
 const SHAREPOINT_SITE_NAME_REGEX =
   /\/sites\/((?![a-f0-9-]{36}(?:\/|$))[^/]+(?:\/[^/]+)*?)\/_api\//gi;
+
+const guidPattern = regexes.guid.source.slice(2, -2);
+const SHAREPOINT_SITE_ID_REGEX = new RegExp(
+  `/sites/(${guidPattern}|[^/,]+,${guidPattern},${guidPattern})(?=/|$)`,
+  'gi',
+);
 
 export function smear(text: string | null | undefined, leaveOver = 4) {
   if (text === undefined || text === null) {
@@ -29,6 +36,18 @@ export function smearSiteNameFromPath(path: string): string {
         .map((segment) => smear(segment))
         .join('/')}/_api/`,
   );
+}
+
+export function smearSiteIdFromPath(path: string): string {
+  return path.replace(SHAREPOINT_SITE_ID_REGEX, (_, siteId: string) => {
+    const smeared = siteId.includes(',')
+      ? siteId
+          .split(',')
+          .map((part) => smear(part))
+          .join(',')
+      : smear(siteId);
+    return `/sites/${smeared}`;
+  });
 }
 
 export function shouldConcealLogs(configService: ConfigService<Config, true>): boolean {
