@@ -28,7 +28,6 @@ const clusterLocalConfig = z.object({
       'JSON string of extra HTTP headers for API requests ' +
         '(e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
     ),
-  serviceId: z.string().describe('Service ID for auth'),
 });
 
 // ==== Config for external communication with Unique API services via app key ====
@@ -37,22 +36,6 @@ const externalConfig = z.object({
   serviceAuthMode: z
     .literal('external')
     .describe('Authentication mode to use for accessing Unique API services'),
-  serviceExtraHeaders: json(z.record(z.string(), z.string()))
-    .refine(
-      (headers) => {
-        const providedHeaders = Object.keys(headers);
-        const requiredHeaders = ['authorization', 'x-app-id', 'x-user-id', 'x-company-id'];
-        return requiredHeaders.every((header) => providedHeaders.includes(header));
-      },
-      {
-        message: 'Must contain authorization, x-app-id, x-user-id, and x-company-id headers',
-        path: ['serviceExtraHeaders'],
-      },
-    )
-    .describe(
-      'JSON string of extra HTTP headers for API requests ' +
-        '(e.g., {"authorization": "Bearer <app-key>", "x-app-id": "<app-id>", "x-user-id": "<user-id>", "x-company-id": "<company-id>"})',
-    ),
   zitadelOauthTokenUrl: z.string().describe(`Zitadel oauth token url`),
   zitadelClientId: z.string().describe(`Zitadel client id`),
   zitadelClientSecret: z.string().describe(`Zitadel client secret`),
