@@ -2,9 +2,15 @@ import { Logger } from '@nestjs/common';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type { DiscoveredSubsite } from '../sharepoint-synchronization/subsite-discovery.service';
 import { Smeared } from '../utils/smeared';
 import { GetRegularFolderPermissionsQuery } from './get-regular-folder-permissions.query';
 import type { Membership } from './types';
+
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return { ...actual, Logger: vi.fn() };
+});
 
 describe('GetRegularFolderPermissionsQuery', () => {
   let query: GetRegularFolderPermissionsQuery;
@@ -65,6 +71,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
 
   const createGroupMembership = (id: string, name: string): Membership => ({
     type: 'siteGroup',
+    siteId: new Smeared(mockSiteId, false),
     id,
     name,
   });
@@ -99,6 +106,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
       permissionsMap: { [permissionsKey]: permissions },
       rootPath,
       siteName,
+      discoveredSubsites: [],
     });
 
     expect(result.size).toBe(1);
@@ -125,6 +133,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
       permissionsMap,
       rootPath,
       siteName,
+      discoveredSubsites: [],
     });
 
     expect(result.size).toBe(0);
@@ -152,12 +161,51 @@ describe('GetRegularFolderPermissionsQuery', () => {
       permissionsMap,
       rootPath,
       siteName,
+      discoveredSubsites: [],
     });
 
     expect(result.size).toBe(1);
     expect(result.has('/TestSite/Documents')).toBe(false);
     expect(result.get('/TestSite/Documents/Subfolder')).toEqual([
       createGroupMembership('group-regular', 'Regular Group'),
+    ]);
+  });
+
+  it('skips subsite library-level folders when subsiteRelativePaths provided', () => {
+    const subsiteLibrary = createMockDirectory(
+      'sub-lib',
+      'https://tenant.sharepoint.com/sites/TestSite/SubSite/Documents',
+    );
+    const subsiteFolder = createMockDirectory(
+      'sub-folder',
+      'https://tenant.sharepoint.com/sites/TestSite/SubSite/Documents/Folder1',
+    );
+
+    const permissionsMap = {
+      [`${mockSiteId}/${subsiteLibrary.item.id}`]: [
+        createGroupMembership('g1', 'Sub Library Group'),
+      ],
+      [`${mockSiteId}/${subsiteFolder.item.id}`]: [createGroupMembership('g2', 'Sub Folder Group')],
+    };
+
+    const result = query.run({
+      directories: [subsiteLibrary, subsiteFolder],
+      permissionsMap,
+      rootPath,
+      siteName,
+      discoveredSubsites: [
+        {
+          siteId: new Smeared('subsite-id', false),
+          name: new Smeared('SubSite', false),
+          relativePath: new Smeared('SubSite', false),
+        } satisfies DiscoveredSubsite,
+      ],
+    });
+
+    expect(result.size).toBe(1);
+    expect(result.has('/TestSite/SubSite/Documents')).toBe(false);
+    expect(result.get('/TestSite/SubSite/Documents/Folder1')).toEqual([
+      createGroupMembership('g2', 'Sub Folder Group'),
     ]);
   });
 
@@ -172,6 +220,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
       permissionsMap: {},
       rootPath,
       siteName,
+      discoveredSubsites: [],
     });
 
     expect(result.size).toBe(0);

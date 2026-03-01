@@ -44,6 +44,7 @@ export class FetchGraphPermissionsMapQuery {
       const sharePointPermissions = await permissionsFetcher[item.itemType]();
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
         sharePointPermissions,
+        item.siteId,
         itemSiteName,
         item.item.id,
       );
@@ -53,6 +54,7 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSharePointPermissionsToOurPermissions(
     simplePermissions: SimplePermission[],
+    siteId: Smeared,
     siteName: Smeared,
     itemId: string,
   ): Permission[] {
@@ -60,6 +62,7 @@ export class FetchGraphPermissionsMapQuery {
       if (isNonNullish(permission.grantedToV2)) {
         const itemPermission = this.mapSharePointIdentitySetToOurPermission(
           permission.grantedToV2,
+          siteId,
           siteName,
         );
         if (isNonNullish(itemPermission)) {
@@ -75,7 +78,7 @@ export class FetchGraphPermissionsMapQuery {
 
         const itemPermissions = permission.grantedToIdentitiesV2
           .map((simpleIdentitySet) =>
-            this.mapSharePointIdentitySetToOurPermission(simpleIdentitySet, siteName),
+            this.mapSharePointIdentitySetToOurPermission(simpleIdentitySet, siteId, siteName),
           )
           .filter(isNonNullish);
         if (itemPermissions.length > 0) {
@@ -118,20 +121,20 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSharePointIdentitySetToOurPermission(
     simpleIdentitySet: SimpleIdentitySet,
+    siteId: Smeared,
     siteName: Smeared,
   ): Permission | null {
     if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
       const groupId = normalizeMsGroupId(simpleIdentitySet.group.id);
-      // TODO: This is basically the case of "Everyone except external users". How are we supposed
-      //       to handle this case? For now we return null to skip it. Does it happen outside of
-      //       SharePoint permissions visible in Site Groups? If it doesn't, we can safely ignore
-      //       it here.
+      // We skip "Everyone except external users" group because we wuld rather err on the side of
+      // caution and not include any wildcard groups.
       if (groupId.startsWith(ALL_USERS_GROUP_ID_PREFIX)) {
         return null;
       }
 
       const isOwners = simpleIdentitySet.siteUser.loginName?.endsWith(OWNERS_SUFFIX);
       return {
+        siteId,
         // Login name of the group looks like
         // c:0o.c|federateddirectoryclaimprovider|838f7d2d-BBBB-AAAA-DDDD-7dd9d399aff7_o
         // or
@@ -145,6 +148,7 @@ export class FetchGraphPermissionsMapQuery {
 
     if (isNonNullish(simpleIdentitySet.siteGroup)) {
       return {
+        siteId,
         type: 'siteGroup',
         id: `${siteName.value}|${simpleIdentitySet.siteGroup.id}`,
         name: simpleIdentitySet.siteGroup.displayName,

@@ -1,12 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { describe, expect, it } from 'vitest';
 import type { Config } from '../config';
-import {
-  shouldConcealLogs,
-  smear,
-  smearSiteIdFromPath,
-  smearSiteNameFromPath,
-} from './logging.util';
+import { shouldConcealLogs, smear, smearSiteNameFromPath } from './logging.util';
 
 describe('logging utilities', () => {
   describe('smear', () => {
@@ -51,9 +46,18 @@ describe('logging utilities', () => {
       expect(smearSiteNameFromPath('/sites/my-site/_api/web/lists')).toBe(
         '/sites/**-site/_api/web/lists',
       );
-      expect(smearSiteNameFromPath('/sites/anotherSite/Documents')).toBe(
-        '/sites/*******Site/Documents',
+    });
+
+    it('smears multi-segment subsite names in REST API paths', () => {
+      expect(smearSiteNameFromPath('/sites/WealthManagement/WMSub1/_api/web/sitegroups')).toBe(
+        '/sites/************ment/[Smeared]/_api/web/sitegroups',
       );
+    });
+
+    it('smears deeply nested subsite names in REST API paths', () => {
+      expect(
+        smearSiteNameFromPath('/sites/WealthManagement/WMSub1/Nested/_api/web/sitegroups'),
+      ).toBe('/sites/************ment/[Smeared]/[Smeared]/_api/web/sitegroups');
     });
 
     it('leaves GUID-like site names untouched (handled by smearSiteIdFromPath)', () => {
@@ -61,9 +65,9 @@ describe('logging utilities', () => {
       expect(smearSiteNameFromPath(guidPath)).toBe(guidPath);
     });
 
-    it('handles multiple site names in path', () => {
-      expect(smearSiteNameFromPath('/sites/site1/subsite/site2/page')).toBe(
-        '/sites/[Smeared]/subsite/site2/page',
+    it('leaves paths without /_api/ untouched', () => {
+      expect(smearSiteNameFromPath('/sites/site1/Documents/page')).toBe(
+        '/sites/site1/Documents/page',
       );
     });
 
@@ -75,50 +79,6 @@ describe('logging utilities', () => {
     it('handles edge cases', () => {
       expect(smearSiteNameFromPath('/sites//_api/web')).toBe('/sites//_api/web');
       expect(smearSiteNameFromPath('/sites/a/_api/web')).toBe('/sites/[Smeared]/_api/web');
-    });
-  });
-
-  describe('smearSiteIdFromPath', () => {
-    it('smeares GUID site IDs in Graph API paths', () => {
-      expect(smearSiteIdFromPath('/sites/a1b2c3d4-e5f6-7890-abcd-ef1234567890/drive')).toBe(
-        '/sites/********-****-****-****-********7890/drive',
-      );
-      expect(smearSiteIdFromPath('/sites/b2c3d4e5-f6a7-8910-bcde-f23456789012/root')).toBe(
-        '/sites/********-****-****-****-********9012/root',
-      );
-    });
-
-    it('handles site IDs at end of path', () => {
-      expect(smearSiteIdFromPath('/sites/a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBe(
-        '/sites/********-****-****-****-********7890',
-      );
-    });
-
-    it('leaves non-GUID site names untouched (handled by smearSiteNameFromPath)', () => {
-      const siteNamePath = '/sites/my-site/_api/web';
-      expect(smearSiteIdFromPath(siteNamePath)).toBe(siteNamePath);
-    });
-
-    it('handles multiple GUIDs in path', () => {
-      expect(
-        smearSiteIdFromPath(
-          '/sites/a1b2c3d4-e5f6-7890-abcd-ef1234567890/sub/b2c3d4e5-f6a7-8910-bcde-f23456789012',
-        ),
-      ).toBe(
-        '/sites/********-****-****-****-********7890/sub/b2c3d4e5-f6a7-8910-bcde-f23456789012',
-      );
-    });
-
-    it('handles paths without site IDs', () => {
-      expect(smearSiteIdFromPath('/_api/web/lists')).toBe('/_api/web/lists');
-      expect(smearSiteIdFromPath('/graph/me')).toBe('/graph/me');
-    });
-
-    it('ignores invalid GUID formats', () => {
-      expect(smearSiteIdFromPath('/sites/not-a-guid/_api/web')).toBe('/sites/not-a-guid/_api/web');
-      expect(smearSiteIdFromPath('/sites/123-456-789/_api/web')).toBe(
-        '/sites/123-456-789/_api/web',
-      );
     });
   });
 

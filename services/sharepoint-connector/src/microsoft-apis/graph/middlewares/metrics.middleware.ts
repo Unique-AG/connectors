@@ -13,11 +13,7 @@ import {
   getHttpStatusCodeClass,
   getSlowRequestDurationBucket,
 } from '../../../metrics';
-import {
-  shouldConcealLogs,
-  smearSiteIdFromPath,
-  smearSiteNameFromPath,
-} from '../../../utils/logging.util';
+import { shouldConcealLogs, smearSiteNameFromPath } from '../../../utils/logging.util';
 import { elapsedMilliseconds, elapsedSeconds } from '../../../utils/timing.util';
 import { GraphApiErrorResponse, isGraphApiError } from '../types/sharepoint.types';
 
@@ -258,7 +254,6 @@ export class MetricsMiddleware implements Middleware {
       // Apply logging policy to sensitive path segments
       if (this.shouldConcealLogs) {
         endpoint = smearSiteNameFromPath(endpoint); // Process names first
-        endpoint = smearSiteIdFromPath(endpoint); // Then GUIDs (more specific match)
       }
 
       return endpoint || '/';

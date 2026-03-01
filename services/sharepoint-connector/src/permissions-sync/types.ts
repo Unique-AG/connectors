@@ -2,6 +2,7 @@
 //       permissions on files/folders and memberships of groups.
 
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
+import type { Smeared } from '../utils/smeared';
 
 export interface UserMembership {
   type: 'user';
@@ -10,16 +11,19 @@ export interface UserMembership {
 
 export type GroupMembership =
   | {
+      siteId: Smeared;
       type: 'siteGroup';
       id: string;
       name: string;
     }
   | {
+      siteId: Smeared;
       type: 'groupMembers';
       id: string;
       name: string;
     }
   | {
+      siteId: Smeared;
       type: 'groupOwners';
       id: string;
       name: string;
@@ -33,6 +37,7 @@ export type GroupDistinctId = `${Exclude<MembershipType, 'user'>}:${string}`;
 
 export interface SharepointGroupWithMembers {
   id: GroupDistinctId;
+  siteId: Smeared;
   displayName: string;
   members: string[]; // list of emails of the members
 }

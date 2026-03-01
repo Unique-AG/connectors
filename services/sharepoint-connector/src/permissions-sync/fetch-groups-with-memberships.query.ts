@@ -89,7 +89,7 @@ export class FetchGroupsWithMembershipsQuery {
       [...uniqueGroupPermissions, ...allMembershipsFromSiteGroups],
       filter(isGroupType),
       uniqueBy(groupDistinctId),
-      map(pick(['id', 'type'])),
+      map(pick(['id', 'type', 'siteId'])),
     );
 
     this.logger.log(`${logPrefix} Fetching MS groups memberships map`);
@@ -108,7 +108,7 @@ export class FetchGroupsWithMembershipsQuery {
         filter(isGroupType),
         filter((group) => !groupMembershipsCache[groupDistinctId(group)]),
         uniqueBy(groupDistinctId),
-        map(pick(['id', 'type'])),
+        map(pick(['id', 'type', 'siteId'])),
       );
       this.logger.debug(`${logPrefix} Found ${msGroupsToProcess.length} groups to process next`);
     }
@@ -172,6 +172,7 @@ export class FetchGroupsWithMembershipsQuery {
 
     return {
       id: groupId,
+      siteId: group.siteId,
       displayName: groupName,
       members: Array.from(groupMembers),
     };
@@ -179,7 +180,7 @@ export class FetchGroupsWithMembershipsQuery {
   // ===== Helper methods for fetching groups from Microsoft Graph API =====
 
   private async fetchGroupMemberships(
-    groups: { id: string; type: 'groupMembers' | 'groupOwners' }[],
+    groups: { id: string; siteId: Smeared; type: 'groupMembers' | 'groupOwners' }[],
     logPrefix: string,
   ): Promise<[GroupDistinctId, Membership[]][]> {
     // TODO: Once we have batch requests for Graph API implemented, change this method to take
@@ -202,9 +203,12 @@ export class FetchGroupsWithMembershipsQuery {
 
       const chunkIds = groupChunk.map(groupDistinctId);
       const chunkItemPermissions = groupMembershipsResults.map((result, index) => {
+        const group = groupChunk[index];
+        assert.ok(group, `Missing group at index ${index} in chunk`);
+
         if (result.status === 'fulfilled') {
           return result.value.map((membership) =>
-            this.mapGroupMembershipToItemPermission(membership),
+            this.mapGroupMembershipToItemPermission(membership, group.siteId),
           );
         }
 
@@ -212,8 +216,6 @@ export class FetchGroupsWithMembershipsQuery {
         // return 404 from Graph API when we request memberships.
         // We check for 404 status to identify these cases and treat them as empty memberships.
         const error = result.reason as Error & { statusCode?: number };
-        const group = groupChunk[index];
-        assert.ok(group, `Missing group at index ${index} in chunk`);
 
         if (error.statusCode === 404) {
           this.logger.warn(
@@ -235,7 +237,7 @@ export class FetchGroupsWithMembershipsQuery {
     return groupMembershipsMappings;
   }
 
-  private mapGroupMembershipToItemPermission(membership: GroupMember): Membership {
+  private mapGroupMembershipToItemPermission(membership: GroupMember, siteId: Smeared): Membership {
     if (membership['@odata.type'] === '#microsoft.graph.user') {
       return {
         type: 'user',
@@ -247,6 +249,7 @@ export class FetchGroupsWithMembershipsQuery {
     }
 
     return {
+      siteId,
       type: 'groupMembers',
       id: membership.id,
       name: membership.displayName,
@@ -259,7 +262,10 @@ export class FetchGroupsWithMembershipsQuery {
     siteGroupsPermissions: GroupMembership[],
     logPrefix: string,
   ): Promise<Record<GroupDistinctId, Membership[]>> {
-    const siteGroupIdsBySiteName: Record<string, string[]> = {};
+    const siteWithGroupIdsBySiteId: Record<
+      string,
+      { siteId: Smeared; siteName: string; siteGroupIds: string[] }
+    > = {};
     for (const siteGroupPermission of siteGroupsPermissions) {
       const [siteName, siteGroupId, ...rest] = siteGroupPermission.id.split('|');
 
@@ -275,22 +281,33 @@ export class FetchGroupsWithMembershipsQuery {
 
       assert.ok(siteName, 'Site name must be present');
       assert.ok(siteGroupId, 'Site group id must be present');
-      siteGroupIdsBySiteName[siteName] ??= [];
-      siteGroupIdsBySiteName[siteName].push(siteGroupId);
+      const rawSiteId = siteGroupPermission.siteId.value;
+      siteWithGroupIdsBySiteId[rawSiteId] ??= {
+        siteId: createSmeared(rawSiteId),
+        siteName,
+        siteGroupIds: [],
+      };
+      siteWithGroupIdsBySiteId[rawSiteId].siteGroupIds.push(siteGroupId);
     }
 
-    const totalSites = Object.keys(siteGroupIdsBySiteName).length;
-    const totalSiteGroups = pipe(siteGroupIdsBySiteName, values(), map(length()), sum());
+    const totalSites = Object.keys(siteWithGroupIdsBySiteId).length;
+    const totalSiteGroups = pipe(
+      siteWithGroupIdsBySiteId,
+      values(),
+      map((site) => site.siteGroupIds.length),
+      sum(),
+    );
     this.logger.log(
       `${logPrefix} Fetching site groups memberships map for ${totalSiteGroups} site groups` +
         `${totalSites > 1 ? ` across ${totalSites} sites` : ''}`,
     );
 
     const aggregatedSiteGroupsMembershipsMap: Record<GroupDistinctId, Membership[]> = {};
-    for (const [siteName, siteGroupIds] of Object.entries(siteGroupIdsBySiteName)) {
+    for (const { siteId, siteName, siteGroupIds } of Object.values(siteWithGroupIdsBySiteId)) {
       const siteGroupsMembershipsMapForSite = await this.fetchSiteGroupsMembershipsMap(
         createSmeared(siteName),
         siteGroupIds,
+        siteId,
       );
       Object.assign(aggregatedSiteGroupsMembershipsMap, siteGroupsMembershipsMapForSite);
     }
@@ -302,6 +319,7 @@ export class FetchGroupsWithMembershipsQuery {
   private async fetchSiteGroupsMembershipsMap(
     siteName: Smeared,
     siteGroupIds: string[],
+    siteId: Smeared,
   ): Promise<Record<GroupDistinctId, Membership[]>> {
     return pipe(
       await this.sharepointRestClientService.getSiteGroupsMemberships(siteName, siteGroupIds),
@@ -312,17 +330,25 @@ export class FetchGroupsWithMembershipsQuery {
           id: `${siteName.value}|${id}`,
         }),
       ),
-      mapValues(map(this.mapRestApiMembershipToGroupMembership.bind(this))),
+      mapValues(
+        map((membership: SiteGroupMembership) =>
+          this.mapRestApiMembershipToGroupMembership(membership, siteId),
+        ),
+      ),
       mapValues(filter(isNonNullish)),
     );
   }
 
-  private mapRestApiMembershipToGroupMembership({
-    PrincipalType: principalType,
-    LoginName: loginName,
-    Email: email,
-    Title: title,
-  }: SiteGroupMembership): Membership | null {
+  private mapRestApiMembershipToGroupMembership(
+    siteGroupMembership: SiteGroupMembership,
+    siteId: Smeared,
+  ): Membership | null {
+    const {
+      PrincipalType: principalType,
+      LoginName: loginName,
+      Email: email,
+      Title: title,
+    } = siteGroupMembership;
     const principalTypeMapper: Record<PrincipalType, () => Membership | null> = {
       [PrincipalType.User]: () => {
         // In some specific cases, that are rather unclear, there may be no email specified in the
@@ -335,18 +361,18 @@ export class FetchGroupsWithMembershipsQuery {
       },
       [PrincipalType.DistributionList]: () => {
         const groupId = this.extractGroupId(loginName);
-        return groupId ? { type: 'groupMembers', id: groupId, name: title } : null;
+        return groupId ? { siteId, type: 'groupMembers', id: groupId, name: title } : null;
       },
       [PrincipalType.SecurityGroup]: () => {
         const groupId = this.extractGroupId(loginName);
-        // TODO: This is basically the case of "Everyone except external users". How are we supposed
-        //       to handle this case? For now we return null to skip it.
+        // We skip "Everyone except external users" group because we wuld rather err on the side of
+        // caution and not include any wildcard groups.
         if (groupId?.startsWith(ALL_USERS_GROUP_ID_PREFIX)) {
           return null;
         }
         const groupType = groupId?.endsWith(OWNERS_SUFFIX) ? 'Owners' : 'Members';
         return groupId
-          ? { type: `group${groupType}`, id: normalizeMsGroupId(groupId), name: title }
+          ? { siteId, type: `group${groupType}`, id: normalizeMsGroupId(groupId), name: title }
           : null;
       },
       [PrincipalType.SharePointGroup]: () =>

@@ -100,6 +100,7 @@ export class PermissionsSyncService {
       currentStep = SyncStep.GroupsSync;
       const { updatedUniqueGroupsMap } = await this.syncSharepointGroupsToUniqueCommand.run({
         siteId,
+        siteNamesBySiteId,
         sharePoint: { groupsMap: groupsWithMembershipsMap },
         unique: { groupsMap: uniqueGroupsMap, usersMap: uniqueUsersMap },
       });
@@ -124,6 +125,7 @@ export class PermissionsSyncService {
           permissionsMap,
           rootPath: context.rootPath,
           siteName: context.siteName,
+          discoveredSubsites: context.discoveredSubsites,
         });
 
         const topFolderPermissions = this.getTopFolderPermissionsQuery.run({
@@ -132,6 +134,7 @@ export class PermissionsSyncService {
           permissionsMap,
           rootPath: context.rootPath,
           siteName: context.siteName,
+          discoveredSubsites: context.discoveredSubsites,
         });
 
         await this.syncSharepointFolderPermissionsToUniqueCommand.run({

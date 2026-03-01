@@ -682,20 +682,6 @@ describe('MetricsMiddleware', () => {
   describe('endpoint extraction with sensitive data concealment', () => {
     let loggerDebugSpy: ReturnType<typeof vi.fn>;
 
-    const createConcealingConfigService = (): ConfigService<Config, true> => {
-      return {
-        get: vi.fn().mockImplementation((key: string, _options?: { infer?: boolean }) => {
-          if (key === 'sharepoint.tenantId') {
-            return 'test-tenant-id';
-          }
-          if (key === 'app.logsDiagnosticsDataPolicy') {
-            return 'conceal';
-          }
-          return undefined;
-        }),
-      } as unknown as ConfigService<Config, true>;
-    };
-
     beforeEach(() => {
       loggerDebugSpy = vi.fn();
       // Mock the Logger constructor to return an object with debug method
@@ -713,100 +699,6 @@ describe('MetricsMiddleware', () => {
 
     afterEach(() => {
       vi.restoreAllMocks();
-    });
-
-    it('conceals site names in logged endpoints when enabled', async () => {
-      const concealingConfigService = createConcealingConfigService();
-      const concealingMiddleware = new MetricsMiddleware(
-        mockHistogram,
-        mockCounter,
-        mockCounter,
-        concealingConfigService,
-      );
-      concealingMiddleware.setNext(mockNextMiddleware);
-
-      const mockContext: Context = {
-        request: 'https://graph.microsoft.com/v1.0/sites/LoadTestFlat/_layouts/15/download.aspx',
-        options: { method: 'GET' },
-      };
-
-      const mockResponse = new Response('{"value": []}', { status: 200 });
-      mockContext.response = mockResponse;
-
-      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
-        ctx.response = mockResponse;
-      });
-
-      await concealingMiddleware.execute(mockContext);
-
-      expect(loggerDebugSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          endpoint: '/sites/********Flat/_layouts/15/download.aspx',
-        }),
-      );
-    });
-
-    it('conceals site IDs in logged endpoints when enabled', async () => {
-      const concealingConfigService = createConcealingConfigService();
-      const concealingMiddleware = new MetricsMiddleware(
-        mockHistogram,
-        mockCounter,
-        mockCounter,
-        concealingConfigService,
-      );
-      concealingMiddleware.setNext(mockNextMiddleware);
-
-      const mockContext: Context = {
-        request:
-          'https://graph.microsoft.com/v1.0/sites/1d045c6a-f230-48fd-b826-7cf8601d7729/lists',
-        options: { method: 'GET' },
-      };
-
-      const mockResponse = new Response('{"value": []}', { status: 200 });
-      mockContext.response = mockResponse;
-
-      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
-        ctx.response = mockResponse;
-      });
-
-      await concealingMiddleware.execute(mockContext);
-
-      expect(loggerDebugSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          endpoint: '/sites/********-****-****-****-********7729/lists',
-        }),
-      );
-    });
-
-    it('conceals site IDs in logged endpoints without trailing path when enabled', async () => {
-      const concealingConfigService = createConcealingConfigService();
-      const concealingMiddleware = new MetricsMiddleware(
-        mockHistogram,
-        mockCounter,
-        mockCounter,
-        concealingConfigService,
-      );
-      concealingMiddleware.setNext(mockNextMiddleware);
-
-      const mockContext: Context = {
-        request: 'https://graph.microsoft.com/v1.0/sites/1d045c6a-f230-48fd-b826-7cf8601d7729',
-        options: { method: 'GET' },
-      };
-
-      const mockResponse = new Response('{"value": []}', { status: 200 });
-      mockContext.response = mockResponse;
-
-      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
-        ctx.response = mockResponse;
-      });
-
-      await concealingMiddleware.execute(mockContext);
-
-      expect(loggerDebugSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          endpoint: '/sites/********-****-****-****-********7729',
-        }),
-      );
     });
 
     it('does not conceal endpoints in logs when disabled', async () => {

@@ -10,6 +10,11 @@ import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint
 import { Smeared } from '../utils/smeared';
 import { FetchGraphPermissionsMapQuery } from './fetch-graph-permissions-map.query';
 
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return { ...actual, Logger: vi.fn() };
+});
+
 describe('FetchGraphPermissionsMapQuery', () => {
   let query: FetchGraphPermissionsMapQuery;
   let graphApiService: GraphApiService;
@@ -101,7 +106,6 @@ describe('FetchGraphPermissionsMapQuery', () => {
       .mock<GraphApiService>(GraphApiService)
       .impl((stubFn) => ({
         ...stubFn(),
-        getSiteName: vi.fn().mockResolvedValue(mockSiteName),
         getDriveItemPermissions: vi.fn(),
         getListItemPermissions: vi.fn(),
       }))
