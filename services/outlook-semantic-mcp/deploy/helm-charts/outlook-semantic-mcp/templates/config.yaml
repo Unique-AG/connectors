@@ -20,7 +20,6 @@ data:
   UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL: {{ include "chart.ensureTrailingSlash" (dict "url" .Values.mcpConfig.unique.scopeManagementServiceBaseUrl) | quote }}
   {{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
   UNIQUE_SERVICE_EXTRA_HEADERS: '{{ .Values.mcpConfig.unique.serviceExtraHeaders | toJson }}'
-  UNIQUE_SERVICE_ID: {{ .Values.mcpConfig.unique.serviceId | quote }}
   {{- end }}
   {{- if eq .Values.mcpConfig.unique.serviceAuthMode "external" }}
   UNIQUE_ZITADEL_CLIENT_ID: {{ .Values.mcpConfig.unique.zitadel.clientId | quote }}
