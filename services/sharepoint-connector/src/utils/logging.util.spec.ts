@@ -127,9 +127,7 @@ describe('logging utilities', () => {
     });
 
     it('leaves paths with non-UUID segments after /sites/ untouched', () => {
-      expect(smearSiteIdFromPath('/sites/my-site-name/lists')).toBe(
-        '/sites/my-site-name/lists',
-      );
+      expect(smearSiteIdFromPath('/sites/my-site-name/lists')).toBe('/sites/my-site-name/lists');
     });
   });
 
