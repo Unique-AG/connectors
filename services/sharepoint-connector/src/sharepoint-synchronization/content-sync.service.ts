@@ -106,18 +106,11 @@ export class ContentSyncService {
     const newItems = items.filter((item) => newFileKeys.has(buildFileDiffKey(item)));
     const updatedItems = items.filter((item) => updatedFileKeys.has(buildFileDiffKey(item)));
 
-    const getScopeIdForItem = (itemId: string): string => {
+    const getScopeIdForItem = (item: SharepointContentItem): string => {
       const scopeId = context.siteConfig.scopeId;
 
+      // If we have no scopes, it means that we are in flat mode and we should use the root scope.
       if (!scopes || scopes.length === 0) {
-        return scopeId;
-      }
-
-      const item = [...newItems, ...updatedItems].find((item) => item.item.id === itemId);
-      if (!item) {
-        this.logger.warn(
-          `${logPrefix} Cannot determine scope for item because item with id: ${itemId} not found`,
-        );
         return scopeId;
       }
       return this.scopeManagementService.determineScopeForItem(item, scopes, context) || scopeId;

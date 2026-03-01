@@ -74,29 +74,17 @@ export class FetchGroupsWithMembershipsQuery {
       `${logPrefix} Fetching groups with memberships for ${uniqueGroupPermissions.length} unique ` +
         `group permissions`,
     );
-    const siteName = await this.graphApiService.getSiteName(siteId);
 
     const siteGroupsPermissions = pipe(
       uniqueGroupPermissions,
       filter((permission) => permission.type === 'siteGroup'),
     );
 
-    const siteGroupIds = siteGroupsPermissions
-      .map((permission) => permission.id.split('|').pop())
-      .filter(isNonNullish);
-    this.logger.log(
-      `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
+    const groupMembershipsCache = await this.processSiteGroupsPermissions(
+      siteGroupsPermissions,
+      logPrefix,
     );
-    const groupMembershipsCache: Record<GroupDistinctId, Membership[]> = {};
-    // There's only one call for SharePoint site groups memberships because they are not nested.
-    const siteGroupsMembershipsMap = await this.fetchSiteGroupsMembershipsMap(
-      siteName,
-      siteGroupIds,
-    );
-    Object.assign(groupMembershipsCache, siteGroupsMembershipsMap);
-    this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
-
-    const allMembershipsFromSiteGroups = pipe(siteGroupsMembershipsMap, values(), flat());
+    const allMembershipsFromSiteGroups = pipe(groupMembershipsCache, values(), flat());
     let msGroupsToProcess = pipe(
       [...uniqueGroupPermissions, ...allMembershipsFromSiteGroups],
       filter(isGroupType),
@@ -266,6 +254,50 @@ export class FetchGroupsWithMembershipsQuery {
   }
 
   // ===== Helper methods for fetching groups from SharePoint REST API =====
+
+  private async processSiteGroupsPermissions(
+    siteGroupsPermissions: GroupMembership[],
+    logPrefix: string,
+  ): Promise<Record<GroupDistinctId, Membership[]>> {
+    const siteGroupIdsBySiteName: Record<string, string[]> = {};
+    for (const siteGroupPermission of siteGroupsPermissions) {
+      const [siteName, siteGroupId, ...rest] = siteGroupPermission.id.split('|');
+
+      // Validate the format of the site group id. It should be in the format of
+      // "siteName|siteGroupId" but we are paranoid and want to check for extra parts just in case.
+      const hasValidFormat = Boolean(siteName) && Boolean(siteGroupId) && rest.length === 0;
+      if (!hasValidFormat) {
+        this.logger.warn(
+          `${logPrefix} Skipping site group with invalid id format: ${createSmeared(siteGroupPermission.id)}`,
+        );
+        continue;
+      }
+
+      assert.ok(siteName, 'Site name must be present');
+      assert.ok(siteGroupId, 'Site group id must be present');
+      siteGroupIdsBySiteName[siteName] ??= [];
+      siteGroupIdsBySiteName[siteName].push(siteGroupId);
+    }
+
+    const totalSites = Object.keys(siteGroupIdsBySiteName).length;
+    const totalSiteGroups = pipe(siteGroupIdsBySiteName, values(), map(length()), sum());
+    this.logger.log(
+      `${logPrefix} Fetching site groups memberships map for ${totalSiteGroups} site groups` +
+        `${totalSites > 1 ? ` across ${totalSites} sites` : ''}`,
+    );
+
+    const aggregatedSiteGroupsMembershipsMap: Record<GroupDistinctId, Membership[]> = {};
+    for (const [siteName, siteGroupIds] of Object.entries(siteGroupIdsBySiteName)) {
+      const siteGroupsMembershipsMapForSite = await this.fetchSiteGroupsMembershipsMap(
+        createSmeared(siteName),
+        siteGroupIds,
+      );
+      Object.assign(aggregatedSiteGroupsMembershipsMap, siteGroupsMembershipsMapForSite);
+    }
+
+    this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
+    return aggregatedSiteGroupsMembershipsMap;
+  }
 
   private async fetchSiteGroupsMembershipsMap(
     siteName: Smeared,

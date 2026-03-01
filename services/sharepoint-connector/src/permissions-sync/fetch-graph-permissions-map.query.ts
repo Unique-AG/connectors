@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { isNonNullish } from 'remeda';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
@@ -24,23 +25,26 @@ export class FetchGraphPermissionsMapQuery {
 
   public constructor(private readonly graphApiService: GraphApiService) {}
 
-  public async run(siteId: Smeared, items: AnySharepointItem[]): Promise<PermissionsMap> {
-    const siteName = await this.graphApiService.getSiteName(siteId);
-
+  public async run(
+    items: AnySharepointItem[],
+    siteNameBySiteId: ReadonlyMap<string, Smeared>,
+  ): Promise<PermissionsMap> {
     const permissionsMap: PermissionsMap = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
+      const itemSiteName = siteNameBySiteId.get(item.siteId.value);
+      assert.ok(itemSiteName, `Site name for site ${item.siteId} not found`);
       const permissionsFetcher: PermissionsFetcher = {
         driveItem: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
         listItem: () =>
-          this.graphApiService.getListItemPermissions(siteId, item.driveId, item.item.id),
+          this.graphApiService.getListItemPermissions(item.siteId, item.driveId, item.item.id),
         directory: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
       };
 
       const sharePointPermissions = await permissionsFetcher[item.itemType]();
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
         sharePointPermissions,
-        siteName,
+        itemSiteName,
         item.item.id,
       );
     }

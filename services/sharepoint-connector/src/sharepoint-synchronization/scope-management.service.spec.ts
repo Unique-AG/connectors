@@ -462,10 +462,7 @@ describe('ScopeManagementService', () => {
         relativePath: new Smeared(relativePath, false),
       });
 
-      const createSubsiteContentItem = (
-        path: string,
-        siteId: string,
-      ): SharepointContentItem => {
+      const createSubsiteContentItem = (path: string, siteId: string): SharepointContentItem => {
         const item = createDriveContentItem(path);
         return {
           ...item,
@@ -512,16 +509,14 @@ describe('ScopeManagementService', () => {
           .mock<UniqueScopesService>(UniqueScopesService)
           .impl((stubFn) => ({
             ...stubFn(),
-            createScopesBasedOnPaths: vi
-              .fn()
-              .mockImplementation((paths: string[]) =>
-                paths.map((path, i) => ({
-                  id: `scope-${i}`,
-                  name: path.split('/').pop(),
-                  parentId: null,
-                  externalId: null,
-                })),
-              ),
+            createScopesBasedOnPaths: vi.fn().mockImplementation((paths: string[]) =>
+              paths.map((path, i) => ({
+                id: `scope-${i}`,
+                name: path.split('/').pop(),
+                parentId: null,
+                externalId: null,
+              })),
+            ),
             updateScopeExternalId: updateScopeExternalIdMock,
           }))
           .compile();
@@ -658,49 +653,6 @@ describe('ScopeManagementService', () => {
           expect.objectContaining({ value: `spc:folder:${subASiteId}/sub-folder` }),
         );
       });
-    });
-  });
-
-  describe('buildItemIdToScopeIdMap', () => {
-    it('maps item identifiers to scope identifiers', () => {
-      const items = [createDriveContentItem('UniqueAG/SitePages')];
-      const item = items[0];
-
-      const result = service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
-
-      // biome-ignore lint/style/noNonNullAssertion: Test data is guaranteed to exist
-      expect(result.get(item!.item.id)).toBe('scope_3');
-    });
-
-    it('decodes URL-encoded paths before lookup', () => {
-      const items = [createDriveContentItem('UniqueAG/Freigegebene%20Dokumente/General')];
-      const item = items[0];
-
-      const result = service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
-
-      // The scope for this path doesn't exist in mockScopes, so it should return undefined
-      // biome-ignore lint/style/noNonNullAssertion: Test data is guaranteed to exist
-      expect(result.get(item!.item.id)).toBeUndefined();
-    });
-
-    it('returns empty map when scopes is empty', () => {
-      const items = [createDriveContentItem('UniqueAG/SitePages')];
-
-      const result = service.buildItemIdToScopeIdMap(items, [], mockContext);
-
-      expect(result.size).toBe(0);
-    });
-
-    it('logs warning when scope is not present in cache', () => {
-      const items = [createDriveContentItem('UniqueAG/UnknownFolder')];
-
-      service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
-
-      // The logger is globally mocked, so we can check the mock calls
-      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].warn).toHaveBeenCalledWith(
-        expect.stringContaining('Scope not found in cache for path'),
-      );
     });
   });
 

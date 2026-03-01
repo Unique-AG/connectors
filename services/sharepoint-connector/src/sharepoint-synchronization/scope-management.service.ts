@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { isNonNullish, isNullish, prop, pullObject, sortBy } from 'remeda';
+import { isNonNullish, isNullish, sortBy, unique } from 'remeda';
 import { getInheritanceSettings } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
@@ -232,21 +232,6 @@ export class ScopeManagementService {
     return rootScope.externalId === expectedExternalId.value;
   }
 
-  private buildItemIdToScopePathMap(
-    items: SharepointContentItem[],
-    rootPath: Smeared,
-    siteName: Smeared,
-  ): Map<string, string> {
-    const itemIdToScopePathMap = new Map<string, string>();
-
-    for (const item of items) {
-      const scopePath = getUniqueParentPathFromItem(item, rootPath, siteName);
-      itemIdToScopePathMap.set(item.item.id, scopePath.value);
-    }
-
-    return itemIdToScopePathMap;
-  }
-
   /**
    * Extracts all unique parent directory paths from a list of path strings.
    * @param paths An array of raw path strings.
@@ -292,20 +277,17 @@ export class ScopeManagementService {
   ): Promise<ScopeWithPath[]> {
     const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
 
-    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(
-      items,
-      context.rootPath,
-      context.siteName,
+    const uniqueFolderPaths = items.map(
+      (item) => getUniqueParentPathFromItem(item, context.rootPath, context.siteName).value,
     );
-    const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
 
-    if (uniqueFolderPaths.size === 0) {
+    if (uniqueFolderPaths.length === 0) {
       this.logger.log(`${logPrefix} No folder paths to create scopes for`);
       return [];
     }
 
     // Extract all parent paths from the folder paths
-    const allPathsWithParents = this.extractAllParentPaths(Array.from(uniqueFolderPaths));
+    const allPathsWithParents = this.extractAllParentPaths(unique(uniqueFolderPaths));
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
@@ -473,54 +455,6 @@ export class ScopeManagementService {
     }
 
     return pathToExternalIdMap;
-  }
-
-  public buildItemIdToScopeIdMap(
-    items: SharepointContentItem[],
-    scopes: ScopeWithPath[],
-    context: SharepointSyncContext,
-  ): Map<string, string> {
-    const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
-    const itemIdToScopeIdMap = new Map<string, string>();
-
-    if (scopes.length === 0) {
-      return itemIdToScopeIdMap;
-    }
-
-    // Build path -> scopeId map from scopes
-    const scopePathToIdMap = pullObject(scopes, prop('path'), prop('id'));
-
-    this.logger.debug(
-      `${logPrefix} Built scopePathToIdMap with ${Object.keys(scopePathToIdMap).length} entries`,
-    );
-
-    // Build item -> path map
-    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(
-      items,
-      context.rootPath,
-      context.siteName,
-    );
-
-    this.logger.debug(
-      `${logPrefix} Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries`,
-    );
-
-    for (const [itemId, scopePath] of itemIdToScopePathMap) {
-      const scopeId = scopePathToIdMap[scopePath];
-      if (scopeId) {
-        itemIdToScopeIdMap.set(itemId, scopeId);
-      } else {
-        this.logger.warn(
-          `${logPrefix} Scope not found in cache for path: ${createSmeared(scopePath)}`,
-        );
-      }
-    }
-
-    this.logger.debug(
-      `${logPrefix} Built itemIdToScopeIdMap with ${itemIdToScopeIdMap.size} entries for ${items.length} items`,
-    );
-
-    return itemIdToScopeIdMap;
   }
 
   /**
