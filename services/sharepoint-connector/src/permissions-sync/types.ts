@@ -1,5 +1,4 @@
-// TODO: Consider using name Access instead of Membership or Permission. It encompasses both
-//       permissions on files/folders and memberships of groups.
+// "Membership" in this module covers both file/folder permissions and group memberships.
 
 import { UniqueGroupWithMembers } from '../unique-api/unique-groups/unique-groups.types';
 import type { Smeared } from '../utils/smeared';

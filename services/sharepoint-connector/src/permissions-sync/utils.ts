@@ -17,19 +17,9 @@ export function normalizeMsGroupId(groupId: string): string {
   return groupId.replace(new RegExp(`${OWNERS_SUFFIX}$`), '');
 }
 
-// Determines if a path is a "top folder" (site/subsite root or library level).
-// Top folders use aggregated group permissions from their descendants instead of direct
-// SharePoint permissions.
-//
-// For the main site:
-//   /RootScope              -> true  (site root)
-//   /RootScope/Drive        -> true  (library level, 1 segment)
-//   /RootScope/Drive/Folder -> false (regular folder)
-//
-// For subsites (e.g. subsiteRelativePaths = ["SubSite"]):
-//   /RootScope/SubSite              -> true  (subsite root, 1 segment but matches subsite)
-//   /RootScope/SubSite/Drive        -> true  (subsite library level)
-//   /RootScope/SubSite/Drive/Folder -> false (regular folder)
+// Determines if a path is a site/subsite root or first library level.
+// Top folders use aggregated descendant group permissions.
+// Deeper descendants are regular folders and return false.
 export function isTopFolder(
   path: Smeared,
   rootPath: Smeared,

@@ -30,7 +30,7 @@ export class FetchGraphPermissionsMapQuery {
     siteNameBySiteId: ReadonlyMap<string, Smeared>,
   ): Promise<PermissionsMap> {
     const permissionsMap: PermissionsMap = {};
-    // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
+    // This can switch to Promise.allSettled once API calls are batched and parallelized.
     for (const item of items) {
       const itemSiteName = siteNameBySiteId.get(item.siteId.value);
       assert.ok(itemSiteName, `Site name for site ${item.siteId} not found`);

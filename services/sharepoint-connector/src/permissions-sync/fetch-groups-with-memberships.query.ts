@@ -183,8 +183,7 @@ export class FetchGroupsWithMembershipsQuery {
     groups: { id: string; siteId: Smeared; type: 'groupMembers' | 'groupOwners' }[],
     logPrefix: string,
   ): Promise<[GroupDistinctId, Membership[]][]> {
-    // TODO: Once we have batch requests for Graph API implemented, change this method to take
-    //       advantage of that instead of chunking manually.
+    // This can use Graph API batch requests once batching support is implemented.
 
     const chunkedGroups = chunk(groups, 20);
     const groupMembershipsMappings: [GroupDistinctId, Membership[]][] = [];
