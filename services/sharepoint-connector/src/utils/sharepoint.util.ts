@@ -20,15 +20,22 @@ export function getItemUrl(sharepointContentItem: SharepointContentItem): string
 }
 
 /**
+ * Separator used between the subsite ID and the item ID in file keys. We use `::` instead of `/`
+ * because the file-diff API splits stored keys by `/` and compares only the last segment. Using
+ * `/` would cause the diff to lose the subsite prefix and produce phantom new+deleted results.
+ */
+const SUBSITE_KEY_SEPARATOR = '::';
+
+/**
  * Builds the key portion submitted to the file-diff API.
  *
  * The diff API scopes to items whose full key starts with `partialKey/` (the parent siteId) and
  * compares the remainder against submitted keys. For main-site items the remainder is just the
- * itemId; for subsite items it is `subsiteId/itemId`.
+ * itemId; for subsite items it is `subsiteId::{itemId}` (using `::` to avoid `/`-based splitting).
  */
 export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): string {
   if (sharepointContentItem.syncSiteId) {
-    return `${sharepointContentItem.siteId.value}/${sharepointContentItem.item.id}`;
+    return `${sharepointContentItem.siteId.value}${SUBSITE_KEY_SEPARATOR}${sharepointContentItem.item.id}`;
   }
   return sharepointContentItem.item.id;
 }
@@ -37,11 +44,11 @@ export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): 
  * Builds a unique hierarchical key for ingestion.
  *
  * Main-site items:  `{siteId}/{itemId}`
- * Subsite items:    `{parentSiteId}/{subsiteId}/{itemId}`
+ * Subsite items:    `{parentSiteId}/{subsiteId}::{itemId}`
  */
 export function buildIngestionItemKey(sharepointContentItem: AnySharepointItem): string {
   if (sharepointContentItem.syncSiteId) {
-    return `${sharepointContentItem.syncSiteId.value}/${sharepointContentItem.siteId.value}/${sharepointContentItem.item.id}`;
+    return `${sharepointContentItem.syncSiteId.value}/${sharepointContentItem.siteId.value}${SUBSITE_KEY_SEPARATOR}${sharepointContentItem.item.id}`;
   }
   return `${sharepointContentItem.siteId.value}/${sharepointContentItem.item.id}`;
 }

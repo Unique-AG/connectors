@@ -223,6 +223,24 @@ export class ScopeManagementService {
     }
   }
 
+  private resolveEffectiveSiteId(path: string, context: SharepointSyncContext): Smeared {
+    let bestMatch: Smeared | undefined;
+    let bestMatchLength = 0;
+
+    for (const subsite of context.discoveredSubsites) {
+      const subsiteScopePath = `${context.rootPath.value}/${subsite.relativePath.value}`;
+      if (
+        (path.startsWith(`${subsiteScopePath}/`) || path === subsiteScopePath) &&
+        subsiteScopePath.length > bestMatchLength
+      ) {
+        bestMatch = subsite.siteId;
+        bestMatchLength = subsiteScopePath.length;
+      }
+    }
+
+    return bestMatch ?? context.siteConfig.siteId;
+  }
+
   private isValidScopeOwnership(rootScope: Scope, siteId: Smeared): boolean {
     if (!rootScope.externalId) {
       return true;
@@ -302,6 +320,7 @@ export class ScopeManagementService {
     await this.updateNewlyCreatedScopesWithExternalId(
       scopes,
       allPathsWithParents,
+      items,
       directories,
       context,
     );
@@ -322,11 +341,12 @@ export class ScopeManagementService {
   private async updateNewlyCreatedScopesWithExternalId(
     scopes: Scope[],
     paths: string[],
+    items: SharepointContentItem[],
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<void> {
     const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
-    const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context);
+    const pathToExternalIdMap = this.buildPathToExternalIdMap(items, directories, context);
 
     for (const [index, scope] of scopes.entries()) {
       if (isNonNullish(scope.externalId)) {
@@ -344,16 +364,14 @@ export class ScopeManagementService {
         continue;
       }
 
-      /* We have a couple of known directories in sharepoint for which it's more complex to get the id: root scope,
-       * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
-       */
       let externalId = pathToExternalIdMap[path]
         ? createSmeared(pathToExternalIdMap[path])
         : undefined;
 
       if (isNullish(externalId)) {
         this.logger.warn(`${logPrefix} No external ID found for path ${createSmeared(path)}`);
-        externalId = context.siteConfig.siteId.transform(
+        const effectiveSiteId = this.resolveEffectiveSiteId(path, context);
+        externalId = effectiveSiteId.transform(
           (siteId) => `${EXTERNAL_ID_PREFIX}unknown:${siteId}/${scope.name}-${randomUUID()}`,
         );
       }
@@ -414,6 +432,7 @@ export class ScopeManagementService {
   }
 
   private buildPathToExternalIdMap(
+    items: SharepointContentItem[],
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Record<string, string> {
@@ -434,6 +453,8 @@ export class ScopeManagementService {
     pathToExternalIdMap[`${rootPath.value}/SitePages`] =
       `${EXTERNAL_ID_PREFIX}${siteConfig.siteId.value}/sitePages`;
 
+    const registeredDrives = new Set<string>();
+
     for (const directory of directories) {
       const path = getUniquePathFromItem(directory, rootPath, siteName);
       if (isAncestorOfRootPath(path.value, rootPath.value) || path.value === rootPath.value) {
@@ -449,8 +470,40 @@ export class ScopeManagementService {
       const segments = driveRelative.split('/').filter(Boolean);
       // Segments can be empty when a directory resolves to exactly the site scope path.
       if (segments[0]) {
+        registeredDrives.add(`${directory.siteId.value}/${directory.driveId}`);
         pathToExternalIdMap[`${siteScopePath}/${segments[0]}`] ??=
           `${EXTERNAL_ID_PREFIX}drive:${directory.siteId.value}/${directory.driveId}`;
+      }
+    }
+
+    // Register drive-level mappings from items for drives that had no subdirectories.
+    // Without this, drives containing only root-level files would get spc:unknown: external IDs.
+    for (const item of items) {
+      if (item.itemType !== 'driveItem') {
+        continue;
+      }
+
+      const driveKey = `${item.siteId.value}/${item.driveId}`;
+      if (registeredDrives.has(driveKey)) {
+        continue;
+      }
+      registeredDrives.add(driveKey);
+
+      // Resolve the item's parent path (e.g. "/Company/Root/SubA/Shared Documents/FolderA")
+      const parentPath = getUniqueParentPathFromItem(item, rootPath, siteName);
+
+      // Determine the scope path for the site or subsite this item belongs to
+      // (e.g. "/Company/Root" for main site items, "/Company/Root/SubA" for subsite items)
+      const sitePrefix = siteIdToPrefix.get(item.siteId.value);
+      const siteScopePath = sitePrefix ? `${rootPath.value}/${sitePrefix}` : rootPath.value;
+
+      // Extract the path relative to the site scope, then take the first segment — that's the
+      // drive/library name (e.g. "/Shared Documents/FolderA" → "Shared Documents")
+      const driveRelative = parentPath.value.substring(siteScopePath.length);
+      const segments = driveRelative.split('/').filter(Boolean);
+      if (segments[0]) {
+        pathToExternalIdMap[`${siteScopePath}/${segments[0]}`] ??=
+          `${EXTERNAL_ID_PREFIX}drive:${item.siteId.value}/${item.driveId}`;
       }
     }
 

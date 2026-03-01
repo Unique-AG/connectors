@@ -69,13 +69,9 @@ export class SyncSharepointGroupsToUniqueCommand {
         `${groupLogPrefix} Syncing sharepoint group ${createSmeared(sharePointGroup.displayName)}`,
       );
 
-      // We only use subsite-specific group name for site groups, because entra groups are same
-      // across all sites and subsites so we use the top-level site name for them
-      const effectiveSiteId = sharePointGroup.id.startsWith('siteGroup:')
-        ? sharePointGroup.siteId
-        : siteId;
-      const groupSiteName =
-        siteNamesBySiteId.get(effectiveSiteId.value) ?? createSmeared(effectiveSiteId.value);
+      // All group types use the root site name: siteGroups are site-collection-scoped (not
+      // per-subsite) and Entra groups are tenant-wide. Neither is subsite-specific.
+      const groupSiteName = siteNamesBySiteId.get(siteId.value) ?? createSmeared(siteId.value);
 
       const correspondingUniqueGroup = unique.groupsMap[sharePointGroup.id];
       if (!correspondingUniqueGroup) {

@@ -430,7 +430,7 @@ describe('buildIngestionItemKey', () => {
     expect(buildIngestionItemKey(item)).toBe(`${siteId}/file123`);
   });
 
-  it('produces {parentSiteId}/{subsiteId}/{itemId} for subsite items', () => {
+  it('produces {parentSiteId}/{subsiteId}::{itemId} for subsite items', () => {
     const parentSiteId = 'parent-site-uuid';
     const subsiteSiteId = 'contoso.sharepoint.com,col-id,web-id';
     const item = createDriveItem(
@@ -439,7 +439,7 @@ describe('buildIngestionItemKey', () => {
     item.siteId = new Smeared(subsiteSiteId, false);
     item.syncSiteId = new Smeared(parentSiteId, false);
 
-    expect(buildIngestionItemKey(item)).toBe(`${parentSiteId}/${subsiteSiteId}/file123`);
+    expect(buildIngestionItemKey(item)).toBe(`${parentSiteId}/${subsiteSiteId}::file123`);
   });
 });
 
@@ -452,7 +452,7 @@ describe('buildFileDiffKey', () => {
     expect(buildFileDiffKey(item)).toBe('file123');
   });
 
-  it('returns {subsiteId}/{itemId} for subsite items', () => {
+  it('returns {subsiteId}::{itemId} for subsite items', () => {
     const subsiteSiteId = 'contoso.sharepoint.com,col-id,web-id';
     const item = createDriveItem(
       'https://tenant.sharepoint.com/sites/TestSite/Sub/Shared%20Documents/doc.pdf',
@@ -460,6 +460,6 @@ describe('buildFileDiffKey', () => {
     item.siteId = new Smeared(subsiteSiteId, false);
     item.syncSiteId = new Smeared('parent-uuid', false);
 
-    expect(buildFileDiffKey(item)).toBe(`${subsiteSiteId}/file123`);
+    expect(buildFileDiffKey(item)).toBe(`${subsiteSiteId}::file123`);
   });
 });

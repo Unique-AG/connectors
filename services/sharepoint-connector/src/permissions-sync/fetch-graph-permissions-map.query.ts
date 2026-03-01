@@ -1,4 +1,3 @@
-import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { isNonNullish } from 'remeda';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
@@ -27,13 +26,12 @@ export class FetchGraphPermissionsMapQuery {
 
   public async run(
     items: AnySharepointItem[],
-    siteNameBySiteId: ReadonlyMap<string, Smeared>,
+    rootSiteId: Smeared,
+    rootSiteName: Smeared,
   ): Promise<PermissionsMap> {
     const permissionsMap: PermissionsMap = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
-      const itemSiteName = siteNameBySiteId.get(item.siteId.value);
-      assert.ok(itemSiteName, `Site name for site ${item.siteId} not found`);
       const permissionsFetcher: PermissionsFetcher = {
         driveItem: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
         listItem: () =>
@@ -45,8 +43,9 @@ export class FetchGraphPermissionsMapQuery {
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
         sharePointPermissions,
         item.siteId,
-        itemSiteName,
         item.item.id,
+        rootSiteId,
+        rootSiteName,
       );
     }
     return permissionsMap;
@@ -55,15 +54,17 @@ export class FetchGraphPermissionsMapQuery {
   private mapSharePointPermissionsToOurPermissions(
     simplePermissions: SimplePermission[],
     siteId: Smeared,
-    siteName: Smeared,
     itemId: string,
+    rootSiteId: Smeared,
+    rootSiteName: Smeared,
   ): Permission[] {
     return simplePermissions.flatMap((permission) => {
       if (isNonNullish(permission.grantedToV2)) {
         const itemPermission = this.mapSharePointIdentitySetToOurPermission(
           permission.grantedToV2,
           siteId,
-          siteName,
+          rootSiteId,
+          rootSiteName,
         );
         if (isNonNullish(itemPermission)) {
           return [itemPermission];
@@ -78,7 +79,12 @@ export class FetchGraphPermissionsMapQuery {
 
         const itemPermissions = permission.grantedToIdentitiesV2
           .map((simpleIdentitySet) =>
-            this.mapSharePointIdentitySetToOurPermission(simpleIdentitySet, siteId, siteName),
+            this.mapSharePointIdentitySetToOurPermission(
+              simpleIdentitySet,
+              siteId,
+              rootSiteId,
+              rootSiteName,
+            ),
           )
           .filter(isNonNullish);
         if (itemPermissions.length > 0) {
@@ -122,7 +128,8 @@ export class FetchGraphPermissionsMapQuery {
   private mapSharePointIdentitySetToOurPermission(
     simpleIdentitySet: SimpleIdentitySet,
     siteId: Smeared,
-    siteName: Smeared,
+    rootSiteId: Smeared,
+    rootSiteName: Smeared,
   ): Permission | null {
     if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
       const groupId = normalizeMsGroupId(simpleIdentitySet.group.id);
@@ -147,10 +154,13 @@ export class FetchGraphPermissionsMapQuery {
     }
 
     if (isNonNullish(simpleIdentitySet.siteGroup)) {
+      // SiteGroups are scoped to the site collection, not individual webs/subsites.
+      // We always use the root site identity so that the same siteGroup isn't duplicated
+      // when it appears on items from both the root site and its subsites.
       return {
-        siteId,
+        siteId: rootSiteId,
         type: 'siteGroup',
-        id: `${siteName.value}|${simpleIdentitySet.siteGroup.id}`,
+        id: `${rootSiteName.value}|${simpleIdentitySet.siteGroup.id}`,
         name: simpleIdentitySet.siteGroup.displayName,
       };
     }
