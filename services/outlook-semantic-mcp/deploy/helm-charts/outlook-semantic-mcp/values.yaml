@@ -179,6 +179,9 @@ mcpConfig:
     # cluster_local: communicates using in-cluster URLs with service headers
     # external: communicates using external URLs with app key authentication
     serviceAuthMode: cluster_local
+    # -- Service ID sent as x-service-id header in cluster_local mode.
+    # This is the Zitadel service account ID of the MCP server itself.
+    serviceId: unset_default_value
     # -- Extra headers to send with requests to Unique API services (JSON string)
     # For cluster_local mode: '{"x-company-id": "...", "x-user-id": "..."}'
     serviceExtraHeaders: {}
