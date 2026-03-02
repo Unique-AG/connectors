@@ -212,19 +212,9 @@
               "enum": ["cluster_local", "external"],
               "description": "Authentication mode for Unique API services: cluster_local for in-cluster, external for app key"
             },
-            "apiBaseUrl": {
+            "serviceId": {
               "type": "string",
-              "description": "The Public API URL. Example: https://api.unique.app"
-            },
-            "apiVersion": {
-              "type": "string",
-              "description": "The Public API version to use",
-              "default": "2023-12-06"
-            },
-            "rootScopePath": {
-              "type": "string",
-              "description": "The root scope path where to upload transcripts",
-              "default": "outlook-semantic-mcp"
+              "description": "Service ID sent as x-service-id header for in-cluster authentication"
             },
             "serviceExtraHeaders": {
               "type": "object",
@@ -237,29 +227,30 @@
               "type": "string",
               "description": "Base URL for Unique ingestion service (cluster_local mode). Example: http://node-ingestion.namespace:8091"
             },
-            "userFetchConcurrency": {
-              "type": "integer",
-              "description": "Concurrency limit for fetching users when resolving scope accesses",
-              "default": 5
-            },
-            "appKey": {
+            "scopeManagementServiceBaseUrl": {
               "type": "string",
-              "description": "API key of a Chat App (external mode, loaded from secret)"
+              "description": "Base URL for Unique scope management service"
             },
-            "appId": {
-              "type": "string",
-              "description": "App ID of the Chat App (external mode)"
-            },
-            "authUserId": {
-              "type": "string",
-              "description": "User ID of a Zitadel Service User (external mode)"
-            },
-            "authCompanyId": {
-              "type": "string",
-              "description": "Organisation ID where the Zitadel Service User is created (external mode)"
+            "zitadel": {
+              "type": "object",
+              "description": "Zitadel configuration",
+              "properties": {
+                "clientId": {
+                  "type": "string",
+                  "description": "Zitadel client ID"
+                },
+                "oauthTokenUrl": {
+                  "type": "string",
+                  "description": "Zitadel OAuth token URL"
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Zitadel project ID"
+                }
+              }
             }
           },
-          "required": ["serviceAuthMode", "apiBaseUrl"]
+          "required": ["serviceAuthMode"]
         },
         "auth": {
           "type": "object",
