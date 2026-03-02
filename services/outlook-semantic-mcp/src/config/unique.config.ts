@@ -28,6 +28,7 @@ const clusterLocalConfig = z.object({
       'JSON string of extra HTTP headers for API requests ' +
         '(e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
     ),
+  serviceId: z.string().describe('Service ID sent as x-service-id header for in-cluster authentication'),
 });
 
 // ==== Config for external communication with Unique API services via app key ====
