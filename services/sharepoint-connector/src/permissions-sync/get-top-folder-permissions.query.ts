@@ -59,11 +59,15 @@ export class GetTopFolderPermissionsQuery {
   ): Smeared[] {
     const normalizedRootPath = createSmeared(`/${normalizeSlashes(rootPath.value)}`);
 
+    const subsiteRootPaths = subsiteRelativePaths.map((relativePath) =>
+      createSmeared(`/${normalizeSlashes(rootPath.value)}/${relativePath}`),
+    );
+
     return pipe(
       items,
       map((item) => getUniqueParentPathFromItem(item, rootPath, siteName)),
       filter((folderPath) => isTopFolder(folderPath, rootPath, subsiteRelativePaths)),
-      (paths) => [normalizedRootPath, ...paths],
+      (paths) => [normalizedRootPath, ...subsiteRootPaths, ...paths],
       uniqueBy(prop('value')),
     );
   }

@@ -391,6 +391,41 @@ describe('GetTopFolderPermissionsQuery', () => {
     expect(result.get('/TestSite/SubSite/Documents')).toEqual([group]);
   });
 
+  it('includes subsite root path even when no item has it as parent', () => {
+    const subsiteFile = createMockFile(
+      'sub-file',
+      'https://tenant.sharepoint.com/sites/TestSite/SubSite/Documents/Folder/file.docx',
+    );
+    const subsiteFolder = createMockDirectory(
+      'sub-folder',
+      'https://tenant.sharepoint.com/sites/TestSite/SubSite/Documents/Folder',
+    );
+    const group = createSiteGroupMembership('sub-group', 'SubSite Group');
+
+    const permissionsMap = {
+      [`${mockSiteId}/${subsiteFile.item.id}`]: [group],
+      [`${mockSiteId}/${subsiteFolder.item.id}`]: [group],
+    };
+
+    const result = query.run({
+      items: [subsiteFile],
+      directories: [subsiteFolder],
+      permissionsMap,
+      rootPath,
+      siteName,
+      discoveredSubsites: [
+        {
+          siteId: new Smeared('subsite-id', false),
+          name: new Smeared('SubSite', false),
+          relativePath: new Smeared('SubSite', false),
+        } satisfies DiscoveredSubsite,
+      ],
+    });
+
+    expect(result.has('/TestSite/SubSite')).toBe(true);
+    expect(result.get('/TestSite/SubSite')).toEqual([group]);
+  });
+
   it('handles missing permissions gracefully and logs warning', () => {
     const topFolder = createMockDirectory(
       'docs',
