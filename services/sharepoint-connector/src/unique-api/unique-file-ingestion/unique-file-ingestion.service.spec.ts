@@ -234,5 +234,52 @@ describe('UniqueFileIngestionService', () => {
         }),
       );
     });
+
+    it('appends trailing slash to partialKey to avoid substring matches', async () => {
+      let capturedBody: string | undefined;
+      const mockHttpClient = {
+        request: vi.fn().mockImplementation(async (options) => {
+          capturedBody = options.body;
+          return {
+            statusCode: 200,
+            body: {
+              json: vi.fn().mockResolvedValue({
+                newFiles: [],
+                updatedFiles: [],
+                movedFiles: [],
+                deletedFiles: [],
+              }),
+              text: vi.fn().mockResolvedValue(''),
+            },
+          };
+        }),
+      };
+
+      const { unit } = await TestBed.solitary(UniqueFileIngestionService)
+        .mock(INGESTION_CLIENT)
+        .impl(() => ingestionClientMock)
+        .mock(IngestionHttpClient)
+        .impl(() => mockHttpClient)
+        .mock(ConfigService)
+        .impl((stub) => ({
+          ...stub(),
+          get: vi.fn((key: string) => {
+            if (key === 'unique') {
+              return { storeInternally: EnabledDisabledMode.Enabled };
+            }
+            if (key === 'unique.ingestionServiceBaseUrl') {
+              return 'https://api.unique.app';
+            }
+            return undefined;
+          }),
+        }))
+        .compile();
+
+      await unit.performFileDiff([], new Smeared('site-uuid', false));
+
+      expect(capturedBody).not.toBeUndefined();
+      const parsed = JSON.parse(capturedBody ?? ''); // It's checked above anyway
+      expect(parsed.partialKey).toBe('site-uuid/');
+    });
   });
 });
