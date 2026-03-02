@@ -212,10 +212,6 @@
               "enum": ["cluster_local", "external"],
               "description": "Authentication mode for Unique API services: cluster_local for in-cluster, external for app key"
             },
-            "serviceId": {
-              "type": "string",
-              "description": "Service ID sent as x-service-id header for in-cluster authentication"
-            },
             "serviceExtraHeaders": {
               "type": "object",
               "description": "Extra HTTP headers for cluster_local mode (requires x-company-id, x-user-id, x-service-id)",
