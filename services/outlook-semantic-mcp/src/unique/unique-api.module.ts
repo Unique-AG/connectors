@@ -21,7 +21,10 @@ const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANT
   ): UniqueApiFeatureModuleInputOptions => {
     const uniqueConfig = configService.get('unique', { infer: true });
     return {
-      auth: uniqueConfig,
+      auth:
+        uniqueConfig.serviceAuthMode === 'cluster_local'
+          ? { ...uniqueConfig, serviceId: 'outlook-semantic-mcp' }
+          : uniqueConfig,
       ingestion: { baseUrl: uniqueConfig.ingestionServiceBaseUrl },
       scopeManagement: { baseUrl: uniqueConfig.scopeManagementServiceBaseUrl },
     };

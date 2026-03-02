@@ -15,8 +15,15 @@ server:
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
-  # -- Environment variables from secrets (required secrets listed at bottom of file)
-  # @see https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars
+  # -- Environment variables from secrets.
+  # Example for loading secrets (uncomment and customize as needed):
+  #   envVars:
+  #     # For Zitadel authentication (required when authMode is 'external')
+  #     - name: UNIQUE_ZITADEL_CLIENT_SECRET
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: outlook-semantic-mcp-zitadel-secret
+  #           key: UNIQUE_ZITADEL_CLIENT_SECRET
   envVars: []
   # -- ConfigMap(s) to load environment variables from.
   # Default assumes release name is "outlook-semantic-mcp" (i.e., chart.fullname resolves to "outlook-semantic-mcp").
@@ -109,6 +116,36 @@ grafana:
 alerts:
   # -- Enable PrometheusRule resource creation
   enabled: false
+  # -- Default alert definitions
+  defaultAlerts:
+    # -- Enable GraphQL API error rate alerts
+    graphql:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # OutlookSemanticMcpGraphQLErrors: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # OutlookSemanticMcpGraphQLErrors:
+        #   for: "15s"
+        #   severity: "critical"
+        #   threshold: 0.05
+    # -- Enable Unique REST API error rate alerts
+    uniqueApi:
+      enabled: true
+      # -- Disable specific alerts by setting them to true
+      disabled: {}
+        # OutlookSemanticMcpUniqueAPIErrors: false
+      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
+      customRules: {}
+        # OutlookSemanticMcpUniqueAPIErrors:
+        #   for: "15s"
+        #   severity: "critical"
+        #   threshold: 0.05
+    # -- Additional labels to add to all default alerts
+    additionalLabels: {}
+      # environment: production
+      # team: backend
 
 # -- Configuration for the deployed Outlook Semantic MCP Server, will be mapped to environment variables
 # Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
@@ -152,20 +189,19 @@ mcpConfig:
     #   x-user-id: "..."
     #   x-company-id: "..."
 
-    # -- The Public API URL
-    # example: https://gateway.unique.app/public/chat/
-    # example: http://node-chat.finance-gpt:8092/public/
-    apiBaseUrl: unset_default_value
-    # -- The Public API version to use
-    apiVersion: "2023-12-06"
-    # -- The root scope path where to upload transcripts
-    rootScopePath: outlook-semantic-mcp
-    # -- Concurrency limit for fetching users when resolving scope accesses
-    userFetchConcurrency: 5
-
-    # -- Base URL for Unique ingestion service (cluster_local mode only)
+    # -- Base URL for Unique ingestion service
     # example: http://node-ingestion.finance-gpt:8091
     ingestionServiceBaseUrl: unset_default_value
+
+    # -- Base URL for Unique scope management
+    # example: http://node-ingestion.finance-gpt:8091
+    scopeManagementServiceBaseUrl: unset_default_value
+
+    # Zitadel config
+    zitadel:
+        clientId: unset_default_value
+        oauthTokenUrl: unset_default_value
+        projectId: unset_default_value
 
   # -- Authentication configuration for the MCP server
   auth:
