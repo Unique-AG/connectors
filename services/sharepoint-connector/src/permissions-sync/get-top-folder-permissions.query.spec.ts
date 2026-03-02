@@ -126,7 +126,6 @@ describe('GetTopFolderPermissionsQuery', () => {
 
   const createSiteGroupMembership = (id: string, name: string): GroupMembership => ({
     type: 'siteGroup',
-    siteId: new Smeared(mockSiteId, false),
     id,
     name,
   });

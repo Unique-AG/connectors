@@ -89,7 +89,7 @@ export class FetchGroupsWithMembershipsQuery {
       [...uniqueGroupPermissions, ...allMembershipsFromSiteGroups],
       filter(isGroupType),
       uniqueBy(groupDistinctId),
-      map(pick(['id', 'type', 'siteId'])),
+      map(pick(['id', 'type'])),
     );
 
     this.logger.log(`${logPrefix} Fetching MS groups memberships map`);
@@ -108,7 +108,7 @@ export class FetchGroupsWithMembershipsQuery {
         filter(isGroupType),
         filter((group) => !groupMembershipsCache[groupDistinctId(group)]),
         uniqueBy(groupDistinctId),
-        map(pick(['id', 'type', 'siteId'])),
+        map(pick(['id', 'type'])),
       );
       this.logger.debug(`${logPrefix} Found ${msGroupsToProcess.length} groups to process next`);
     }
@@ -172,7 +172,6 @@ export class FetchGroupsWithMembershipsQuery {
 
     return {
       id: groupId,
-      siteId: group.siteId,
       displayName: groupName,
       members: Array.from(groupMembers),
     };
@@ -180,7 +179,7 @@ export class FetchGroupsWithMembershipsQuery {
   // ===== Helper methods for fetching groups from Microsoft Graph API =====
 
   private async fetchGroupMemberships(
-    groups: { id: string; siteId: Smeared; type: 'groupMembers' | 'groupOwners' }[],
+    groups: { id: string; type: 'groupMembers' | 'groupOwners' }[],
     logPrefix: string,
   ): Promise<[GroupDistinctId, Membership[]][]> {
     // TODO: Once we have batch requests for Graph API implemented, change this method to take
@@ -208,7 +207,7 @@ export class FetchGroupsWithMembershipsQuery {
 
         if (result.status === 'fulfilled') {
           return result.value.map((membership) =>
-            this.mapGroupMembershipToItemPermission(membership, group.siteId),
+            this.mapGroupMembershipToItemPermission(membership),
           );
         }
 
@@ -237,7 +236,7 @@ export class FetchGroupsWithMembershipsQuery {
     return groupMembershipsMappings;
   }
 
-  private mapGroupMembershipToItemPermission(membership: GroupMember, siteId: Smeared): Membership {
+  private mapGroupMembershipToItemPermission(membership: GroupMember): Membership {
     if (membership['@odata.type'] === '#microsoft.graph.user') {
       return {
         type: 'user',
@@ -249,7 +248,6 @@ export class FetchGroupsWithMembershipsQuery {
     }
 
     return {
-      siteId,
       type: 'groupMembers',
       id: membership.id,
       name: membership.displayName,
@@ -262,10 +260,11 @@ export class FetchGroupsWithMembershipsQuery {
     siteGroupsPermissions: GroupMembership[],
     logPrefix: string,
   ): Promise<Record<GroupDistinctId, Membership[]>> {
-    const siteWithGroupIdsBySiteId: Record<
-      string,
-      { siteId: Smeared; siteName: string; siteGroupIds: string[] }
-    > = {};
+    // SiteGroups are site-collection-scoped, so all permissions share the same root site name.
+    // We extract it from the first permission ID and collect all numeric group IDs.
+    let rootSiteName: Smeared | undefined;
+    const siteGroupIds: string[] = [];
+
     for (const siteGroupPermission of siteGroupsPermissions) {
       const [siteName, siteGroupId, ...rest] = siteGroupPermission.id.split('|');
 
@@ -281,74 +280,41 @@ export class FetchGroupsWithMembershipsQuery {
 
       assert.ok(siteName, 'Site name must be present');
       assert.ok(siteGroupId, 'Site group id must be present');
-      const rawSiteId = siteGroupPermission.siteId.value;
-      siteWithGroupIdsBySiteId[rawSiteId] ??= {
-        siteId: createSmeared(rawSiteId),
-        siteName,
-        siteGroupIds: [],
-      };
-      siteWithGroupIdsBySiteId[rawSiteId].siteGroupIds.push(siteGroupId);
+      rootSiteName ??= createSmeared(siteName);
+      siteGroupIds.push(siteGroupId);
     }
 
-    const totalSites = Object.keys(siteWithGroupIdsBySiteId).length;
-    const totalSiteGroups = pipe(
-      siteWithGroupIdsBySiteId,
-      values(),
-      map((site) => site.siteGroupIds.length),
-      sum(),
-    );
+    if (!rootSiteName || siteGroupIds.length === 0) {
+      return {};
+    }
+
     this.logger.log(
-      `${logPrefix} Fetching site groups memberships map for ${totalSiteGroups} site groups` +
-        `${totalSites > 1 ? ` across ${totalSites} sites` : ''}`,
+      `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
     );
 
-    const aggregatedSiteGroupsMembershipsMap: Record<GroupDistinctId, Membership[]> = {};
-    for (const { siteId, siteName, siteGroupIds } of Object.values(siteWithGroupIdsBySiteId)) {
-      const siteGroupsMembershipsMapForSite = await this.fetchSiteGroupsMembershipsMap(
-        createSmeared(siteName),
-        siteGroupIds,
-        siteId,
-      );
-      Object.assign(aggregatedSiteGroupsMembershipsMap, siteGroupsMembershipsMapForSite);
-    }
-
-    this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
-    return aggregatedSiteGroupsMembershipsMap;
-  }
-
-  private async fetchSiteGroupsMembershipsMap(
-    siteName: Smeared,
-    siteGroupIds: string[],
-    siteId: Smeared,
-  ): Promise<Record<GroupDistinctId, Membership[]>> {
-    return pipe(
+    const siteName = rootSiteName;
+    const result = pipe(
       await this.sharepointRestClientService.getSiteGroupsMemberships(siteName, siteGroupIds),
-      // We need to add site name to the id to make it unique across all sites.
       mapKeys((id) =>
         groupDistinctId({
           type: 'siteGroup',
-          id: `${siteName.value}|${id}`,
+          id: `${rootSiteName.value}|${id}`,
         }),
       ),
-      mapValues(
-        map((membership: SiteGroupMembership) =>
-          this.mapRestApiMembershipToGroupMembership(membership, siteId),
-        ),
-      ),
+      mapValues(map(this.mapRestApiMembershipToGroupMembership.bind(this))),
       mapValues(filter(isNonNullish)),
     );
+
+    this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
+    return result;
   }
 
-  private mapRestApiMembershipToGroupMembership(
-    siteGroupMembership: SiteGroupMembership,
-    siteId: Smeared,
-  ): Membership | null {
-    const {
-      PrincipalType: principalType,
-      LoginName: loginName,
-      Email: email,
-      Title: title,
-    } = siteGroupMembership;
+  private mapRestApiMembershipToGroupMembership({
+    PrincipalType: principalType,
+    LoginName: loginName,
+    Email: email,
+    Title: title,
+  }: SiteGroupMembership): Membership | null {
     const principalTypeMapper: Record<PrincipalType, () => Membership | null> = {
       [PrincipalType.User]: () => {
         // In some specific cases, that are rather unclear, there may be no email specified in the
@@ -361,7 +327,7 @@ export class FetchGroupsWithMembershipsQuery {
       },
       [PrincipalType.DistributionList]: () => {
         const groupId = this.extractGroupId(loginName);
-        return groupId ? { siteId, type: 'groupMembers', id: groupId, name: title } : null;
+        return groupId ? { type: 'groupMembers', id: groupId, name: title } : null;
       },
       [PrincipalType.SecurityGroup]: () => {
         const groupId = this.extractGroupId(loginName);
@@ -372,7 +338,7 @@ export class FetchGroupsWithMembershipsQuery {
         }
         const groupType = groupId?.endsWith(OWNERS_SUFFIX) ? 'Owners' : 'Members';
         return groupId
-          ? { siteId, type: `group${groupType}`, id: normalizeMsGroupId(groupId), name: title }
+          ? { type: `group${groupType}`, id: normalizeMsGroupId(groupId), name: title }
           : null;
       },
       [PrincipalType.SharePointGroup]: () =>

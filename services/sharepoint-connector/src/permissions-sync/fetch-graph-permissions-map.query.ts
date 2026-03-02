@@ -24,11 +24,7 @@ export class FetchGraphPermissionsMapQuery {
 
   public constructor(private readonly graphApiService: GraphApiService) {}
 
-  public async run(
-    items: AnySharepointItem[],
-    rootSiteId: Smeared,
-    rootSiteName: Smeared,
-  ): Promise<PermissionsMap> {
+  public async run(items: AnySharepointItem[], rootSiteName: Smeared): Promise<PermissionsMap> {
     const permissionsMap: PermissionsMap = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
@@ -42,9 +38,7 @@ export class FetchGraphPermissionsMapQuery {
       const sharePointPermissions = await permissionsFetcher[item.itemType]();
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
         sharePointPermissions,
-        item.siteId,
         item.item.id,
-        rootSiteId,
         rootSiteName,
       );
     }
@@ -53,17 +47,13 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSharePointPermissionsToOurPermissions(
     simplePermissions: SimplePermission[],
-    siteId: Smeared,
     itemId: string,
-    rootSiteId: Smeared,
     rootSiteName: Smeared,
   ): Permission[] {
     return simplePermissions.flatMap((permission) => {
       if (isNonNullish(permission.grantedToV2)) {
         const itemPermission = this.mapSharePointIdentitySetToOurPermission(
           permission.grantedToV2,
-          siteId,
-          rootSiteId,
           rootSiteName,
         );
         if (isNonNullish(itemPermission)) {
@@ -79,12 +69,7 @@ export class FetchGraphPermissionsMapQuery {
 
         const itemPermissions = permission.grantedToIdentitiesV2
           .map((simpleIdentitySet) =>
-            this.mapSharePointIdentitySetToOurPermission(
-              simpleIdentitySet,
-              siteId,
-              rootSiteId,
-              rootSiteName,
-            ),
+            this.mapSharePointIdentitySetToOurPermission(simpleIdentitySet, rootSiteName),
           )
           .filter(isNonNullish);
         if (itemPermissions.length > 0) {
@@ -127,8 +112,6 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSharePointIdentitySetToOurPermission(
     simpleIdentitySet: SimpleIdentitySet,
-    siteId: Smeared,
-    rootSiteId: Smeared,
     rootSiteName: Smeared,
   ): Permission | null {
     if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
@@ -141,7 +124,6 @@ export class FetchGraphPermissionsMapQuery {
 
       const isOwners = simpleIdentitySet.siteUser.loginName?.endsWith(OWNERS_SUFFIX);
       return {
-        siteId,
         // Login name of the group looks like
         // c:0o.c|federateddirectoryclaimprovider|838f7d2d-BBBB-AAAA-DDDD-7dd9d399aff7_o
         // or
@@ -155,10 +137,9 @@ export class FetchGraphPermissionsMapQuery {
 
     if (isNonNullish(simpleIdentitySet.siteGroup)) {
       // SiteGroups are scoped to the site collection, not individual webs/subsites.
-      // We always use the root site identity so that the same siteGroup isn't duplicated
+      // We always use the root site name so that the same siteGroup isn't duplicated
       // when it appears on items from both the root site and its subsites.
       return {
-        siteId: rootSiteId,
         type: 'siteGroup',
         id: `${rootSiteName.value}|${simpleIdentitySet.siteGroup.id}`,
         name: simpleIdentitySet.siteGroup.displayName,

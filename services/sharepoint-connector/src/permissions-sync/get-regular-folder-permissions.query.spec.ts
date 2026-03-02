@@ -71,7 +71,6 @@ describe('GetRegularFolderPermissionsQuery', () => {
 
   const createGroupMembership = (id: string, name: string): Membership => ({
     type: 'siteGroup',
-    siteId: new Smeared(mockSiteId, false),
     id,
     name,
   });

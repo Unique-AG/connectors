@@ -14,7 +14,7 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/unique-groups/unique-groups.utils';
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { createSmeared, Smeared } from '../utils/smeared';
+import { Smeared } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery, PermissionsMap } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
@@ -70,10 +70,8 @@ export class PermissionsSyncService {
           `${sharePoint.directories.length} directories`,
       );
       const permissionsFetchStartTime = Date.now();
-      const siteNamesBySiteId = this.buildSiteNamesBySiteId(context);
       const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(
         [...sharePoint.items, ...sharePoint.directories],
-        siteId,
         context.siteName,
       );
       this.logger.log(
@@ -101,7 +99,6 @@ export class PermissionsSyncService {
       currentStep = SyncStep.GroupsSync;
       const { updatedUniqueGroupsMap } = await this.syncSharepointGroupsToUniqueCommand.run({
         siteId,
-        siteNamesBySiteId,
         sharePoint: { groupsMap: groupsWithMembershipsMap },
         unique: { groupsMap: uniqueGroupsMap, usersMap: uniqueUsersMap },
       });
@@ -201,19 +198,5 @@ export class PermissionsSyncService {
       indexBy(prop('externalId')),
       mapKeys((groupExternalId) => groupExternalId.replace(groupExternalIdPrefix, '')),
     );
-  }
-
-  private buildSiteNamesBySiteId(context: SharepointSyncContext): Map<string, Smeared> {
-    const siteNamesBySiteId = new Map<string, Smeared>();
-    siteNamesBySiteId.set(context.siteConfig.siteId.value, context.siteName);
-
-    for (const subsite of context.discoveredSubsites) {
-      siteNamesBySiteId.set(
-        subsite.siteId.value,
-        createSmeared(`${context.siteName.value}/${subsite.relativePath.value}`),
-      );
-    }
-
-    return siteNamesBySiteId;
   }
 }
