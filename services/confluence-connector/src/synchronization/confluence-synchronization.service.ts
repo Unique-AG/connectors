@@ -53,8 +53,7 @@ export class ConfluenceSynchronizationService {
       const uniqueSpaceKeys = [...new Set(pagesToFetch.map((p) => p.spaceKey))];
       const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(uniqueSpaceKeys);
 
-      const concurrency = Math.max(1, tenant.config.processing.concurrency);
-      await this.fetchAndIngestPages(pagesToFetch, spaceScopes, concurrency);
+      await this.fetchAndIngestPages(pagesToFetch, spaceScopes, tenant.config.processing.concurrency);
 
       if (diffResult.deletedKeys.length > 0) {
         await this.ingestionService.deleteContent(diffResult.deletedKeys);

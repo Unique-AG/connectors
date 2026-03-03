@@ -99,7 +99,7 @@ export class ScopeManagementService {
     if (uncachedKeys.length === 0) {
       this.logger.info(
         { spaceKeys: uniqueKeys, count: uniqueKeys.length },
-        'Batch space scopes resolved (all cached)',
+        'Batch space scopes resolved',
       );
       return result;
     }
@@ -124,7 +124,7 @@ export class ScopeManagementService {
       result.set(spaceKey, scope.id);
     }
 
-    this.logger.info(
+    this.logger.debug(
       { spaceKeys: uniqueKeys, count: uniqueKeys.length },
       'Batch space scopes resolved',
     );
