@@ -16,8 +16,8 @@ data:
 
   # Unique auth config
   UNIQUE_SERVICE_AUTH_MODE: {{ .Values.mcpConfig.unique.serviceAuthMode | quote }}
-  UNIQUE_INGESTION_SERVICE_BASE_URL: {{ include "chart.ensureTrailingSlash" (dict "url" .Values.mcpConfig.unique.ingestionServiceBaseUrl) | quote }}
-  UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL: {{ include "chart.ensureTrailingSlash" (dict "url" .Values.mcpConfig.unique.scopeManagementServiceBaseUrl) | quote }}
+  UNIQUE_INGESTION_SERVICE_BASE_URL: {{ include "chart.ensureNoTrailingSlash" (dict "url" .Values.mcpConfig.unique.ingestionServiceBaseUrl) | quote }}
+  UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL: {{ include "chart.ensureNoTrailingSlash" (dict "url" .Values.mcpConfig.unique.scopeManagementServiceBaseUrl) | quote }}
   {{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
   UNIQUE_SERVICE_EXTRA_HEADERS: '{{ .Values.mcpConfig.unique.serviceExtraHeaders | toJson }}'
   {{- end }}
