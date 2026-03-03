@@ -3,6 +3,13 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "builder": "swc"
+    "builder": {
+      "type": "swc",
+      "options": {
+        "swcOptions": {
+          "sourceMaps": true
+        }
+      }
+    }
   }
 }
