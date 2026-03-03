@@ -119,17 +119,18 @@ export class TenantRegistry implements OnModuleInit {
         );
         this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
 
-        this.serviceRegistry.register(
-          tenantName,
-          ConfluenceSynchronizationService,
-          new ConfluenceSynchronizationService(
+        const confluenceSynchronizationService = new ConfluenceSynchronizationService(
             scanner,
             fetcher,
             fileDiffService,
             ingestionService,
             scopeManagementService,
             syncLogger,
-          ),
+          );
+        this.serviceRegistry.register(
+          tenantName,
+          ConfluenceSynchronizationService,
+          confluenceSynchronizationService
         );
       });
 
