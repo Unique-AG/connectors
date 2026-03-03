@@ -1,7 +1,7 @@
 import type pino from 'pino';
 import type { IngestionConfig } from '../config/ingestion.schema';
 import { CONFC_EXTERNAL_ID_PREFIX } from '../constants/ingestion.constants';
-import type { UniqueApiClient } from '../unique-api';
+import type { UniqueApiClient } from '@unique-ag/unique-api';
 import assert from 'assert';
 
 export class ScopeManagementService {

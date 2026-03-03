@@ -1,7 +1,7 @@
 import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestionConfig } from '../../config/ingestion.schema';
-import type { UniqueApiClient } from '../../unique-api/types/unique-api-client.types';
+import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { ScopeManagementService } from '../scope-management.service';
 
 const TENANT_NAME = 'dogfood-cloud';

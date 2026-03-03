@@ -1,8 +1,7 @@
 import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
-import type { IngestionApiResponse } from '../../unique-api/types/ingestion.types';
-import type { UniqueApiClient } from '../../unique-api/types/unique-api-client.types';
+import type { IngestionApiResponse, UniqueApiClient } from '@unique-ag/unique-api';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { IngestionService } from '../ingestion.service';
 import type { FetchedPage } from '../sync.types';

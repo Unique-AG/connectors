@@ -3,8 +3,7 @@ import type pino from 'pino';
 import { request } from 'undici';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind, INGESTION_MIME_TYPE, OWNER_TYPE, SOURCE_OWNER_TYPE } from '../constants/ingestion.constants';
-import type { UniqueApiClient } from '../unique-api';
-import type { ContentRegistrationRequest, IngestionFinalizationRequest } from '../unique-api/types';
+import type { ContentRegistrationRequest, IngestionFinalizationRequest, UniqueApiClient } from '@unique-ag/unique-api';
 import type { FetchedPage } from './sync.types';
 
 export class IngestionService {

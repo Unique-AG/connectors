@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import {
+  AbstractUniqueApiClient,
   UNIQUE_API_CLIENT_FACTORY,
   type UniqueApiClientFactory,
   type UniqueApiFeatureModuleInputOptions,
@@ -15,7 +16,6 @@ import { ConfluenceSynchronizationService } from '../synchronization/confluence-
 import { FileDiffService } from '../synchronization/file-diff.service';
 import { IngestionService } from '../synchronization/ingestion.service';
 import { ScopeManagementService } from '../synchronization/scope-management.service';
-import { UniqueApiClient } from '../unique-api';
 import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
 import { tenantStorage } from './tenant-context.storage';
@@ -69,6 +69,8 @@ export class TenantRegistry implements OnModuleInit {
         this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
 
         const syncLogger = this.serviceRegistry.getServiceLogger(ConfluenceSynchronizationService);
+
+        // todo pass a logger
         const uniqueClient = this.uniqueApiFactory.create({
           auth: this.buildUniqueAuthConfig(config.unique),
           ingestion: {
@@ -84,18 +86,17 @@ export class TenantRegistry implements OnModuleInit {
             tenantKey: tenantName,
           },
         });
-        // The shared package's UniqueApiClient interface and the local abstract class have compatible
-        // runtime facades but slightly divergent type definitions (e.g. UniqueFile.fileAccess).
+
         this.serviceRegistry.register(
           tenantName,
-          UniqueApiClient,
-          uniqueClient as unknown as UniqueApiClient,
+          AbstractUniqueApiClient,
+          uniqueClient,
         );
         const scopeManagementLogger = this.serviceRegistry.getServiceLogger(ScopeManagementService);
         const scopeManagementService = new ScopeManagementService(
           config.ingestion,
           tenantName,
-          uniqueClient as unknown as UniqueApiClient,
+          uniqueClient,
           scopeManagementLogger,
         );
         this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
@@ -104,7 +105,7 @@ export class TenantRegistry implements OnModuleInit {
         const fileDiffService = new FileDiffService(
           config.confluence,
           tenantName,
-          uniqueClient as unknown as UniqueApiClient,
+          uniqueClient,
           fileDiffLogger,
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
@@ -114,7 +115,7 @@ export class TenantRegistry implements OnModuleInit {
           config.confluence,
           tenantName,
           config.ingestion.storeInternally,
-          uniqueClient as unknown as UniqueApiClient,
+          uniqueClient,
           ingestionLogger,
         );
         this.serviceRegistry.register(tenantName, IngestionService, ingestionService);

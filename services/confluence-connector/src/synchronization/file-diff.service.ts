@@ -3,8 +3,7 @@ import type pino from 'pino';
 import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind } from '../constants/ingestion.constants';
-import type { FileDiffItem, FileDiffResponse } from '../unique-api/types';
-import type { UniqueApiClient } from '../unique-api';
+import type { FileDiffItem, FileDiffResponse, UniqueApiClient } from '@unique-ag/unique-api';
 import type { DiscoveredPage, FileDiffResult } from './sync.types';
 
 export class FileDiffService {

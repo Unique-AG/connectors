@@ -3,8 +3,7 @@ import type { ConfluenceConfig } from '../../config';
 import { ContentType } from '../../confluence-api/types/confluence-api.types';
 import { IngestionMode } from '../../constants/ingestion.constants';
 import type { ServiceRegistry } from '../../tenant';
-import type { UniqueApiClient } from '../../unique-api/types/unique-api-client.types';
-import { UniqueApiClient as UniqueApiClientToken } from '../../unique-api/types/unique-api-client.types';
+import { AbstractUniqueApiClient, type UniqueApiClient } from '@unique-ag/unique-api';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { FileDiffService } from '../file-diff.service';
 import type { DiscoveredPage } from '../sync.types';
@@ -34,7 +33,7 @@ function makeService(performFileDiffImpl: UniqueApiClient['ingestion']['performF
 
   const serviceRegistry = {
     getService: vi.fn((token: unknown) => {
-      if (token === UniqueApiClientToken) {
+      if (token === AbstractUniqueApiClient) {
         return uniqueApiClient;
       }
       throw new Error(`Unexpected token: ${String(token)}`);

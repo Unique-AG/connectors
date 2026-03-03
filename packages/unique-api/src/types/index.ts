@@ -1,3 +1,4 @@
+export { AbstractUniqueApiClient } from './abstract-unique-api-client';
 export type { UniqueAuthFacade } from '../auth/unique-auth.facade';
 export type { UniqueApiClientFactory } from '../core/unique-api-client.factory';
 export type { UniqueApiClientRegistry } from '../core/unique-api-client.registry';

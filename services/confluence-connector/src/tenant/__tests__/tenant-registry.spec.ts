@@ -4,7 +4,7 @@ import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-aut
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
 import { getTenantConfigs } from '../../config/tenant-config-loader';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../../confluence-api';
-import { UniqueApiClient } from '../../unique-api/types/unique-api-client.types';
+import { AbstractUniqueApiClient } from '@unique-ag/unique-api';
 import { ServiceRegistry } from '../service-registry';
 import { tenantStorage } from '../tenant-context.storage';
 import { TenantRegistry } from '../tenant-registry';
@@ -233,7 +233,7 @@ describe('TenantRegistry', () => {
 
       tenantStorage.run(tenant, () => {
         expect(serviceRegistry.getService(ConfluenceAuth)).toBeDefined();
-        expect(serviceRegistry.getService(UniqueApiClient)).toBeDefined();
+        expect(serviceRegistry.getService(AbstractUniqueApiClient)).toBeDefined();
         expect(serviceRegistry.getService(ConfluenceApiClient)).toBeDefined();
       });
     });
