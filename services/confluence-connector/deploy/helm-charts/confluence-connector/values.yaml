@@ -179,3 +179,5 @@ connectorConfig:
         ingestionMode: flat
         # -- Root scope ID for ingestion
         scopeId: unset_default_value
+        # -- Whether to store content internally in Unique
+        storeInternally: true

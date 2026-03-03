@@ -29,6 +29,7 @@ const baseProcessingConfig = {
 const baseIngestionConfig = {
   ingestionMode: 'flat',
   scopeId: 'test-scope-id',
+  storeInternally: true,
 };
 
 const clusterLocalUniqueConfig = {

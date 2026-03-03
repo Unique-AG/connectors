@@ -6,6 +6,7 @@ const IngestionModeSchema = z.enum([IngestionMode.Flat]);
 export const IngestionConfigSchema = z.object({
   ingestionMode: IngestionModeSchema.describe('Ingestion traversal mode'),
   scopeId: z.string().min(1).describe('Root scope ID for ingestion'),
+  storeInternally: z.boolean().default(true).describe('Whether to store content internally in Unique'),
 });
 
 export type IngestionConfig = z.infer<typeof IngestionConfigSchema>;

@@ -113,6 +113,7 @@ export class TenantRegistry implements OnModuleInit {
         const ingestionService = new IngestionService(
           config.confluence,
           tenantName,
+          config.ingestion.storeInternally,
           uniqueClient as unknown as UniqueApiClient,
           ingestionLogger,
         );

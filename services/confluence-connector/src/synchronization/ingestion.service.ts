@@ -14,6 +14,7 @@ export class IngestionService {
   public constructor(
     private readonly confluenceConfig: ConfluenceConfig,
     private readonly tenantName: string,
+    private readonly storeInternally: boolean,
     private readonly uniqueApiClient: UniqueApiClient,
     private readonly logger: pino.Logger,
   ) {
@@ -48,7 +49,7 @@ export class IngestionService {
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
 
-      this.logger.info({ pageId: page.id, title: page.title }, 'Page ingested');
+      this.logger.debug({ pageId: page.id, title: page.title }, 'Page sent for ingestion');
     } catch (error) {
       this.logger.error({
         pageId: page.id,
@@ -108,7 +109,7 @@ export class IngestionService {
         spaceKey: page.spaceKey,
         spaceName: page.spaceName,
       },
-      storeInternally: true,
+      storeInternally: this.storeInternally,
     };
   }
 

@@ -367,6 +367,11 @@
                   "scopeId": {
                     "type": "string",
                     "description": "Root scope ID for ingestion"
+                  },
+                  "storeInternally": {
+                    "type": "boolean",
+                    "description": "Whether to store content internally in Unique",
+                    "default": true
                   }
                 },
                 "additionalProperties": false

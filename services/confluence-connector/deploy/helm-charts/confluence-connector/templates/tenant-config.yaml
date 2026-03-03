@@ -67,5 +67,6 @@ data:
     ingestion:
       ingestionMode: {{ $tenant.ingestion.ingestionMode | quote }}
       scopeId: {{ $tenant.ingestion.scopeId | quote }}
+      storeInternally: {{ $tenant.ingestion.storeInternally }}
   {{- end }}
 {{- end }}

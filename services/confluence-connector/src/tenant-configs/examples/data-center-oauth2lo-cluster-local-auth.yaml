@@ -35,3 +35,4 @@ processing:
 ingestion:
   ingestionMode: flat
   scopeId: your-scope-id
+  storeInternally: true

@@ -55,6 +55,7 @@ function makeService(performFileDiffImpl: UniqueApiClient['ingestion']['performF
   const ingestionConfig = {
     ingestionMode: IngestionMode.Flat,
     scopeId: 'scope-1',
+    storeInternally: true,
   };
 
   return {
