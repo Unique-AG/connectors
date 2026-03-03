@@ -1,57 +1,69 @@
 import assert from 'node:assert';
 import type pino from 'pino';
+import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
-import type { IngestionConfig } from '../config/ingestion.schema';
 import { getSourceKind } from '../constants/ingestion.constants';
-import type { ServiceRegistry } from '../tenant';
-import type { FileDiffItem, FileDiffResponse } from '../unique-api/types/ingestion.types';
-import { UniqueApiClient } from '../unique-api/types/unique-api-client.types';
+import type { FileDiffItem, FileDiffResponse } from '../unique-api/types';
+import type { UniqueApiClient } from '../unique-api';
 import type { DiscoveredPage, FileDiffResult } from './sync.types';
 
 export class FileDiffService {
-  private readonly uniqueApiClient: UniqueApiClient;
-  private readonly logger: pino.Logger;
-
   public constructor(
     private readonly confluenceConfig: ConfluenceConfig,
-    private readonly ingestionConfig: IngestionConfig,
     private readonly tenantName: string,
-    serviceRegistry: ServiceRegistry,
-  ) {
-    this.uniqueApiClient = serviceRegistry.getService(UniqueApiClient);
-    this.logger = serviceRegistry.getServiceLogger(FileDiffService);
-  }
+    private readonly uniqueApiClient: UniqueApiClient,
+    private readonly logger: pino.Logger,
+  ) {}
 
   public async computeDiff(discoveredPages: DiscoveredPage[]): Promise<FileDiffResult> {
-    const fileDiffItems = this.buildFileDiffItems(discoveredPages);
+    this.logger.info({ pageCount: discoveredPages.length }, 'Performing file diff');
 
-    this.logger.info({ itemCount: fileDiffItems.length }, 'Performing file diff');
+    const pagesBySpace = groupBy(discoveredPages, (page) => page.spaceKey);
+    const sourceKind = getSourceKind(this.confluenceConfig.instanceType);
 
-    const diffResponse = await this.uniqueApiClient.ingestion.performFileDiff(
-      fileDiffItems,
-      this.tenantName,
-      getSourceKind(this.confluenceConfig.instanceType),
-      this.confluenceConfig.baseUrl,
-    );
+    const result: FileDiffResult = {
+      newPageIds: [],
+      updatedPageIds: [],
+      deletedPageIds: [],
+      deletedKeys: [],
+      movedPageIds: [],
+    };
 
-    this.validateNoAccidentalFullDeletion(fileDiffItems, diffResponse);
+    for (const [spaceKey, pages] of Object.entries(pagesBySpace)) {
+      const fileDiffItems = this.buildFileDiffItems(pages);
+      const partialKey = `${this.tenantName}/${spaceKey}`;
+
+      const diffResponse = await this.uniqueApiClient.ingestion.performFileDiff(
+        fileDiffItems,
+        partialKey,
+        sourceKind,
+        this.confluenceConfig.baseUrl,
+      );
+
+      this.validateNoAccidentalFullDeletion(fileDiffItems, diffResponse);
+
+      result.newPageIds.push(...diffResponse.newFiles);
+      result.updatedPageIds.push(...diffResponse.updatedFiles);
+      result.deletedPageIds.push(...diffResponse.deletedFiles);
+      result.movedPageIds.push(...diffResponse.movedFiles);
+    }
 
     this.logger.info(
       {
-        new: diffResponse.newFiles.length,
-        updated: diffResponse.updatedFiles.length,
-        deleted: diffResponse.deletedFiles.length,
-        moved: diffResponse.movedFiles.length,
+        new: result.newPageIds.length,
+        updated: result.updatedPageIds.length,
+        deleted: result.deletedPageIds.length,
+        moved: result.movedPageIds.length,
       },
       'File diff completed',
     );
 
-    return this.categorizeByPageId(diffResponse);
+    return result;
   }
 
   private buildFileDiffItems(pages: DiscoveredPage[]): FileDiffItem[] {
     return pages.map((page) => ({
-      key: `${page.spaceKey}/${page.id}`,
+      key: page.id,
       url: page.webUrl,
       updatedAt: page.versionTimestamp,
     }));
@@ -89,25 +101,4 @@ export class FileDiffService {
     }
   }
 
-  private categorizeByPageId(diffResponse: FileDiffResponse): FileDiffResult {
-    return {
-      newPageIds: this.extractPageIds(diffResponse.newFiles),
-      updatedPageIds: this.extractPageIds(diffResponse.updatedFiles),
-      deletedPageIds: this.extractPageIds(diffResponse.deletedFiles),
-      deletedKeys: diffResponse.deletedFiles.map((key) => `${this.tenantName}/${key}`),
-      movedPageIds: this.extractPageIds(diffResponse.movedFiles),
-    };
-  }
-
-  private extractPageIds(keys: string[]): string[] {
-    const pageIds = new Set<string>();
-    for (const key of keys) {
-      // Key format: {spaceKey}/{pageId} or {spaceKey}/{pageId}_{filename}
-      const slashIndex = key.indexOf('/');
-      const afterSlash = slashIndex === -1 ? key : key.substring(slashIndex + 1);
-      const underscoreIndex = afterSlash.indexOf('_');
-      pageIds.add(underscoreIndex === -1 ? afterSlash : afterSlash.substring(0, underscoreIndex));
-    }
-    return [...pageIds];
-  }
 }

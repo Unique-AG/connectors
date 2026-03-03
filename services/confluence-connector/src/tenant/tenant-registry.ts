@@ -15,7 +15,7 @@ import { ConfluenceSynchronizationService } from '../synchronization/confluence-
 import { FileDiffService } from '../synchronization/file-diff.service';
 import { IngestionService } from '../synchronization/ingestion.service';
 import { ScopeManagementService } from '../synchronization/scope-management.service';
-import { UniqueApiClient } from '../unique-api/types/unique-api-client.types';
+import { UniqueApiClient } from '../unique-api';
 import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
 import { tenantStorage } from './tenant-context.storage';
@@ -100,11 +100,12 @@ export class TenantRegistry implements OnModuleInit {
         );
         this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
 
+        const fileDiffLogger = this.serviceRegistry.getServiceLogger(FileDiffService);
         const fileDiffService = new FileDiffService(
           config.confluence,
-          config.ingestion,
           tenantName,
-          this.serviceRegistry,
+          uniqueClient as unknown as UniqueApiClient,
+          fileDiffLogger,
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
 

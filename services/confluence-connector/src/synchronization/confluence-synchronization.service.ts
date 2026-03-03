@@ -36,18 +36,18 @@ export class ConfluenceSynchronizationService {
       const discoveredPages = await this.scanner.discoverPages();
       this.logger.info({ count: discoveredPages.length }, 'Discovery completed');
 
-      const diff = await this.fileDiffService.computeDiff(discoveredPages);
+      const diffResult = await this.fileDiffService.computeDiff(discoveredPages);
       this.logger.info(
         {
-          new: diff.newPageIds.length,
-          updated: diff.updatedPageIds.length,
-          deleted: diff.deletedPageIds.length,
-          moved: diff.movedPageIds.length,
+          new: diffResult.newPageIds.length,
+          updated: diffResult.updatedPageIds.length,
+          deleted: diffResult.deletedPageIds.length,
+          moved: diffResult.movedPageIds.length,
         },
         'File diff completed',
       );
 
-      const pageIdsToFetch = new Set([...diff.newPageIds, ...diff.updatedPageIds]);
+      const pageIdsToFetch = new Set([...diffResult.newPageIds, ...diffResult.updatedPageIds]);
       const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
 
       const fetchedPages = await this.contentFetcher.fetchPagesContent(pagesToFetch);
@@ -60,9 +60,9 @@ export class ConfluenceSynchronizationService {
 
       await this.ingestPagesWithConcurrency(fetchedPages, spaceScopes, concurrency);
 
-      if (diff.deletedKeys.length > 0) {
-        await this.ingestionService.deleteContent(diff.deletedKeys);
-        this.logger.info({ count: diff.deletedKeys.length }, 'Deleted content processed');
+      if (diffResult.deletedKeys.length > 0) {
+        await this.ingestionService.deleteContent(diffResult.deletedKeys);
+        this.logger.info({ count: diffResult.deletedKeys.length }, 'Deleted content processed');
       }
 
       this.logger.info('Sync completed');
