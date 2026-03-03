@@ -4,5 +4,5 @@
   "services/sharepoint-connector": "2.1.1",
   "services/teams-mcp": "0.2.6",
   "services/confluence-connector": "2.0.0-alpha.0",
-  "services/outlook-semantic-mcp": "0.2.1"
+  "services/outlook-semantic-mcp": "0.2.2"
 }

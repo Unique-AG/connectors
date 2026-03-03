@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.1...outlook-semantic-mcp@0.2.2) (2026-03-03)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** fix env vars in charts ([#319](https://github.com/Unique-AG/connectors/issues/319)) ([1a60d91](https://github.com/Unique-AG/connectors/commit/1a60d91a50f5d72efad1fe52a4e6bfd5b70c9700))
+
 ## [0.2.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.0...outlook-semantic-mcp@0.2.1) (2026-03-03)
 
 
