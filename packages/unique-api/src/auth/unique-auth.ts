@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { Logger } from '@nestjs/common';
+import type pino from 'pino';
 import type { Dispatcher } from 'undici';
 import { UniqueAuthConfig, UniqueAuthExternalConfig } from '../config/unique-api-auth-schema';
 import type { UniqueApiMetrics } from '../core/observability';
@@ -14,7 +14,7 @@ export class UniqueAuth implements UniqueAuthFacade {
   public constructor(
     private readonly config: UniqueAuthConfig,
     private readonly metrics: UniqueApiMetrics,
-    private readonly logger: Logger,
+    private readonly logger: pino.Logger,
     private readonly dispatcher: Dispatcher,
   ) {}
 
@@ -98,10 +98,7 @@ export class UniqueAuth implements UniqueAuthFacade {
 
       return tokenData.access_token;
     } catch (error) {
-      this.logger.error({
-        msg: 'Failed to acquire Unique API token from Zitadel',
-        error,
-      });
+      this.logger.error({ err: error }, 'Failed to acquire Unique API token from Zitadel');
       throw error;
     }
   }

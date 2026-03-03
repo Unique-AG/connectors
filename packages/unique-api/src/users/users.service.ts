@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import type pino from 'pino';
 import { pick } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import { UniqueUsersFacade } from './unique-users.facade';
@@ -16,11 +16,11 @@ const BATCH_SIZE = 100;
 export class UsersService implements UniqueUsersFacade {
   public constructor(
     private readonly scopeManagementClient: UniqueGraphqlClient,
-    private readonly logger: Logger,
+    private readonly logger: pino.Logger,
   ) {}
 
   public async listAll(): Promise<SimpleUser[]> {
-    this.logger.log('Requesting all users from Unique API');
+    this.logger.info('Requesting all users from Unique API');
 
     let skip = 0;
     const users: SimpleUser[] = [];
@@ -48,7 +48,7 @@ export class UsersService implements UniqueUsersFacade {
   }
 
   public async getCurrentId(): Promise<string> {
-    this.logger.log('Requesting current user ID from Unique API');
+    this.logger.info('Requesting current user ID from Unique API');
 
     const result =
       await this.scopeManagementClient.request<GetCurrentUserQueryResult>(GET_CURRENT_USER_QUERY);

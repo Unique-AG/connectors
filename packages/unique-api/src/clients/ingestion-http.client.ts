@@ -4,7 +4,7 @@ import {
   getHttpStatusCodeClass,
   getSlowRequestDurationBucket,
 } from '@unique-ag/utils';
-import { Logger } from '@nestjs/common';
+import type pino from 'pino';
 import Bottleneck from 'bottleneck';
 import { type Dispatcher, errors, interceptors } from 'undici';
 import type { UniqueAuth } from '../auth/unique-auth';
@@ -20,7 +20,7 @@ export class IngestionHttpClient {
   public constructor(
     private readonly auth: UniqueAuth,
     private readonly metrics: UniqueApiMetrics,
-    private readonly logger: Logger,
+    private readonly logger: pino.Logger,
     private readonly dispatcher: Dispatcher,
     private readonly bottleneckFactory: BottleneckFactory,
     private readonly options: {
@@ -128,13 +128,10 @@ export class IngestionHttpClient {
           duration_bucket: slowBucket,
         });
 
-        this.logger.warn({
-          msg: 'Slow Unique API request detected',
-          method: httpMethod,
-          path: options.path,
-          duration: durationMs,
-          durationBucket: slowBucket,
-        });
+        this.logger.warn(
+          { method: httpMethod, path: options.path, duration: durationMs, durationBucket: slowBucket },
+          'Slow Unique API request detected',
+        );
       }
 
       return result;
@@ -162,7 +159,7 @@ export class IngestionHttpClient {
         });
       }
 
-      this.logger.error({ msg: 'Failed ingestion HTTP request', error });
+      this.logger.error({ err: error }, 'Failed ingestion HTTP request');
 
       throw error;
     }

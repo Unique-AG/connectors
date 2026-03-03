@@ -4,7 +4,7 @@ import {
   getHttpStatusCodeClass,
   getSlowRequestDurationBucket,
 } from '@unique-ag/utils';
-import { Logger } from '@nestjs/common';
+import type pino from 'pino';
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
@@ -22,7 +22,7 @@ export class UniqueGraphqlClient {
   public constructor(
     private readonly auth: UniqueAuth,
     private readonly metrics: UniqueApiMetrics,
-    private readonly logger: Logger,
+    private readonly logger: pino.Logger,
     private readonly dispatcher: Dispatcher,
     private readonly bottleneckFactory: BottleneckFactory,
     private readonly config: {
@@ -114,13 +114,10 @@ export class UniqueGraphqlClient {
           duration_bucket: slowBucket,
         });
 
-        this.logger.warn({
-          msg: 'Slow Unique GraphQL request detected',
-          target: this.config.target,
-          operationName,
-          duration: durationMs,
-          durationBucket: slowBucket,
-        });
+        this.logger.warn(
+          { target: this.config.target, operationName, duration: durationMs, durationBucket: slowBucket },
+          'Slow Unique GraphQL request detected',
+        );
       }
 
       return result;
@@ -148,7 +145,7 @@ export class UniqueGraphqlClient {
         });
       }
 
-      this.logger.error({ msg: `Failed ${this.config.target} request (${operationName})`, error });
+      this.logger.error({ err: error }, `Failed ${this.config.target} request (${operationName})`);
 
       throw error;
     }

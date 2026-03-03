@@ -2,6 +2,7 @@ import { defaultLoggerOptions } from '@unique-ag/logger';
 import { ProbeModule } from '@unique-ag/probe';
 import { UniqueApiModule } from '@unique-ag/unique-api';
 import { Module } from '@nestjs/common';
+import { tenantStorage } from './tenant/tenant-context.storage';
 import { ConfigModule } from '@nestjs/config';
 import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
@@ -22,6 +23,10 @@ import { TenantModule } from './tenant';
       observability: {
         loggerContext: 'UniqueApi',
         metricPrefix: 'confluence_connector_unique_api',
+        mixin: () => {
+          const tenant = tenantStorage.getStore();
+          return tenant ? { tenantName: tenant.name } : {};
+        },
       },
     }),
     TenantModule,

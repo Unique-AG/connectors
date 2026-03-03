@@ -1,5 +1,5 @@
 import { processInBatches } from '@unique-ag/utils';
-import { Logger } from '@nestjs/common';
+import type pino from 'pino';
 import { isNullish } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -30,7 +30,7 @@ const BATCH_SIZE = 100;
 export class ScopesService implements UniqueApiScopesFacade {
   public constructor(
     private readonly scopeManagementClient: UniqueGraphqlClient,
-    private readonly logger: Logger,
+    private readonly logger: pino.Logger,
   ) {}
 
   public async createFromPaths(

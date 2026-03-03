@@ -2,7 +2,6 @@ import {
   ConfigurableModuleAsyncOptions,
   type DynamicModule,
   Inject,
-  Logger,
   Module,
   type OnModuleDestroy,
   type Provider,
@@ -18,6 +17,7 @@ import {
   UniqueApiRootModuleOptions,
   uniqueApiRootModuleHost,
 } from '../config/unique-api-root-module-options';
+import pino from 'pino';
 import type { UniqueApiClientFactory, UniqueApiClientRegistry } from '../types';
 import { BottleneckFactory } from './bottleneck.factory';
 import { createUniqueApiMetrics, UniqueApiMetrics } from './observability';
@@ -25,6 +25,7 @@ import {
   getUniqueApiClientToken,
   UNIQUE_API_CLIENT_FACTORY,
   UNIQUE_API_CLIENT_REGISTRY,
+  UNIQUE_API_LOGGER,
   UNIQUE_API_METER,
   UNIQUE_API_METRICS,
 } from './tokens';
@@ -160,7 +161,22 @@ export const UniqueApiModule = {
 
 const createCoreProviders = (): Provider[] => {
   return [
-    BottleneckFactory,
+    {
+      provide: UNIQUE_API_LOGGER,
+      useFactory: (options: UniqueApiRootModuleOptions) => {
+        const loggerContext = options.observability?.loggerContext ?? 'UniqueApi';
+        return pino({
+          name: loggerContext,
+          ...(options.observability?.mixin ? { mixin: options.observability.mixin } : {}),
+        });
+      },
+      inject: [uniqueApiRootModuleHost.MODULE_OPTIONS_TOKEN],
+    },
+    {
+      provide: BottleneckFactory,
+      useFactory: (logger: pino.Logger) => new BottleneckFactory(logger),
+      inject: [UNIQUE_API_LOGGER],
+    },
     {
       provide: UNIQUE_API_METER,
       useFactory: (options: UniqueApiRootModuleOptions) => {
@@ -178,16 +194,13 @@ const createCoreProviders = (): Provider[] => {
     {
       provide: UNIQUE_API_CLIENT_FACTORY,
       useFactory: (
+        logger: pino.Logger,
         metricsInstance: UniqueApiMetrics,
-        options: UniqueApiRootModuleOptions,
         bottleneckFactory: BottleneckFactory,
       ) => {
-        const loggerContext = options.observability?.loggerContext ?? 'UniqueApi';
-        const logger = new Logger(loggerContext);
-
         return new UniqueApiClientFactoryImpl(logger, metricsInstance, bottleneckFactory);
       },
-      inject: [UNIQUE_API_METRICS, uniqueApiRootModuleHost.MODULE_OPTIONS_TOKEN, BottleneckFactory],
+      inject: [UNIQUE_API_LOGGER, UNIQUE_API_METRICS, BottleneckFactory],
     },
     {
       provide: UNIQUE_API_CLIENT_REGISTRY,

@@ -9,6 +9,10 @@ const uniqueApiRootModuleOptionsSchema = z.object({
         .optional()
         .prefault(`UniqueApi`)
         .describe(`The logger context which will be present in package logs`),
+      mixin: z
+        .custom<() => Record<string, unknown>>((val) => typeof val === 'function')
+        .optional()
+        .describe(`Optional pino mixin function called on every log to inject dynamic context`),
       metricPrefix: z
         .string()
         .optional()
