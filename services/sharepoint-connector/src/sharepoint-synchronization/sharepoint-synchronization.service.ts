@@ -399,27 +399,13 @@ export class SharepointSynchronizationService {
     configuredSubsiteIds: Set<string>,
     logPrefix: string,
   ): Promise<DiscoveredSubsite[]> {
-    const allSubsites = await this.subsiteDiscoveryService.discoverAllSubsites(
+    const subsites = await this.subsiteDiscoveryService.discoverAllSubsites(
       context.siteConfig.siteId,
       context.siteName,
+      configuredSubsiteIds,
     );
 
-    // We guard against fetching items for subsites that are already configured as standalone sites.
-    // Syncing site twice into different scopes would have most probably a range of issues regarding
-    // permissions, conflicting externalIds and constant moving of items between scopes.
-    const subsites = allSubsites.filter((subsite) => {
-      if (configuredSubsiteIds.has(subsite.siteId.value)) {
-        this.logger.warn(
-          `${logPrefix} Skipping discovered subsite ${subsite.siteId} — it is already configured as a standalone site`,
-        );
-        return false;
-      }
-      return true;
-    });
-
-    this.logger.log(
-      `${logPrefix} Discovered ${allSubsites.length} subsites, ${subsites.length} to sync`,
-    );
+    this.logger.log(`${logPrefix} Discovered ${subsites.length} subsites to sync`);
 
     return subsites;
   }

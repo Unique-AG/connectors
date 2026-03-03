@@ -146,6 +146,74 @@ describe('SubsiteDiscoveryService', () => {
       expect(result[0]?.relativePath.value).toBe('Sub Site');
     });
 
+    it('excludes subsites in excludeSiteIds and does not recurse into their children', async () => {
+      mockGraphApiService.getSubsites.mockImplementation((siteId: Smeared) => {
+        if (siteId.value === 'root-site') {
+          return Promise.resolve([
+            {
+              id: 'host,col,sub-b',
+              name: 'B',
+              displayName: 'Subsite B',
+              webUrl: 'https://example.sharepoint.com/sites/root/B',
+            },
+            {
+              id: 'host,col,sub-c',
+              name: 'C',
+              displayName: 'Subsite C',
+              webUrl: 'https://example.sharepoint.com/sites/root/C',
+            },
+          ]);
+        }
+        if (siteId.value === 'host,col,sub-c') {
+          return Promise.resolve([
+            {
+              id: 'host,col,sub-d',
+              name: 'D',
+              displayName: 'Subsite D',
+              webUrl: 'https://example.sharepoint.com/sites/root/C/D',
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      const excludeSiteIds = new Set(['host,col,sub-c']);
+      const result = await service.discoverAllSubsites(rootSiteId, rootSiteName, excludeSiteIds);
+
+      expect(result).toEqual([
+        {
+          siteId: expect.objectContaining({ value: 'host,col,sub-b' }),
+          name: expect.objectContaining({ value: 'root/B' }),
+          relativePath: expect.objectContaining({ value: 'B' }),
+        },
+      ]);
+      expect(mockGraphApiService.getSubsites).toHaveBeenCalledTimes(2);
+      expect(mockGraphApiService.getSubsites).not.toHaveBeenCalledWith(
+        expect.objectContaining({ value: 'host,col,sub-c' }),
+      );
+    });
+
+    it('returns all subsites when excludeSiteIds is not provided', async () => {
+      mockGraphApiService.getSubsites.mockImplementation((siteId: Smeared) => {
+        if (siteId.value === 'root-site') {
+          return Promise.resolve([
+            {
+              id: 'host,col,sub-b',
+              name: 'B',
+              displayName: 'Subsite B',
+              webUrl: 'https://example.sharepoint.com/sites/root/B',
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      const result = await service.discoverAllSubsites(rootSiteId, rootSiteName);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.siteId.value).toBe('host,col,sub-b');
+    });
+
     it('propagates errors from getSubsites', async () => {
       const error = new Error('Graph API failure');
       mockGraphApiService.getSubsites.mockRejectedValue(error);

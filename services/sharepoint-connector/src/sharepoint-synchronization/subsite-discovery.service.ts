@@ -20,13 +20,15 @@ export class SubsiteDiscoveryService {
   public async discoverAllSubsites(
     rootSiteId: Smeared,
     rootSiteName: Smeared,
+    excludeSiteIds?: Set<string>,
   ): Promise<DiscoveredSubsite[]> {
-    return this.discoverRecursively(rootSiteId, rootSiteName);
+    return this.discoverRecursively(rootSiteId, rootSiteName, excludeSiteIds ?? new Set());
   }
 
   private async discoverRecursively(
     siteId: Smeared,
     rootSiteName: Smeared,
+    excludeSiteIds: Set<string>,
   ): Promise<DiscoveredSubsite[]> {
     const subsites: Site[] = await this.graphApiService.getSubsites(siteId);
     const results: DiscoveredSubsite[] = [];
@@ -34,6 +36,13 @@ export class SubsiteDiscoveryService {
     for (const site of subsites) {
       assert.ok(site.id, 'Subsite missing id');
       assert.ok(site.webUrl, 'Subsite missing webUrl');
+
+      if (excludeSiteIds.has(site.id)) {
+        this.logger.warn(
+          `Skipping subsite ${site.id} and its descendants — it is already configured as a standalone site`,
+        );
+        continue;
+      }
 
       const subsiteId = createSmeared(site.id);
       const subsiteName = createSmeared(extractSiteNameFromWebUrl(site.webUrl));
@@ -45,7 +54,7 @@ export class SubsiteDiscoveryService {
 
       this.logger.debug(`Discovered subsite "${subsiteName}" at path "${smearPath(relativePath)}"`);
 
-      const nested = await this.discoverRecursively(subsiteId, rootSiteName);
+      const nested = await this.discoverRecursively(subsiteId, rootSiteName, excludeSiteIds);
       results.push(...nested);
     }
 

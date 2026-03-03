@@ -815,6 +815,7 @@ describe('SharepointSynchronizationService', () => {
     expect(mockSubsiteDiscoveryService.discoverAllSubsites).toHaveBeenCalledWith(
       siteConfig.siteId,
       new Smeared('test-site-name', false),
+      expect.any(Set),
     );
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
     const getAllSiteItemsMock = mockGraphApiService.getAllSiteItems as ReturnType<typeof vi.fn>;
@@ -892,12 +893,9 @@ describe('SharepointSynchronizationService', () => {
       .fn()
       .mockResolvedValue([parentSiteConfig, standaloneSiteConfig]);
 
+    // discoverAllSubsites receives configuredSubsiteIds and filters internally,
+    // so the mock returns only non-excluded subsites
     mockSubsiteDiscoveryService.discoverAllSubsites.mockResolvedValue([
-      {
-        siteId: new Smeared('host,col,subsite-web-id', false),
-        name: new Smeared('SubA', false),
-        relativePath: new Smeared('SubA', false),
-      },
       {
         siteId: new Smeared('host,col,other-subsite', false),
         name: new Smeared('SubB', false),
@@ -918,8 +916,13 @@ describe('SharepointSynchronizationService', () => {
 
     await service.synchronize();
 
-    // 3 calls: parent site, non-configured subsite (SubB) via discovery, standalone site via its own sync
-    // Without the guard, there would be 4 calls (SubA also fetched via discovery)
+    expect(mockSubsiteDiscoveryService.discoverAllSubsites).toHaveBeenCalledWith(
+      parentSiteConfig.siteId,
+      expect.any(Smeared),
+      new Set(['host,col,subsite-web-id']),
+    );
+    // 3 calls: parent site, non-configured subsite (SubB) via discovery, standalone site via its
+    // own sync. Without the guard, there would be 4 calls (SubA also fetched via discovery)
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(3);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
       parentSiteConfig.siteId,
@@ -955,17 +958,9 @@ describe('SharepointSynchronizationService', () => {
       .fn()
       .mockResolvedValue([parentSiteConfig, inactiveSubsiteConfig, deletedSubsiteConfig]);
 
+    // discoverAllSubsites receives configuredSubsiteIds (including inactive/deleted) and filters
+    // internally
     mockSubsiteDiscoveryService.discoverAllSubsites.mockResolvedValue([
-      {
-        siteId: new Smeared('host,col,inactive-subsite', false),
-        name: new Smeared('InactiveSubsite', false),
-        relativePath: new Smeared('InactiveSubsite', false),
-      },
-      {
-        siteId: new Smeared('host,col,deleted-subsite', false),
-        name: new Smeared('DeletedSubsite', false),
-        relativePath: new Smeared('DeletedSubsite', false),
-      },
       {
         siteId: new Smeared('host,col,other-subsite', false),
         name: new Smeared('OtherSubsite', false),
@@ -985,21 +980,18 @@ describe('SharepointSynchronizationService', () => {
 
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-      expect.objectContaining({ value: 'host,col,other-subsite' }),
-      expect.any(String),
+    expect(mockSubsiteDiscoveryService.discoverAllSubsites).toHaveBeenCalledWith(
+      parentSiteConfig.siteId,
+      expect.any(Smeared),
+      new Set(['host,col,inactive-subsite', 'host,col,deleted-subsite']),
     );
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
       parentSiteConfig.siteId,
       expect.any(String),
     );
-    expect(mockGraphApiService.getAllSiteItems).not.toHaveBeenCalledWith(
-      expect.objectContaining({ value: 'host,col,inactive-subsite' }),
-      expect.any(String),
-    );
-    expect(mockGraphApiService.getAllSiteItems).not.toHaveBeenCalledWith(
-      expect.objectContaining({ value: 'host,col,deleted-subsite' }),
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'host,col,other-subsite' }),
       expect.any(String),
     );
   });
