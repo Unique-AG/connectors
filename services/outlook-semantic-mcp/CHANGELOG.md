@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.0...outlook-semantic-mcp@0.2.1) (2026-03-03)
+
+
+### Bug Fixes
+
+* **deps:** Declare all dependencies for docker build ([#317](https://github.com/Unique-AG/connectors/issues/317)) ([daa0f45](https://github.com/Unique-AG/connectors/commit/daa0f45efe26e6fd8335af88ecd8094556a1e100))
+
 ## [0.2.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.1.0...outlook-semantic-mcp@0.2.0) (2026-03-02)
 
 
