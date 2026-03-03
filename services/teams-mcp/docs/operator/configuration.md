@@ -229,6 +229,39 @@ The service account must have permissions to:
 
 Ensure the service account has sufficient permissions in the target organization to perform these operations.
 
+## Root Scope
+
+### Why a Root Scope is Required
+
+The Teams MCP Server requires a root scope (folder) in the Unique platform. All meeting transcripts and recordings are ingested as child scopes under this root, providing a single organizational entry point and making it easy to manage permissions and visibility for Teams content.
+
+### Creating the Root Scope
+
+The root scope must be created **manually** in the Unique platform before deploying the Teams MCP Server. There is no automated provisioning for this step.
+
+1. **Log in to the Unique platform** as an administrator
+
+2. **Create a new scope (folder)**
+
+   - Navigate to the scope/folder management area
+   - Create a new top-level scope with a descriptive name (e.g., "Teams MCP")
+   - Note the scope ID — it starts with `scope_` (e.g., `scope_abc123xyz`)
+
+3. **Grant the service account access**
+
+   - Ensure the Zitadel service account (see above) has read/write permissions on the root scope
+
+4. **Configure in Helm Values**
+   ```yaml
+   mcpConfig:
+     unique:
+       rootScopeId: "scope_abc123xyz"
+   ```
+
+### One Scope Per Environment
+
+Each environment (QA, prod, etc.) requires its own root scope. Do not reuse the same scope ID across environments.
+
 ## Database Configuration
 
 ### Connection String Format
