@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import type pino from 'pino';
 import { request } from 'undici';
 import type { ConfluenceConfig } from '../config';
-import { getSourceKind, OWNER_TYPE, SOURCE_OWNER_TYPE } from '../constants/ingestion.constants';
+import { getSourceKind, INGESTION_MIME_TYPE, OWNER_TYPE, SOURCE_OWNER_TYPE } from '../constants/ingestion.constants';
 import type { UniqueApiClient } from '../unique-api';
 import type { ContentRegistrationRequest, IngestionFinalizationRequest } from '../unique-api/types';
 import type { FetchedPage } from './sync.types';
@@ -41,7 +41,7 @@ export class IngestionService {
       const registrationResponse =
         await this.uniqueApiClient.ingestion.registerContent(registrationRequest);
 
-      await this.uploadBuffer(registrationResponse.writeUrl, htmlBuffer, 'text/html');
+      await this.uploadBuffer(registrationResponse.writeUrl, htmlBuffer, INGESTION_MIME_TYPE);
 
       const finalizationRequest = this.buildFinalizationRequest(
         registrationRequest,
@@ -95,7 +95,7 @@ export class IngestionService {
     return {
       key,
       title: page.title,
-      mimeType: 'text/html',
+      mimeType: INGESTION_MIME_TYPE,
       ownerType: OWNER_TYPE,
       scopeId,
       sourceOwnerType: SOURCE_OWNER_TYPE,
