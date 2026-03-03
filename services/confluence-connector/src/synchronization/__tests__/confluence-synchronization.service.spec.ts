@@ -2,6 +2,11 @@ import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
+import {
+  createMockTenant,
+  discoveredPagesFixture,
+  fetchedPagesFixture,
+} from '../__mocks__/sync.fixtures';
 import type { ConfluenceContentFetcher } from '../confluence-content-fetcher';
 import type { ConfluencePageScanner } from '../confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../confluence-synchronization.service';
@@ -9,11 +14,6 @@ import type { FileDiffService } from '../file-diff.service';
 import type { IngestionService } from '../ingestion.service';
 import type { ScopeManagementService } from '../scope-management.service';
 import type { FileDiffResult } from '../sync.types';
-import {
-  createMockTenant,
-  discoveredPagesFixture,
-  fetchedPagesFixture,
-} from '../__mocks__/sync.fixtures';
 
 const mockTenantLogger = vi.hoisted(() => ({
   info: vi.fn(),
@@ -74,7 +74,12 @@ describe('ConfluenceSynchronizationService', () => {
       ingestPage: vi.fn().mockResolvedValue(undefined),
       deleteContent: vi.fn().mockResolvedValue(undefined),
     };
-    service = createService(mockScanner, mockContentFetcher, mockFileDiffService, mockIngestionService);
+    service = createService(
+      mockScanner,
+      mockContentFetcher,
+      mockFileDiffService,
+      mockIngestionService,
+    );
   });
 
   describe('synchronize', () => {
@@ -95,7 +100,10 @@ describe('ConfluenceSynchronizationService', () => {
       expect(mockScanner.discoverPages).toHaveBeenCalledOnce();
       expect(mockFileDiffService.computeDiff).toHaveBeenCalledWith(discoveredPagesFixture);
       expect(mockContentFetcher.fetchPagesContent).toHaveBeenCalledWith(discoveredPagesFixture);
-      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(fetchedPagesFixture[0], 'scope-1');
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        fetchedPagesFixture[0],
+        'scope-1',
+      );
 
       const discoverLog = mockTenantLogger.info.mock.calls.find(
         (call) => typeof call[1] === 'string' && call[1].startsWith('Discovery completed'),

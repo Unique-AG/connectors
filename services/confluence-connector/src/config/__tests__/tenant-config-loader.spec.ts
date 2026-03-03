@@ -122,7 +122,9 @@ describe('tenant-config-loader', () => {
     globSync.mockReturnValue(configs.map((c) => c.path));
     readFileSync.mockImplementation((filePath: unknown) => {
       const match = configs.find((c) => c.path === filePath);
-      if (!match) throw new Error(`Unexpected file path: ${filePath}`);
+      if (!match) {
+        throw new Error(`Unexpected file path: ${filePath}`);
+      }
       return dump(match.config);
     });
   }

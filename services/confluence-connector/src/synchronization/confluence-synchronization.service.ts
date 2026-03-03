@@ -1,3 +1,4 @@
+import assert from 'assert';
 import pLimit from 'p-limit';
 import type pino from 'pino';
 import { getCurrentTenant } from '../tenant';
@@ -83,7 +84,7 @@ export class ConfluenceSynchronizationService {
       pages.map((page) =>
         limit(() => {
           const scopeId = spaceScopes.get(page.spaceKey);
-          if (!scopeId) throw new Error(`No scope resolved for space: ${page.spaceKey}`);
+          assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
           return this.ingestionService.ingestPage(page, scopeId);
         }),
       ),

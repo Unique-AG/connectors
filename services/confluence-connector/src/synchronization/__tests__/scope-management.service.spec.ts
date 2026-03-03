@@ -43,7 +43,10 @@ function makeService(): {
 }
 
 describe('ScopeManagementService', () => {
-  async function initializeService(service: ScopeManagementService, scopes: ReturnType<typeof makeService>['scopes']) {
+  async function initializeService(
+    service: ScopeManagementService,
+    scopes: ReturnType<typeof makeService>['scopes'],
+  ) {
     scopes.getById.mockResolvedValueOnce({
       id: ROOT_SCOPE_ID,
       name: 'Confluence',
@@ -103,9 +106,7 @@ describe('ScopeManagementService', () => {
         })
         .mockResolvedValueOnce(null);
 
-      await expect(service.initialize()).rejects.toThrow(
-        'Parent scope not found: missing-parent',
-      );
+      await expect(service.initialize()).rejects.toThrow('Parent scope not found: missing-parent');
     });
   });
 
@@ -154,10 +155,7 @@ describe('ScopeManagementService', () => {
       expect(scopes.createFromPaths).toHaveBeenCalledWith(['/Confluence/DEV'], {
         inheritAccess: true,
       });
-      expect(scopes.updateExternalId).toHaveBeenCalledWith(
-        'new-scope',
-        `confc:${TENANT_NAME}:DEV`,
-      );
+      expect(scopes.updateExternalId).toHaveBeenCalledWith('new-scope', `confc:${TENANT_NAME}:DEV`);
     });
 
     it('throws when not initialized', async () => {
@@ -183,14 +181,15 @@ describe('ScopeManagementService', () => {
 
       const result = await service.ensureSpaceScopes(['ENG', 'MKT']);
 
-      expect(result).toEqual(new Map([
-        ['ENG', 'scope-eng'],
-        ['MKT', 'scope-mkt'],
-      ]));
-      expect(scopes.createFromPaths).toHaveBeenCalledWith(
-        ['/Confluence/ENG', '/Confluence/MKT'],
-        { inheritAccess: true },
+      expect(result).toEqual(
+        new Map([
+          ['ENG', 'scope-eng'],
+          ['MKT', 'scope-mkt'],
+        ]),
       );
+      expect(scopes.createFromPaths).toHaveBeenCalledWith(['/Confluence/ENG', '/Confluence/MKT'], {
+        inheritAccess: true,
+      });
       expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-eng', `confc:${TENANT_NAME}:ENG`);
       expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-mkt', `confc:${TENANT_NAME}:MKT`);
     });
@@ -205,10 +204,9 @@ describe('ScopeManagementService', () => {
       const result = await service.ensureSpaceScopes(['SP', 'SP', 'SP']);
 
       expect(result).toEqual(new Map([['SP', 'scope-sp']]));
-      expect(scopes.createFromPaths).toHaveBeenCalledWith(
-        ['/Confluence/SP'],
-        { inheritAccess: true },
-      );
+      expect(scopes.createFromPaths).toHaveBeenCalledWith(['/Confluence/SP'], {
+        inheritAccess: true,
+      });
       expect(scopes.updateExternalId).toHaveBeenCalledTimes(1);
     });
 
@@ -221,19 +219,22 @@ describe('ScopeManagementService', () => {
       await service.ensureSpaceScope('SP');
 
       // Now call plural with one cached ('SP') and one new ('DEV')
-      scopes.createFromPaths.mockResolvedValueOnce([{ id: 'scope-dev', name: 'DEV', externalId: null }]);
+      scopes.createFromPaths.mockResolvedValueOnce([
+        { id: 'scope-dev', name: 'DEV', externalId: null },
+      ]);
       scopes.updateExternalId.mockResolvedValue(undefined);
 
       const result = await service.ensureSpaceScopes(['SP', 'DEV']);
 
-      expect(scopes.createFromPaths).toHaveBeenCalledWith(
-        ['/Confluence/DEV'],
-        { inheritAccess: true },
+      expect(scopes.createFromPaths).toHaveBeenCalledWith(['/Confluence/DEV'], {
+        inheritAccess: true,
+      });
+      expect(result).toEqual(
+        new Map([
+          ['SP', 'scope-sp'],
+          ['DEV', 'scope-dev'],
+        ]),
       );
-      expect(result).toEqual(new Map([
-        ['SP', 'scope-sp'],
-        ['DEV', 'scope-dev'],
-      ]));
     });
 
     it('throws when not initialized', async () => {

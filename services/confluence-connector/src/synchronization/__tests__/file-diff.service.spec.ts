@@ -23,9 +23,7 @@ const basePage: DiscoveredPage = {
   labels: ['ai-ingest'],
 };
 
-function makeService(
-  performFileDiffImpl: UniqueApiClient['ingestion']['performFileDiff'],
-): {
+function makeService(performFileDiffImpl: UniqueApiClient['ingestion']['performFileDiff']): {
   service: FileDiffService;
   performFileDiff: ReturnType<typeof vi.fn>;
 } {
@@ -36,7 +34,9 @@ function makeService(
 
   const serviceRegistry = {
     getService: vi.fn((token: unknown) => {
-      if (token === UniqueApiClientToken) return uniqueApiClient;
+      if (token === UniqueApiClientToken) {
+        return uniqueApiClient;
+      }
       throw new Error(`Unexpected token: ${String(token)}`);
     }),
     getServiceLogger: vi.fn().mockReturnValue({

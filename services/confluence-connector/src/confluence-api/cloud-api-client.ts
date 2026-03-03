@@ -50,7 +50,9 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
 
   // V1 CQL `ancestor` returns all descendants at any depth with labels; V2 bulk pages lacks label support.
   public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {
-    if (rootIds.length === 0) return [];
+    if (rootIds.length === 0) {
+      return [];
+    }
 
     const batches = chunk(rootIds, ANCESTOR_BATCH_SIZE);
     const results: ConfluencePage[] = [];

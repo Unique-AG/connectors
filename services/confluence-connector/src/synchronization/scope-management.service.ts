@@ -2,6 +2,7 @@ import type pino from 'pino';
 import type { IngestionConfig } from '../config/ingestion.schema';
 import { CONFC_EXTERNAL_ID_PREFIX } from '../constants/ingestion.constants';
 import type { UniqueApiClient } from '../unique-api';
+import assert from 'assert';
 
 export class ScopeManagementService {
   private rootScopePath: string | null = null;
@@ -25,9 +26,7 @@ export class ScopeManagementService {
     ]);
 
     const rootScope = await this.uniqueApiClient.scopes.getById(this.ingestionConfig.scopeId);
-    if (!rootScope) {
-      throw new Error(`Root scope not found: ${this.ingestionConfig.scopeId}`);
-    }
+    assert.ok(rootScope, `Root scope with ID ${this.ingestionConfig.scopeId} not found`);
 
     const pathSegments: string[] = [rootScope.name];
     let currentScope = rootScope;
@@ -39,9 +38,7 @@ export class ScopeManagementService {
       ]);
 
       const parentScope = await this.uniqueApiClient.scopes.getById(currentScope.parentId);
-      if (!parentScope) {
-        throw new Error(`Parent scope not found: ${currentScope.parentId}`);
-      }
+      assert.ok(parentScope, `Parent scope not found: ${currentScope.parentId}`);
       pathSegments.unshift(parentScope.name);
       currentScope = parentScope;
     }
@@ -65,9 +62,7 @@ export class ScopeManagementService {
       return existingScope.id;
     }
 
-    if (!this.rootScopePath) {
-      throw new Error('ScopeManagementService not initialized — call initialize() first');
-    }
+    assert.ok(this.rootScopePath, 'ScopeManagementService not initialized — call initialize() first');
 
     const spaceScopePath = `${this.rootScopePath}/${spaceKey}`;
     const createdScopes = await this.uniqueApiClient.scopes.createFromPaths([spaceScopePath], {
@@ -75,25 +70,18 @@ export class ScopeManagementService {
     });
 
     const createdScope = createdScopes[0];
-    if (!createdScope) {
-      throw new Error(`Failed to create scope for space: ${spaceKey}`);
-    }
+    assert.ok(createdScope, `Failed to create scope for space: ${spaceKey}`);
 
     await this.uniqueApiClient.scopes.updateExternalId(createdScope.id, externalId);
 
     this.spaceScopes.set(spaceKey, createdScope.id);
-    this.logger.info(
-      { spaceKey, scopeId: createdScope.id, externalId },
-      'Created space scope',
-    );
+    this.logger.info({ spaceKey, scopeId: createdScope.id, externalId }, 'Created space scope');
 
     return createdScope.id;
   }
 
   public async ensureSpaceScopes(spaceKeys: string[]): Promise<Map<string, string>> {
-    if (!this.rootScopePath) {
-      throw new Error('ScopeManagementService not initialized — call initialize() first');
-    }
+    assert.ok(this.rootScopePath, 'ScopeManagementService not initialized — call initialize() first');
 
     const uniqueKeys = [...new Set(spaceKeys)];
     const result = new Map<string, string>();
@@ -109,7 +97,10 @@ export class ScopeManagementService {
     }
 
     if (uncachedKeys.length === 0) {
-      this.logger.info({ spaceKeys: uniqueKeys, count: uniqueKeys.length }, 'Batch space scopes resolved (all cached)');
+      this.logger.info(
+        { spaceKeys: uniqueKeys, count: uniqueKeys.length },
+        'Batch space scopes resolved (all cached)',
+      );
       return result;
     }
 
@@ -122,9 +113,7 @@ export class ScopeManagementService {
     for (let i = 0; i < uncachedKeys.length; i++) {
       const spaceKey = uncachedKeys[i]!;
       const scope = createdScopes[i];
-      if (!scope) {
-        throw new Error(`Failed to create scope for space: ${spaceKey}`);
-      }
+      assert.ok(scope, `Failed to create scope for space: ${spaceKey}`);
 
       if (!scope.externalId) {
         const externalId = `${CONFC_EXTERNAL_ID_PREFIX}${this.tenantName}:${spaceKey}`;
@@ -135,7 +124,10 @@ export class ScopeManagementService {
       result.set(spaceKey, scope.id);
     }
 
-    this.logger.info({ spaceKeys: uniqueKeys, count: uniqueKeys.length }, 'Batch space scopes resolved');
+    this.logger.info(
+      { spaceKeys: uniqueKeys, count: uniqueKeys.length },
+      'Batch space scopes resolved',
+    );
     return result;
   }
 }

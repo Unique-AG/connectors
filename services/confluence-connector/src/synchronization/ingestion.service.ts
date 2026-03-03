@@ -2,16 +2,9 @@ import assert from 'node:assert';
 import type pino from 'pino';
 import { request } from 'undici';
 import type { ConfluenceConfig } from '../config';
-import {
-  getSourceKind,
-  OWNER_TYPE,
-  SOURCE_OWNER_TYPE,
-} from '../constants/ingestion.constants';
-import type {
-  ContentRegistrationRequest,
-  IngestionFinalizationRequest,
-} from '../unique-api/types';
+import { getSourceKind, OWNER_TYPE, SOURCE_OWNER_TYPE } from '../constants/ingestion.constants';
 import type { UniqueApiClient } from '../unique-api';
+import type { ContentRegistrationRequest, IngestionFinalizationRequest } from '../unique-api/types';
 import type { FetchedPage } from './sync.types';
 
 export class IngestionService {
@@ -67,7 +60,9 @@ export class IngestionService {
   }
 
   public async deleteContent(contentKeys: string[]): Promise<void> {
-    if (contentKeys.length === 0) return;
+    if (contentKeys.length === 0) {
+      return;
+    }
 
     try {
       const files = await this.uniqueApiClient.files.getByKeys(contentKeys);
@@ -152,5 +147,4 @@ export class IngestionService {
 
     assert.ok(statusCode >= 200 && statusCode < 300, `Upload failed with status ${statusCode}`);
   }
-
 }

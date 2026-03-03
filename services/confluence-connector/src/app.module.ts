@@ -35,7 +35,9 @@ import { TenantModule } from './tenant';
             level: appConfigValue.logLevel,
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
-              if (!ctx) return crypto.randomUUID();
+              if (!ctx) {
+                return crypto.randomUUID();
+              }
               return ctx.traceId;
             },
           },

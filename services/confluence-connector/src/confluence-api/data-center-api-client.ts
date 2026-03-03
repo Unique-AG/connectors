@@ -39,7 +39,9 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
   }
 
   public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {
-    if (rootIds.length === 0) return [];
+    if (rootIds.length === 0) {
+      return [];
+    }
 
     const batches = chunk(rootIds, ANCESTOR_BATCH_SIZE);
     const results: ConfluencePage[] = [];
