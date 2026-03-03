@@ -182,6 +182,28 @@ Then combine as `{tenant}.sharepoint.com,{siteCollectionId},{webId}`. This appro
 https://graph.microsoft.com/v1.0/sites/{tenant}.sharepoint.com:/sites/{parentSite}/{subsite}/{nestedSubsite}
 ```
 
+## Subsites Scanning
+
+### Overview
+
+When `subsitesScan` is set to `enabled` for a site, the connector recursively discovers all subsites under that site and syncs their content alongside the parent site's content. This means you only need to configure the top-level site — all nested subsites are discovered and included automatically.
+
+### How It Works
+
+1. **Discovery** — During each sync cycle, the connector calls the Graph API (`GET /sites/{siteId}/sites`) to list direct child subsites, then recurses into each child to discover the full subsite tree.
+2. **Content fetching** — For each discovered subsite, the connector fetches document libraries and site pages using the same `syncColumnName` as the parent site.
+3. **Scope hierarchy** — Subsite content is ingested under the parent site's scope tree. Each subsite appears as a folder at its relative path within the hierarchy (e.g., `/RootScope/SubsiteA/Documents/file.pdf`).
+4. **File diff** — Subsite items are keyed under the parent site's ID in the file-diff mechanism. If a subsite is later removed or reconfigured, its files are detected as deleted and cleaned up.
+
+### Deduplication with Standalone Sites
+
+If a subsite is also configured as a standalone site (using its compound site ID), it is **excluded** from the parent's recursive discovery to avoid double-syncing. The connector compares compound IDs across all configured sites and skips any match during discovery, including any further subsites.
+
+### Limitations
+
+- The `syncColumnName` is shared between the parent site and all its subsites. You cannot use a different sync column per subsite.
+- Subsites are only addressable via compound site IDs (`hostname,siteCollectionId,webId`) in the Graph API. A plain UUID cannot identify a subsite.
+
 ### Configuring Document Libraries for Sync
 
 #### Adding the Sync Column

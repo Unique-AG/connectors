@@ -274,7 +274,7 @@ These settings ensure the service has sufficient capacity for expected workloads
 
 ## Related Documentation
 
-- [Flows](./flows.md) - Content sync, permission sync, file diff mechanism
+- [Flows](./flows.md) - Content sync, subsite discovery, permission sync, file diff mechanism
 - [Permissions](./permissions.md) - Microsoft Graph and SharePoint REST permissions
 - [Security](./security.md) - Security updates and SBOM
 - [Operator Guide](../operator/README.md) - Deployment and operations
