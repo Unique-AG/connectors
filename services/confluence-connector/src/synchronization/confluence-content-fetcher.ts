@@ -10,21 +10,7 @@ export class ConfluenceContentFetcher {
     private readonly logger: pino.Logger,
   ) {}
 
-  public async fetchPagesContent(pages: DiscoveredPage[]): Promise<FetchedPage[]> {
-    const fetched: FetchedPage[] = [];
-
-    for (const page of pages) {
-      const result = await this.fetchPage(page);
-      if (result) {
-        fetched.push(result);
-      }
-    }
-
-    this.logger.info({ count: fetched.length, total: pages.length }, 'Content fetching completed');
-    return fetched;
-  }
-
-  private async fetchPage(page: DiscoveredPage): Promise<FetchedPage | null> {
+  public async fetchPageContent(page: DiscoveredPage): Promise<FetchedPage | null> {
     let fullPage: ConfluencePage | null;
     try {
       fullPage = await this.apiClient.getPageById(page.id);

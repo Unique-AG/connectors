@@ -7,7 +7,7 @@ import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
 import type { ScopeManagementService } from './scope-management.service';
-import type { FetchedPage } from './sync.types';
+import type { DiscoveredPage } from './sync.types';
 
 export class ConfluenceSynchronizationService {
   public constructor(
@@ -50,15 +50,11 @@ export class ConfluenceSynchronizationService {
       const pageIdsToFetch = new Set([...diffResult.newPageIds, ...diffResult.updatedPageIds]);
       const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
 
-      const fetchedPages = await this.contentFetcher.fetchPagesContent(pagesToFetch);
-      this.logger.info({ count: fetchedPages.length }, 'Content fetching completed');
-
-      const uniqueSpaceKeys = [...new Set(fetchedPages.map((p) => p.spaceKey))];
+      const uniqueSpaceKeys = [...new Set(pagesToFetch.map((p) => p.spaceKey))];
       const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(uniqueSpaceKeys);
 
       const concurrency = Math.max(1, tenant.config.processing.concurrency);
-
-      await this.ingestPagesWithConcurrency(fetchedPages, spaceScopes, concurrency);
+      await this.fetchAndIngestPages(pagesToFetch, spaceScopes, concurrency);
 
       if (diffResult.deletedKeys.length > 0) {
         await this.ingestionService.deleteContent(diffResult.deletedKeys);
@@ -73,22 +69,25 @@ export class ConfluenceSynchronizationService {
     }
   }
 
-  private async ingestPagesWithConcurrency(
-    pages: FetchedPage[],
+  private async fetchAndIngestPages(
+    pages: DiscoveredPage[],
     spaceScopes: Map<string, string>,
     concurrency: number,
   ): Promise<void> {
     const limit = pLimit(concurrency);
 
     await Promise.all(
-      pages.map((page) =>
-        limit(() => {
-          const scopeId = spaceScopes.get(page.spaceKey);
-          assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
-          return this.ingestionService.ingestPage(page, scopeId);
-        }),
-      ),
-    );
+      pages.map((page) => limit(async () => {
+        const fetched = await this.contentFetcher.fetchPageContent(page);
+
+        if (!fetched) {
+          return;
+        }
+        const scopeId = spaceScopes.get(page.spaceKey);
+        assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
+        await this.ingestionService.ingestPage(fetched, scopeId);
+      }),
+    ))
 
     this.logger.info({ count: pages.length }, 'Page ingestion completed');
   }
