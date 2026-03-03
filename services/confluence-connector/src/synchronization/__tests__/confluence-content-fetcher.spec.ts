@@ -91,24 +91,18 @@ describe('ConfluenceContentFetcher', () => {
     };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPagesContent([discoveredPage]);
+    const result = await fetcher.fetchPageContent(discoveredPage);
 
-    expect(result).toEqual([
-      {
-        id: '1',
-        title: 'Page 1',
-        body: '<p>content</p>',
-        webUrl: 'https://confluence.example.com/wiki/1',
-        spaceId: 'space-1',
-        spaceKey: 'SP',
-        spaceName: 'Space',
-        metadata: { confluenceLabels: ['engineering'] },
-      },
-    ]);
-    expect(mockTenantLogger.info).toHaveBeenCalledWith(
-      { count: 1, total: 1 },
-      'Content fetching completed',
-    );
+    expect(result).toEqual({
+      id: '1',
+      title: 'Page 1',
+      body: '<p>content</p>',
+      webUrl: 'https://confluence.example.com/wiki/1',
+      spaceId: 'space-1',
+      spaceKey: 'SP',
+      spaceName: 'Space',
+      metadata: { confluenceLabels: ['engineering'] },
+    });
   });
 
   it('omits metadata when page has only ingest labels', async () => {
@@ -120,10 +114,10 @@ describe('ConfluenceContentFetcher', () => {
     };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPagesContent([discoveredPage]);
+    const result = await fetcher.fetchPageContent(discoveredPage);
 
-    expect(result).toHaveLength(1);
-    expect(result[0]?.metadata).toBeUndefined();
+    expect(result).toBeDefined();
+    expect(result?.metadata).toBeUndefined();
   });
 
   it('skips pages that are missing in Confluence', async () => {
@@ -133,9 +127,9 @@ describe('ConfluenceContentFetcher', () => {
     };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPagesContent([discoveredPage]);
+    const result = await fetcher.fetchPageContent(discoveredPage);
 
-    expect(result).toEqual([]);
+    expect(result).toBeNull();
     expect(mockTenantLogger.warn).toHaveBeenCalledWith(
       { pageId: 'missing', title: 'Page missing' },
       'Page not found, possibly deleted',
@@ -149,9 +143,9 @@ describe('ConfluenceContentFetcher', () => {
     };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPagesContent([discoveredPage]);
+    const result = await fetcher.fetchPageContent(discoveredPage);
 
-    expect(result).toEqual([]);
+    expect(result).toBeNull();
     expect(mockTenantLogger.info).toHaveBeenCalledWith(
       { pageId: 'empty', title: 'Page empty' },
       'Page has no body, skipping',
@@ -159,19 +153,14 @@ describe('ConfluenceContentFetcher', () => {
   });
 
   it('continues processing after getPageById error', async () => {
-    const failingPage = makeDiscoveredPage('fail');
-    const successfulPage = makeDiscoveredPage('ok');
     const apiClient = {
-      getPageById: vi
-        .fn()
-        .mockRejectedValueOnce(new Error('request failed'))
-        .mockResolvedValueOnce(makeFullPage('ok', { labels: ['engineering'] })),
+      getPageById: vi.fn().mockRejectedValue(new Error('request failed')),
     };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPagesContent([failingPage, successfulPage]);
+    const result = await fetcher.fetchPageContent(makeDiscoveredPage('fail'));
 
-    expect(result.map((page) => page.id)).toEqual(['ok']);
+    expect(result).toBeNull();
     expect(mockTenantLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         pageId: 'fail',

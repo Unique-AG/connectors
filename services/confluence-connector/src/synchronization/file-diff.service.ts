@@ -10,6 +10,7 @@ export class FileDiffService {
   public constructor(
     private readonly confluenceConfig: ConfluenceConfig,
     private readonly tenantName: string,
+    private readonly useV1KeyFormat: boolean,
     private readonly uniqueApiClient: UniqueApiClient,
     private readonly logger: pino.Logger,
   ) {}
@@ -30,7 +31,9 @@ export class FileDiffService {
 
     for (const [spaceKey, pages] of Object.entries(pagesBySpace)) {
       const fileDiffItems = this.buildFileDiffItems(pages);
-      const partialKey = `${this.tenantName}/${spaceKey}`;
+      const firstPage = pages[0];
+      const basePartialKey = `${firstPage.spaceId}_${spaceKey}`;
+      const partialKey = this.useV1KeyFormat ? basePartialKey : `${this.tenantName}/${basePartialKey}`;
 
       const diffResponse = await this.uniqueApiClient.ingestion.performFileDiff(
         fileDiffItems,

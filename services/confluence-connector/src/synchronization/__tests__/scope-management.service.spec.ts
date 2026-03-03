@@ -93,7 +93,7 @@ describe('ScopeManagementService', () => {
       const { service, scopes } = makeService();
       scopes.getById.mockResolvedValueOnce(null);
 
-      await expect(service.initialize()).rejects.toThrow(`Root scope not found: ${ROOT_SCOPE_ID}`);
+      await expect(service.initialize()).rejects.toThrow(`Root scope with ID ${ROOT_SCOPE_ID} not found`);
     });
 
     it('throws when a parent scope is not found', async () => {

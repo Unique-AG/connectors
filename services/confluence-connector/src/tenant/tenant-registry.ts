@@ -105,6 +105,7 @@ export class TenantRegistry implements OnModuleInit {
         const fileDiffService = new FileDiffService(
           config.confluence,
           tenantName,
+          config.ingestion.useV1KeyFormat,
           uniqueClient,
           fileDiffLogger,
         );
@@ -115,6 +116,7 @@ export class TenantRegistry implements OnModuleInit {
           config.confluence,
           tenantName,
           config.ingestion.storeInternally,
+          config.ingestion.useV1KeyFormat,
           uniqueClient,
           ingestionLogger,
         );

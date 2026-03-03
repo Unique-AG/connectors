@@ -14,6 +14,7 @@ export class IngestionService {
     private readonly confluenceConfig: ConfluenceConfig,
     private readonly tenantName: string,
     private readonly storeInternally: boolean,
+    private readonly useV1KeyFormat: boolean,
     private readonly uniqueApiClient: UniqueApiClient,
     private readonly logger: pino.Logger,
   ) {
@@ -29,7 +30,8 @@ export class IngestionService {
 
     try {
       const htmlBuffer = Buffer.from(page.body, 'utf-8');
-      const key = `${this.tenantName}/${page.spaceKey}/${page.id}`;
+      const baseKey = `${page.spaceId}_${page.spaceKey}/${page.id}`;
+      const key = this.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
 
       const registrationRequest = this.buildPageRegistrationRequest(
         page,

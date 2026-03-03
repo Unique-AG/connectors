@@ -181,3 +181,5 @@ connectorConfig:
         scopeId: unset_default_value
         # -- Whether to store content internally in Unique
         storeInternally: true
+        # -- Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix
+        useV1KeyFormat: false

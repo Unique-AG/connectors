@@ -59,6 +59,11 @@ function createMockTenantConfig(): TenantConfig {
       scopeManagementServiceBaseUrl: 'https://scope.example.com',
       apiRateLimitPerMinute: 100,
     },
+    ingestion: {
+      scopeId: 'scope-1',
+      storeInternally: true,
+      useV1KeyFormat: false,
+    },
     processing: {},
   } as unknown as TenantConfig;
 }

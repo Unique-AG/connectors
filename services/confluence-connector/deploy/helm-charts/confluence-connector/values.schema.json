@@ -372,6 +372,11 @@
                     "type": "boolean",
                     "description": "Whether to store content internally in Unique",
                     "default": true
+                  },
+                  "useV1KeyFormat": {
+                    "type": "boolean",
+                    "description": "Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix",
+                    "default": false
                   }
                 },
                 "additionalProperties": false

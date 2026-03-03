@@ -32,3 +32,4 @@ connectorConfig:
         ingestionMode: flat
         scopeId: test-scope-id
         storeInternally: true
+        useV1KeyFormat: false

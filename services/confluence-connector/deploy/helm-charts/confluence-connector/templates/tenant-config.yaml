@@ -68,5 +68,6 @@ data:
       ingestionMode: {{ $tenant.ingestion.ingestionMode | quote }}
       scopeId: {{ $tenant.ingestion.scopeId | quote }}
       storeInternally: {{ $tenant.ingestion.storeInternally }}
+      useV1KeyFormat: {{ $tenant.ingestion.useV1KeyFormat }}
   {{- end }}
 {{- end }}

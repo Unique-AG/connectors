@@ -76,6 +76,8 @@ function makeService(): {
     service: new IngestionService(
       confluenceConfig,
       TENANT_NAME,
+      true,
+      false,
       uniqueApiClient,
       logger as unknown as pino.Logger,
     ),
@@ -97,7 +99,7 @@ describe('IngestionService', () => {
 
     expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: `${TENANT_NAME}/SP/42`,
+        key: `${TENANT_NAME}/space-1_SP/42`,
         title: 'Architecture',
         mimeType: 'text/html',
         scopeId: 'space-scope-1',
@@ -122,7 +124,7 @@ describe('IngestionService', () => {
     );
     expect(uniqueApiClient.ingestion.finalizeIngestion).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: `${TENANT_NAME}/SP/42`,
+        key: `${TENANT_NAME}/space-1_SP/42`,
         fileUrl: 'https://blob.example.com/read',
       }),
     );

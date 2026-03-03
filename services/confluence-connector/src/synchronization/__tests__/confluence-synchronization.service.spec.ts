@@ -29,7 +29,7 @@ const mockScopeManagementService = {
 
 function createService(
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
-  contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPagesContent'>,
+  contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>,
   fileDiffService: Pick<FileDiffService, 'computeDiff'>,
   ingestionService: Pick<IngestionService, 'ingestPage' | 'deleteContent'>,
 ): ConfluenceSynchronizationService {
@@ -46,7 +46,7 @@ function createService(
 describe('ConfluenceSynchronizationService', () => {
   let tenant: TenantContext;
   let mockScanner: Pick<ConfluencePageScanner, 'discoverPages'>;
-  let mockContentFetcher: Pick<ConfluenceContentFetcher, 'fetchPagesContent'>;
+  let mockContentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>;
   let mockFileDiffService: Pick<FileDiffService, 'computeDiff'>;
   let mockIngestionService: Pick<IngestionService, 'ingestPage' | 'deleteContent'>;
   let service: ConfluenceSynchronizationService;
@@ -58,7 +58,10 @@ describe('ConfluenceSynchronizationService', () => {
       discoverPages: vi.fn().mockResolvedValue(discoveredPagesFixture),
     };
     mockContentFetcher = {
-      fetchPagesContent: vi.fn().mockResolvedValue(fetchedPagesFixture),
+      fetchPageContent: vi.fn().mockImplementation((page: { id: string }) => {
+        const fetched = fetchedPagesFixture.find((f) => f.id === page.id);
+        return Promise.resolve(fetched ?? null);
+      }),
     };
     const diffResult: FileDiffResult = {
       newPageIds: ['1'],
@@ -90,7 +93,7 @@ describe('ConfluenceSynchronizationService', () => {
 
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync already in progress, skipping');
       expect(mockScanner.discoverPages).not.toHaveBeenCalled();
-      expect(mockContentFetcher.fetchPagesContent).not.toHaveBeenCalled();
+      expect(mockContentFetcher.fetchPageContent).not.toHaveBeenCalled();
     });
 
     it('runs scanner then content fetcher and logs summaries', async () => {
@@ -99,7 +102,9 @@ describe('ConfluenceSynchronizationService', () => {
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
       expect(mockScanner.discoverPages).toHaveBeenCalledOnce();
       expect(mockFileDiffService.computeDiff).toHaveBeenCalledWith(discoveredPagesFixture);
-      expect(mockContentFetcher.fetchPagesContent).toHaveBeenCalledWith(discoveredPagesFixture);
+      expect(mockContentFetcher.fetchPageContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
+      );
       expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
         fetchedPagesFixture[0],
         'scope-1',
@@ -110,12 +115,6 @@ describe('ConfluenceSynchronizationService', () => {
       );
       expect(discoverLog).toBeDefined();
       expect(discoverLog?.[0]).toMatchObject({ count: discoveredPagesFixture.length });
-
-      const fetchLog = mockTenantLogger.info.mock.calls.find(
-        (call) => typeof call[1] === 'string' && call[1].startsWith('Content fetching completed'),
-      );
-      expect(fetchLog).toBeDefined();
-      expect(fetchLog?.[0]).toMatchObject({ count: fetchedPagesFixture.length });
 
       expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync completed');
     });
@@ -137,7 +136,7 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('resets isScanning and logs errors when content fetcher fails', async () => {
-      vi.mocked(mockContentFetcher.fetchPagesContent).mockRejectedValue(new Error('fetch failure'));
+      vi.mocked(mockContentFetcher.fetchPageContent).mockRejectedValue(new Error('fetch failure'));
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
@@ -169,11 +168,9 @@ describe('ConfluenceSynchronizationService', () => {
         movedPageIds: [],
         deletedKeys: [],
       });
-      vi.mocked(mockContentFetcher.fetchPagesContent).mockResolvedValue([]);
-
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockContentFetcher.fetchPagesContent).toHaveBeenCalledWith([]);
+      expect(mockContentFetcher.fetchPageContent).not.toHaveBeenCalled();
       expect(mockIngestionService.ingestPage).not.toHaveBeenCalled();
       expect(mockIngestionService.deleteContent).not.toHaveBeenCalled();
     });
@@ -187,7 +184,7 @@ describe('ConfluenceSynchronizationService', () => {
       expect(mockTenantLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
       );
-      expect(mockContentFetcher.fetchPagesContent).not.toHaveBeenCalled();
+      expect(mockContentFetcher.fetchPageContent).not.toHaveBeenCalled();
     });
 
     it('fetches content only for new and updated pages from diff', async () => {
@@ -208,18 +205,24 @@ describe('ConfluenceSynchronizationService', () => {
       });
       // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction
       const baseFetched = fetchedPagesFixture[0]!;
-      const fetchedSubset = [
-        { ...baseFetched, id: '2', title: 'Page 2' },
-        { ...baseFetched, id: '3', title: 'Page 3' },
-      ];
-      vi.mocked(mockContentFetcher.fetchPagesContent).mockResolvedValue(fetchedSubset);
+      vi.mocked(mockContentFetcher.fetchPageContent).mockImplementation((page: { id: string }) => {
+        if (page.id === '2') {
+          return Promise.resolve({ ...baseFetched, id: '2', title: 'Page 2' });
+        }
+        if (page.id === '3') {
+          return Promise.resolve({ ...baseFetched, id: '3', title: 'Page 3' });
+        }
+        return Promise.resolve(null);
+      });
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockContentFetcher.fetchPagesContent).toHaveBeenCalledWith([
+      expect(mockContentFetcher.fetchPageContent).toHaveBeenCalledWith(
         expect.objectContaining({ id: '2' }),
+      );
+      expect(mockContentFetcher.fetchPageContent).toHaveBeenCalledWith(
         expect.objectContaining({ id: '3' }),
-      ]);
+      );
       expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
         expect.objectContaining({ id: '2' }),
         'scope-1',

@@ -1,9 +1,8 @@
+import type pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import { ContentType } from '../../confluence-api/types/confluence-api.types';
-import { IngestionMode } from '../../constants/ingestion.constants';
-import type { ServiceRegistry } from '../../tenant';
-import { AbstractUniqueApiClient, type UniqueApiClient } from '@unique-ag/unique-api';
+import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { FileDiffService } from '../file-diff.service';
 import type { DiscoveredPage } from '../sync.types';
@@ -31,38 +30,20 @@ function makeService(performFileDiffImpl: UniqueApiClient['ingestion']['performF
     ingestion: { performFileDiff },
   } as unknown as UniqueApiClient;
 
-  const serviceRegistry = {
-    getService: vi.fn((token: unknown) => {
-      if (token === AbstractUniqueApiClient) {
-        return uniqueApiClient;
-      }
-      throw new Error(`Unexpected token: ${String(token)}`);
-    }),
-    getServiceLogger: vi.fn().mockReturnValue({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
-  } as unknown as ServiceRegistry;
+  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 
   const confluenceConfig = {
     instanceType: 'cloud',
     baseUrl: CONFLUENCE_BASE_URL,
   } as unknown as ConfluenceConfig;
 
-  const ingestionConfig = {
-    ingestionMode: IngestionMode.Flat,
-    scopeId: 'scope-1',
-    storeInternally: true,
-  };
-
   return {
     service: new FileDiffService(
       confluenceConfig,
-      ingestionConfig as unknown as ConstructorParameters<typeof FileDiffService>[1],
       TENANT_NAME,
-      serviceRegistry,
+      false,
+      uniqueApiClient,
+      logger as unknown as pino.Logger,
     ),
     performFileDiff,
   };
@@ -82,17 +63,17 @@ describe('FileDiffService', () => {
     expect(performFileDiff).toHaveBeenCalledWith(
       [
         {
-          key: 'SP/p-1',
+          key: 'p-1',
           url: basePage.webUrl,
           updatedAt: basePage.versionTimestamp,
         },
       ],
-      TENANT_NAME,
+      `${TENANT_NAME}/space-1_SP`,
       'ATLASSIAN_CONFLUENCE_CLOUD',
       CONFLUENCE_BASE_URL,
     );
     expect(result).toEqual({
-      newPageIds: ['p-1'],
+      newPageIds: ['SP/p-1'],
       updatedPageIds: [],
       deletedPageIds: [],
       movedPageIds: [],
@@ -111,11 +92,11 @@ describe('FileDiffService', () => {
     const result = await service.computeDiff([{ ...basePage }, { ...basePage, id: 'p-2' }]);
 
     expect(result).toEqual({
-      newPageIds: ['p-1'],
-      updatedPageIds: ['p-2'],
-      deletedPageIds: ['p-3'],
-      movedPageIds: ['p-4'],
-      deletedKeys: [`${TENANT_NAME}/SP/p-3`, `${TENANT_NAME}/SP/p-3_old.pdf`],
+      newPageIds: ['SP/p-1', 'SP/p-1_file.pdf'],
+      updatedPageIds: ['SP/p-2'],
+      deletedPageIds: ['SP/p-3', 'SP/p-3_old.pdf'],
+      movedPageIds: ['SP/p-4', 'SP/p-4_new.pdf'],
+      deletedKeys: [],
     });
   });
 
