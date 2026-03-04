@@ -9,13 +9,12 @@ import { type AppConfigNamespaced } from './config';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  const logger = app.get(Logger);
+  app.useLogger(logger);
 
   const configService = app.get<ConfigService<AppConfigNamespaced, true>>(ConfigService);
 
   app.enableShutdownHooks();
-
-  const logger = app.get(Logger);
-  app.useLogger(logger);
 
   app.enableCors({
     origin: true,

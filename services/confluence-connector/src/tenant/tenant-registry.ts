@@ -5,7 +5,7 @@ import {
   type UniqueApiClientFactory,
   type UniqueApiFeatureModuleInputOptions,
 } from '@unique-ag/unique-api';
-import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
 import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
@@ -21,6 +21,7 @@ import { tenantStorage } from './tenant-context.storage';
 
 @Injectable()
 export class TenantRegistry implements OnModuleInit {
+  private readonly logger = new Logger(TenantRegistry.name);
   private readonly tenants = new Map<string, TenantContext>();
 
   public constructor(
@@ -51,17 +52,14 @@ export class TenantRegistry implements OnModuleInit {
         const apiClient = this.confluenceApiClientFactory.create(config.confluence);
         this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
 
-        const scannerLogger = this.serviceRegistry.getServiceLogger(ConfluencePageScanner);
         const scanner = new ConfluencePageScanner(
           config.confluence,
           config.processing,
           apiClient,
-          scannerLogger,
         );
         this.serviceRegistry.register(tenantName, ConfluencePageScanner, scanner);
 
-        const fetcherLogger = this.serviceRegistry.getServiceLogger(ConfluenceContentFetcher);
-        const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient, fetcherLogger);
+        const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient);
         this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
 
         const uniqueClient = this.uniqueApiFactory.create({
@@ -85,53 +83,44 @@ export class TenantRegistry implements OnModuleInit {
           AbstractUniqueApiClient,
           uniqueClient,
         );
-        const scopeManagementLogger = this.serviceRegistry.getServiceLogger(ScopeManagementService);
         const scopeManagementService = new ScopeManagementService(
           config.ingestion,
           tenantName,
           uniqueClient,
-          scopeManagementLogger,
         );
         this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
 
-        const fileDiffLogger = this.serviceRegistry.getServiceLogger(FileDiffService);
         const fileDiffService = new FileDiffService(
           config.confluence,
           tenantName,
           config.ingestion.useV1KeyFormat,
           uniqueClient,
-          fileDiffLogger,
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
 
-        const ingestionLogger = this.serviceRegistry.getServiceLogger(IngestionService);
         const ingestionService = new IngestionService(
           config.confluence,
           tenantName,
           config.ingestion.storeInternally,
           config.ingestion.useV1KeyFormat,
           uniqueClient,
-          ingestionLogger,
         );
         this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
 
-        const syncLogger = this.serviceRegistry.getServiceLogger(ConfluenceSynchronizationService);
         const confluenceSynchronizationService = new ConfluenceSynchronizationService(
-            scanner,
-            fetcher,
-            fileDiffService,
-            ingestionService,
-            scopeManagementService,
-            syncLogger,
-          );
+          scanner,
+          fetcher,
+          fileDiffService,
+          ingestionService,
+          scopeManagementService,
+        );
         this.serviceRegistry.register(
           tenantName,
           ConfluenceSynchronizationService,
           confluenceSynchronizationService
         );
 
-        const logger = this.serviceRegistry.getServiceLogger(TenantRegistry);
-        logger.info('Tenant registered');
+        this.logger.log({ tenantName, msg: 'Tenant registered' });
       });
     }
   }

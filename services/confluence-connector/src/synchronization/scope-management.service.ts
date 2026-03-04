@@ -1,20 +1,21 @@
-import type pino from 'pino';
+import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
 import { CONFC_EXTERNAL_ID_PREFIX } from '../constants/ingestion.constants';
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import assert from 'assert';
 
 export class ScopeManagementService {
+  private readonly logger = new Logger(ScopeManagementService.name);
   private rootScopePath: string | null = null;
 
   public constructor(
     private readonly ingestionConfig: IngestionConfig,
     private readonly tenantName: string,
     private readonly uniqueApiClient: UniqueApiClient,
-    private readonly logger: pino.Logger,
   ) {}
 
   public async initialize(): Promise<void> {
+    this.logger.log({ tenantName: this.tenantName, msg: 'Requesting current user ID from Unique API' });
     const userId = await this.uniqueApiClient.users.getCurrentId();
 
     // Grant access to root scope before reading it (service account needs permission to query scopes)
@@ -43,7 +44,7 @@ export class ScopeManagementService {
     }
 
     this.rootScopePath = `/${pathSegments.join('/')}`;
-    this.logger.info({ rootScopePath: this.rootScopePath }, 'Scope management initialized');
+    this.logger.log({ rootScopePath: this.rootScopePath, msg: 'Scope management initialized' });
   }
 
   public async ensureSpaceScopes(spaceKeys: string[]): Promise<Map<string, string>> {
@@ -68,7 +69,7 @@ export class ScopeManagementService {
       result.set(spaceKey, scope.id);
     }
 
-    this.logger.debug({ spaceKeys, count: spaceKeys.length }, 'Space scopes resolved');
+    this.logger.debug({ spaceKeys, count: spaceKeys.length, msg: 'Space scopes resolved' });
     return result;
   }
 }

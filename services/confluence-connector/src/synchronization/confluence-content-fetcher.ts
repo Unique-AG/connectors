@@ -1,13 +1,14 @@
-import type pino from 'pino';
+import { Logger } from '@nestjs/common';
 import type { ConfluenceConfig } from '../config';
 import type { ConfluenceApiClient, ConfluencePage } from '../confluence-api';
 import type { DiscoveredPage, FetchedPage } from './sync.types';
 
 export class ConfluenceContentFetcher {
+  private readonly logger = new Logger(ConfluenceContentFetcher.name);
+
   public constructor(
     private readonly confluenceConfig: ConfluenceConfig,
     private readonly apiClient: ConfluenceApiClient,
-    private readonly logger: pino.Logger,
   ) {}
 
   public async fetchPageContent(page: DiscoveredPage): Promise<FetchedPage | null> {
@@ -25,20 +26,20 @@ export class ConfluenceContentFetcher {
     }
 
     if (!fullPage) {
-      this.logger.warn({ pageId: page.id, title: page.title }, 'Page not found, possibly deleted');
+      this.logger.warn({ pageId: page.id, title: page.title, msg: 'Page not found, possibly deleted' });
       return null;
     }
 
     const body = fullPage.body?.storage?.value || '';
     if (!body) {
-      this.logger.info({ pageId: page.id, title: page.title }, 'Page has no body, skipping');
+      this.logger.log({ pageId: page.id, title: page.title, msg: 'Page has no body, skipping' });
       return null;
     }
 
     const confluenceLabels = this.extractLabels(fullPage.metadata.labels.results);
     const metadata = confluenceLabels.length > 0 ? { confluenceLabels } : undefined;
 
-    this.logger.debug({ pageId: page.id, title: page.title }, 'Page content fetched');
+    this.logger.debug({ pageId: page.id, title: page.title, msg: 'Page content fetched' });
 
     return {
       id: page.id,

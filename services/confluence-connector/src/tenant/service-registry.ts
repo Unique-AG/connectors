@@ -1,7 +1,5 @@
 import assert from 'node:assert';
 import { Injectable } from '@nestjs/common';
-import type pino from 'pino';
-import { PinoLogger } from 'nestjs-pino';
 import { getCurrentTenant } from './tenant-context.storage';
 
 // biome-ignore lint/suspicious/noExplicitAny: Constructor args are irrelevant — these types are used only as Map keys for service lookup
@@ -27,10 +25,6 @@ export class ServiceRegistry {
     }
 
     services.set(key, instance);
-  }
-
-  public getServiceLogger(service: ServiceClass): pino.Logger {
-    return PinoLogger.root.child({ service: service.name });
   }
 
   public getService<T>(key: ServiceToken<T>): T {

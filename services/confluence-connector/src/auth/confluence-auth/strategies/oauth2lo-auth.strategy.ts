@@ -1,4 +1,4 @@
-import type pino from 'pino';
+import { Logger } from '@nestjs/common';
 import { request } from 'undici';
 import { z } from 'zod';
 import { AuthMode, ConfluenceConfig } from '../../../config';
@@ -25,7 +25,7 @@ const tokenResponseSchema = z.object({
 });
 
 export class OAuth2LoAuthStrategy extends ConfluenceAuth {
-  private readonly logger: pino.Logger;
+  private readonly logger = new Logger(OAuth2LoAuthStrategy.name);
   private readonly tokenCache = new TokenCache();
   private readonly clientId: string;
   private readonly clientSecret: string;
@@ -35,10 +35,8 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
   public constructor(
     authConfig: OAuth2LoAuthConfig,
     connectionConfig: OAuth2LoConnectionConfig,
-    logger: pino.Logger,
   ) {
     super();
-    this.logger = logger;
     this.clientId = authConfig.clientId;
     this.clientSecret = authConfig.clientSecret.value;
     this.instanceType = connectionConfig.instanceType;
@@ -53,7 +51,7 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
   }
 
   private async fetchToken(): Promise<TokenResult> {
-    this.logger.info(`Acquiring Confluence ${this.instanceType} token via OAuth 2.0 2LO`);
+    this.logger.log(`Acquiring Confluence ${this.instanceType} token via OAuth 2.0 2LO`);
 
     try {
       return await this.requestToken();

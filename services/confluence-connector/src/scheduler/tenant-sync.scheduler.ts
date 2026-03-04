@@ -23,7 +23,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     }
 
     for (const tenant of this.tenantRegistry.getAllTenants()) {
-      this.logger.log(`Triggering initial sync for tenant: ${tenant.name}`);
+      this.logger.log({ tenantName: tenant.name, msg: 'Triggering initial sync' });
       void this.syncTenant(tenant);
       this.registerCronJob(tenant);
     }
@@ -52,25 +52,23 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     job.start();
 
     this.tenantRegistry.run(tenant, () => {
-      const logger = this.serviceRegistry.getServiceLogger(TenantSyncScheduler);
-      logger.info(`Scheduled sync with cron: ${cronExpression}`);
+      this.logger.log({ tenantName: tenant.name },`Scheduled sync with cron: ${cronExpression}`);
     });
   }
 
   private async syncTenant(tenant: TenantContext): Promise<void> {
     await this.tenantRegistry.run(tenant, async () => {
-      const logger = this.serviceRegistry.getServiceLogger(TenantSyncScheduler);
       const syncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
 
       if (this.isShuttingDown) {
-        logger.info('Skipping sync due to shutdown');
+        this.logger.log('Skipping sync due to shutdown');
         return;
       }
 
       try {
         await syncService.synchronize();
       } catch (error) {
-        logger.error({ err: error, msg: 'Unexpected sync error' });
+        this.logger.error({ err: error, msg: 'Unexpected sync error' });
       }
     });
   }

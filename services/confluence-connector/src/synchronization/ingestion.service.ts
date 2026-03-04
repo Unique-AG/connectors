@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import type pino from 'pino';
+import { Logger } from '@nestjs/common';
 import { request } from 'undici';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind, INGESTION_MIME_TYPE, OWNER_TYPE, SOURCE_OWNER_TYPE } from '../constants/ingestion.constants';
@@ -7,6 +7,7 @@ import type { ContentRegistrationRequest, IngestionFinalizationRequest, UniqueAp
 import type { FetchedPage } from './sync.types';
 
 export class IngestionService {
+  private readonly logger = new Logger(IngestionService.name);
   private readonly sourceKind: string;
   private readonly sourceName: string;
 
@@ -16,7 +17,6 @@ export class IngestionService {
     private readonly storeInternally: boolean,
     private readonly useV1KeyFormat: boolean,
     private readonly uniqueApiClient: UniqueApiClient,
-    private readonly logger: pino.Logger,
   ) {
     this.sourceKind = getSourceKind(this.confluenceConfig.instanceType);
     this.sourceName = this.confluenceConfig.baseUrl;
@@ -24,7 +24,7 @@ export class IngestionService {
 
   public async ingestPage(page: FetchedPage, scopeId: string): Promise<void> {
     if (!page.body) {
-      this.logger.info({ pageId: page.id, title: page.title }, 'Skipping page with empty body');
+      this.logger.log({ pageId: page.id, title: page.title, msg: 'Skipping page with empty body' });
       return;
     }
 
@@ -50,7 +50,7 @@ export class IngestionService {
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
 
-      this.logger.debug({ pageId: page.id, title: page.title }, 'Page sent for ingestion');
+      this.logger.debug({ pageId: page.id, title: page.title, msg: 'Page sent for ingestion' });
     } catch (error) {
       this.logger.error({
         pageId: page.id,
@@ -69,19 +69,13 @@ export class IngestionService {
     try {
       const files = await this.uniqueApiClient.files.getByKeys(contentKeys);
       if (files.length === 0) {
-        this.logger.info(
-          { keyCount: contentKeys.length },
-          'No content found for keys, nothing to delete',
-        );
+        this.logger.log({ keyCount: contentKeys.length, msg: 'No content found for keys, nothing to delete' });
         return;
       }
 
       const contentIds = files.map((f) => f.id);
       const deletedCount = await this.uniqueApiClient.files.deleteByIds(contentIds);
-      this.logger.info(
-        { requestedCount: contentKeys.length, resolvedCount: files.length, deletedCount },
-        'Content deleted',
-      );
+      this.logger.log({ requestedCount: contentKeys.length, resolvedCount: files.length, deletedCount, msg: 'Content deleted' });
     } catch (error) {
       this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
     }

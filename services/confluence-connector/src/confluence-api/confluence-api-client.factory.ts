@@ -15,8 +15,7 @@ export class ConfluenceApiClientFactory {
 
   public create(config: ConfluenceConfig): ConfluenceApiClient {
     const confluenceAuth = this.serviceRegistry.getService(ConfluenceAuth);
-    const logger = this.serviceRegistry.getServiceLogger(ConfluenceApiClient);
-    const httpClient = new RateLimitedHttpClient(logger, config.apiRateLimitPerMinute);
+    const httpClient = new RateLimitedHttpClient(config.apiRateLimitPerMinute);
 
     return config.instanceType === 'cloud'
       ? new CloudConfluenceApiClient(config, confluenceAuth, httpClient)

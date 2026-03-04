@@ -1,6 +1,6 @@
 import assert from 'assert';
+import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
-import type pino from 'pino';
 import { getCurrentTenant } from '../tenant';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
@@ -10,42 +10,41 @@ import type { ScopeManagementService } from './scope-management.service';
 import type { DiscoveredPage } from './sync.types';
 
 export class ConfluenceSynchronizationService {
+  private readonly logger = new Logger(ConfluenceSynchronizationService.name);
+
   public constructor(
     private readonly scanner: ConfluencePageScanner,
     private readonly contentFetcher: ConfluenceContentFetcher,
     private readonly fileDiffService: FileDiffService,
     private readonly ingestionService: IngestionService,
     private readonly scopeManagementService: ScopeManagementService,
-    private readonly logger: pino.Logger,
   ) {}
 
   public async synchronize(): Promise<void> {
     const tenant = getCurrentTenant();
 
     if (tenant.isScanning) {
-      this.logger.info('Sync already in progress, skipping');
+      this.logger.log({ tenantName: tenant.name, msg: 'Sync already in progress, skipping' });
       return;
     }
 
     tenant.isScanning = true;
     try {
-      this.logger.info('Starting sync');
+      this.logger.log({ tenantName: tenant.name, msg: 'Starting sync' });
 
       await this.scopeManagementService.initialize();
 
       const discoveredPages = await this.scanner.discoverPages();
-      this.logger.info({ count: discoveredPages.length }, 'Discovery completed');
+      this.logger.log({ count: discoveredPages.length, msg: 'Discovery completed' });
 
       const diffResult = await this.fileDiffService.computeDiff(discoveredPages);
-      this.logger.info(
-        {
-          new: diffResult.newPageIds.length,
-          updated: diffResult.updatedPageIds.length,
-          deleted: diffResult.deletedPageIds.length,
-          moved: diffResult.movedPageIds.length,
-        },
-        'File diff completed',
-      );
+      this.logger.log({
+        new: diffResult.newPageIds.length,
+        updated: diffResult.updatedPageIds.length,
+        deleted: diffResult.deletedPageIds.length,
+        moved: diffResult.movedPageIds.length,
+        msg: 'File diff completed',
+      });
 
       const pageIdsToFetch = new Set([...diffResult.newPageIds, ...diffResult.updatedPageIds]);
       const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
@@ -57,10 +56,10 @@ export class ConfluenceSynchronizationService {
 
       if (diffResult.deletedKeys.length > 0) {
         await this.ingestionService.deleteContent(diffResult.deletedKeys);
-        this.logger.info({ count: diffResult.deletedKeys.length }, 'Deleted content processed');
+        this.logger.log({ count: diffResult.deletedKeys.length, msg: 'Deleted content processed' });
       }
 
-      this.logger.info('Sync completed');
+      this.logger.log('Sync completed');
     } catch (error) {
       this.logger.error({ err: error, msg: 'Sync failed' });
     } finally {
@@ -88,6 +87,6 @@ export class ConfluenceSynchronizationService {
       }),
     ))
 
-    this.logger.info({ count: pages.length }, 'Page ingestion completed');
+    this.logger.log({ count: pages.length, msg: 'Page ingestion completed' });
   }
 }
