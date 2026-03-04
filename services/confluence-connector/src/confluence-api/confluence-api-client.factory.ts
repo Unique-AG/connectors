@@ -1,13 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
+import { ConfluenceAuth } from '../auth/confluence-auth';
 import type { ConfluenceConfig } from '../config';
-import { ServiceRegistry } from '../tenant/service-registry';
+import { ServiceRegistry } from '../tenant';
 import { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import { CloudConfluenceApiClient } from './cloud-api-client';
 import { ConfluenceApiClient } from './confluence-api-client';
 import { DataCenterConfluenceApiClient } from './data-center-api-client';
-
-const ATLASSIAN_API_GATEWAY = 'https://api.atlassian.com/ex/confluence';
 
 @Injectable()
 export class ConfluenceApiClientFactory {
