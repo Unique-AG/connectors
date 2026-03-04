@@ -1,8 +1,8 @@
+import assert from 'assert';
+import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
 import { CONFC_EXTERNAL_ID_PREFIX } from '../constants/ingestion.constants';
-import type { UniqueApiClient } from '@unique-ag/unique-api';
-import assert from 'assert';
 
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
@@ -15,7 +15,10 @@ export class ScopeManagementService {
   ) {}
 
   public async initialize(): Promise<void> {
-    this.logger.log({ tenantName: this.tenantName, msg: 'Requesting current user ID from Unique API' });
+    this.logger.log({
+      tenantName: this.tenantName,
+      msg: 'Requesting current user ID from Unique API',
+    });
     const userId = await this.uniqueApiClient.users.getCurrentId();
 
     // Grant access to root scope before reading it (service account needs permission to query scopes)
@@ -48,7 +51,10 @@ export class ScopeManagementService {
   }
 
   public async ensureSpaceScopes(spaceKeys: string[]): Promise<Map<string, string>> {
-    assert.ok(this.rootScopePath, 'ScopeManagementService not initialized — call initialize() first');
+    assert.ok(
+      this.rootScopePath,
+      'ScopeManagementService not initialized — call initialize() first',
+    );
 
     const paths = spaceKeys.map((key) => `${this.rootScopePath}/${key}`);
     const createdScopes = await this.uniqueApiClient.scopes.createFromPaths(paths, {

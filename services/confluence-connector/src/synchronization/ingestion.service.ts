@@ -1,9 +1,18 @@
 import assert from 'node:assert';
+import type {
+  ContentRegistrationRequest,
+  IngestionFinalizationRequest,
+  UniqueApiClient,
+} from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import { request } from 'undici';
 import type { ConfluenceConfig } from '../config';
-import { getSourceKind, INGESTION_MIME_TYPE, OWNER_TYPE, SOURCE_OWNER_TYPE } from '../constants/ingestion.constants';
-import type { ContentRegistrationRequest, IngestionFinalizationRequest, UniqueApiClient } from '@unique-ag/unique-api';
+import {
+  getSourceKind,
+  INGESTION_MIME_TYPE,
+  OWNER_TYPE,
+  SOURCE_OWNER_TYPE,
+} from '../constants/ingestion.constants';
 import type { FetchedPage } from './sync.types';
 
 export class IngestionService {
@@ -69,13 +78,21 @@ export class IngestionService {
     try {
       const files = await this.uniqueApiClient.files.getByKeys(contentKeys);
       if (files.length === 0) {
-        this.logger.log({ keyCount: contentKeys.length, msg: 'No content found for keys, nothing to delete' });
+        this.logger.log({
+          keyCount: contentKeys.length,
+          msg: 'No content found for keys, nothing to delete',
+        });
         return;
       }
 
       const contentIds = files.map((f) => f.id);
       const deletedCount = await this.uniqueApiClient.files.deleteByIds(contentIds);
-      this.logger.log({ requestedCount: contentKeys.length, resolvedCount: files.length, deletedCount, msg: 'Content deleted' });
+      this.logger.log({
+        requestedCount: contentKeys.length,
+        resolvedCount: files.length,
+        deletedCount,
+        msg: 'Content deleted',
+      });
     } catch (error) {
       this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
     }

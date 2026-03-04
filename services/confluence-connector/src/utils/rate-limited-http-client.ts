@@ -1,5 +1,5 @@
-import Bottleneck from 'bottleneck';
 import { Logger } from '@nestjs/common';
+import Bottleneck from 'bottleneck';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
 import { handleErrorStatus } from './http-util';
 

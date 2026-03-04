@@ -52,11 +52,7 @@ export class TenantRegistry implements OnModuleInit {
         const apiClient = this.confluenceApiClientFactory.create(config.confluence);
         this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
 
-        const scanner = new ConfluencePageScanner(
-          config.confluence,
-          config.processing,
-          apiClient,
-        );
+        const scanner = new ConfluencePageScanner(config.confluence, config.processing, apiClient);
         this.serviceRegistry.register(tenantName, ConfluencePageScanner, scanner);
 
         const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient);
@@ -78,11 +74,7 @@ export class TenantRegistry implements OnModuleInit {
           },
         });
 
-        this.serviceRegistry.register(
-          tenantName,
-          AbstractUniqueApiClient,
-          uniqueClient,
-        );
+        this.serviceRegistry.register(tenantName, AbstractUniqueApiClient, uniqueClient);
         const scopeManagementService = new ScopeManagementService(
           config.ingestion,
           tenantName,
@@ -117,7 +109,7 @@ export class TenantRegistry implements OnModuleInit {
         this.serviceRegistry.register(
           tenantName,
           ConfluenceSynchronizationService,
-          confluenceSynchronizationService
+          confluenceSynchronizationService,
         );
 
         this.logger.log({ tenantName, msg: 'Tenant registered' });

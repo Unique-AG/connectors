@@ -2,16 +2,15 @@ import { defaultLoggerOptions } from '@unique-ag/logger';
 import { ProbeModule } from '@unique-ag/probe';
 import { UniqueApiModule } from '@unique-ag/unique-api';
 import { Module } from '@nestjs/common';
-import { tenantStorage } from './tenant';
 import { ConfigModule } from '@nestjs/config';
 import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { type AppConfig, appConfig } from './config';
-import { Redacted } from './utils/redacted';
 import { SchedulerModule } from './scheduler/scheduler.module';
-import { TenantModule } from './tenant';
+import { TenantModule, tenantStorage } from './tenant';
+import { Redacted } from './utils/redacted';
 
 @Module({
   imports: [

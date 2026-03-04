@@ -95,6 +95,5 @@ describe('ConfluenceAuthFactory', () => {
         'Unsupported Confluence auth mode',
       );
     });
-
   });
 });

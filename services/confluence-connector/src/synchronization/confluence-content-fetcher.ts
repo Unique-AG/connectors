@@ -26,7 +26,11 @@ export class ConfluenceContentFetcher {
     }
 
     if (!fullPage) {
-      this.logger.warn({ pageId: page.id, title: page.title, msg: 'Page not found, possibly deleted' });
+      this.logger.warn({
+        pageId: page.id,
+        title: page.title,
+        msg: 'Page not found, possibly deleted',
+      });
       return null;
     }
 

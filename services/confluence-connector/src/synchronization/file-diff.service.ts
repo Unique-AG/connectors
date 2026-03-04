@@ -1,9 +1,9 @@
 import assert from 'node:assert';
+import type { FileDiffItem, FileDiffResponse, UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind } from '../constants/ingestion.constants';
-import type { FileDiffItem, FileDiffResponse, UniqueApiClient } from '@unique-ag/unique-api';
 import type { DiscoveredPage, FileDiffResult } from './sync.types';
 
 export class FileDiffService {
@@ -34,7 +34,9 @@ export class FileDiffService {
       const fileDiffItems = this.buildFileDiffItems(pages);
       const firstPage = pages[0];
       const basePartialKey = `${firstPage.spaceId}_${spaceKey}`;
-      const partialKey = this.useV1KeyFormat ? basePartialKey : `${this.tenantName}/${basePartialKey}`;
+      const partialKey = this.useV1KeyFormat
+        ? basePartialKey
+        : `${this.tenantName}/${basePartialKey}`;
 
       const diffResponse = await this.uniqueApiClient.ingestion.performFileDiff(
         fileDiffItems,
@@ -101,5 +103,4 @@ export class FileDiffService {
       );
     }
   }
-
 }

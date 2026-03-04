@@ -52,7 +52,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     job.start();
 
     this.tenantRegistry.run(tenant, () => {
-      this.logger.log({ tenantName: tenant.name },`Scheduled sync with cron: ${cronExpression}`);
+      this.logger.log({ tenantName: tenant.name }, `Scheduled sync with cron: ${cronExpression}`);
     });
   }
 

@@ -1,7 +1,7 @@
+import type { UniqueApiClient } from '@unique-ag/unique-api';
 import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestionConfig } from '../../config/ingestion.schema';
-import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { ScopeManagementService } from '../scope-management.service';
 
 const TENANT_NAME = 'dogfood-cloud';
@@ -91,7 +91,9 @@ describe('ScopeManagementService', () => {
       const { service, scopes } = makeService();
       scopes.getById.mockResolvedValueOnce(null);
 
-      await expect(service.initialize()).rejects.toThrow(`Root scope with ID ${ROOT_SCOPE_ID} not found`);
+      await expect(service.initialize()).rejects.toThrow(
+        `Root scope with ID ${ROOT_SCOPE_ID} not found`,
+      );
     });
 
     it('throws when a parent scope is not found', async () => {

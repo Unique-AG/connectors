@@ -32,10 +32,7 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
   private readonly tokenEndpoint: string;
   private readonly instanceType: 'cloud' | 'data-center';
 
-  public constructor(
-    authConfig: OAuth2LoAuthConfig,
-    connectionConfig: OAuth2LoConnectionConfig,
-  ) {
+  public constructor(authConfig: OAuth2LoAuthConfig, connectionConfig: OAuth2LoConnectionConfig) {
     super();
     this.clientId = authConfig.clientId;
     this.clientSecret = authConfig.clientSecret.value;

@@ -51,9 +51,12 @@ export class ConfluencePageScanner {
       }
 
       if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
-        this.logger.debug(
-          { pageId: page.id, title: page.title, type: page.type, msg: 'Skipping non-page content type' },
-        );
+        this.logger.debug({
+          pageId: page.id,
+          title: page.title,
+          type: page.type,
+          msg: 'Skipping non-page content type',
+        });
         continue;
       }
 

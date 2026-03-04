@@ -1,10 +1,10 @@
+import { AbstractUniqueApiClient } from '@unique-ag/unique-api';
 import type pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-auth';
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
 import { getTenantConfigs } from '../../config/tenant-config-loader';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../../confluence-api';
-import { AbstractUniqueApiClient } from '@unique-ag/unique-api';
 import { ServiceRegistry } from '../service-registry';
 import { tenantStorage } from '../tenant-context.storage';
 import { TenantRegistry } from '../tenant-registry';
@@ -233,9 +233,7 @@ describe('TenantRegistry', () => {
     });
 
     it('provides service loggers via PinoLogger.root child with service binding', () => {
-      const configs: NamedTenantConfig[] = [
-        { name: 'tenant-a', config: createMockTenantConfig() },
-      ];
+      const configs: NamedTenantConfig[] = [{ name: 'tenant-a', config: createMockTenantConfig() }];
 
       const { serviceRegistry } = createRegistry(configs);
       const logger = serviceRegistry.getServiceLogger({ name: 'TestService' });

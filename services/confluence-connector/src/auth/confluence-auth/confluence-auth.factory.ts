@@ -13,7 +13,10 @@ export class ConfluenceAuthFactory {
     const { name: tenantName } = getCurrentTenant();
     switch (config.auth.mode) {
       case AuthMode.OAUTH_2LO: {
-        this.logger.log({ tenantName, msg: `Using OAuth 2.0 2LO authentication for ${config.instanceType} instance` });
+        this.logger.log({
+          tenantName,
+          msg: `Using OAuth 2.0 2LO authentication for ${config.instanceType} instance`,
+        });
         return new OAuth2LoAuthStrategy(config.auth, config);
       }
       case AuthMode.PAT: {

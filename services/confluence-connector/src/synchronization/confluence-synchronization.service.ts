@@ -47,7 +47,11 @@ export class ConfluenceSynchronizationService {
         const spaceKeys = pagesToFetch.map((p) => p.spaceKey);
         const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(spaceKeys);
 
-        await this.fetchAndIngestPages(pagesToFetch, spaceScopes, tenant.config.processing.concurrency);
+        await this.fetchAndIngestPages(
+          pagesToFetch,
+          spaceScopes,
+          tenant.config.processing.concurrency,
+        );
       }
 
       if (diffResult.deletedKeys.length > 0) {
@@ -70,23 +74,25 @@ export class ConfluenceSynchronizationService {
   ): Promise<void> {
     const limit = pLimit(concurrency);
 
-    if(pages.length === 0) {
-      this.logger.log('No pages to ingest')
-      return
+    if (pages.length === 0) {
+      this.logger.log('No pages to ingest');
+      return;
     }
 
     await Promise.all(
-      pages.map((page) => limit(async () => {
-        const fetched = await this.contentFetcher.fetchPageContent(page);
+      pages.map((page) =>
+        limit(async () => {
+          const fetched = await this.contentFetcher.fetchPageContent(page);
 
-        if (!fetched) {
-          return;
-        }
-        const scopeId = spaceScopes.get(page.spaceKey);
-        assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
-        await this.ingestionService.ingestPage(fetched, scopeId);
-      }),
-    ))
+          if (!fetched) {
+            return;
+          }
+          const scopeId = spaceScopes.get(page.spaceKey);
+          assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
+          await this.ingestionService.ingestPage(fetched, scopeId);
+        }),
+      ),
+    );
 
     this.logger.log({ count: pages.length, msg: 'Page ingestion completed' });
   }
