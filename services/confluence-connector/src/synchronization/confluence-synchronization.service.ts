@@ -50,8 +50,8 @@ export class ConfluenceSynchronizationService {
       const pageIdsToFetch = new Set([...diffResult.newPageIds, ...diffResult.updatedPageIds]);
       const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
 
-      const uniqueSpaceKeys = [...new Set(pagesToFetch.map((p) => p.spaceKey))];
-      const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(uniqueSpaceKeys);
+      const spaceKeys = pagesToFetch.map((p) => p.spaceKey);
+      const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(spaceKeys);
 
       await this.fetchAndIngestPages(pagesToFetch, spaceScopes, tenant.config.processing.concurrency);
 

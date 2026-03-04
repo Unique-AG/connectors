@@ -6,7 +6,6 @@ import assert from 'assert';
 
 export class ScopeManagementService {
   private rootScopePath: string | null = null;
-  private readonly spaceScopes = new Map<string, string>();
 
   public constructor(
     private readonly ingestionConfig: IngestionConfig,
@@ -28,7 +27,7 @@ export class ScopeManagementService {
     const rootScope = await this.uniqueApiClient.scopes.getById(this.ingestionConfig.scopeId);
     assert.ok(rootScope, `Root scope with ID ${this.ingestionConfig.scopeId} not found`);
 
-    const pathSegments: string[] = [rootScope.name];
+    const pathSegments = [rootScope.name];
     let currentScope = rootScope;
 
     while (currentScope.parentId !== null) {
@@ -47,72 +46,18 @@ export class ScopeManagementService {
     this.logger.info({ rootScopePath: this.rootScopePath }, 'Scope management initialized');
   }
 
-  public async ensureSpaceScope(spaceKey: string): Promise<string> {
-    const cached = this.spaceScopes.get(spaceKey);
-    if (cached) {
-      return cached;
-    }
-
-    const externalId = `${CONFC_EXTERNAL_ID_PREFIX}${this.tenantName}:${spaceKey}`;
-
-    const existingScope = await this.uniqueApiClient.scopes.getByExternalId(externalId);
-    if (existingScope) {
-      this.spaceScopes.set(spaceKey, existingScope.id);
-      this.logger.debug({ spaceKey, scopeId: existingScope.id }, 'Found existing space scope');
-      return existingScope.id;
-    }
-
-    assert.ok(this.rootScopePath, 'ScopeManagementService not initialized — call initialize() first');
-
-    const spaceScopePath = `${this.rootScopePath}/${spaceKey}`;
-    const createdScopes = await this.uniqueApiClient.scopes.createFromPaths([spaceScopePath], {
-      inheritAccess: true,
-    });
-
-    const createdScope = createdScopes[0];
-    assert.ok(createdScope, `Failed to create scope for space: ${spaceKey}`);
-
-    await this.uniqueApiClient.scopes.updateExternalId(createdScope.id, externalId);
-
-    this.spaceScopes.set(spaceKey, createdScope.id);
-    this.logger.info({ spaceKey, scopeId: createdScope.id, externalId }, 'Created space scope');
-
-    return createdScope.id;
-  }
-
   public async ensureSpaceScopes(spaceKeys: string[]): Promise<Map<string, string>> {
     assert.ok(this.rootScopePath, 'ScopeManagementService not initialized — call initialize() first');
 
-    const uniqueKeys = [...new Set(spaceKeys)];
-    const result = new Map<string, string>();
-
-    const uncachedKeys: string[] = [];
-    for (const key of uniqueKeys) {
-      const cached = this.spaceScopes.get(key);
-      if (cached) {
-        result.set(key, cached);
-      } else {
-        uncachedKeys.push(key);
-      }
-    }
-
-    if (uncachedKeys.length === 0) {
-      this.logger.info(
-        { spaceKeys: uniqueKeys, count: uniqueKeys.length },
-        'Batch space scopes resolved',
-      );
-      return result;
-    }
-
-    const paths = uncachedKeys.map((key) => `${this.rootScopePath}/${key}`);
-
+    const paths = spaceKeys.map((key) => `${this.rootScopePath}/${key}`);
     const createdScopes = await this.uniqueApiClient.scopes.createFromPaths(paths, {
       inheritAccess: true,
     });
 
-    for (let i = 0; i < uncachedKeys.length; i++) {
-      const spaceKey = uncachedKeys[i]!;
-      const scope = createdScopes[i];
+    const result = new Map<string, string>();
+
+    for (const [index, spaceKey] of spaceKeys.entries()) {
+      const scope = createdScopes[index];
       assert.ok(scope, `Failed to create scope for space: ${spaceKey}`);
 
       if (!scope.externalId) {
@@ -120,14 +65,10 @@ export class ScopeManagementService {
         await this.uniqueApiClient.scopes.updateExternalId(scope.id, externalId);
       }
 
-      this.spaceScopes.set(spaceKey, scope.id);
       result.set(spaceKey, scope.id);
     }
 
-    this.logger.debug(
-      { spaceKeys: uniqueKeys, count: uniqueKeys.length },
-      'Batch space scopes resolved',
-    );
+    this.logger.debug({ spaceKeys, count: spaceKeys.length }, 'Space scopes resolved');
     return result;
   }
 }
