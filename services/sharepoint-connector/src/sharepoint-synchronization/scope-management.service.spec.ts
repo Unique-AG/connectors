@@ -845,7 +845,7 @@ describe('ScopeManagementService', () => {
       );
     });
 
-    it('uses subsite siteId in unknown fallback for paths under a subsite', async () => {
+    it('uses root siteId in unknown fallback for paths under a subsite', async () => {
       const subASiteId = 'host.com,col-a,web-a';
       const context: SharepointSyncContext = {
         ...mockContext,
@@ -873,7 +873,7 @@ describe('ScopeManagementService', () => {
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
       const [, externalId] = updateScopeExternalIdMock.mock.calls[0] as [string, Smeared];
-      expect(externalId.value).toMatch(new RegExp(`^spc:unknown:${subASiteId}/UnknownLib-`));
+      expect(externalId.value).toMatch(/^spc:unknown:site-123::\/test1\/SubA\/UnknownLib-/);
     });
 
     describe('conflict marking', () => {
@@ -939,7 +939,7 @@ describe('ScopeManagementService', () => {
         expect(renameId).toBe('old-scope-id');
         expect(renameExternalId).toBeInstanceOf(Smeared);
         expect(renameExternalId.value).toMatch(
-          /^spc:pending-delete:site-123\/unknown:site-123\/TestScope-/,
+          /^spc:pending-delete:site-123\/unknown:site-123::\/test1\/TestScope-/,
         );
 
         expect(updateScopeExternalIdMock).toHaveBeenNthCalledWith(
