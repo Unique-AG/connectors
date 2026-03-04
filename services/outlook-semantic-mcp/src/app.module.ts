@@ -33,7 +33,7 @@ import {
   uniqueConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
-import { OutlookMcpToolsModule } from './email-sync/outlook-mcp-tools.module';
+import { OutlookMcpToolsModule } from './features/outlook-mcp-tools.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';

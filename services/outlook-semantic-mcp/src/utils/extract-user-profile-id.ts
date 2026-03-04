@@ -1,6 +1,6 @@
 import { McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { UnauthorizedException } from '@nestjs/common';
-import { traceAttrs } from '~/email-sync/tracing.utils';
+import { traceAttrs } from '~/features/tracing.utils';
 import {
   convertUserProfileIdToTypeId,
   UserProfileTypeID,
