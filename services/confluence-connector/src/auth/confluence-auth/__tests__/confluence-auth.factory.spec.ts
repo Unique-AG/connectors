@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AuthMode, type ConfluenceConfig } from '../../../config';
 import type { TenantConfig } from '../../../config/tenant-config-loader';
-import { ServiceRegistry } from '../../../tenant/service-registry';
 import type { TenantContext } from '../../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../../tenant/tenant-context.storage';
 import { Redacted } from '../../../utils/redacted';
@@ -21,13 +20,8 @@ vi.mock('../strategies/pat-auth.strategy', () => ({
   })),
 }));
 
-const mockServiceLogger = { info: vi.fn(), error: vi.fn() };
-const mockServiceRegistry = {
-  getServiceLogger: vi.fn().mockReturnValue(mockServiceLogger),
-} as unknown as ServiceRegistry;
-
 function createFactory(): ConfluenceAuthFactory {
-  return new ConfluenceAuthFactory(mockServiceRegistry);
+  return new ConfluenceAuthFactory();
 }
 
 const baseFields = {
@@ -62,7 +56,7 @@ describe('ConfluenceAuthFactory', () => {
       const token = await auth.acquireToken();
 
       expect(token).toBe('oauth-token');
-      expect(OAuth2LoAuthStrategy).toHaveBeenCalledWith(config.auth, config, expect.any(Object));
+      expect(OAuth2LoAuthStrategy).toHaveBeenCalledWith(config.auth, config);
     });
 
     it('creates auth for PAT data-center config', async () => {

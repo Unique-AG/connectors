@@ -5,12 +5,21 @@ import { ConfluenceApiClient, ContentType } from '../../confluence-api';
 import { ConfluenceContentFetcher } from '../confluence-content-fetcher';
 import type { DiscoveredPage } from '../sync.types';
 
-const mockTenantLogger = vi.hoisted(() => ({
-  info: vi.fn(),
+const mockLogger = vi.hoisted(() => ({
+  log: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
   debug: vi.fn(),
+  verbose: vi.fn(),
 }));
+
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return {
+    ...actual,
+    Logger: vi.fn().mockImplementation(() => mockLogger),
+  };
+});
 
 const baseConfluenceConfig: ConfluenceConfig = {
   instanceType: 'data-center',
@@ -71,7 +80,6 @@ function createFetcher(
   return new ConfluenceContentFetcher(
     baseConfluenceConfig,
     apiClient as unknown as ConfluenceApiClient,
-    mockTenantLogger as never,
   );
 }
 
@@ -130,10 +138,11 @@ describe('ConfluenceContentFetcher', () => {
     const result = await fetcher.fetchPageContent(discoveredPage);
 
     expect(result).toBeNull();
-    expect(mockTenantLogger.warn).toHaveBeenCalledWith(
-      { pageId: 'missing', title: 'Page missing' },
-      'Page not found, possibly deleted',
-    );
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      pageId: 'missing',
+      title: 'Page missing',
+      msg: 'Page not found, possibly deleted',
+    });
   });
 
   it('skips pages with empty body', async () => {
@@ -146,10 +155,11 @@ describe('ConfluenceContentFetcher', () => {
     const result = await fetcher.fetchPageContent(discoveredPage);
 
     expect(result).toBeNull();
-    expect(mockTenantLogger.info).toHaveBeenCalledWith(
-      { pageId: 'empty', title: 'Page empty' },
-      'Page has no body, skipping',
-    );
+    expect(mockLogger.log).toHaveBeenCalledWith({
+      pageId: 'empty',
+      title: 'Page empty',
+      msg: 'Page has no body, skipping',
+    });
   });
 
   it('continues processing after getPageById error', async () => {
@@ -161,7 +171,7 @@ describe('ConfluenceContentFetcher', () => {
     const result = await fetcher.fetchPageContent(makeDiscoveredPage('fail'));
 
     expect(result).toBeNull();
-    expect(mockTenantLogger.error).toHaveBeenCalledWith(
+    expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         pageId: 'fail',
         err: expect.any(Error),

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfluenceAuth } from '../auth/confluence-auth';
 import type { ConfluenceConfig } from '../config';
-import { ServiceRegistry } from '../tenant';
+import { ServiceRegistry } from '../tenant/service-registry';
 import { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import { CloudConfluenceApiClient } from './cloud-api-client';
 import { ConfluenceApiClient } from './confluence-api-client';

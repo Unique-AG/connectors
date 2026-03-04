@@ -4,12 +4,20 @@ import type { ConfluencePage } from '../../confluence-api';
 import { ConfluenceApiClient, ContentType } from '../../confluence-api';
 import { ConfluencePageScanner } from '../confluence-page-scanner';
 
-const mockTenantLogger = vi.hoisted(() => ({
-  info: vi.fn(),
+const mockLogger = vi.hoisted(() => ({
+  log: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
   debug: vi.fn(),
 }));
+
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return {
+    ...actual,
+    Logger: vi.fn().mockImplementation(() => mockLogger),
+  };
+});
 
 const baseConfluenceConfig: ConfluenceConfig = {
   instanceType: 'data-center',
@@ -63,7 +71,6 @@ function createScanner(
     baseConfluenceConfig,
     processingConfig,
     apiClient as unknown as ConfluenceApiClient,
-    mockTenantLogger as never,
   );
 }
 
@@ -156,10 +163,7 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.map((item) => item.id)).toEqual(['first']);
-    expect(mockTenantLogger.info).toHaveBeenCalledWith(
-      { limit: 1 },
-      'maxPagesToScan limit reached',
-    );
+    expect(mockLogger.log).toHaveBeenCalledWith({ limit: 1, msg: 'maxPagesToScan limit reached' });
   });
 
   it('returns empty array and logs completion when searchPagesByLabel returns no pages', async () => {
@@ -176,7 +180,7 @@ describe('ConfluencePageScanner', () => {
 
     expect(result).toEqual([]);
     expect(apiClient.getDescendantPages).not.toHaveBeenCalled();
-    expect(mockTenantLogger.info).toHaveBeenCalledWith({ count: 0 }, 'Page discovery completed');
+    expect(mockLogger.log).toHaveBeenCalledWith({ count: 0, msg: 'Page discovery completed' });
   });
 
   it('rejects when searchPagesByLabel fails', async () => {
@@ -213,10 +217,12 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'page-child']);
-    expect(mockTenantLogger.debug).toHaveBeenCalledWith(
-      { pageId: 'db-child', title: 'Page db-child', type: 'database' },
-      'Skipping non-page content type',
-    );
+    expect(mockLogger.debug).toHaveBeenCalledWith({
+      pageId: 'db-child',
+      title: 'Page db-child',
+      type: 'database',
+      msg: 'Skipping non-page content type',
+    });
   });
 
   it('honors maxPagesToScan limit during descendant expansion', async () => {
@@ -240,10 +246,7 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'child']);
-    expect(mockTenantLogger.info).toHaveBeenCalledWith(
-      { limit: 2 },
-      'maxPagesToScan limit reached',
-    );
+    expect(mockLogger.log).toHaveBeenCalledWith({ limit: 2, msg: 'maxPagesToScan limit reached' });
   });
 
   it('deduplicates pages that appear in both the CQL scan and descendant expansion', async () => {

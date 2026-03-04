@@ -1,4 +1,3 @@
-import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
@@ -15,12 +14,20 @@ import type { IngestionService } from '../ingestion.service';
 import type { ScopeManagementService } from '../scope-management.service';
 import type { FileDiffResult } from '../sync.types';
 
-const mockTenantLogger = vi.hoisted(() => ({
-  info: vi.fn(),
+const mockLogger = vi.hoisted(() => ({
+  log: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
   debug: vi.fn(),
 }));
+
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return {
+    ...actual,
+    Logger: vi.fn().mockImplementation(() => mockLogger),
+  };
+});
 
 const mockScopeManagementService = {
   initialize: vi.fn().mockResolvedValue(undefined),
@@ -39,7 +46,6 @@ function createService(
     fileDiffService as FileDiffService,
     ingestionService as IngestionService,
     mockScopeManagementService,
-    mockTenantLogger as unknown as pino.Logger,
   );
 }
 
@@ -91,7 +97,9 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync already in progress, skipping');
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.objectContaining({ msg: 'Sync already in progress, skipping' }),
+      );
       expect(mockScanner.discoverPages).not.toHaveBeenCalled();
       expect(mockContentFetcher.fetchPageContent).not.toHaveBeenCalled();
     });
@@ -99,7 +107,9 @@ describe('ConfluenceSynchronizationService', () => {
     it('runs scanner then content fetcher and logs summaries', async () => {
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.objectContaining({ msg: 'Starting sync' }),
+      );
       expect(mockScanner.discoverPages).toHaveBeenCalledOnce();
       expect(mockFileDiffService.computeDiff).toHaveBeenCalledWith(discoveredPagesFixture);
       expect(mockContentFetcher.fetchPageContent).toHaveBeenCalledWith(
@@ -110,13 +120,14 @@ describe('ConfluenceSynchronizationService', () => {
         'scope-1',
       );
 
-      const discoverLog = mockTenantLogger.info.mock.calls.find(
-        (call) => typeof call[1] === 'string' && call[1].startsWith('Discovery completed'),
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          count: discoveredPagesFixture.length,
+          msg: 'Discovery completed',
+        }),
       );
-      expect(discoverLog).toBeDefined();
-      expect(discoverLog?.[0]).toMatchObject({ count: discoveredPagesFixture.length });
 
-      expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync completed');
+      expect(mockLogger.log).toHaveBeenCalledWith('Sync work done');
     });
 
     it('resets isScanning after successful sync', async () => {
@@ -130,7 +141,7 @@ describe('ConfluenceSynchronizationService', () => {
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(tenant.isScanning).toBe(false);
-      expect(mockTenantLogger.error).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
       );
     });
@@ -141,7 +152,7 @@ describe('ConfluenceSynchronizationService', () => {
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(tenant.isScanning).toBe(false);
-      expect(mockTenantLogger.error).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
       );
     });
@@ -181,7 +192,7 @@ describe('ConfluenceSynchronizationService', () => {
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(tenant.isScanning).toBe(false);
-      expect(mockTenantLogger.error).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
       );
       expect(mockContentFetcher.fetchPageContent).not.toHaveBeenCalled();

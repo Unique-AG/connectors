@@ -1,10 +1,24 @@
 import type { IngestionApiResponse, UniqueApiClient } from '@unique-ag/unique-api';
-import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConfluenceConfig } from '../../config';
+import type { TenantConfig } from '../../config';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { IngestionService } from '../ingestion.service';
 import type { FetchedPage } from '../sync.types';
+
+const mockLogger = vi.hoisted(() => ({
+  log: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return {
+    ...actual,
+    Logger: vi.fn().mockImplementation(() => mockLogger),
+  };
+});
 
 const TENANT_NAME = 'test-tenant';
 
@@ -12,9 +26,13 @@ const { mockRequest } = vi.hoisted(() => ({
   mockRequest: vi.fn(),
 }));
 
-vi.mock('undici', () => ({
-  request: mockRequest,
-}));
+vi.mock('undici', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('undici')>();
+  return {
+    ...actual,
+    request: mockRequest,
+  };
+});
 
 const pageFixture: FetchedPage = {
   id: '42',
@@ -49,13 +67,7 @@ function makeRegistrationResponse(
 function makeService(): {
   service: IngestionService;
   uniqueApiClient: UniqueApiClient;
-  logger: {
-    info: ReturnType<typeof vi.fn>;
-    error: ReturnType<typeof vi.fn>;
-    debug: ReturnType<typeof vi.fn>;
-  };
 } {
-  const logger = { info: vi.fn(), error: vi.fn(), debug: vi.fn() };
   const uniqueApiClient = {
     ingestion: {
       registerContent: vi.fn().mockResolvedValue(makeRegistrationResponse()),
@@ -67,22 +79,20 @@ function makeService(): {
     },
   } as unknown as UniqueApiClient;
 
-  const confluenceConfig = {
-    instanceType: 'cloud',
-    baseUrl: CONFLUENCE_BASE_URL,
-  } as unknown as ConfluenceConfig;
+  const tenantConfig = {
+    confluence: {
+      instanceType: 'cloud',
+      baseUrl: CONFLUENCE_BASE_URL,
+    },
+    ingestion: {
+      storeInternally: true,
+      useV1KeyFormat: false,
+    },
+  } as unknown as TenantConfig;
 
   return {
-    service: new IngestionService(
-      confluenceConfig,
-      TENANT_NAME,
-      true,
-      false,
-      uniqueApiClient,
-      logger as unknown as pino.Logger,
-    ),
+    service: new IngestionService(tenantConfig, TENANT_NAME, uniqueApiClient),
     uniqueApiClient,
-    logger,
   };
 }
 
@@ -131,19 +141,20 @@ describe('IngestionService', () => {
   });
 
   it('skips page ingestion when body is empty', async () => {
-    const { service, uniqueApiClient, logger } = makeService();
+    const { service, uniqueApiClient } = makeService();
 
     await service.ingestPage({ ...pageFixture, body: '' }, 'space-scope-1');
 
     expect(uniqueApiClient.ingestion.registerContent).not.toHaveBeenCalled();
-    expect(logger.info).toHaveBeenCalledWith(
-      { pageId: '42', title: 'Architecture' },
-      'Skipping page with empty body',
-    );
+    expect(mockLogger.log).toHaveBeenCalledWith({
+      pageId: '42',
+      title: 'Architecture',
+      msg: 'Skipping page with empty body',
+    });
   });
 
   it('logs and skips page ingestion when registration fails', async () => {
-    const { service, uniqueApiClient, logger } = makeService();
+    const { service, uniqueApiClient } = makeService();
     vi.mocked(uniqueApiClient.ingestion.registerContent).mockRejectedValue(
       new Error('register failed'),
     );
@@ -151,7 +162,7 @@ describe('IngestionService', () => {
     await service.ingestPage(pageFixture, 'space-scope-1');
 
     expect(uniqueApiClient.ingestion.finalizeIngestion).not.toHaveBeenCalled();
-    expect(logger.error).toHaveBeenCalledWith(
+    expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         pageId: '42',
         title: 'Architecture',
@@ -180,25 +191,25 @@ describe('IngestionService', () => {
   });
 
   it('logs and returns when no content is found for delete keys', async () => {
-    const { service, uniqueApiClient, logger } = makeService();
+    const { service, uniqueApiClient } = makeService();
     vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([]);
 
     await service.deleteContent(['missing-key']);
 
     expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
-    expect(logger.info).toHaveBeenCalledWith(
-      { keyCount: 1 },
-      'No content found for keys, nothing to delete',
-    );
+    expect(mockLogger.log).toHaveBeenCalledWith({
+      keyCount: 1,
+      msg: 'No content found for keys, nothing to delete',
+    });
   });
 
   it('logs delete errors and continues', async () => {
-    const { service, uniqueApiClient, logger } = makeService();
+    const { service, uniqueApiClient } = makeService();
     vi.mocked(uniqueApiClient.files.getByKeys).mockRejectedValue(new Error('delete failed'));
 
     await service.deleteContent(['k1']);
 
-    expect(logger.error).toHaveBeenCalledWith(
+    expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         contentKeys: ['k1'],
         err: expect.anything(),

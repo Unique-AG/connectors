@@ -1,24 +1,7 @@
-import type pino from 'pino';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ServiceRegistry } from '../service-registry';
 import type { TenantContext } from '../tenant-context.interface';
 import { tenantStorage } from '../tenant-context.storage';
-
-const { mockChildLogger, mockRoot } = vi.hoisted(() => {
-  const mockChildLogger = { info: vi.fn() } as unknown as pino.Logger;
-  const mockRoot = {
-    child: vi.fn().mockReturnValue(mockChildLogger),
-  } as unknown as pino.Logger;
-  return { mockChildLogger, mockRoot };
-});
-
-vi.mock('nestjs-pino', async () => {
-  const actual = await vi.importActual('nestjs-pino');
-  return {
-    ...actual,
-    PinoLogger: { root: mockRoot },
-  };
-});
 
 abstract class FooService {
   public abstract doFoo(): string;
@@ -124,17 +107,6 @@ describe('ServiceRegistry', () => {
           'Service not found for tenant "acme": FooService',
         );
       });
-    });
-  });
-
-  describe('getServiceLogger', () => {
-    it('returns a child logger of PinoLogger.root with service binding', () => {
-      const registry = new ServiceRegistry();
-
-      const logger = registry.getServiceLogger(FooService);
-
-      expect(mockRoot.child).toHaveBeenCalledWith({ service: 'FooService' });
-      expect(logger).toBe(mockChildLogger);
     });
   });
 });

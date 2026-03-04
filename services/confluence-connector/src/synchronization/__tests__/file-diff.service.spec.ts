@@ -1,5 +1,4 @@
 import type { UniqueApiClient } from '@unique-ag/unique-api';
-import type pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import { ContentType } from '../../confluence-api/types/confluence-api.types';
@@ -30,21 +29,13 @@ function makeService(performFileDiffImpl: UniqueApiClient['ingestion']['performF
     ingestion: { performFileDiff },
   } as unknown as UniqueApiClient;
 
-  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
-
   const confluenceConfig = {
     instanceType: 'cloud',
     baseUrl: CONFLUENCE_BASE_URL,
   } as unknown as ConfluenceConfig;
 
   return {
-    service: new FileDiffService(
-      confluenceConfig,
-      TENANT_NAME,
-      false,
-      uniqueApiClient,
-      logger as unknown as pino.Logger,
-    ),
+    service: new FileDiffService(confluenceConfig, TENANT_NAME, false, uniqueApiClient),
     performFileDiff,
   };
 }

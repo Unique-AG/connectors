@@ -1,5 +1,4 @@
 import type { UniqueApiClient } from '@unique-ag/unique-api';
-import type pino from 'pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestionConfig } from '../../config/ingestion.schema';
 import { ScopeManagementService } from '../scope-management.service';
@@ -28,14 +27,13 @@ function makeService(): {
   };
 
   const uniqueApiClient = { scopes, users } as unknown as UniqueApiClient;
-  const logger = { info: vi.fn(), debug: vi.fn(), error: vi.fn() } as unknown as pino.Logger;
 
   const ingestionConfig = {
     scopeId: ROOT_SCOPE_ID,
   } as unknown as IngestionConfig;
 
   return {
-    service: new ScopeManagementService(ingestionConfig, TENANT_NAME, uniqueApiClient, logger),
+    service: new ScopeManagementService(ingestionConfig, TENANT_NAME, uniqueApiClient),
     scopes,
   };
 }

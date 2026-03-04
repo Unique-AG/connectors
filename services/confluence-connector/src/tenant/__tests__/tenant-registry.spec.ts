@@ -1,5 +1,4 @@
 import { AbstractUniqueApiClient } from '@unique-ag/unique-api';
-import type pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-auth';
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
@@ -9,29 +8,18 @@ import { ServiceRegistry } from '../service-registry';
 import { tenantStorage } from '../tenant-context.storage';
 import { TenantRegistry } from '../tenant-registry';
 
-const { mockChildLogger, mockRoot } = vi.hoisted(() => {
-  const mockChildLogger = {
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    child: vi.fn().mockImplementation((bindings: Record<string, string>) => ({
-      info: vi.fn(),
-      error: vi.fn(),
-      warn: vi.fn(),
-      bindings: () => bindings,
-    })),
-  } as unknown as pino.Logger;
-  const mockRoot = {
-    child: vi.fn().mockReturnValue(mockChildLogger),
-  } as unknown as pino.Logger;
-  return { mockChildLogger, mockRoot };
-});
+const mockLogger = vi.hoisted(() => ({
+  log: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
 
-vi.mock('nestjs-pino', async () => {
-  const actual = await vi.importActual('nestjs-pino');
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
   return {
     ...actual,
-    PinoLogger: { root: mockRoot },
+    Logger: vi.fn().mockImplementation(() => mockLogger),
   };
 });
 
@@ -91,7 +79,7 @@ function createRegistry(configs: NamedTenantConfig[]): {
 } {
   vi.mocked(getTenantConfigs).mockReturnValue(configs);
 
-  const mockFactory = new ConfluenceAuthFactory({} as ServiceRegistry);
+  const mockFactory = new ConfluenceAuthFactory();
   vi.mocked(mockFactory.createAuthStrategy).mockImplementation(() => createMockAuth());
 
   const mockApiClientFactory = new ConfluenceApiClientFactory({} as ServiceRegistry);
@@ -125,11 +113,12 @@ describe('TenantRegistry', () => {
       expect(registry.tenantCount).toBe(2);
     });
 
-    it('logs tenant registration via service logger', () => {
+    it('logs tenant registration', () => {
       createRegistry([{ name: 'tenant-a', config: createMockTenantConfig() }]);
 
-      expect(mockRoot.child).toHaveBeenCalledWith({ service: 'TenantRegistry' });
-      expect(mockChildLogger.info).toHaveBeenCalledWith('Tenant registered');
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.objectContaining({ msg: 'Tenant registered' }),
+      );
     });
 
     it('calls ConfluenceAuthFactory.createAuthStrategy for each tenant', () => {
@@ -141,7 +130,7 @@ describe('TenantRegistry', () => {
         { name: 'tenant-b', config: configB },
       ]);
 
-      const mockFactory = new ConfluenceAuthFactory({} as ServiceRegistry);
+      const mockFactory = new ConfluenceAuthFactory();
       vi.mocked(mockFactory.createAuthStrategy).mockReturnValue(createMockAuth());
 
       const mockApiClientFactory = new ConfluenceApiClientFactory({} as ServiceRegistry);
@@ -198,7 +187,7 @@ describe('TenantRegistry', () => {
         { name: 'tenant-b', config: configB },
       ]);
 
-      const mockFactory = new ConfluenceAuthFactory({} as ServiceRegistry);
+      const mockFactory = new ConfluenceAuthFactory();
       vi.mocked(mockFactory.createAuthStrategy).mockReturnValue(createMockAuth());
 
       const mockApiClientFactory = new ConfluenceApiClientFactory({} as ServiceRegistry);
@@ -230,16 +219,6 @@ describe('TenantRegistry', () => {
         expect(serviceRegistry.getService(AbstractUniqueApiClient)).toBeDefined();
         expect(serviceRegistry.getService(ConfluenceApiClient)).toBeDefined();
       });
-    });
-
-    it('provides service loggers via PinoLogger.root child with service binding', () => {
-      const configs: NamedTenantConfig[] = [{ name: 'tenant-a', config: createMockTenantConfig() }];
-
-      const { serviceRegistry } = createRegistry(configs);
-      const logger = serviceRegistry.getServiceLogger({ name: 'TestService' });
-
-      expect(logger).toBeDefined();
-      expect(mockRoot.child).toHaveBeenCalledWith({ service: 'TestService' });
     });
   });
 
