@@ -20,6 +20,7 @@ sharepoint:
       storeInternally: enabled
       syncStatus: active
       syncMode: content_and_permissions
+      subsitesScan: disabled
     - siteId: 87654321-4321-4321-4321-cba987654321
       syncColumnName: HRKnowledge
       ingestionMode: flat
@@ -28,6 +29,7 @@ sharepoint:
       syncStatus: active
       syncMode: content_only
       permissionsInheritanceMode: inherit_scopes_and_files
+      subsitesScan: disabled
 unique:
   serviceAuthMode: cluster_local
   serviceExtraHeaders:

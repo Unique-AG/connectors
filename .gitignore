@@ -25,6 +25,7 @@ coverage
 .vscode
 .idea
 .cursor
+*.code-workspace
 
 # Build Outputs
 .next/

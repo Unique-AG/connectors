@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,8 +8,14 @@ import {
   SimplePermission,
 } from '../microsoft-apis/graph/types/sharepoint.types';
 import type { AnySharepointItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { buildIngestionItemKey } from '../utils/sharepoint.util';
 import { Smeared } from '../utils/smeared';
 import { FetchGraphPermissionsMapQuery } from './fetch-graph-permissions-map.query';
+
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return { ...actual, Logger: vi.fn() };
+});
 
 describe('FetchGraphPermissionsMapQuery', () => {
   let query: FetchGraphPermissionsMapQuery;
@@ -101,7 +108,6 @@ describe('FetchGraphPermissionsMapQuery', () => {
       .mock<GraphApiService>(GraphApiService)
       .impl((stubFn) => ({
         ...stubFn(),
-        getSiteName: vi.fn().mockResolvedValue(mockSiteName),
         getDriveItemPermissions: vi.fn(),
         getListItemPermissions: vi.fn(),
       }))
@@ -128,7 +134,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(new Smeared(mockSiteId, false), items);
+      await query.run(items, new Smeared(mockSiteName, false));
 
       expect(loggerWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('No parsable permissions for permission perm-unparseable'),
@@ -169,7 +175,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(new Smeared(mockSiteId, false), items);
+      await query.run(items, new Smeared(mockSiteName, false));
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-user-data'),
@@ -202,7 +208,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(new Smeared(mockSiteId, false), items);
+      await query.run(items, new Smeared(mockSiteName, false));
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-siteuser-data'),
@@ -249,7 +255,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(new Smeared(mockSiteId, false), items);
+      await query.run(items, new Smeared(mockSiteName, false));
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-multiple-nulls'),
@@ -295,7 +301,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(new Smeared(mockSiteId, false), items);
+      await query.run(items, new Smeared(mockSiteName, false));
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-structure-check'),
@@ -314,6 +320,45 @@ describe('FetchGraphPermissionsMapQuery', () => {
       if (groupKeys.includes('@odata.type')) {
         expect(groupKeys).toHaveLength(2);
       }
+    });
+
+    it('uses rootSiteName for siteGroup permissions regardless of item siteId', async () => {
+      const rootSiteName = 'RootSite';
+      const subsiteSiteId = 'subsite-site-123';
+      const siteGroupId = '123';
+
+      const mockPermission: SimplePermission = {
+        id: 'perm-sitegroup',
+        grantedToIdentitiesV2: [
+          {
+            siteGroup: {
+              id: siteGroupId,
+              displayName: 'Site Collection Owners',
+            },
+          } as SimpleIdentitySet,
+        ],
+      };
+
+      const subsiteItem = {
+        ...createMockDriveItem('item-1'),
+        siteId: new Smeared(subsiteSiteId, false),
+      };
+
+      vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
+
+      const result = await query.run([subsiteItem], new Smeared(rootSiteName, false));
+
+      const itemKey = buildIngestionItemKey(subsiteItem);
+      const permissions = result[itemKey];
+      expect(permissions).toBeDefined();
+      expect(permissions).toHaveLength(1);
+
+      const permission = permissions?.[0];
+      assert.ok(permission, 'Expected at least one permission');
+      expect(permission.type).toBe('siteGroup');
+      assert.ok(permission.type === 'siteGroup');
+      expect(permission.id).toBe(`${rootSiteName}|${siteGroupId}`);
+      expect(permission.name).toBe('Site Collection Owners');
     });
   });
 });

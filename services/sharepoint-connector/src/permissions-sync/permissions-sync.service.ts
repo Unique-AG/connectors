@@ -70,10 +70,10 @@ export class PermissionsSyncService {
           `${sharePoint.directories.length} directories`,
       );
       const permissionsFetchStartTime = Date.now();
-      const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(siteId, [
-        ...sharePoint.items,
-        ...sharePoint.directories,
-      ]);
+      const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(
+        [...sharePoint.items, ...sharePoint.directories],
+        context.siteName,
+      );
       this.logger.log(
         `${logPrefix} Fetched permissions for ${sharePoint.items.length} items in ${elapsedSecondsLog(permissionsFetchStartTime)}`,
       );
@@ -122,6 +122,8 @@ export class PermissionsSyncService {
           directories: sharePoint.directories,
           permissionsMap,
           rootPath: context.rootPath,
+          siteName: context.siteName,
+          discoveredSubsites: context.discoveredSubsites,
         });
 
         const topFolderPermissions = this.getTopFolderPermissionsQuery.run({
@@ -129,6 +131,8 @@ export class PermissionsSyncService {
           directories: sharePoint.directories,
           permissionsMap,
           rootPath: context.rootPath,
+          siteName: context.siteName,
+          discoveredSubsites: context.discoveredSubsites,
         });
 
         await this.syncSharepointFolderPermissionsToUniqueCommand.run({

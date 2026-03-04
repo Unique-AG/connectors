@@ -45,6 +45,7 @@ describe('AspxProcessingStep', () => {
       serviceUserId: 'user-1',
       rootPath: new Smeared('/Root', false),
       isInitialSync: false,
+      discoveredSubsites: [],
     },
     correlationId: 'c1',
     startTime: new Date(),

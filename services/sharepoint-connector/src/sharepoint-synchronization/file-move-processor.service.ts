@@ -6,7 +6,7 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
-import { getItemUrl } from '../utils/sharepoint.util';
+import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -104,8 +104,7 @@ export class FileMoveProcessor {
     for (const ingestedFile of ingestedFiles) {
       const relativeKey = ingestedFile.key.replace(`${siteId.value}/`, '');
 
-      // Find the corresponding SharePoint item
-      const sharepointItem = sharepointItems.find((item) => item.item.id === relativeKey);
+      const sharepointItem = sharepointItems.find((item) => buildFileDiffKey(item) === relativeKey);
 
       if (!sharepointItem) {
         this.logger.warn(

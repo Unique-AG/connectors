@@ -65,7 +65,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 
 | Column Display Name | Type | Description |
 |---------------------|------|-------------|
-| `siteId` | Single line text | SharePoint site ID (UUID) |
+| `siteId` | Single line text | SharePoint site ID (UUID or compound format: `hostname,siteCollectionId,webId` for subsites) |
 | `syncColumnName` | Single line text | Column that marks files for sync |
 | `ingestionMode` | Choice | `flat` or `recursive` |
 | `uniqueScopeId` | Single line text | Unique scope ID |
@@ -74,6 +74,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | `syncStatus` | Choice | `active`, `inactive`, or `deleted` |
 | `syncMode` | Choice | `content_only` or `content_and_permissions` |
 | `permissionsInheritanceMode` | Choice | Optional inheritance mode |
+| `subsitesScan` | Choice | `enabled` or `disabled` (default: `disabled`) |
 
 ### Benefits of SharePoint List Configuration
 
@@ -86,7 +87,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 
 | Option | Values | Description |
 |--------|--------|-------------|
-| `siteId` | UUID | SharePoint site ID |
+| `siteId` | UUID or compound ID | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId` |
 | `syncColumnName` | String | Name of the sync flag column |
 | `ingestionMode` | `flat`, `recursive` | Flat ingests all to one scope; recursive maintains hierarchy |
 | `scopeId` | String | Root scope ID in Unique |
@@ -95,6 +96,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | `syncStatus` | `active`, `inactive`, `deleted` | Control sync behavior |
 | `syncMode` | `content_only`, `content_and_permissions` | What to sync |
 | `permissionsInheritanceMode` | See below | Inheritance settings (content_only mode) |
+| `subsitesScan` | `enabled`, `disabled` | Recursively discover and sync content from subsites (default: `disabled`) |
 
 ### Permissions Inheritance Modes
 
@@ -137,6 +139,70 @@ Look for the `id` field in the response.
 Connect-PnPOnline -Url "https://{tenant}.sharepoint.com/sites/your-site"
 Get-PnPSite -Includes Id | Select-Object Id
 ```
+
+### Finding Subsite Compound IDs
+
+Subsites use a compound site ID format (`hostname,siteCollectionId,webId`) instead of a plain UUID. To find a subsite's compound ID:
+
+**Via Microsoft Graph Explorer:**
+
+```
+GET https://graph.microsoft.com/v1.0/sites/{tenant}.sharepoint.com:/sites/{parentSite}/{subsiteName}
+```
+
+The `id` field in the response is the compound ID:
+
+```json
+{
+  "id": "contoso.sharepoint.com,a1b2c3d4-...,e5f6a7b8-..."
+}
+```
+
+Use this full value as the `siteId` in your site configuration.
+
+**Via PowerShell:**
+
+```powershell
+Connect-PnPOnline -Url "https://{tenant}.sharepoint.com/sites/{parentSite}/{subsiteName}"
+Get-PnPSite -Includes Id, Url | Select-Object Id, Url
+```
+
+**Via Browser (manual construction — discouraged):**
+
+You can technically construct the compound ID by navigating to the subsite and calling two REST endpoints:
+
+- `https://{tenant}.sharepoint.com/sites/{parentSite}/{subsiteName}/_api/site/id` → `siteCollectionId`
+- `https://{tenant}.sharepoint.com/sites/{parentSite}/{subsiteName}/_api/web/id` → `webId`
+
+Then combine as `{tenant}.sharepoint.com,{siteCollectionId},{webId}`. This approach is error-prone and discouraged — prefer Microsoft Graph Explorer or PowerShell instead.
+
+**For nested subsites**, extend the path:
+
+```
+https://graph.microsoft.com/v1.0/sites/{tenant}.sharepoint.com:/sites/{parentSite}/{subsite}/{nestedSubsite}
+```
+
+## Subsites Scanning
+
+### Overview
+
+When `subsitesScan` is set to `enabled` for a site, the connector recursively discovers all subsites under that site and syncs their content alongside the parent site's content. This means you only need to configure the top-level site — all nested subsites are discovered and included automatically.
+
+### How It Works
+
+1. **Discovery** — During each sync cycle, the connector calls the Graph API (`GET /sites/{siteId}/sites`) to list direct child subsites, then recurses into each child to discover the full subsite tree.
+2. **Content fetching** — For each discovered subsite, the connector fetches document libraries and site pages using the same `syncColumnName` as the parent site.
+3. **Scope hierarchy** — Subsite content is ingested under the parent site's scope tree. Each subsite appears as a folder at its relative path within the hierarchy (e.g., `/RootScope/SubsiteA/Documents/file.pdf`).
+4. **File diff** — Subsite items are keyed under the parent site's ID in the file-diff mechanism. If a subsite is later removed or reconfigured, its files are detected as deleted and cleaned up.
+
+### Deduplication with Standalone Sites
+
+If a subsite is also configured as a standalone site (using its compound site ID), it is **excluded** from the parent's recursive discovery to avoid double-syncing. The connector compares compound IDs across all configured sites and skips any match during discovery, including any further subsites.
+
+### Limitations
+
+- The `syncColumnName` is shared between the parent site and all its subsites. You cannot use a different sync column per subsite.
+- Subsites are only addressable via compound site IDs (`hostname,siteCollectionId,webId`) in the Graph API. A plain UUID cannot identify a subsite.
 
 ### Configuring Document Libraries for Sync
 

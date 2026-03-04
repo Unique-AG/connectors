@@ -122,7 +122,7 @@ describe('ConfigDiagnosticsService', () => {
 
       await service.onModuleInit();
 
-      expect(loggerSpy).toHaveBeenCalledTimes(4);
+      expect(loggerSpy).toHaveBeenCalledTimes(5);
     });
 
     it('emits all configurations when emit is on with both events', async () => {
@@ -137,7 +137,7 @@ describe('ConfigDiagnosticsService', () => {
 
       await service.onModuleInit();
 
-      expect(loggerSpy).toHaveBeenCalledTimes(4);
+      expect(loggerSpy).toHaveBeenCalledTimes(5);
     });
 
     it('skips emitting configurations when emit is off', async () => {
