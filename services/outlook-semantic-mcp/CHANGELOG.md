@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.2...outlook-semantic-mcp@0.2.3) (2026-03-04)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** Fix directory structure naming ([#322](https://github.com/Unique-AG/connectors/issues/322)) ([ca5a92d](https://github.com/Unique-AG/connectors/commit/ca5a92da75b104a7058b4fc305452d0f0b929b78))
+* **outlook-semantic-mcp:** remove network policy since monorepo will configure it ([#325](https://github.com/Unique-AG/connectors/issues/325)) ([0b1148b](https://github.com/Unique-AG/connectors/commit/0b1148b0cdd1ea9e69281cb72ce1c4f2610f78ad))
+
 ## [0.2.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.1...outlook-semantic-mcp@0.2.2) (2026-03-03)
 
 
