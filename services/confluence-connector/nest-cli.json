@@ -4,12 +4,7 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "builder": {
-      "type": "swc",
-      "options": {
-        "swcOptions": {
-          "sourceMaps": true
-        }
-      }
+      "type": "swc"
     }
   }
 }
