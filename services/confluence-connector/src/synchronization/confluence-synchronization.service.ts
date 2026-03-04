@@ -1,4 +1,4 @@
-import assert from 'assert';
+import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
 import { getCurrentTenant } from '../tenant';

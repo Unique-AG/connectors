@@ -4,10 +4,9 @@ import type { UniqueGroupsFacade } from '../groups/unique-groups.facade';
 import type { UniqueIngestionFacade } from '../ingestion/unique-ingestion.facade';
 import type { UniqueApiScopesFacade } from '../scopes/unique-scopes.facade';
 import type { UniqueUsersFacade } from '../users/unique-users.facade';
-import {UniqueApiClient} from "./unique-api-client.types";
 
 // Abstract class usable as a DI token (interfaces are erased at runtime)
-export abstract class AbstractUniqueApiClient implements UniqueApiClient {
+export abstract class AbstractUniqueApiClient {
   public abstract readonly auth: UniqueAuthFacade;
   public abstract readonly scopes: UniqueApiScopesFacade;
   public abstract readonly files: UniqueFilesFacade;

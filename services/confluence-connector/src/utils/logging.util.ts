@@ -1,5 +1,3 @@
-import { PinoLogger } from 'nestjs-pino';
-
 export function smear(text: string | null | undefined, leaveOver = 4): string {
   if (text === undefined || text === null) {
     return '__erroneous__';

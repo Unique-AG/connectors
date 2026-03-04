@@ -8,10 +8,6 @@ export type AbstractClass<T> = abstract new (...args: any[]) => T;
 type ConcreteClass<T> = new (...args: any[]) => T;
 export type ServiceToken<T> = AbstractClass<T> | ConcreteClass<T>;
 
-interface ServiceClass {
-  readonly name: string;
-}
-
 @Injectable()
 export class ServiceRegistry {
   private readonly tenantServices = new Map<string, Map<ServiceToken<unknown>, unknown>>();

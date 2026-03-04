@@ -30,10 +30,6 @@ export type {
   ScopeAccess,
   ScopeWithPath,
 } from './scopes/scopes.types';
-export {
-  AbstractUniqueApiClient,
-  UniqueOwnerType,
-} from './types';
 export type {
   UniqueAccessType,
   UniqueApiClient,
@@ -46,5 +42,9 @@ export type {
   UniqueGroupsFacade,
   UniqueIngestionFacade,
   UniqueUsersFacade,
+} from './types';
+export {
+  AbstractUniqueApiClient,
+  UniqueOwnerType,
 } from './types';
 export type { SimpleUser } from './users/users.types';
