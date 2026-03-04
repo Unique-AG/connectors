@@ -38,6 +38,10 @@ import { TenantModule } from './tenant';
           pinoHttp: {
             ...defaultLoggerOptions.pinoHttp,
             level: appConfigValue.logLevel,
+            mixin: () => {
+              const tenant = tenantStorage.getStore();
+              return tenant ? { tenantName: tenant.name } : {};
+            },
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
               if (!ctx) {

@@ -1,8 +1,24 @@
-import pino from 'pino';
+import type pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { ServiceRegistry } from '../service-registry';
 import type { TenantContext } from '../tenant-context.interface';
 import { tenantStorage } from '../tenant-context.storage';
+
+const { mockChildLogger, mockRoot } = vi.hoisted(() => {
+  const mockChildLogger = { info: vi.fn() } as unknown as pino.Logger;
+  const mockRoot = {
+    child: vi.fn().mockReturnValue(mockChildLogger),
+  } as unknown as pino.Logger;
+  return { mockChildLogger, mockRoot };
+});
+
+vi.mock('nestjs-pino', async () => {
+  const actual = await vi.importActual('nestjs-pino');
+  return {
+    ...actual,
+    PinoLogger: { root: mockRoot },
+  };
+});
 
 abstract class FooService {
   public abstract doFoo(): string;
@@ -111,69 +127,14 @@ describe('ServiceRegistry', () => {
     });
   });
 
-  describe('logger ownership', () => {
-    it('registers and retrieves a service logger with tenantName and service bindings', () => {
+  describe('getServiceLogger', () => {
+    it('returns a child logger of PinoLogger.root with service binding', () => {
       const registry = new ServiceRegistry();
-      const baseLogger = pino({ level: 'silent' });
-      const childSpy = vi.spyOn(baseLogger, 'child');
-      const tenant = createMockTenant('acme');
 
-      registry.registerTenantLogger('acme', baseLogger);
+      const logger = registry.getServiceLogger(FooService);
 
-      tenantStorage.run(tenant, () => {
-        const serviceLogger = registry.getServiceLogger(FooService);
-
-        expect(serviceLogger).toBeDefined();
-        expect(serviceLogger).not.toBe(baseLogger);
-        expect(childSpy).toHaveBeenCalledWith({
-          tenantName: 'acme',
-          service: 'FooService',
-        });
-      });
-    });
-
-    it('isolates loggers between tenants', () => {
-      const registry = new ServiceRegistry();
-      const baseA = pino({ level: 'silent' });
-      const baseB = pino({ level: 'silent' });
-      const tenantA = createMockTenant('tenant-a');
-      const tenantB = createMockTenant('tenant-b');
-
-      registry.registerTenantLogger('tenant-a', baseA);
-      registry.registerTenantLogger('tenant-b', baseB);
-
-      tenantStorage.run(tenantA, () => {
-        const loggerA = registry.getServiceLogger(FooService);
-        expect(loggerA).toBeDefined();
-        expect(loggerA).not.toBe(baseA);
-        expect(loggerA).not.toBe(baseB);
-      });
-      tenantStorage.run(tenantB, () => {
-        const loggerB = registry.getServiceLogger(FooService);
-        expect(loggerB).toBeDefined();
-        expect(loggerB).not.toBe(baseA);
-        expect(loggerB).not.toBe(baseB);
-      });
-    });
-
-    it('throws when called outside tenant execution scope', () => {
-      const registry = new ServiceRegistry();
-      registry.registerTenantLogger('acme', pino({ level: 'silent' }));
-
-      expect(() => registry.getServiceLogger(FooService)).toThrow(
-        'No tenant context — called outside of sync execution',
-      );
-    });
-
-    it('throws when no logger is registered for the tenant', () => {
-      const registry = new ServiceRegistry();
-      const tenant = createMockTenant('acme');
-
-      tenantStorage.run(tenant, () => {
-        expect(() => registry.getServiceLogger(FooService)).toThrow(
-          'No logger registered for tenant: acme',
-        );
-      });
+      expect(mockRoot.child).toHaveBeenCalledWith({ service: 'FooService' });
+      expect(logger).toBe(mockChildLogger);
     });
   });
 });

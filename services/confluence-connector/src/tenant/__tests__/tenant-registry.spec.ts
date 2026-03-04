@@ -125,21 +125,10 @@ describe('TenantRegistry', () => {
       expect(registry.tenantCount).toBe(2);
     });
 
-    it('creates a pino child logger per tenant with tenantName binding', () => {
-      const configs: NamedTenantConfig[] = [
-        { name: 'tenant-a', config: createMockTenantConfig() },
-        { name: 'tenant-b', config: createMockTenantConfig() },
-      ];
-
-      createRegistry(configs);
-
-      expect(mockRoot.child).toHaveBeenCalledWith({ tenantName: 'tenant-a' });
-      expect(mockRoot.child).toHaveBeenCalledWith({ tenantName: 'tenant-b' });
-    });
-
-    it('logs tenant registration via pino child logger', () => {
+    it('logs tenant registration via service logger', () => {
       createRegistry([{ name: 'tenant-a', config: createMockTenantConfig() }]);
 
+      expect(mockRoot.child).toHaveBeenCalledWith({ service: 'TenantRegistry' });
       expect(mockChildLogger.info).toHaveBeenCalledWith('Tenant registered');
     });
 
@@ -243,31 +232,16 @@ describe('TenantRegistry', () => {
       });
     });
 
-    it('registers tenant base logger in ServiceRegistry for each tenant', () => {
+    it('provides service loggers via PinoLogger.root child with service binding', () => {
       const configs: NamedTenantConfig[] = [
         { name: 'tenant-a', config: createMockTenantConfig() },
-        { name: 'tenant-b', config: createMockTenantConfig() },
       ];
 
-      const { registry, serviceRegistry } = createRegistry(configs);
+      const { serviceRegistry } = createRegistry(configs);
+      const logger = serviceRegistry.getServiceLogger({ name: 'TestService' });
 
-      tenantStorage.run(registry.getTenant('tenant-a'), () => {
-        const loggerA = serviceRegistry.getServiceLogger({ name: 'TestService' });
-        expect(loggerA).toBeDefined();
-        expect(loggerA.bindings()).toMatchObject({
-          tenantName: 'tenant-a',
-          service: 'TestService',
-        });
-      });
-
-      tenantStorage.run(registry.getTenant('tenant-b'), () => {
-        const loggerB = serviceRegistry.getServiceLogger({ name: 'TestService' });
-        expect(loggerB).toBeDefined();
-        expect(loggerB.bindings()).toMatchObject({
-          tenantName: 'tenant-b',
-          service: 'TestService',
-        });
-      });
+      expect(logger).toBeDefined();
+      expect(mockRoot.child).toHaveBeenCalledWith({ service: 'TestService' });
     });
   });
 

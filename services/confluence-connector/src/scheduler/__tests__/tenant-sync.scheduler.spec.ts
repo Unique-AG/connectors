@@ -13,6 +13,14 @@ const mockTenantLogger = vi.hoisted(() => ({
   error: vi.fn(),
 }));
 
+vi.mock('nestjs-pino', async () => {
+  const actual = await vi.importActual('nestjs-pino');
+  return {
+    ...actual,
+    PinoLogger: { root: { child: () => mockTenantLogger } },
+  };
+});
+
 function createMockSyncService() {
   return { synchronize: vi.fn().mockResolvedValue(undefined) };
 }
@@ -51,11 +59,7 @@ function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
 
 function createMockServiceRegistry(tenants: TenantContext[]): ServiceRegistry {
   const serviceRegistry = new ServiceRegistry();
-  const mockBaseLogger = {
-    child: () => mockTenantLogger,
-  };
   for (const tenant of tenants) {
-    serviceRegistry.registerTenantLogger(tenant.name, mockBaseLogger as never);
     serviceRegistry.register(
       tenant.name,
       ConfluenceSynchronizationService,

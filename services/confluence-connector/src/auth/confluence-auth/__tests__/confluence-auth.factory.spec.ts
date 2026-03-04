@@ -96,22 +96,5 @@ describe('ConfluenceAuthFactory', () => {
       );
     });
 
-    it('throws when called outside tenant context due to logger lookup', () => {
-      const factory = new ConfluenceAuthFactory(new ServiceRegistry());
-      const config: ConfluenceConfig = {
-        ...baseFields,
-        instanceType: 'cloud',
-        cloudId: 'test-cloud-id',
-        auth: {
-          mode: AuthMode.OAUTH_2LO,
-          clientId: 'client-id',
-          clientSecret: new Redacted('secret'),
-        },
-      };
-
-      expect(() => factory.createAuthStrategy(config)).toThrow(
-        'No tenant context — called outside of sync execution',
-      );
-    });
   });
 });

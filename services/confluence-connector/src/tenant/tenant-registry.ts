@@ -6,7 +6,6 @@ import {
   type UniqueApiFeatureModuleInputOptions,
 } from '@unique-ag/unique-api';
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { PinoLogger } from 'nestjs-pino';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
 import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
@@ -35,9 +34,6 @@ export class TenantRegistry implements OnModuleInit {
     const tenantConfigs = getTenantConfigs();
 
     for (const { name: tenantName, config } of tenantConfigs) {
-      const tenantLogger = PinoLogger.root.child({ tenantName });
-      this.serviceRegistry.registerTenantLogger(tenantName, tenantLogger);
-
       const tenant: TenantContext = {
         name: tenantName,
         config,
@@ -70,7 +66,6 @@ export class TenantRegistry implements OnModuleInit {
 
         const syncLogger = this.serviceRegistry.getServiceLogger(ConfluenceSynchronizationService);
 
-        // todo pass a logger
         const uniqueClient = this.uniqueApiFactory.create({
           auth: this.buildUniqueAuthConfig(config.unique),
           ingestion: {
@@ -135,9 +130,10 @@ export class TenantRegistry implements OnModuleInit {
           ConfluenceSynchronizationService,
           confluenceSynchronizationService
         );
-      });
 
-      tenantLogger.info('Tenant registered');
+        const logger = this.serviceRegistry.getServiceLogger(TenantRegistry);
+        logger.info('Tenant registered');
+      });
     }
   }
 
