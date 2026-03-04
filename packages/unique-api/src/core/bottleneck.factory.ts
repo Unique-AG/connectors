@@ -34,8 +34,8 @@ export class BottleneckFactory {
     });
 
     // Log errors
-    limiter.on('error', (error) => {
-      this.logger.error({ err: error }, `${contextName}: Rate limit bottleneck error`);
+    limiter.on('error', (err) => {
+      this.logger.error({ err }, `${contextName}: Rate limit bottleneck error`);
     });
   }
 }

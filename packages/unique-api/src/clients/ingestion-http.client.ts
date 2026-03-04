@@ -135,8 +135,8 @@ export class IngestionHttpClient {
       }
 
       return result;
-    } catch (error) {
-      const statusCode = error instanceof errors.ResponseError ? error.statusCode : 0;
+    } catch (err) {
+      const statusCode = err instanceof errors.ResponseError ? err.statusCode : 0;
       const statusCodeClass = getHttpStatusCodeClass(statusCode);
       const durationMs = elapsedMilliseconds(startTime);
 
@@ -159,9 +159,9 @@ export class IngestionHttpClient {
         });
       }
 
-      this.logger.error({ err: error }, 'Failed ingestion HTTP request');
+      this.logger.error({ err }, 'Failed ingestion HTTP request');
 
-      throw error;
+      throw err;
     }
   }
 }

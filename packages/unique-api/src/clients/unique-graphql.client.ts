@@ -121,8 +121,8 @@ export class UniqueGraphqlClient {
       }
 
       return result;
-    } catch (error) {
-      const statusCode = getErrorCodeFromGraphqlRequest(error);
+    } catch (err) {
+      const statusCode = getErrorCodeFromGraphqlRequest(err);
       const statusCodeClass = getHttpStatusCodeClass(statusCode);
       const durationMs = elapsedMilliseconds(startTime);
 
@@ -145,9 +145,9 @@ export class UniqueGraphqlClient {
         });
       }
 
-      this.logger.error({ err: error }, `Failed ${this.config.target} request (${operationName})`);
+      this.logger.error({ err }, `Failed ${this.config.target} request (${operationName})`);
 
-      throw error;
+      throw err;
     }
   }
 }
