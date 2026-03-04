@@ -38,28 +38,24 @@ export class ConfluenceSynchronizationService {
       this.logger.log({ count: discoveredPages.length, msg: 'Discovery completed' });
 
       const diffResult = await this.fileDiffService.computeDiff(discoveredPages);
-      this.logger.log({
-        new: diffResult.newPageIds.length,
-        updated: diffResult.updatedPageIds.length,
-        deleted: diffResult.deletedPageIds.length,
-        moved: diffResult.movedPageIds.length,
-        msg: 'File diff completed',
-      });
 
       const pageIdsToFetch = new Set([...diffResult.newPageIds, ...diffResult.updatedPageIds]);
-      const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
 
-      const spaceKeys = pagesToFetch.map((p) => p.spaceKey);
-      const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(spaceKeys);
+      if (pageIdsToFetch.size > 0) {
+        const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
 
-      await this.fetchAndIngestPages(pagesToFetch, spaceScopes, tenant.config.processing.concurrency);
+        const spaceKeys = pagesToFetch.map((p) => p.spaceKey);
+        const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(spaceKeys);
+
+        await this.fetchAndIngestPages(pagesToFetch, spaceScopes, tenant.config.processing.concurrency);
+      }
 
       if (diffResult.deletedKeys.length > 0) {
         await this.ingestionService.deleteContent(diffResult.deletedKeys);
         this.logger.log({ count: diffResult.deletedKeys.length, msg: 'Deleted content processed' });
       }
 
-      this.logger.log('Sync completed');
+      this.logger.log('Sync work done');
     } catch (error) {
       this.logger.error({ err: error, msg: 'Sync failed' });
     } finally {
@@ -73,6 +69,11 @@ export class ConfluenceSynchronizationService {
     concurrency: number,
   ): Promise<void> {
     const limit = pLimit(concurrency);
+
+    if(pages.length === 0) {
+      this.logger.log('No pages to ingest')
+      return
+    }
 
     await Promise.all(
       pages.map((page) => limit(async () => {
