@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import type pino from 'pino';
+import { Logger } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { UniqueAuthConfig } from '../../config/unique-api-auth-schema';
@@ -17,7 +17,7 @@ function createMockMetrics(): UniqueApiMetrics {
 }
 
 function createMockLogger() {
-  return { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
+  return { error: vi.fn(), debug: vi.fn() };
 }
 
 function createDispatcherResponse(statusCode: number, body: object): Dispatcher.ResponseData {
@@ -66,7 +66,7 @@ describe('UniqueAuth', () => {
       const auth = new UniqueAuth(
         clusterLocalConfig,
         metrics,
-        logger as unknown as pino.Logger,
+        logger as unknown as Logger,
         dispatcher as unknown as Dispatcher,
       );
 
@@ -82,7 +82,7 @@ describe('UniqueAuth', () => {
       const auth = new UniqueAuth(
         clusterLocalConfig,
         metrics,
-        logger as unknown as pino.Logger,
+        logger as unknown as Logger,
         dispatcher as unknown as Dispatcher,
       );
 
@@ -95,7 +95,7 @@ describe('UniqueAuth', () => {
       return new UniqueAuth(
         externalConfig,
         metrics,
-        logger as unknown as pino.Logger,
+        logger as unknown as Logger,
         dispatcher as unknown as Dispatcher,
       );
     }
@@ -179,8 +179,10 @@ describe('UniqueAuth', () => {
 
       await expect(auth.getToken()).rejects.toThrow('Zitadel token request failed with status 401');
       expect(logger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.anything() }),
-        'Failed to acquire Unique API token from Zitadel',
+        expect.objectContaining({
+          msg: 'Failed to acquire Unique API token from Zitadel',
+          error: expect.anything(),
+        }),
       );
     });
 
@@ -218,8 +220,10 @@ describe('UniqueAuth', () => {
 
       await expect(auth.getToken()).rejects.toThrow('network timeout');
       expect(logger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.anything() }),
-        'Failed to acquire Unique API token from Zitadel',
+        expect.objectContaining({
+          msg: 'Failed to acquire Unique API token from Zitadel',
+          error: expect.anything(),
+        }),
       );
     });
 
