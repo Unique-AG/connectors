@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.3...outlook-semantic-mcp@0.2.4) (2026-03-04)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** remove buffered logs ([#326](https://github.com/Unique-AG/connectors/issues/326)) ([596ca58](https://github.com/Unique-AG/connectors/commit/596ca581e14506e4f8fcf6df18eb089ca2a164c3))
+
 ## [0.2.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.2...outlook-semantic-mcp@0.2.3) (2026-03-04)
 
 
