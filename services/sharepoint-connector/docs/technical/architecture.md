@@ -1,4 +1,6 @@
+<!-- confluence-page-id: 1953857592 -->
 <!-- confluence-space-key: PUBDOC -->
+
 
 ## High-Level Architecture
 
@@ -154,7 +156,7 @@ In cluster-internal mode:
 
 ## Multi-Origin Support
 
-**Note:** Multi-origin support is not available until after version `2.0.0` GA.
+**Note:** Multi-origin support is not available in the current `2.0.x` GA release line.
 
 ### Scenarios
 

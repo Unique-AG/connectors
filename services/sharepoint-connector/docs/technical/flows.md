@@ -1,4 +1,6 @@
+<!-- confluence-page-id: 1952546867 -->
 <!-- confluence-space-key: PUBDOC -->
+
 
 ## Content Sync Flow
 
@@ -177,6 +179,10 @@ IMPORTANT: For SharePoint site groups, the connector must be able to read group 
 - Add app principal as group member/owner
 - Grant Full Control to app principal
 
+### Public Site and Tenant-Wide Groups
+
+For public SharePoint sites, permissions can include tenant-wide principals such as `Everyone` or `Everyone except external users`. The connector does not expand these principals for sync. As a result, content may be accessible in SharePoint while corresponding tenant-wide visibility is not mirrored in Unique permissions.
+
 ## File Diff Mechanism
 
 The connector maintains local state to detect changes between sync cycles.
@@ -285,6 +291,18 @@ ASPX pages contain structured content in special fields:
 The connector extracts text content from these fields for ingestion.
 
 ## Error Handling
+
+### Error Handling Strategy
+
+The connector applies scenario-specific behavior to keep sync cycles stable while avoiding incorrect permission or content updates:
+
+| Scenario | Typical Cause | Connector Behavior |
+|----------|---------------|--------------------|
+| Authentication/configuration error | Invalid certificate, wrong tenant/app configuration | Fail the current cycle early, log actionable error, require operator fix |
+| Transient API/network error | 429/5xx, temporary network failures | Retry with backoff up to retry limit, then skip affected item and continue |
+| Permission denied (`403`) | Missing site/library grant or group visibility restriction | Skip affected item/permission sync path and continue remaining work |
+| Not found (`404`) | Item deleted/renamed or stale state | Treat as deleted where applicable and reconcile local state |
+| Malformed/unsupported content | Corrupt file or parser failure | Log item-level error, skip item, continue cycle |
 
 ### Retry Logic
 

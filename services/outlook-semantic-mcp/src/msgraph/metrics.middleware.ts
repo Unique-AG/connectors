@@ -131,7 +131,7 @@ export class MetricsMiddleware implements Middleware {
           'Microsoft Graph API request exceeded performance threshold and is considered slow',
         );
       }
-    } catch (error) {
+    } catch (err) {
       const duration = Date.now() - startTime;
 
       this.msgraphRequestCounter.add(1, {
@@ -151,10 +151,10 @@ export class MetricsMiddleware implements Middleware {
         endpoint,
         duration,
         requestFailed: true,
-        error,
+        err,
       });
 
-      throw error;
+      throw err;
     }
   }
 

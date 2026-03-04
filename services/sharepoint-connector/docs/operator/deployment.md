@@ -1,4 +1,6 @@
+<!-- confluence-page-id: 1952907339 -->
 <!-- confluence-space-key: PUBDOC -->
+
 
 ## Content
 
@@ -11,17 +13,17 @@ The SharePoint Connector is delivered as part of the [Unique Connectors](https:/
 
 ## Container Image
 
-Container images are available from GitHub Container Registry:
+Container images are available from container registries, including `uniquecr` and GitHub Container Registry:
 
 ```
 ghcr.io/unique-ag/sharepoint-connector:<version>
 ```
 
-**Note:** After version `2.0.0` becomes generally available, images will also be provided via the `uniquecr` OCI registry.
+**Note:** With `2.0.0` GA and higher, images are available via the `uniquecr` OCI registry.
 
 ### Image Contents
 
-The images contain the application code plus all necessary dependencies. See [Software Bill Of Materials (SBOM)](../technical/security.md#software-bill-of-materials-sbom) for detailed contents.
+The images contain the application code plus all necessary dependencies. See [Software Bill Of Materials (SBOM)](../technical/security.md) for detailed contents.
 
 ## Helm Chart
 
@@ -29,7 +31,7 @@ The images contain the application code plus all necessary dependencies. See [So
 
 You can find installation instructions in the [connectors repo Helm chart](https://github.com/Unique-AG/connectors/tree/main/services/sharepoint-connector/deploy/helm-charts/sharepoint-connector#installation).
 
-**Note:** After version `2.0.0` becomes generally available, charts will also be provided via the `uniquecr` OCI registry.
+**Note:** With `2.0.0` GA and higher, charts are available via the `uniquecr` OCI registry.
 
 ### Basic Installation
 
@@ -151,6 +153,12 @@ Pre-release versions are marked with suffixes like `-alpha` or `-beta`:
 2.0.0-beta.1
 2.0.0  (GA)
 ```
+
+## Version Support and Maintenance Policy
+
+The SharePoint Connector follows Unique's standard release lifecycle and maintenance expectations. The canonical source is [Upgrade and Release Process](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1385366775/Upgrade+and+Release+Process).
+
+In short, plan operations around the latest release line and the previous supported line. Always verify current support boundaries and rollout expectations in the linked policy before upgrading production environments.
 
 ## Compatibility
 

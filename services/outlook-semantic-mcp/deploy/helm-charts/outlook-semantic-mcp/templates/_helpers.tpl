@@ -62,3 +62,11 @@ Accepts a context with .url containing the URL to process
 {{- printf "%s/" $url }}
 {{- end }}
 {{- end }}
+
+{{/*
+Ensure URL has no trailing slash
+Accepts a context with .url containing the URL to process
+*/}}
+{{- define "chart.ensureNoTrailingSlash" -}}
+{{- .url | trimSuffix "/" }}
+{{- end }}

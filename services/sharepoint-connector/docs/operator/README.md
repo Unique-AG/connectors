@@ -1,4 +1,6 @@
+<!-- confluence-page-id: 1951858774 -->
 <!-- confluence-space-key: PUBDOC -->
+
 
 ## Overview
 
@@ -10,7 +12,7 @@ For end-user and administrator documentation, see the [SharePoint Connector Over
 
 | Document | Description |
 |----------|-------------|
-| [Deployment](./deployment.md) | Container images, Helm charts, Terraform modules |
+| [Deployment](./deployment.md) | Container images, Helm charts, Terraform modules, release/support policy |
 | [Configuration](./configuration.md) | Tenant configuration, site configuration, scheduling |
 | [Authentication](./authentication.md) | Azure AD setup, certificates, service principals |
 | [FAQ](../faq.md) | Frequently asked questions and common issues |

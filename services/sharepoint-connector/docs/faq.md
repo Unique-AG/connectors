@@ -1,4 +1,6 @@
+<!-- confluence-page-id: 1953562662 -->
 <!-- confluence-space-key: PUBDOC -->
+
 
 ## General
 
@@ -63,6 +65,15 @@ If this is **not** set to "Everyone", the connector cannot read group members.
 1. Set group visibility to "Everyone"
 2. Add the app principal as a group member/owner
 3. Grant Full Control to the app principal
+
+### How do public and private SharePoint sites affect `Everyone` permissions?
+
+**Answer:** Private and public sites can behave differently for tenant-wide visibility:
+
+- **Private site:** Access is typically limited to explicit members/owners/visitors.
+- **Public site (org-visible):** SharePoint can include tenant-wide principals such as `Everyone except external users` for read visibility.
+
+The connector intentionally does not expand tenant-wide principals (`Everyone`, `Everyone except external users`) during permission sync. This avoids broad permission replication into Unique and can create a visible difference between SharePoint and Unique access behavior.
 
 ## Configuration
 
@@ -201,6 +212,16 @@ Additional types can be configured via `ALLOWED_MIME_TYPES`.
 5. Is the file under `maxFileSizeToIngestBytes`?
 6. Check connector logs for errors
 
+### How does the connector behave when errors occur?
+
+**Answer:** The connector uses scenario-based handling to keep sync cycles running:
+
+- transient API/network issues are retried with backoff
+- non-retryable item errors are logged and skipped
+- configuration/authentication problems require operator action and can fail a cycle early
+
+Detailed behavior by scenario is documented in [Flows](./technical/flows.md#error-handling-strategy).
+
 ### Why do I see "Site not found" errors?
 
 **Causes:**
@@ -245,11 +266,40 @@ Additional types can be configured via `ALLOWED_MIME_TYPES`.
 3. Check for rate limit warnings in logs
 4. Verify network connectivity
 
+### Why is a public SharePoint site accessible, but its content is not visible in Unique for all users?
+
+**Answer:** This usually occurs when SharePoint visibility is granted through tenant-wide groups such as `Everyone` or `Everyone except external users`.
+
+- SharePoint may allow broad read access through those principals.
+- The connector does not sync those tenant-wide principals to Unique permissions.
+
+Resolution:
+
+1. Grant access through explicit users/groups that are supported by connector permission sync.
+2. Re-run permission sync after updating site permissions.
+3. See [Permissions](./technical/permissions.md) and [Flows](./technical/flows.md) for supported resolution behavior.
+
+### Why do I see `secretOrPrivateKey must be an asymmetric key when using RS256`?
+
+**Answer:** The connector received private key material in an unsupported format.
+
+Common causes:
+
+- Key is provided as plain text that is not valid PEM/asymmetric key content
+- Key and certificate do not match
+- KeyVault-backed secret value does not contain the expected key file content
+
+Resolution:
+
+1. Provide private key content in a valid file-based PEM/asymmetric format.
+2. Verify key/certificate pair consistency.
+3. Reapply connector secret/config values and restart the pod.
+
 ## Multi-Tenant
 
 ### Can one connector serve multiple SharePoint tenants?
 
-**Answer:** Not currently. Each SharePoint tenant requires a separate connector deployment. Multi-tenant support is planned for after version 2.0.0 GA.
+**Answer:** Not currently. Each SharePoint tenant requires a separate connector deployment. Multi-tenant support is planned for a future release.
 
 **Workaround:** Deploy multiple connector instances, each configured for a different tenant.
 
@@ -291,6 +341,18 @@ Each site must have `Sites.Selected` or library-specific `Lists.SelectedOperatio
 - 4 concurrent requests per resource type
 
 The connector respects these limits via configurable rate limiting and exponential backoff.
+
+## Certificates
+
+### What certificate formats are supported, and do I need the thumbprint?
+
+**Answer:** Generate certificates with OpenSSL or PowerShell and keep the deployment on connector-compatible asymmetric key/certificate material.
+
+- OpenSSL output can be `.key` + `.crt` and optionally `.pfx`
+- PowerShell commonly produces `.cer`/`.pfx`
+- If needed, convert formats to the recommended PEM key/cert files before configuring the connector
+
+After uploading the certificate to Entra App Registration, capture the **Thumbprint (SHA)** and add it to connector configuration where thumbprint is required by your deployment setup.
 
 ## Related Documentation
 

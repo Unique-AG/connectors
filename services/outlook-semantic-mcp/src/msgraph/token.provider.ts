@@ -128,16 +128,17 @@ export class TokenProvider implements AuthenticationProvider {
         'Successfully refreshed Microsoft Graph API access token',
       );
       return tokenData.access_token;
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         msg: 'Failed to refresh Microsoft Graph API access token for user',
         userProfileId: this.userProfileId,
         tokenRefreshFailed: true,
         errorSource: 'microsoft_graph_api',
-        error,
+        err,
       });
       throw new Error(
-        `Token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Token refresh failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        { cause: err },
       );
     }
   }

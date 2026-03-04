@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/outlook-semantic-mcp",
   "description": "",
-  "version": "0.2.3",
+  "version": "0.2.2",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -12,7 +12,7 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "debug:mac": "lsof -i tcp:9229 | grep node | awk '{print $2}' | xargs -r kill -9 && nest start --debug",
+    "mac:kill-dangling": "lsof -i tcp:9229 | grep node | awk '{print $2}' | xargs -r kill -9 && ps | grep \"[c]onnectors\" | awk '{print $1}' | xargs -r kill -9",
     "debug": "nest start --debug",
     "codegen": "echo \"No codegen for this server\"",
     "db:generate": "drizzle-kit generate",
@@ -55,6 +55,7 @@
     "cron": "^4.3.0",
     "drizzle-orm": "^0.44.5",
     "drizzle-zod": "^0.8.3",
+    "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "nestjs-otel": "^7.0.1",
     "nestjs-pino": "^4.4.0",

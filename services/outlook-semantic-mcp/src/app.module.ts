@@ -33,7 +33,7 @@ import {
   uniqueConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
-import { MailSubscriptionModule } from './email-sync/mail-subscription.module';
+import { OutlookMcpToolsModule } from './features/outlook-mcp-tools.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
@@ -140,11 +140,11 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     AMQPModule,
     UniqueApiModule.forRoot({
       observability: {
-        metricPrefix: 'spc_unique',
+        metricPrefix: 'outlook_semantic_mcp_unique',
         loggerContext: 'UniqueApi',
       },
     }),
-    MailSubscriptionModule,
+    OutlookMcpToolsModule,
   ],
   controllers: [ManifestController],
   providers: [

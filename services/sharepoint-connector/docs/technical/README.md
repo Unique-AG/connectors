@@ -1,4 +1,6 @@
+<!-- confluence-page-id: 1952972855 -->
 <!-- confluence-space-key: PUBDOC -->
+
 
 The SharePoint Connector is a Node.js-based service that integrates Microsoft SharePoint Online with the Unique platform. It periodically scans configured SharePoint sites, downloads flagged documents, and ingests them into the Unique knowledge base.
 

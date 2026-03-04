@@ -1,6 +1,6 @@
 import { gql } from 'graphql-request';
 import type { FileAccessKey } from '../files/files.types';
-import type { IngestionApiResponse, IngestionState } from './ingestion.types';
+import type { ContentMetadataValue, IngestionApiResponse, IngestionState } from './ingestion.types';
 
 export interface IngestionConfig {
   uniqueIngestionMode?:
@@ -90,12 +90,12 @@ export const CONTENT_UPDATE_METADATA_MUTATION = gql`
 
 export interface ContentUpdateMetadataMutationInput {
   contentId: string;
-  metadata: Record<string, string>;
+  metadata: Record<string, ContentMetadataValue>;
 }
 
 export interface ContentUpdateMetadataResponse {
   id: string;
-  metadata: Record<string, string>;
+  metadata: Record<string, ContentMetadataValue>;
   ingestionState: IngestionState;
 }
 

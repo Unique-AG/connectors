@@ -1,4 +1,6 @@
+<!-- confluence-page-id: 1953399156 -->
 <!-- confluence-space-key: PUBDOC -->
+
 
 ## Overview
 
@@ -60,6 +62,10 @@ These APIs are only used when permission sync is enabled:
 | `/_api/web/sitegroups/getById({groupId})/users` | GET | Read site group members | `Sites.Selected`* |
 
 **Note:** *If "Who can view the membership of the group?" is **not** set to "Everyone", the connector cannot read group members. The app principal must be a member/owner of the group or hold Full Control.
+
+### Public Sites and Tenant-Wide Visibility Groups
+
+Public SharePoint sites may include tenant-wide principals such as `Everyone` and `Everyone except external users`. These principals are intentionally not expanded by the connector for permission sync. This can lead to expected differences where content is visible in SharePoint through tenant-wide visibility but not mirrored as broad visibility in Unique.
 
 ## Why Sites.Selected?
 

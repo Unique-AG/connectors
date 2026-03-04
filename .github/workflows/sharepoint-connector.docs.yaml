@@ -1,0 +1,16 @@
+name: "[sharepoint-connector] Publish Docs to Confluence"
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  publish-docs:
+    uses: ./.github/workflows/_template-docs-confluence.yaml
+    secrets: inherit
+    with:
+      service-name: sharepoint-connector
+      docs-path: services/sharepoint-connector/docs
