@@ -90,13 +90,7 @@ export class TenantRegistry implements OnModuleInit {
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
 
-        const ingestionService = new IngestionService(
-          config.confluence,
-          tenantName,
-          config.ingestion.storeInternally,
-          config.ingestion.useV1KeyFormat,
-          uniqueClient,
-        );
+        const ingestionService = new IngestionService(config, tenantName, uniqueClient);
         this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
 
         const confluenceSynchronizationService = new ConfluenceSynchronizationService(

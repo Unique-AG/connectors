@@ -6,7 +6,7 @@ import type {
 } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import { request } from 'undici';
-import type { ConfluenceConfig } from '../config';
+import type { TenantConfig } from '../config';
 import {
   getSourceKind,
   INGESTION_MIME_TYPE,
@@ -21,14 +21,12 @@ export class IngestionService {
   private readonly sourceName: string;
 
   public constructor(
-    private readonly confluenceConfig: ConfluenceConfig,
+    private readonly config: TenantConfig,
     private readonly tenantName: string,
-    private readonly storeInternally: boolean,
-    private readonly useV1KeyFormat: boolean,
     private readonly uniqueApiClient: UniqueApiClient,
   ) {
-    this.sourceKind = getSourceKind(this.confluenceConfig.instanceType);
-    this.sourceName = this.confluenceConfig.baseUrl;
+    this.sourceKind = getSourceKind(this.config.confluence.instanceType);
+    this.sourceName = this.config.confluence.baseUrl;
   }
 
   public async ingestPage(page: FetchedPage, scopeId: string): Promise<void> {
@@ -40,7 +38,7 @@ export class IngestionService {
     try {
       const htmlBuffer = Buffer.from(page.body, 'utf-8');
       const baseKey = `${page.spaceId}_${page.spaceKey}/${page.id}`;
-      const key = this.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
+      const key = this.config.ingestion.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
 
       const registrationRequest = this.buildPageRegistrationRequest(
         page,
@@ -114,14 +112,14 @@ export class IngestionService {
       sourceKind: this.sourceKind,
       sourceName: this.sourceName,
       url: page.webUrl,
-      baseUrl: this.confluenceConfig.baseUrl,
+      baseUrl: this.config.confluence.baseUrl,
       byteSize,
       metadata: {
         confluenceLabels: page.metadata?.confluenceLabels ?? [],
         spaceKey: page.spaceKey,
         spaceName: page.spaceName,
       },
-      storeInternally: this.storeInternally,
+      storeInternally: this.config.ingestion.storeInternally,
     };
   }
 
