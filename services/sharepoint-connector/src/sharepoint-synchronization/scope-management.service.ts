@@ -223,24 +223,6 @@ export class ScopeManagementService {
     }
   }
 
-  private resolveEffectiveSiteId(path: string, context: SharepointSyncContext): Smeared {
-    let bestMatch: Smeared | undefined;
-    let bestMatchLength = 0;
-
-    for (const subsite of context.discoveredSubsites) {
-      const subsiteScopePath = `${context.rootPath.value}/${subsite.relativePath.value}`;
-      if (
-        (path.startsWith(`${subsiteScopePath}/`) || path === subsiteScopePath) &&
-        subsiteScopePath.length > bestMatchLength
-      ) {
-        bestMatch = subsite.siteId;
-        bestMatchLength = subsiteScopePath.length;
-      }
-    }
-
-    return bestMatch ?? context.siteConfig.siteId;
-  }
-
   private isValidScopeOwnership(rootScope: Scope, siteId: Smeared): boolean {
     if (!rootScope.externalId) {
       return true;
@@ -370,9 +352,8 @@ export class ScopeManagementService {
 
       if (isNullish(externalId)) {
         this.logger.warn(`${logPrefix} No external ID found for path ${createSmeared(path)}`);
-        const effectiveSiteId = this.resolveEffectiveSiteId(path, context);
-        externalId = effectiveSiteId.transform(
-          (siteId) => `${EXTERNAL_ID_PREFIX}unknown:${siteId}/${scope.name}-${randomUUID()}`,
+        externalId = createSmeared(
+          `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId.value}::${path}-${randomUUID()}`,
         );
       }
 

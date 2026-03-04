@@ -4,8 +4,13 @@ import type { Config } from '../config';
 export const EXTERNAL_ID_PREFIX = 'spc:' as const;
 export const PENDING_DELETE_PREFIX = 'spc:pending-delete:' as const;
 
+// SharePoint reserved virtual directories that appear after the site/subsite path. Used as
+// terminators to distinguish multi-segment subsite names from library/folder segments.
+// https://learn.microsoft.com/en-us/sharepoint/dev/sp-add-ins/determine-sharepoint-rest-service-endpoint-uris (_api)
+// https://learn.microsoft.com/en-us/sharepoint/dev/general-development/urls-and-tokens-in-sharepoint (_layouts)
+// https://learn.microsoft.com/en-us/sharepoint/dev/general-development/basic-uri-structure-and-path (_vti_bin)
 const SHAREPOINT_SITE_NAME_REGEX =
-  /\/sites\/((?![a-f0-9-]{36}(?:\/|$))[^/]+(?:\/[^/]+)*?)\/_api\//gi;
+  /\/sites\/((?![a-f0-9-]{36}(?:\/|$))[^/]+(?:\/[^/]+)*?)\/(_api|_layouts|_vti_bin)\//gi;
 
 const guidPattern = regexes.guid.source.slice(2, -2);
 const SHAREPOINT_SITE_ID_REGEX = new RegExp(
@@ -30,11 +35,11 @@ export function smear(text: string | null | undefined, leaveOver = 4) {
 export function smearSiteNameFromPath(path: string): string {
   return path.replace(
     SHAREPOINT_SITE_NAME_REGEX,
-    (_, siteName: string) =>
+    (_, siteName: string, keyword: string) =>
       `/sites/${siteName
         .split('/')
         .map((segment) => smear(segment))
-        .join('/')}/_api/`,
+        .join('/')}/${keyword}/`,
   );
 }
 

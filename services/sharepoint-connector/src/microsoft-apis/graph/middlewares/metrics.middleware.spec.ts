@@ -780,6 +780,37 @@ describe('MetricsMiddleware', () => {
       );
     });
 
+    it('conceals site names in logged endpoints when enabled', async () => {
+      const concealingConfigService = createConcealingConfigService();
+      const concealingMiddleware = new MetricsMiddleware(
+        mockHistogram,
+        mockCounter,
+        mockCounter,
+        concealingConfigService,
+      );
+      concealingMiddleware.setNext(mockNextMiddleware);
+
+      const mockContext: Context = {
+        request: 'https://graph.microsoft.com/v1.0/sites/LoadTestFlat/_layouts/15/download.aspx',
+        options: { method: 'GET' },
+      };
+
+      const mockResponse = new Response('{"value": []}', { status: 200 });
+      mockContext.response = mockResponse;
+
+      mockNextMiddleware.execute.mockImplementation(async (ctx: Context) => {
+        ctx.response = mockResponse;
+      });
+
+      await concealingMiddleware.execute(mockContext);
+
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: '/sites/********Flat/_layouts/15/download.aspx',
+        }),
+      );
+    });
+
     it('does not conceal endpoints in logs when disabled', async () => {
       const nonConcealingMiddleware = new MetricsMiddleware(
         mockHistogram,

@@ -87,6 +87,11 @@ function getRelativeUniqueParentPathFromUrl(url: string, siteName: Smeared): str
   return '';
 }
 
+/**
+ * `siteName` controls how many leading URL segments are stripped. In the subsitesScan flow, pass
+ * the **top parent** site's name so that subsite segments are preserved as folders in the
+ * hierarchy. Passing the subsite's own name would incorrectly strip it from the resulting path.
+ */
 export function getUniquePathFromItem(
   item: AnySharepointItem,
   rootPath: Smeared,
@@ -99,6 +104,7 @@ export function getUniquePathFromItem(
   return createSmeared(`/${normalizeSlashes(rootPath.value)}${uniquePath}`);
 }
 
+/** @see {@link getUniquePathFromItem} for `siteName` semantics. */
 export function getUniqueParentPathFromItem(
   item: AnySharepointItem,
   rootPath: Smeared,

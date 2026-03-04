@@ -292,9 +292,8 @@ export class FetchGroupsWithMembershipsQuery {
       `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
     );
 
-    const siteName = rootSiteName;
     const result = pipe(
-      await this.sharepointRestClientService.getSiteGroupsMemberships(siteName, siteGroupIds),
+      await this.sharepointRestClientService.getSiteGroupsMemberships(rootSiteName, siteGroupIds),
       mapKeys((id) =>
         groupDistinctId({
           type: 'siteGroup',
