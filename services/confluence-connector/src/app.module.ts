@@ -9,6 +9,7 @@ import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { type AppConfig, appConfig } from './config';
+import { Redacted } from './utils/redacted';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { TenantModule } from './tenant';
 
@@ -44,6 +45,10 @@ import { TenantModule } from './tenant';
                 return crypto.randomUUID();
               }
               return ctx.traceId;
+            },
+            redact: {
+              paths: ['req.headers.authorization'],
+              censor: (value) => (value instanceof Redacted ? value : new Redacted(value)),
             },
           },
         };
