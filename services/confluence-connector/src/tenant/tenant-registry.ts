@@ -64,8 +64,6 @@ export class TenantRegistry implements OnModuleInit {
         const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient, fetcherLogger);
         this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
 
-        const syncLogger = this.serviceRegistry.getServiceLogger(ConfluenceSynchronizationService);
-
         const uniqueClient = this.uniqueApiFactory.create({
           auth: this.buildUniqueAuthConfig(config.unique),
           ingestion: {
@@ -117,6 +115,7 @@ export class TenantRegistry implements OnModuleInit {
         );
         this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
 
+        const syncLogger = this.serviceRegistry.getServiceLogger(ConfluenceSynchronizationService);
         const confluenceSynchronizationService = new ConfluenceSynchronizationService(
             scanner,
             fetcher,
