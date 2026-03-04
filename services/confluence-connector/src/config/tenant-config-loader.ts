@@ -22,7 +22,7 @@ const TenantStatus = {
 const TenantStatusSchema = z.object({
   status: z
     .enum([TenantStatus.ACTIVE, TenantStatus.INACTIVE, TenantStatus.DELETED])
-    .default(TenantStatus.ACTIVE),
+    .prefault(TenantStatus.ACTIVE),
 });
 
 const TenantConfigSchema = z.object({
