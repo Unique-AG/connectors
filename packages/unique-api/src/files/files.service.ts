@@ -1,5 +1,5 @@
 import { getErrorCodeFromGraphqlRequest } from '@unique-ag/utils';
-import type pino from 'pino';
+import { Logger } from '@nestjs/common';
 import { chunk } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -42,7 +42,7 @@ const ACCESS_BATCH_SIZE = 20;
 export class FilesService implements UniqueFilesFacade {
   public constructor(
     private readonly ingestionClient: UniqueGraphqlClient,
-    private readonly logger: pino.Logger,
+    private readonly logger: Logger,
   ) {}
 
   public async getByKeys(keys: string[]): Promise<UniqueFile[]> {
@@ -76,7 +76,7 @@ export class FilesService implements UniqueFilesFacade {
   }
 
   public async getByKeyPrefix(keyPrefix: string): Promise<UniqueFile[]> {
-    this.logger.info(`[KeyPrefix: ${keyPrefix}] Fetching files`);
+    this.logger.log(`[KeyPrefix: ${keyPrefix}] Fetching files`);
 
     let skip = 0;
     const files: UniqueFile[] = [];
@@ -176,7 +176,7 @@ export class FilesService implements UniqueFilesFacade {
 
   public async deleteByKeyPrefix(keyPrefix: string): Promise<number> {
     const logPrefix = `[KeyPrefix: ${keyPrefix}]`;
-    this.logger.info(`${logPrefix} Starting iterative file deletion`);
+    this.logger.log(`${logPrefix} Starting iterative file deletion`);
 
     let totalDeleted = 0;
     let hasMore = true;
@@ -218,7 +218,7 @@ export class FilesService implements UniqueFilesFacade {
       }
     }
 
-    this.logger.info(
+    this.logger.log(
       `${logPrefix} Iterative file deletion completed. Total deleted: ${totalDeleted}`,
     );
     return totalDeleted;
@@ -250,10 +250,12 @@ export class FilesService implements UniqueFilesFacade {
           throw error;
         }
 
-        this.logger.warn(
-          { scopeId, batchSize: batch.length, statusCode },
-          `${logPrefix} Failed to batch add file accesses, retrying one-by-one`,
-        );
+        this.logger.warn({
+          msg: `${logPrefix} Failed to batch add file accesses, retrying one-by-one`,
+          scopeId,
+          batchSize: batch.length,
+          statusCode,
+        });
 
         for (const permission of batch) {
           try {
@@ -266,10 +268,12 @@ export class FilesService implements UniqueFilesFacade {
             );
             successCount += 1;
           } catch (singleError) {
-            this.logger.error(
-              { scopeId, permission, err: singleError },
-              `${logPrefix} Failed to add single file access`,
-            );
+            this.logger.error({
+              msg: `${logPrefix} Failed to add single file access`,
+              scopeId,
+              permission,
+              error: singleError,
+            });
           }
         }
       }
@@ -304,10 +308,12 @@ export class FilesService implements UniqueFilesFacade {
           throw error;
         }
 
-        this.logger.warn(
-          { scopeId, batchSize: batch.length, statusCode },
-          `${logPrefix} Failed to batch remove file accesses, retrying one-by-one`,
-        );
+        this.logger.warn({
+          msg: `${logPrefix} Failed to batch remove file accesses, retrying one-by-one`,
+          scopeId,
+          batchSize: batch.length,
+          statusCode,
+        });
 
         for (const permission of batch) {
           try {
@@ -320,10 +326,12 @@ export class FilesService implements UniqueFilesFacade {
             });
             successCount += 1;
           } catch (singleError) {
-            this.logger.error(
-              { scopeId, permission, err: singleError },
-              `${logPrefix} Failed to remove single file access`,
-            );
+            this.logger.error({
+              msg: `${logPrefix} Failed to remove single file access`,
+              scopeId,
+              permission,
+              error: singleError,
+            });
           }
         }
       }

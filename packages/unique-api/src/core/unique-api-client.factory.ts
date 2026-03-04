@@ -1,4 +1,4 @@
-import type pino from 'pino';
+import { Logger } from '@nestjs/common';
 import { Agent, interceptors } from 'undici';
 import { UniqueAuth } from '../auth/unique-auth';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
@@ -19,7 +19,7 @@ export interface UniqueApiClientFactory {
 
 export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
   public constructor(
-    private readonly logger: pino.Logger,
+    private readonly logger: Logger,
     private readonly metrics: UniqueApiMetrics,
     private readonly bottleneckFactory: BottleneckFactory,
   ) {}

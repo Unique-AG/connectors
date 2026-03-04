@@ -1,4 +1,4 @@
-import type pino from 'pino';
+import { Logger } from '@nestjs/common';
 import { pick, prop } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
@@ -29,11 +29,11 @@ const BATCH_SIZE = 100;
 export class GroupsService implements UniqueGroupsFacade {
   public constructor(
     private readonly scopeManagementClient: UniqueGraphqlClient,
-    private readonly logger: pino.Logger,
+    private readonly logger: Logger,
   ) {}
 
   public async listByExternalIdPrefix(externalIdPrefix: string): Promise<GroupWithMembers[]> {
-    this.logger.info(
+    this.logger.log(
       `[ExternalIdPrefix: ${externalIdPrefix}] Requesting all groups from Unique API`,
     );
 

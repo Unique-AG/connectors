@@ -1,4 +1,4 @@
-import type pino from 'pino';
+import { Injectable, Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 
 export interface BottleneckConfig {
@@ -9,8 +9,11 @@ export interface BottleneckConfig {
   minTime?: number;
 }
 
+@Injectable()
 export class BottleneckFactory {
-  public constructor(private readonly logger: pino.Logger) {}
+  private readonly logger = new Logger(this.constructor.name);
+
+  public constructor() {}
 
   public createLimiter(config: BottleneckConfig, contextName: string): Bottleneck {
     const limiter = new Bottleneck(config);
@@ -22,20 +25,20 @@ export class BottleneckFactory {
     // Log when rate limit reservoir is depleted (rate limit hit)
     limiter.on('depleted', (empty) => {
       if (empty) {
-        this.logger.info(`${contextName}: Rate limit reservoir depleted - queuing requests`);
+        this.logger.log(`${contextName}: Rate limit reservoir depleted - queuing requests`);
       }
     });
 
     // Log dropped requests (queue overflow)
     limiter.on('dropped', () => {
-      this.logger.error(
-        `${contextName}: Rate limit request dropped due to rate limiter queue overflow`,
-      );
+      this.logger.error({
+        msg: `${contextName}: Rate limit request dropped due to rate limiter queue overflow`,
+      });
     });
 
     // Log errors
-    limiter.on('error', (err) => {
-      this.logger.error({ err }, `${contextName}: Rate limit bottleneck error`);
+    limiter.on('error', (error) => {
+      this.logger.error({ msg: `${contextName}: Rate limit bottleneck error`, error });
     });
   }
 }

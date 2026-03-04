@@ -4,7 +4,7 @@ import {
   getHttpStatusCodeClass,
   getSlowRequestDurationBucket,
 } from '@unique-ag/utils';
-import type pino from 'pino';
+import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { type Dispatcher, errors, interceptors } from 'undici';
 import type { UniqueAuth } from '../auth/unique-auth';
@@ -20,7 +20,7 @@ export class IngestionHttpClient {
   public constructor(
     private readonly auth: UniqueAuth,
     private readonly metrics: UniqueApiMetrics,
-    private readonly logger: pino.Logger,
+    private readonly logger: Logger,
     private readonly dispatcher: Dispatcher,
     private readonly bottleneckFactory: BottleneckFactory,
     private readonly options: {
@@ -128,15 +128,18 @@ export class IngestionHttpClient {
           duration_bucket: slowBucket,
         });
 
-        this.logger.warn(
-          { method: httpMethod, path: options.path, duration: durationMs, durationBucket: slowBucket },
-          'Slow Unique API request detected',
-        );
+        this.logger.warn({
+          msg: 'Slow Unique API request detected',
+          method: httpMethod,
+          path: options.path,
+          duration: durationMs,
+          durationBucket: slowBucket,
+        });
       }
 
       return result;
-    } catch (err) {
-      const statusCode = err instanceof errors.ResponseError ? err.statusCode : 0;
+    } catch (error) {
+      const statusCode = error instanceof errors.ResponseError ? error.statusCode : 0;
       const statusCodeClass = getHttpStatusCodeClass(statusCode);
       const durationMs = elapsedMilliseconds(startTime);
 
@@ -159,9 +162,9 @@ export class IngestionHttpClient {
         });
       }
 
-      this.logger.error({ err }, 'Failed ingestion HTTP request');
+      this.logger.error({ msg: 'Failed ingestion HTTP request', error });
 
-      throw err;
+      throw error;
     }
   }
 }
