@@ -10,6 +10,8 @@ import { type AppConfigNamespaced } from './config';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   const logger = app.get(Logger);
+  // All Logger instances app-wide (including shared packages) route through this single pino
+  // instance via Logger.staticInstanceRef, so the mixin and log level apply universally.
   app.useLogger(logger);
 
   const configService = app.get<ConfigService<AppConfigNamespaced, true>>(ConfigService);

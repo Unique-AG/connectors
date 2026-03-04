@@ -34,6 +34,8 @@ import { Redacted } from './utils/redacted';
           pinoHttp: {
             ...defaultLoggerOptions.pinoHttp,
             level: appConfigValue.logLevel,
+            // Injects tenantName into every log. Logs emitted before tenantStorage.run() is
+            // called (during bootstrap) won't have it — those sites must set it explicitly.
             mixin: () => {
               const tenant = tenantStorage.getStore();
               return tenant ? { tenantName: tenant.name } : {};
