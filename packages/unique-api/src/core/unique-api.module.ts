@@ -164,10 +164,9 @@ const createCoreProviders = (): Provider[] => {
     {
       provide: UNIQUE_API_LOGGER,
       useFactory: (options: UniqueApiRootModuleOptions) => {
-        const loggerContext = options.observability?.loggerContext ?? 'UniqueApi';
         return pino({
-          name: loggerContext,
-          ...(options.observability?.mixin ? { mixin: options.observability.mixin } : {}),
+          name: options.observability.loggerContext ?? 'UniqueApi',
+          mixin: options.observability.mixin,
         });
       },
       inject: [uniqueApiRootModuleHost.MODULE_OPTIONS_TOKEN],
