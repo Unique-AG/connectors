@@ -2,9 +2,23 @@ export const IngestionMode = {
   Flat: 'flat',
 } as const;
 
+export const StoreInternallyMode = {
+  Enabled: 'enabled',
+  Disabled: 'disabled',
+} as const;
+
+export type StoreInternallyMode = (typeof StoreInternallyMode)[keyof typeof StoreInternallyMode];
+
+export const V1KeyFormatMode = {
+  Enabled: 'enabled',
+  Disabled: 'disabled',
+} as const;
+
+export type V1KeyFormatMode = (typeof V1KeyFormatMode)[keyof typeof V1KeyFormatMode];
+
 export type IngestionMode = (typeof IngestionMode)[keyof typeof IngestionMode];
 
-export const CONFC_EXTERNAL_ID_PREFIX = 'confc:' as const;
+export const EXTERNAL_ID_PREFIX = 'confc:' as const;
 
 export const IngestionSourceKind = {
   Cloud: 'ATLASSIAN_CONFLUENCE_CLOUD',

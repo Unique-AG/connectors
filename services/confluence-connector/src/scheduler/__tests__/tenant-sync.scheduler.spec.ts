@@ -118,8 +118,10 @@ describe('TenantSyncScheduler', () => {
       scheduler.onModuleInit();
 
       expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantName: 'tenant-a' }),
-        'Scheduled sync with cron: */5 * * * *',
+        expect.objectContaining({
+          tenantName: 'tenant-a',
+          msg: 'Scheduled sync with cron: */5 * * * *',
+        }),
       );
     });
 
@@ -172,7 +174,7 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(mockLogger.log).toHaveBeenCalledWith('Skipping sync due to shutdown');
+      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Skipping sync due to shutdown' });
       const syncService = tenantStorage.run(tenantA, () =>
         serviceRegistry.getService(ConfluenceSynchronizationService),
       );

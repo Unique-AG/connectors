@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { AuthMode, type ConfluenceConfig } from '../../config';
 import { getCurrentTenant } from '../../tenant/tenant-context.storage';
@@ -10,21 +11,24 @@ export class ConfluenceAuthFactory {
   private readonly logger = new Logger(ConfluenceAuthFactory.name);
 
   public createAuthStrategy(config: ConfluenceConfig): ConfluenceAuth {
+    // Explicitly read tenantName because this runs during onModuleInit, before
+    // main.ts swaps in the pino logger — the mixin that auto-injects tenantName
+    // into logs is not active yet at this point.
     const { name: tenantName } = getCurrentTenant();
     switch (config.auth.mode) {
-      case AuthMode.OAUTH_2LO: {
+      case AuthMode.OAuth2Lo: {
         this.logger.log({
           tenantName,
           msg: `Using OAuth 2.0 2LO authentication for ${config.instanceType} instance`,
         });
         return new OAuth2LoAuthStrategy(config.auth, config);
       }
-      case AuthMode.PAT: {
+      case AuthMode.Pat: {
         this.logger.log({ tenantName, msg: 'Using PAT authentication for data-center instance' });
         return new PatAuthStrategy(config.auth);
       }
       default: {
-        throw new Error(`Unsupported Confluence auth mode`);
+        assert.fail(`Unsupported Confluence auth mode`);
       }
     }
   }

@@ -37,12 +37,12 @@ export class RateLimitedHttpClient {
   private setupThrottlingMonitoring(): void {
     this.limiter.on('depleted', (empty) => {
       if (empty) {
-        this.logger.log('Rate limit reservoir depleted - queuing requests');
+        this.logger.log({ msg: 'Rate limit reservoir depleted - queuing requests' });
       }
     });
 
     this.limiter.on('dropped', () => {
-      this.logger.error('Request dropped due to rate limiter queue overflow');
+      this.logger.error({ msg: 'Request dropped due to rate limiter queue overflow' });
     });
 
     this.limiter.on('error', (error) => {

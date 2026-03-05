@@ -42,14 +42,15 @@ describe('ScopeManagementService', () => {
   async function initializeService(
     service: ScopeManagementService,
     scopes: ReturnType<typeof makeService>['scopes'],
-  ) {
+  ): Promise<string> {
     scopes.getById.mockResolvedValueOnce({
       id: ROOT_SCOPE_ID,
       name: 'Confluence',
       parentId: null,
     });
-    await service.initialize();
+    const rootScopePath = await service.initialize();
     scopes.getById.mockReset();
+    return rootScopePath;
   }
 
   beforeEach(() => {
@@ -64,8 +65,9 @@ describe('ScopeManagementService', () => {
         .mockResolvedValueOnce({ id: 'parent-1', name: 'Connectors', parentId: 'top-1' })
         .mockResolvedValueOnce({ id: 'top-1', name: 'Company', parentId: null });
 
-      await service.initialize();
+      const rootScopePath = await service.initialize();
 
+      expect(rootScopePath).toBe('/Company/Connectors/Confluence');
       expect(scopes.getById).toHaveBeenCalledTimes(3);
       expect(scopes.getById).toHaveBeenCalledWith(ROOT_SCOPE_ID);
       expect(scopes.getById).toHaveBeenCalledWith('parent-1');
@@ -80,8 +82,9 @@ describe('ScopeManagementService', () => {
         parentId: null,
       });
 
-      await service.initialize();
+      const rootScopePath = await service.initialize();
 
+      expect(rootScopePath).toBe('/RootScope');
       expect(scopes.getById).toHaveBeenCalledTimes(1);
     });
 
@@ -111,7 +114,7 @@ describe('ScopeManagementService', () => {
   describe('ensureSpaceScopes', () => {
     it('batch-resolves multiple space keys via createFromPaths and sets externalIds', async () => {
       const { service, scopes } = makeService();
-      await initializeService(service, scopes);
+      const rootScopePath = await initializeService(service, scopes);
 
       scopes.createFromPaths.mockResolvedValueOnce([
         { id: 'scope-eng', name: 'ENG' },
@@ -119,7 +122,7 @@ describe('ScopeManagementService', () => {
       ]);
       scopes.updateExternalId.mockResolvedValue(undefined);
 
-      const result = await service.ensureSpaceScopes(['ENG', 'MKT']);
+      const result = await service.ensureSpaceScopes(rootScopePath, ['ENG', 'MKT']);
 
       expect(result).toEqual(
         new Map([
@@ -132,14 +135,6 @@ describe('ScopeManagementService', () => {
       });
       expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-eng', `confc:${TENANT_NAME}:ENG`);
       expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-mkt', `confc:${TENANT_NAME}:MKT`);
-    });
-
-    it('throws when not initialized', async () => {
-      const { service } = makeService();
-
-      await expect(service.ensureSpaceScopes(['SP'])).rejects.toThrow(
-        'ScopeManagementService not initialized',
-      );
     });
   });
 });

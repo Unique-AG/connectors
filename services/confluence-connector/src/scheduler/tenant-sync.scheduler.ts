@@ -18,7 +18,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
 
   public onModuleInit(): void {
     if (this.tenantRegistry.tenantCount === 0) {
-      this.logger.warn('No tenants registered — no sync jobs will be scheduled');
+      this.logger.warn({ msg: 'No tenants registered — no sync jobs will be scheduled' });
       return;
     }
 
@@ -30,11 +30,11 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
   }
 
   public onModuleDestroy(): void {
-    this.logger.log('Shutting down tenant sync scheduler');
+    this.logger.log({ msg: 'Shutting down tenant sync scheduler' });
     this.isShuttingDown = true;
     try {
       for (const [name, job] of this.schedulerRegistry.getCronJobs()) {
-        this.logger.log(`Stopping cron job: ${name}`);
+        this.logger.log({ msg: `Stopping cron job: ${name}` });
         job.stop();
       }
     } catch (error) {
@@ -52,7 +52,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     job.start();
 
     this.tenantRegistry.run(tenant, () => {
-      this.logger.log({ tenantName: tenant.name }, `Scheduled sync with cron: ${cronExpression}`);
+      this.logger.log({ tenantName: tenant.name, msg: `Scheduled sync with cron: ${cronExpression}` });
     });
   }
 
@@ -61,7 +61,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       const syncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
 
       if (this.isShuttingDown) {
-        this.logger.log('Skipping sync due to shutdown');
+        this.logger.log({ msg: 'Skipping sync due to shutdown' });
         return;
       }
 

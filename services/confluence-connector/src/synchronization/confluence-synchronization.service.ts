@@ -32,7 +32,7 @@ export class ConfluenceSynchronizationService {
     try {
       this.logger.log({ tenantName: tenant.name, msg: 'Starting sync' });
 
-      await this.scopeManagementService.initialize();
+      const rootScopePath = await this.scopeManagementService.initialize();
 
       const discoveredPages = await this.scanner.discoverPages();
       this.logger.log({ count: discoveredPages.length, msg: 'Discovery completed' });
@@ -44,8 +44,8 @@ export class ConfluenceSynchronizationService {
       if (pageIdsToFetch.size > 0) {
         const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
 
-        const spaceKeys = pagesToFetch.map((p) => p.spaceKey);
-        const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(spaceKeys);
+        const spaceKeys = [...new Set(pagesToFetch.map((p) => p.spaceKey))];
+        const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(rootScopePath, spaceKeys);
 
         await this.fetchAndIngestPages(
           pagesToFetch,
@@ -55,11 +55,11 @@ export class ConfluenceSynchronizationService {
       }
 
       if (diffResult.deletedKeys.length > 0) {
-        await this.ingestionService.deleteContent(diffResult.deletedKeys);
+        await this.ingestionService.deleteContentByKeys(diffResult.deletedKeys);
         this.logger.log({ count: diffResult.deletedKeys.length, msg: 'Deleted content processed' });
       }
 
-      this.logger.log('Sync work done');
+      this.logger.log({ msg: 'Sync work done' });
     } catch (error) {
       this.logger.error({ err: error, msg: 'Sync failed' });
     } finally {
@@ -75,11 +75,11 @@ export class ConfluenceSynchronizationService {
     const limit = pLimit(concurrency);
 
     if (pages.length === 0) {
-      this.logger.log('No pages to ingest');
+      this.logger.log({ msg: 'No pages to ingest' });
       return;
     }
 
-    await Promise.all(
+    const results = await Promise.allSettled(
       pages.map((page) =>
         limit(async () => {
           const fetched = await this.contentFetcher.fetchPageContent(page);
@@ -94,6 +94,10 @@ export class ConfluenceSynchronizationService {
       ),
     );
 
-    this.logger.log({ count: pages.length, msg: 'Page ingestion completed' });
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error({ err: result.reason, msg: 'Page ingestion failed' });
+      }
+    }
   }
 }

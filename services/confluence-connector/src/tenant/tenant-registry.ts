@@ -1,10 +1,11 @@
 import assert from 'node:assert';
 import {
-  AbstractUniqueApiClient,
+  UniqueApiClient,
   UNIQUE_API_CLIENT_FACTORY,
   type UniqueApiClientFactory,
   type UniqueApiFeatureModuleInputOptions,
 } from '@unique-ag/unique-api';
+import { V1KeyFormatMode } from '../constants/ingestion.constants';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
 import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
@@ -74,7 +75,7 @@ export class TenantRegistry implements OnModuleInit {
           },
         });
 
-        this.serviceRegistry.register(tenantName, AbstractUniqueApiClient, uniqueClient);
+        this.serviceRegistry.register(tenantName, UniqueApiClient, uniqueClient);
         const scopeManagementService = new ScopeManagementService(
           config.ingestion,
           tenantName,
@@ -85,7 +86,7 @@ export class TenantRegistry implements OnModuleInit {
         const fileDiffService = new FileDiffService(
           config.confluence,
           tenantName,
-          config.ingestion.useV1KeyFormat,
+          config.ingestion.useV1KeyFormat === V1KeyFormatMode.Enabled,
           uniqueClient,
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
@@ -133,13 +134,13 @@ export class TenantRegistry implements OnModuleInit {
     uniqueConfig: UniqueConfig,
   ): UniqueApiFeatureModuleInputOptions['auth'] {
     switch (uniqueConfig.serviceAuthMode) {
-      case UniqueAuthMode.CLUSTER_LOCAL:
+      case UniqueAuthMode.ClusterLocal:
         return {
           serviceAuthMode: uniqueConfig.serviceAuthMode,
           serviceExtraHeaders: uniqueConfig.serviceExtraHeaders,
           serviceId: 'confluence-connector',
         };
-      case UniqueAuthMode.EXTERNAL:
+      case UniqueAuthMode.External:
         return {
           serviceAuthMode: uniqueConfig.serviceAuthMode,
           zitadelOauthTokenUrl: uniqueConfig.zitadelOauthTokenUrl,

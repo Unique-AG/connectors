@@ -369,14 +369,16 @@
                     "description": "Root scope ID for ingestion"
                   },
                   "storeInternally": {
-                    "type": "boolean",
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
                     "description": "Whether to store content internally in Unique",
-                    "default": true
+                    "default": "enabled"
                   },
                   "useV1KeyFormat": {
-                    "type": "boolean",
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
                     "description": "Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix",
-                    "default": false
+                    "default": "disabled"
                   }
                 },
                 "additionalProperties": false

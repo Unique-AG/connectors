@@ -85,8 +85,8 @@ function makeService(): {
       baseUrl: CONFLUENCE_BASE_URL,
     },
     ingestion: {
-      storeInternally: true,
-      useV1KeyFormat: false,
+      storeInternally: 'enabled',
+      useV1KeyFormat: 'disabled',
     },
   } as unknown as TenantConfig;
 
@@ -184,7 +184,7 @@ describe('IngestionService', () => {
     ] as never);
     vi.mocked(uniqueApiClient.files.deleteByIds).mockResolvedValue(2);
 
-    await service.deleteContent(['k1', 'k2']);
+    await service.deleteContentByKeys(['k1', 'k2']);
 
     expect(uniqueApiClient.files.getByKeys).toHaveBeenCalledWith(['k1', 'k2']);
     expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['content-1', 'content-2']);
@@ -194,7 +194,7 @@ describe('IngestionService', () => {
     const { service, uniqueApiClient } = makeService();
     vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([]);
 
-    await service.deleteContent(['missing-key']);
+    await service.deleteContentByKeys(['missing-key']);
 
     expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
     expect(mockLogger.log).toHaveBeenCalledWith({
@@ -207,7 +207,7 @@ describe('IngestionService', () => {
     const { service, uniqueApiClient } = makeService();
     vi.mocked(uniqueApiClient.files.getByKeys).mockRejectedValue(new Error('delete failed'));
 
-    await service.deleteContent(['k1']);
+    await service.deleteContentByKeys(['k1']);
 
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -221,7 +221,7 @@ describe('IngestionService', () => {
   it('returns early for empty delete input', async () => {
     const { service, uniqueApiClient } = makeService();
 
-    await service.deleteContent([]);
+    await service.deleteContentByKeys([]);
 
     expect(uniqueApiClient.files.getByKeys).not.toHaveBeenCalled();
     expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();

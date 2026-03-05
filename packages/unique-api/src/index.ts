@@ -43,7 +43,6 @@ export type {
 } from './scopes/scopes.types';
 export type {
   UniqueAccessType,
-  UniqueApiClient,
   UniqueApiClientFactory,
   UniqueApiClientRegistry,
   UniqueApiScopes,
@@ -55,7 +54,7 @@ export type {
   UniqueUsersFacade,
 } from './types';
 export {
-  AbstractUniqueApiClient,
+  UniqueApiClient,
   UniqueOwnerType,
 } from './types';
 export type { SimpleUser } from './users/users.types';

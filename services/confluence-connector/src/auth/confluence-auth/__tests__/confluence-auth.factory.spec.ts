@@ -46,7 +46,7 @@ describe('ConfluenceAuthFactory', () => {
         instanceType: 'cloud',
         cloudId: 'test-cloud-id',
         auth: {
-          mode: AuthMode.OAUTH_2LO,
+          mode: AuthMode.OAuth2Lo,
           clientId: 'client-id',
           clientSecret: new Redacted('secret'),
         },
@@ -65,7 +65,7 @@ describe('ConfluenceAuthFactory', () => {
         ...baseFields,
         instanceType: 'data-center',
         auth: {
-          mode: AuthMode.PAT,
+          mode: AuthMode.Pat,
           token: new Redacted('my-pat'),
         },
       };

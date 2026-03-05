@@ -25,7 +25,6 @@ export class FileDiffService {
     const result: FileDiffResult = {
       newPageIds: [],
       updatedPageIds: [],
-      deletedPageIds: [],
       deletedKeys: [],
       movedPageIds: [],
     };
@@ -33,6 +32,8 @@ export class FileDiffService {
     for (const [spaceKey, pages] of Object.entries(pagesBySpace)) {
       const fileDiffItems = this.buildFileDiffItems(pages);
       const firstPage = pages[0];
+      assert.ok(firstPage, `Expected at least one page for space "${spaceKey}"`);
+
       const basePartialKey = `${firstPage.spaceId}_${spaceKey}`;
       const partialKey = this.useV1KeyFormat
         ? basePartialKey
@@ -49,14 +50,14 @@ export class FileDiffService {
 
       result.newPageIds.push(...diffResponse.newFiles);
       result.updatedPageIds.push(...diffResponse.updatedFiles);
-      result.deletedPageIds.push(...diffResponse.deletedFiles);
+      result.deletedKeys.push(...diffResponse.deletedFiles);
       result.movedPageIds.push(...diffResponse.movedFiles);
     }
 
     this.logger.log({
       new: result.newPageIds.length,
       updated: result.updatedPageIds.length,
-      deleted: result.deletedPageIds.length,
+      deleted: result.deletedKeys.length,
       moved: result.movedPageIds.length,
       msg: 'File diff completed',
     });
@@ -84,20 +85,22 @@ export class FileDiffService {
       diffResponse.newFiles.length > 0 || diffResponse.updatedFiles.length > 0;
 
     if (submittedItems.length === 0 && diffResponse.deletedFiles.length > 0) {
-      this.logger.error(
-        { submittedCount: 0, deletedCount: diffResponse.deletedFiles.length },
-        'File diff would delete all files because zero items were submitted. Aborting to prevent accidental full deletion.',
-      );
+      this.logger.error({
+        submittedCount: 0,
+        deletedCount: diffResponse.deletedFiles.length,
+        msg: 'File diff would delete all files because zero items were submitted. Aborting to prevent accidental full deletion.',
+      });
       assert.fail(
         `Submitted 0 items to file diff but ${diffResponse.deletedFiles.length} files would be deleted. Aborting sync.`,
       );
     }
 
     if (!hasNewOrUpdated && diffResponse.deletedFiles.length >= submittedItems.length) {
-      this.logger.error(
-        { submittedCount: submittedItems.length, deletedCount: diffResponse.deletedFiles.length },
-        'File diff would delete all files with zero new or updated items. Aborting to prevent accidental full deletion.',
-      );
+      this.logger.error({
+        submittedCount: submittedItems.length,
+        deletedCount: diffResponse.deletedFiles.length,
+        msg: 'File diff would delete all files with zero new or updated items. Aborting to prevent accidental full deletion.',
+      });
       assert.fail(
         `File diff would delete ${diffResponse.deletedFiles.length} files with zero new or updated items. Aborting sync.`,
       );

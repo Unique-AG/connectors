@@ -1,4 +1,4 @@
-import { AbstractUniqueApiClient } from '@unique-ag/unique-api';
+import { UniqueApiClient } from '@unique-ag/unique-api';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-auth';
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
@@ -49,8 +49,8 @@ function createMockTenantConfig(): TenantConfig {
     },
     ingestion: {
       scopeId: 'scope-1',
-      storeInternally: true,
-      useV1KeyFormat: false,
+      storeInternally: 'enabled',
+      useV1KeyFormat: 'disabled',
     },
     processing: {},
   } as unknown as TenantConfig;
@@ -216,7 +216,7 @@ describe('TenantRegistry', () => {
 
       tenantStorage.run(tenant, () => {
         expect(serviceRegistry.getService(ConfluenceAuth)).toBeDefined();
-        expect(serviceRegistry.getService(AbstractUniqueApiClient)).toBeDefined();
+        expect(serviceRegistry.getService(UniqueApiClient)).toBeDefined();
         expect(serviceRegistry.getService(ConfluenceApiClient)).toBeDefined();
       });
     });

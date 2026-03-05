@@ -12,6 +12,8 @@ import {
   INGESTION_MIME_TYPE,
   OWNER_TYPE,
   SOURCE_OWNER_TYPE,
+  StoreInternallyMode,
+  V1KeyFormatMode,
 } from '../constants/ingestion.constants';
 import type { FetchedPage } from './sync.types';
 
@@ -38,7 +40,7 @@ export class IngestionService {
     try {
       const htmlBuffer = Buffer.from(page.body, 'utf-8');
       const baseKey = `${page.spaceId}_${page.spaceKey}/${page.id}`;
-      const key = this.config.ingestion.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
+      const key = this.config.ingestion.useV1KeyFormat === V1KeyFormatMode.Enabled ? baseKey : `${this.tenantName}/${baseKey}`;
 
       const registrationRequest = this.buildPageRegistrationRequest(
         page,
@@ -68,7 +70,7 @@ export class IngestionService {
     }
   }
 
-  public async deleteContent(contentKeys: string[]): Promise<void> {
+  public async deleteContentByKeys(contentKeys: string[]): Promise<void> {
     if (contentKeys.length === 0) {
       return;
     }
@@ -119,7 +121,7 @@ export class IngestionService {
         spaceKey: page.spaceKey,
         spaceName: page.spaceName,
       },
-      storeInternally: this.config.ingestion.storeInternally,
+      storeInternally: this.config.ingestion.storeInternally === StoreInternallyMode.Enabled,
     };
   }
 
@@ -127,22 +129,7 @@ export class IngestionService {
     registration: ContentRegistrationRequest,
     readUrl: string,
   ): IngestionFinalizationRequest {
-    return {
-      key: registration.key,
-      title: registration.title,
-      mimeType: registration.mimeType,
-      ownerType: registration.ownerType,
-      byteSize: registration.byteSize,
-      scopeId: registration.scopeId,
-      sourceOwnerType: registration.sourceOwnerType,
-      sourceName: registration.sourceName,
-      sourceKind: registration.sourceKind,
-      fileUrl: readUrl,
-      url: registration.url,
-      baseUrl: registration.baseUrl,
-      metadata: registration.metadata,
-      storeInternally: registration.storeInternally,
-    };
+    return { ...registration, fileUrl: readUrl };
   }
 
   private async uploadBuffer(writeUrl: string, buffer: Buffer, contentType: string): Promise<void> {

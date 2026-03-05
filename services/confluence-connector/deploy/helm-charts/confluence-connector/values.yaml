@@ -180,6 +180,6 @@ connectorConfig:
         # -- Root scope ID for ingestion
         scopeId: unset_default_value
         # -- Whether to store content internally in Unique
-        storeInternally: true
+        storeInternally: enabled
         # -- Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix
-        useV1KeyFormat: false
+        useV1KeyFormat: disabled

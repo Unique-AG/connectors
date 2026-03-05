@@ -1,10 +1,6 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { LogsDiagnosticDataPolicy } from '@unique-ag/utils';
 import { z } from 'zod';
-
-export const LogsDiagnosticDataPolicy = {
-  CONCEAL: 'conceal',
-  DISCLOSE: 'disclose',
-} as const;
 
 export const AppConfigSchema = z
   .object({

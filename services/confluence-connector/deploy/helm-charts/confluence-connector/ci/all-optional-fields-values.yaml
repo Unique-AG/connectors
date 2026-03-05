@@ -31,5 +31,5 @@ connectorConfig:
       ingestion:
         ingestionMode: flat
         scopeId: test-scope-id
-        storeInternally: true
-        useV1KeyFormat: false
+        storeInternally: enabled
+        useV1KeyFormat: disabled

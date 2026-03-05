@@ -30,7 +30,7 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 });
 
 const mockScopeManagementService = {
-  initialize: vi.fn().mockResolvedValue(undefined),
+  initialize: vi.fn().mockResolvedValue('/Confluence'),
   ensureSpaceScopes: vi.fn().mockResolvedValue(new Map([['SP', 'scope-1']])),
 } as unknown as ScopeManagementService;
 
@@ -38,7 +38,7 @@ function createService(
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
   contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>,
   fileDiffService: Pick<FileDiffService, 'computeDiff'>,
-  ingestionService: Pick<IngestionService, 'ingestPage' | 'deleteContent'>,
+  ingestionService: Pick<IngestionService, 'ingestPage' | 'deleteContentByKeys'>,
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
     scanner as ConfluencePageScanner,
@@ -54,7 +54,7 @@ describe('ConfluenceSynchronizationService', () => {
   let mockScanner: Pick<ConfluencePageScanner, 'discoverPages'>;
   let mockContentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>;
   let mockFileDiffService: Pick<FileDiffService, 'computeDiff'>;
-  let mockIngestionService: Pick<IngestionService, 'ingestPage' | 'deleteContent'>;
+  let mockIngestionService: Pick<IngestionService, 'ingestPage' | 'deleteContentByKeys'>;
   let service: ConfluenceSynchronizationService;
 
   beforeEach(() => {
@@ -72,16 +72,15 @@ describe('ConfluenceSynchronizationService', () => {
     const diffResult: FileDiffResult = {
       newPageIds: ['1'],
       updatedPageIds: [],
-      deletedPageIds: [],
-      movedPageIds: [],
       deletedKeys: [],
+      movedPageIds: [],
     };
     mockFileDiffService = {
       computeDiff: vi.fn().mockResolvedValue(diffResult),
     };
     mockIngestionService = {
       ingestPage: vi.fn().mockResolvedValue(undefined),
-      deleteContent: vi.fn().mockResolvedValue(undefined),
+      deleteContentByKeys: vi.fn().mockResolvedValue(undefined),
     };
     service = createService(
       mockScanner,
@@ -127,7 +126,7 @@ describe('ConfluenceSynchronizationService', () => {
         }),
       );
 
-      expect(mockLogger.log).toHaveBeenCalledWith('Sync work done');
+      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Sync work done' });
     });
 
     it('resets isScanning after successful sync', async () => {
@@ -146,14 +145,14 @@ describe('ConfluenceSynchronizationService', () => {
       );
     });
 
-    it('resets isScanning and logs errors when content fetcher fails', async () => {
+    it('logs individual page failures without aborting the sync', async () => {
       vi.mocked(mockContentFetcher.fetchPageContent).mockRejectedValue(new Error('fetch failure'));
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
+        expect.objectContaining({ err: expect.any(Error), msg: 'Page ingestion failed' }),
       );
     });
 
@@ -161,29 +160,27 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newPageIds: ['1'],
         updatedPageIds: [],
-        deletedPageIds: ['99'],
-        movedPageIds: [],
         deletedKeys: ['99', '99_attachment.pdf'],
+        movedPageIds: [],
       });
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockIngestionService.deleteContent).toHaveBeenCalledWith(['99', '99_attachment.pdf']);
+      expect(mockIngestionService.deleteContentByKeys).toHaveBeenCalledWith(['99', '99_attachment.pdf']);
     });
 
     it('handles no-change diffs without deleting content', async () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newPageIds: [],
         updatedPageIds: [],
-        deletedPageIds: [],
-        movedPageIds: [],
         deletedKeys: [],
+        movedPageIds: [],
       });
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(mockContentFetcher.fetchPageContent).not.toHaveBeenCalled();
       expect(mockIngestionService.ingestPage).not.toHaveBeenCalled();
-      expect(mockIngestionService.deleteContent).not.toHaveBeenCalled();
+      expect(mockIngestionService.deleteContentByKeys).not.toHaveBeenCalled();
     });
 
     it('logs and exits when file diff fails', async () => {
@@ -210,9 +207,8 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newPageIds: ['2'],
         updatedPageIds: ['3'],
-        deletedPageIds: [],
-        movedPageIds: [],
         deletedKeys: [],
+        movedPageIds: [],
       });
       // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction
       const baseFetched = fetchedPagesFixture[0]!;

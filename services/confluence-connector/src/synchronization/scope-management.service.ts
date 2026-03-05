@@ -2,19 +2,17 @@ import assert from 'node:assert';
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
-import { CONFC_EXTERNAL_ID_PREFIX } from '../constants/ingestion.constants';
+import { EXTERNAL_ID_PREFIX } from '../constants/ingestion.constants';
 
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
-  private rootScopePath: string | null = null;
-
   public constructor(
     private readonly ingestionConfig: IngestionConfig,
     private readonly tenantName: string,
     private readonly uniqueApiClient: UniqueApiClient,
   ) {}
 
-  public async initialize(): Promise<void> {
+  public async initialize(): Promise<string> {
     this.logger.log({
       tenantName: this.tenantName,
       msg: 'Requesting current user ID from Unique API',
@@ -46,17 +44,13 @@ export class ScopeManagementService {
       currentScope = parentScope;
     }
 
-    this.rootScopePath = `/${pathSegments.join('/')}`;
-    this.logger.log({ rootScopePath: this.rootScopePath, msg: 'Scope management initialized' });
+    const rootScopePath = `/${pathSegments.join('/')}`;
+    this.logger.log({ rootScopePath, msg: 'Scope management initialized' });
+    return rootScopePath;
   }
 
-  public async ensureSpaceScopes(spaceKeys: string[]): Promise<Map<string, string>> {
-    assert.ok(
-      this.rootScopePath,
-      'ScopeManagementService not initialized — call initialize() first',
-    );
-
-    const paths = spaceKeys.map((key) => `${this.rootScopePath}/${key}`);
+  public async ensureSpaceScopes(rootScopePath: string, spaceKeys: string[]): Promise<Map<string, string>> {
+    const paths = spaceKeys.map((key) => `${rootScopePath}/${key}`);
     const createdScopes = await this.uniqueApiClient.scopes.createFromPaths(paths, {
       inheritAccess: true,
     });
@@ -68,7 +62,7 @@ export class ScopeManagementService {
       assert.ok(scope, `Failed to create scope for space: ${spaceKey}`);
 
       if (!scope.externalId) {
-        const externalId = `${CONFC_EXTERNAL_ID_PREFIX}${this.tenantName}:${spaceKey}`;
+        const externalId = `${EXTERNAL_ID_PREFIX}${this.tenantName}:${spaceKey}`;
         await this.uniqueApiClient.scopes.updateExternalId(scope.id, externalId);
       }
 

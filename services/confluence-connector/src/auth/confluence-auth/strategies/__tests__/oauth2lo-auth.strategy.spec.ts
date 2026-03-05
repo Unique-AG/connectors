@@ -27,7 +27,7 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 
 describe('OAuth2LoAuthStrategy', () => {
   const authConfig = {
-    mode: AuthMode.OAUTH_2LO,
+    mode: AuthMode.OAuth2Lo,
     clientId: 'my-client-id',
     clientSecret: new Redacted('my-client-secret'),
   };
@@ -131,9 +131,9 @@ describe('OAuth2LoAuthStrategy', () => {
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
       await strategy.acquireToken();
 
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        'Acquiring Confluence cloud token via OAuth 2.0 2LO',
-      );
+      expect(mockLogger.log).toHaveBeenCalledWith({
+        msg: 'Acquiring Confluence cloud token via OAuth 2.0 2LO',
+      });
       expect(mockLogger.error).not.toHaveBeenCalled();
     });
   });
