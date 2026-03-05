@@ -40,7 +40,6 @@ export class CreateRootScopeCommand {
     externalId: string;
     xUserRoles?: string[];
   }): Promise<void> {
-    // const rootScopePartForUser = getRootScopeExternalIdForUser(userProviderUserId);
     const scopeExists = await this.uniqueApi.scopes.getByExternalId(externalId);
     if (scopeExists) {
       return;
