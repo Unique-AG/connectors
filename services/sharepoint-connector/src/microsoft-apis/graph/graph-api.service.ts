@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Readable } from 'node:stream';
 import { Client } from '@microsoft/microsoft-graph-client';
-import type { Drive, List } from '@microsoft/microsoft-graph-types';
+import type { Drive, List, Site } from '@microsoft/microsoft-graph-types';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
@@ -10,6 +10,7 @@ import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
 import { sanitizeError } from '../../utils/normalize-error';
+import { extractSiteNameFromWebUrl } from '../../utils/paths.util';
 import { createSmeared, Smeared } from '../../utils/smeared';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
@@ -244,6 +245,33 @@ export class GraphApiService {
     }
   }
 
+  public async getSubsites(siteId: Smeared): Promise<Site[]> {
+    const logPrefix = `[Site: ${siteId}]`;
+
+    try {
+      const allSubsites = await this.paginateGraphApiRequest<Site>(
+        `/sites/${siteId.value}/sites`,
+        (url) =>
+          this.graphClient
+            .api(url)
+            .select('id,name,displayName,webUrl')
+            .top(GRAPH_API_PAGE_SIZE)
+            .get(),
+      );
+
+      this.logger.log(`${logPrefix} Found ${allSubsites.length} subsites`);
+
+      return allSubsites;
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to fetch subsites. Check Sites.Selected permission.`,
+        siteId,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
+  }
+
   /**
    * Fetch all columns for a specific SharePoint list.
    * Documentation: https://learn.microsoft.com/en-us/graph/api/list-list-columns
@@ -452,9 +480,7 @@ export class GraphApiService {
 
   public async getSiteName(siteId: Smeared): Promise<Smeared> {
     const siteWebUrl = await this.getSiteWebUrl(siteId);
-    const siteName =
-      siteWebUrl.split('/').pop() ?? assert.fail(`Site name not found for site ${siteId}`);
-    return createSmeared(siteName);
+    return createSmeared(extractSiteNameFromWebUrl(siteWebUrl));
   }
 
   private async getDrivesForSite(siteId: Smeared): Promise<Drive[]> {

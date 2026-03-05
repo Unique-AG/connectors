@@ -97,6 +97,8 @@ export interface DriveItem {
     id: string;
     name: string;
     path: string;
+    // Important
+    // This ID seems to be simple UUID of the top site and not the full composite ID of a subsite
     siteId: string;
   };
   folder?: {

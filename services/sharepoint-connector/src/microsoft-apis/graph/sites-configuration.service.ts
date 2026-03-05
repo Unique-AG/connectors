@@ -106,6 +106,7 @@ export class SitesConfigurationService {
         syncStatus: getFieldValue('syncStatus'),
         syncMode: getFieldValue('syncMode'),
         permissionsInheritanceMode: getFieldValue('permissionsInheritanceMode'),
+        subsitesScan: getFieldValue('subsitesScan'),
       };
 
       return SiteConfigSchema.parse(siteConfig);

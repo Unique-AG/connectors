@@ -51,6 +51,9 @@ data:
           {{- if .permissionsInheritanceMode }}
           permissionsInheritanceMode: {{ .permissionsInheritanceMode | quote }}
           {{- end }}
+          {{- if .subsitesScan }}
+          subsitesScan: {{ .subsitesScan | quote }}
+          {{- end }}
         {{- end }}
       {{- end }}
     # Unique API Configuration

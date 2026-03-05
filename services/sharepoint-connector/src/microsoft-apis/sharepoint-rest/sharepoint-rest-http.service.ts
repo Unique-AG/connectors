@@ -7,6 +7,7 @@ import { Dispatcher, interceptors } from 'undici';
 import { Config } from '../../config';
 import { ProxyService } from '../../proxy';
 import { shouldConcealLogs } from '../../utils/logging.util';
+import { encodeSiteNameForPath } from '../../utils/paths.util';
 import type { Smeared } from '../../utils/smeared';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { createLoggingInterceptor } from './logging.interceptor';
@@ -71,7 +72,8 @@ export class SharepointRestHttpService {
   public async requestSingle<T>(siteName: Smeared, apiPath: string): Promise<T> {
     const token = await this.microsoftAuthenticationService.getAccessToken('sharepoint-rest');
     const cleanedApiPath = apiPath.startsWith('/') ? apiPath.slice(1) : apiPath;
-    const path = `/sites/${siteName.value}/_api/${cleanedApiPath}`;
+    const encodedSiteName = siteName.transform((value) => encodeSiteNameForPath(value));
+    const path = `/sites/${encodedSiteName.value}/_api/${cleanedApiPath}`;
     const { statusCode, body } = await this.client.request({
       origin: this.origin,
       method: 'GET',
@@ -85,7 +87,7 @@ export class SharepointRestHttpService {
 
     assert.ok(
       200 <= statusCode && statusCode < 300,
-      `Failed to request SharePoint endpoint ${path.replace(siteName.value, `${siteName}`)}: ${statusCode}`,
+      `Failed to request SharePoint endpoint ${path.replace(encodedSiteName.value, `${encodedSiteName}`)}: ${statusCode}`,
     );
 
     return body.json() as Promise<T>;
@@ -109,13 +111,14 @@ export class SharepointRestHttpService {
 
     for (const [chunkIndex, apiPathsChunk] of chunkedApiPaths.entries()) {
       const boundary = `batch_${randomUUID()}`;
+      const encodedSiteName = siteName.transform((value) => encodeSiteNameForPath(value));
       const fullApiPaths = apiPathsChunk
         .map((apiPath) => (apiPath.startsWith('/') ? apiPath.slice(1) : apiPath))
-        .map((apiPath) => `/sites/${siteName.value}/_api/web/${apiPath}`);
+        .map((apiPath) => `/sites/${encodedSiteName.value}/_api/web/${apiPath}`);
       const batchItems = fullApiPaths.map((apiPath) => this.buildBatchItem(apiPath, boundary));
 
       const redactedApiPaths = fullApiPaths.map((path) =>
-        path.replace(siteName.value, `${siteName}`),
+        path.replace(encodedSiteName.value, `${encodedSiteName}`),
       );
 
       this.logger.debug({
@@ -127,7 +130,7 @@ export class SharepointRestHttpService {
       });
 
       const requestBody = `${batchItems.join('\r\n\r\n')}\r\n--${boundary}--\r\n`;
-      const path = `/sites/${siteName.value}/_api/$batch`;
+      const path = `/sites/${encodedSiteName.value}/_api/$batch`;
 
       const requestStartTime = Date.now();
       const { statusCode, body, headers } = await this.client.request({
@@ -145,7 +148,7 @@ export class SharepointRestHttpService {
       const isSuccess = 200 <= statusCode && statusCode < 300;
 
       if (!isSuccess) {
-        const redactedPath = path.replace(siteName.value, `${siteName}`);
+        const redactedPath = path.replace(encodedSiteName.value, `${encodedSiteName}`);
 
         const errorBody = await body.text();
         this.logger.error({

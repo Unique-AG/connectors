@@ -41,7 +41,10 @@ export const ProcessingConfigSchema = z.object({
       (val) => (val === '' ? undefined : val),
       z.coerce.number().int().positive().optional(),
     )
-    .describe('For testing purpose. Maximum number of files to scan. Unlimited if not set'),
+    .describe(
+      'For testing purposes. Limit the number of files scanned. Limit is per site in case ' +
+        'of subsite scan and is applied separately to files and site pages Unlimited if not set',
+    ),
   scanIntervalCron: z
     .string()
     .default(CRON_EVERY_15_MINUTES)

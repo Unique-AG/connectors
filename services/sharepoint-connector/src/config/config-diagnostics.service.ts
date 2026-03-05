@@ -19,6 +19,7 @@ export class ConfigDiagnosticsService implements OnModuleInit {
     this.logConfig('SharePoint Config', this.configService.get('sharepoint', { infer: true }));
     this.logConfig('Unique Config', this.configService.get('unique', { infer: true }));
     this.logConfig('Processing Config', this.configService.get('processing', { infer: true }));
+    this.logConfig('Proxy Config', this.configService.get('proxy', { infer: true }));
   }
 
   public shouldLogConfig(event: ConfigEmitEventType): boolean {

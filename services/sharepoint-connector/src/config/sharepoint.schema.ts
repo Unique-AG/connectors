@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS } from '../constants/defaults.constants';
+import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import { IngestionMode } from '../constants/ingestion.constants';
-import { StoreInternallyMode } from '../constants/store-internally-mode.enum';
 import type { Redacted } from '../utils/redacted';
 import { createSmeared, Smeared } from '../utils/smeared';
 import {
@@ -93,13 +93,24 @@ export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 // Site Configuration
 // ==========================================
 
+const compoundSiteIdSchema = z.string().refine(
+  (val) => {
+    const parts = val.split(',');
+    if (parts.length !== 3 || !parts[0]) {
+      return false;
+    }
+    return z.uuidv4().safeParse(parts[1]).success && z.uuidv4().safeParse(parts[2]).success;
+  },
+  { message: 'Invalid compound site ID format (expected: hostname,siteCollectionId,webId)' },
+);
+
 export const SiteConfigSchema = z.object({
   siteId: z
     .string()
     .trim()
-    .pipe(z.uuidv4())
+    .pipe(z.union([z.uuidv4(), compoundSiteIdSchema]))
     .transform((val) => createSmeared(val))
-    .describe('SharePoint site ID'),
+    .describe('SharePoint site ID (UUID or compound format: hostname,siteCollectionId,webId)'),
   syncColumnName: z
     .string()
     .trim()
@@ -122,8 +133,8 @@ export const SiteConfigSchema = z.object({
       'Maximum number of files to ingest per site in a single sync run. If the number of new + updated files exceeds this limit, the sync for that site will fail.',
     ),
   storeInternally: z
-    .enum([StoreInternallyMode.Enabled, StoreInternallyMode.Disabled])
-    .default(StoreInternallyMode.Enabled)
+    .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+    .default(EnabledDisabledMode.Enabled)
     .describe('Whether to store content internally in Unique or not.'),
   syncStatus: z
     .enum(['active', 'inactive', 'deleted'])
@@ -139,6 +150,10 @@ export const SiteConfigSchema = z.object({
         'content_and_permissions: sync both content and permissions',
     ),
   permissionsInheritanceMode: PermissionsInheritanceModeSchema,
+  subsitesScan: z
+    .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+    .default(EnabledDisabledMode.Disabled)
+    .describe('Whether to recursively discover and sync content from subsites.'),
 });
 
 export type SiteConfig = z.infer<typeof SiteConfigSchema>;

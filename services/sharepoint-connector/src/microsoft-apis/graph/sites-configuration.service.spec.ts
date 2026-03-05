@@ -40,6 +40,7 @@ describe('SitesConfigurationService', () => {
                   syncStatus: 'active',
                   syncMode: 'content_and_permissions',
                   permissionsInheritanceMode: 'inherit_scopes_and_files',
+                  subsitesScan: 'disabled',
                 },
               ],
             };
@@ -67,6 +68,7 @@ describe('SitesConfigurationService', () => {
         syncStatus: 'active',
         syncMode: 'content_and_permissions',
         permissionsInheritanceMode: 'inherit_scopes_and_files',
+        subsitesScan: 'disabled',
       });
     });
   });
@@ -87,6 +89,7 @@ describe('SitesConfigurationService', () => {
           name: 'internal_permissionsInheritanceMode',
           displayName: 'permissionsInheritanceMode',
         },
+        { id: 'c10', name: 'internal_subsitesScan', displayName: 'subsitesScan' },
       ];
 
       mockGraphApiService.getListColumns.mockResolvedValue(mockColumns);
@@ -103,6 +106,7 @@ describe('SitesConfigurationService', () => {
           internal_syncStatus: 'active',
           internal_syncMode: 'content_and_permissions',
           internal_permissionsInheritanceMode: 'inherit_scopes_and_files',
+          internal_subsitesScan: 'disabled',
         },
       };
 
@@ -126,6 +130,7 @@ describe('SitesConfigurationService', () => {
         syncStatus: 'active',
         syncMode: 'content_and_permissions',
         permissionsInheritanceMode: 'inherit_scopes_and_files',
+        subsitesScan: 'disabled',
       });
 
       expect(mockGraphApiService.getListItems).toHaveBeenCalledWith(
@@ -153,6 +158,7 @@ describe('SitesConfigurationService', () => {
       syncStatus: 'internal_syncStatus',
       syncMode: 'internal_syncMode',
       permissionsInheritanceMode: 'internal_permissionsInheritanceMode',
+      subsitesScan: 'internal_subsitesScan',
     };
 
     it('correctly transforms valid list item to SiteConfig', () => {
@@ -168,6 +174,7 @@ describe('SitesConfigurationService', () => {
           internal_syncStatus: 'active',
           internal_syncMode: 'content_and_permissions',
           internal_permissionsInheritanceMode: 'inherit_scopes_and_files',
+          internal_subsitesScan: 'disabled',
         },
       } as unknown as ListItem;
 
@@ -184,6 +191,7 @@ describe('SitesConfigurationService', () => {
         syncStatus: 'active',
         syncMode: 'content_and_permissions',
         permissionsInheritanceMode: 'inherit_scopes_and_files',
+        subsitesScan: 'disabled',
       });
     });
 

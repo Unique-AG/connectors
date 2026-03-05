@@ -7,7 +7,7 @@ import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-p
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { Smeared } from '../utils/smeared';
+import { createSmeared, Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
@@ -17,6 +17,8 @@ import type { SharepointSyncContext } from './sharepoint-sync-context.interface'
 const mockSiteConfig = createMockSiteConfig({
   maxFilesToIngest: 1000,
 });
+
+const defaultSiteId = createSmeared('site-id');
 
 describe('ContentSyncService', () => {
   let service: ContentSyncService;
@@ -95,6 +97,7 @@ describe('ContentSyncService', () => {
     it('throws an error if the number of files to ingest exceeds the limit', async () => {
       const items = [
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '1',
@@ -103,6 +106,7 @@ describe('ContentSyncService', () => {
           },
         },
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '2',
@@ -118,6 +122,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -140,6 +145,7 @@ describe('ContentSyncService', () => {
     it('does not throw an error if the number of files to ingest is within the limit', async () => {
       const items = [
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '1',
@@ -155,6 +161,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -177,6 +184,7 @@ describe('ContentSyncService', () => {
     it('does not throw an error if the limit is not set', async () => {
       const items = [
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '1',
@@ -192,6 +200,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -207,6 +216,7 @@ describe('ContentSyncService', () => {
     it('does not throw an error when no files need to be ingested', async () => {
       const items = [
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: 'existing-file',
@@ -222,6 +232,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -253,6 +264,7 @@ describe('ContentSyncService', () => {
     it('does not throw an error when total files to ingest equals the limit', async () => {
       const items = [
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '1',
@@ -268,6 +280,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -287,6 +300,7 @@ describe('ContentSyncService', () => {
     it('throws an error with correct message format when limit is exceeded', async () => {
       const items = [
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '1',
@@ -295,6 +309,7 @@ describe('ContentSyncService', () => {
           },
         },
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '2',
@@ -303,6 +318,7 @@ describe('ContentSyncService', () => {
           },
         },
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '3',
@@ -323,6 +339,7 @@ describe('ContentSyncService', () => {
           maxFilesToIngest: 2,
         },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -344,6 +361,7 @@ describe('ContentSyncService', () => {
     it('handles limit validation with only new files', async () => {
       const items = [
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '1',
@@ -352,6 +370,7 @@ describe('ContentSyncService', () => {
           },
         },
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '2',
@@ -367,6 +386,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -386,6 +406,7 @@ describe('ContentSyncService', () => {
     it('handles limit validation with only updated files', async () => {
       const items = [
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '1',
@@ -394,6 +415,7 @@ describe('ContentSyncService', () => {
           },
         },
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '2',
@@ -409,6 +431,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -428,6 +451,7 @@ describe('ContentSyncService', () => {
     it('throws an error when file diff would delete all files in Unique', async () => {
       const items = [
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '1',
@@ -436,6 +460,7 @@ describe('ContentSyncService', () => {
           },
         },
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '2',
@@ -451,6 +476,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -478,6 +504,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -497,6 +524,7 @@ describe('ContentSyncService', () => {
     it('does not throw an error when partial deletions occur', async () => {
       const items = [
         {
+          siteId: defaultSiteId,
           itemType: 'driveItem',
           item: {
             id: '1',
@@ -512,6 +540,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
@@ -547,6 +576,7 @@ describe('ContentSyncService', () => {
         siteName: new Smeared('test-site', false),
         siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
         isInitialSync: false,
+        discoveredSubsites: [],
       };
 
       vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({

@@ -113,6 +113,7 @@ describe('ScopeManagementService', () => {
       scopeId: 'root-scope-123',
     }),
     isInitialSync: false,
+    discoveredSubsites: [],
   };
 
   let service: ScopeManagementService;
@@ -451,48 +452,227 @@ describe('ScopeManagementService', () => {
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].log).toHaveBeenCalledWith(expect.stringContaining('[Site:'));
     });
-  });
 
-  describe('buildItemIdToScopeIdMap', () => {
-    it('maps item identifiers to scope identifiers', () => {
-      const items = [createDriveContentItem('UniqueAG/SitePages')];
-      const item = items[0];
+    describe('subsite external ID assignment', () => {
+      let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
 
-      const result = service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
+      const makeSubsite = (name: string, relativePath: string, siteId: string) => ({
+        siteId: new Smeared(siteId, false),
+        name: new Smeared(name, false),
+        relativePath: new Smeared(relativePath, false),
+      });
 
-      // biome-ignore lint/style/noNonNullAssertion: Test data is guaranteed to exist
-      expect(result.get(item!.item.id)).toBe('scope_3');
-    });
+      const createSubsiteContentItem = (path: string, siteId: string): SharepointContentItem => {
+        const item = createDriveContentItem(path);
+        return {
+          ...item,
+          siteId: new Smeared(siteId, false),
+          syncSiteId: new Smeared('site-123', false),
+        };
+      };
 
-    it('decodes URL-encoded paths before lookup', () => {
-      const items = [createDriveContentItem('UniqueAG/Freigegebene%20Dokumente/General')];
-      const item = items[0];
+      const createSubsiteDirectoryItem = (
+        webUrl: string,
+        siteId: string,
+        driveId: string,
+        folderId: string,
+      ): SharepointDirectoryItem =>
+        ({
+          itemType: 'directory',
+          siteId: new Smeared(siteId, false),
+          syncSiteId: new Smeared('site-123', false),
+          driveId,
+          driveName: 'Documents',
+          folderPath: '/path',
+          fileName: '',
+          item: {
+            id: folderId,
+            webUrl,
+            listItem: {
+              webUrl: '',
+              id: 'li-1',
+              '@odata.etag': 'e',
+              eTag: 'e',
+              createdDateTime: '2025-01-01T00:00:00Z',
+              lastModifiedDateTime: '2025-01-01T00:00:00Z',
+              fields: {},
+            },
+          },
+        }) as SharepointDirectoryItem;
 
-      const result = service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
+      beforeEach(async () => {
+        updateScopeExternalIdMock = vi
+          .fn()
+          .mockResolvedValue({ externalId: 'updated-external-id' });
 
-      // The scope for this path doesn't exist in mockScopes, so it should return undefined
-      // biome-ignore lint/style/noNonNullAssertion: Test data is guaranteed to exist
-      expect(result.get(item!.item.id)).toBeUndefined();
-    });
+        const { unit } = await TestBed.solitary(ScopeManagementService)
+          .mock<UniqueScopesService>(UniqueScopesService)
+          .impl((stubFn) => ({
+            ...stubFn(),
+            createScopesBasedOnPaths: vi.fn().mockImplementation((paths: string[]) =>
+              paths.map((path, i) => ({
+                id: `scope-${i}`,
+                name: path.split('/').pop(),
+                parentId: null,
+                externalId: null,
+              })),
+            ),
+            updateScopeExternalId: updateScopeExternalIdMock,
+          }))
+          .compile();
 
-    it('returns empty map when scopes is empty', () => {
-      const items = [createDriveContentItem('UniqueAG/SitePages')];
+        service = unit;
 
-      const result = service.buildItemIdToScopeIdMap(items, [], mockContext);
+        Object.defineProperty(service, 'logger', {
+          value: {
+            log: vi.fn(),
+            error: vi.fn(),
+            warn: vi.fn(),
+            debug: vi.fn(),
+            verbose: vi.fn(),
+          },
+          writable: true,
+        });
+      });
 
-      expect(result.size).toBe(0);
-    });
+      it('assigns subsite: and drive: for subsite directories', async () => {
+        const subASiteId = 'host.com,col-a,web-a';
+        const context: SharepointSyncContext = {
+          ...mockContext,
+          discoveredSubsites: [makeSubsite('SubA', 'SubA', subASiteId)],
+        };
+        const item = createSubsiteContentItem('SubA/Documents/Reports', subASiteId);
+        const directory = createSubsiteDirectoryItem(
+          'https://example.sharepoint.com/sites/test1/SubA/Documents/Reports',
+          subASiteId,
+          'sub-drive',
+          'sub-folder',
+        );
 
-    it('logs warning when scope is not present in cache', () => {
-      const items = [createDriveContentItem('UniqueAG/UnknownFolder')];
+        await service.batchCreateScopes([item], [directory], context);
 
-      service.buildItemIdToScopeIdMap(items, mockScopes, mockContext);
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:drive:${subASiteId}/sub-drive` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:folder:${subASiteId}/sub-folder` }),
+        );
+      });
 
-      // The logger is globally mocked, so we can check the mock calls
-      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].warn).toHaveBeenCalledWith(
-        expect.stringContaining('Scope not found in cache for path'),
-      );
+      it('strips nested subsite prefix so drive is correctly identified', async () => {
+        const subASiteId = 'host.com,a1,a2';
+        const subBSiteId = 'host.com,b1,b2';
+        const context: SharepointSyncContext = {
+          ...mockContext,
+          discoveredSubsites: [
+            makeSubsite('SubA', 'SubA', subASiteId),
+            makeSubsite('SubB', 'SubA/SubB', subBSiteId),
+          ],
+        };
+        const item = createSubsiteContentItem('SubA/SubB/Docs/Archive', subBSiteId);
+        const directory = createSubsiteDirectoryItem(
+          'https://example.sharepoint.com/sites/test1/SubA/SubB/Docs/Archive',
+          subBSiteId,
+          'nested-drive',
+          'nested-folder',
+        );
+
+        await service.batchCreateScopes([item], [directory], context);
+
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:subsite:${subBSiteId}` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:drive:${subBSiteId}/nested-drive` }),
+        );
+      });
+
+      it('assigns drive externalId from items when subsite drive has no subdirectories', async () => {
+        const subASiteId = 'host.com,col-a,web-a';
+        const context: SharepointSyncContext = {
+          ...mockContext,
+          discoveredSubsites: [makeSubsite('SubA', 'SubA', subASiteId)],
+        };
+        const item = createSubsiteContentItem('SubA/Shared Documents', subASiteId);
+
+        await service.batchCreateScopes([item], [], context);
+
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:drive:${subASiteId}/drive-1` }),
+        );
+      });
+
+      it('assigns correct IDs for both root-site and subsite directories together', async () => {
+        const subASiteId = 'host.com,col-a,web-a';
+        const context: SharepointSyncContext = {
+          ...mockContext,
+          discoveredSubsites: [makeSubsite('SubA', 'SubA', subASiteId)],
+        };
+        const rootItem = createDriveContentItem('Documents/Folder1');
+        const rootDirectory: SharepointDirectoryItem = {
+          itemType: 'directory',
+          siteId: new Smeared('site-123', false),
+          driveId: 'root-drive',
+          driveName: 'Documents',
+          folderPath: '/Documents/Folder1',
+          fileName: '',
+          item: {
+            id: 'root-folder',
+            webUrl: 'https://example.sharepoint.com/sites/test1/Documents/Folder1',
+          },
+        } as SharepointDirectoryItem;
+        const subsiteItem = createSubsiteContentItem('SubA/Docs/Reports', subASiteId);
+        const subsiteDirectory = createSubsiteDirectoryItem(
+          'https://example.sharepoint.com/sites/test1/SubA/Docs/Reports',
+          subASiteId,
+          'sub-drive',
+          'sub-folder',
+        );
+
+        await service.batchCreateScopes(
+          [rootItem, subsiteItem],
+          [rootDirectory, subsiteDirectory],
+          context,
+        );
+
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: 'spc:drive:site-123/root-drive' }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: 'spc:folder:site-123/root-folder' }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:drive:${subASiteId}/sub-drive` }),
+        );
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ value: `spc:folder:${subASiteId}/sub-folder` }),
+        );
+      });
     });
   });
 
@@ -531,12 +711,14 @@ describe('ScopeManagementService', () => {
         { id: 'scope-2', name: 'AnotherScope', externalId: null },
       ];
       const paths = ['/test1/TestScope', '/test1/AnotherScope'];
-      const directories: SharepointDirectoryItem[] = []; // No directories provided
+      const items: SharepointContentItem[] = [];
+      const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
       await (service as any).updateNewlyCreatedScopesWithExternalId(
         scopes,
         paths,
+        items,
         directories,
         mockContext,
       );
@@ -556,12 +738,14 @@ describe('ScopeManagementService', () => {
         { id: 'scope-2', name: 'SitePages', externalId: null },
       ];
       const paths = ['/test1', '/test1/SitePages'];
+      const items: SharepointContentItem[] = [];
       const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
       await (service as any).updateNewlyCreatedScopesWithExternalId(
         scopes,
         paths,
+        items,
         directories,
         mockContext,
       );
@@ -577,12 +761,14 @@ describe('ScopeManagementService', () => {
       ];
       const paths = ['/', '/test1/ChildScope'];
       // mockContext.rootPath is '/test1'
+      const items: SharepointContentItem[] = [];
       const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
       await (service as any).updateNewlyCreatedScopesWithExternalId(
         scopes,
         paths,
+        items,
         directories,
         mockContext,
       );
@@ -596,12 +782,14 @@ describe('ScopeManagementService', () => {
     it('logs debug message when updating externalId', async () => {
       const scopes = [{ id: 'scope-1', name: 'test1', externalId: null }];
       const paths = ['/test1'];
+      const items: SharepointContentItem[] = [];
       const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
       await (service as any).updateNewlyCreatedScopesWithExternalId(
         scopes,
         paths,
+        items,
         directories,
         mockContext,
       );
@@ -616,12 +804,14 @@ describe('ScopeManagementService', () => {
       updateScopeExternalIdMock.mockRejectedValue(new Error('Update failed'));
       const scopes = [{ id: 'scope-1', name: 'test1', externalId: null }];
       const paths = ['/test1'];
+      const items: SharepointContentItem[] = [];
       const directories: SharepointDirectoryItem[] = [];
 
       // biome-ignore lint/suspicious/noExplicitAny: Testing private method
       await (service as any).updateNewlyCreatedScopesWithExternalId(
         scopes,
         paths,
+        items,
         directories,
         mockContext,
       );
@@ -631,6 +821,59 @@ describe('ScopeManagementService', () => {
         msg: 'Failed to update externalId for scope scope-1',
         error: expect.any(Object),
       });
+    });
+
+    it('registers drive-level externalId from items when drive has no subdirectories', async () => {
+      const scopes = [{ id: 'scope-1', name: 'Shared Documents', externalId: null }];
+      const paths = ['/test1/Shared Documents'];
+      const items = [createDriveContentItem('Shared Documents')];
+      const directories: SharepointDirectoryItem[] = [];
+
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).updateNewlyCreatedScopesWithExternalId(
+        scopes,
+        paths,
+        items,
+        directories,
+        mockContext,
+      );
+
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+        'scope-1',
+        expect.objectContaining({ value: 'spc:drive:site-123/drive-1' }),
+      );
+    });
+
+    it('uses root siteId in unknown fallback for paths under a subsite', async () => {
+      const subASiteId = 'host.com,col-a,web-a';
+      const context: SharepointSyncContext = {
+        ...mockContext,
+        discoveredSubsites: [
+          {
+            siteId: new Smeared(subASiteId, false),
+            name: new Smeared('test-site/SubA', false),
+            relativePath: new Smeared('SubA', false),
+          },
+        ],
+      };
+      const scopes = [{ id: 'scope-1', name: 'UnknownLib', externalId: null }];
+      const paths = ['/test1/SubA/UnknownLib'];
+      const items: SharepointContentItem[] = [];
+      const directories: SharepointDirectoryItem[] = [];
+
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).updateNewlyCreatedScopesWithExternalId(
+        scopes,
+        paths,
+        items,
+        directories,
+        context,
+      );
+
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
+      const [, externalId] = updateScopeExternalIdMock.mock.calls[0] as [string, Smeared];
+      expect(externalId.value).toMatch(/^spc:unknown:site-123::\/test1\/SubA\/UnknownLib-/);
     });
 
     describe('conflict marking', () => {
@@ -675,12 +918,14 @@ describe('ScopeManagementService', () => {
 
         const scopes = [{ id: 'new-scope-id', name: 'TestScope', externalId: null }];
         const paths = ['/test1/TestScope'];
+        const items: SharepointContentItem[] = [];
         const directories: SharepointDirectoryItem[] = [];
 
         // biome-ignore lint/suspicious/noExplicitAny: Testing private method
         await (service as any).updateNewlyCreatedScopesWithExternalId(
           scopes,
           paths,
+          items,
           directories,
           mockContext,
         );
@@ -694,7 +939,7 @@ describe('ScopeManagementService', () => {
         expect(renameId).toBe('old-scope-id');
         expect(renameExternalId).toBeInstanceOf(Smeared);
         expect(renameExternalId.value).toMatch(
-          /^spc:pending-delete:site-123\/unknown:site-123\/TestScope-/,
+          /^spc:pending-delete:site-123\/unknown:site-123::\/test1\/TestScope-/,
         );
 
         expect(updateScopeExternalIdMock).toHaveBeenNthCalledWith(
@@ -709,12 +954,14 @@ describe('ScopeManagementService', () => {
 
         const scopes = [{ id: 'new-scope-id', name: 'TestScope', externalId: null }];
         const paths = ['/test1/TestScope'];
+        const items: SharepointContentItem[] = [];
         const directories: SharepointDirectoryItem[] = [];
 
         // biome-ignore lint/suspicious/noExplicitAny: Testing private method
         await (service as any).updateNewlyCreatedScopesWithExternalId(
           scopes,
           paths,
+          items,
           directories,
           mockContext,
         );
@@ -737,12 +984,14 @@ describe('ScopeManagementService', () => {
 
         const scopes = [{ id: 'new-scope-id', name: 'TestScope', externalId: null }];
         const paths = ['/test1/TestScope'];
+        const items: SharepointContentItem[] = [];
         const directories: SharepointDirectoryItem[] = [];
 
         // biome-ignore lint/suspicious/noExplicitAny: Testing private method
         await (service as any).updateNewlyCreatedScopesWithExternalId(
           scopes,
           paths,
+          items,
           directories,
           mockContext,
         );
@@ -764,12 +1013,14 @@ describe('ScopeManagementService', () => {
         const initialSyncContext = { ...mockContext, isInitialSync: true };
         const scopes = [{ id: 'new-scope-id', name: 'TestScope', externalId: null }];
         const paths = ['/test1/TestScope'];
+        const items: SharepointContentItem[] = [];
         const directories: SharepointDirectoryItem[] = [];
 
         // biome-ignore lint/suspicious/noExplicitAny: Testing private method
         await (service as any).updateNewlyCreatedScopesWithExternalId(
           scopes,
           paths,
+          items,
           directories,
           initialSyncContext,
         );

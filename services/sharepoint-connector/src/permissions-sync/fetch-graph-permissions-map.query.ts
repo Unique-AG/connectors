@@ -24,24 +24,22 @@ export class FetchGraphPermissionsMapQuery {
 
   public constructor(private readonly graphApiService: GraphApiService) {}
 
-  public async run(siteId: Smeared, items: AnySharepointItem[]): Promise<PermissionsMap> {
-    const siteName = await this.graphApiService.getSiteName(siteId);
-
+  public async run(items: AnySharepointItem[], rootSiteName: Smeared): Promise<PermissionsMap> {
     const permissionsMap: PermissionsMap = {};
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
       const permissionsFetcher: PermissionsFetcher = {
         driveItem: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
         listItem: () =>
-          this.graphApiService.getListItemPermissions(siteId, item.driveId, item.item.id),
+          this.graphApiService.getListItemPermissions(item.siteId, item.driveId, item.item.id),
         directory: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
       };
 
       const sharePointPermissions = await permissionsFetcher[item.itemType]();
       permissionsMap[buildIngestionItemKey(item)] = this.mapSharePointPermissionsToOurPermissions(
         sharePointPermissions,
-        siteName,
         item.item.id,
+        rootSiteName,
       );
     }
     return permissionsMap;
@@ -49,14 +47,14 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSharePointPermissionsToOurPermissions(
     simplePermissions: SimplePermission[],
-    siteName: Smeared,
     itemId: string,
+    rootSiteName: Smeared,
   ): Permission[] {
     return simplePermissions.flatMap((permission) => {
       if (isNonNullish(permission.grantedToV2)) {
         const itemPermission = this.mapSharePointIdentitySetToOurPermission(
           permission.grantedToV2,
-          siteName,
+          rootSiteName,
         );
         if (isNonNullish(itemPermission)) {
           return [itemPermission];
@@ -71,7 +69,7 @@ export class FetchGraphPermissionsMapQuery {
 
         const itemPermissions = permission.grantedToIdentitiesV2
           .map((simpleIdentitySet) =>
-            this.mapSharePointIdentitySetToOurPermission(simpleIdentitySet, siteName),
+            this.mapSharePointIdentitySetToOurPermission(simpleIdentitySet, rootSiteName),
           )
           .filter(isNonNullish);
         if (itemPermissions.length > 0) {
@@ -114,14 +112,12 @@ export class FetchGraphPermissionsMapQuery {
 
   private mapSharePointIdentitySetToOurPermission(
     simpleIdentitySet: SimpleIdentitySet,
-    siteName: Smeared,
+    rootSiteName: Smeared,
   ): Permission | null {
     if (isNonNullish(simpleIdentitySet.group) && isNonNullish(simpleIdentitySet.siteUser)) {
       const groupId = normalizeMsGroupId(simpleIdentitySet.group.id);
-      // TODO: This is basically the case of "Everyone except external users". How are we supposed
-      //       to handle this case? For now we return null to skip it. Does it happen outside of
-      //       SharePoint permissions visible in Site Groups? If it doesn't, we can safely ignore
-      //       it here.
+      // We skip "Everyone except external users" group because we wuld rather err on the side of
+      // caution and not include any wildcard groups.
       if (groupId.startsWith(ALL_USERS_GROUP_ID_PREFIX)) {
         return null;
       }
@@ -140,9 +136,12 @@ export class FetchGraphPermissionsMapQuery {
     }
 
     if (isNonNullish(simpleIdentitySet.siteGroup)) {
+      // SiteGroups are scoped to the site collection, not individual webs/subsites.
+      // We always use the root site name so that the same siteGroup isn't duplicated
+      // when it appears on items from both the root site and its subsites.
       return {
         type: 'siteGroup',
-        id: `${siteName.value}|${simpleIdentitySet.siteGroup.id}`,
+        id: `${rootSiteName.value}|${simpleIdentitySet.siteGroup.id}`,
         name: simpleIdentitySet.siteGroup.displayName,
       };
     }

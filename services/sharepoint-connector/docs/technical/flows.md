@@ -86,6 +86,117 @@ sequenceDiagram
     Note over Connector: Sync cycle complete
 ```
 
+## Subsite Discovery and Sync Flow
+
+When `subsitesScan` is enabled for a site, the connector extends the per-site content sync with recursive subsite discovery and content fetching. All steps run sequentially.
+
+### Overview
+
+```mermaid
+flowchart TB
+    subgraph SiteSync["Per-Site Sync"]
+        InitScope["Initialize Root Scope"]
+        FetchSiteName["Fetch Site Name"]
+    end
+
+    subgraph SubsiteDiscovery["Subsite Discovery"]
+        ListSubsites["GET /sites/{siteId}/sites"]
+        FilterConfigured["Exclude standalone-configured subsites"]
+        Recurse["Recurse into child subsites"]
+    end
+
+    subgraph ContentFetch["Content Fetching"]
+        FetchParentItems["Fetch parent site items"]
+        FetchSubsiteItems["Fetch items per subsite"]
+        MergeItems["Merge all items"]
+    end
+
+    subgraph Processing["Processing"]
+        Scopes["Create scopes"]
+        ContentSync["Content sync"]
+        PermSync["Permission sync (if enabled)"]
+    end
+
+    InitScope --> FetchSiteName
+    FetchSiteName --> ListSubsites
+    ListSubsites --> FilterConfigured
+    FilterConfigured --> Recurse
+    Recurse -->|"For each child"| ListSubsites
+    Recurse --> FetchParentItems
+
+    FetchParentItems --> FetchSubsiteItems
+    FetchSubsiteItems --> MergeItems
+
+    MergeItems --> Scopes
+    Scopes --> ContentSync
+    ContentSync --> PermSync
+```
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Connector as SharePoint Connector
+    participant Graph as Microsoft Graph API
+    participant Unique as Unique Platform
+
+    Note over Connector: subsitesScan = enabled
+
+    Connector->>Unique: Initialize root scope
+    Connector->>Graph: GET /sites/{siteId} (fetch site name)
+    Graph->>Connector: Site metadata
+
+    rect rgb(40, 40, 80)
+        Note over Connector,Graph: Recursive subsite discovery
+        Connector->>Graph: GET /sites/{siteId}/sites
+        Graph->>Connector: Direct child subsites
+
+        loop For each child subsite
+            Note over Connector: Skip if subsite is<br/>configured standalone
+            Connector->>Graph: GET /sites/{childId}/sites
+            Graph->>Connector: Nested subsites (recurse)
+        end
+    end
+
+    rect rgb(40, 80, 40)
+        Note over Connector,Graph: Fetch parent site items
+        Connector->>Graph: GET /sites/{siteId}/drives
+        Graph->>Connector: Document libraries
+        loop For each drive
+            Connector->>Graph: GET /drives/{driveId}/root/children
+            Graph->>Connector: Items with sync column
+        end
+    end
+
+    rect rgb(40, 80, 40)
+        Note over Connector,Graph: Fetch subsite items (sequential)
+        loop For each discovered subsite
+            Connector->>Graph: GET /sites/{subsiteId}/drives
+            Graph->>Connector: Subsite document libraries
+            loop For each drive
+                Connector->>Graph: GET /drives/{driveId}/root/children
+                Graph->>Connector: Subsite items
+            end
+            Note over Connector: Tag items with syncSiteId<br/>(parent site ID)
+        end
+    end
+
+    Note over Connector: All items collected<br/>(parent + subsites)
+
+    Connector->>Unique: Create scopes<br/>(subsites as folders in parent's tree)
+    Connector->>Unique: Content sync (new/modified/deleted)
+    Connector->>Unique: Permission sync
+    Connector->>Unique: Delete orphaned scopes
+```
+
+### Key Behaviors
+
+- **Recursive discovery**: The connector walks the full subsite tree, not just direct children.
+- **Deduplication**: Subsites already configured as standalone sites (via compound ID) are skipped along with their descendants.
+- **Unified scope tree**: Subsite content is placed under the parent site's root scope. A subsite at path `ParentSite/SubA` creates scopes like `/RootScope/SubA/Documents/...`.
+- **File diff keying**: Subsite items carry a `syncSiteId` pointing to the parent site. The file-diff mechanism uses this to scope all items (parent + subsites) under one diff key, ensuring correct deletion detection when subsites are removed.
+
 ## Permission Sync Flow
 
 When enabled, the permission sync flow synchronizes SharePoint permissions to Unique.

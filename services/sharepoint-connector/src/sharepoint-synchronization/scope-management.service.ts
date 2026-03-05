@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { isNonNullish, isNullish, prop, pullObject, sortBy } from 'remeda';
+import { isNonNullish, isNullish, sortBy, unique } from 'remeda';
 import { getInheritanceSettings } from '../config/sharepoint.schema';
 import { IngestionMode } from '../constants/ingestion.constants';
 import type {
@@ -83,11 +83,11 @@ export class ScopeManagementService {
         );
         rootScope.externalId = updatedScope.externalId;
         this.logger.debug(
-          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${buildSiteExternalId(siteId)}`,
+          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${externalId}`,
         );
       } catch (error) {
         this.logger.warn({
-          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${buildSiteExternalId(siteId)}`,
+          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${externalId}`,
           error: sanitizeError(error),
         });
       }
@@ -156,6 +156,11 @@ export class ScopeManagementService {
   public async deleteOrphanedScopes(siteId: Smeared): Promise<void> {
     const logPrefix = `[Site: ${siteId}]`;
 
+    // Note: When subsites are enabled, we do not need to iterate over all discovered subsite IDs.
+    // This is because `markConflictingScope` (which marks scopes for deletion) constructs the
+    // pending-delete prefix using the root site's ID for all items, including those from subsites.
+    // Therefore, querying by the root site's ID prefix is sufficient to find all orphaned scopes
+    // for the entire site tree.
     let orphanedScopes: Scope[];
     try {
       orphanedScopes = await this.uniqueScopesService.listScopesByExternalIdPrefix(
@@ -227,20 +232,6 @@ export class ScopeManagementService {
     return rootScope.externalId === expectedExternalId.value;
   }
 
-  private buildItemIdToScopePathMap(
-    items: SharepointContentItem[],
-    rootPath: Smeared,
-  ): Map<string, string> {
-    const itemIdToScopePathMap = new Map<string, string>();
-
-    for (const item of items) {
-      const scopePath = getUniqueParentPathFromItem(item, rootPath);
-      itemIdToScopePathMap.set(item.item.id, scopePath.value);
-    }
-
-    return itemIdToScopePathMap;
-  }
-
   /**
    * Extracts all unique parent directory paths from a list of path strings.
    * @param paths An array of raw path strings.
@@ -286,16 +277,17 @@ export class ScopeManagementService {
   ): Promise<ScopeWithPath[]> {
     const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
 
-    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
-    const uniqueFolderPaths = new Set(itemIdToScopePathMap.values());
+    const uniqueFolderPaths = items.map(
+      (item) => getUniqueParentPathFromItem(item, context.rootPath, context.siteName).value,
+    );
 
-    if (uniqueFolderPaths.size === 0) {
+    if (uniqueFolderPaths.length === 0) {
       this.logger.log(`${logPrefix} No folder paths to create scopes for`);
       return [];
     }
 
     // Extract all parent paths from the folder paths
-    const allPathsWithParents = this.extractAllParentPaths(Array.from(uniqueFolderPaths));
+    const allPathsWithParents = this.extractAllParentPaths(unique(uniqueFolderPaths));
 
     this.logger.debug(`${logPrefix} Sending ${allPathsWithParents.length} paths to API`);
 
@@ -310,6 +302,7 @@ export class ScopeManagementService {
     await this.updateNewlyCreatedScopesWithExternalId(
       scopes,
       allPathsWithParents,
+      items,
       directories,
       context,
     );
@@ -325,21 +318,17 @@ export class ScopeManagementService {
     return scopesWithPaths;
   }
 
-  /* Sets the external id on newly created scopes.
-   * This is necessary after creating a new scope to make the scope non editable for other users, essentially marking
-   * the scope as externally created.
-   */
+  // Sets the externalId on new scopes so they're non-editable for other users. Makes the scope
+  // externally managed.
   private async updateNewlyCreatedScopesWithExternalId(
     scopes: Scope[],
     paths: string[],
+    items: SharepointContentItem[],
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
   ): Promise<void> {
     const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
-    const pathToExternalIdMap = this.buildPathToExternalIdMap(directories, context.rootPath);
-    // Site pages is a special collection we fetch for ASPX pages, but has no folders.
-    pathToExternalIdMap[`${context.rootPath.value}/SitePages`] =
-      `${EXTERNAL_ID_PREFIX}${context.siteConfig.siteId.value}/sitePages`;
+    const pathToExternalIdMap = this.buildPathToExternalIdMap(items, directories, context);
 
     for (const [index, scope] of scopes.entries()) {
       if (isNonNullish(scope.externalId)) {
@@ -357,17 +346,14 @@ export class ScopeManagementService {
         continue;
       }
 
-      /* We have a couple of known directories in sharepoint for which it's more complex to get the id: root scope,
-       * sites, <site-name>, Shared Documents. For these we're setting the external id to be the scope name.
-       */
       let externalId = pathToExternalIdMap[path]
         ? createSmeared(pathToExternalIdMap[path])
         : undefined;
 
       if (isNullish(externalId)) {
         this.logger.warn(`${logPrefix} No external ID found for path ${createSmeared(path)}`);
-        externalId = context.siteConfig.siteId.transform(
-          (siteId) => `${EXTERNAL_ID_PREFIX}unknown:${siteId}/${scope.name}-${randomUUID()}`,
+        externalId = createSmeared(
+          `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId.value}::${path}-${randomUUID()}`,
         );
       }
 
@@ -427,71 +413,82 @@ export class ScopeManagementService {
   }
 
   private buildPathToExternalIdMap(
+    items: SharepointContentItem[],
     directories: SharepointDirectoryItem[],
-    rootPath: Smeared,
+    context: SharepointSyncContext,
   ): Record<string, string> {
+    const { rootPath, siteName, siteConfig, discoveredSubsites } = context;
     const pathToExternalIdMap: Record<string, string> = {};
 
+    const siteIdToPrefix = new Map<string, string>();
+    for (const subsite of discoveredSubsites) {
+      siteIdToPrefix.set(subsite.siteId.value, subsite.relativePath.value);
+      pathToExternalIdMap[`${rootPath.value}/${subsite.relativePath.value}`] ??=
+        `${EXTERNAL_ID_PREFIX}subsite:${subsite.siteId.value}`;
+      // Site pages is a special collection we fetch for ASPX pages, but has no folders.
+      pathToExternalIdMap[`${rootPath.value}/${subsite.relativePath.value}/SitePages`] =
+        `${EXTERNAL_ID_PREFIX}${subsite.siteId.value}/sitePages`;
+    }
+
+    // Site pages is a special collection we fetch for ASPX pages, but has no folders.
+    pathToExternalIdMap[`${rootPath.value}/SitePages`] =
+      `${EXTERNAL_ID_PREFIX}${siteConfig.siteId.value}/sitePages`;
+
+    const registeredDrives = new Set<string>();
+
     for (const directory of directories) {
-      const path = getUniquePathFromItem(directory, rootPath);
+      const path = getUniquePathFromItem(directory, rootPath, siteName);
       if (isAncestorOfRootPath(path.value, rootPath.value) || path.value === rootPath.value) {
         continue;
       }
 
-      const pathWithoutRoot = path.value.substring(rootPath.value.length);
-      const segments = pathWithoutRoot.split('/').filter(Boolean);
-      pathToExternalIdMap[path.value] =
+      pathToExternalIdMap[path.value] ??=
         `${EXTERNAL_ID_PREFIX}folder:${directory.siteId.value}/${directory.item.id}`;
-      // siteName is now stripped, so first segment is already the drive
-      pathToExternalIdMap[`${rootPath.value}/${segments[0]}`] ??=
-        `${EXTERNAL_ID_PREFIX}drive:${directory.siteId.value}/${directory.driveId}`;
-    }
 
-    return pathToExternalIdMap;
-  }
-
-  public buildItemIdToScopeIdMap(
-    items: SharepointContentItem[],
-    scopes: ScopeWithPath[],
-    context: SharepointSyncContext,
-  ): Map<string, string> {
-    const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
-    const itemIdToScopeIdMap = new Map<string, string>();
-
-    if (scopes.length === 0) {
-      return itemIdToScopeIdMap;
-    }
-
-    // Build path -> scopeId map from scopes
-    const scopePathToIdMap = pullObject(scopes, prop('path'), prop('id'));
-
-    this.logger.debug(
-      `${logPrefix} Built scopePathToIdMap with ${Object.keys(scopePathToIdMap).length} entries`,
-    );
-
-    // Build item -> path map
-    const itemIdToScopePathMap = this.buildItemIdToScopePathMap(items, context.rootPath);
-
-    this.logger.debug(
-      `${logPrefix} Built itemIdToScopePathMap with ${itemIdToScopePathMap.size} entries`,
-    );
-
-    for (const [itemId, scopePath] of itemIdToScopePathMap) {
-      const scopeId = scopePathToIdMap[scopePath];
-      if (scopeId) {
-        itemIdToScopeIdMap.set(itemId, scopeId);
-      } else {
-        this.logger.warn(
-          `${logPrefix} Scope not found in cache for path: ${createSmeared(scopePath)}`,
-        );
+      const sitePrefix = siteIdToPrefix.get(directory.siteId.value);
+      const siteScopePath = sitePrefix ? `${rootPath.value}/${sitePrefix}` : rootPath.value;
+      const driveRelative = path.value.substring(siteScopePath.length);
+      const segments = driveRelative.split('/').filter(Boolean);
+      // Segments can be empty when a directory resolves to exactly the site scope path.
+      if (segments[0]) {
+        registeredDrives.add(`${directory.siteId.value}/${directory.driveId}`);
+        pathToExternalIdMap[`${siteScopePath}/${segments[0]}`] ??=
+          `${EXTERNAL_ID_PREFIX}drive:${directory.siteId.value}/${directory.driveId}`;
       }
     }
 
-    this.logger.debug(
-      `${logPrefix} Built itemIdToScopeIdMap with ${itemIdToScopeIdMap.size} entries for ${items.length} items`,
-    );
+    // Register drive-level mappings from items for drives that had no subdirectories.
+    // Without this, drives containing only root-level files would get spc:unknown: external IDs.
+    for (const item of items) {
+      if (item.itemType !== 'driveItem') {
+        continue;
+      }
 
-    return itemIdToScopeIdMap;
+      const driveKey = `${item.siteId.value}/${item.driveId}`;
+      if (registeredDrives.has(driveKey)) {
+        continue;
+      }
+      registeredDrives.add(driveKey);
+
+      // Resolve the item's parent path (e.g. "/Company/Root/SubA/Shared Documents/FolderA")
+      const parentPath = getUniqueParentPathFromItem(item, rootPath, siteName);
+
+      // Determine the scope path for the site or subsite this item belongs to
+      // (e.g. "/Company/Root" for main site items, "/Company/Root/SubA" for subsite items)
+      const sitePrefix = siteIdToPrefix.get(item.siteId.value);
+      const siteScopePath = sitePrefix ? `${rootPath.value}/${sitePrefix}` : rootPath.value;
+
+      // Extract the path relative to the site scope, then take the first segment — that's the
+      // drive/library name (e.g. "/Shared Documents/FolderA" → "Shared Documents")
+      const driveRelative = parentPath.value.substring(siteScopePath.length);
+      const segments = driveRelative.split('/').filter(Boolean);
+      if (segments[0]) {
+        pathToExternalIdMap[`${siteScopePath}/${segments[0]}`] ??=
+          `${EXTERNAL_ID_PREFIX}drive:${item.siteId.value}/${item.driveId}`;
+      }
+    }
+
+    return pathToExternalIdMap;
   }
 
   /**
@@ -507,7 +504,7 @@ export class ScopeManagementService {
       return context.siteConfig.scopeId;
     }
 
-    const scopePath = getUniqueParentPathFromItem(item, context.rootPath);
+    const scopePath = getUniqueParentPathFromItem(item, context.rootPath, context.siteName);
 
     // Find scope with this path.
     const scope = scopes.find((scope) => scope.path === scopePath.value);

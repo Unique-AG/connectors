@@ -51,9 +51,18 @@ describe('logging utilities', () => {
       expect(smearSiteNameFromPath('/sites/my-site/_api/web/lists')).toBe(
         '/sites/**-site/_api/web/lists',
       );
-      expect(smearSiteNameFromPath('/sites/anotherSite/Documents')).toBe(
-        '/sites/*******Site/Documents',
+    });
+
+    it('smears multi-segment subsite names in REST API paths', () => {
+      expect(smearSiteNameFromPath('/sites/WealthManagement/WMSub1/_api/web/sitegroups')).toBe(
+        '/sites/************ment/[Smeared]/_api/web/sitegroups',
       );
+    });
+
+    it('smears deeply nested subsite names in REST API paths', () => {
+      expect(
+        smearSiteNameFromPath('/sites/WealthManagement/WMSub1/Nested/_api/web/sitegroups'),
+      ).toBe('/sites/************ment/[Smeared]/[Smeared]/_api/web/sitegroups');
     });
 
     it('leaves GUID-like site names untouched (handled by smearSiteIdFromPath)', () => {
@@ -61,9 +70,9 @@ describe('logging utilities', () => {
       expect(smearSiteNameFromPath(guidPath)).toBe(guidPath);
     });
 
-    it('handles multiple site names in path', () => {
-      expect(smearSiteNameFromPath('/sites/site1/subsite/site2/page')).toBe(
-        '/sites/[Smeared]/subsite/site2/page',
+    it('leaves paths without /_api/ untouched', () => {
+      expect(smearSiteNameFromPath('/sites/site1/Documents/page')).toBe(
+        '/sites/site1/Documents/page',
       );
     });
 
@@ -79,46 +88,46 @@ describe('logging utilities', () => {
   });
 
   describe('smearSiteIdFromPath', () => {
-    it('smeares GUID site IDs in Graph API paths', () => {
-      expect(smearSiteIdFromPath('/sites/a1b2c3d4-e5f6-7890-abcd-ef1234567890/drive')).toBe(
-        '/sites/********-****-****-****-********7890/drive',
-      );
-      expect(smearSiteIdFromPath('/sites/b2c3d4e5-f6a7-8910-bcde-f23456789012/root')).toBe(
-        '/sites/********-****-****-****-********9012/root',
+    it('smears UUID site IDs in Graph API paths', () => {
+      expect(smearSiteIdFromPath('/sites/1d045c6a-f230-48fd-b826-7cf8601d7729/lists')).toBe(
+        '/sites/********-****-****-****-********7729/lists',
       );
     });
 
-    it('handles site IDs at end of path', () => {
-      expect(smearSiteIdFromPath('/sites/a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBe(
-        '/sites/********-****-****-****-********7890',
+    it('smears UUID site IDs without trailing path', () => {
+      expect(smearSiteIdFromPath('/sites/1d045c6a-f230-48fd-b826-7cf8601d7729')).toBe(
+        '/sites/********-****-****-****-********7729',
       );
     });
 
-    it('leaves non-GUID site names untouched (handled by smearSiteNameFromPath)', () => {
-      const siteNamePath = '/sites/my-site/_api/web';
-      expect(smearSiteIdFromPath(siteNamePath)).toBe(siteNamePath);
-    });
-
-    it('handles multiple GUIDs in path', () => {
+    it('smears compound site IDs by smearing each part', () => {
       expect(
         smearSiteIdFromPath(
-          '/sites/a1b2c3d4-e5f6-7890-abcd-ef1234567890/sub/b2c3d4e5-f6a7-8910-bcde-f23456789012',
+          '/sites/contoso.sharepoint.com,af2b5be6-a37d-4992-ab8f-988b0134007e,86088ee2-974c-49b8-9689-ba6e04b1807c/lists',
         ),
       ).toBe(
-        '/sites/********-****-****-****-********7890/sub/b2c3d4e5-f6a7-8910-bcde-f23456789012',
+        '/sites/*******.**********.com,********-****-****-****-********007e,********-****-****-****-********807c/lists',
       );
     });
 
-    it('handles paths without site IDs', () => {
-      expect(smearSiteIdFromPath('/_api/web/lists')).toBe('/_api/web/lists');
-      expect(smearSiteIdFromPath('/graph/me')).toBe('/graph/me');
+    it('smears compound site IDs without trailing path', () => {
+      expect(
+        smearSiteIdFromPath(
+          '/sites/contoso.sharepoint.com,af2b5be6-a37d-4992-ab8f-988b0134007e,86088ee2-974c-49b8-9689-ba6e04b1807c',
+        ),
+      ).toBe(
+        '/sites/*******.**********.com,********-****-****-****-********007e,********-****-****-****-********807c',
+      );
     });
 
-    it('ignores invalid GUID formats', () => {
-      expect(smearSiteIdFromPath('/sites/not-a-guid/_api/web')).toBe('/sites/not-a-guid/_api/web');
-      expect(smearSiteIdFromPath('/sites/123-456-789/_api/web')).toBe(
-        '/sites/123-456-789/_api/web',
+    it('leaves paths without /sites/ untouched', () => {
+      expect(smearSiteIdFromPath('/drives/some-drive-id/items')).toBe(
+        '/drives/some-drive-id/items',
       );
+    });
+
+    it('leaves paths with non-UUID segments after /sites/ untouched', () => {
+      expect(smearSiteIdFromPath('/sites/my-site-name/lists')).toBe('/sites/my-site-name/lists');
     });
   });
 

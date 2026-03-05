@@ -111,8 +111,12 @@ export class UniqueFileIngestionService {
     const pathPrefix = ingestionUrl.pathname === '/' ? '' : ingestionUrl.pathname;
     const fileDiffPath = `${pathPrefix}/v2/content/file-diff`;
 
+    // Trailing slash is required because the diff API uses `contains` matching. Without it,
+    // a parent site ID like "abc-123" would also match compound subsite keys that embed the
+    // same UUID (e.g. "hostname,abc-123,web-uuid/item"). The slash scopes the match to keys
+    // that were actually stored under this site's prefix ("abc-123/…").
     const diffRequest: FileDiffRequest = {
-      partialKey: partialKey.value,
+      partialKey: `${partialKey.value}/`,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       fileList,

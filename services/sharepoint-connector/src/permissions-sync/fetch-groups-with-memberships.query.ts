@@ -74,29 +74,17 @@ export class FetchGroupsWithMembershipsQuery {
       `${logPrefix} Fetching groups with memberships for ${uniqueGroupPermissions.length} unique ` +
         `group permissions`,
     );
-    const siteName = await this.graphApiService.getSiteName(siteId);
 
     const siteGroupsPermissions = pipe(
       uniqueGroupPermissions,
       filter((permission) => permission.type === 'siteGroup'),
     );
 
-    const siteGroupIds = siteGroupsPermissions
-      .map((permission) => permission.id.split('|').pop())
-      .filter(isNonNullish);
-    this.logger.log(
-      `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
+    const groupMembershipsCache = await this.processSiteGroupsPermissions(
+      siteGroupsPermissions,
+      logPrefix,
     );
-    const groupMembershipsCache: Record<GroupDistinctId, Membership[]> = {};
-    // There's only one call for SharePoint site groups memberships because they are not nested.
-    const siteGroupsMembershipsMap = await this.fetchSiteGroupsMembershipsMap(
-      siteName,
-      siteGroupIds,
-    );
-    Object.assign(groupMembershipsCache, siteGroupsMembershipsMap);
-    this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
-
-    const allMembershipsFromSiteGroups = pipe(siteGroupsMembershipsMap, values(), flat());
+    const allMembershipsFromSiteGroups = pipe(groupMembershipsCache, values(), flat());
     let msGroupsToProcess = pipe(
       [...uniqueGroupPermissions, ...allMembershipsFromSiteGroups],
       filter(isGroupType),
@@ -214,6 +202,9 @@ export class FetchGroupsWithMembershipsQuery {
 
       const chunkIds = groupChunk.map(groupDistinctId);
       const chunkItemPermissions = groupMembershipsResults.map((result, index) => {
+        const group = groupChunk[index];
+        assert.ok(group, `Missing group at index ${index} in chunk`);
+
         if (result.status === 'fulfilled') {
           return result.value.map((membership) =>
             this.mapGroupMembershipToItemPermission(membership),
@@ -224,8 +215,6 @@ export class FetchGroupsWithMembershipsQuery {
         // return 404 from Graph API when we request memberships.
         // We check for 404 status to identify these cases and treat them as empty memberships.
         const error = result.reason as Error & { statusCode?: number };
-        const group = groupChunk[index];
-        assert.ok(group, `Missing group at index ${index} in chunk`);
 
         if (error.statusCode === 404) {
           this.logger.warn(
@@ -267,22 +256,56 @@ export class FetchGroupsWithMembershipsQuery {
 
   // ===== Helper methods for fetching groups from SharePoint REST API =====
 
-  private async fetchSiteGroupsMembershipsMap(
-    siteName: Smeared,
-    siteGroupIds: string[],
+  private async processSiteGroupsPermissions(
+    siteGroupsPermissions: GroupMembership[],
+    logPrefix: string,
   ): Promise<Record<GroupDistinctId, Membership[]>> {
-    return pipe(
-      await this.sharepointRestClientService.getSiteGroupsMemberships(siteName, siteGroupIds),
-      // We need to add site name to the id to make it unique across all sites.
+    // SiteGroups are site-collection-scoped, so all permissions share the same root site name.
+    // We extract it from the first permission ID and collect all numeric group IDs.
+    let rootSiteName: Smeared | undefined;
+    const siteGroupIds: string[] = [];
+
+    for (const siteGroupPermission of siteGroupsPermissions) {
+      const [siteName, siteGroupId, ...rest] = siteGroupPermission.id.split('|');
+
+      // Validate the format of the site group id. It should be in the format of
+      // "siteName|siteGroupId" but we are paranoid and want to check for extra parts just in case.
+      const hasValidFormat = Boolean(siteName) && Boolean(siteGroupId) && rest.length === 0;
+      if (!hasValidFormat) {
+        this.logger.warn(
+          `${logPrefix} Skipping site group with invalid id format: ${createSmeared(siteGroupPermission.id)}`,
+        );
+        continue;
+      }
+
+      assert.ok(siteName, 'Site name must be present');
+      assert.ok(siteGroupId, 'Site group id must be present');
+      rootSiteName ??= createSmeared(siteName);
+      siteGroupIds.push(siteGroupId);
+    }
+
+    if (!rootSiteName || siteGroupIds.length === 0) {
+      return {};
+    }
+
+    this.logger.log(
+      `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
+    );
+
+    const result = pipe(
+      await this.sharepointRestClientService.getSiteGroupsMemberships(rootSiteName, siteGroupIds),
       mapKeys((id) =>
         groupDistinctId({
           type: 'siteGroup',
-          id: `${siteName.value}|${id}`,
+          id: `${rootSiteName.value}|${id}`,
         }),
       ),
       mapValues(map(this.mapRestApiMembershipToGroupMembership.bind(this))),
       mapValues(filter(isNonNullish)),
     );
+
+    this.logger.log(`${logPrefix} Site groups memberships map fetched successfully`);
+    return result;
   }
 
   private mapRestApiMembershipToGroupMembership({
@@ -307,8 +330,8 @@ export class FetchGroupsWithMembershipsQuery {
       },
       [PrincipalType.SecurityGroup]: () => {
         const groupId = this.extractGroupId(loginName);
-        // TODO: This is basically the case of "Everyone except external users". How are we supposed
-        //       to handle this case? For now we return null to skip it.
+        // We skip "Everyone except external users" group because we wuld rather err on the side of
+        // caution and not include any wildcard groups.
         if (groupId?.startsWith(ALL_USERS_GROUP_ID_PREFIX)) {
           return null;
         }

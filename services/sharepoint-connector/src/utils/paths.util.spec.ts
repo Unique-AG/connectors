@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isAncestorOfRootPath, normalizeSlashes } from './paths.util';
+import {
+  encodeSiteNameForPath,
+  extractSiteNameFromWebUrl,
+  isAncestorOfRootPath,
+  normalizeSlashes,
+} from './paths.util';
 
 describe('normalizeSlashes', () => {
   it('removes leading and trailing whitespace', () => {
@@ -48,6 +53,66 @@ describe('normalizeSlashes', () => {
   it('handles complex paths with all normalization needs', () => {
     expect(normalizeSlashes('  //path//to///file//  ')).toBe('path/to/file');
     expect(normalizeSlashes('///root///sub///dir///')).toBe('root/sub/dir');
+  });
+});
+
+describe('extractSiteNameFromWebUrl', () => {
+  it('extracts site name from a regular site URL', () => {
+    expect(extractSiteNameFromWebUrl('https://contoso.sharepoint.com/sites/WealthManagement')).toBe(
+      'WealthManagement',
+    );
+  });
+
+  it('extracts full path for a subsite URL', () => {
+    expect(
+      extractSiteNameFromWebUrl('https://contoso.sharepoint.com/sites/WealthManagement/WMSub1'),
+    ).toBe('WealthManagement/WMSub1');
+  });
+
+  it('extracts full path for a deeply nested subsite URL', () => {
+    expect(
+      extractSiteNameFromWebUrl(
+        'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1/Nested',
+      ),
+    ).toBe('WealthManagement/WMSub1/Nested');
+  });
+
+  it('decodes URL-encoded segments', () => {
+    expect(
+      extractSiteNameFromWebUrl('https://contoso.sharepoint.com/sites/Wealth%20Management'),
+    ).toBe('Wealth Management');
+  });
+
+  it('decodes URL-encoded subsite segments', () => {
+    expect(
+      extractSiteNameFromWebUrl('https://contoso.sharepoint.com/sites/My%20Site/Sub%20Site'),
+    ).toBe('My Site/Sub Site');
+  });
+
+  it('throws when URL has no /sites/ prefix', () => {
+    expect(() => extractSiteNameFromWebUrl('https://contoso.sharepoint.com/teams/Team')).toThrow();
+  });
+});
+
+describe('encodeSiteNameForPath', () => {
+  it('returns plain names unchanged', () => {
+    expect(encodeSiteNameForPath('WealthManagement')).toBe('WealthManagement');
+  });
+
+  it('preserves slashes between segments', () => {
+    expect(encodeSiteNameForPath('WealthManagement/WMSub1')).toBe('WealthManagement/WMSub1');
+  });
+
+  it('encodes spaces within segments', () => {
+    expect(encodeSiteNameForPath('Wealth Management')).toBe('Wealth%20Management');
+  });
+
+  it('encodes spaces in each segment independently', () => {
+    expect(encodeSiteNameForPath('Wealth Management/WM Sub')).toBe('Wealth%20Management/WM%20Sub');
+  });
+
+  it('encodes special characters within segments', () => {
+    expect(encodeSiteNameForPath("lorand's files")).toBe("lorand's%20files");
   });
 });
 

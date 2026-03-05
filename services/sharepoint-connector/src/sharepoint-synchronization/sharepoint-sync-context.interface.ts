@@ -1,5 +1,6 @@
 import type { SiteConfig } from '../config/sharepoint.schema';
-import { Smeared } from '../utils/smeared';
+import type { Smeared } from '../utils/smeared';
+import type { DiscoveredSubsite } from './subsite-discovery.service';
 
 export interface SharepointSyncContext {
   siteConfig: SiteConfig;
@@ -8,4 +9,5 @@ export interface SharepointSyncContext {
   /** Resolved path of the root scope (e.g. "/Root/Project") */
   rootPath: Smeared;
   isInitialSync: boolean;
+  discoveredSubsites: DiscoveredSubsite[];
 }
