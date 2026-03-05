@@ -137,8 +137,4 @@ namespace, port `5672`). The pod was crashing at startup because it could not co
 the startup probe timed out. Also if you compare the pr with the final version there was a mistake
 on allowing access to rabbitmq instance.
 
-Network policy for outlook semnatic mcp:
-
-```
-[gitops-resources/argocd/clusters/unique/qa/application-specs/mcp/outlook-semantic/network-policy.values.yaml](https://github.com/Unique-AG/monorepo/blob/master/gitops-resources/argocd/clusters/unique/qa/application-specs/mcp/outlook-semantic/network-policy.values.yaml)
-```
+Network policy for outlook semnatic mcp: [network-policy.values.yaml](https://github.com/Unique-AG/monorepo/blob/master/gitops-resources/argocd/clusters/unique/qa/application-specs/mcp/outlook-semantic/network-policy.values.yaml)
