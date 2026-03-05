@@ -8,7 +8,7 @@ import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
-import { isNonNullish, isString, omit, unique } from 'remeda';
+import { isNonNullish, omit, unique } from 'remeda';
 import { type Dispatcher, fetch as undiciFetch } from 'undici';
 import type { UniqueAuth } from '../auth/unique-auth';
 import { BottleneckFactory } from '../core/bottleneck.factory';
@@ -55,7 +55,7 @@ export class UniqueGraphqlClient {
         }
         const authXUserRoles = authHeaders['x-user-roles'] || '';
         const currentXUserRoles = requestHeaders.get('x-user-roles') || '';
-        if (isString(currentXUserRoles) || isString(authXUserRoles)) {
+        if (currentXUserRoles || authXUserRoles) {
           requestHeaders.set(
             'x-user-roles',
             unique([...authXUserRoles.split(','), ...currentXUserRoles.split(',')]).join(','),
