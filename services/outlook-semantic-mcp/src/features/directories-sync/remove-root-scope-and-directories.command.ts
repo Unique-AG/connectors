@@ -3,7 +3,7 @@ import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDatabase, directories, directoriesSync, userProfiles } from '~/db';
-import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
+import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 
@@ -31,7 +31,7 @@ export class RemoveRootScopeAndDirectoriesCommand {
       .execute();
 
     const rootScopeExists = await this.uniqueApi.scopes.getByExternalId(
-      getRootScopeExternalId(userProfile.providerUserId),
+      getRootScopeExternalIdForUser(userProfile.providerUserId),
     );
     if (rootScopeExists) {
       await this.uniqueApi.scopes.delete(rootScopeExists.id, {
