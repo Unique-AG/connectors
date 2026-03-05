@@ -58,7 +58,11 @@ export class UniqueGraphqlClient {
         if (currentXUserRoles || authXUserRoles) {
           requestHeaders.set(
             'x-user-roles',
-            unique([...authXUserRoles.split(','), ...currentXUserRoles.split(',')]).join(','),
+            unique(
+              [...authXUserRoles.split(','), ...currentXUserRoles.split(',')]
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0),
+            ).join(','),
           );
         }
         if (!requestHeaders.get('Content-Type')) {
