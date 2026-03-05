@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.4...outlook-semantic-mcp@0.2.5) (2026-03-05)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,unique-api:** update headers passing and root scope creation ([#329](https://github.com/Unique-AG/connectors/issues/329)) ([00bdb1a](https://github.com/Unique-AG/connectors/commit/00bdb1a7c855b6f6e219528ce3ef0c5d4ab09e1f))
+
 ## [0.2.4](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.3...outlook-semantic-mcp@0.2.4) (2026-03-04)
 
 
