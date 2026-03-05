@@ -102,7 +102,7 @@ export class UniqueGraphqlClient {
   private async executeRequest<T, V extends Variables = Variables>(
     document: RequestDocument,
     variables?: V,
-    extraHeaders?: Record<string, string>,
+    requestHeaders?: Record<string, string>,
   ): Promise<T> {
     const startTime = Date.now();
     const operationName = extractOperationName(document);
@@ -118,7 +118,7 @@ export class UniqueGraphqlClient {
       const options = {
         document,
         variables,
-        requestHeaders: extraHeaders,
+        requestHeaders,
       } as unknown as RequestOptions<V, T>;
       const result = await this.graphQlClient.request<T, V>(options);
 
