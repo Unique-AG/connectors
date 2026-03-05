@@ -8,11 +8,11 @@ import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
+import { isNonNullish, isString, omit, unique } from 'remeda';
 import { type Dispatcher, fetch as undiciFetch } from 'undici';
 import type { UniqueAuth } from '../auth/unique-auth';
 import { BottleneckFactory } from '../core/bottleneck.factory';
 import type { RequestMetricAttributes, UniqueApiMetrics } from '../core/observability';
-import { isNonNullish, isString, omit, unique } from 'remeda';
 
 export type UniqueGraphqlClientTarget = 'ingestion' | 'scopeManagement';
 
@@ -58,9 +58,7 @@ export class UniqueGraphqlClient {
         if (isString(currentXUserRoles) || isString(authXUserRoles)) {
           requestHeaders.set(
             'x-user-roles',
-            unique([(authXUserRoles || '').split(','), (currentXUserRoles || '').split(',')]).join(
-              ',',
-            ),
+            unique([...authXUserRoles.split(','), ...currentXUserRoles.split(',')]).join(','),
           );
         }
         if (!requestHeaders.get('Content-Type')) {
