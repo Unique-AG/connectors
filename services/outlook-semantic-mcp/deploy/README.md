@@ -114,3 +114,31 @@ Azure resource names follow the existing project conventions. Key Vault names mu
   terraform apply -var-file="<name>.tfvars"
   ```
   Requires the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) to be installed and authenticated.
+
+
+## Network policy setup
+
+QA (and UAT1) clusters enforce **Cilium Network Policies** with default-deny for both ingress and egress.
+New services must explicitly declare every allowed connection or they will time out silently.
+
+This document captures the investigation and fixes made in March 2026 when `outlook-semantic-mcp`
+was first deployed to QA and could not reach `node-ingestion`, `node-scope-management`, or RabbitMQ.
+
+Reference: [Confluence — Fixing Cilium Network Policies](https://unique-ch.atlassian.net/wiki/spaces/ptf/pages/1891860560/Fixing+Cilium+Network+Policies)
+see **Fix Network Policy on QA** section and **HubblePolicyDropsImmediate** for debugging.
+
+### 1. Network policy values added to monorepo
+
+**PR #20999** — initial network policy rules (ingress from Kong/Prometheus/kubelet, egress to DNS,
+Postgres, internal services, Microsoft Graph APIs).
+
+**PR #21027** — critical follow-up: added the missing egress rule for **RabbitMQ** (`eventing`
+namespace, port `5672`). The pod was crashing at startup because it could not connect to AMQP and
+the startup probe timed out. Also if you compare the pr with the final version there was a mistake
+on allowing access to rabbitmq instance.
+
+Network policy for outlook semnatic mcp:
+
+```
+[gitops-resources/argocd/clusters/unique/qa/application-specs/mcp/outlook-semantic/network-policy.values.yaml](https://github.com/Unique-AG/monorepo/blob/master/gitops-resources/argocd/clusters/unique/qa/application-specs/mcp/outlook-semantic/network-policy.values.yaml)
+```

@@ -3,7 +3,12 @@ import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
 export interface UniqueApiScopesFacade {
   createFromPaths(
     paths: string[],
-    opts?: { includePermissions?: boolean; inheritAccess?: boolean },
+    opts?: {
+      includePermissions?: boolean;
+      inheritAccess?: boolean;
+      // This option should be removed once createFromPaths is fixed in the monorepo for integrations.
+      xUserRoles?: string[];
+    },
   ): Promise<Scope[]>;
   getById(id: string): Promise<Scope | null>;
   getByExternalId(externalId: string): Promise<Scope | null>;

@@ -12,7 +12,7 @@ import {
   SystemDirectoriesIgnoredForSync,
 } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
+import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
@@ -224,7 +224,7 @@ export class SyncDirectoriesForUserProfileCommand {
       .execute();
 
     const rootScope = await this.uniqueApi.scopes.getByExternalId(
-      getRootScopeExternalId(providerUserId),
+      getRootScopeExternalIdForUser(providerUserId),
     );
     if (!rootScope) {
       this.logger.warn({

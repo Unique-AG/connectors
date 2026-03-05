@@ -12,6 +12,7 @@ import { type Dispatcher, fetch as undiciFetch } from 'undici';
 import type { UniqueAuth } from '../auth/unique-auth';
 import { BottleneckFactory } from '../core/bottleneck.factory';
 import type { RequestMetricAttributes, UniqueApiMetrics } from '../core/observability';
+import { isNonNullish, isString, omit, unique } from 'remeda';
 
 export type UniqueGraphqlClientTarget = 'ingestion' | 'scopeManagement';
 
@@ -45,13 +46,29 @@ export class UniqueGraphqlClient {
         )) as typeof fetch,
       requestMiddleware: async (request) => {
         const authHeaders = await this.auth.getAuthHeaders();
+        const requestHeaders = request.headers as Headers;
+        for (const key in omit(authHeaders, ['x-user-roles'])) {
+          const value = authHeaders[key];
+          if (isNonNullish(value)) {
+            requestHeaders.set(key, value);
+          }
+        }
+        const authXUserRoles = authHeaders['x-user-roles'] || '';
+        const currentXUserRoles = requestHeaders.get('x-user-roles') || '';
+        if (isString(currentXUserRoles) || isString(authXUserRoles)) {
+          requestHeaders.set(
+            'x-user-roles',
+            unique([(authXUserRoles || '').split(','), (currentXUserRoles || '').split(',')]).join(
+              ',',
+            ),
+          );
+        }
+        if (!requestHeaders.get('Content-Type')) {
+          requestHeaders.set('Content-Type', 'application/json');
+        }
         return {
           ...request,
-          headers: {
-            ...request.headers,
-            ...authHeaders,
-            'Content-Type': 'application/json',
-          },
+          headers: requestHeaders,
         };
       },
     });
@@ -69,8 +86,11 @@ export class UniqueGraphqlClient {
   public async request<T, V extends Variables = Variables>(
     document: RequestDocument,
     variables?: V,
+    requestHeaders?: Record<string, string>,
   ): Promise<T> {
-    return this.limiter.schedule(() => this.executeRequest<T, V>(document, variables));
+    return this.limiter.schedule(() =>
+      this.executeRequest<T, V>(document, variables, requestHeaders),
+    );
   }
 
   public async close(): Promise<void> {
@@ -80,6 +100,7 @@ export class UniqueGraphqlClient {
   private async executeRequest<T, V extends Variables = Variables>(
     document: RequestDocument,
     variables?: V,
+    extraHeaders?: Record<string, string>,
   ): Promise<T> {
     const startTime = Date.now();
     const operationName = extractOperationName(document);
@@ -92,7 +113,11 @@ export class UniqueGraphqlClient {
     };
 
     try {
-      const options = { document, variables } as unknown as RequestOptions<V, T>;
+      const options = {
+        document,
+        variables,
+        requestHeaders: extraHeaders,
+      } as unknown as RequestOptions<V, T>;
       const result = await this.graphQlClient.request<T, V>(options);
 
       const durationMs = elapsedMilliseconds(startTime);

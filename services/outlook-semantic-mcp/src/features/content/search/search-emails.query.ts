@@ -6,7 +6,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { DRIZZLE, type DrizzleDatabase, userProfiles } from '~/db';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
-import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
+import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { buildSearchFilter, SearchEmailsInputSchema } from './search-conditions.dto';
 
@@ -40,7 +40,7 @@ export class SearchEmailsQuery {
     assert.ok(userProfile.providerUserId, `providerUserId missing for: ${userProfileId}`);
 
     const rootScope = await this.uniqueApi.scopes.getByExternalId(
-      getRootScopeExternalId(userProfile.providerUserId),
+      getRootScopeExternalIdForUser(userProfile.providerUserId),
     );
     assert.ok(rootScope, `Root scope not found for user: ${userProfile.providerUserId}`);
 

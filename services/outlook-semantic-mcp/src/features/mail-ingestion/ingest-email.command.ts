@@ -10,7 +10,7 @@ import { UniqueConfigNamespaced } from '~/config';
 import { DirectoryType, DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { getRootScopeExternalId } from '~/unique/get-root-scope-path';
+import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UploadFileForIngestionCommand } from '~/unique/upload-file-for-ingestion.command';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
@@ -112,7 +112,7 @@ export class IngestEmailCommand {
     }
 
     const rootScope = await this.uniqueApi.scopes.getByExternalId(
-      getRootScopeExternalId(userProfile.providerUserId),
+      getRootScopeExternalIdForUser(userProfile.providerUserId),
     );
     assert.ok(rootScope, `Parent scope id`);
 

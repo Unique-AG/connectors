@@ -35,7 +35,11 @@ export class ScopesService implements UniqueApiScopesFacade {
 
   public async createFromPaths(
     paths: string[],
-    opts: { includePermissions: boolean; inheritAccess: boolean } = {
+    opts: {
+      includePermissions: boolean;
+      inheritAccess: boolean;
+      xUserRoles?: string[];
+    } = {
       includePermissions: false,
       inheritAccess: true,
     },
@@ -47,6 +51,12 @@ export class ScopesService implements UniqueApiScopesFacade {
     }
 
     const mutation = getGenerateScopesBasedOnPathsMutation(opts.includePermissions);
+    // This is a hack to create the root scope because we do not check permissions for integrations
+    // correctly in the monorepo
+    const extraHeaders: Record<string, string> =
+      Array.isArray(opts.xUserRoles) && opts.xUserRoles.length > 0
+        ? { 'x-user-roles': opts.xUserRoles.join(',') }
+        : {};
 
     const allScopes = await processInBatches({
       items: paths,
@@ -63,7 +73,7 @@ export class ScopesService implements UniqueApiScopesFacade {
         const result = await this.scopeManagementClient.request<
           GenerateScopesBasedOnPathsMutationResult,
           GenerateScopesBasedOnPathsMutationInput
-        >(mutation, variables);
+        >(mutation, variables, extraHeaders);
 
         return result.generateScopesBasedOnPaths;
       },

@@ -9,7 +9,7 @@ import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { getRootScopePath } from '~/unique/get-root-scope-path';
+import { getRootScopePathForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
@@ -111,7 +111,7 @@ export class FullSyncCommand {
 
     const filleDiffResponse = await this.uniqueApi.ingestion.performFileDiff(
       filesList,
-      getRootScopePath(userProfile.email),
+      getRootScopePathForUser(userProfile.email),
       INGESTION_SOURCE_KIND,
       INGESTION_SOURCE_NAME,
     );
