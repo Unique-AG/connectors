@@ -45,7 +45,7 @@ Secrets are managed via Azure Key Vault with manual provisioning:
 The `confluence-connector-secrets` Terraform module creates **placeholder** secrets in Azure Key Vault with the value `<TO BE SET MANUALLY>`. The `lifecycle { ignore_changes }` block ensures Terraform never overwrites manually set values.
 
 Default placeholders (per-tenant):
-- `manual-confluence-connector-client-secret-dc` — OAuth 2.0 client secret for the Data Center tenant
+- `manual-confluence-connector-pat-dc` — PAT for the Data Center tenant
 - `manual-confluence-connector-client-secret-cloud` — OAuth 2.0 client secret for the Cloud tenant
 
 After Terraform provisions the placeholders, set the real values manually:
@@ -53,22 +53,25 @@ After Terraform provisions the placeholders, set the real values manually:
 ```sh
 az keyvault secret set \
   --vault-name qa-app-common \
-  --name manual-confluence-connector-client-secret-dc \
-  --value "<actual-dc-client-secret>"
+  --name manual-confluence-connector-pat-dc \
+  --value "<actual-PAT>"
 
 az keyvault secret set \
   --vault-name qa-app-common \
   --name manual-confluence-connector-client-secret-cloud \
-  --value "<actual-cloud-client-secret>"
+  --value "<actual-client-secret>"
 ```
 
 ### Kubernetes Secrets (via ESO)
 
 The `secrets.yaml` ExternalSecret in the Monorepo syncs the Key Vault secrets into a single Kubernetes Secret (`confluence-connector-v2-secret`) using the External Secrets Operator (ESO) with the `kv-app-common` ClusterSecretStore.
 
-Each tenant references its secret via `clientSecret` or `token` in the Helm values using the `os.environ/` prefix:
-- Data Center tenant (PAT): `token: "os.environ/CONFLUENCE_PAT_DC"`
-- Cloud tenant (OAuth 2LO): `clientSecret: "os.environ/CONFLUENCE_CLIENT_SECRET_CLOUD"`
+### End-to-end secrets chain
+
+| Terraform placeholder | Key Vault name | ESO remoteRef | K8s secret key | Pod env var | Tenant config value |
+|---|---|---|---|---|---|
+| `confluence-connector-pat-dc` | `manual-confluence-connector-pat-dc` | `manual-confluence-connector-pat-dc` | `CONFLUENCE_PAT_DC` | `CONFLUENCE_PAT_DC` | `os.environ/CONFLUENCE_PAT_DC` |
+| `confluence-connector-client-secret-cloud` | `manual-confluence-connector-client-secret-cloud` | `manual-confluence-connector-client-secret-cloud` | `CONFLUENCE_CLIENT_SECRET_CLOUD` | `CONFLUENCE_CLIENT_SECRET_CLOUD` | `os.environ/CONFLUENCE_CLIENT_SECRET_CLOUD` |
 
 ---
 
