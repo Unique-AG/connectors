@@ -19,7 +19,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
   }
 
   public async searchPagesByLabel(): Promise<ConfluencePage[]> {
-    const spaceTypeFilter = '(space.type=global OR space.type=collaboration)';
+    const spaceTypeFilter = 'space.type=global';
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
     const url = `${this.config.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=metadata.labels,version,space&os_authType=basic&limit=${SEARCH_PAGE_SIZE}&start=0`;
 

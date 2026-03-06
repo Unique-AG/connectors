@@ -1,4 +1,3 @@
-import { createSmeared } from '@unique-ag/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
@@ -204,8 +203,8 @@ describe('ConfluenceSynchronizationService', () => {
       const baseDiscovered = discoveredPagesFixture[0]!;
       const discovered = [
         ...discoveredPagesFixture,
-        { ...baseDiscovered, id: '2', title: createSmeared('Page 2') },
-        { ...baseDiscovered, id: '3', title: createSmeared('Page 3') },
+        { ...baseDiscovered, id: '2', title: 'Page 2' },
+        { ...baseDiscovered, id: '3', title: 'Page 3' },
       ];
       vi.mocked(mockScanner.discoverPages).mockResolvedValue(discovered);
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
@@ -218,10 +217,10 @@ describe('ConfluenceSynchronizationService', () => {
       const baseFetched = fetchedPagesFixture[0]!;
       vi.mocked(mockContentFetcher.fetchPageContent).mockImplementation((page: { id: string }) => {
         if (page.id === '2') {
-          return Promise.resolve({ ...baseFetched, id: '2', title: createSmeared('Page 2') });
+          return Promise.resolve({ ...baseFetched, id: '2', title: 'Page 2' });
         }
         if (page.id === '3') {
-          return Promise.resolve({ ...baseFetched, id: '3', title: createSmeared('Page 3') });
+          return Promise.resolve({ ...baseFetched, id: '3', title: 'Page 3' });
         }
         return Promise.resolve(null);
       });

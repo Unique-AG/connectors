@@ -1,5 +1,4 @@
 import type { UniqueApiClient } from '@unique-ag/unique-api';
-import { createSmeared } from '@unique-ag/utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import { ContentType } from '../../confluence-api/types/confluence-api.types';
@@ -11,7 +10,7 @@ const TENANT_NAME = 'test-tenant';
 
 const basePage: DiscoveredPage = {
   id: 'p-1',
-  title: createSmeared('Page 1'),
+  title: 'Page 1',
   type: ContentType.PAGE,
   spaceId: 'space-1',
   spaceKey: 'SP',

@@ -1,4 +1,3 @@
-import { createSmeared } from '@unique-ag/utils';
 import { ContentType } from '../../confluence-api';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import type { DiscoveredPage, FetchedPage } from '../sync.types';
@@ -8,7 +7,7 @@ export const CONFLUENCE_BASE_URL = 'https://confluence.example.com';
 export const discoveredPagesFixture: DiscoveredPage[] = [
   {
     id: '1',
-    title: createSmeared('Page 1'),
+    title: 'Page 1',
     type: ContentType.PAGE,
     spaceId: 'space-1',
     spaceKey: 'SP',
@@ -22,7 +21,7 @@ export const discoveredPagesFixture: DiscoveredPage[] = [
 export const fetchedPagesFixture: FetchedPage[] = [
   {
     id: '1',
-    title: createSmeared('Page 1'),
+    title: 'Page 1',
     body: '<p>content</p>',
     webUrl: `${CONFLUENCE_BASE_URL}/page/1`,
     spaceId: 'space-1',

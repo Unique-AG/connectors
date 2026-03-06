@@ -72,7 +72,7 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(url).toContain('os_authType=basic');
     });
 
-    it('includes collaboration space type in filter', async () => {
+    it('excludes collaboration space type from filter', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -82,7 +82,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
-      expect(decodedUrl).toContain('space.type=collaboration');
+      expect(decodedUrl).not.toContain('collaboration');
     });
 
     it('uses limit=100 for search pages', async () => {

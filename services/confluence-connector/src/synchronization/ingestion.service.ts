@@ -109,7 +109,7 @@ export class IngestionService {
   ): ContentRegistrationRequest {
     return {
       key,
-      title: page.title.value,
+      title: page.title,
       mimeType: INGESTION_MIME_TYPE,
       ownerType: OWNER_TYPE,
       scopeId,
