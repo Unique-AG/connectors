@@ -149,15 +149,15 @@ export class FetchAllDirectoriesFromOutlookQuery {
     );
   }
 
-  private async logFullDirectoriesStructure({
+  private logFullDirectoriesStructure({
+    msg,
     userProfileId,
     directories,
-    msg,
   }: {
     userProfileId: string;
     directories: GraphOutlookDirectory[];
     msg: string;
-  }): Promise<void> {
+  }): void {
     const frozenValue = clone(directories);
 
     const mapRecursive = (items: GraphOutlookDirectory[]): GraphOutlookDirectory[] => {
