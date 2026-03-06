@@ -8,7 +8,7 @@ connectorConfig:
         auth:
           mode: oauth_2lo
           clientId: test-dc-client-id
-          clientSecretEnvVar: CONFLUENCE_CLIENT_SECRET
+          clientSecret: "os.environ/CONFLUENCE_CLIENT_SECRET"
         apiRateLimitPerMinute: 200
         ingestSingleLabel: ai-ingest
         ingestAllLabel: ai-ingest-all

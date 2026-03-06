@@ -19,10 +19,10 @@ data:
         mode: {{ $tenant.confluence.auth.mode | quote }}
         {{- if eq $tenant.confluence.auth.mode "oauth_2lo" }}
         clientId: {{ $tenant.confluence.auth.clientId | quote }}
-        clientSecret: "os.environ/{{ $tenant.confluence.auth.clientSecretEnvVar }}"
+        clientSecret: {{ $tenant.confluence.auth.clientSecret | quote }}
         {{- end }}
         {{- if eq $tenant.confluence.auth.mode "pat" }}
-        token: "os.environ/{{ $tenant.confluence.auth.tokenEnvVar }}"
+        token: {{ $tenant.confluence.auth.token | quote }}
         {{- end }}
       apiRateLimitPerMinute: {{ $tenant.confluence.apiRateLimitPerMinute }}
       ingestSingleLabel: {{ $tenant.confluence.ingestSingleLabel | quote }}

@@ -181,12 +181,12 @@
                             "type": "string",
                             "description": "OAuth 2.0 (2LO) application client ID"
                           },
-                          "clientSecretEnvVar": {
+                          "clientSecret": {
                             "type": "string",
-                            "description": "Environment variable name for the client secret (allows per-tenant secrets)"
+                            "description": "OAuth 2.0 client secret. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
                           }
                         },
-                        "required": ["mode", "clientId", "clientSecretEnvVar"],
+                        "required": ["mode", "clientId", "clientSecret"],
                         "additionalProperties": false
                       },
                       {
@@ -196,12 +196,12 @@
                             "enum": ["pat"],
                             "description": "Personal Access Token (Data Center only)"
                           },
-                          "tokenEnvVar": {
+                          "token": {
                             "type": "string",
-                            "description": "Environment variable name for the PAT token (allows per-tenant secrets)"
+                            "description": "Personal Access Token. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
                           }
                         },
-                        "required": ["mode", "tokenEnvVar"],
+                        "required": ["mode", "token"],
                         "additionalProperties": false
                       }
                     ]

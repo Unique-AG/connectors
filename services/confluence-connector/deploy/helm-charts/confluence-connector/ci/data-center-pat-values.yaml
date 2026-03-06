@@ -10,7 +10,7 @@ connectorConfig:
         ingestAllLabel: ai-ingest-all
         auth:
           mode: pat
-          tokenEnvVar: CONFLUENCE_PAT
+          token: "os.environ/CONFLUENCE_PAT"
       unique:
         authMode: cluster_local
         ingestionServiceBaseUrl: http://node-ingestion.finance-gpt:8091

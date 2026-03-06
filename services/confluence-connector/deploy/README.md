@@ -66,9 +66,9 @@ az keyvault secret set \
 
 The `secrets.yaml` ExternalSecret in the Monorepo syncs the Key Vault secrets into a single Kubernetes Secret (`confluence-connector-v2-secret`) using the External Secrets Operator (ESO) with the `kv-app-common` ClusterSecretStore.
 
-Each tenant references its own environment variable via `clientSecretEnvVar` in the Helm values:
-- Data Center tenant: `CONFLUENCE_CLIENT_SECRET_DC`
-- Cloud tenant: `CONFLUENCE_CLIENT_SECRET_CLOUD`
+Each tenant references its secret via `clientSecret` or `token` in the Helm values using the `os.environ/` prefix:
+- Data Center tenant (PAT): `token: "os.environ/CONFLUENCE_PAT_DC"`
+- Cloud tenant (OAuth 2LO): `clientSecret: "os.environ/CONFLUENCE_CLIENT_SECRET_CLOUD"`
 
 ---
 
@@ -80,10 +80,10 @@ The connector supports multiple Confluence tenants in a single deployment. Each 
 
 | Mode | Field | Description |
 |------|-------|-------------|
-| `oauth_2lo` | `clientSecretEnvVar` | **Required.** Environment variable name holding the OAuth 2.0 client secret for this tenant |
-| `pat` | `tokenEnvVar` | **Required.** Environment variable name holding the PAT token for this tenant |
+| `oauth_2lo` | `clientSecret` | **Required.** OAuth 2.0 client secret. Use `os.environ/ENV_VAR_NAME` to read from an environment variable at runtime. |
+| `pat` | `token` | **Required.** Personal Access Token. Use `os.environ/ENV_VAR_NAME` to read from an environment variable at runtime. |
 
-Each tenant must explicitly specify its secret env var name — there are no defaults.
+Secrets are resolved at runtime via the `os.environ/` prefix convention — the value is read from the named environment variable when the config is loaded.
 
 ### Instance types
 
