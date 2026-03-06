@@ -39,7 +39,7 @@ export class SubscriptionRemoveService {
       operation: 'enqueue_removal',
     });
 
-    this.logger.debug({ subscriptionId }, 'Enqueuing subscription removal event for processing');
+    this.logger.debug({ subscriptionId, msg: 'Enqueuing subscription removal event for processing' });
 
     const payload = await SubscriptionRemovedEventDto.encodeAsync({
       subscriptionId,
@@ -55,14 +55,12 @@ export class SubscriptionRemoveService {
       published,
     });
 
-    this.logger.debug(
-      {
-        exchangeName: MAIN_EXCHANGE.name,
-        payload,
-        published,
-      },
-      'Publishing event to message queue for asynchronous processing',
-    );
+    this.logger.debug({
+      msg: 'Publishing event to message queue for asynchronous processing',
+      exchangeName: MAIN_EXCHANGE.name,
+      payload,
+      published,
+    });
 
     assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
   }
@@ -83,7 +81,7 @@ export class SubscriptionRemoveService {
 
     if (!existingSubscription) {
       traceEvent('no subscription found for user');
-      this.logger.debug({ userProfileId }, 'No active subscription found for user');
+      this.logger.debug({ userProfileId, msg: 'No active subscription found for user' });
       return { status: 'not_found', subscription: null };
     }
 
@@ -97,7 +95,7 @@ export class SubscriptionRemoveService {
       operation: 'remove_subscription',
     });
 
-    this.logger.log({ subscriptionId }, 'Beginning Microsoft Graph subscription removal process');
+    this.logger.log({ subscriptionId, msg: 'Beginning Microsoft Graph subscription removal process' });
 
     const deletedSubscriptions = await this.db
       .delete(subscriptions)
@@ -109,23 +107,25 @@ export class SubscriptionRemoveService {
       count: deletedSubscriptions.length,
     });
 
-    this.logger.log(
-      { subscriptionId, count: deletedSubscriptions.length },
-      'Successfully deleted managed subscription record from database',
-    );
+    this.logger.log({
+      msg: 'Successfully deleted managed subscription record from database',
+      subscriptionId,
+      count: deletedSubscriptions.length,
+    });
 
     const deletedSubscription = deletedSubscriptions.at(0);
     if (!deletedSubscription) {
       traceEvent('no subscription found to delete');
-      this.logger.debug({ subscriptionId }, 'No matching subscription found in database to delete');
+      this.logger.debug({ subscriptionId, msg: 'No matching subscription found in database to delete' });
       return { status: 'not_found', subscription: null };
     }
 
     traceAttrs({ user_profile_id: deletedSubscription.userProfileId });
-    this.logger.debug(
-      { subscriptionId, userProfileId: deletedSubscription.userProfileId },
-      'Sending deletion request to Microsoft Graph API for subscription',
-    );
+    this.logger.debug({
+      msg: 'Sending deletion request to Microsoft Graph API for subscription',
+      subscriptionId,
+      userProfileId: deletedSubscription.userProfileId,
+    });
 
     // NOTE: even if this deletion fails, whenever we get notification from microsoft we verify
     // the subscription exists on our DB as the source of truth, ignoring anything coming if not there
@@ -138,10 +138,10 @@ export class SubscriptionRemoveService {
       .delete()) as unknown;
 
     traceEvent('Graph API subscription deleted');
-    this.logger.log(
-      { subscriptionId },
-      'Successfully removed subscription from Microsoft Graph API',
-    );
+    this.logger.log({
+      msg: 'Successfully removed subscription from Microsoft Graph API',
+      subscriptionId,
+    });
 
     return { status: 'removed', subscription: deletedSubscription };
   }

@@ -1,6 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { createSmeared, smearPath } from '@unique-ag/utils';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
+import { unique } from 'remeda';
 import { Directory, DRIZZLE, type DrizzleDatabase, directories } from '~/db';
 
 export interface UserDirectory {
@@ -11,6 +13,8 @@ export interface UserDirectory {
 
 @Injectable()
 export class ListDirectoriesQuery {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
   @Span()
@@ -23,10 +27,20 @@ export class ListDirectoriesQuery {
       ),
     });
 
-    return this.buildTree(allDirectories);
+    const { directoryTree, paths } = this.buildTree(allDirectories);
+    this.logger.debug({
+      msg: `Returned Directories: ${paths.length}`,
+      userProfileId,
+      directories: paths.map((item) => smearPath(createSmeared(item))).join('\r\n'),
+    });
+
+    return directoryTree;
   }
 
-  private buildTree(allDirectories: Directory[]): UserDirectory[] {
+  private buildTree(allDirectories: Directory[]): {
+    directoryTree: UserDirectory[];
+    paths: string[];
+  } {
     const directoriesByParentId = allDirectories.reduce<Map<string | null, Directory[]>>(
       (acc, item) => {
         if (acc.has(item.parentId)) {
@@ -39,16 +53,23 @@ export class ListDirectoriesQuery {
       new Map(),
     );
 
-    const buildTreeRecursive = (parentId: string | null): UserDirectory[] => {
+    const allPaths: string[] = [];
+    const buildTreeRecursive = (parentId: string | null, path: string[]): UserDirectory[] => {
       const elements = directoriesByParentId.get(parentId) ?? [];
+      allPaths.push(path.join('/'));
+
       return elements.map((element) => ({
         id: element.providerDirectoryId,
         displayName: element.displayName,
-        children: buildTreeRecursive(element.id),
+        children: buildTreeRecursive(element.id, [...path, element.displayName]),
       }));
     };
 
     // All root directories have parentId as null.
-    return buildTreeRecursive(null);
+    const directoryTree = buildTreeRecursive(null, []);
+    return {
+      directoryTree,
+      paths: unique(allPaths),
+    };
   }
 }

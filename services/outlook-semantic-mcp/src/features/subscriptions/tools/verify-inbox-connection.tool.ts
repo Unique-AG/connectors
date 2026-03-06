@@ -62,7 +62,7 @@ export class VerifyInboxConnectionTool {
     const userProfileTypeid = extractUserProfileId(request);
     const userProfileId = userProfileTypeid.toString();
 
-    this.logger.debug({ userProfileId }, 'Checking inbox connection status for user');
+    this.logger.debug({ userProfileId, msg: 'Checking inbox connection status for user' });
 
     const subscription = await this.db.query.subscriptions.findFirst({
       where: and(
@@ -72,7 +72,7 @@ export class VerifyInboxConnectionTool {
     });
 
     if (!subscription) {
-      this.logger.debug({ userProfileId }, 'No mail subscription found for user');
+      this.logger.debug({ userProfileId, msg: 'No mail subscription found for user' });
       return {
         status: 'not_configured' as SubscriptionStatus,
         message: 'Inbox connection is not configured. Use connect_inbox to begin ingesting emails.',
@@ -105,10 +105,13 @@ export class VerifyInboxConnectionTool {
       message = 'Inbox connection is active and running. Emails are being ingested.';
     }
 
-    this.logger.debug(
-      { userProfileId, status, expiresAt, minutesUntilExpiration },
-      'Inbox connection status retrieved',
-    );
+    this.logger.debug({
+      msg: 'Inbox connection status retrieved',
+      userProfileId,
+      status,
+      expiresAt,
+      minutesUntilExpiration,
+    });
 
     return {
       status,

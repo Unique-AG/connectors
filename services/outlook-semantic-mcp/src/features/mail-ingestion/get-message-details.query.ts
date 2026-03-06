@@ -19,10 +19,10 @@ export class GetMessageDetailsQuery {
       .header(`Prefer`, `IdType="ImmutableId"`)
       .select(GraphMessageFields)
       .get();
-    this.logger.log(`Received data for messageId: ${messageId}`);
+    this.logger.log({ msg: 'Received data for messageId', messageId });
 
     const output = graphMessageSchema.parse(messageRaw);
-    this.logger.log(`Parsed succesfully the data for message: ${messageId}`);
+    this.logger.log({ msg: 'Parsed succesfully the data for message', messageId });
     return output;
   }
 }

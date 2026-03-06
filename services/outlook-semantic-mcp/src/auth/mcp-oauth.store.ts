@@ -100,13 +100,11 @@ export class McpOAuthStore implements IOAuthStore {
     try {
       await this.drizzle.delete(authorizationCodes).where(eq(authorizationCodes.code, code));
     } catch (error) {
-      this.logger.warn(
-        {
-          message: 'Failed to delete expired authorization code from database',
-          operation: 'cleanup_auth_code',
-        },
-        error,
-      );
+      this.logger.warn({
+        msg: 'Failed to delete expired authorization code from database',
+        operation: 'cleanup_auth_code',
+        err: error,
+      });
     }
   }
 
@@ -132,13 +130,11 @@ export class McpOAuthStore implements IOAuthStore {
     try {
       await this.drizzle.delete(oauthSessions).where(eq(oauthSessions.sessionId, sessionId));
     } catch (error) {
-      this.logger.warn(
-        {
-          message: 'Failed to delete expired OAuth session from database',
-          operation: 'cleanup_oauth_session',
-        },
-        error,
-      );
+      this.logger.warn({
+        msg: 'Failed to delete expired OAuth session from database',
+        operation: 'cleanup_oauth_session',
+        err: error,
+      });
     }
   }
 
@@ -403,14 +399,12 @@ export class McpOAuthStore implements IOAuthStore {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
-    this.logger.debug(
-      {
-        cutoffDate: cutoffDate.toISOString(),
-        olderThanDays,
-        operation: 'cleanup_expired_tokens',
-      },
-      'Beginning cleanup of expired tokens and sessions from database',
-    );
+    this.logger.debug({
+      msg: 'Beginning cleanup of expired tokens and sessions from database',
+      cutoffDate: cutoffDate.toISOString(),
+      olderThanDays,
+      operation: 'cleanup_expired_tokens',
+    });
 
     const deletedTokens = await this.drizzle
       .delete(tokens)

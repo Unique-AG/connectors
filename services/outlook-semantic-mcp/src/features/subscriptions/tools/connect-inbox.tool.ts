@@ -72,7 +72,7 @@ export class ConnectInboxTool {
     const userProfileTypeid = extractUserProfileId(request);
     const userProfileId = userProfileTypeid.toString();
 
-    this.logger.log({ userProfileId }, 'Starting knowledge base integration for user');
+    this.logger.log({ userProfileId, msg: 'Starting knowledge base integration for user' });
 
     // We first sync all directories because if the webhook receives notifications we should be able to process them.
     await this.syncDirectoriesCommand.run(userProfileTypeid);
@@ -89,10 +89,12 @@ export class ConnectInboxTool {
       expiring_soon: `Knowledge base integration is active but expiring in ${minutesUntilExpiration} minutes. It will be automatically renewed.`,
     };
 
-    this.logger.log(
-      { userProfileId, subscriptionId: subscription.id, status },
-      'Knowledge base integration operation completed',
-    );
+    this.logger.log({
+      msg: 'Knowledge base integration operation completed',
+      userProfileId,
+      subscriptionId: subscription.id,
+      status,
+    });
 
     return {
       success: true,

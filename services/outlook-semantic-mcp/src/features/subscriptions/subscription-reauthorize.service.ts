@@ -32,10 +32,10 @@ export class SubscriptionReauthorizeService {
       operation: 'enqueue_reauthorization',
     });
 
-    this.logger.debug(
-      { subscriptionId },
-      'Enqueuing subscription reauthorization event for processing',
-    );
+    this.logger.debug({
+      msg: 'Enqueuing subscription reauthorization event for processing',
+      subscriptionId,
+    });
 
     const payload = await ReauthorizationRequiredEventDto.encodeAsync({
       subscriptionId,
@@ -51,14 +51,12 @@ export class SubscriptionReauthorizeService {
       published,
     });
 
-    this.logger.debug(
-      {
-        exchangeName: MAIN_EXCHANGE.name,
-        payload,
-        published,
-      },
-      'Publishing event to message queue for asynchronous processing',
-    );
+    this.logger.debug({
+      msg: 'Publishing event to message queue for asynchronous processing',
+      exchangeName: MAIN_EXCHANGE.name,
+      payload,
+      published,
+    });
 
     assert.ok(published, `Cannot publish AMQP event "${payload.type}"`);
   }
@@ -70,10 +68,10 @@ export class SubscriptionReauthorizeService {
       operation: 'reauthorize_subscription',
     });
 
-    this.logger.log(
-      { subscriptionId },
-      'Beginning Microsoft Graph subscription reauthorization process',
-    );
+    this.logger.log({
+      msg: 'Beginning Microsoft Graph subscription reauthorization process',
+      subscriptionId,
+    });
 
     const subscription = await this.db.query.subscriptions.findFirst({
       where: and(
@@ -85,10 +83,10 @@ export class SubscriptionReauthorizeService {
     if (!subscription) {
       traceEvent('subscription not found for reauthorization');
 
-      this.logger.warn(
-        { subscriptionId },
-        'Cannot reauthorize: subscription is not managed by this service',
-      );
+      this.logger.warn({
+        msg: 'Cannot reauthorize: subscription is not managed by this service',
+        subscriptionId,
+      });
       return;
     }
 
@@ -97,14 +95,12 @@ export class SubscriptionReauthorizeService {
       'subscription.id': subscription.id,
     });
 
-    this.logger.debug(
-      {
-        subscriptionId,
-        managedId: subscription.id,
-        userProfileId: subscription.userProfileId,
-      },
-      'Located managed subscription record that requires reauthorization',
-    );
+    this.logger.debug({
+      msg: 'Located managed subscription record that requires reauthorization',
+      subscriptionId,
+      managedId: subscription.id,
+      userProfileId: subscription.userProfileId,
+    });
 
     const nextScheduledExpiration = this.utils.getNextScheduledExpiration();
 
@@ -116,17 +112,16 @@ export class SubscriptionReauthorizeService {
       expirationDateTime: payload.expirationDateTime,
     });
 
-    this.logger.debug(
-      {
-        expirationDateTime: payload.expirationDateTime,
-      },
-      'Prepared Microsoft Graph subscription reauthorization request payload',
-    );
+    this.logger.debug({
+      msg: 'Prepared Microsoft Graph subscription reauthorization request payload',
+      expirationDateTime: payload.expirationDateTime,
+    });
 
-    this.logger.debug(
-      { subscriptionId, newExpiration: payload.expirationDateTime },
-      'Sending reauthorization update request to Microsoft Graph API',
-    );
+    this.logger.debug({
+      msg: 'Sending reauthorization update request to Microsoft Graph API',
+      subscriptionId,
+      newExpiration: payload.expirationDateTime,
+    });
 
     const client = this.graphClientFactory.createClientForUser(subscription.userProfileId);
     const graphResponse = (await client
@@ -139,10 +134,11 @@ export class SubscriptionReauthorizeService {
       newExpirationDateTime: graphSubscription.expirationDateTime.toISOString(),
     });
 
-    this.logger.log(
-      { subscriptionId, newExpiration: graphSubscription.expirationDateTime },
-      'Microsoft Graph API subscription was successfully reauthorized',
-    );
+    this.logger.log({
+      msg: 'Microsoft Graph API subscription was successfully reauthorized',
+      subscriptionId,
+      newExpiration: graphSubscription.expirationDateTime,
+    });
 
     const updates = await this.db
       .update(subscriptions)
@@ -165,9 +161,9 @@ export class SubscriptionReauthorizeService {
     }
 
     traceEvent('managed subscription updated', { id: updated.id });
-    this.logger.log(
-      { id: updated.id },
-      'Successfully updated managed subscription record with new expiration',
-    );
+    this.logger.log({
+      msg: 'Successfully updated managed subscription record with new expiration',
+      id: updated.id,
+    });
   }
 }
