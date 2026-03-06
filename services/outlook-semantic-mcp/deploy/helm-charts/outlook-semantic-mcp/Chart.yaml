@@ -2,8 +2,8 @@ apiVersion: v2
 name: outlook-semantic-mcp
 description: An experimental MCP server for Outlook leveraging the Microsoft Graph API.
 type: application
-version: 0.2.6
-appVersion: 0.2.6
+version: 0.2.7
+appVersion: 0.2.7
 dependencies:
   - alias: server
     name: backend-service

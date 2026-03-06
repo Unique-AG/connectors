@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.7](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.6...outlook-semantic-mcp@0.2.7) (2026-03-06)
+
+
+### Features
+
+* **confluence-connector,unique-api,utils,deps:** implement ingestion pipeline ([#305](https://github.com/Unique-AG/connectors/issues/305)) ([7d2c64c](https://github.com/Unique-AG/connectors/commit/7d2c64c1f4248e06a822a7d827715c4ae001eeec))
+
 ## [0.2.6](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.5...outlook-semantic-mcp@0.2.6) (2026-03-06)
 
 
