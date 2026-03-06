@@ -51,9 +51,6 @@ data:
       {{- end }}
     # Processing Configuration
     processing:
-      {{- if $tenant.processing.stepTimeoutSeconds }}
-      stepTimeoutSeconds: {{ $tenant.processing.stepTimeoutSeconds }}
-      {{- end }}
       {{- if $tenant.processing.concurrency }}
       concurrency: {{ $tenant.processing.concurrency }}
       {{- end }}

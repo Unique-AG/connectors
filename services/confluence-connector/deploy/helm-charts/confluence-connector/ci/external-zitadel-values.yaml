@@ -22,7 +22,6 @@ connectorConfig:
           oauthTokenUrl: https://idp.unique.app/oauth/v2/token
           projectId: "225317577440629999"
       processing:
-        stepTimeoutSeconds: 300
         concurrency: 1
         scanIntervalCron: "*/15 * * * *"
       ingestion:

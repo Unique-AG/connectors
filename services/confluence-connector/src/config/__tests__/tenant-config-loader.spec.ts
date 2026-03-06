@@ -21,7 +21,6 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 });
 
 const baseProcessingConfig = {
-  stepTimeoutSeconds: 300,
   concurrency: 1,
   scanIntervalCron: '*/15 * * * *',
 };

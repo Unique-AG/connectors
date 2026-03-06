@@ -342,10 +342,6 @@
                 "type": "object",
                 "description": "Page processing configuration",
                 "properties": {
-                  "stepTimeoutSeconds": {
-                    "type": "integer",
-                    "description": "Timeout in seconds for page processing steps"
-                  },
                   "concurrency": {
                     "type": "integer",
                     "description": "Number of concurrent page processing operations"

@@ -25,7 +25,6 @@ connectorConfig:
           uniqueIngestionMode: INGESTION
           customProperty: value
       processing:
-        stepTimeoutSeconds: 300
         concurrency: 1
         scanIntervalCron: "*/30 * * * *"
         maxPagesToScan: 5000
