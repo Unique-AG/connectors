@@ -1,15 +1,15 @@
 import assert from 'node:assert';
 import {
-  UniqueApiClient,
   UNIQUE_API_CLIENT_FACTORY,
+  UniqueApiClient,
   type UniqueApiClientFactory,
   type UniqueApiFeatureModuleInputOptions,
 } from '@unique-ag/unique-api';
-import { V1KeyFormatMode } from '../constants/ingestion.constants';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
 import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
+import { V1KeyFormatMode } from '../constants/ingestion.constants';
 import { ConfluenceContentFetcher } from '../synchronization/confluence-content-fetcher';
 import { ConfluencePageScanner } from '../synchronization/confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';

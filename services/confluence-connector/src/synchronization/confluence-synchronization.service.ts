@@ -45,7 +45,10 @@ export class ConfluenceSynchronizationService {
         const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
 
         const spaceKeys = [...new Set(pagesToFetch.map((p) => p.spaceKey))];
-        const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(rootScopePath, spaceKeys);
+        const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(
+          rootScopePath,
+          spaceKeys,
+        );
 
         await this.fetchAndIngestPages(
           pagesToFetch,

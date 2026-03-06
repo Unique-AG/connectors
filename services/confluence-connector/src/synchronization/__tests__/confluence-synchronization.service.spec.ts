@@ -166,7 +166,10 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockIngestionService.deleteContentByKeys).toHaveBeenCalledWith(['99', '99_attachment.pdf']);
+      expect(mockIngestionService.deleteContentByKeys).toHaveBeenCalledWith([
+        '99',
+        '99_attachment.pdf',
+      ]);
     });
 
     it('handles no-change diffs without deleting content', async () => {

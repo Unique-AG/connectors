@@ -49,7 +49,10 @@ export class ScopeManagementService {
     return rootScopePath;
   }
 
-  public async ensureSpaceScopes(rootScopePath: string, spaceKeys: string[]): Promise<Map<string, string>> {
+  public async ensureSpaceScopes(
+    rootScopePath: string,
+    spaceKeys: string[],
+  ): Promise<Map<string, string>> {
     const paths = spaceKeys.map((key) => `${rootScopePath}/${key}`);
     const createdScopes = await this.uniqueApiClient.scopes.createFromPaths(paths, {
       inheritAccess: true,

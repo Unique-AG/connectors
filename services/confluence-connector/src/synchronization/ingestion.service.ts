@@ -40,7 +40,10 @@ export class IngestionService {
     try {
       const htmlBuffer = Buffer.from(page.body, 'utf-8');
       const baseKey = `${page.spaceId}_${page.spaceKey}/${page.id}`;
-      const key = this.config.ingestion.useV1KeyFormat === V1KeyFormatMode.Enabled ? baseKey : `${this.tenantName}/${baseKey}`;
+      const key =
+        this.config.ingestion.useV1KeyFormat === V1KeyFormatMode.Enabled
+          ? baseKey
+          : `${this.tenantName}/${baseKey}`;
 
       const registrationRequest = this.buildPageRegistrationRequest(
         page,

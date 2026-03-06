@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { IngestionMode, StoreInternallyMode, V1KeyFormatMode } from '../constants/ingestion.constants';
+import {
+  IngestionMode,
+  StoreInternallyMode,
+  V1KeyFormatMode,
+} from '../constants/ingestion.constants';
 
 const IngestionModeSchema = z.enum([IngestionMode.Flat]).prefault(IngestionMode.Flat);
 
