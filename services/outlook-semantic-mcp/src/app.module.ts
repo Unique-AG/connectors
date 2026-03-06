@@ -64,6 +64,12 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
           pinoHttp: {
             ...defaultLoggerOptions.pinoHttp,
             level: config.logLevel,
+            mixin: () => {
+              const span = trace.getActiveSpan();
+              if (!span?.isRecording()) return {};
+              const ctx = span.spanContext();
+              return { trace_id: ctx.traceId, span_id: ctx.spanId, trace_flags: ctx.traceFlags };
+            },
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
               if (!ctx) return typeid('trace').toString();
