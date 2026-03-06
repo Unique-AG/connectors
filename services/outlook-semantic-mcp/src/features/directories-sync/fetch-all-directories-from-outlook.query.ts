@@ -2,7 +2,7 @@ import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { sumBy, unique } from 'remeda';
+import { clone, sumBy, unique } from 'remeda';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import {
@@ -10,6 +10,7 @@ import {
   graphOutlookDirectoriesResponse,
   graphOutlookDirectory,
 } from './microsoft-graph.dtos';
+import { ms } from 'zod/v4/locales';
 
 @Injectable()
 export class FetchAllDirectoriesFromOutlookQuery {
@@ -34,6 +35,11 @@ export class FetchAllDirectoriesFromOutlookQuery {
       userProfileId,
       rootDirectoryCount: rootDirectories.length,
       msg: `Root directories fetched`,
+    });
+    this.logFullDirectoriesStructure({
+      userProfileId,
+      directories: rootDirectories,
+      msg: `Directories from microsoft before expansion`,
     });
 
     const shouldExpandDirectory = (directory: GraphOutlookDirectory) =>
@@ -71,6 +77,11 @@ export class FetchAllDirectoriesFromOutlookQuery {
     });
 
     await Promise.all(allPromisses);
+    this.logFullDirectoriesStructure({
+      userProfileId,
+      directories: rootDirectories,
+      msg: `Directories from microsoft after expansion`,
+    });
 
     const totalCount = this.countDirectories(rootDirectories);
     const pathsFetched = this.getPaths(rootDirectories, []);
@@ -137,6 +148,32 @@ export class FetchAllDirectoriesFromOutlookQuery {
         return [currentPath.join('/'), ...this.getPaths(directory.childFolders ?? [], currentPath)];
       }),
     );
+  }
+
+  private async logFullDirectoriesStructure({
+    userProfileId,
+    directories,
+    msg,
+  }: {
+    userProfileId: string;
+    directories: GraphOutlookDirectory[];
+    msg: string;
+  }): Promise<void> {
+    const frozenValue = clone(directories);
+
+    const mapRecursive = (items: GraphOutlookDirectory[]): GraphOutlookDirectory[] => {
+      return items.map((item) => ({
+        ...item,
+        displayName: createSmeared(item.displayName).toString(),
+        childFolders: mapRecursive(item.childFolders ?? []),
+      }));
+    };
+
+    this.logger.debug({
+      msg,
+      userProfileId,
+      directoriesStructure: mapRecursive(frozenValue),
+    });
   }
 
   private async expandDirectory({
