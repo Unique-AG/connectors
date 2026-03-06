@@ -33,6 +33,7 @@ teams-mcp = services/teams-mcp/**
 
 # Packages
 aes-gcm-encryption = packages/aes-gcm-encryption/**
+ms-graph-sdk = packages/ms-graph-sdk/**
 instrumentation = packages/instrumentation/**
 logger = packages/logger/**
 mcp-oauth = packages/mcp-oauth/**
