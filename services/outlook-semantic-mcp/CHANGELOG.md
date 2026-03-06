@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.5...outlook-semantic-mcp@0.2.6) (2026-03-06)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** Cleanup logging, add email to logs using smeared ([#331](https://github.com/Unique-AG/connectors/issues/331)) ([6ce957d](https://github.com/Unique-AG/connectors/commit/6ce957dd83b0611445efdf44d3529d7f7afacdf8))
+
 ## [0.2.5](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.4...outlook-semantic-mcp@0.2.5) (2026-03-05)
 
 
