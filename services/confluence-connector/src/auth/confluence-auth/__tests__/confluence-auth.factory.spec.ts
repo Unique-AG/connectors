@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AuthMode, type ConfluenceConfig } from '../../../config';
 import type { TenantConfig } from '../../../config/tenant-config-loader';
-import { ServiceRegistry } from '../../../tenant/service-registry';
 import type { TenantContext } from '../../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../../tenant/tenant-context.storage';
 import { Redacted } from '../../../utils/redacted';
@@ -21,13 +20,8 @@ vi.mock('../strategies/pat-auth.strategy', () => ({
   })),
 }));
 
-const mockServiceLogger = { info: vi.fn(), error: vi.fn() };
-const mockServiceRegistry = {
-  getServiceLogger: vi.fn().mockReturnValue(mockServiceLogger),
-} as unknown as ServiceRegistry;
-
 function createFactory(): ConfluenceAuthFactory {
-  return new ConfluenceAuthFactory(mockServiceRegistry);
+  return new ConfluenceAuthFactory();
 }
 
 const baseFields = {
@@ -52,7 +46,7 @@ describe('ConfluenceAuthFactory', () => {
         instanceType: 'cloud',
         cloudId: 'test-cloud-id',
         auth: {
-          mode: AuthMode.OAUTH_2LO,
+          mode: AuthMode.OAuth2Lo,
           clientId: 'client-id',
           clientSecret: new Redacted('secret'),
         },
@@ -62,7 +56,7 @@ describe('ConfluenceAuthFactory', () => {
       const token = await auth.acquireToken();
 
       expect(token).toBe('oauth-token');
-      expect(OAuth2LoAuthStrategy).toHaveBeenCalledWith(config.auth, config, expect.any(Object));
+      expect(OAuth2LoAuthStrategy).toHaveBeenCalledWith(config.auth, config);
     });
 
     it('creates auth for PAT data-center config', async () => {
@@ -71,7 +65,7 @@ describe('ConfluenceAuthFactory', () => {
         ...baseFields,
         instanceType: 'data-center',
         auth: {
-          mode: AuthMode.PAT,
+          mode: AuthMode.Pat,
           token: new Redacted('my-pat'),
         },
       };
@@ -93,24 +87,6 @@ describe('ConfluenceAuthFactory', () => {
 
       expect(() => tenantStorage.run(mockTenant, () => factory.createAuthStrategy(config))).toThrow(
         'Unsupported Confluence auth mode',
-      );
-    });
-
-    it('throws when called outside tenant context due to logger lookup', () => {
-      const factory = new ConfluenceAuthFactory(new ServiceRegistry());
-      const config: ConfluenceConfig = {
-        ...baseFields,
-        instanceType: 'cloud',
-        cloudId: 'test-cloud-id',
-        auth: {
-          mode: AuthMode.OAUTH_2LO,
-          clientId: 'client-id',
-          clientSecret: new Redacted('secret'),
-        },
-      };
-
-      expect(() => factory.createAuthStrategy(config)).toThrow(
-        'No tenant context — called outside of sync execution',
       );
     });
   });

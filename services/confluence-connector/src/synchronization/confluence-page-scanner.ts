@@ -1,4 +1,4 @@
-import type pino from 'pino';
+import { Logger } from '@nestjs/common';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
 import type { ConfluencePage } from '../confluence-api';
 import { type ConfluenceApiClient, ContentType } from '../confluence-api';
@@ -12,11 +12,12 @@ const SKIPPED_CONTENT_TYPES = [
 ];
 
 export class ConfluencePageScanner {
+  private readonly logger = new Logger(ConfluencePageScanner.name);
+
   public constructor(
     private readonly confluenceConfig: ConfluenceConfig,
     private readonly processingConfig: ProcessingConfig,
     private readonly apiClient: ConfluenceApiClient,
-    private readonly logger: pino.Logger,
   ) {}
 
   public async discoverPages(): Promise<DiscoveredPage[]> {
@@ -35,7 +36,7 @@ export class ConfluencePageScanner {
       discoveredPages.push(...mappedDescendantPages);
     }
 
-    this.logger.info({ count: discoveredPages.length }, 'Page discovery completed');
+    this.logger.log({ count: discoveredPages.length, msg: 'Page discovery completed' });
     return discoveredPages;
   }
 
@@ -50,10 +51,12 @@ export class ConfluencePageScanner {
       }
 
       if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
-        this.logger.debug(
-          { pageId: page.id, title: page.title, type: page.type },
-          'Skipping non-page content type',
-        );
+        this.logger.debug({
+          pageId: page.id,
+          title: page.title,
+          type: page.type,
+          msg: 'Skipping non-page content type',
+        });
         continue;
       }
 
@@ -91,7 +94,7 @@ export class ConfluencePageScanner {
       return false;
     }
     if (currentCount >= limit) {
-      this.logger.info({ limit }, 'maxPagesToScan limit reached');
+      this.logger.log({ limit, msg: 'maxPagesToScan limit reached' });
       return true;
     }
     return false;

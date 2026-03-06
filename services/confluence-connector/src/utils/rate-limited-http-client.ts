@@ -1,17 +1,15 @@
+import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
-import type pino from 'pino';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
 import { handleErrorStatus } from './http-util';
 
 // TODO: extract to shared utils package (bottleneck as optional peer dep)
 export class RateLimitedHttpClient {
+  private readonly logger = new Logger(RateLimitedHttpClient.name);
   private readonly limiter: Bottleneck;
   private readonly dispatcher: Dispatcher;
 
-  public constructor(
-    private readonly logger: pino.Logger,
-    ratePerMinute: number,
-  ) {
+  public constructor(ratePerMinute: number) {
     this.dispatcher = new Agent().compose([interceptors.redirect(), interceptors.retry()]);
 
     this.limiter = new Bottleneck({
@@ -39,12 +37,12 @@ export class RateLimitedHttpClient {
   private setupThrottlingMonitoring(): void {
     this.limiter.on('depleted', (empty) => {
       if (empty) {
-        this.logger.info('Rate limit reservoir depleted - queuing requests');
+        this.logger.log({ msg: 'Rate limit reservoir depleted - queuing requests' });
       }
     });
 
     this.limiter.on('dropped', () => {
-      this.logger.error('Request dropped due to rate limiter queue overflow');
+      this.logger.error({ msg: 'Request dropped due to rate limiter queue overflow' });
     });
 
     this.limiter.on('error', (error) => {

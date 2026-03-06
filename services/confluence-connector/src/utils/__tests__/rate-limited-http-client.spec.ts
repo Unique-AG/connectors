@@ -21,22 +21,10 @@ vi.mock('bottleneck', () => ({
   },
 }));
 
-vi.mock('../normalize-error', () => ({
-  normalizeError: vi.fn((e: unknown) => (e instanceof Error ? e : new Error(String(e)))),
-}));
-
 import { request } from 'undici';
 import { RateLimitedHttpClient } from '../rate-limited-http-client';
 
 const mockedRequest = request as Mock;
-
-const mockLogger = {
-  info: vi.fn(),
-  warn: vi.fn(),
-  error: vi.fn(),
-  debug: vi.fn(),
-  child: vi.fn(),
-};
 
 function mockUndiciResponse(
   statusCode: number,
@@ -58,7 +46,7 @@ describe('RateLimitedHttpClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new RateLimitedHttpClient(mockLogger as never, 100);
+    client = new RateLimitedHttpClient(100);
   });
 
   describe('rateLimitedRequest', () => {

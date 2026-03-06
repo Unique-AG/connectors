@@ -1,7 +1,7 @@
 import { AuthMode, ConfluenceConfig } from '../../../config/confluence.schema';
 import { ConfluenceAuth } from '../confluence-auth.abstract';
 
-type PatAuthConfig = Extract<ConfluenceConfig['auth'], { mode: typeof AuthMode.PAT }>;
+type PatAuthConfig = Extract<ConfluenceConfig['auth'], { mode: typeof AuthMode.Pat }>;
 
 export class PatAuthStrategy extends ConfluenceAuth {
   private readonly token: string;

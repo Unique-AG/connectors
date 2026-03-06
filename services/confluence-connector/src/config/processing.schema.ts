@@ -17,7 +17,7 @@ export const ProcessingConfigSchema = z.object({
     .describe('Sets the concurrency of how many pages you want to ingest into unique at once'),
   scanIntervalCron: z
     .string()
-    .default(CRON_EVERY_15_MINUTES)
+    .prefault(CRON_EVERY_15_MINUTES)
     .describe('Cron expression for the scheduled page scan interval'),
   maxPagesToScan: z
     .preprocess(

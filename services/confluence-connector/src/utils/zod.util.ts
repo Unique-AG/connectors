@@ -14,7 +14,9 @@ export const requiredStringSchema = z.string().trim().nonempty();
 const ENV_REF_PREFIX = 'os.environ/';
 
 const envResolvableStringSchema = z.string().transform((val) => {
-  if (!val.startsWith(ENV_REF_PREFIX)) return val;
+  if (!val.startsWith(ENV_REF_PREFIX)) {
+    return val;
+  }
   const varName = val.slice(ENV_REF_PREFIX.length);
   return process.env[varName] ?? '';
 });

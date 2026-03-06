@@ -6,6 +6,7 @@ import { load } from 'js-yaml';
 import { isPlainObject } from 'remeda';
 import { z } from 'zod';
 import { ConfluenceConfigSchema } from './confluence.schema';
+import { IngestionConfigSchema } from './ingestion.schema';
 import { ProcessingConfigSchema } from './processing.schema';
 import { UniqueConfigSchema } from './unique.schema';
 
@@ -13,21 +14,22 @@ const TENANT_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const TENANT_CONFIG_SUFFIX = '-tenant-config.yaml';
 
 const TenantStatus = {
-  ACTIVE: 'active',
-  INACTIVE: 'inactive',
-  DELETED: 'deleted',
+  Active: 'active',
+  Inactive: 'inactive',
+  Deleted: 'deleted',
 } as const;
 
 const TenantStatusSchema = z.object({
   status: z
-    .enum([TenantStatus.ACTIVE, TenantStatus.INACTIVE, TenantStatus.DELETED])
-    .default(TenantStatus.ACTIVE),
+    .enum([TenantStatus.Active, TenantStatus.Inactive, TenantStatus.Deleted])
+    .prefault(TenantStatus.Active),
 });
 
 const TenantConfigSchema = z.object({
   confluence: ConfluenceConfigSchema,
   unique: UniqueConfigSchema,
   processing: ProcessingConfigSchema,
+  ingestion: IngestionConfigSchema,
 });
 export type TenantConfig = z.infer<typeof TenantConfigSchema>;
 
@@ -67,11 +69,10 @@ function validateTenantNames(entries: { name: string; path: string }[]): void {
       `Invalid tenant name '${entry.name}' extracted from '${entry.path}': must match ${TENANT_NAME_REGEX}`,
     );
     const existing = seen.get(entry.name);
-    if (existing) {
-      throw new Error(
-        `Duplicate tenant name '${entry.name}' found in '${existing}' and '${entry.path}'`,
-      );
-    }
+    assert.ok(
+      !existing,
+      `Duplicate tenant name '${entry.name}' found in '${existing}' and '${entry.path}'`,
+    );
     seen.set(entry.name, entry.path);
   }
 }
@@ -103,16 +104,16 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
 
       const { status } = TenantStatusSchema.parse(rawConfig);
 
-      if (status === TenantStatus.DELETED) {
+      if (status === TenantStatus.Deleted) {
         // TODO implement deletion for ingested confluence-content
-        logger.log(`Tenant '${entry.name}' is deleted, skipping`);
+        logger.log({ tenantName: entry.name, msg: `Tenant '${entry.name}' is deleted, skipping` });
         continue;
       }
 
       const config = TenantConfigSchema.parse(rawConfig);
 
-      if (status === TenantStatus.INACTIVE) {
-        logger.log(`Tenant '${entry.name}' is inactive, skipping`);
+      if (status === TenantStatus.Inactive) {
+        logger.log({ tenantName: entry.name, msg: `Tenant '${entry.name}' is inactive, skipping` });
         continue;
       }
 

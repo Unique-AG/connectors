@@ -133,7 +133,7 @@
           "description": "List of tenant configurations",
           "items": {
             "type": "object",
-            "required": ["name", "confluence", "unique", "processing"],
+            "required": ["name", "confluence", "unique", "processing", "ingestion"],
             "properties": {
               "name": {
                 "type": "string",
@@ -350,6 +350,35 @@
                   "maxPagesToScan": {
                     "type": ["integer", "null"],
                     "description": "Maximum number of pages to scan (for testing). Unlimited if not set"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "ingestion": {
+                "type": "object",
+                "description": "Ingestion configuration",
+                "required": ["ingestionMode", "scopeId"],
+                "properties": {
+                  "ingestionMode": {
+                    "type": "string",
+                    "enum": ["flat"],
+                    "description": "Ingestion traversal mode"
+                  },
+                  "scopeId": {
+                    "type": "string",
+                    "description": "Root scope ID for ingestion"
+                  },
+                  "storeInternally": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
+                    "description": "Whether to store content internally in Unique",
+                    "default": "enabled"
+                  },
+                  "useV1KeyFormat": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
+                    "description": "Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix",
+                    "default": "disabled"
                   }
                 },
                 "additionalProperties": false

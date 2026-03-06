@@ -18,11 +18,9 @@ vi.mock('../../utils/rate-limited-http-client', () => ({
 }));
 
 const mockAuth = { acquireToken: vi.fn() } as unknown as ConfluenceAuth;
-const mockLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 
 const mockServiceRegistry = {
   getService: vi.fn().mockReturnValue(mockAuth),
-  getServiceLogger: vi.fn().mockReturnValue(mockLogger),
 } as unknown as ServiceRegistry;
 
 const baseFields = {
@@ -43,7 +41,7 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(RateLimitedHttpClient).toHaveBeenCalledWith(mockLogger, 100);
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100);
     expect(CloudConfluenceApiClient).toHaveBeenCalledWith(
       config,
       mockAuth,
@@ -61,7 +59,7 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(RateLimitedHttpClient).toHaveBeenCalledWith(mockLogger, 100);
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100);
     expect(DataCenterConfluenceApiClient).toHaveBeenCalledWith(
       config,
       mockAuth,

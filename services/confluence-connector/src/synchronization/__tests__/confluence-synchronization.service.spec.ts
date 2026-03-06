@@ -1,72 +1,60 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ContentType } from '../../confluence-api';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
+import {
+  createMockTenant,
+  discoveredPagesFixture,
+  fetchedPagesFixture,
+} from '../__mocks__/sync.fixtures';
 import type { ConfluenceContentFetcher } from '../confluence-content-fetcher';
 import type { ConfluencePageScanner } from '../confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../confluence-synchronization.service';
-import type { DiscoveredPage, FetchedPage } from '../sync.types';
+import type { FileDiffService } from '../file-diff.service';
+import type { IngestionService } from '../ingestion.service';
+import type { ScopeManagementService } from '../scope-management.service';
+import type { FileDiffResult } from '../sync.types';
 
-const mockTenantLogger = vi.hoisted(() => ({
-  info: vi.fn(),
+const mockLogger = vi.hoisted(() => ({
+  log: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
   debug: vi.fn(),
 }));
 
-const discoveredPagesFixture: DiscoveredPage[] = [
-  {
-    id: '1',
-    title: 'Page 1',
-    type: ContentType.PAGE,
-    spaceId: 'space-1',
-    spaceKey: 'SP',
-    spaceName: 'Space',
-    versionTimestamp: '2026-02-01T00:00:00.000Z',
-    webUrl: 'https://confluence.example.com/page/1',
-    labels: ['ai-ingest'],
-  },
-];
-
-const fetchedPagesFixture: FetchedPage[] = [
-  {
-    id: '1',
-    title: 'Page 1',
-    body: '<p>content</p>',
-    webUrl: 'https://confluence.example.com/page/1',
-    spaceId: 'space-1',
-    spaceKey: 'SP',
-    spaceName: 'Space',
-    metadata: { confluenceLabels: ['engineering'] },
-  },
-];
-
-function createMockTenant(name: string, overrides: Partial<TenantContext> = {}): TenantContext {
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
   return {
-    name,
-    config: {
-      processing: { scanIntervalCron: '*/5 * * * *' },
-    },
-    isScanning: false,
-    ...overrides,
-  } as unknown as TenantContext;
-}
+    ...actual,
+    Logger: vi.fn().mockImplementation(() => mockLogger),
+  };
+});
+
+const mockScopeManagementService = {
+  initialize: vi.fn().mockResolvedValue('/Confluence'),
+  ensureSpaceScopes: vi.fn().mockResolvedValue(new Map([['SP', 'scope-1']])),
+} as unknown as ScopeManagementService;
 
 function createService(
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
-  contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPagesContent'>,
+  contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>,
+  fileDiffService: Pick<FileDiffService, 'computeDiff'>,
+  ingestionService: Pick<IngestionService, 'ingestPage' | 'deleteContentByKeys'>,
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
     scanner as ConfluencePageScanner,
     contentFetcher as ConfluenceContentFetcher,
-    mockTenantLogger as never,
+    fileDiffService as FileDiffService,
+    ingestionService as IngestionService,
+    mockScopeManagementService,
   );
 }
 
 describe('ConfluenceSynchronizationService', () => {
   let tenant: TenantContext;
   let mockScanner: Pick<ConfluencePageScanner, 'discoverPages'>;
-  let mockContentFetcher: Pick<ConfluenceContentFetcher, 'fetchPagesContent'>;
+  let mockContentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>;
+  let mockFileDiffService: Pick<FileDiffService, 'computeDiff'>;
+  let mockIngestionService: Pick<IngestionService, 'ingestPage' | 'deleteContentByKeys'>;
   let service: ConfluenceSynchronizationService;
 
   beforeEach(() => {
@@ -76,9 +64,30 @@ describe('ConfluenceSynchronizationService', () => {
       discoverPages: vi.fn().mockResolvedValue(discoveredPagesFixture),
     };
     mockContentFetcher = {
-      fetchPagesContent: vi.fn().mockResolvedValue(fetchedPagesFixture),
+      fetchPageContent: vi.fn().mockImplementation((page: { id: string }) => {
+        const fetched = fetchedPagesFixture.find((f) => f.id === page.id);
+        return Promise.resolve(fetched ?? null);
+      }),
     };
-    service = createService(mockScanner, mockContentFetcher);
+    const diffResult: FileDiffResult = {
+      newPageIds: ['1'],
+      updatedPageIds: [],
+      deletedPageIds: [],
+      movedPageIds: [],
+    };
+    mockFileDiffService = {
+      computeDiff: vi.fn().mockResolvedValue(diffResult),
+    };
+    mockIngestionService = {
+      ingestPage: vi.fn().mockResolvedValue(undefined),
+      deleteContentByKeys: vi.fn().mockResolvedValue(undefined),
+    };
+    service = createService(
+      mockScanner,
+      mockContentFetcher,
+      mockFileDiffService,
+      mockIngestionService,
+    );
   });
 
   describe('synchronize', () => {
@@ -87,33 +96,37 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync already in progress, skipping');
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.objectContaining({ msg: 'Sync already in progress, skipping' }),
+      );
       expect(mockScanner.discoverPages).not.toHaveBeenCalled();
-      expect(mockContentFetcher.fetchPagesContent).not.toHaveBeenCalled();
+      expect(mockContentFetcher.fetchPageContent).not.toHaveBeenCalled();
     });
 
     it('runs scanner then content fetcher and logs summaries', async () => {
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockTenantLogger.info).toHaveBeenCalledWith('Starting sync');
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.objectContaining({ msg: 'Starting sync' }),
+      );
       expect(mockScanner.discoverPages).toHaveBeenCalledOnce();
-      expect(mockContentFetcher.fetchPagesContent).toHaveBeenCalledWith(discoveredPagesFixture);
-
-      const discoverLog = mockTenantLogger.info.mock.calls.find(
-        (call) => typeof call[1] === 'string' && call[1].startsWith('Discovery completed'),
+      expect(mockFileDiffService.computeDiff).toHaveBeenCalledWith(discoveredPagesFixture);
+      expect(mockContentFetcher.fetchPageContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
       );
-      expect(discoverLog).toBeDefined();
-      expect(discoverLog?.[0]).toMatchObject({ count: discoveredPagesFixture.length });
-      expect(discoverLog?.[1]).toContain('"id": "1"');
-
-      const fetchLog = mockTenantLogger.info.mock.calls.find(
-        (call) => typeof call[1] === 'string' && call[1].startsWith('Fetching completed'),
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        fetchedPagesFixture[0],
+        'scope-1',
       );
-      expect(fetchLog).toBeDefined();
-      expect(fetchLog?.[0]).toMatchObject({ count: fetchedPagesFixture.length });
-      expect(fetchLog?.[1]).toContain('"id": "1"');
 
-      expect(mockTenantLogger.info).toHaveBeenCalledWith('Sync completed');
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          count: discoveredPagesFixture.length,
+          msg: 'Discovery completed',
+        }),
+      );
+
+      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Sync work done' });
     });
 
     it('resets isScanning after successful sync', async () => {
@@ -127,19 +140,110 @@ describe('ConfluenceSynchronizationService', () => {
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(tenant.isScanning).toBe(false);
-      expect(mockTenantLogger.error).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
       );
     });
 
-    it('resets isScanning and logs errors when content fetcher fails', async () => {
-      vi.mocked(mockContentFetcher.fetchPagesContent).mockRejectedValue(new Error('fetch failure'));
+    it('logs individual page failures without aborting the sync', async () => {
+      vi.mocked(mockContentFetcher.fetchPageContent).mockRejectedValue(new Error('fetch failure'));
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(tenant.isScanning).toBe(false);
-      expect(mockTenantLogger.error).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), msg: 'Page ingestion failed' }),
+      );
+    });
+
+    it('deletes content for deleted keys returned by file diff', async () => {
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newPageIds: ['1'],
+        updatedPageIds: [],
+        deletedPageIds: ['99', '99_attachment.pdf'],
+        movedPageIds: [],
+      });
+
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(mockIngestionService.deleteContentByKeys).toHaveBeenCalledWith([
+        '99',
+        '99_attachment.pdf',
+      ]);
+    });
+
+    it('handles no-change diffs without deleting content', async () => {
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newPageIds: [],
+        updatedPageIds: [],
+        deletedPageIds: [],
+        movedPageIds: [],
+      });
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(mockContentFetcher.fetchPageContent).not.toHaveBeenCalled();
+      expect(mockIngestionService.ingestPage).not.toHaveBeenCalled();
+      expect(mockIngestionService.deleteContentByKeys).not.toHaveBeenCalled();
+    });
+
+    it('logs and exits when file diff fails', async () => {
+      vi.mocked(mockFileDiffService.computeDiff).mockRejectedValue(new Error('diff failed'));
+
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(tenant.isScanning).toBe(false);
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
+      );
+      expect(mockContentFetcher.fetchPageContent).not.toHaveBeenCalled();
+    });
+
+    it('fetches content only for new and updated pages from diff', async () => {
+      // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction
+      const baseDiscovered = discoveredPagesFixture[0]!;
+      const discovered = [
+        ...discoveredPagesFixture,
+        { ...baseDiscovered, id: '2', title: 'Page 2' },
+        { ...baseDiscovered, id: '3', title: 'Page 3' },
+      ];
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue(discovered);
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newPageIds: ['2'],
+        updatedPageIds: ['3'],
+        deletedPageIds: [],
+        movedPageIds: [],
+      });
+      // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction
+      const baseFetched = fetchedPagesFixture[0]!;
+      vi.mocked(mockContentFetcher.fetchPageContent).mockImplementation((page: { id: string }) => {
+        if (page.id === '2') {
+          return Promise.resolve({ ...baseFetched, id: '2', title: 'Page 2' });
+        }
+        if (page.id === '3') {
+          return Promise.resolve({ ...baseFetched, id: '3', title: 'Page 3' });
+        }
+        return Promise.resolve(null);
+      });
+
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(mockContentFetcher.fetchPageContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '2' }),
+      );
+      expect(mockContentFetcher.fetchPageContent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '3' }),
+      );
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '2' }),
+        'scope-1',
+      );
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '3' }),
+        'scope-1',
+      );
+      expect(mockIngestionService.ingestPage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
+        expect.anything(),
       );
     });
   });
