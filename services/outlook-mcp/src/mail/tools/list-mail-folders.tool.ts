@@ -63,6 +63,7 @@ export class ListMailFoldersTool extends BaseMsGraphTool {
     try {
       const response = await graphClient
         .api('/me/mailFolders')
+        .query({ includeHiddenFolders: 'true' })
         .select('id,displayName,parentFolderId,childFolderCount,unreadItemCount,totalItemCount')
         .top(limit)
         .get();
@@ -83,6 +84,7 @@ export class ListMailFoldersTool extends BaseMsGraphTool {
               try {
                 const childResponse = await graphClient
                   .api(`/me/mailFolders/${folder.id}/childFolders`)
+                  .query({ includeHiddenFolders: 'true' })
                   .select(
                     'id,displayName,parentFolderId,childFolderCount,unreadItemCount,totalItemCount',
                   )
