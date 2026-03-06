@@ -184,6 +184,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
   }): Promise<GraphOutlookDirectory> {
     const response = await client
       .api(`me/mailFolders/${parentDirectoryId}`)
+      .query({ includeHiddenFolders: 'true' })
       .top(500)
       .expand('childFolders')
       .header(`Prefer`, `IdType="ImmutableId"`)
