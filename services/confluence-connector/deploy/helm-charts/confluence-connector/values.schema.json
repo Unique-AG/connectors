@@ -183,11 +183,10 @@
                           },
                           "clientSecretEnvVar": {
                             "type": "string",
-                            "description": "Environment variable name for the client secret (allows per-tenant secrets). Defaults to CONFLUENCE_CLIENT_SECRET.",
-                            "default": "CONFLUENCE_CLIENT_SECRET"
+                            "description": "Environment variable name for the client secret (allows per-tenant secrets)"
                           }
                         },
-                        "required": ["mode", "clientId"],
+                        "required": ["mode", "clientId", "clientSecretEnvVar"],
                         "additionalProperties": false
                       },
                       {
@@ -199,11 +198,10 @@
                           },
                           "tokenEnvVar": {
                             "type": "string",
-                            "description": "Environment variable name for the PAT token (allows per-tenant secrets). Defaults to CONFLUENCE_PAT.",
-                            "default": "CONFLUENCE_PAT"
+                            "description": "Environment variable name for the PAT token (allows per-tenant secrets)"
                           }
                         },
-                        "required": ["mode"],
+                        "required": ["mode", "tokenEnvVar"],
                         "additionalProperties": false
                       }
                     ]

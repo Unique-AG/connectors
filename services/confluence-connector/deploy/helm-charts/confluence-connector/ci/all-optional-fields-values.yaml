@@ -9,6 +9,7 @@ connectorConfig:
         auth:
           mode: oauth_2lo
           clientId: test-client-id
+          clientSecretEnvVar: CONFLUENCE_CLIENT_SECRET
         apiRateLimitPerMinute: 100
         ingestSingleLabel: ai-ingest
         ingestAllLabel: ai-ingest-all

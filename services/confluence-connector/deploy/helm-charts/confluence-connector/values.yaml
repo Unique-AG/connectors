@@ -120,8 +120,8 @@ connectorConfig:
           mode: oauth_2lo
           # -- OAuth 2.0 (2LO) application client ID
           clientId: unset_default_value
-          # -- Environment variable name for the OAuth 2.0 client secret (allows per-tenant secrets)
-          # clientSecretEnvVar: CONFLUENCE_CLIENT_SECRET
+          # -- Environment variable name for the OAuth 2.0 client secret (per-tenant)
+          clientSecretEnvVar: CONFLUENCE_CLIENT_SECRET
         # -- Number of Confluence API requests allowed per minute
         apiRateLimitPerMinute: 100
         # -- Label to trigger single-page sync
