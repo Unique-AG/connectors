@@ -10,7 +10,6 @@ import {
   graphOutlookDirectoriesResponse,
   graphOutlookDirectory,
 } from './microsoft-graph.dtos';
-import { ms } from 'zod/v4/locales';
 
 @Injectable()
 export class FetchAllDirectoriesFromOutlookQuery {
