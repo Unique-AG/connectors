@@ -1,3 +1,4 @@
+import { createSmeared } from '@unique-ag/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig, ProcessingConfig } from '../../config';
 import type { ConfluencePage } from '../../confluence-api';
@@ -218,7 +219,7 @@ describe('ConfluencePageScanner', () => {
     expect(result.map((page) => page.id)).toEqual(['parent', 'page-child']);
     expect(mockLogger.debug).toHaveBeenCalledWith({
       pageId: 'db-child',
-      title: 'Page db-child',
+      title: createSmeared('Page db-child'),
       type: 'database',
       msg: 'Skipping non-page content type',
     });
@@ -264,6 +265,27 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'labeled-child']);
+  });
+
+  it('includes blog posts in discovery results', async () => {
+    const blog = makePage('blog-1', {
+      type: ContentType.BLOGPOST,
+      labels: ['ai-ingest'],
+    });
+    const page = makePage('page-1', { labels: ['ai-ingest'] });
+
+    const apiClient = {
+      searchPagesByLabel: vi.fn().mockResolvedValue([blog, page]),
+      getDescendantPages: vi.fn().mockResolvedValue([]),
+      buildPageWebUrl: vi.fn(
+        (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
+      ),
+    };
+
+    const scanner = createScanner(apiClient);
+    const result = await scanner.discoverPages();
+
+    expect(result.map((item) => item.id)).toEqual(['blog-1', 'page-1']);
   });
 
   it('rejects when descendant fetching fails', async () => {
