@@ -56,13 +56,17 @@ export class ListDirectoriesQuery {
     const allPaths: string[] = [];
     const buildTreeRecursive = (parentId: string | null, path: string[]): UserDirectory[] => {
       const elements = directoriesByParentId.get(parentId) ?? [];
-      allPaths.push(path.join('/'));
 
-      return elements.map((element) => ({
-        id: element.providerDirectoryId,
-        displayName: element.displayName,
-        children: buildTreeRecursive(element.id, [...path, element.displayName]),
-      }));
+      return elements.map((element) => {
+        const currentPath = [...path, element.displayName];
+        allPaths.push(currentPath.join('/'));
+
+        return {
+          id: element.providerDirectoryId,
+          displayName: element.displayName,
+          children: buildTreeRecursive(element.id, [...currentPath]),
+        };
+      });
     };
 
     // All root directories have parentId as null.

@@ -31,6 +31,7 @@ import {
   type MicrosoftConfigNamespaced,
   microsoftConfig,
   uniqueConfig,
+  logsConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
 import { OutlookMcpToolsModule } from './features/outlook-mcp-tools.module';
@@ -48,6 +49,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         amqpConfig,
         appConfig,
         authConfig,
+        logsConfig,
         databaseConfig,
         encryptionConfig,
         microsoftConfig,
