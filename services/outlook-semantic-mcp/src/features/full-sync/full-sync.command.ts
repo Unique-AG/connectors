@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { createSmeared } from '@unique-ag/utils';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -51,9 +52,11 @@ export class FullSyncCommand {
     const { userProfile, subscription } =
       await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
     traceAttrs({ user_profile_id: userProfile.id });
+    const userEmail = createSmeared(userProfile.email);
     this.logger.log({
       subscriptionId,
       userProfileId: userProfile.id,
+      userEmail,
       msg: `Resolved subscription and user profile`,
     });
 
@@ -72,6 +75,7 @@ export class FullSyncCommand {
       this.logger.log({
         subscriptionId,
         userProfileId: userProfile.id,
+        userEmail,
         lastFullSyncRunAt: subscription.lastFullSyncRunAt,
         msg: `Full sync skipped: ran recently`,
       });
@@ -87,6 +91,7 @@ export class FullSyncCommand {
     this.logger.log({
       subscriptionId,
       userProfileId: userProfile.id,
+      userEmail,
       dateFrom: filters.dateFrom,
       msg: `Fetching emails with filters`,
     });
@@ -99,6 +104,7 @@ export class FullSyncCommand {
     this.logger.log({
       subscriptionId,
       userProfileId: userProfile.id,
+      userEmail,
       emailCount: allGraphEmails.length,
       msg: `Emails fetched`,
     });
@@ -124,6 +130,7 @@ export class FullSyncCommand {
     this.logger.log({
       subscriptionId,
       userProfileId: userProfile.id,
+      userEmail,
       newFiles: filleDiffResponse.newFiles.length,
       updatedFiles: filleDiffResponse.updatedFiles.length,
       deletedFiles: filleDiffResponse.deletedFiles.length,
@@ -138,6 +145,7 @@ export class FullSyncCommand {
     this.logger.log({
       subscriptionId,
       userProfileId: userProfile.id,
+      userEmail,
       count: toIngest.length,
       msg: `Publishing ingestion events`,
     });
@@ -156,6 +164,9 @@ export class FullSyncCommand {
     if (filleDiffResponse.movedFiles.length) {
       this.logger.error({
         msg: `We found moved files: ${filleDiffResponse.movedFiles.length}`,
+        subscriptionId,
+        userProfileId: userProfile.id,
+        userEmail,
         keys: filleDiffResponse.movedFiles.join(', '),
       });
     }
@@ -164,6 +175,7 @@ export class FullSyncCommand {
       this.logger.log({
         subscriptionId,
         userProfileId: userProfile.id,
+        userEmail,
         count: filesToDelete.length,
         msg: `Deleting files from unique`,
       });

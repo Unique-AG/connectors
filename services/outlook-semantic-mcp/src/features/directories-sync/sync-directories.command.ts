@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { createSmeared } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes } from '@opentelemetry/api';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -28,15 +29,16 @@ export class SyncDirectoriesCommand {
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
     traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
     this.logger.log({
-      userProfileTypeId: userProfileTypeId.toString(),
+      userProfileId: userProfileTypeId.toString(),
       msg: `Starting directories sync`,
     });
 
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
     traceAttrs({ user_profile_id: userProfile.id });
+    const userEmail = createSmeared(userProfile.email);
     this.logger.log({
-      userProfileTypeId: userProfileTypeId.toString(),
       userProfileId: userProfile.id,
+      userEmail,
       msg: `Resolved user profile`,
     });
 
@@ -55,6 +57,7 @@ export class SyncDirectoriesCommand {
     traceAttrs({ should_force_directories_sync: shouldForceDirectoriesSync });
     this.logger.log({
       userProfileId: userProfile.id,
+      userEmail,
       shouldForceDirectoriesSync,
       msg: `Checked force sync condition`,
     });
@@ -67,8 +70,8 @@ export class SyncDirectoriesCommand {
       delta_link_present: isNonNullish(deltaLink),
     });
     const logContext: Attributes = {
-      userProfileTypeId: userProfileTypeId.toString(),
       userProfileId: userProfile.id,
+      userEmail: userEmail.toString(),
       shouldSyncDirectories,
       shouldForceDirectoriesSync,
       syncStatsId,

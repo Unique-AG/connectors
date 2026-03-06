@@ -1,3 +1,4 @@
+import { createSmeared } from '@unique-ag/utils';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, inArray, not } from 'drizzle-orm';
@@ -42,20 +43,20 @@ export class SyncDirectoriesForUserProfileCommand {
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
     traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
     this.logger.log({
-      userProfileTypeId: userProfileTypeId.toString(),
+      userProfileId: userProfileTypeId.toString(),
       msg: `Starting full directories sync for user profile`,
     });
 
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
     traceAttrs({ user_profile_id: userProfile.id });
+    const userEmail = createSmeared(userProfile.email);
     this.logger.log({
-      userProfileTypeId: userProfileTypeId.toString(),
       userProfileId: userProfile.id,
+      userEmail,
       msg: `Resolved user profile`,
     });
 
     await this.createRootScopeCommand.run({
-      userProfileEmail: userProfile.email,
       userProviderUserId: userProfile.providerUserId,
     });
 
@@ -73,6 +74,7 @@ export class SyncDirectoriesForUserProfileCommand {
       traceEvent('syncing system directories');
       this.logger.log({
         userProfileId: userProfile.id,
+        userEmail,
         msg: `No existing directories found, syncing system directories`,
       });
       await this.syncSystemDirectoriesCommand.run(userProfileTypeId);
@@ -82,6 +84,7 @@ export class SyncDirectoriesForUserProfileCommand {
     traceEvent('microsoft directories fetched', { count: microsoftDirectories.length });
     this.logger.log({
       userProfileId: userProfile.id,
+      userEmail,
       microsoftDirectoryCount: microsoftDirectories.length,
       msg: `Fetched directories from Microsoft`,
     });
@@ -91,7 +94,7 @@ export class SyncDirectoriesForUserProfileCommand {
       microsoftDirectories,
     });
     traceEvent('directories upserted');
-    this.logger.log({ userProfileId: userProfile.id, msg: `Directories upserted` });
+    this.logger.log({ userProfileId: userProfile.id, userEmail, msg: `Directories upserted` });
 
     await this.removeExtraDirectories({
       userProfileId: userProfile.id,
@@ -99,14 +102,14 @@ export class SyncDirectoriesForUserProfileCommand {
       microsoftDirectories,
     });
     traceEvent('extra directories removed');
-    this.logger.log({ userProfileId: userProfile.id, msg: `Extra directories removed` });
+    this.logger.log({ userProfileId: userProfile.id, userEmail, msg: `Extra directories removed` });
 
     await this.db
       .update(directoriesSync)
       .set({ lastDirectorySyncRanAt: new Date() })
       .where(eq(directoriesSync.userProfileId, userProfile.id))
       .execute();
-    this.logger.log({ userProfileId: userProfile.id, msg: `Directories sync completed` });
+    this.logger.log({ userProfileId: userProfile.id, userEmail, msg: `Directories sync completed` });
   }
 
   private async upsertDirectories({
