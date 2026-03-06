@@ -33,7 +33,7 @@ export class IngestionListener {
   })
   public async onIngestionRequested(@RabbitPayload() payload: unknown): Promise<void> {
     const event = MessageEventDto.parse(payload);
-    this.logger.log(`Email ingestion requested: ${event.type}`);
+    this.logger.log({ msg: 'Email ingestion requested', type: event.type });
 
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received':

@@ -26,13 +26,11 @@ export class ValidationCallInterceptor implements NestInterceptor {
 
     const validationToken = request.query.validationToken;
     if (typeof validationToken === 'string') {
-      this.logger.debug(
-        {
-          validationToken,
-          path: request.path,
-        },
-        'Received Microsoft Graph subscription validation challenge',
-      );
+      this.logger.debug({
+        msg: 'Received Microsoft Graph subscription validation challenge',
+        validationToken,
+        path: request.path,
+      });
       response.status(HttpStatus.OK).contentType('text/plain');
       return of(validationToken);
     }

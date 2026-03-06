@@ -52,7 +52,7 @@ export class RunFullSyncTool {
     const userProfileTypeid = extractUserProfileId(request);
     const userProfileId = userProfileTypeid.toString();
 
-    this.logger.log({ userProfileId }, 'Starting directory sync');
+    this.logger.log({ userProfileId, msg: 'Starting directory sync' });
     const subscription = await this.drizzle.query.subscriptions.findFirst({
       where: eq(subscriptions.userProfileId, userProfileId),
     });

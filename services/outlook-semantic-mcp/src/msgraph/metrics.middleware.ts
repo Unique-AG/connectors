@@ -106,30 +106,26 @@ export class MetricsMiddleware implements Middleware {
         const policy = this.getThrottlePolicy(context.response);
         this.msgraphThrottleCounter.add(1, { policy });
 
-        this.logger.warn(
-          {
-            method,
-            endpoint,
-            statusCode,
-            throttlePolicy: policy,
-            duration: duration,
-            rateLimited: true,
-          },
-          'Microsoft Graph API request was rate-limited and throttled',
-        );
+        this.logger.warn({
+          msg: 'Microsoft Graph API request was rate-limited and throttled',
+          method,
+          endpoint,
+          statusCode,
+          throttlePolicy: policy,
+          duration: duration,
+          rateLimited: true,
+        });
       }
 
       if (duration > 5000) {
-        this.logger.warn(
-          {
-            method,
-            endpoint,
-            duration,
-            thresholdMs: 5000,
-            performanceIssue: true,
-          },
-          'Microsoft Graph API request exceeded performance threshold and is considered slow',
-        );
+        this.logger.warn({
+          msg: 'Microsoft Graph API request exceeded performance threshold and is considered slow',
+          method,
+          endpoint,
+          duration,
+          thresholdMs: 5000,
+          performanceIssue: true,
+        });
       }
     } catch (err) {
       const duration = Date.now() - startTime;

@@ -58,7 +58,7 @@ export class RemoveInboxConnectionTool {
     const userProfileTypeid = extractUserProfileId(request);
     const userProfileId = userProfileTypeid.toString();
 
-    this.logger.log({ userProfileId }, 'Removing inbox connection for user');
+    this.logger.log({ userProfileId, msg: 'Removing inbox connection for user' });
 
     await this.removeRootScopeAndDirectoriesCommand.run(userProfileTypeid);
     const result = await this.subscriptionRemove.removeByUserProfileId(userProfileTypeid);
@@ -69,10 +69,12 @@ export class RemoveInboxConnectionTool {
       not_found: 'No active inbox connection found. Nothing to remove.',
     };
 
-    this.logger.log(
-      { userProfileId, subscriptionId: subscription?.id, status },
-      'Inbox connection removal operation completed',
-    );
+    this.logger.log({
+      msg: 'Inbox connection removal operation completed',
+      userProfileId,
+      subscriptionId: subscription?.id,
+      status,
+    });
 
     return {
       success: true,

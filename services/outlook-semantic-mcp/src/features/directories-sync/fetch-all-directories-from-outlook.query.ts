@@ -1,7 +1,8 @@
+import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { sumBy } from 'remeda';
+import { sumBy, unique } from 'remeda';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import {
@@ -72,14 +73,18 @@ export class FetchAllDirectoriesFromOutlookQuery {
     await Promise.all(allPromisses);
 
     const totalCount = this.countDirectories(rootDirectories);
+    const pathsFetched = this.getPaths(rootDirectories, []);
+    const directoriesTree = pathsFetched.map((item) => smearPath(createSmeared(item))).join('\r\n');
     traceEvent('all directories fetched', {
-      total_count: totalCount,
-      root_count: rootDirectories.length,
+      totalCount: totalCount,
+      rootDirectoriesCount: rootDirectories.length,
+      directoriesTree,
     });
     this.logger.log({
       userProfileId,
       totalCount,
-      rootDirectoryCount: rootDirectories.length,
+      rootDirectoriesCount: rootDirectories.length,
+      directoriesTree,
       msg: `All directories fetched including children`,
     });
 
@@ -121,6 +126,15 @@ export class FetchAllDirectoriesFromOutlookQuery {
     return sumBy(
       directories,
       (dir) => 1 + (dir.childFolders ? this.countDirectories(dir.childFolders) : 0),
+    );
+  }
+
+  private getPaths(directories: GraphOutlookDirectory[], parent: string[]): string[] {
+    return unique(
+      directories.flatMap((directory) => {
+        const currentPath = [...parent, directory.displayName];
+        return [currentPath.join('/'), ...this.getPaths(directory.childFolders ?? [], currentPath)];
+      }),
     );
   }
 

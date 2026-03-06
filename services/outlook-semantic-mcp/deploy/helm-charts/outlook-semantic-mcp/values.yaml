@@ -139,6 +139,9 @@ mcpConfig:
     # example: https://outlook.mcp.unique.app
     selfUrl: unset_default_value
 
+  logs:
+    diagnosticsDataPolicy: conceal
+
   # -- Microsoft Graph API configuration
   microsoft:
     # -- The client ID of the Microsoft App Registration

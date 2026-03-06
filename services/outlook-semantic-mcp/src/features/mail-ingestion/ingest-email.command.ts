@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
+import { createSmeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -23,6 +24,7 @@ import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
 type LogContext = Partial<{
   messageId: string;
   userProfileId: string;
+  userEmail: string;
   uniqueFileId: string;
   key: string;
   parentDirectoryId: string;
@@ -76,6 +78,7 @@ export class IngestEmailCommand {
     const logContext: LogContext = {
       messageId,
       userProfileId,
+      userEmail: createSmeared(userProfile.email).toString(),
       key: fileKey,
       uniqueFileId: file?.id,
       parentDirectoryId: graphMessage.parentFolderId,

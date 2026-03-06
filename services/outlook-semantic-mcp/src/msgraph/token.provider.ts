@@ -119,14 +119,12 @@ export class TokenProvider implements AuthenticationProvider {
         })
         .where(eq(userProfiles.id, userProfileId));
 
-      this.logger.debug(
-        {
-          userProfileId: this.userProfileId,
-          tokenRefreshSuccess: true,
-          action: 'token_refresh_completed',
-        },
-        'Successfully refreshed Microsoft Graph API access token',
-      );
+      this.logger.debug({
+        msg: 'Successfully refreshed Microsoft Graph API access token',
+        userProfileId: this.userProfileId,
+        tokenRefreshSuccess: true,
+        action: 'token_refresh_completed',
+      });
       return tokenData.access_token;
     } catch (err) {
       this.logger.error({
