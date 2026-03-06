@@ -120,9 +120,11 @@ export class SyncDirectoriesCommand {
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
-    let directoriesDeltaResult = await client
-      .api(syncStats.deltaLink || `/me/mailFolders/delta`)
-      .get();
+    const deltaApi = syncStats.deltaLink
+      ? client.api(syncStats.deltaLink)
+      : client.api(`/me/mailFolders/delta`).query({ includeHiddenFolders: 'true' });
+
+    let directoriesDeltaResult = await deltaApi.get();
 
     let directroriesResponse = graphOutlookDirectoriesDeltaResponse.parse(directoriesDeltaResult);
     let shouldSyncDirectories = false;
