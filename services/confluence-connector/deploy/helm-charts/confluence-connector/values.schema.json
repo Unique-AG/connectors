@@ -180,6 +180,11 @@
                           "clientId": {
                             "type": "string",
                             "description": "OAuth 2.0 (2LO) application client ID"
+                          },
+                          "clientSecretEnvVar": {
+                            "type": "string",
+                            "description": "Environment variable name for the client secret (allows per-tenant secrets). Defaults to CONFLUENCE_CLIENT_SECRET.",
+                            "default": "CONFLUENCE_CLIENT_SECRET"
                           }
                         },
                         "required": ["mode", "clientId"],
@@ -191,6 +196,11 @@
                             "type": "string",
                             "enum": ["pat"],
                             "description": "Personal Access Token (Data Center only)"
+                          },
+                          "tokenEnvVar": {
+                            "type": "string",
+                            "description": "Environment variable name for the PAT token (allows per-tenant secrets). Defaults to CONFLUENCE_PAT.",
+                            "default": "CONFLUENCE_PAT"
                           }
                         },
                         "required": ["mode"],

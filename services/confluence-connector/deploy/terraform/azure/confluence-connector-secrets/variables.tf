@@ -10,6 +10,7 @@ variable "secrets_placeholders" {
     expiration_date = optional(string, "2099-12-31T23:59:59Z")
   }))
   default = {
-    confluence-connector-client-secret = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
+    confluence-connector-client-secret-dc    = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
+    confluence-connector-client-secret-cloud = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
   }
 }
