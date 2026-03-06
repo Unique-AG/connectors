@@ -57,9 +57,12 @@ export class ConfluenceSynchronizationService {
         );
       }
 
-      if (diffResult.deletedKeys.length > 0) {
-        await this.ingestionService.deleteContentByKeys(diffResult.deletedKeys);
-        this.logger.log({ count: diffResult.deletedKeys.length, msg: 'Deleted content processed' });
+      if (diffResult.deletedPageIds.length > 0) {
+        await this.ingestionService.deleteContentByKeys(diffResult.deletedPageIds);
+        this.logger.log({
+          count: diffResult.deletedPageIds.length,
+          msg: 'Deleted content processed',
+        });
       }
 
       this.logger.log({ msg: 'Sync work done' });

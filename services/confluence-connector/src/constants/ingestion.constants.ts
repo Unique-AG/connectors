@@ -2,19 +2,12 @@ export const IngestionMode = {
   Flat: 'flat',
 } as const;
 
-export const StoreInternallyMode = {
+export const EnabledDisabledMode = {
   Enabled: 'enabled',
   Disabled: 'disabled',
 } as const;
 
-export type StoreInternallyMode = (typeof StoreInternallyMode)[keyof typeof StoreInternallyMode];
-
-export const V1KeyFormatMode = {
-  Enabled: 'enabled',
-  Disabled: 'disabled',
-} as const;
-
-export type V1KeyFormatMode = (typeof V1KeyFormatMode)[keyof typeof V1KeyFormatMode];
+export type EnabledDisabledMode = (typeof EnabledDisabledMode)[keyof typeof EnabledDisabledMode];
 
 export type IngestionMode = (typeof IngestionMode)[keyof typeof IngestionMode];
 

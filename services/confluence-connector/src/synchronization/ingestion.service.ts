@@ -12,8 +12,6 @@ import {
   INGESTION_MIME_TYPE,
   OWNER_TYPE,
   SOURCE_OWNER_TYPE,
-  StoreInternallyMode,
-  V1KeyFormatMode,
 } from '../constants/ingestion.constants';
 import type { FetchedPage } from './sync.types';
 
@@ -40,10 +38,7 @@ export class IngestionService {
     try {
       const htmlBuffer = Buffer.from(page.body, 'utf-8');
       const baseKey = `${page.spaceId}_${page.spaceKey}/${page.id}`;
-      const key =
-        this.config.ingestion.useV1KeyFormat === V1KeyFormatMode.Enabled
-          ? baseKey
-          : `${this.tenantName}/${baseKey}`;
+      const key = this.config.ingestion.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
 
       const registrationRequest = this.buildPageRegistrationRequest(
         page,
@@ -124,7 +119,7 @@ export class IngestionService {
         spaceKey: page.spaceKey,
         spaceName: page.spaceName,
       },
-      storeInternally: this.config.ingestion.storeInternally === StoreInternallyMode.Enabled,
+      storeInternally: this.config.ingestion.storeInternally,
     };
   }
 

@@ -25,7 +25,7 @@ export class FileDiffService {
     const result: FileDiffResult = {
       newPageIds: [],
       updatedPageIds: [],
-      deletedKeys: [],
+      deletedPageIds: [],
       movedPageIds: [],
     };
 
@@ -50,14 +50,14 @@ export class FileDiffService {
 
       result.newPageIds.push(...diffResponse.newFiles);
       result.updatedPageIds.push(...diffResponse.updatedFiles);
-      result.deletedKeys.push(...diffResponse.deletedFiles);
+      result.deletedPageIds.push(...diffResponse.deletedFiles);
       result.movedPageIds.push(...diffResponse.movedFiles);
     }
 
     this.logger.log({
       new: result.newPageIds.length,
       updated: result.updatedPageIds.length,
-      deleted: result.deletedKeys.length,
+      deleted: result.deletedPageIds.length,
       moved: result.movedPageIds.length,
       msg: 'File diff completed',
     });

@@ -85,8 +85,8 @@ function makeService(): {
       baseUrl: CONFLUENCE_BASE_URL,
     },
     ingestion: {
-      storeInternally: 'enabled',
-      useV1KeyFormat: 'disabled',
+      storeInternally: true,
+      useV1KeyFormat: false,
     },
   } as unknown as TenantConfig;
 

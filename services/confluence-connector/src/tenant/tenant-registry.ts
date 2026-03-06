@@ -9,7 +9,6 @@ import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
 import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
-import { V1KeyFormatMode } from '../constants/ingestion.constants';
 import { ConfluenceContentFetcher } from '../synchronization/confluence-content-fetcher';
 import { ConfluencePageScanner } from '../synchronization/confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
@@ -86,7 +85,7 @@ export class TenantRegistry implements OnModuleInit {
         const fileDiffService = new FileDiffService(
           config.confluence,
           tenantName,
-          config.ingestion.useV1KeyFormat === V1KeyFormatMode.Enabled,
+          config.ingestion.useV1KeyFormat,
           uniqueClient,
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);

@@ -72,7 +72,7 @@ describe('ConfluenceSynchronizationService', () => {
     const diffResult: FileDiffResult = {
       newPageIds: ['1'],
       updatedPageIds: [],
-      deletedKeys: [],
+      deletedPageIds: [],
       movedPageIds: [],
     };
     mockFileDiffService = {
@@ -160,7 +160,7 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newPageIds: ['1'],
         updatedPageIds: [],
-        deletedKeys: ['99', '99_attachment.pdf'],
+        deletedPageIds: ['99', '99_attachment.pdf'],
         movedPageIds: [],
       });
 
@@ -176,7 +176,7 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newPageIds: [],
         updatedPageIds: [],
-        deletedKeys: [],
+        deletedPageIds: [],
         movedPageIds: [],
       });
       await tenantStorage.run(tenant, () => service.synchronize());
@@ -210,7 +210,7 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newPageIds: ['2'],
         updatedPageIds: ['3'],
-        deletedKeys: [],
+        deletedPageIds: [],
         movedPageIds: [],
       });
       // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction

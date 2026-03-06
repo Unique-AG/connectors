@@ -66,7 +66,7 @@ describe('FileDiffService', () => {
       expect(result).toEqual({
         newPageIds: [],
         updatedPageIds: [],
-        deletedKeys: [],
+        deletedPageIds: [],
         movedPageIds: [],
       });
     });
@@ -88,7 +88,7 @@ describe('FileDiffService', () => {
       expect(result).toEqual({
         newPageIds: ['p-1'],
         updatedPageIds: [],
-        deletedKeys: [],
+        deletedPageIds: [],
         movedPageIds: [],
       });
     });
@@ -111,7 +111,7 @@ describe('FileDiffService', () => {
       expect(result).toEqual({
         newPageIds: ['p-1', 'p-1_file.pdf'],
         updatedPageIds: ['p-2'],
-        deletedKeys: ['p-3', 'p-3_old.pdf'],
+        deletedPageIds: ['p-3', 'p-3_old.pdf'],
         movedPageIds: ['p-4', 'p-4_new.pdf'],
       });
     });
@@ -158,7 +158,7 @@ describe('FileDiffService', () => {
       expect(result).toEqual({
         newPageIds: ['p-1', 'p-2'],
         updatedPageIds: ['p-3'],
-        deletedKeys: ['p-old'],
+        deletedPageIds: ['p-old'],
         movedPageIds: [],
       });
     });
@@ -205,7 +205,7 @@ describe('FileDiffService', () => {
 
       const result = await service.computeDiff([basePage]);
 
-      expect(result.deletedKeys).toEqual(['p-old']);
+      expect(result.deletedPageIds).toEqual(['p-old']);
     });
 
     it('allows deletions when there are updated files', async () => {
@@ -218,7 +218,7 @@ describe('FileDiffService', () => {
 
       const result = await service.computeDiff([basePage]);
 
-      expect(result.deletedKeys).toEqual(['p-old']);
+      expect(result.deletedPageIds).toEqual(['p-old']);
     });
 
     it('aborts when all submitted items would be deleted with no new or updated files', async () => {
@@ -257,7 +257,7 @@ describe('FileDiffService', () => {
 
       const result = await service.computeDiff([basePage, { ...basePage, id: 'p-2' }]);
 
-      expect(result.deletedKeys).toEqual(['p-old']);
+      expect(result.deletedPageIds).toEqual(['p-old']);
     });
   });
 });
