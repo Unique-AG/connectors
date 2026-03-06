@@ -8,7 +8,7 @@ import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import type { RequestDocument, RequestOptions, Variables } from 'graphql-request';
 import { GraphQLClient } from 'graphql-request';
-import { isNonNullish, omit, unique } from 'remeda';
+import { isNonNullish } from 'remeda';
 import { type Dispatcher, fetch as undiciFetch } from 'undici';
 import type { UniqueAuth } from '../auth/unique-auth';
 import { BottleneckFactory } from '../core/bottleneck.factory';
@@ -47,23 +47,13 @@ export class UniqueGraphqlClient {
       requestMiddleware: async (request) => {
         const authHeaders = await this.auth.getAuthHeaders();
         const requestHeaders = request.headers as Headers;
-        for (const key in omit(authHeaders, ['x-user-roles'])) {
+        // Existential question: Should we actually check if the request headers have the auth headers ?
+        // A normal library will not override what we passed to the request where we called the method.
+        for (const key in authHeaders) {
           const value = authHeaders[key];
           if (isNonNullish(value)) {
             requestHeaders.set(key, value);
           }
-        }
-        const authXUserRoles = authHeaders['x-user-roles'] || '';
-        const currentXUserRoles = requestHeaders.get('x-user-roles') || '';
-        if (currentXUserRoles || authXUserRoles) {
-          requestHeaders.set(
-            'x-user-roles',
-            unique(
-              [...authXUserRoles.split(','), ...currentXUserRoles.split(',')]
-                .map((item) => item.trim())
-                .filter((item) => item.length > 0),
-            ).join(','),
-          );
         }
         if (!requestHeaders.get('Content-Type')) {
           requestHeaders.set('Content-Type', 'application/json');

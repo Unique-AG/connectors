@@ -1,6 +1,6 @@
-export const getRootScopePath = () => `/__Outlook MCP`;
+export const getRootScopePath = () => `/__Outlook MCP 1`;
 
-export const getRootScopeExternalId = () => `/__Outlook MCP`;
+export const getRootScopeExternalId = () => `/__Outlook MCP 1`;
 
 export const getRootScopePathForUser = (userProviderIdentifier: string): string =>
   `${getRootScopePath()}/${userProviderIdentifier}_uncategoried`;
