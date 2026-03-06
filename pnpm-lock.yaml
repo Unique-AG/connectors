@@ -261,6 +261,61 @@ importers:
         specifier: ^5.9.2
         version: 5.9.2
 
+  packages/ms-graph-sdk:
+    dependencies:
+      '@proventuslabs/nestjs-zod':
+        specifier: 2.1.0
+        version: 2.1.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.1.5)
+      '@proventuslabs/retry-strategies':
+        specifier: 0.1.2
+        version: 0.1.2
+      '@qfetch/qfetch':
+        specifier: 0.1.0
+        version: 0.1.0(@proventuslabs/retry-strategies@0.1.2)
+      '@unique-ag/utils':
+        specifier: workspace:*
+        version: link:../utils
+      zod:
+        specifier: ^4.1.5
+        version: 4.1.5
+    devDependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.0.0
+        version: 11.1.6(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.6)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/testing':
+        specifier: ^11.0.0
+        version: 11.1.6(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/platform-express@11.1.6)
+      '@suites/di.nestjs':
+        specifier: ^3.0.1
+        version: 3.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
+      '@suites/doubles.vitest':
+        specifier: ^3.0.1
+        version: 3.0.1(@vitest/spy@3.2.4)(vitest@3.2.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))
+      '@suites/unit':
+        specifier: ^3.0.1
+        version: 3.0.1
+      '@swc/core':
+        specifier: ^1.13.5
+        version: 1.13.5
+      '@types/node':
+        specifier: ^22.13.14
+        version: 22.16.5
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      unplugin-swc:
+        specifier: ^1.5.7
+        version: 1.5.7(@swc/core@1.13.5)(rollup@4.50.0)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1)
+
   packages/probe:
     dependencies:
       '@nestjs/common':
@@ -406,7 +461,7 @@ importers:
         version: link:../../packages/probe
       '@unique-ag/unique-api':
         specifier: workspace:*
-        version: link:../../packages/unique-api
+        version: file:packages/unique-api(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(@nestjs/core@11.1.6)(@opentelemetry/api@1.9.0)(nestjs-otel@7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6))(typeid-js@1.2.0)
       '@unique-ag/utils':
         specifier: workspace:*
         version: link:../../packages/utils
@@ -910,7 +965,7 @@ importers:
         version: link:../../packages/probe
       '@unique-ag/unique-api':
         specifier: workspace:*
-        version: link:../../packages/unique-api
+        version: file:packages/unique-api(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(@nestjs/core@11.1.6)(@opentelemetry/api@1.9.0)(nestjs-otel@7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6))(typeid-js@1.2.0)
       '@unique-ag/utils':
         specifier: workspace:*
         version: link:../../packages/utils
@@ -3046,6 +3101,13 @@ packages:
       '@nestjs/config': ^3.0.0 || ^4.0.0
       zod: ^3.25.0 || ^4.0.0
 
+  '@proventuslabs/nestjs-zod@2.1.0':
+    resolution: {integrity: sha512-jk9jFjzkMOPA2FLqcLdkIuTzbhsL6aaWGr0rNRhwGbD210NuEMn9/AuB+mNX/zR62X4Jc61O587SgQvb+DbA6g==}
+    peerDependencies:
+      '@nestjs/common': ^10.0.0 || ^11.0.0
+      '@nestjs/config': ^3.0.0 || ^4.0.0
+      zod: ^3.25.0 || ^4.0.0
+
   '@proventuslabs/retry-strategies@0.1.2':
     resolution: {integrity: sha512-RPZz3sGmXfr2zrlEve696wnr6ZSNujQrWx/stdBgz3Rcz7ec/jgSmWuTF2gCXcnu/s5IomzY2+daIoyVe9EjpA==}
 
@@ -3508,9 +3570,6 @@ packages:
   '@types/mysql@2.15.27':
     resolution: {integrity: sha512-YfWiV16IY0OeBfBCk8+hXKmdTKrKlwKN1MNKAPBu5JYxLwBEZl7QzeEpGnlZb3VMGJrrGmB84gXiH+ofs/TezA==}
 
-  '@types/node@22.13.17':
-    resolution: {integrity: sha512-nAJuQXoyPj04uLgu+obZcSmsfOenUg6DxPKogeUy6yNCFwWaj5sBF8/G/pNo8EtBJjAfSVgfIlugR/BCOleO+g==}
-
   '@types/node@22.16.5':
     resolution: {integrity: sha512-bJFoMATwIGaxxx8VJPeM8TonI8t579oRvgAuT8zFugJsJZgzqv0Fu8Mhp68iecjzG7cnN3mO2dJQ5uUM2EFrgQ==}
 
@@ -3592,6 +3651,25 @@ packages:
       '@nestjs/core': ^10 || ^11
       '@opentelemetry/api': ^1.9.0
       nestjs-otel: ^7
+
+  '@unique-ag/unique-api@file:packages/unique-api':
+    resolution: {directory: packages/unique-api, type: directory}
+    peerDependencies:
+      '@nestjs/common': ^10 || ^11
+      '@nestjs/core': ^10 || ^11
+      '@opentelemetry/api': ^1.9.0
+      nestjs-otel: ^7
+
+  '@unique-ag/utils@file:packages/utils':
+    resolution: {directory: packages/utils, type: directory}
+    peerDependencies:
+      typeid-js: ^1.2.0
+      zod: ^4.1.5
+    peerDependenciesMeta:
+      typeid-js:
+        optional: true
+      zod:
+        optional: true
 
   '@vitest/coverage-istanbul@3.2.4':
     resolution: {integrity: sha512-IDlpuFJiWU9rhcKLkpzj8mFu/lpe64gVgnV15ZOrYx1iFzxxrxCzbExiUEKtwwXRvEiEMUS6iZeYgnMxgbqbxQ==}
@@ -6682,9 +6760,6 @@ packages:
   unbzip2-stream@1.4.3:
     resolution: {integrity: sha512-mlExGW4w71ebDJviH16lQLtZS32VKqsSfk80GCfUlwT/4/hNRFsoscrF/c++9xinkMzECL1uL9DDwXqFWkruPg==}
 
-  undici-types@6.20.0:
-    resolution: {integrity: sha512-Ny6QZ2Nju20vw1SRHe3d9jVu6gJ+4e3+MMpqu7pqE5HT6WsTSlce++GQmK5UXS8mzV8DSYHrQH+Xrf2jVcuKNg==}
-
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
@@ -8826,6 +8901,13 @@ snapshots:
       lodash: 4.17.21
       zod: 4.1.5
 
+  '@proventuslabs/nestjs-zod@2.1.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.1.5)':
+    dependencies:
+      '@nestjs/common': 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/config': 4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
+      lodash: 4.17.21
+      zod: 4.1.5
+
   '@proventuslabs/retry-strategies@0.1.2': {}
 
   '@qfetch/core@0.2.2': {}
@@ -9317,7 +9399,7 @@ snapshots:
   '@types/jsonwebtoken@9.0.10':
     dependencies:
       '@types/ms': 2.1.0
-      '@types/node': 22.13.17
+      '@types/node': 22.16.5
 
   '@types/luxon@3.6.2': {}
 
@@ -9336,10 +9418,6 @@ snapshots:
   '@types/mysql@2.15.27':
     dependencies:
       '@types/node': 22.16.5
-
-  '@types/node@22.13.17':
-    dependencies:
-      undici-types: 6.20.0
 
   '@types/node@22.16.5':
     dependencies:
@@ -9480,6 +9558,31 @@ snapshots:
       - '@cfworker/json-schema'
       - hono
       - supports-color
+
+  '@unique-ag/unique-api@file:packages/unique-api(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(@nestjs/core@11.1.6)(@opentelemetry/api@1.9.0)(nestjs-otel@7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6))(typeid-js@1.2.0)':
+    dependencies:
+      '@nestjs/common': 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core': 11.1.6(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.6)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@opentelemetry/api': 1.9.0
+      '@proventuslabs/nestjs-zod': 2.1.0(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.1.5)
+      '@unique-ag/utils': file:packages/utils(typeid-js@1.2.0)(zod@4.1.5)
+      bottleneck: 2.19.5
+      graphql: 16.11.0
+      graphql-request: 7.2.0(graphql@16.11.0)
+      nestjs-otel: 7.0.1(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)
+      remeda: 2.32.0
+      undici: 7.18.2
+      zod: 4.1.5
+    transitivePeerDependencies:
+      - '@nestjs/config'
+      - typeid-js
+
+  '@unique-ag/utils@file:packages/utils(typeid-js@1.2.0)(zod@4.1.5)':
+    dependencies:
+      remeda: 2.32.0
+    optionalDependencies:
+      typeid-js: 1.2.0
+      zod: 4.1.5
 
   '@vitest/coverage-istanbul@3.2.4(vitest@3.2.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))':
     dependencies:
@@ -12838,8 +12941,6 @@ snapshots:
     dependencies:
       buffer: 5.7.1
       through: 2.3.8
-
-  undici-types@6.20.0: {}
 
   undici-types@6.21.0: {}
 
