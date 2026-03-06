@@ -1,8 +1,9 @@
+import type { Smeared } from '@unique-ag/utils';
 import type { ContentType } from '../confluence-api';
 
 export interface DiscoveredPage {
   id: string;
-  title: string;
+  title: Smeared;
   type: ContentType;
   spaceId: string;
   spaceKey: string;
@@ -21,7 +22,7 @@ export interface FileDiffResult {
 
 export interface FetchedPage {
   id: string;
-  title: string;
+  title: Smeared;
   body: string;
   webUrl: string;
   spaceId: string;

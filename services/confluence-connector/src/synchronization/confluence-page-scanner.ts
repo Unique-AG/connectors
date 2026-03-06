@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { createSmeared } from '@unique-ag/utils';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
 import type { ConfluencePage } from '../confluence-api';
 import { type ConfluenceApiClient, ContentType } from '../confluence-api';
@@ -6,7 +7,6 @@ import type { DiscoveredPage } from './sync.types';
 
 const SKIPPED_CONTENT_TYPES = [
   ContentType.DATABASE,
-  ContentType.BLOGPOST,
   ContentType.WHITEBOARD,
   ContentType.EMBED,
 ];
@@ -53,7 +53,7 @@ export class ConfluencePageScanner {
       if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
         this.logger.debug({
           pageId: page.id,
-          title: page.title,
+          title: createSmeared(page.title),
           type: page.type,
           msg: 'Skipping non-page content type',
         });
@@ -68,7 +68,7 @@ export class ConfluencePageScanner {
 
       discoveredPages.push({
         id: page.id,
-        title: page.title,
+        title: createSmeared(page.title),
         type: page.type,
         spaceId: page.space.id,
         spaceKey: page.space.key,

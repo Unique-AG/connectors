@@ -1,4 +1,5 @@
 import type { IngestionApiResponse, UniqueApiClient } from '@unique-ag/unique-api';
+import { createSmeared } from '@unique-ag/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantConfig } from '../../config';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
@@ -36,7 +37,7 @@ vi.mock('undici', async (importOriginal) => {
 
 const pageFixture: FetchedPage = {
   id: '42',
-  title: 'Architecture',
+  title: createSmeared('Architecture'),
   body: '<p>Hello</p>',
   webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/42`,
   spaceId: 'space-1',
@@ -148,7 +149,7 @@ describe('IngestionService', () => {
     expect(uniqueApiClient.ingestion.registerContent).not.toHaveBeenCalled();
     expect(mockLogger.log).toHaveBeenCalledWith({
       pageId: '42',
-      title: 'Architecture',
+      title: createSmeared('Architecture'),
       msg: 'Skipping page with empty body',
     });
   });
@@ -165,7 +166,7 @@ describe('IngestionService', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         pageId: '42',
-        title: 'Architecture',
+        title: createSmeared('Architecture'),
         err: expect.anything(),
         msg: 'Failed to ingest page, skipping',
       }),

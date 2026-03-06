@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSmeared } from '@unique-ag/utils';
 import type { ConfluenceConfig } from '../../config';
 import type { ConfluencePage } from '../../confluence-api';
 import { ConfluenceApiClient, ContentType } from '../../confluence-api';
@@ -36,7 +37,7 @@ const baseConfluenceConfig: ConfluenceConfig = {
 function makeDiscoveredPage(id: string, overrides: Partial<DiscoveredPage> = {}): DiscoveredPage {
   return {
     id,
-    title: `Page ${id}`,
+    title: createSmeared(`Page ${id}`),
     type: ContentType.PAGE,
     spaceId: 'space-1',
     spaceKey: 'SP',
@@ -103,7 +104,7 @@ describe('ConfluenceContentFetcher', () => {
 
     expect(result).toEqual({
       id: '1',
-      title: 'Page 1',
+      title: createSmeared('Page 1'),
       body: '<p>content</p>',
       webUrl: 'https://confluence.example.com/wiki/1',
       spaceId: 'space-1',
@@ -140,7 +141,7 @@ describe('ConfluenceContentFetcher', () => {
     expect(result).toBeNull();
     expect(mockLogger.warn).toHaveBeenCalledWith({
       pageId: 'missing',
-      title: 'Page missing',
+      title: createSmeared('Page missing'),
       msg: 'Page not found, possibly deleted',
     });
   });
@@ -157,9 +158,25 @@ describe('ConfluenceContentFetcher', () => {
     expect(result).toBeNull();
     expect(mockLogger.log).toHaveBeenCalledWith({
       pageId: 'empty',
-      title: 'Page empty',
+      title: createSmeared('Page empty'),
       msg: 'Page has no body, skipping',
     });
+  });
+
+  it('returns labels sorted alphabetically', async () => {
+    const discoveredPage = makeDiscoveredPage('1');
+    const apiClient = {
+      getPageById: vi
+        .fn()
+        .mockResolvedValue(
+          makeFullPage('1', { labels: ['zebra', 'alpha', 'ai-ingest'] }),
+        ),
+    };
+
+    const fetcher = createFetcher(apiClient);
+    const result = await fetcher.fetchPageContent(discoveredPage);
+
+    expect(result?.metadata?.confluenceLabels).toEqual(['alpha', 'zebra']);
   });
 
   it('continues processing after getPageById error', async () => {
