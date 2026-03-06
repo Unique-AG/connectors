@@ -28,10 +28,10 @@ import {
   databaseConfig,
   type EncryptionConfig,
   encryptionConfig,
+  logsConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
   uniqueConfig,
-  logsConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
 import { OutlookMcpToolsModule } from './features/outlook-mcp-tools.module';
