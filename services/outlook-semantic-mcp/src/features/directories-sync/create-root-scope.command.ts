@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Injectable, Logger } from '@nestjs/common';
+import { Span } from 'nestjs-otel';
 import {
   getRootScopeExternalId,
   getRootScopeExternalIdForUser,
@@ -8,7 +9,6 @@ import {
   getRootScopePathForUser,
 } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
-import { Span } from 'nestjs-otel';
 import { traceAttrs } from '../tracing.utils';
 
 @Injectable()

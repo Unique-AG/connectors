@@ -39,7 +39,10 @@ export class SubscriptionRemoveService {
       operation: 'enqueue_removal',
     });
 
-    this.logger.debug({ subscriptionId, msg: 'Enqueuing subscription removal event for processing' });
+    this.logger.debug({
+      subscriptionId,
+      msg: 'Enqueuing subscription removal event for processing',
+    });
 
     const payload = await SubscriptionRemovedEventDto.encodeAsync({
       subscriptionId,
@@ -95,7 +98,10 @@ export class SubscriptionRemoveService {
       operation: 'remove_subscription',
     });
 
-    this.logger.log({ subscriptionId, msg: 'Beginning Microsoft Graph subscription removal process' });
+    this.logger.log({
+      subscriptionId,
+      msg: 'Beginning Microsoft Graph subscription removal process',
+    });
 
     const deletedSubscriptions = await this.db
       .delete(subscriptions)
@@ -116,7 +122,10 @@ export class SubscriptionRemoveService {
     const deletedSubscription = deletedSubscriptions.at(0);
     if (!deletedSubscription) {
       traceEvent('no subscription found to delete');
-      this.logger.debug({ subscriptionId, msg: 'No matching subscription found in database to delete' });
+      this.logger.debug({
+        subscriptionId,
+        msg: 'No matching subscription found in database to delete',
+      });
       return { status: 'not_found', subscription: null };
     }
 

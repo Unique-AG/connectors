@@ -1,6 +1,6 @@
 import assert from 'node:assert';
-import { createSmeared } from '@unique-ag/utils';
 import { UniqueApiClient } from '@unique-ag/unique-api';
+import { createSmeared } from '@unique-ag/utils';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';

@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { createSmeared } from '@unique-ag/utils';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
@@ -15,7 +16,6 @@ import {
   Subscription,
 } from './subscription.dtos';
 import { MailSubscriptionUtilsService } from './subscription-utils.service';
-import { createSmeared } from '@unique-ag/utils';
 
 export interface SubscribeResult {
   status: 'created' | 'already_active' | 'expiring_soon';

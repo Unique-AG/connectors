@@ -1,3 +1,4 @@
+import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
@@ -9,7 +10,6 @@ import {
   graphOutlookDirectoriesResponse,
   graphOutlookDirectory,
 } from './microsoft-graph.dtos';
-import { createSmeared, smearPath } from '@unique-ag/utils';
 
 @Injectable()
 export class FetchAllDirectoriesFromOutlookQuery {

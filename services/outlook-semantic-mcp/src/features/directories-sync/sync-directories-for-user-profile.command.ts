@@ -1,5 +1,5 @@
-import { createSmeared } from '@unique-ag/utils';
 import { UniqueApiClient } from '@unique-ag/unique-api';
+import { createSmeared } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, inArray, not } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -109,7 +109,11 @@ export class SyncDirectoriesForUserProfileCommand {
       .set({ lastDirectorySyncRanAt: new Date() })
       .where(eq(directoriesSync.userProfileId, userProfile.id))
       .execute();
-    this.logger.log({ userProfileId: userProfile.id, userEmail, msg: `Directories sync completed` });
+    this.logger.log({
+      userProfileId: userProfile.id,
+      userEmail,
+      msg: `Directories sync completed`,
+    });
   }
 
   private async upsertDirectories({
