@@ -14,16 +14,16 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@proventuslabs/nestjs-zod": "2.1.0",
+    "@proventuslabs/nestjs-zod": "^2.0.0",
     "@proventuslabs/retry-strategies": "0.1.2",
     "@qfetch/qfetch": "0.1.0",
     "@unique-ag/utils": "workspace:*",
     "zod": "^4.1.5"
   },
   "devDependencies": {
-    "@nestjs/common": "^11.0.0",
-    "@nestjs/core": "^11.0.0",
-    "@nestjs/testing": "^11.0.0",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/testing": "^11.1.6",
     "@suites/di.nestjs": "^3.0.1",
     "@suites/doubles.vitest": "^3.0.1",
     "@suites/unit": "^3.0.1",
