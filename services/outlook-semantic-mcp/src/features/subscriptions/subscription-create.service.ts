@@ -15,6 +15,7 @@ import {
   Subscription,
 } from './subscription.dtos';
 import { MailSubscriptionUtilsService } from './subscription-utils.service';
+import { createSmeared } from '@unique-ag/utils';
 
 export interface SubscribeResult {
   status: 'created' | 'already_active' | 'expiring_soon';
@@ -167,6 +168,8 @@ export class SubscriptionCreateService {
 
     const userProfile = await this.db.query.userProfiles.findFirst({
       columns: {
+        id: true,
+        email: true,
         providerUserId: true,
       },
       where: eq(userProfiles.id, userProfileId.toString()),
@@ -186,6 +189,8 @@ export class SubscriptionCreateService {
     });
     this.logger.debug({
       msg: 'Successfully retrieved user profile from database',
+      userProfileId: userProfile.id,
+      userEmail: createSmeared(userProfile.email ?? `___Empty Email__`),
       providerUserId: userProfile.providerUserId,
     });
 
@@ -254,7 +259,10 @@ export class SubscriptionCreateService {
     }
 
     traceEvent('new managed subscription created', { id: created.id });
-    this.logger.log({ id: created.id, msg: 'Successfully created new managed subscription record' });
+    this.logger.log({
+      id: created.id,
+      msg: 'Successfully created new managed subscription record',
+    });
 
     const subscriptionCreated = LifecycleEventDto.encode({
       type: 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created',
