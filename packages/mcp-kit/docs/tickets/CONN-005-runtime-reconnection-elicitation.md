@@ -38,10 +38,16 @@ This flow integrates naturally with the existing pipeline runner (CORE-010): `Up
 - [ ] `McpReconnectionPipeline` awaits the completion notifier (with a configurable timeout, default: 5 minutes)
 - [ ] On timeout: returns MCP error result with code `connection_timeout`
 
+### Branded types (owned by this module)
+- [ ] `ElicitationId = z.string().uuid().brand('ElicitationId')` — fresh UUID generated per elicitation; `.uuid()` enforces UUID format at parse time
+- [ ] Exported from `connection/types.ts`
+- [ ] `ProviderId` is imported from CONN-001's `connection/types.ts`
+
 ### Elicitation result handling
 - [ ] `elicitInput` result with `action: 'completed'` → proceed to retry
 - [ ] `elicitInput` result with `action: 'declined'` → return `{ isError: true, content: [{ type: 'text', text: 'Connection to {displayName} was declined' }] }`
 - [ ] `elicitInput` result with `action: 'error'` → return `{ isError: true, content: [{ type: 'text', text: 'Connection to {displayName} failed: {reason}' }] }`
+- [ ] `elicitInput` result with `action: 'timeout'` → return `{ isError: true, content: [{ type: 'text', text: 'Connection to {displayName} timed out. Please try again.' }] }` (same as `reconnectionTimeoutMs` expiry)
 
 ### Client capability check
 - [ ] Before triggering elicitation, check whether the connected MCP client supports URL elicitation (via `server.getClientCapabilities().elicitation?.urlMode`)
@@ -90,7 +96,8 @@ Feature: Runtime Reconnection via Elicitation
       Given a tool requiring "google-drive" with an expired token
       And the user does not complete the OAuth flow within 5 minutes
       When the elicitation times out
-      Then the tool returns an error result indicating the connection timed out
+      Then `elicitInput` resolves with `action: 'timeout'`
+      And the tool returns an error result: "Connection to Google Drive timed out. Please try again."
 
     Scenario: One retry after reconnection — no infinite loop
       Given "alice" reconnects "microsoft-graph" via elicitation

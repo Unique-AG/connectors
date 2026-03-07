@@ -17,8 +17,8 @@ The `MCP_SESSION_STORE` injection token lets consumers swap implementations (Red
 - [ ] `McpSessionStore` interface defined with methods: `save`, `get`, `delete`, `findByUserId`, `findByClientId`, `deleteByUserId`, `touch`, `deleteExpired`
 - [ ] `MCP_SESSION_STORE` injection token exported
 - [ ] `InMemorySessionStore` implements `McpSessionStore` using `Map<string, McpSessionRecord>`
-- [ ] `get()` returns `null` for expired records and lazily deletes them
-- [ ] `get()` returns `null` for non-existent session IDs
+- [ ] `get()` returns `undefined` for expired records and lazily deletes them
+- [ ] `get()` returns `undefined` for non-existent session IDs
 - [ ] `touch(sessionId)` updates only `lastActivityAt` and recomputes `expiresAt`
 - [ ] `touch(sessionId)` for a non-existent session is a no-op (does not throw)
 - [ ] `findByUserId` / `findByClientId` filter out expired records
@@ -51,7 +51,7 @@ interface McpSessionRecord {
 
 interface McpSessionStore {
   save(session: McpSessionRecord): Promise<void>;
-  get(sessionId: string): Promise<McpSessionRecord | null>;
+  get(sessionId: string): Promise<McpSessionRecord | undefined>;
   delete(sessionId: string): Promise<void>;
   findByUserId(userId: string): Promise<McpSessionRecord[]>;
   findByClientId(clientId: string): Promise<McpSessionRecord[]>;
@@ -91,16 +91,16 @@ Feature: In-memory session store
       When a session is saved with ID "sess-1" and server name "server-b"
       Then retrieving session "sess-1" returns a record with server name "server-b"
 
-    Scenario: Retrieving a non-existent session returns nothing
+    Scenario: Retrieving a non-existent session returns undefined
       When session "unknown-session" is retrieved
-      Then no session record is returned
+      Then undefined is returned
 
   Rule: Expired sessions are invisible and lazily removed
 
     Scenario: An expired session is not returned on retrieval
       Given a session "sess-expired" exists with an expiration time in the past
       When session "sess-expired" is retrieved
-      Then no session record is returned
+      Then undefined is returned
 
     Scenario: Retrieving an expired session removes it from the store
       Given a session "sess-expired" exists with an expiration time in the past
@@ -154,7 +154,7 @@ Feature: In-memory session store
     Scenario: Deleting a specific session by ID
       Given a session "sess-1" exists
       When session "sess-1" is deleted
-      Then retrieving session "sess-1" returns nothing
+      Then retrieving session "sess-1" returns undefined
 ```
 
 ## Dependencies

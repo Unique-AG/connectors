@@ -11,10 +11,12 @@ Currently, our framework does not expose this capability. Tool authors would nee
 ## Acceptance Criteria
 - [ ] `McpContext.elicit<T extends z.ZodObject>(schema: T, message: string): Promise<z.infer<T>>` is available to tools via `@Ctx()`
 - [ ] Zod schema is auto-converted to JSON Schema using `toJSONSchema()` (from zod v4)
+- [ ] `ElicitationResult` is a discriminated union with four members: `completed`, `declined`, `error` (with `reason: string`), and `timeout`. The `timeout` action is returned when the configurable timeout elapses before the user responds.
 - [ ] If the user accepts, the validated data is returned (type-safe via Zod inference)
 - [ ] If the user declines, `McpElicitationDeclinedError` is thrown
-- [ ] If the user cancels, `McpElicitationCancelledError` is thrown
-- [ ] Both error classes extend a base `McpElicitationError` for catch-all handling
+- [ ] If the user cancels/error, `McpElicitationCancelledError` is thrown
+- [ ] If the elicitation times out, `McpElicitationTimeoutError` is thrown
+- [ ] Error classes (`McpElicitationDeclinedError`, `McpElicitationCancelledError`, `McpElicitationTimeoutError`) extend a base `McpElicitationError` for catch-all handling
 - [ ] The response data is validated against the Zod schema before returning (defense in depth)
 - [ ] Elicitation works with Streamable HTTP transport (stateful sessions)
 - [ ] Meaningful error thrown if elicitation is attempted on a transport/client that doesn't support it
@@ -91,7 +93,7 @@ FastMCP (Python) exposes elicitation via `ctx.elicit()` with a Pydantic model fo
 
 ## Technical Notes
 - SDK API: `server.elicitInput({ message, requestedSchema }, { signal? })` returns `Promise<ElicitationResult>`
-- `ElicitationResult` has shape: `{ action: 'accept' | 'decline' | 'cancel', content?: Record<string, unknown> }`
+- `ElicitationResult` has shape: `{ action: 'completed' | 'declined' | 'error' | 'timeout', reason?: string, content?: Record<string, unknown> }`
 - Implementation in `McpContext`:
   ```typescript
   async elicit<T extends z.ZodObject<any>>(schema: T, message: string): Promise<z.infer<T>> {
@@ -100,11 +102,15 @@ FastMCP (Python) exposes elicitation via `ctx.elicit()` with a Pydantic model fo
       { message, requestedSchema: jsonSchema },
       { signal: this.abortSignal }
     );
-    if (result.action === 'decline') throw new McpElicitationDeclinedError(message);
-    if (result.action === 'cancel') throw new McpElicitationCancelledError(message);
-    // Validate response against schema for safety
-    return schema.parse(result.content);
+    if (result.action === 'declined') throw new McpElicitationDeclinedError(message);
+    if (result.action === 'error') throw new McpElicitationCancelledError(result.reason ?? 'Elicitation error');
+    if (result.action === 'timeout') throw new McpElicitationTimeoutError(message);
+    if (result.action === 'completed') {
+      // Validate response against schema for safety
+      return schema.parse(result.content);
+    }
+    throw new McpElicitationError('Unknown elicitation result action');
   }
   ```
-- Error classes should live in `packages/nestjs-mcp/src/errors/`
+- Error classes should live in `packages/nestjs-mcp/src/errors/` and extend `McpElicitationError`
 - The `server` capability for elicitation must be enabled — check if SDK auto-advertises or if we need to declare it in server capabilities

@@ -21,6 +21,10 @@ AUTH-003 provides a Drizzle-based implementation of `IOAuthStore`. Some teams us
 - [ ] `generateClientId()` generates typeid-prefixed client IDs (same as DrizzleOAuthStore)
 - [ ] `getAuthCode()` auto-removes expired codes and returns undefined
 - [ ] `getOAuthSession()` auto-removes expired sessions and returns undefined
+- [ ] `scope` and `resource` fields on the `Token` Prisma model must be `String` (not `String?`) to match `AccessTokenMetadata.scope: string` and `resource: string`.
+- [ ] `Token.type` uses a Prisma `enum TokenType { ACCESS REFRESH }` (not `String`). The mapping layer asserts the enum value when reading from DB.
+- [ ] The accepted `PrismaClient` type must NOT use bare `Function` for method types. Use Prisma's generated delegate types, or define a minimal structural interface with fully-typed method signatures (not `Function`).
+- [ ] `userData Json?` column is Zod-parsed with `TokenUserDataSchema.nullable()` when read back from Prisma. `metadata Json?` on `OAuthSession` is similarly Zod-parsed when accessed.
 - [ ] Exported from `@unique-ag/nestjs-mcp/auth`
 
 ## BDD Scenarios
@@ -191,26 +195,31 @@ model OAuthSession {
   state     String?
   nonce     String?
   expiresAt DateTime? @map("expires_at")
-  metadata  Json?
+  metadata  Json?                                     // nullable in DB, Zod-parsed when accessed
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("oauth_sessions")
 }
 
+enum TokenType {
+  ACCESS
+  REFRESH
+}
+
 model Token {
   id            String    @id @default(uuid())
   token         String    @unique
-  type          String    // ACCESS or REFRESH
+  type          TokenType                              // DB-level enum enforcement
   expiresAt     DateTime  @map("expires_at")
   userId        String    @map("user_id")
   clientId      String    @map("client_id")
-  scope         String?
-  resource      String?
+  scope         String                                // non-optional, matches AccessTokenMetadata
+  resource      String                                // non-optional, matches AccessTokenMetadata
   userProfileId String    @map("user_profile_id")
   familyId      String?   @map("family_id")
   generation    Int?
   usedAt        DateTime? @map("used_at")
-  userData      Json?     @map("user_data")
+  userData      Json?     @map("user_data")          // nullable in DB, Zod-parsed with nullable() coercion
   createdAt     DateTime  @default(now()) @map("created_at")
 
   userProfile   UserProfile @relation(fields: [userProfileId], references: [id])
@@ -275,7 +284,7 @@ No `@modelcontextprotocol/sdk` APIs are directly used. This is a pure NestJS/Pri
 Transaction isolation: use Prisma's default isolation level (READ COMMITTED on PostgreSQL, REPEATABLE READ on MySQL). No explicit isolation level override is needed for upsert operations.
 
 ### PrismaClient typing
-`PrismaClient` is accepted as `PrismaClient` (the generated class). Type it as `{ oauthAccessToken: { upsert: Function, findUnique: Function, delete: Function } }` if you need to avoid importing the generated client directly in the library.
+`PrismaClient` is accepted as `PrismaClient` (the generated class). Do NOT use bare `Function` types for methods. Use Prisma's generated delegate types from `@prisma/client`, or define a minimal structural interface with fully-typed method signatures (e.g., `{ token: { findUnique: (args) => Promise<Token | null>; create: (args) => Promise<Token>; ... } }`). Avoid importing the full generated client if possible by using a generic type parameter or minimal interface.
 
 ### Key design decisions
 1. **Peer dependency**: `@prisma/client` is a peer dependency. If a consumer doesn't use Prisma, they never install it. The import is only resolved when `PrismaOAuthStore` is actually instantiated.

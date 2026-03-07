@@ -22,6 +22,13 @@ The key difference from HTTP is that Zod validation is mandatory and always runs
 - [ ] Unknown exceptions -> `{ content: [...], isError: true }` with error message
 - [ ] Error normalization is always-on (not opt-in)
 - [ ] The wrapped handler receives an `McpExecutionContextHost` with `contextType = 'mcp'`
+- [ ] The execution context passed through the pipeline uses a discriminated `McpRequestContext` type rather than three separate nullable parameters:
+  ```typescript
+  type McpRequestContext =
+    | { authenticated: true;  identity: McpIdentity; session: McpSession; request: McpRequest }
+    | { authenticated: false; identity: null;         session: null;       request: McpRequest };
+  ```
+  Note: `identity: null` and `session: null` in the unauthenticated branch uses `null` (not `undefined`) as the explicit zero-auth contract signal. Guards and handlers narrow via `if (ctx.authenticated)`.
 - [ ] Method: `wrapHandler(registryEntry, mcpServer, identity, sessionId, httpRequest) -> (input) => Promise<ToolResult>`
 - [ ] Method: `canList(handler, identity)` — runs guards-only (no interceptors, no pipes) for list-time visibility filtering. Creates an execution context via `McpExecutionContextHost.createForList()` and runs only `CanActivate` guards. Returns `boolean`. Used by list handlers (CORE-013, CORE-027, CORE-028) to filter components from list responses.
 

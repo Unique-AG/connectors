@@ -28,13 +28,18 @@ In NestJS, both implement `McpAuthProvider` from AUTH-001 and extend `JwtTokenVe
   - `algorithms?: string[]` — allowed signing algorithms (default: RS256)
   - `discoveryTtl?: number` — discovery document cache TTL in ms (default: 3600000 = 1 hour)
 - [ ] On initialization, fetches OpenID Connect discovery document from `{issuerUrl}/.well-known/openid-configuration`
-- [ ] Extracts `jwks_uri` from discovery and passes to parent `JwtTokenVerifier`
-- [ ] Extracts `registration_endpoint` from discovery and advertises to MCP clients
+- [ ] Extracts `jwks_uri` from discovery and calls `this.updateJwksUri(this.discoveryDoc.jwks_uri)` on the parent `JwtTokenVerifier`. This method is defined in AUTH-005 as `protected updateJwksUri(uri: JwksUri): void`.
+- [ ] Extracts `registration_endpoint` from discovery and advertises to MCP clients (omits the field entirely when absent — MUST NOT substitute `''`)
 - [ ] Exposes `/.well-known/oauth-authorization-server` endpoint that returns metadata pointing to the external IdP's endpoints
 - [ ] Discovery document cached with configurable TTL (default 1 hour)
 - [ ] Cache refreshed on key rotation errors (unknown kid in JWT)
 - [ ] If discovery document unavailable at startup, logs warning (not error) and retries on first request
 - [ ] `RemoteAuthProvider` implements `OnModuleInit`. Token discovery (fetching `/.well-known/openid-configuration` or `/.well-known/oauth-authorization-server`) runs in `onModuleInit()`, not in the constructor. If discovery fails, `onModuleInit()` throws and the application fails to start.
+- [ ] `refreshDiscovery()` calls `this.updateJwksUri(this.discoveryDoc.jwks_uri)` on the parent `JwtTokenVerifier`. This method is defined in AUTH-005 as `protected updateJwksUri(uri: JwksUri): void`.
+- [ ] Discovery is guarded by a shared lazy-init promise to prevent concurrent first requests from triggering duplicate fetches: `this.discoveryPromise ??= this.refreshDiscovery()`. Concurrent callers await the same promise. The promise is cleared on TTL expiry.
+- [ ] `getDiscoveryMetadata()` omits `registration_endpoint` entirely when the discovery document does not include it. MUST NOT substitute empty string `''` — clients treat empty string as a valid but broken endpoint.
+- [ ] `discoveryDoc` is typed `OidcDiscoveryDocument | undefined` (not `| null`). Initial state is `undefined`.
+- [ ] `OidcDiscoveryDocumentSchema` Zod schema validates the discovery endpoint HTTP response before use: required fields `issuer`, `jwks_uri`, `authorization_endpoint`, `token_endpoint` (all `.string().url()`); optional `registration_endpoint`, `userinfo_endpoint`.
 
 ### AuthKitProvider
 - [ ] `AuthKitProvider` class exported from `@unique-ag/nestjs-mcp/auth`
@@ -126,62 +131,95 @@ export interface RemoteAuthProviderOptions {
   discoveryTtl?: number; // ms, default 3600000 (1 hour)
 }
 
+// OidcDiscoveryDocumentSchema — validates HTTP response before field access
+const OidcDiscoveryDocumentSchema = z.object({
+  issuer: z.string().url(),
+  jwks_uri: z.string().url(),
+  authorization_endpoint: z.string().url(),
+  token_endpoint: z.string().url(),
+  registration_endpoint: z.string().url().optional(),
+  userinfo_endpoint: z.string().url().optional(),
+  scopes_supported: z.array(z.string()).optional(),
+  response_types_supported: z.array(z.string()).optional(),
+  grant_types_supported: z.array(z.string()).optional(),
+  code_challenge_methods_supported: z.array(z.string()).optional(),
+});
+
 export class RemoteAuthProvider extends JwtTokenVerifier {
   readonly servesOAuthRoutes = true; // overrides JwtTokenVerifier's false
 
-  private discoveryDoc: OidcDiscoveryDocument | null = null;
+  // undefined (not null) — follows the project undefined-only convention
+  private discoveryDoc: OidcDiscoveryDocument | undefined;
   private discoveryFetchedAt: number = 0;
   private readonly discoveryTtl: number;
+  // Shared lazy-init promise prevents concurrent discovery races
+  private discoveryPromise: Promise<void> | undefined;
 
   constructor(private readonly remoteOptions: RemoteAuthProviderOptions) {
     // Defer JwtTokenVerifier initialization — jwksUri comes from discovery
     super({
-      jwksUri: '', // placeholder — set after discovery
+      jwksUri: 'https://placeholder.invalid', // overwritten after discovery
       issuer: remoteOptions.issuerUrl,
       audience: remoteOptions.audience,
       algorithms: remoteOptions.algorithms,
     });
     this.discoveryTtl = remoteOptions.discoveryTtl ?? 3_600_000;
     // Fire-and-forget initial discovery fetch (see note below on NestJS lifecycle)
-    this.refreshDiscovery().catch(err => {
+    this.discoveryPromise = this.refreshDiscovery();
+    this.discoveryPromise.catch(err => {
       console.warn(`[RemoteAuthProvider] Failed to fetch discovery doc on startup: ${err.message}`);
+      this.discoveryPromise = undefined; // allow retry on next validate()
     });
   }
 
-  async validate(token: string): Promise<TokenValidationResult | null> {
-    // Ensure discovery is loaded before first validation
-    if (!this.discoveryDoc) {
-      await this.refreshDiscovery();
-    }
+  async validate(token: string): Promise<TokenValidationResult | undefined> {
+    // Shared promise prevents concurrent callers from triggering duplicate fetches
+    await this.ensureDiscovery();
     return super.validate(token);
   }
 
-  private async refreshDiscovery(): Promise<void> {
-    const now = Date.now();
-    if (this.discoveryDoc && now - this.discoveryFetchedAt < this.discoveryTtl) return;
+  private ensureDiscovery(): Promise<void> {
+    const isStale = this.discoveryDoc && Date.now() - this.discoveryFetchedAt >= this.discoveryTtl;
+    if (!this.discoveryDoc || isStale) {
+      // ??= ensures concurrent callers await the same promise
+      this.discoveryPromise ??= this.refreshDiscovery().finally(() => {
+        this.discoveryPromise = undefined; // clear on completion so next TTL expiry retries
+      });
+    }
+    return this.discoveryPromise ?? Promise.resolve();
+  }
 
+  private async refreshDiscovery(): Promise<void> {
     const url = `${this.remoteOptions.issuerUrl}/.well-known/openid-configuration`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Discovery fetch failed: ${response.status}`);
 
-    this.discoveryDoc = await response.json() as OidcDiscoveryDocument;
-    this.discoveryFetchedAt = now;
+    // Zod-parse the response — never use unsafe cast
+    const parsed = OidcDiscoveryDocumentSchema.safeParse(await response.json());
+    if (!parsed.success) throw new Error(`Discovery document validation failed: ${parsed.error.message}`);
 
-    // Update parent JwtTokenVerifier's JWKS source
-    this.updateJwksUri(this.discoveryDoc.jwks_uri);
+    this.discoveryDoc = parsed.data;
+    this.discoveryFetchedAt = Date.now();
+
+    // Update parent JwtTokenVerifier's JWKS source via protected method (AUTH-005)
+    this.updateJwksUri(this.discoveryDoc.jwks_uri as JwksUri);
   }
 
   getDiscoveryMetadata(): OAuthServerMetadata {
-    return {
+    const base = {
       issuer: this.remoteOptions.issuerUrl,
       authorization_endpoint: this.discoveryDoc?.authorization_endpoint ?? '',
       token_endpoint: this.discoveryDoc?.token_endpoint ?? '',
-      registration_endpoint: this.discoveryDoc?.registration_endpoint ?? '',
       jwks_uri: this.discoveryDoc?.jwks_uri ?? '',
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],
     };
+    // Omit registration_endpoint entirely when not in the discovery doc — never use '' sentinel
+    if (this.discoveryDoc?.registration_endpoint) {
+      return { ...base, registration_endpoint: this.discoveryDoc.registration_endpoint };
+    }
+    return base;
   }
 }
 ```
@@ -205,13 +243,17 @@ export class AuthKitProvider extends RemoteAuthProvider {
 ```
 
 ### Discovery document interface
+`OidcDiscoveryDocument` is inferred from `OidcDiscoveryDocumentSchema` (Zod). The TypeScript type is:
 ```typescript
+// Derived from OidcDiscoveryDocumentSchema — do not define separately
+type OidcDiscoveryDocument = z.infer<typeof OidcDiscoveryDocumentSchema>;
+// Equivalent to:
 interface OidcDiscoveryDocument {
-  issuer: string;
-  authorization_endpoint: string;
-  token_endpoint: string;
-  registration_endpoint?: string;
-  jwks_uri: string;
+  issuer: string;                      // required, URL
+  jwks_uri: string;                    // required, URL
+  authorization_endpoint: string;      // required, URL
+  token_endpoint: string;              // required, URL
+  registration_endpoint?: string;      // optional — omit from metadata when absent
   userinfo_endpoint?: string;
   scopes_supported?: string[];
   response_types_supported?: string[];
@@ -219,6 +261,7 @@ interface OidcDiscoveryDocument {
   code_challenge_methods_supported?: string[];
 }
 ```
+`discoveryDoc` is typed `OidcDiscoveryDocument | undefined` (not `| null`). Initial state is `undefined`.
 
 ### Discovery metadata endpoint
 `RemoteAuthProvider` registers a `GET /.well-known/oauth-authorization-server` endpoint that returns the external IdP's endpoints, enabling MCP clients to discover and register with the IdP directly:

@@ -21,6 +21,19 @@ Build tooling should use `tsup` for bundling (dual CJS/ESM with `.d.ts` generati
 - [ ] TypeScript strict mode enabled
 - [ ] Biome config extends the monorepo root config
 
+### Branded types (cross-cutting)
+- [ ] `src/types/brands.ts` is created as the first file in the package, defining cross-cutting branded types used by 3+ modules. All other module-specific branded types follow the same pattern in their own `types.ts` files.
+- [ ] Cross-cutting types defined here (using `z.brand()` — see conventions.md):
+  - `UserId = z.string().min(1).brand('UserId')` — used in AUTH, CONN, SESS, CORE
+  - `ClientId = z.string().min(1).brand('ClientId')` — used in AUTH, CORE, SESS
+  - `SessionId = z.string().uuid().brand('SessionId')` — used in SESS, TRANS, CORE
+  - `ToolName = z.string().min(1).brand('ToolName')` — used in CORE decorators and registry
+  - `ResourceUri = z.string().min(1).brand('ResourceUri')` — used in CORE-002, CORE-027
+  - `PromptName = z.string().min(1).brand('PromptName')` — used in CORE-003, CORE-028
+- [ ] Each branded const is paired with an inferred type: `export type UserId = z.infer<typeof UserId>`
+- [ ] All cross-cutting brands are re-exported from `src/index.ts` (the package barrel)
+- [ ] `src/types/index.ts` barrel re-exports from all module `types.ts` files as they are added by subsequent PRs
+
 ## BDD Scenarios
 
 ```gherkin

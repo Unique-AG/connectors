@@ -28,7 +28,7 @@ The store must support:
 
 ### McpConnectionStore interface
 - [ ] `McpConnectionStore` interface exported from `@unique-ag/mcp-kit`
-- [ ] `get(userId, providerId): Promise<UpstreamConnection | null>`
+- [ ] `get(userId, providerId): Promise<UpstreamConnection | undefined>`
 - [ ] `set(userId, providerId, connection: UpstreamConnection): Promise<void>`
 - [ ] `delete(userId, providerId): Promise<void>`
 - [ ] `listByUser(userId): Promise<UpstreamConnection[]>` — returns all connections for a user
@@ -52,6 +52,13 @@ The store must support:
 - [ ] Key sourced from `McpConnectionModuleOptions.encryptionKey` (required, min 32 bytes, validated on module init)
 - [ ] If `encryptionKey` is not set and `NODE_ENV !== 'test'`, module init throws a descriptive error
 
+### Branded types (owned by this module)
+- [ ] `ProviderId = z.string().min(1).brand('ProviderId')` — upstream provider identifier slug (e.g. `'microsoft-graph'`); prevents passing a `UserId` or `SessionId` in a provider slot
+- [ ] `EncryptedToken = z.string().min(1).brand('EncryptedToken')` — AES-256-GCM ciphertext; prevents using an encrypted value as a raw access token
+- [ ] `RawAccessToken = z.string().min(1).brand('RawAccessToken')` — decrypted upstream access token; prevents storing a raw token in a slot expecting encrypted data
+- [ ] All three exported from `connection/types.ts` and re-exported from `src/types/index.ts`
+- [ ] `UserId` is imported from `src/types/brands.ts`
+
 ### McpConnectionModule
 - [ ] `McpConnectionModule.forRoot({ encryptionKey, store?: Type<McpConnectionStore> })` static factory
 - [ ] `McpConnectionModule.forRootAsync({ useFactory, inject })` async factory
@@ -72,10 +79,10 @@ Feature: Upstream Connection Store
       When a connection for user "alice" and provider "microsoft-graph" is stored with access token "tok_abc"
       Then retrieving "alice" + "microsoft-graph" returns a connection with the access token decrypted to "tok_abc"
 
-    Scenario: Unknown connection returns null
+    Scenario: Unknown connection returns undefined
       Given an empty connection store
       When retrieving user "alice" + provider "slack"
-      Then null is returned
+      Then undefined is returned
 
     Scenario: Overwriting a connection replaces the previous one
       Given user "alice" has a stored connection for "google-drive" with token "old_token"

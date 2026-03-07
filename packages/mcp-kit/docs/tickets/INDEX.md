@@ -1,6 +1,6 @@
 # @unique-ag/nestjs-mcp — Implementation Ticket Index
 
-> **Total tickets:** 64
+> **Total tickets:** 67
 > **Design artifact:** `.claude/artifacts/mcp-nestjs-framework-final.md`
 > **Testing approach:** BDD (Given/When/Then) — all tickets include full scenario coverage
 
@@ -10,6 +10,8 @@
 
 ```
 INFRA-001  (Monorepo package scaffold)
+├── CORE-031  (McpExceptionFilter & Error Hierarchy)  ─► CORE-010, CORE-013, CORE-027, CORE-028, AUTH-001, AUTH-007, CONN-003, CONN-004, SDK-001
+│
 ├── CORE-001  (@Tool decorator)           ─► CORE-018, CORE-019
 ├── CORE-002  (@Resource decorator)       ─► CORE-018, CORE-023
 ├── CORE-003  (@Prompt decorator)         ─► CORE-018
@@ -84,7 +86,7 @@ INFRA-001  (Monorepo package scaffold)
 ```
 
 **Critical path:**
-`INFRA-001 → CORE-001..004 → CORE-005 → CORE-009 → CORE-010 → CORE-012 → CORE-013 → CORE-027/028 → SESS-001 → SESS-004 → SESS-005 → SESS-006 → TRANS-001`
+`INFRA-001 → CORE-031 (error foundation) → CORE-001..004 → CORE-005 → CORE-009 → CORE-010 → CORE-012 → CORE-013 → CORE-027/028 → SESS-001 → SESS-004 → SESS-005 → SESS-006 → TRANS-001`
 
 ---
 
@@ -94,6 +96,9 @@ INFRA-001  (Monorepo package scaffold)
 | Ticket | Title |
 |--------|-------|
 | INFRA-001 | Monorepo package scaffold |
+| INFRA-002 | Configure subpath exports (`./errors`, `./types`, `./brands`, `./session`, `./auth`, `./connection`) |
+| INFRA-003 | Add lint rule: no cross-subpath imports, no `@nestjs/*` in leaf subpath modules |
+| CORE-031 | McpExceptionFilter & Error Hierarchy (DefectError, McpBaseError, invariant, handleMcpToolError, McpHttpExceptionFilter) |
 | CORE-001 | @Tool() decorator |
 | CORE-002 | @Resource() decorator (unified) |
 | CORE-003 | @Prompt() decorator |
@@ -194,6 +199,8 @@ INFRA-001  (Monorepo package scaffold)
 | ID | Title | Depends on | Blocks |
 |----|-------|------------|--------|
 | INFRA-001 | Monorepo package scaffold | — | CORE-001, CORE-002, CORE-003, CORE-004, CORE-008 |
+| INFRA-002 | Configure subpath exports in package.json | INFRA-001 | — |
+| INFRA-003 | Add barrel export lint rule (no cross-subpath imports, no @nestjs in leaf modules) | INFRA-001 | — |
 
 ### CORE — Core Framework
 
@@ -229,6 +236,7 @@ INFRA-001  (Monorepo package scaffold)
 | CORE-028 | McpPromptsHandler | CORE-003, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-012, CORE-013 | — |
 | CORE-029 | Proxy feature forwarding | CORE-017, SESS-004, SDK-001, SDK-002 | — |
 | CORE-030 | Proxy McpModule integration | CORE-017, CORE-012, CORE-013 | — |
+| CORE-031 | McpExceptionFilter & Error Hierarchy | INFRA-001 | CORE-010, CORE-013, CORE-027, CORE-028, AUTH-001, AUTH-007, CONN-003, CONN-004, SDK-001 |
 
 ### SESS — Sessions
 

@@ -12,9 +12,13 @@ In NestJS, both `OAuthProxyProvider` and `GitHubOAuthProvider` implement the `Mc
 
 ## Acceptance Criteria
 
+### Branded types (owned by this module)
+- [ ] `ClientSecret = z.string().min(1).brand('ClientSecret')` — OAuth client secret; branded to prevent accidentally logging or passing it in place of other credential strings
+- [ ] Exported from `auth/types.ts`
+
 ### OAuthProxyProvider
 - [ ] `OAuthProxyProvider` class exported from `@unique-ag/nestjs-mcp/auth`
-- [ ] Implements `McpAuthProvider` interface: `validate(token: string): Promise<TokenValidationResult | null>`
+- [ ] Implements `McpAuthProvider` interface: `validate(token: string): Promise<TokenValidationResult | undefined>`
 - [ ] `servesOAuthRoutes` returns `true` — provider registers HTTP routes
 - [ ] Constructor accepts `OAuthProxyProviderOptions`:
   - `clientId: string` — pre-registered app client ID at the upstream provider
@@ -23,8 +27,12 @@ In NestJS, both `OAuthProxyProvider` and `GitHubOAuthProvider` implement the `Mc
   - `tokenUrl: string` — upstream provider's token endpoint
   - `scopes: string[]` — OAuth scopes to request from upstream
   - `callbackUrl: string` — this server's callback URL
-  - `userInfoUrl?: string` — endpoint to validate tokens and fetch user info
-  - `tokenIntrospectionUrl?: string` — alternative token validation endpoint
+  - `userInfoUrl?: string` — endpoint to validate tokens and fetch user info (mutually exclusive with `tokenIntrospectionUrl`)
+  - `tokenIntrospectionUrl?: string` — alternative token validation endpoint (mutually exclusive with `userInfoUrl`)
+- [ ] `mapToValidationResult()` returns `undefined` (validation failure) when neither `sub` nor `id` is present in the userinfo response. MUST NOT fall back to an empty string `''` for userId — an empty userId would be treated as authenticated.
+- [ ] `OAuthProxyProviderOptions` uses a discriminated union to require at least one validation endpoint at compile time: either `{ userInfoUrl: string }` or `{ tokenIntrospectionUrl: string }`. Both optional is not permitted — this is caught at construction, not runtime.
+- [ ] `fetchUserInfo()` result is Zod-parsed before `mapToValidationResult()` accesses fields. `GitHubOAuthProvider` uses `GitHubUserSchema = z.object({ login: z.string(), id: z.number(), email: z.string().email().nullable().optional(), name: z.string().nullable().optional() })`.
+- [ ] `OAuthProxyProviderOptionsSchema` validates at construction: all URLs are valid HTTPS URLs, `scopes` is non-empty.
 - [ ] Exposes OAuth metadata discovery endpoint at `/.well-known/oauth-authorization-server`
 - [ ] Handles OAuth authorization code flow: redirects client to upstream, receives callback, exchanges code for token
 - [ ] Validates access tokens by calling the upstream provider's userinfo or introspection endpoint
@@ -109,25 +117,56 @@ Feature: OAuth proxy bridging non-DCR providers for MCP clients
 
 ### OAuthProxyProvider implementation sketch
 ```typescript
+// OAuthProxyProviderOptions — discriminated union requires at least one validation endpoint
+export type OAuthProxyProviderOptions =
+  | {
+      clientId: string;
+      clientSecret: string;
+      authorizationUrl: string;
+      tokenUrl: string;
+      scopes: string[];
+      callbackUrl: string;
+      userInfoUrl: string;
+      tokenIntrospectionUrl?: never;
+    }
+  | {
+      clientId: string;
+      clientSecret: string;
+      authorizationUrl: string;
+      tokenUrl: string;
+      scopes: string[];
+      callbackUrl: string;
+      userInfoUrl?: never;
+      tokenIntrospectionUrl: string;
+    };
+
+// GenericUserInfoSchema — validates the userinfo response before field access
+const GenericUserInfoSchema = z.object({
+  sub: z.union([z.string(), z.number()]).optional(),
+  id: z.union([z.string(), z.number()]).optional(),
+  email: z.string().optional(),
+  name: z.string().optional(),
+});
+
 export class OAuthProxyProvider implements McpAuthProvider {
   readonly servesOAuthRoutes = true;
 
-  constructor(private readonly options: OAuthProxyProviderOptions) {}
+  constructor(protected readonly options: OAuthProxyProviderOptions) {}
 
-  async validate(token: string): Promise<TokenValidationResult | null> {
-    if (!token) return null;
+  async validate(token: string): Promise<TokenValidationResult | undefined> {
+    if (!token) return undefined;
     try {
       // Validate by calling upstream userinfo/introspection endpoint
       const userInfo = await this.fetchUserInfo(token);
       return this.mapToValidationResult(userInfo);
     } catch {
-      return null;
+      return undefined;
     }
   }
 
   private async fetchUserInfo(token: string): Promise<unknown> {
+    // url is always defined — discriminated union enforces at least one endpoint
     const url = this.options.userInfoUrl ?? this.options.tokenIntrospectionUrl;
-    if (!url) throw new Error('No userinfo or introspection URL configured');
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -136,15 +175,25 @@ export class OAuthProxyProvider implements McpAuthProvider {
   }
 
   // Subclasses override this for provider-specific mapping
-  protected mapToValidationResult(userInfo: unknown): TokenValidationResult {
-    // Generic mapping — subclasses provide specific logic
-    const info = userInfo as Record<string, unknown>;
+  protected mapToValidationResult(userInfo: unknown): TokenValidationResult | undefined {
+    // Zod-parse the response before accessing fields
+    const parsed = GenericUserInfoSchema.safeParse(userInfo);
+    if (!parsed.success) return undefined;
+    const info = parsed.data;
+
+    // P0 security: never fall back to empty string — treat missing ID as auth failure
+    const rawId = info.sub ?? info.id;
+    if (rawId === undefined || rawId === null) return undefined;
+
     return {
-      userId: String(info.sub ?? info.id ?? ''),
-      clientId: this.options.clientId,
-      scopes: this.options.scopes,
-      email: info.email as string | undefined,
-      displayName: info.name as string | undefined,
+      source: 'oauth',
+      userId: String(rawId) as UserId,
+      clientId: this.options.clientId as ClientId,
+      scopes: this.options.scopes as Scope[],
+      resource: this.options.callbackUrl,
+      userProfileId: String(rawId) as UserProfileId,
+      email: info.email,
+      displayName: info.name,
       raw: userInfo,
     };
   }
@@ -160,6 +209,14 @@ export interface GitHubOAuthProviderOptions {
   scopes?: string[];
 }
 
+// GitHubUserSchema — validates GitHub userinfo response before field access
+const GitHubUserSchema = z.object({
+  login: z.string(),
+  id: z.number(),
+  email: z.string().email().nullable().optional(),
+  name: z.string().nullable().optional(),
+});
+
 export class GitHubOAuthProvider extends OAuthProxyProvider {
   constructor(options: GitHubOAuthProviderOptions) {
     super({
@@ -173,14 +230,20 @@ export class GitHubOAuthProvider extends OAuthProxyProvider {
     });
   }
 
-  protected override mapToValidationResult(userInfo: unknown): TokenValidationResult {
-    const ghUser = userInfo as { login: string; id: number; email?: string; name?: string };
+  protected override mapToValidationResult(userInfo: unknown): TokenValidationResult | undefined {
+    // Zod-parse the GitHub user response — never use unsafe cast
+    const parsed = GitHubUserSchema.safeParse(userInfo);
+    if (!parsed.success) return undefined;
+    const ghUser = parsed.data;
     return {
-      userId: ghUser.login,
-      clientId: this.options.clientId,
-      scopes: this.options.scopes,
-      email: ghUser.email,
-      displayName: ghUser.name,
+      source: 'oauth',
+      userId: ghUser.login as UserId,
+      clientId: this.options.clientId as ClientId,
+      scopes: this.options.scopes as Scope[],
+      resource: this.options.callbackUrl,
+      userProfileId: String(ghUser.id) as UserProfileId,
+      email: ghUser.email ?? undefined,
+      displayName: ghUser.name ?? undefined,
       raw: userInfo,
     };
   }
@@ -242,17 +305,30 @@ The provider registers these HTTP routes via a standard `OAuthProxyController` (
 ```
 
 ### Configuration interface
+See `OAuthProxyProviderOptions` discriminated union in the implementation sketch above. Both `userInfoUrl` and `tokenIntrospectionUrl` as optional is not permitted — one must be provided. The union is enforced at compile time.
+
 ```typescript
-export interface OAuthProxyProviderOptions {
-  clientId: string;
-  clientSecret: string;
-  authorizationUrl: string;
-  tokenUrl: string;
-  scopes: string[];
-  callbackUrl: string;
-  userInfoUrl?: string;
-  tokenIntrospectionUrl?: string;
-}
+// OAuthProxyProviderOptionsSchema — validates at construction time
+const OAuthProxyProviderOptionsSchema = z.union([
+  z.object({
+    clientId: z.string().min(1),
+    clientSecret: z.string().min(1),
+    authorizationUrl: z.string().url(),
+    tokenUrl: z.string().url(),
+    scopes: z.array(z.string().min(1)).min(1),
+    callbackUrl: z.string().url(),
+    userInfoUrl: z.string().url(),
+  }),
+  z.object({
+    clientId: z.string().min(1),
+    clientSecret: z.string().min(1),
+    authorizationUrl: z.string().url(),
+    tokenUrl: z.string().url(),
+    scopes: z.array(z.string().min(1)).min(1),
+    callbackUrl: z.string().url(),
+    tokenIntrospectionUrl: z.string().url(),
+  }),
+]);
 ```
 
 ### FastMCP parity

@@ -24,10 +24,18 @@ Token revocation triggers session termination via direct injection (FullOAuthPro
 ## Acceptance Criteria
 
 ### McpAuthProvider interface (common contract)
-- [ ] `McpAuthProvider` interface exported from `@unique-ag/nestjs-mcp/auth` with method: `validate(token: string): Promise<TokenValidationResult | null>`
-- [ ] `validate()` returns `TokenValidationResult` on success, `null` when the token is not recognized by this provider (allows chaining in MultiAuth)
-- [ ] `TokenValidationResult` includes at minimum: `userId`, `clientId`, `scopes` (string[]), `email?`, `displayName?`, `raw` (original token payload)
+- [ ] `McpAuthProvider` interface exported from `@unique-ag/nestjs-mcp/auth` with method: `validate(token: string): Promise<TokenValidationResult | undefined>`
+- [ ] `validate()` returns `TokenValidationResult` on success, returns `undefined` when the token is not recognized by this provider (not `null` — follows the project undefined-only convention, enables chaining in MultiAuth)
+- [ ] `TokenValidationResult` is a discriminated union on `source: 'oauth' | 'jwt'`; `resource` and `userProfileId` are non-optional in the `oauth` branch only
 - [ ] All auth mode implementations (`FullOAuthProvider`, `JwtTokenVerifier`, `MultiAuthProvider`) implement `McpAuthProvider`
+- [ ] `McpAuthModuleOptionsSchema` validates options at `forRoot()` time: `serverUrl` is a valid URL, `hmacSecret` is non-empty, `clientId`/`clientSecret` are non-empty strings. Invalid config throws at startup, not at first request.
+
+### Branded types (owned by this module)
+- [ ] `BearerToken = z.string().min(1).brand('BearerToken')` — the raw HTTP bearer token string; prevents passing a client secret or encrypted token where a bearer token is expected
+- [ ] `HmacSecret = z.string().min(32).brand('HmacSecret')` — HMAC signing key; min(32) enforces minimum key length at parse time
+- [ ] `Scope = z.string().min(1).brand('Scope')` — an OAuth scope string (e.g. `'Files.Read'`)
+- [ ] All three are exported from `auth/types.ts` and re-exported from `src/types/index.ts`
+- [ ] `UserId` and `ClientId` are imported from `src/types/brands.ts` (cross-cutting, defined in INFRA-001)
 
 ### McpAuthModule (pluggable auth system)
 - [ ] `McpAuthModule` is a NestJS dynamic module with `forRootAsync()` configuration
@@ -223,10 +231,11 @@ Feature: Pluggable MCP auth module with sub-entrypoint isolation
 export interface McpAuthProvider {
   /**
    * Validate a bearer token and return identity information.
-   * Returns TokenValidationResult on success, null when the token is not recognized
+   * Returns TokenValidationResult on success, undefined when the token is not recognized
    * by this provider (enables chaining in MultiAuthProvider).
+   * Returns undefined (not null) when token is not recognized by this provider.
    */
-  validate(token: string): Promise<TokenValidationResult | null>;
+  validate(token: string): Promise<TokenValidationResult | undefined>;
 
   /**
    * Whether this provider serves OAuth endpoints (discovery, authorization, token).
@@ -236,16 +245,29 @@ export interface McpAuthProvider {
 }
 
 // TokenValidationResult — returned by validate() on success
-export interface TokenValidationResult {
-  userId: string;
-  clientId: string;
-  scopes: string[];
-  email?: string;
-  displayName?: string;
-  resource?: string;
-  userProfileId?: string;
-  raw: unknown;                                 // original token payload (JWT claims or opaque token metadata)
-}
+// Discriminated union on `source`: oauth branch requires resource + userProfileId;
+// jwt branch makes clientId optional (service tokens may omit client_id claim).
+export type TokenValidationResult =
+  | {
+      source: 'oauth';
+      userId: UserId;
+      clientId: ClientId;
+      scopes: Scope[];
+      resource: string;
+      userProfileId: UserProfileId;
+      email?: string;
+      displayName?: string;
+      raw: unknown;                             // original opaque token metadata
+    }
+  | {
+      source: 'jwt';
+      userId: UserId;
+      clientId?: ClientId;
+      scopes: Scope[];
+      email?: string;
+      displayName?: string;
+      raw: unknown;                             // original JWT payload
+    };
 ```
 
 ### McpAuthModule.forRootAsync() — pluggable auth configuration

@@ -14,6 +14,12 @@ The constructor takes three dependencies:
 3. `Cache` (from `cache-manager`) — for caching token lookups with TTL matching token expiration
 
 ## Acceptance Criteria
+
+### Branded types (owned by this module)
+- [ ] `CacheKey = z.string().min(1).brand('CacheKey')` — a composed cache key string (e.g. `access_token:{token}`); use factory functions `accessTokenCacheKey(token: BearerToken): CacheKey` and `refreshTokenCacheKey(token: BearerToken): CacheKey` to construct them, preventing raw string interpolation at call sites
+- [ ] Exported from `auth/types.ts`
+
+### Core functionality
 - [ ] `DrizzleOAuthStore` class implements all `IOAuthStore` methods (15 required + 3 optional)
 - [ ] Constructor signature: `new DrizzleOAuthStore(drizzle, encryptionService, cacheManager)`
 - [ ] Built-in Drizzle schema definitions exported for consumers to include in their migrations: `oauthClients`, `authorizationCodes`, `oauthSessions`, `tokens`, `userProfiles`
@@ -27,6 +33,10 @@ The constructor takes three dependencies:
 - [ ] `generateClientId()` generates typeid-prefixed client IDs (e.g., `typeid(normalizedClientName).toString()`)
 - [ ] `getAuthCode()` auto-removes expired codes and returns undefined
 - [ ] `getOAuthSession()` auto-removes expired sessions and returns undefined
+- [ ] `scope` and `resource` columns in the `oauth_access_tokens` Drizzle schema must be `.notNull()` to match `AccessTokenMetadata.scope: string` and `resource: string` (non-optional). If null values exist in existing data, the migration must backfill them before adding the constraint.
+- [ ] `type` column uses `text('type', { enum: ['ACCESS', 'REFRESH'] }).notNull()` — not plain `text()` — so Drizzle enforces the value set at the DB level.
+- [ ] `getAccessToken()` Zod-parses the DB row into `AccessTokenMetadata` before returning it. `userData: json('user_data')` column is parsed with `TokenUserDataSchema.nullable()` and coerced to `undefined` if null.
+- [ ] Cache reads (`cacheManager.get()`) return `unknown` — result is Zod-parsed with `AccessTokenMetadataSchema` before use, not cast with `as`.
 - [ ] Exported from `@unique-ag/nestjs-mcp/auth`
 - [ ] When `cacheTtlMs` is set to `0`, caching is disabled entirely — every `findToken()` call hits the database
 
@@ -229,16 +239,16 @@ import { pgTable, text, timestamp, json } from 'drizzle-orm/pg-core';
 export const oauthAccessTokens = pgTable('oauth_access_tokens', {
   id: text('id').primaryKey(),
   token: text('token').notNull().unique(),
-  type: text('type').notNull(),                          // 'ACCESS' | 'REFRESH'
+  type: text('type', { enum: ['ACCESS', 'REFRESH'] }).notNull(),  // DB-level enum enforcement
   userId: text('user_id').notNull(),
   clientId: text('client_id').notNull(),
-  scope: text('scope'),
-  resource: text('resource'),
+  scope: text('scope').notNull(),                        // non-optional, matches AccessTokenMetadata
+  resource: text('resource').notNull(),                 // non-optional, matches AccessTokenMetadata
   userProfileId: text('user_profile_id').notNull(),
   familyId: text('family_id'),
   generation: integer('generation'),
   usedAt: timestamp('used_at'),
-  userData: json('user_data'),                           // TokenUserData (denormalized)
+  userData: json('user_data'),                           // TokenUserData (denormalized, nullable in DB, coerced to undefined)
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });

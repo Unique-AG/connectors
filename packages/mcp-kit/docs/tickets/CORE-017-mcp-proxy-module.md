@@ -50,6 +50,15 @@ Proxied components are "read-through" — they reflect the remote server's state
 - [ ] `NpxStdioTransport`: `{ upstream: { npxPackage: 'package-name', args?: string[], env?: Record<string, string> } }` — spawns `npx -y package-name` as stdio subprocess
 - [ ] `UvxStdioTransport`: `{ upstream: { uvxTool: 'tool-name', args?: string[], env?: Record<string, string> } }` — spawns `uvx tool-name` as stdio subprocess
 - [ ] `env` option on any subprocess transport passes environment variables to the spawned process
+- [ ] Upstream server configuration uses a discriminated union `McpUpstreamConfig` to prevent invalid combinations:
+  ```typescript
+  type McpUpstreamConfig =
+    | { kind: 'http';  url: string; headers?: Record<string, string>; timeout?: number }
+    | { kind: 'stdio'; command: string; args?: string[]; env?: Record<string, string> }
+    | { kind: 'npx';   package: string; args?: string[]; version?: string }
+    | { kind: 'uvx';   tool: string; args?: string[] };
+  ```
+  A single interface with all fields optional is not permitted — `kind` is required and narrows the type.
 
 ### Session mode
 - [ ] `sessionMode: 'isolated'` (default) — each incoming request creates a fresh upstream client connection; prevents context mixing between concurrent downstream clients
@@ -235,15 +244,11 @@ FastMCP (Python) supports:
 - **Session mode**: `sessionMode: 'isolated'` (default) creates a fresh upstream client connection per incoming request, preventing context mixing between concurrent downstream clients. `sessionMode: 'shared'` reuses a single upstream client across all requests for lower latency but potential context mixing. In `shared` mode, the upstream client is established once on first use and reused until module destruction.
 - **Config interface**:
   ```typescript
-  interface McpUpstreamConfig {
-    name?: string;
-    url?: string;
-    command?: string;
-    args?: string[];
-    npxPackage?: string;    // npm package name for NpxStdioTransport (spawns `npx -y <package>`)
-    uvxTool?: string;       // Python tool name for UvxStdioTransport (spawns `uvx <tool>`)
-    env?: Record<string, string>; // environment variables for subprocess transports
-  }
+  type McpUpstreamConfig =
+    | { kind: 'http';  url: string; headers?: Record<string, string>; timeout?: number }
+    | { kind: 'stdio'; command: string; args?: string[]; env?: Record<string, string> }
+    | { kind: 'npx';   package: string; args?: string[]; version?: string }
+    | { kind: 'uvx';   tool: string; args?: string[] };
 
   interface McpProxyModuleOptions {
     name?: string;

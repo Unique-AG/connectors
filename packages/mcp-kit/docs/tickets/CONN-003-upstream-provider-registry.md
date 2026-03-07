@@ -22,7 +22,7 @@ The callback controller is a standard NestJS `@Controller()` — not raw Express
 ### UpstreamProviderRegistry service
 - [ ] `UpstreamProviderRegistry` is a `@Injectable()` singleton
 - [ ] `register(config: UpstreamProviderConfig): void` — registers a provider; called during module init
-- [ ] `get(providerId: string): UpstreamProviderConfig | null`
+- [ ] `get(providerId: string): UpstreamProviderConfig | undefined`
 - [ ] `list(): UpstreamProviderConfig[]` — returns all registered providers
 - [ ] Duplicate `providerId` registration at startup throws: `"Provider already registered: {providerId}"`
 - [ ] Exported from `McpConnectionModule`
@@ -81,10 +81,10 @@ Feature: Upstream Provider Registry & OAuth Callback
       When a second registration for "microsoft-graph" is attempted at startup
       Then an error is thrown: "Provider already registered: microsoft-graph"
 
-    Scenario: Unknown provider ID returns null
+    Scenario: Unknown provider ID returns undefined
       Given no provider "acme" is registered
       When UpstreamProviderRegistry.get("acme") is called
-      Then null is returned
+      Then undefined is returned
 
   Rule: Authorization URLs include state and optional PKCE
 

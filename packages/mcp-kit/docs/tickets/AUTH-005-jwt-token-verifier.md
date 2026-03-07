@@ -11,8 +11,15 @@ This mode is ideal for MCP servers deployed behind an existing identity platform
 `JwtTokenVerifier` builds a `TokenValidationResult` (and ultimately `McpIdentity` via CORE-006) from standard JWT claims, enabling tools to access `ctx.identity.userId`, `ctx.identity.scopes`, etc. without any OAuth state.
 
 ## Acceptance Criteria
+
+### Branded types (owned by this module)
+- [ ] `JwksUri = z.string().url().brand('JwksUri')` — a JWKS endpoint URL; `.url()` validates it is a well-formed URL at parse time
+- [ ] `IssuerUrl = z.string().url().brand('IssuerUrl')` — an OAuth issuer URL
+- [ ] Exported from `auth/types.ts`
+
+### Core functionality
 - [ ] `JwtTokenVerifier` class exported from `@unique-ag/nestjs-mcp/auth`
-- [ ] Implements `McpAuthProvider` interface: `validate(token: string): Promise<TokenValidationResult | null>`
+- [ ] Implements `McpAuthProvider` interface: `validate(token: string): Promise<TokenValidationResult | undefined>`
 - [ ] Constructor accepts: `{ jwksUri: string, issuer: string, audience: string | string[], algorithms?: string[] }`
 - [ ] `servesOAuthRoutes` property returns `false` — no OAuth controllers needed
 - [ ] Uses `jose` library for JWKS key fetching and JWT verification (NOT `jsonwebtoken` — it lacks JWKS support)
@@ -21,14 +28,19 @@ This mode is ideal for MCP servers deployed behind an existing identity platform
 - [ ] JWT claims mapped to `TokenValidationResult`:
   - `sub` claim → `userId`
   - `client_id` claim → `clientId`
-  - `scope` claim (space-separated string) → `scopes[]`
+  - `scope` claim (space-separated string or string array) → `scopes[]`
   - `email` claim → `email`
   - `name` claim → `displayName`
   - Full payload → `raw`
-- [ ] Returns `null` (not throw) when token is invalid, expired, wrong issuer, or wrong audience — caller (guard or MultiAuthProvider) decides the response
+- [ ] Returns `undefined` (not throw) when token is invalid, expired, wrong issuer, or wrong audience — caller (guard or MultiAuthProvider) decides the response
 - [ ] No `IOAuthStore` interaction — purely stateless validation
 - [ ] No session termination on revocation — stateless JWT has no revocation mechanism
 - [ ] `McpAuthModule.forRootAsync({ useFactory: () => ({ auth: new JwtTokenVerifier({ jwksUri, issuer, audience }) }) })` works without providing `oauthStore` or `encryptionService`
+- [ ] `mapClaims()` must NOT use non-null assertion on `payload.sub`. If `sub` is absent, return `undefined` (validation failure). Use `z.string().min(1).safeParse(payload.sub)` or explicit `if (!payload.sub) return undefined`.
+- [ ] `scope` claim is normalised to `string[]` regardless of whether the IdP sends it as a space-separated string or as a string array: `Array.isArray(scope) ? scope : scope.split(' ').filter(Boolean)`
+- [ ] `JwtClaimsSchema` Zod schema validates the JWT payload before field access: `{ sub: z.string(), client_id: z.string().optional(), scope: z.union([z.string(), z.array(z.string())]).optional(), email: z.string().email().optional(), name: z.string().optional() }`. Validation failure returns `undefined` from `validate()`.
+- [ ] `JwtTokenVerifier` exposes `protected updateJwksUri(uri: JwksUri): void` which updates `this.jwks = createRemoteJWKSet(new URL(uri))`. The `jwks` property is `protected` (not `private`) to allow subclass override. This is required by `RemoteAuthProvider` (AUTH-009).
+- [ ] `JwtTokenVerifierOptionsSchema` validates at construction: `jwksUri` is a valid HTTPS URL, `issuer` is non-empty, `audience` is non-empty.
 
 ## BDD Scenarios
 
@@ -114,7 +126,8 @@ import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 export class JwtTokenVerifier implements McpAuthProvider {
   readonly servesOAuthRoutes = false;
 
-  private jwks: ReturnType<typeof createRemoteJWKSet>;
+  // protected (not private) so RemoteAuthProvider (AUTH-009) can call updateJwksUri()
+  protected jwks: ReturnType<typeof createRemoteJWKSet>;
 
   constructor(private readonly options: JwtTokenVerifierOptions) {
     // createRemoteJWKSet handles JWKS fetching, caching, and kid-based re-fetch
@@ -123,8 +136,8 @@ export class JwtTokenVerifier implements McpAuthProvider {
     });
   }
 
-  async validate(token: string): Promise<TokenValidationResult | null> {
-    if (!token) return null;
+  async validate(token: string): Promise<TokenValidationResult | undefined> {
+    if (!token) return undefined;
     try {
       const { payload } = await jwtVerify(token, this.jwks, {
         issuer: this.options.issuer,
@@ -133,22 +146,54 @@ export class JwtTokenVerifier implements McpAuthProvider {
       });
       return this.mapClaims(payload);
     } catch {
-      return null; // expired, wrong issuer/audience, bad signature, malformed
+      return undefined; // expired, wrong issuer/audience, bad signature, malformed
     }
   }
 
-  private mapClaims(payload: JWTPayload): TokenValidationResult {
-    const scope = (payload.scope as string) ?? '';
+  /**
+   * Update the JWKS source. Called by RemoteAuthProvider after discovery refresh.
+   * Must be protected (not private) to allow subclass access.
+   */
+  protected updateJwksUri(uri: JwksUri): void {
+    this.jwks = createRemoteJWKSet(new URL(uri));
+  }
+
+  private mapClaims(payload: JWTPayload): TokenValidationResult | undefined {
+    // P0: sub is optional per RFC 7519 — never use non-null assertion
+    const subResult = z.string().min(1).safeParse(payload.sub);
+    if (!subResult.success) return undefined;
+
+    // Validate full payload with JwtClaimsSchema before field access
+    const claimsResult = JwtClaimsSchema.safeParse(payload);
+    if (!claimsResult.success) return undefined;
+    const claims = claimsResult.data;
+
+    // Normalise scope to string[] regardless of IdP format (string or array)
+    const rawScope = claims.scope;
+    const scopes: Scope[] = rawScope
+      ? (Array.isArray(rawScope) ? rawScope : rawScope.split(' ').filter(Boolean)).map(s => s as Scope)
+      : [];
+
     return {
-      userId: payload.sub!,
-      clientId: (payload.client_id as string) ?? undefined,
-      scopes: scope ? scope.split(' ') : [],
-      email: (payload.email as string) ?? undefined,
-      displayName: (payload.name as string) ?? undefined,
+      source: 'jwt',
+      userId: subResult.data as UserId,
+      clientId: claims.client_id as ClientId | undefined,
+      scopes,
+      email: claims.email,
+      displayName: claims.name,
       raw: payload,
     };
   }
 }
+
+// JwtClaimsSchema — validates raw JWT payload from jose before field access
+const JwtClaimsSchema = z.object({
+  sub: z.string().min(1),
+  client_id: z.string().optional(),
+  scope: z.union([z.string(), z.array(z.string())]).optional(),
+  email: z.string().email().optional(),
+  name: z.string().optional(),
+});
 ```
 
 ### Configuration interface

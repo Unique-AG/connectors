@@ -14,15 +14,17 @@ For multi-identity upstream scenarios: `ctx.identity.profileId` identifies which
 
 ## Acceptance Criteria
 - [ ] `MultiAuthProvider` class exported from `@unique-ag/nestjs-mcp/auth`
-- [ ] Implements `McpAuthProvider` interface: `validate(token: string): Promise<TokenValidationResult | null>`
-- [ ] Constructor accepts: `{ server: McpAuthProvider, verifiers: McpAuthProvider[] }`
-- [ ] `servesOAuthRoutes` returns `true` (delegates to `server.servesOAuthRoutes`)
-- [ ] `validate(token)` flow: tries `server.validate(token)` first, then each verifier in order — first non-null result wins
-- [ ] If ALL providers return null → `validate()` returns null (caller returns 401)
+- [ ] Implements `McpAuthProvider` interface: `validate(token: string): Promise<TokenValidationResult | undefined>`
+- [ ] Constructor accepts: `{ server: McpAuthProvider & { readonly servesOAuthRoutes: true }, verifiers: [McpAuthProvider, ...McpAuthProvider[]] }`
+- [ ] `servesOAuthRoutes` delegates to `this.options.server.servesOAuthRoutes` (NOT hardcoded `true`). Construction throws if `options.server.servesOAuthRoutes === false`.
+- [ ] `validate(token)` flow: tries `server.validate(token)` first, then each verifier in order — first non-undefined result wins
+- [ ] If ALL providers return `undefined` → `validate()` returns `undefined` (caller returns 401)
 - [ ] `server` handles OAuth routes (authorization, token, discovery, client registration) — verifiers do not
-- [ ] Each provider builds its own `TokenValidationResult` — `MultiAuthProvider` passes through whichever result is non-null
+- [ ] Each provider builds its own `TokenValidationResult` — `MultiAuthProvider` passes through whichever result is non-undefined
 - [ ] Order matters: `server` is always tried first, then verifiers in array order
 - [ ] `McpAuthModule.forRootAsync({ useFactory: () => ({ auth: new MultiAuthProvider({ server, verifiers }) }) })` registers OAuth controllers from the `server` provider
+- [ ] `MultiAuthProviderOptions.server` is typed as `McpAuthProvider & { readonly servesOAuthRoutes: true }` to prevent passing a `JwtTokenVerifier` as the server at compile time.
+- [ ] `verifiers` is typed as `[McpAuthProvider, ...McpAuthProvider[]]` (non-empty tuple). An empty array is rejected at construction.
 
 ## BDD Scenarios
 
@@ -100,17 +102,29 @@ Feature: Multi-auth composition of OAuth server with JWT verifiers
 ### Implementation
 ```typescript
 export class MultiAuthProvider implements McpAuthProvider {
-  readonly servesOAuthRoutes = true;
+  // Delegates to server — NOT hardcoded true
+  get servesOAuthRoutes(): true {
+    return this.options.server.servesOAuthRoutes;
+  }
 
-  constructor(private readonly options: MultiAuthProviderOptions) {}
+  constructor(private readonly options: MultiAuthProviderOptions) {
+    // Guard: server must actually serve OAuth routes (prevents passing JwtTokenVerifier as server)
+    if (!options.server.servesOAuthRoutes) {
+      throw new Error('MultiAuthProvider: server must have servesOAuthRoutes === true');
+    }
+    // Guard: verifiers must be non-empty
+    if (options.verifiers.length === 0) {
+      throw new Error('MultiAuthProvider: verifiers must contain at least one provider');
+    }
+  }
 
-  async validate(token: string): Promise<TokenValidationResult | null> {
+  async validate(token: string): Promise<TokenValidationResult | undefined> {
     // Try server first
     try {
       const result = await this.options.server.validate(token);
       if (result) return result;
     } catch {
-      // Server error → treat as null, continue to verifiers
+      // Server error → treat as undefined, continue to verifiers
     }
 
     // Try each verifier in order
@@ -119,19 +133,19 @@ export class MultiAuthProvider implements McpAuthProvider {
         const result = await verifier.validate(token);
         if (result) return result;
       } catch {
-        // Verifier error → treat as null, continue to next
+        // Verifier error → treat as undefined, continue to next
       }
     }
 
-    return null; // All providers returned null
+    return undefined; // All providers returned undefined
   }
 }
 
 export interface MultiAuthProviderOptions {
-  /** Primary auth provider that serves OAuth routes */
-  server: McpAuthProvider;
-  /** Additional token verifiers tried in order after server */
-  verifiers: McpAuthProvider[];
+  /** Primary auth provider that serves OAuth routes — must have servesOAuthRoutes: true */
+  server: McpAuthProvider & { readonly servesOAuthRoutes: true };
+  /** Additional token verifiers tried in order after server (non-empty tuple) */
+  verifiers: [McpAuthProvider, ...McpAuthProvider[]];
 }
 ```
 

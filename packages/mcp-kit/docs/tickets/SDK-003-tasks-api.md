@@ -25,6 +25,10 @@ The SDK provides `registerTool({ taskSupport: 'optional' | 'required' })`, `Tool
 - [ ] Task TTL is configurable (`McpModule.forRoot({ taskTtlMs: 3600000 })`)
 - [ ] Tasks are cleaned up after TTL expiration
 
+### Branded types (owned by this module)
+- [ ] `TaskId = z.string().uuid().brand('TaskId')` — unique identifier for a long-running task; `.uuid()` enforces UUID format
+- [ ] Exported from `sdk/types.ts` and re-exported from `src/types/index.ts`
+
 ## BDD Scenarios
 
 ```gherkin

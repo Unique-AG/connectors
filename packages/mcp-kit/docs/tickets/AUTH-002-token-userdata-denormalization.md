@@ -9,6 +9,12 @@ Without denormalization, building `McpIdentity` at request time would require tw
 The `AccessTokenMetadata` interface (defined in AUTH-001) has a `userData` field. This ticket types it strictly, populates it during `generateTokenPair()`, and ensures `McpIdentityResolver` (CORE-006) reads from it.
 
 ## Acceptance Criteria
+
+### Branded types (owned by this module)
+- [ ] `UserProfileId = z.string().min(1).brand('UserProfileId')` — DB primary key for user profile records; prevents passing a `UserId` in a `UserProfileId` slot
+- [ ] Exported from `auth/types.ts`
+
+### Core functionality
 - [ ] `TokenUserData` interface defined: `{ email?: string; displayName?: string }`
 - [ ] `AccessTokenMetadata.userData` typed as `TokenUserData` (not `unknown`)
 - [ ] `TokenValidationResult.userData` typed as `TokenUserData` (not `unknown`)

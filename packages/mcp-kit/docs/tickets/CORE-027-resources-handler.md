@@ -33,6 +33,13 @@ Resources in the unified `@Resource()` decorator model can be either static (fix
 - [ ] Unknown resource URI returns `McpError(MethodNotFound)` mentioning the URI
 - [ ] Injects `McpContext` at the `@Ctx()` parameter position
 - [ ] Subscribe/unsubscribe routing: delegates `SubscribeRequestSchema` and `UnsubscribeRequestSchema` to the resource subscription system (SDK-004)
+- [ ] The resource registry entry uses a discriminated union to distinguish static URIs from URI templates:
+  ```typescript
+  type ResourceRegistryEntry =
+    | { kind: 'static';   uri: ResourceUri; handler: StaticResourceHandler; metadata: ResourceMetadata }
+    | { kind: 'template'; pattern: UriTemplate; handler: TemplateResourceHandler; metadata: ResourceMetadata };
+  ```
+  The registry never stores both `uri` and `pattern` as optional on the same type.
 
 ## BDD Scenarios
 
