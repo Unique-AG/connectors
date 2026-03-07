@@ -272,4 +272,5 @@ export class McpContext {
 - `listPrompts()` delegates to `McpHandlerRegistry.getPrompts()` filtered by session-level visibility overrides (SDK-007). Returns `PromptRef[]` with name, description, arguments
 - `getPrompt()` delegates to the registered prompt handler via registry lookup — throws `McpError(InvalidParams)` if prompt name not found
 - **FastMCP parity:** `sessionId`, `requestId`, `clientId`, `transport`, `listResources()`, `listPrompts()`, `getPrompt()` map directly to FastMCP Context properties and methods. `get_state`/`set_state` are handled separately in SDK-006
+- **Session visibility note**: Session visibility methods (`ctx.enableComponents()`, `ctx.disableComponents()`) are defined in SDK-007. In this ticket, stub the interface with `// defined in SDK-007` comments. Do not implement the visibility logic here
 - File location: `packages/nestjs-mcp/src/context/mcp-context.ts`

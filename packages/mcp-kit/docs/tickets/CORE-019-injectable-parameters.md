@@ -19,6 +19,7 @@ Currently, the `McpRegistryService` receives the class instance via NestJS DI, b
 - [ ] The `listTools` response shows the correct `inputSchema` without injected parameter fields
 - [ ] Works with both `z.ZodObject` and `Record<string, z.ZodType>` shorthand parameter definitions
 - [ ] A `@McpExclude()` escape-hatch decorator is provided for marking arbitrary parameters as server-side-only
+- [ ] `@McpExclude()` marks a parameter as framework-managed (already injected by the pipeline, e.g., via `@Ctx()`). The parameter factory skips DI resolution for excluded parameters. This is needed because `@Ctx()` parameters are already handled by the `@Ctx()` decorator — without `@McpExclude()`, the factory would try to resolve `McpContext` from DI unnecessarily
 
 ## BDD Scenarios
 
@@ -113,4 +114,14 @@ interface ExcludedParamEntry {
   4. Fill remaining positions with validated MCP input values
 - **Schema generation**: When converting the Zod schema to JSON Schema for `inputSchema`, filter out keys corresponding to excluded parameter indexes. If using positional mapping (param index to schema key), maintain a mapping from parameter name to index
 - **Edge case**: If all non-`@Ctx()` params are DI-injected, the tool's `inputSchema` should be `{ type: 'object', properties: {} }` (empty object, no required fields)
+- **NestJS metadata detection**: Use `Reflect.getMetadata(PARAMTYPES_METADATA, target, propertyKey)` (where `PARAMTYPES_METADATA = 'design:paramtypes'`) to get the parameter type array. Filter out parameters that have `@Ctx()` metadata or `@McpExclude()` metadata. Remaining parameters are resolved via `moduleRef.resolve()` or `moduleRef.get()` based on their type token
+- **Positional mapping example**:
+  ```typescript
+  @Tool({ name: 'search', description: 'Search' })
+  async search(
+    query: string,          // position 0: no DI metadata → resolved from MCP args by matching the TypeScript parameter name "query"
+    @Ctx() ctx: McpContext, // position 1: @Ctx() metadata → injects McpContext (excluded from inputSchema)
+    @Inject(MY_SERVICE) svc: MyService, // position 2: @Inject() metadata → resolves MY_SERVICE from DI (excluded from inputSchema)
+  ): Promise<string> { ... }
+  ```
 - File location: `packages/nestjs-mcp/src/decorators/mcp-exclude.decorator.ts` for the `@McpExclude()` decorator; detection logic in `packages/nestjs-mcp/src/registry/param-scanner.ts`

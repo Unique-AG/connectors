@@ -24,6 +24,9 @@ This flow integrates naturally with the existing pipeline runner (CORE-010): `Up
 - [ ] If elicitation completes successfully: retries the original tool call **once** (not indefinitely)
 - [ ] If the retry throws `UpstreamConnectionRequiredError` again: returns an MCP error result with code `connection_failed` — does NOT loop
 - [ ] If elicitation is declined/cancelled by the user: returns an MCP error result with code `connection_declined`
+- [ ] `reconnectionTimeoutMs` is configurable in `McpModule.forRoot()` (default: 300_000 = 5 minutes). If the user does not complete the OAuth flow within this window, `elicitInput` resolves with `action: 'timeout'` and the tool returns `{ isError: true, content: [{ type: 'text', text: 'Connection to {displayName} timed out. Please try again.' }] }`
+- [ ] `McpReconnectionPipeline` is opt-in. To enable it: `McpModule.forRoot({ pipeline: [McpReconnectionPipeline, ...otherComponents] })`. When not registered, `UpstreamConnectionRequiredError` propagates to `McpExceptionFilter` which returns a plain error response with the provider details
+- [ ] If the one-time retry still throws `UpstreamConnectionRequiredError` (e.g., user granted insufficient scopes during reconnection), the pipeline returns `{ isError: true, content: [{ type: 'text', text: 'Connection to {displayName} was re-established but lacks required permissions ({scopes}). Please reconnect and grant all requested permissions.', authorizationUrl: '...' }] }`. The `authorizationUrl` points to a fresh OAuth flow
 - [ ] Registered as an opt-in pipeline component: `McpModule.forRoot({ pipeline: [McpReconnectionPipeline, ...] })`
 
 ### Elicitation trigger
@@ -149,6 +152,7 @@ FastMCP (Python) does not implement mid-session reconnection via elicitation. Th
 - **Blocks:** none
 
 ## Technical Notes
+- **Cross-reference CONN-002**: For virtual server deployments using `requiredConnections` (CONN-002), `McpReconnectionPipeline` serves as the recovery mechanism when a previously-required connection expires or is revoked. Both layers use the same `McpConnectionStore` and `UpstreamProviderRegistry`.
 - `McpReconnectionPipeline` is intentionally opt-in, not default. Elicitation requires client support, and not all deployments will want auto-reconnect behavior. For purely pre-auth virtual server scenarios (CONN-002 only), skip this pipeline component entirely.
 - The `elicitationId` encodes as part of the OAuth `state` JWT (CONN-003) so the callback knows which elicitation to complete. This is why the elicitation ID must be generated before building the authorization URL.
 - Retry is "once only" to prevent thrashing. If the problem persists after one reconnection (e.g., user granted wrong scopes), the error is surfaced immediately rather than looping.

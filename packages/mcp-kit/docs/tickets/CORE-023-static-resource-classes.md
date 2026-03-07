@@ -28,6 +28,7 @@ In NestJS, these are provided as classes implementing a common `McpStaticResourc
 - [ ] All registered static resources appear in `listResources` responses with correct `uri`, `name`, `description`, and `mimeType`
 - [ ] All static resource classes exported from `@unique-ag/nestjs-mcp`
 - [ ] Aliased exports for FastMCP naming: `TextResource`, `BinaryResource`, `FileResource`, `HttpResource`, `DirectoryResource`
+- [ ] When a `FileResource` or `HttpResource` read fails (file not found, HTTP error, permission denied), the handler throws `ResourceError` with an appropriate message. It does NOT return an empty response or silently swallow the error. The error is caught by `McpExceptionFilter` and returned as an MCP error response
 
 ## BDD Scenarios
 

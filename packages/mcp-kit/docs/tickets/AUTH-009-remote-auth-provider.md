@@ -34,6 +34,7 @@ In NestJS, both implement `McpAuthProvider` from AUTH-001 and extend `JwtTokenVe
 - [ ] Discovery document cached with configurable TTL (default 1 hour)
 - [ ] Cache refreshed on key rotation errors (unknown kid in JWT)
 - [ ] If discovery document unavailable at startup, logs warning (not error) and retries on first request
+- [ ] `RemoteAuthProvider` implements `OnModuleInit`. Token discovery (fetching `/.well-known/openid-configuration` or `/.well-known/oauth-authorization-server`) runs in `onModuleInit()`, not in the constructor. If discovery fails, `onModuleInit()` throws and the application fails to start.
 
 ### AuthKitProvider
 - [ ] `AuthKitProvider` class exported from `@unique-ag/nestjs-mcp/auth`
@@ -249,6 +250,12 @@ interface OidcDiscoveryDocument {
 |---|---|
 | `RemoteAuthProvider(issuer_url=..., audience=...)` | `new RemoteAuthProvider({ issuerUrl, audience })` |
 | `AuthKitProvider(authkit_domain=..., client_id=...)` | `new AuthKitProvider({ authkitDomain, clientId })` |
+
+### Discovery retry
+Discovery retry: on `onModuleInit()` failure, retry up to 3 times with exponential backoff (1s, 2s, 4s). After 3 failures, throw with message: `RemoteAuthProvider: Failed to discover auth configuration from {discoveryUrl} after 3 attempts`.
+
+### JWKS cache update
+JWKS cache update: when `verifyAccessToken()` receives a JWT with an unknown `kid` (key ID not in cached JWKS), the provider re-fetches the JWKS endpoint once and retries verification. If the key is still missing, verification fails. This handles key rotation without requiring a server restart.
 
 ### Async initialization
 - If `RemoteAuthProvider` is managed as an injectable NestJS provider, async initialization should use `OnModuleInit` so NestJS awaits it during bootstrap. When used as a plain value object (instantiated by consumer and passed to `forRootAsync()`), the constructor fire-and-forget pattern is acceptable — document both usage patterns.

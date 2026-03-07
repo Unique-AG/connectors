@@ -13,7 +13,7 @@ The MCP protocol distinguishes between static resources (listed in `resources/li
 - [ ] `@ResourceTemplate()` is NOT exported (deleted from API surface)
 - [ ] Static URI (no `{...}`) registers as a static resource
 - [ ] URI with `{param}` patterns registers as a resource template
-- [ ] `name` defaults to the method name (camelCase preserved, as MCP resource names are freeform)
+- [ ] `name` defaults to the method name (camelCase preserved, as MCP resource names are freeform). This applies to both static resources and resource templates
 - [ ] `description` is optional
 - [ ] `mimeType` is optional
 - [ ] Metadata includes a `kind` discriminator: `'static' | 'template'`
@@ -170,5 +170,6 @@ export interface ResourceMetadata {
 - **FastMCP parity:** FastMCP supports wildcard `{path*}` and query `{?param}` via full RFC 6570. Our implementation must match this capability for resource URI flexibility
 - Metadata storage: `Reflect.defineMetadata(MCP_RESOURCE_METADATA, resolvedMetadata, descriptor.value)`
 - Use a single `MCP_RESOURCE_METADATA` symbol (replaces both `MCP_RESOURCE_METADATA_KEY` and `MCP_RESOURCE_TEMPLATE_METADATA_KEY` from the old code)
+- **URI uniqueness**: Two resources cannot share the same `uri`. The `onDuplicate` setting from CORE-012 applies to resource URIs (not names) since URIs are the primary lookup key for resources
 - File location: `packages/nestjs-mcp/src/decorators/resource.decorator.ts`
 - The registry (CORE-005) will use the `kind` discriminator to register with the correct SDK method

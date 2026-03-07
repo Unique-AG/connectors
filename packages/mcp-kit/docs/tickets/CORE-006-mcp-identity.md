@@ -113,3 +113,4 @@ export function getMcpIdentity(context: ExecutionContext): McpIdentity | null;
   - `packages/nestjs-mcp/src/services/mcp-identity-resolver.service.ts` (resolver)
   - `packages/nestjs-mcp/src/helpers/get-mcp-identity.ts` (helper function)
 - The `scope` field in `TokenValidationResult` is a space-separated string per OAuth spec; split on space to produce `scopes: string[]`
+- **Stub interface note**: Implementation may proceed with a stub `McpIdentity` interface (`userId`, `clientId`, `scopes`, `email?`, `displayName?`). The exact token shape is confirmed in AUTH-002. If AUTH-002 fields differ, update the interface accordingly

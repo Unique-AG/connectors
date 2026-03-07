@@ -59,26 +59,22 @@ Proxied components are "read-through" — they reflect the remote server's state
 - [ ] Each incoming MCP request spawns a fresh upstream client call (no shared backend session state between different downstream clients)
 - [ ] Upstream client connections are pooled per upstream server (not per downstream session) for efficiency
 
-### Feature forwarding
-- [ ] Upstream progress notifications are forwarded to the downstream client session
-- [ ] Upstream logging messages are forwarded to the downstream client
-- [ ] Roots, sampling, and elicitation requests from upstream are forwarded to the downstream client (if supported)
-
 ### Authentication
 - [ ] Optional `forwardAuth: true` config forwards the caller's bearer token to the upstream server
 - [ ] Optional `upstreamAuth: { token: '...' }` provides a static token for upstream authentication
 - [ ] Optional `upstreamAuth: { tokenFactory: () => Promise<string> }` provides dynamic token resolution
+
+### Subprocess timeout
+- [ ] If a subprocess tool call does not return within `subprocessTimeoutMs` (default: 30000ms, configurable), the proxy throws `McpError(RequestTimeout)`. The subprocess is NOT killed on timeout — it continues running and may complete later
 
 ### Error handling
 - [ ] Upstream server unavailable → tool call returns `{ isError: true, content: [{ type: 'text', text: 'Upstream server unavailable: ...' }] }`
 - [ ] Upstream timeout → tool call returns `{ isError: true }` with descriptive timeout message
 - [ ] Individual upstream failure in multi-server mode does not prevent other upstreams from functioning
 
-### Integration with McpModule
-- [ ] `McpProxyModule` integrates with `McpModule` via `McpModule.forRoot({ imports: [McpProxyModule.forRoot(...)] })`
-- [ ] Can also be used standalone without `McpModule` for pure proxy scenarios
-- [ ] Global guards/interceptors from `McpModule.forRoot()` apply to proxied components
-- [ ] Proxied components appear in `listTools`/`listResources`/`listPrompts` alongside local components
+### Multi-server partial failure
+- [ ] If one upstream in a multi-server config is unavailable at list time, its tools/resources/prompts are omitted from the response with a warning log. The server does NOT fail entirely
+- [ ] At call time, if the specific upstream is unavailable, the call returns an error result
 
 ## BDD Scenarios
 
@@ -159,12 +155,29 @@ Feature: MCP Proxy Module
       And the resource appears as "data://ext/items"
       And the prompt appears as "ext-summarize"
 
-  Rule: Feature forwarding
+  Rule: Multi-server partial failure
 
-    Scenario: Upstream progress notifications are forwarded to the downstream client
-      Given a proxied tool that emits progress notifications during execution
+    Scenario: Unavailable upstream is omitted from list responses
+      Given a proxy configured with upstream servers "weather" and "calendar"
+      And the weather server is unavailable
+      When a client requests the tool list
+      Then tools from "calendar" still appear
+      And a warning is logged about the weather server being unavailable
+
+    Scenario: Call to unavailable upstream returns an error
+      Given a proxy configured with upstream servers "weather" and "calendar"
+      And the weather server is unavailable
+      When a client calls "weather_get_forecast"
+      Then the client receives an error response indicating the upstream is unavailable
+
+  Rule: Subprocess timeout
+
+    Scenario: Subprocess tool call that exceeds timeout returns an error
+      Given a proxy configured with a subprocess upstream and a timeout of 5000ms
+      And the subprocess tool takes longer than 5000ms to respond
       When a client calls the proxied tool
-      Then progress notifications from the upstream are delivered to the client in real time
+      Then the client receives a timeout error
+      And the subprocess continues running
 
   Rule: Authentication forwarding
 
@@ -197,8 +210,8 @@ FastMCP (Python) supports:
 - **Depends on:** CORE-001 (@Tool registration interface) — proxy tools register using the same interface
 - **Depends on:** CORE-005 (Handler registry) — proxy tools register themselves in the central registry
 - **Depends on:** CORE-013 (McpToolsHandler/ResourcesHandler/PromptsHandler) — handlers integrate proxy tools alongside local tools
-- **Depends on:** SESS-004 (McpSessionService) — session context needed for feature forwarding
-- **Blocks:** none (standalone feature)
+- **Depends on:** SESS-004 (McpSessionService) — session context needed for proxy session management
+- **Blocks:** CORE-029 (Proxy feature forwarding), CORE-030 (Proxy McpModule integration)
 
 ## Technical Notes
 - Uses `@modelcontextprotocol/sdk` `Client` class internally — one `Client` instance per upstream server
@@ -240,5 +253,6 @@ FastMCP (Python) supports:
     upstreamAuth?: { token: string } | { tokenFactory: () => Promise<string> };
     listCacheTtlMs?: number; // default: 30_000
     sessionMode?: 'isolated' | 'shared'; // default: 'isolated'
+    subprocessTimeoutMs?: number; // default: 30_000 — timeout for subprocess tool calls
   }
   ```

@@ -20,6 +20,7 @@ SSE transport (TRANS-002) will do the same integration separately.
 - [ ] The session record's `expiresAt` is updated on each touch (computed by the store based on TTL)
 - [ ] Identity is resolved via `McpIdentityResolver` before `registerSession()` is called (identity may be null for unauthenticated servers)
 - [ ] When identity is null (unauthenticated server), `registerSession()` is still called with `identity: null`
+- [ ] `registerSession(sessionId, userId, metadata)` is called by `McpStreamableHttpController` (TRANS-001) immediately after the MCP session is established -- specifically after `transport.handleRequest()` returns a `101 Switching Protocols` or `200 OK` with streaming body, and before the first MCP message is processed. For STDIO transport, `registerSession` is called once on `McpStdioTransportService.start()`
 
 ## BDD Scenarios
 
@@ -69,6 +70,15 @@ Feature: Session registration and activity tracking
       When the client disconnects
       Then the session is removed from the active sessions list
       And the session record is removed from the store
+
+  Rule: Session is registered before first tool call
+
+    Scenario: Session is registered before first tool call is processed
+      When a client sends an initialize request to the Streamable HTTP endpoint
+      Then the transport establishes the session and returns the session ID header
+      And registerSession() is called with the session ID, transport, and identity
+      When the client subsequently sends a tool call request
+      Then the session is already present in the registry and store
 
   Rule: Multiple clients are tracked independently
 

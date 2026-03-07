@@ -48,6 +48,7 @@ The callback controller is a standard NestJS `@Controller()` — not raw Express
 - [ ] Returns an HTML success page (or redirect to configured `successRedirectUrl`) after successful exchange
 - [ ] On error (invalid code, exchange failure): returns an HTML error page or redirects to `errorRedirectUrl`
 - [ ] Controller is auto-registered when `McpConnectionModule` is imported
+- [ ] The OAuth state CSRF store is pluggable via `{ provide: MCP_OAUTH_STATE_STORE, useClass: RedisOAuthStateStore }`. `InMemoryOAuthStateStore` is the default. In multi-instance deployments, a shared store (Redis) is required to ensure callbacks can be validated on any instance.
 
 ### State parameter encoding
 - [ ] State is a signed JWT (HS256) containing: `{ userId, providerId, nonce, elicitationId?, exp }`
@@ -148,3 +149,6 @@ FastMCP handles OAuth callbacks via its built-in auth server routes. Our `McpOAu
 - The HTML success/error pages are minimal by default (plain text confirmation). `successRedirectUrl` and `errorRedirectUrl` options allow redirecting to a custom UI (e.g., connection portal's confirmation page)
 - Callback URL must be registered as an allowed redirect URI in the upstream provider's OAuth app settings — document this as a deployment requirement
 - The CSRF state store is in-memory (10-min TTL). In multi-instance deployments, state validation may fail if the callback hits a different instance. Use Redis-backed state store in production — pluggable via `{ provide: MCP_OAUTH_STATE_STORE, useClass: RedisOAuthStateStore }`
+
+### PKCE policy
+PKCE policy: PKCE (`code_challenge` + `code_verifier`) is **mandatory** for public clients (those without a `clientSecret`). It is **optional but recommended** for confidential clients (those with a `clientSecret`). The `buildAuthorizationUrl()` method automatically includes PKCE when `codeVerifier` is supplied. Callers should always supply a `codeVerifier` unless they have a specific reason not to.

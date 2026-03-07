@@ -17,6 +17,7 @@ The `McpOnly(guard)` wrapper is sugar for hybrid apps that have both HTTP contro
 - [ ] `McpOperationContext` interface has: `type`, `name`, `args`, `identity` (McpIdentity | null), `sessionId` (string | null), `extras` (Map), `httpRequest` (available in pipeline, NOT on McpContext)
 - [ ] TypeScript module augmentation adds `switchToMcp()` to `@nestjs/common`'s `ArgumentsHost` interface
 - [ ] `McpOnly(guard)` function takes a guard class, returns a new guard class that passes through for non-MCP contexts
+- [ ] `McpExecutionContextHost.createForList(handlerRef, handlerName, contextType)` — a variant factory method for constructing execution contexts for list operations (listTools, listResources, listPrompts). Unlike `create()` which wraps a full tool/resource/prompt invocation, `createForList()` creates a lightweight context suitable for guard/filter checks during list-time filtering. The `McpContext` injected during list operations does NOT have `args` or `progress` — only `identity`, `session`, and `server`.
 - [ ] All interfaces and classes exported from `@unique-ag/nestjs-mcp`
 
 ## BDD Scenarios
@@ -75,6 +76,17 @@ Feature: MCP execution context integrates with NestJS guard/interceptor infrastr
       And registered as a global guard
       When the application starts
       Then the scope guard receives its ConfigService dependency
+
+  Rule: List-time context provides identity but no args
+
+    Scenario: List-time context has identity but no args
+      Given a guard running during a listTools request by an authenticated user
+      When the guard switches to the MCP context created via createForList()
+      Then the identity is present with the session user's information
+      And the operation type matches the handler's component type
+      And the operation name matches the handler's registered name
+      And getInput() returns an empty record
+      And the McpContext does not provide args or progress
 
   Rule: Module augmentation makes switchToMcp() available on all contexts
 

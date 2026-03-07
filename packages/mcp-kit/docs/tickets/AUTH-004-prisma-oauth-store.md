@@ -268,6 +268,15 @@ export class PrismaOAuthStore implements IOAuthStore {
 ### SDK APIs used
 No `@modelcontextprotocol/sdk` APIs are directly used. This is a pure NestJS/Prisma storage implementation.
 
+### Scopes serialization
+`scopes` is stored as a JSON string in the database (Prisma `String` field with JSON serialization in the store layer). The store serializes `string[]` to `JSON.stringify(scopes)` on write and `JSON.parse(scopesJson)` on read.
+
+### Transaction isolation
+Transaction isolation: use Prisma's default isolation level (READ COMMITTED on PostgreSQL, REPEATABLE READ on MySQL). No explicit isolation level override is needed for upsert operations.
+
+### PrismaClient typing
+`PrismaClient` is accepted as `PrismaClient` (the generated class). Type it as `{ oauthAccessToken: { upsert: Function, findUnique: Function, delete: Function } }` if you need to avoid importing the generated client directly in the library.
+
 ### Key design decisions
 1. **Peer dependency**: `@prisma/client` is a peer dependency. If a consumer doesn't use Prisma, they never install it. The import is only resolved when `PrismaOAuthStore` is actually instantiated.
 2. **Schema snippet, not auto-migration**: The Prisma schema is provided as documentation/snippet. Consumers copy it into their own `schema.prisma`. The store does NOT run `prisma migrate` automatically.

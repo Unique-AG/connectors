@@ -49,6 +49,7 @@ In NestJS, both `OAuthProxyProvider` and `GitHubOAuthProvider` implement the `Mc
 - [ ] `McpAuthModule.forRootAsync({ useFactory: () => ({ auth: new OAuthProxyProvider({...}) }) })` works
 - [ ] `McpAuthModule.forRootAsync({ useFactory: () => ({ auth: new GitHubOAuthProvider({...}) }) })` works
 - [ ] OAuth proxy routes registered only when `auth.servesOAuthRoutes` is true
+- [ ] OAuth `state` parameter is validated on callback to prevent CSRF. The state is a signed JWT (same pattern as CONN-003). Validation failure returns HTTP 400.
 
 ## BDD Scenarios
 
@@ -185,6 +186,34 @@ export class GitHubOAuthProvider extends OAuthProxyProvider {
   }
 }
 ```
+
+### OAuthProxyController implementation
+`OAuthProxyController` is a standard `@Controller('mcp/oauth')` with `@Get('authorize')`, `@Post('token')`, `@Post('revoke')` routes delegating to `ProxyOAuthServerProvider`:
+
+```typescript
+@Controller('mcp/oauth')
+export class OAuthProxyController {
+  constructor(private readonly proxy: OAuthProxyProvider) {}
+
+  @Get('authorize')
+  authorize(@Query() query: AuthorizeQueryDto, @Res() res: Response) {
+    return this.proxy.handleAuthorize(query, res);
+  }
+
+  @Post('token')
+  token(@Body() body: TokenRequestDto) {
+    return this.proxy.handleTokenExchange(body);
+  }
+
+  @Post('revoke')
+  revoke(@Body() body: RevokeRequestDto) {
+    return this.proxy.handleRevoke(body);
+  }
+}
+```
+
+### GitHub user ID mapping
+GitHub user ID mapping: GitHub's `sub` claim in the OIDC token is the numeric user ID as a string (e.g., `'1234567'`). Map this to `userId` in `TokenValidationResult`. The `email` is available from the `/user` endpoint if the `user:email` scope is granted.
 
 ### OAuth proxy routes
 The provider registers these HTTP routes via a standard `OAuthProxyController` (`@Controller()`):

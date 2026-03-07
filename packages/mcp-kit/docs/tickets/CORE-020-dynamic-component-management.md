@@ -22,6 +22,9 @@ In NestJS, static registration happens at bootstrap via `McpHandlerRegistry` (CO
 - [ ] Runtime-registered tools are fully functional: Zod validation, pipeline execution (guards/interceptors/pipes), `@Ctx()` injection all work identically to boot-time tools
 - [ ] `options` parameter allows overriding name, description, schema, annotations, guards, etc. — if not provided, decorator metadata is read from the method (if present)
 - [ ] Methods without decorator metadata require `options.name` and `options.schema` at minimum; omitting them throws a descriptive error
+- [ ] List-changed notifications triggered by dynamic registration/unregistration are sent asynchronously (fire-and-forget via `McpSessionService.broadcastToolListChanged()`). The `register()`/`unregister()` methods return `Promise<void>` and resolve after the registry is updated, not after all notifications are sent
+- [ ] `options.schema` accepts a Zod schema (`z.ZodObject`) preferred, or a raw JSON Schema object. When Zod is provided, it is converted via `toJSONSchema()`. When raw JSON Schema is provided, it is used as-is
+- [ ] Calling `unregister(name)` with a name that is not registered is a no-op (no error thrown, no notification sent)
 
 ## BDD Scenarios
 

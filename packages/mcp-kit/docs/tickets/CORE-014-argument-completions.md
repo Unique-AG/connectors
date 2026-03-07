@@ -21,6 +21,8 @@ Both should be supported for flexibility.
 - [ ] Partial input filtering is handled by the completion handler (framework does not auto-filter)
 - [ ] Completions work for tools registered via both `McpModule.forRoot()` and `McpModule.forFeature()`
 - [ ] If no completion handler is registered for a parameter, the client receives an empty completions response
+- [ ] Resource template parameter completions are supported: `@Complete('paramName')` can be applied to a method in the same class as a `@Resource()` template method, linking completions to that template's parameter
+- [ ] Completion requests from the client include `{ argument: { name, value } }`. The framework routes by `name` to find the registered completion handler. The `value` is the partial input passed to the handler
 
 ## BDD Scenarios
 

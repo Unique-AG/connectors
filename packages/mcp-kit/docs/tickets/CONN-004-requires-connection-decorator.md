@@ -151,3 +151,23 @@ FastMCP does not have a per-tool connection requirement decorator. Our `@Require
 - The inline refresh in the guard is intentionally synchronous within `canActivate()`. If refresh takes >2 seconds, it may feel slow — accept this as a UX trade-off vs. failing hard. Document the latency expectation.
 - `UpstreamTokenService` is session-scoped so its per-request decrypt cache is naturally scoped to one tool call. Between calls, cache is cleared.
 - Do NOT add `@RequiresConnection` to `@Resource()` or `@Prompt()` list handlers (the list/describe handlers that respond to `listTools`, `listResources`, `listPrompts`). Connection checks only apply to execution handlers. List handlers should not trigger OAuth flows.
+
+### Inline refresh latency mitigation
+Inline refresh latency mitigation: if `refreshToken()` does not return within 2000ms, abort the refresh (using `Promise.race` with a 2s timeout) and throw `UpstreamConnectionRequiredError` to trigger the elicitation flow instead. Log a warning: `McpConnectionGuard: token refresh for {providerId} exceeded 2s threshold, falling back to elicitation`. This prevents slow token endpoints from blocking tool calls.
+
+### Multiple @RequiresConnection decorators
+Multiple `@RequiresConnection` decorators on a single method are merged by the guard using `Reflector.getAllAndMerge(MCP_REQUIRED_CONNECTION, [handler, handlerClass])`:
+
+```typescript
+@Tool({ description: 'Sync files from SharePoint to Google Drive' })
+@RequiresConnection('microsoft-graph', { scopes: ['Files.Read'] })
+@RequiresConnection('google-drive', { scopes: ['drive.file'] })
+async syncFiles(@McpParam() folderId: string): Promise<string> {
+  // Guard checks both connections before execution
+  const msToken = await this.upstream.getToken('microsoft-graph');
+  const gdToken = await this.upstream.getToken('google-drive');
+  // ...
+}
+```
+
+The guard iterates over the merged array and checks each connection sequentially. If any connection is missing, it throws `UpstreamConnectionRequiredError` for that provider immediately (short-circuit).

@@ -1,6 +1,6 @@
 # @unique-ag/nestjs-mcp — Implementation Ticket Index
 
-> **Total tickets:** 59
+> **Total tickets:** 64
 > **Design artifact:** `.claude/artifacts/mcp-nestjs-framework-final.md`
 > **Testing approach:** BDD (Given/When/Then) — all tickets include full scenario coverage
 
@@ -28,7 +28,11 @@ INFRA-001  (Monorepo package scaffold)
     │   └── CORE-006  (McpIdentity + resolver)  ← + CORE-005
     │
     └── CORE-012  (McpModule config)  ← CORE-010 + CORE-011
-        ├── CORE-013  (Handlers)  ← + CORE-007 + CORE-008
+        ├── CORE-013  (McpToolsHandler)  ← + CORE-007 + CORE-008
+        │   ├── CORE-027  (McpResourcesHandler) ← + CORE-002
+        │   │   ├── SDK-004  (Resource subscriptions) ← + SESS-004
+        │   │   └── CORE-023  (Static resource classes)
+        │   ├── CORE-028  (McpPromptsHandler) ← + CORE-003
         │   ├── SESS-001  (Session store interface)
         │   │   ├── SESS-002  (Redis session store)
         │   │   ├── SESS-003  (Drizzle session store)
@@ -37,12 +41,13 @@ INFRA-001  (Monorepo package scaffold)
         │   │       │   ├── SESS-006  (Session resumption)  ← + SESS-004
         │   │       │   │   └── TRANS-001  (Streamable HTTP)
         │   │       │   └── TRANS-002  (SSE transport)
-        │   │       ├── SDK-004  (Resource subscriptions) ← + CORE-002, CORE-013
+        │   │       ├── SDK-004  (Resource subscriptions) ← + CORE-002, CORE-027
         │   │       └── SDK-005  (List change notifications) ← + CORE-013
         │   │                                               ─► CORE-020
         │   ├── SDK-003  (Tasks API) ← + CORE-001
         │   ├── CORE-017  (Proxy module) ← + CORE-001, CORE-005, SESS-004
-        │   ├── CORE-023  (Static resource classes)
+        │   │   ├── CORE-029  (Proxy feature forwarding) ← + SESS-004, SDK-001, SDK-002
+        │   │   └── CORE-030  (Proxy McpModule integration) ← + CORE-012, CORE-013
         │   ├── CORE-024  (getMcpContext utility)
         │   ├── CORE-025  (Schema dereferencing)
         │   └── CORE-026  (Transforms)
@@ -79,7 +84,7 @@ INFRA-001  (Monorepo package scaffold)
 ```
 
 **Critical path:**
-`INFRA-001 → CORE-001..004 → CORE-005 → CORE-009 → CORE-010 → CORE-012 → CORE-013 → SESS-001 → SESS-004 → SESS-005 → SESS-006 → TRANS-001`
+`INFRA-001 → CORE-001..004 → CORE-005 → CORE-009 → CORE-010 → CORE-012 → CORE-013 → CORE-027/028 → SESS-001 → SESS-004 → SESS-005 → SESS-006 → TRANS-001`
 
 ---
 
@@ -107,7 +112,9 @@ INFRA-001  (Monorepo package scaffold)
 | CORE-007 | McpContext class |
 | CORE-011 | Built-in pipeline components |
 | CORE-012 | McpModule configuration |
-| CORE-013 | McpToolsHandler / McpResourcesHandler / McpPromptsHandler |
+| CORE-013 | McpToolsHandler |
+| CORE-027 | McpResourcesHandler |
+| CORE-028 | McpPromptsHandler |
 | CORE-021 | Custom HTTP routes alongside MCP endpoint |
 | CORE-022 | Server lifespan / startup-teardown hooks |
 | CORE-024 | getMcpContext() — context access from nested services |
@@ -161,6 +168,8 @@ INFRA-001  (Monorepo package scaffold)
 | CORE-015 | Tag-based tool filtering |
 | CORE-016 | Server composition (McpModule.forFeature) |
 | CORE-017 | McpProxyModule — MCP Client Bridge |
+| CORE-029 | Proxy feature forwarding |
+| CORE-030 | Proxy McpModule integration |
 
 ### Sprint 7 — Runtime Management
 | Ticket | Title |
@@ -202,20 +211,24 @@ INFRA-001  (Monorepo package scaffold)
 | CORE-010 | McpPipelineRunner | CORE-005, CORE-008, CORE-009 | CORE-007, CORE-011, CORE-012 |
 | CORE-011 | Built-in pipeline components | CORE-006, CORE-009, CORE-010 | CORE-012 |
 | CORE-012 | McpModule configuration | CORE-005, CORE-006, CORE-010, CORE-011 | CORE-013, CORE-020, CORE-021, CORE-022, CORE-025, CORE-026, AUTH-001, CORE-016, TEST-001, TRANS-003 |
-| CORE-013 | McpToolsHandler / ResourcesHandler / PromptsHandler | CORE-004, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-012 | SESS-001, SDK-003, SDK-004, SDK-005, CORE-017, CORE-023, CORE-024, CORE-025, CORE-026, AUTH-007 |
+| CORE-013 | McpToolsHandler | CORE-004, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-012 | CORE-027, CORE-028, SESS-001, SDK-003, SDK-005, CORE-017, CORE-024, CORE-025, CORE-026, AUTH-007 |
 | CORE-014 | Argument completions (@Complete decorator) | CORE-001, CORE-005 | — |
 | CORE-015 | Tag-based tool filtering | CORE-001, CORE-002, CORE-003, CORE-005, AUTH-001, CORE-013, SDK-005 | SDK-007 |
 | CORE-016 | Server composition (McpModule.forFeature) | CORE-001, CORE-005, CORE-012 | — |
-| CORE-017 | McpProxyModule — MCP Client Bridge | CORE-001, CORE-005, CORE-013, SESS-004 | — |
+| CORE-017 | McpProxyModule — MCP Client Bridge | CORE-001, CORE-005, CORE-013, SESS-004 | CORE-029, CORE-030 |
 | CORE-018 | Decorator metadata enhancements (icons, meta, version, title) | CORE-001, CORE-002, CORE-003, CORE-005, CORE-012 | — |
 | CORE-019 | Injectable / excluded parameters (@Inject DI exclusion) | CORE-001, CORE-005 | — |
 | CORE-020 | Dynamic component management (runtime add/remove) | CORE-005, CORE-012, SDK-005 | — |
 | CORE-021 | Custom HTTP routes alongside MCP endpoint | CORE-012 | — |
 | CORE-022 | Server lifespan / startup-teardown hooks | CORE-005, CORE-012 | — |
-| CORE-023 | Static resource classes (TextResource, FileResource, HttpResource, DirectoryResource) | CORE-002, CORE-005, CORE-013 | — |
+| CORE-023 | Static resource classes (TextResource, FileResource, HttpResource, DirectoryResource) | CORE-002, CORE-005, CORE-027 | — |
 | CORE-024 | getMcpContext() — context access from nested services | CORE-007, CORE-013 | AUTH-007 |
 | CORE-025 | Schema dereferencing (derefSchemas option) | CORE-012, CORE-013 | — |
 | CORE-026 | Transforms — server-wide component presentation modifiers | CORE-012, CORE-013 | — |
+| CORE-027 | McpResourcesHandler | CORE-002, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-012, CORE-013 | SDK-004, CORE-023 |
+| CORE-028 | McpPromptsHandler | CORE-003, CORE-005, CORE-007, CORE-008, CORE-009, CORE-010, CORE-012, CORE-013 | — |
+| CORE-029 | Proxy feature forwarding | CORE-017, SESS-004, SDK-001, SDK-002 | — |
+| CORE-030 | Proxy McpModule integration | CORE-017, CORE-012, CORE-013 | — |
 
 ### SESS — Sessions
 
@@ -257,7 +270,7 @@ INFRA-001  (Monorepo package scaffold)
 | SDK-001 | ctx.elicit() — structured user input | CORE-007 | — |
 | SDK-002 | ctx.sample() — LLM sampling | CORE-007 | — |
 | SDK-003 | Tasks API — @Tool({ longRunning: true }) | CORE-001, CORE-013 | — |
-| SDK-004 | Resource subscriptions — @Resource({ subscribe: true }) | CORE-002, CORE-013, SESS-004 | — |
+| SDK-004 | Resource subscriptions — @Resource({ subscribe: true }) | CORE-002, CORE-027, SESS-004 | — |
 | SDK-005 | List change notifications | SESS-004, CORE-013 | CORE-020 |
 | SDK-006 | ctx.get_state / ctx.set_state — Per-Session State | CORE-007, SESS-001, SESS-004 | — |
 | SDK-007 | ctx.enableComponents / ctx.disableComponents — Per-Session Visibility | CORE-007, SESS-001, CORE-013, CORE-015 | — |

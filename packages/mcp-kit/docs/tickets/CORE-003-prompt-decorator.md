@@ -14,7 +14,7 @@ MCP prompts are templates that return `GetPromptResult` (a list of messages). Pa
 - [ ] Name can be overridden via `name` option
 - [ ] `description` is required in options
 - [ ] `parameters` accepts optional `z.ZodObject` for input validation
-- [ ] `parameters` accepts `Record<string, z.ZodType>` shorthand (same as @Tool)
+- [ ] `parameters` accepts `Record<string, z.ZodType>` shorthand (same as @Tool) — the shorthand is wrapped into `z.object(record)` during metadata resolution, so `PromptMetadata.parameters` is always a `z.ZodObject` or `undefined`
 - [ ] `title` option stores a human-readable display name, separate from the identifier `name`
 - [ ] `title` appears in `listPrompts` response as the `title` field
 - [ ] `icons` option stores array of `McpIcon` objects and includes them in `listPrompts` responses (v2.13.0+ parity)
@@ -121,7 +121,8 @@ export interface PromptMetadata {
 - Same shorthand detection logic as @Tool for the `parameters` field
 - Metadata storage: `Reflect.defineMetadata(MCP_PROMPT_METADATA, resolvedMetadata, descriptor.value)`
 - File location: `packages/nestjs-mcp/src/decorators/prompt.decorator.ts`
-- The MCP protocol prompt parameters are sent as `{ name, description, required }` tuples, not JSON Schema. The registry/handler must convert `z.ZodObject` keys to this format when responding to `prompts/list`.
+- The MCP protocol prompt parameters are sent as `{ name, description, required }` tuples, not JSON Schema. The registry/handler must convert `z.ZodObject` keys to this format when responding to `prompts/list`. Note: all MCP prompt arguments are strings at the protocol level — the Zod schema validates the string values but the wire format is always `Record<string, string>`.
+- **Return type handling**: Handlers may return a plain `string`, `McpMessage[]`, or a `PromptResult` object (see Technical Notes below). The framework normalizes all return types to `GetPromptResult` before sending to the client.
 - **PromptResult return type**: Prompt handler methods may return a `PromptResult` object for richer responses:
   ```typescript
   interface PromptResult {

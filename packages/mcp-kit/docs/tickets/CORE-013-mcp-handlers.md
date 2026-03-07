@@ -1,26 +1,25 @@
-# CORE-013: McpToolsHandler / McpResourcesHandler / McpPromptsHandler
+# CORE-013: McpToolsHandler
 
 ## Summary
-Implement the three handler services that register SDK request handlers for MCP protocol operations (CallTool, ReadResource, ListTools, ListResources, ListResourceTemplates, ListPrompts, GetPrompt). Each handler retrieves the correct method from the registry, runs it through the pipeline (Zod -> Pipes -> Guards -> Interceptors -> Handler -> Serialization), injects `McpContext` at the `@Ctx()` position, and returns the properly formatted MCP response.
+Implement `McpToolsHandler`, the handler service that registers SDK request handlers for tool-related MCP protocol operations (ListTools, CallTool). The handler retrieves the correct method from the registry, runs it through the pipeline (Zod -> Pipes -> Guards -> Interceptors -> Handler -> Serialization), injects `McpContext` at the `@Ctx()` position, and returns the properly formatted MCP response.
+
+> **Note:** ResourcesHandler is specified in CORE-027; PromptsHandler in CORE-028. All three follow identical patterns — read CORE-027/028 for resource/prompt specifics.
 
 ## Background / Context
-The three handler services register SDK request handlers for MCP protocol operations. They delegate to `McpPipelineRunner` for the full NestJS guard/interceptor/pipe pipeline and construct `McpContext` for injection via `@Ctx()`.
+The tools handler service registers SDK request handlers for tool-related MCP protocol operations. It delegates to `McpPipelineRunner` for the full NestJS guard/interceptor/pipe pipeline and constructs `McpContext` for injection via `@Ctx()`.
 
-The handlers are orchestrated by `McpExecutorService` which registers them on the `McpServer` instance. They are REQUEST-scoped (tied to the HTTP request that established the MCP connection).
+The handler is orchestrated by `McpExecutorService` which registers it on the `McpServer` instance. It is REQUEST-scoped (tied to the HTTP request that established the MCP connection).
 
 ## Acceptance Criteria
 
 ### List-time authorization filtering (FastMCP parity)
 - [ ] `McpToolsHandler.listTools()` evaluates per-tool guards before including a tool in the response — guarded tools that the current identity would fail are excluded
-- [ ] `McpResourcesHandler.listResources()` evaluates per-resource guards before including a resource in the response
-- [ ] `McpResourcesHandler.listResourceTemplates()` evaluates per-resource-template guards before including a template in the response
-- [ ] `McpPromptsHandler.listPrompts()` evaluates per-prompt guards before including a prompt in the response
 - [ ] A component that a guard would block MUST NOT appear in list responses (matches FastMCP behavior where authorization hides components)
 - [ ] Guard evaluation for list requests builds a minimal `McpOperationContext` with the session identity and a "list" context type
 - [ ] Guard that throws during list evaluation → component excluded from list, NO error propagated to client
 - [ ] Guard that returns false during list evaluation → component excluded from list
 - [ ] Components without guards always appear in list responses
-- [ ] `canList(handlerMeta, identity): Promise<boolean>` method (or equivalent) on `McpPipelineRunner` for list-time guard checks
+- [ ] Uses `McpPipelineRunner.canList(handlerMeta, identity)` for list-time guard checks
 
 ### McpToolsHandler
 - [ ] Registers `ListToolsRequestSchema` handler — returns only tools that pass list-time guard evaluation, with name, description, inputSchema (JSON Schema from Zod), outputSchema, annotations, title, _meta
@@ -31,31 +30,16 @@ The handlers are orchestrated by `McpExecutorService` which registers them on th
 - [ ] Output auto-serialized via `formatToolResult()` (CORE-008)
 - [ ] Errors normalized: `HttpException` / `McpError` / unknown -> `{ isError: true }` or protocol error
 
-### McpResourcesHandler
-- [ ] Registers `ListResourcesRequestSchema` handler — returns all static resources
-- [ ] Registers `ListResourceTemplatesRequestSchema` handler — returns all template resources
-- [ ] Registers `ReadResourceRequestSchema` handler — finds resource by URI (static or template match), invokes handler
-- [ ] Template resources: extracts params from URI, passes as input
-- [ ] Static resources: invokes handler with empty input
-- [ ] Injects `McpContext` at the `@Ctx()` parameter position
-
-### McpPromptsHandler
-- [ ] Registers `ListPromptsRequestSchema` handler — returns all prompts with name, description, arguments
-- [ ] Registers `GetPromptRequestSchema` handler — finds prompt by name, validates params, invokes handler
-- [ ] Prompt parameters converted from Zod to MCP format: `{ name, description, required }` tuples
-- [ ] Unknown prompt name returns `McpError(MethodNotFound)`
-- [ ] Injects `McpContext` at the `@Ctx()` parameter position
-
 ## BDD Scenarios
 
 ```gherkin
-Feature: MCP Protocol Handlers
-  The tools, resources, and prompts handlers register SDK request handlers,
-  route calls through the pipeline, inject context, serialize output, and
-  filter list responses based on authorization.
+Feature: MCP Tools Handler
+  The tools handler registers SDK request handlers for tool operations,
+  routes calls through the pipeline, injects context, serializes output, and
+  filters list responses based on authorization.
 
   Background:
-    Given an MCP server is running with registered tools, resources, and prompts
+    Given an MCP server is running with registered tools
 
   Rule: Tool call routing and execution
 
@@ -91,31 +75,6 @@ Feature: MCP Protocol Handlers
       When a client calls a guarded tool
       Then the guard evaluates access before the handler runs
       And the interceptor wraps the handler execution
-
-  Rule: Resource routing
-
-    Scenario: Resource template URI parameters are extracted
-      Given a resource template with URI pattern "users://{user_id}/profile"
-      When a client reads resource "users://abc-123/profile"
-      Then the handler is invoked with user_id "abc-123"
-
-    Scenario: Unknown resource URI returns an error
-      Given no resource matches URI "unknown://resource"
-      When a client reads resource "unknown://resource"
-      Then the client receives a "method not found" error mentioning "unknown://resource"
-
-  Rule: Prompt handling
-
-    Scenario: Prompt arguments are described in the list response
-      Given a prompt with a required "recipient" argument described as "Email address"
-      When a client requests the prompt list
-      Then the prompt entry includes an argument named "recipient" marked as required with description "Email address"
-
-    Scenario: Prompt with no arguments can be invoked with empty input
-      Given a prompt with no arguments
-      When a client requests the prompt with no arguments
-      Then the prompt handler is invoked
-      And the response contains the rendered prompt messages
 
   Rule: List responses
 
@@ -167,18 +126,6 @@ Feature: MCP Protocol Handlers
       Given a tool "always_visible" with no access restrictions
       When any caller requests the tool list
       Then "always_visible" appears in the response
-
-    Scenario: Guarded resource is hidden from unauthorized callers
-      Given a resource "secret://config" that requires the "admin" role
-      And the current session does not have the "admin" role
-      When a client requests the resource list
-      Then "secret://config" does not appear in the response
-
-    Scenario: Guarded prompt is hidden from unauthorized callers
-      Given a prompt "admin_report" that requires the "admin" role
-      And the current session does not have the "admin" role
-      When a client requests the prompt list
-      Then "admin_report" does not appear in the response
 ```
 
 ## Dependencies
@@ -188,13 +135,16 @@ Feature: MCP Protocol Handlers
 - Depends on: CORE-007 — McpContext construction
 - Depends on: CORE-008 — output serialization (formatToolResult)
 - Depends on: CORE-009 — McpExecutionContextHost needed to build list-time guard evaluation context
-- Depends on: CORE-010 — pipeline runner for guard/interceptor/pipe execution; `canList()` method added here
+- Depends on: CORE-010 — pipeline runner for guard/interceptor/pipe execution; `canList()` method
 - Depends on: CORE-012 — module wiring provides McpServer and config
+- Blocks: CORE-027 — McpResourcesHandler (common handler infrastructure)
+- Blocks: CORE-028 — McpPromptsHandler (common handler infrastructure)
 - Blocks: SESS-001 — session store used during handler execution
 - Blocks: SDK-003, SDK-004, SDK-005 — these extend handler behavior
+- Blocks: CORE-017, CORE-023, CORE-024, CORE-025, CORE-026, AUTH-007
 
 ## Technical Notes
-- The handlers register on `mcpServer.server.setRequestHandler()` (low-level SDK Server, not McpServer high-level API) to maintain full control over the request/response flow
+- The handler registers on `mcpServer.server.setRequestHandler()` (low-level SDK Server, not McpServer high-level API) to maintain full control over the request/response flow
 - `McpContext` construction per call:
   ```typescript
   const ctx = McpContext.create({
@@ -215,47 +165,12 @@ Feature: MCP Protocol Handlers
   }
   ```
 - For ListTools, convert Zod schemas to JSON Schema using `z.toJSONSchema(schema, { io: 'input' })` (same as existing code)
-- For ListPrompts, convert Zod object keys to MCP prompt argument format:
-  ```typescript
-  const shape = schema.shape;
-  const args = Object.entries(shape).map(([name, zodType]) => ({
-    name,
-    description: zodType.description,
-    required: !zodType.isOptional(),
-  }));
-  ```
-- Resource handlers must check both static and template resources when matching URIs (unified @Resource decorator means both are in the same registry)
 
 ### List-time authorization filtering implementation
 
 **FastMCP parity**: FastMCP's authorization system hides components from list responses when auth checks fail — a user without `mail.send` scope never sees the `send_email` tool in `listTools`. Our implementation mirrors this behavior.
 
-**Approach**: For each list request (`listTools`, `listResources`, `listResourceTemplates`, `listPrompts`), iterate over registered handlers and evaluate their guards before including them in the response.
-
-```typescript
-// McpPipelineRunner — new method for list-time guard evaluation
-async canList(handlerMeta: HandlerRegistryEntry, identity: McpIdentity | null): Promise<boolean> {
-  const guards = this.resolveGuards(handlerMeta); // same guard resolution as execution
-  if (guards.length === 0) return true; // no guards → always visible
-
-  // Build a minimal McpExecutionContextHost for guard evaluation
-  const listContext = McpExecutionContextHost.createForList({
-    operationType: handlerMeta.type, // 'tool' | 'resource' | 'prompt'
-    operationName: handlerMeta.name,
-    identity,
-  });
-
-  try {
-    for (const guard of guards) {
-      const canActivate = await guard.canActivate(listContext);
-      if (!canActivate) return false;
-    }
-    return true;
-  } catch {
-    return false; // guard threw → exclude component, no error to client
-  }
-}
-```
+**Approach**: For each list request, iterate over registered tools and evaluate their guards via `McpPipelineRunner.canList()` before including them in the response.
 
 ```typescript
 // McpToolsHandler.listTools() — with filtering
@@ -280,15 +195,7 @@ async listTools(): Promise<ListToolsResult> {
 - Guard that throws → component excluded, no error propagated (logged at debug level)
 - Unauthenticated request (identity=null) → all guards that check identity will fail → guarded components hidden
 - Performance: guard evaluation is per-component per-list-request. For servers with many guarded components, this adds latency to list requests. Future optimization: cache guard results per identity+component for the duration of a session
-- File locations:
-  - `packages/nestjs-mcp/src/services/handlers/mcp-tools.handler.ts`
-  - `packages/nestjs-mcp/src/services/handlers/mcp-resources.handler.ts`
-  - `packages/nestjs-mcp/src/services/handlers/mcp-prompts.handler.ts`
+- File location: `packages/nestjs-mcp/src/services/handlers/mcp-tools.handler.ts`
 - SDK APIs used:
   - `mcpServer.server.setRequestHandler(ListToolsRequestSchema, ...)`
   - `mcpServer.server.setRequestHandler(CallToolRequestSchema, ...)`
-  - `mcpServer.server.setRequestHandler(ListResourcesRequestSchema, ...)`
-  - `mcpServer.server.setRequestHandler(ListResourceTemplatesRequestSchema, ...)`
-  - `mcpServer.server.setRequestHandler(ReadResourceRequestSchema, ...)`
-  - `mcpServer.server.setRequestHandler(ListPromptsRequestSchema, ...)`
-  - `mcpServer.server.setRequestHandler(GetPromptRequestSchema, ...)`

@@ -32,6 +32,8 @@ The design separates session concerns into two layers:
 - [ ] `terminateSession` returns `true` if session existed, `false` if not found
 - [ ] `terminateUserSessions` is safe to call even if some sessions are not in the local registry (store-only sessions from other instances) -- it deletes from store regardless
 - [ ] `notifyToolsChanged` does not throw if a send fails on one session -- logs warning and continues
+- [ ] `McpSessionService` exposes `enableTags(sessionId: string, tags: string[]): Promise<void>` and `disableTags(sessionId: string, tags: string[]): Promise<void>` for per-session dynamic tag visibility (used by CORE-015/SDK-007). These update the session record's `enabledTags` / `disabledTags` sets and trigger a list-changed notification via SDK-005
+- [ ] `McpSessionStore` interface includes `findAll(): Promise<McpSessionRecord[]>` for listing all stored sessions. Used by `McpSessionService.getActiveSessions()`. `InMemorySessionStore` returns all in-memory sessions; `RedisSessionStore` queries the Redis keyspace
 
 ## Interface Contract
 
@@ -199,4 +201,5 @@ Feature: Session registry and session service
   - `ServerTransport` type from `@modelcontextprotocol/sdk/server/index.js` -- base transport interface
   - `McpServer` from `@modelcontextprotocol/sdk/server/mcp.js` -- `sendToolListChanged()` method
   - `Transport.close()` -- to terminate live connections
-- `getActiveSessions()` implementation note: there is no `findAll()` on `McpSessionStore`. For InMemory/Redis this could scan all entries; for Drizzle it queries all non-expired rows. Consider adding a `findAll()` method to the store interface, or have `getActiveSessions` iterate known session IDs from the registry + store. This is a design decision to resolve during implementation.
+- `getActiveSessions()` delegates to `store.findAll()` which returns all non-expired sessions. `InMemorySessionStore` returns all in-memory sessions; `RedisSessionStore` queries the Redis keyspace; Drizzle queries all non-expired rows.
+- **Multi-instance `getActiveSessions()` semantics**: `getActiveSessions()` returns sessions visible to the current instance only when using `InMemorySessionStore`. With `RedisSessionStore`, it returns all active sessions across all instances. Document this distinction clearly -- callers should not assume `getActiveSessions()` is globally consistent with in-memory store.

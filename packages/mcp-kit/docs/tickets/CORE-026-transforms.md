@@ -145,6 +145,8 @@ Maps to FastMCP v3.1.0+ `transforms=` parameter on the FastMCP constructor. Fast
 - Transforms are stored in `McpOptions.transforms` and injected into handlers via `MCP_OPTIONS`
 - For `callTool`, the handler must maintain a reverse mapping from transformed name back to original name. This mapping is rebuilt whenever the transform chain or tool list changes.
 - Transforms are pure functions — they receive a component info object and return a (potentially modified) copy. They must not mutate the input.
+- **Request-time application**: Transforms are applied at request time, not at registration time. The original `RegistryEntry` is never mutated. Each list/describe response applies all configured transforms in order to a shallow copy of the entry. This means transform logic runs on every list call — keep transforms lightweight.
+- **Name transforms and routing**: Name transforms change what clients see in list responses. Clients must use the transformed name when calling tools (see BDD scenario "Calling the original untransformed name fails"). Internally, the handler maintains a reverse mapping from transformed name back to original registered name — the original `RegistryEntry` and its handler are never renamed. Document this distinction clearly in the public API: transforms affect the client-facing name, not the internal registry key.
 - File location: `packages/nestjs-mcp/src/transforms/`
   - `packages/nestjs-mcp/src/transforms/mcp-transform.interface.ts`
   - `packages/nestjs-mcp/src/transforms/prefix.transform.ts`

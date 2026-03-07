@@ -56,6 +56,7 @@ In NestJS, component-level auth uses two standard patterns: (1) `@RequiredScopes
 - [ ] `AccessToken` interface exported: `{ token: string, clientId?: string, scopes: string[], expiresAt?: Date, claims: Record<string, unknown> }`
 - [ ] `RequiredScopes` metadata decorator exported from `@unique-ag/nestjs-mcp/auth`
 - [ ] All types exported from `@unique-ag/nestjs-mcp/auth`
+- [ ] To apply `@RequiredScopes` filtering at list time: `McpModule.forRoot({ pipeline: [RequiredScopesFilter, ...] })`. `RequiredScopesFilter` is a built-in pipeline component that reads `requiredScopes` from `RegistryEntry` metadata and calls `canActivate()` logic. Without this filter, `@RequiredScopes` only enforces at call time (not at list time).
 
 ## BDD Scenarios
 
@@ -254,6 +255,9 @@ Component-level `auth` and `TagScopeGuard` are complementary:
 | `get_access_token()` | `getAccessToken()` |
 | `restrict_tag(tag, auth_check)` | Covered by `TagScopeGuard` in CORE-015 |
 | `run_auth_checks(checks, auth_context)` | Not needed — NestJS guard chain handles sequential checks |
+
+### Handler registry integration
+Handler registry integration: `McpHandlerRegistry.getEntry(name)` returns the `RegistryEntry` which includes any `requiredScopes` metadata from `@RequiredScopes()`. The pipeline runner (CORE-010) reads this metadata when constructing the execution context for list-time guard checks.
 
 ### File locations
 - `packages/nestjs-mcp/src/auth/helpers/require-scopes.ts`

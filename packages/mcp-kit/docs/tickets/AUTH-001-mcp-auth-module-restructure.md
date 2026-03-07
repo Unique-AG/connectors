@@ -369,6 +369,12 @@ The `src/auth/index.ts` barrel file exports:
 6. **Refresh token revocation skips session termination**: Only access token revocation triggers session cleanup. Refresh tokens are used to obtain new access tokens, not to maintain active sessions.
 7. **Auth sub-entrypoint imports from core's public API only**: The auth barrel (`src/auth/index.ts`) can import `McpSessionService` from the core entrypoint, but must NOT import from core's internal modules to avoid tight coupling.
 
+### Sub-entrypoint path mapping
+Sub-entrypoint path: `@unique-ag/mcp-kit/auth` maps to `src/auth/index.ts`. The tsconfig `paths` and package.json `exports` field must both declare this path: `"./auth": "./dist/auth/index.js"`. Consumers import: `import { McpAuthModule } from '@unique-ag/mcp-kit/auth'`.
+
+### McpSessionService injection token
+`McpSessionService` is injected via `@Inject(MCP_SESSION_SERVICE)` token, not by class reference, to avoid circular dependency between the auth module and session module.
+
 ### FastMCP parity
 | FastMCP auth mode | Our equivalent | Ticket |
 |---|---|---|

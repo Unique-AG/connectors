@@ -23,6 +23,7 @@ FastMCP (Python) supports server composition via `server.mount(child, prefix="we
 - [ ] Resources from `forFeature()` modules are included in `listResources`
 - [ ] Prompts from `forFeature()` modules are included in `listPrompts`
 - [ ] `forFeature()` modules respect global guards, interceptors, and pipes from `forRoot()`
+- [ ] Global guards, interceptors, and pipes registered via `APP_GUARD`/`APP_INTERCEPTOR`/`APP_PIPE` in any module apply to all MCP components regardless of whether they were registered via `forRoot()` or `forFeature()`. This is standard NestJS global DI behavior — no special handling needed in `forFeature()`
 
 ### Prefix / Namespacing
 - [ ] `McpModule.forFeature({ prefix: 'weather' })` prefixes all tool names with `weather_` (e.g., `get_forecast` becomes `weather_get_forecast`)
@@ -37,10 +38,12 @@ FastMCP (Python) supports server composition via `server.mount(child, prefix="we
 - [ ] Components registered via `forFeature` without the required tags are excluded from lists (same filtering logic as root-level components)
 
 ### Conflict resolution
+- [ ] `onDuplicate` is configured once in `McpModule.forRoot()` and applies globally to all registrations from all feature modules
 - [ ] When `onDuplicate: 'error'` (from CORE-012 config), `forFeature` registration with a conflicting name throws at module init time
 - [ ] When `onDuplicate: 'replace'`, later registration silently replaces the earlier one
 - [ ] When `onDuplicate: 'warn'` (default), later registration replaces with a warning log
 - [ ] Collision detection considers the final prefixed name, not the original name
+- [ ] Two `forFeature()` calls with the same `prefix` do NOT cause an error — the prefix is just a naming convention. Name collision rules (`onDuplicate`) apply to the final resolved names, not the prefixes themselves
 
 ## BDD Scenarios
 
@@ -185,4 +188,5 @@ Our approach uses NestJS's native module system instead. The key difference is t
   }
   ```
 - `McpFeatureScanner` uses `DiscoveryService` (from `@nestjs/core`) to find decorated providers within the importing module's scope
+- `McpFeatureScanner` uses NestJS `DiscoveryService` to find providers decorated with `@Tool`/`@Resource`/`@Prompt` within the **importing module's providers array only** (direct providers, not transitively imported modules). If a feature module imports a sub-module that also has tools, those sub-module tools are NOT auto-discovered — the sub-module must also call `McpModule.forFeature()`
 - Tag filter inheritance is automatic — `McpRegistryService` applies the same global `enabledTags`/`disabledTags` filters to all entries regardless of origin module. No special code needed; the filtering in CORE-015 operates on the unified registry.

@@ -45,6 +45,7 @@ These can be combined: allowlist + denylist together, and tag-based scope restri
 - [ ] `McpSessionService.disableTags(tags: string[])` dynamically adds tags to the session-level denylist
 - [ ] `McpSessionService.enableTags(tags: string[])` dynamically adds tags to the session-level allowlist
 - [ ] Dynamic tag changes trigger `listChanged` notifications (tools/resources/prompts) per SDK-005
+- [ ] When multiple tags are enabled/disabled in rapid succession (within 50ms), the list-changed notification (SDK-005) is debounced — only one notification is sent after the last change in the burst
 - [ ] Session-level tag overrides are layered on top of global `forRoot` config (session deny + global deny = union)
 
 ### Conditional scope requirements (tagScopes + TagScopeGuard)
@@ -53,7 +54,7 @@ These can be combined: allowlist + denylist together, and tag-based scope restri
 - [ ] If a component has a tag present in `tagScopes`, the guard requires the associated scopes from the caller's identity
 - [ ] Multiple tags on one component — the required scopes are the UNION of all matching tag→scope entries (most restrictive)
 - [ ] Components without any tags in `tagScopes` are unaffected by the guard
-- [ ] `TagScopeGuard` is registered via `APP_GUARD` (standard NestJS global guard registration)
+- [ ] `TagScopeGuard` is **opt-in** — users must register it explicitly as `{ provide: APP_GUARD, useClass: McpOnly(TagScopeGuard) }` in any module's providers. It is NOT auto-registered by `McpModule.forRoot()`
 - [ ] `TagScopeGuard` also applies at list time (per CORE-013 filtering) — users without required scopes don't see tagged components in list responses
 - [ ] `TagScopeGuard` is exported from `@unique-ag/nestjs-mcp` for explicit registration
 
@@ -248,3 +249,5 @@ Our implementation extends FastMCP's approach with:
   ```
 - Session-level tag state stored in `McpSessionService` per session ID, merged with global config at query time
 - Runtime `disableTags`/`enableTags` calls should debounce list-changed notifications (avoid flooding if multiple tag changes happen in quick succession)
+- Tag filtering in `canList()` is O(n×m) where n = registered components and m = number of tags to check. In practice n is small (<500 components per server) so no special optimization is needed. For very large registries, pre-build a per-tag index at registration time and invalidate on dynamic tag changes (CORE-020).
+- Dynamic filter function signature: `filterFn: (component: RegistryEntry) => boolean` where `RegistryEntry` has `{ name, tags, type: 'tool'|'resource'|'prompt' }`

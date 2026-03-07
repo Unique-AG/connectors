@@ -22,7 +22,7 @@ Implement `McpModule.forRoot()` and `McpModule.forRootAsync()` that configure th
 - [ ] Imports `DiscoveryModule` for handler discovery
 - [ ] `forRootAsync` supports `useFactory`, `useClass`, `useExisting` patterns
 - [ ] `forRootAsync` supports `inject` for dependency injection into factory
-- [ ] `maskErrorDetails` option (optional `boolean`, default `false`) — module-wide default for masking internal error details from clients. Per-tool `@Tool({ mask: true })` overrides this default
+- [ ] `maskErrorDetails` option (optional `boolean`, default `false`) — module-wide default for masking internal error details from clients. Per-tool `mask: true` in `@Tool()` options takes precedence over the module-level `maskErrorDetails` setting. If a tool has `mask: false` explicitly, it overrides `maskErrorDetails: true` on the module. The default when `mask` is omitted is to inherit from `maskErrorDetails` (which defaults to `false`)
 - [ ] `onDuplicate` option (optional, `'warn' | 'error' | 'replace' | 'ignore'`, default `'warn'`) — behavior when two tools/resources/prompts register the same name. `'warn'` logs and keeps first, `'error'` throws at boot, `'replace'` keeps last, `'ignore'` keeps first silently. Handler registry (CORE-005) must respect this setting
 - [ ] `listPageSize` option (optional `number`, default `undefined`) — pagination limit for `listTools`/`listResources`/`listPrompts` responses. When set, responses include a `nextCursor` for pagination. `undefined`/`null` returns all items (no pagination)
 - [ ] `serverInfo` option (optional `{ websiteUrl?: string; icons?: ServerIcon[] }`) — additional server metadata forwarded in the MCP `initialize` response
@@ -182,7 +182,7 @@ Feature: MCP Module Configuration
     icons?: Array<{ url: string; mediaType: string }>;     // visual identifiers for the server
     strictInputValidation?: boolean;                       // default false; when true rejects type coercions ("10" for int param)
     derefSchemas?: boolean;                                // default true; auto-dereference $ref in generated JSON schemas
-    serverInfo?: {                                         // additional server metadata (deprecated, use top-level websiteUrl/icons)
+    serverInfo?: {                                         // additional server metadata; websiteUrl/icons are shorthand aliases
       websiteUrl?: string;
       icons?: Array<{ url: string; mediaType: string }>;
     };
@@ -203,5 +203,6 @@ Feature: MCP Module Configuration
 - The `forRootAsync` pattern follows the same structure as the existing module but adds the new options
 - Module ID generation (`mcp-module-${counter}`) for multi-module support should be preserved
 - **Cross-references:** `onDuplicate` requires CORE-005 (handler registry) to check for duplicate names during registration and respect the configured behavior. `listPageSize` affects CORE-013 handlers (they must implement cursor-based pagination when set). `maskErrorDetails` is consumed by CORE-010 (pipeline runner) as the default, overridden by per-tool `mask` from CORE-001. `serverInfo` is forwarded to the SDK `McpServer` constructor or `initialize` response handler
+- **`websiteUrl`/`icons` vs `serverInfo` precedence**: `websiteUrl` and `icons` are top-level shorthand options that set the corresponding fields in `serverInfo`. If both `serverInfo.websiteUrl` and top-level `websiteUrl` are provided, `serverInfo.websiteUrl` wins (nested takes precedence over shorthand). Same for `icons`. This avoids ambiguity when both forms are used.
 - **FastMCP parity:** `maskErrorDetails` maps to FastMCP's `mask_error_details` server option. `onDuplicate` maps to FastMCP's `on_duplicate_tools`/`on_duplicate_resources`/`on_duplicate_prompts`. `serverInfo.icons` / `icons` maps to FastMCP's `server_icon`. `listPageSize` is a framework addition (FastMCP does not paginate list responses). `strictInputValidation` maps to FastMCP's `strict_input_validation`. `derefSchemas` maps to FastMCP's `deref_schemas`. `websiteUrl` maps to FastMCP's `website_url`
 - File location: `packages/nestjs-mcp/src/mcp.module.ts`

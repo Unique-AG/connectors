@@ -23,6 +23,7 @@ The key difference from HTTP is that Zod validation is mandatory and always runs
 - [ ] Error normalization is always-on (not opt-in)
 - [ ] The wrapped handler receives an `McpExecutionContextHost` with `contextType = 'mcp'`
 - [ ] Method: `wrapHandler(registryEntry, mcpServer, identity, sessionId, httpRequest) -> (input) => Promise<ToolResult>`
+- [ ] Method: `canList(handler, identity)` — runs guards-only (no interceptors, no pipes) for list-time visibility filtering. Creates an execution context via `McpExecutionContextHost.createForList()` and runs only `CanActivate` guards. Returns `boolean`. Used by list handlers (CORE-013, CORE-027, CORE-028) to filter components from list responses.
 
 ## BDD Scenarios
 
@@ -119,6 +120,12 @@ export class McpPipelineRunner {
     sessionId: string | null,
     httpRequest: HttpRequest | null,
   ): (input: Record<string, unknown>) => Promise<ToolResult>;
+
+  /** Runs guards-only for list-time visibility filtering */
+  canList(
+    handler: HandlerRegistryEntry,
+    identity: McpIdentity | null,
+  ): Promise<boolean>;
 }
 ```
 
@@ -148,3 +155,11 @@ export class McpPipelineRunner {
   - Other errors -> `{ isError: true }` with error message
 - File location: `packages/nestjs-mcp/src/pipeline/mcp-pipeline-runner.ts`
 - Reference NestJS source: `packages/core/helpers/external-context-creator.ts` for the `create()` method signature
+
+### ExternalContextCreator integration contract
+
+1. **Parameter factory**: The framework registers an MCP-specific parameter factory with `ExternalContextCreator`. For each handler parameter position, the factory checks metadata for `@Ctx()` (injects McpContext), `@Inject()` (resolves from DI), or falls back to MCP args by parameter name matching.
+
+2. **Exception filter ordering**: User-registered `@Catch()` filters run first (innermost), then the framework's `McpExceptionFilter` (outermost). Error masking (per-tool `mask` or module `maskErrorDetails`) is applied in `McpExceptionFilter` after all user filters have run.
+
+3. **Error masking**: `McpExceptionFilter` checks `handler.metadata.mask ?? moduleOptions.maskErrorDetails`. If true, replaces error `message` with "Internal server error" before serializing to MCP error response. This ensures sensitive error details (stack traces, internal service names) are never leaked to MCP clients when masking is enabled.

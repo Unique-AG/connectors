@@ -28,6 +28,7 @@ The constructor takes three dependencies:
 - [ ] `getAuthCode()` auto-removes expired codes and returns undefined
 - [ ] `getOAuthSession()` auto-removes expired sessions and returns undefined
 - [ ] Exported from `@unique-ag/nestjs-mcp/auth`
+- [ ] When `cacheTtlMs` is set to `0`, caching is disabled entirely — every `findToken()` call hits the database
 
 ## BDD Scenarios
 
@@ -216,6 +217,31 @@ export class DrizzleOAuthStore implements IOAuthStore {
     private readonly cacheManager: Cache,              // from cache-manager
   ) {}
 }
+```
+
+### Column naming convention
+Column naming: use Drizzle's built-in `snake_case` column naming convention. TypeScript fields are camelCase (`accessToken`, `refreshToken`); database columns are snake_case (`access_token`, `refresh_token`) via `{ columnName: 'access_token' }` or a global `snake_case` plugin.
+
+### Drizzle schema for `oauth_access_tokens` table
+```typescript
+import { pgTable, text, timestamp, json } from 'drizzle-orm/pg-core';
+
+export const oauthAccessTokens = pgTable('oauth_access_tokens', {
+  id: text('id').primaryKey(),
+  token: text('token').notNull().unique(),
+  type: text('type').notNull(),                          // 'ACCESS' | 'REFRESH'
+  userId: text('user_id').notNull(),
+  clientId: text('client_id').notNull(),
+  scope: text('scope'),
+  resource: text('resource'),
+  userProfileId: text('user_profile_id').notNull(),
+  familyId: text('family_id'),
+  generation: integer('generation'),
+  usedAt: timestamp('used_at'),
+  userData: json('user_data'),                           // TokenUserData (denormalized)
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
 ```
 
 ### Key design decisions

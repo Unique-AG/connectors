@@ -20,6 +20,7 @@ The `/.well-known/mcp-connections` endpoint serves as the machine-readable contr
 - [ ] `McpModule.forRoot({ requiredConnections: ['microsoft-graph', 'google-drive'] })` declares mandatory upstream connections
 - [ ] `McpModule.forRoot({ optionalConnections: ['slack'] })` declares optional upstream connections (tools degrade gracefully when missing)
 - [ ] Connection IDs in `requiredConnections` must correspond to providers registered in `UpstreamProviderRegistry` (CONN-003); startup throws if unknown ID is declared
+- [ ] At module init (`OnModuleInit`), `McpConnectionModule` validates that every provider ID listed in `requiredConnections` and `optionalConnections` is registered in `UpstreamProviderRegistry`. If any ID is unrecognized, the application throws: `McpConnectionError: Unknown upstream provider declared in requiredConnections: '{providerId}'. Register it in McpConnectionModule.forRoot({ providers: [...] }) first.`
 
 ### Well-known discovery endpoint
 - [ ] `GET /.well-known/mcp-connections` returns a JSON document listing all declared connections
@@ -119,6 +120,13 @@ Feature: Required Connections & Pre-Auth Gate
       When a tool reads ctx.identity.connectedProviders
       Then the value is an empty array
 
+    Scenario: Mid-session optional connection is accessible without JWT update
+      Given "alice"'s token lists connectedProviders ["microsoft-graph"]
+      And "alice" connects "slack" mid-session via elicitation
+      When a tool calls upstream.getToken("slack")
+      Then the token is returned from the connection store
+      Even though "slack" is not in ctx.identity.connectedProviders
+
   Rule: Unknown provider IDs cause startup failure
 
     Scenario: Undeclared provider in requiredConnections fails at startup
@@ -140,5 +148,5 @@ FastMCP (Python) does not have a built-in multi-provider pre-auth gate; its prox
 ## Technical Notes
 - The `/.well-known/mcp-connections` endpoint is part of MCP service discovery — register it as a standard `@Controller()` (not raw middleware)
 - The JWT gate is implemented as a hook in `McpAuthModule.issueToken()` — not as a separate guard, since the check must happen before the token exists
-- `connectedProviders` in the JWT is a snapshot at token issuance time. If a user later connects an additional optional provider, the JWT won't reflect it until they get a new token. This is acceptable and documented — the runtime reconnection layer (CONN-005) handles mid-session token acquisition for optional providers
+- The `connectedProviders` array in the JWT is a snapshot taken at token-issuance time. It does NOT update when the user acquires additional optional connections mid-session via the elicitation flow (CONN-005). Mid-session connections are stored in `McpConnectionStore` and accessible via `UpstreamTokenService.getToken()` even if not listed in the JWT. The JWT claim is only used as a fast-path check by `McpConnectionGuard` to avoid store lookups for required connections. Guards always fall back to a store lookup when the JWT claim is absent.
 - For virtual server scenarios, `requiredConnections` is the correct mechanism. For servers where tools optionally use upstream providers, use `optionalConnections` + `@RequiresConnection` (CONN-004) which will trigger elicitation lazily

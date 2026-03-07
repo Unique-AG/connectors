@@ -18,6 +18,7 @@ The `AccessTokenMetadata` interface (defined in AUTH-001) has a `userData` field
 - [ ] `McpIdentityResolver` (CORE-006) builds `McpIdentity.email` and `McpIdentity.displayName` from `request.user.userData` without calling `IOAuthStore`
 - [ ] Token refresh re-fetches `userData` from the profile store (to pick up any profile changes since original grant)
 - [ ] `TokenUserData` is exported from `@unique-ag/nestjs-mcp/auth`
+- [ ] CORE-006's `McpIdentity` interface includes `email?: string` and `displayName?: string` fields populated from `TokenValidationResult.userData`. If CORE-006 is implemented without these fields, AUTH-002 implementation must add them.
 
 ## BDD Scenarios
 
@@ -147,6 +148,9 @@ async generateTokenPair(
 
 ### Design decision: Re-fetch on refresh vs carry forward
 On token refresh, `userData` is re-fetched from the profile store (via a new `generateTokenPair()` call which calls `getUserProfileById()`). This ensures profile changes (e.g., user updated their display name) are reflected in new tokens. The cost is one additional DB call per refresh (infrequent), which is acceptable.
+
+### Token refresh and userData staleness
+When a token is refreshed (new access token issued), the `userData` denormalization is NOT re-run automatically. Denormalized fields reflect the state at original token issuance. If `email` or `displayName` changes upstream, the user must re-authenticate to get updated values in their session.
 
 ### SDK APIs used
 No direct `@modelcontextprotocol/sdk` APIs are involved in this ticket. The denormalization is purely an application-layer optimization within the auth module.
