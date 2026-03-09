@@ -23,10 +23,11 @@ describe('OneNotePermissionsService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // biome-ignore lint/suspicious/noExplicitAny: Test mock
     service = new OneNotePermissionsService(
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock
       mockConfig as any,
       mockGraphService,
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock
       mockUserService as any,
     );
   });

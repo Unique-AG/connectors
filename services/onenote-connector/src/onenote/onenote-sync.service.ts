@@ -46,7 +46,7 @@ export class OneNoteSyncService {
 
     const notebooksToSync = deltaResult.isFullSync
       ? notebooks
-      : notebooks.filter((nb) => deltaResult.changedNotebookIds.has(nb.id));
+      : notebooks.filter((nb) => deltaResult.changedNotebookNames.has(nb.displayName));
 
     this.logger.log(
       {

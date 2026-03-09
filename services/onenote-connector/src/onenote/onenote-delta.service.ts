@@ -8,7 +8,7 @@ import type { DriveItemDelta } from './onenote.types';
 import { OneNoteGraphService } from './onenote-graph.service';
 
 export interface DeltaResult {
-  changedNotebookIds: Set<string>;
+  changedNotebookNames: Set<string>;
   isFullSync: boolean;
 }
 
@@ -50,38 +50,36 @@ export class OneNoteDeltaService {
 
     await this.persistDeltaLink(userProfileId, nextDeltaLink, 'success');
 
-    const changedNotebookIds = this.filterOneNoteItems(items);
+    const changedNotebookNames = this.filterOneNoteItems(items);
 
     this.logger.log(
       {
         userProfileId,
         isFullSync,
         totalDeltaItems: items.length,
-        changedNotebooks: changedNotebookIds.size,
+        changedNotebooks: changedNotebookNames.size,
       },
       'Completed delta fetch',
     );
 
-    return { changedNotebookIds, isFullSync };
+    return { changedNotebookNames, isFullSync };
   }
 
   private filterOneNoteItems(items: DriveItemDelta[]): Set<string> {
-    const notebookIds = new Set<string>();
+    const notebookNames = new Set<string>();
 
     for (const item of items) {
       const isOneNotePackage = item.package?.type === 'oneNote';
       const isOneNoteFile = item.name?.endsWith('.one') || item.name?.endsWith('.onetoc2');
 
-      if (isOneNotePackage || isOneNoteFile) {
-        notebookIds.add(item.id);
-
-        if (item.parentReference?.id) {
-          notebookIds.add(item.parentReference.id);
-        }
+      if (isOneNotePackage && item.name) {
+        notebookNames.add(item.name);
+      } else if (isOneNoteFile && item.parentReference?.name) {
+        notebookNames.add(item.parentReference.name);
       }
     }
 
-    return notebookIds;
+    return notebookNames;
   }
 
   private async persistDeltaLink(

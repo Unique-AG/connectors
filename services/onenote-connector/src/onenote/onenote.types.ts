@@ -64,6 +64,7 @@ export const DriveItemDeltaSchema = z.object({
     .object({
       driveId: z.string().optional(),
       id: z.string().optional(),
+      name: z.string().optional(),
       path: z.string().optional(),
     })
     .optional(),

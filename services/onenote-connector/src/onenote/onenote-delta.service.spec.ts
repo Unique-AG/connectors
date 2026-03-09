@@ -38,7 +38,7 @@ describe('OneNoteDeltaService', () => {
       mockDrizzle.query.deltaState.findFirst.mockResolvedValue(null);
       (mockGraphService.getDelta as ReturnType<typeof vi.fn>).mockResolvedValue({
         items: [
-          { id: 'item-1', package: { type: 'oneNote' }, name: 'Notebook.onetoc2' },
+          { id: 'item-1', package: { type: 'oneNote' }, name: 'My Notebook' },
           { id: 'item-2', name: 'regular-file.docx' },
         ],
         nextDeltaLink: 'https://graph.microsoft.com/delta?token=abc',
@@ -47,8 +47,8 @@ describe('OneNoteDeltaService', () => {
       const result = await service.fetchDelta(mockClient, 'user-1');
 
       expect(result.isFullSync).toBe(true);
-      expect(result.changedNotebookIds.has('item-1')).toBe(true);
-      expect(result.changedNotebookIds.has('item-2')).toBe(false);
+      expect(result.changedNotebookNames.has('My Notebook')).toBe(true);
+      expect(result.changedNotebookNames.has('regular-file.docx')).toBe(false);
       expect(mockGraphService.getDelta).toHaveBeenCalledWith(mockClient, undefined);
     });
 
@@ -57,14 +57,14 @@ describe('OneNoteDeltaService', () => {
         deltaLink: 'https://graph.microsoft.com/delta?token=existing',
       });
       (mockGraphService.getDelta as ReturnType<typeof vi.fn>).mockResolvedValue({
-        items: [{ id: 'changed-nb', package: { type: 'oneNote' } }],
+        items: [{ id: 'changed-nb', package: { type: 'oneNote' }, name: 'Changed Notebook' }],
         nextDeltaLink: 'https://graph.microsoft.com/delta?token=new',
       });
 
       const result = await service.fetchDelta(mockClient, 'user-1');
 
       expect(result.isFullSync).toBe(false);
-      expect(result.changedNotebookIds.has('changed-nb')).toBe(true);
+      expect(result.changedNotebookNames.has('Changed Notebook')).toBe(true);
       expect(mockGraphService.getDelta).toHaveBeenCalledWith(
         mockClient,
         'https://graph.microsoft.com/delta?token=existing',
@@ -78,33 +78,39 @@ describe('OneNoteDeltaService', () => {
       (mockGraphService.getDelta as ReturnType<typeof vi.fn>)
         .mockRejectedValueOnce(new Error('410 Gone'))
         .mockResolvedValueOnce({
-          items: [{ id: 'nb-1', name: 'test.onetoc2' }],
+          items: [
+            {
+              id: 'nb-1',
+              name: 'test.onetoc2',
+              parentReference: { name: 'Work Notebook' },
+            },
+          ],
           nextDeltaLink: 'https://graph.microsoft.com/delta?token=fresh',
         });
 
       const result = await service.fetchDelta(mockClient, 'user-1');
 
       expect(result.isFullSync).toBe(true);
-      expect(result.changedNotebookIds.has('nb-1')).toBe(true);
+      expect(result.changedNotebookNames.has('Work Notebook')).toBe(true);
       expect(mockGraphService.getDelta).toHaveBeenCalledTimes(2);
     });
 
-    it('filters .one files as OneNote items', async () => {
+    it('filters .one files and resolves parent notebook names', async () => {
       mockDrizzle.query.deltaState.findFirst.mockResolvedValue(null);
       (mockGraphService.getDelta as ReturnType<typeof vi.fn>).mockResolvedValue({
         items: [
-          { id: 'section-1', name: 'Section.one' },
+          { id: 'section-1', name: 'Section.one', parentReference: { name: 'Study Notes' } },
           { id: 'doc-1', name: 'Document.docx' },
-          { id: 'nb-1', package: { type: 'oneNote' } },
+          { id: 'nb-1', package: { type: 'oneNote' }, name: 'Work Notebook' },
         ],
         nextDeltaLink: 'delta-link',
       });
 
       const result = await service.fetchDelta(mockClient, 'user-1');
 
-      expect(result.changedNotebookIds.has('section-1')).toBe(true);
-      expect(result.changedNotebookIds.has('nb-1')).toBe(true);
-      expect(result.changedNotebookIds.has('doc-1')).toBe(false);
+      expect(result.changedNotebookNames.has('Study Notes')).toBe(true);
+      expect(result.changedNotebookNames.has('Work Notebook')).toBe(true);
+      expect(result.changedNotebookNames.has('Document.docx')).toBe(false);
     });
   });
 

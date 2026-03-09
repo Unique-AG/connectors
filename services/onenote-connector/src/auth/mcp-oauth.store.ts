@@ -76,7 +76,7 @@ export class McpOAuthStore implements IOAuthStore {
 
   public generateClientId(client: OAuthClient): string {
     const normalizedName = client.client_name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    // TODO: We need to discuss if we want to add the normalizedName as a clientId prefix.
+    // TODO (UN-17982): Discuss whether to add normalizedName as a clientId prefix.
     return typeid(normalizedName).toString();
   }
 

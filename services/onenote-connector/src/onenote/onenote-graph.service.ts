@@ -108,16 +108,14 @@ export class OneNoteGraphService {
     try {
       const response = await client
         .api(`/me/onenote/notebooks/${notebookId}`)
-        .select('id')
-        .expand('parentNotebook')
+        .select('id,displayName')
         .get();
 
-      // Notebooks don't expose driveId directly; use the self URL to extract drive info
-      // Alternative: search drive items for the notebook by name
+      const escapedName = this.escapeODataString(response.displayName);
       const driveItem = await client
         .api("/me/drive/root/search(q='.onetoc2')")
         .select('id,name,parentReference')
-        .filter(`name eq '${response.displayName}.onetoc2' or name eq 'Open Notebook.onetoc2'`)
+        .filter(`name eq '${escapedName}.onetoc2' or name eq 'Open Notebook.onetoc2'`)
         .top(1)
         .get();
 
@@ -131,6 +129,10 @@ export class OneNoteGraphService {
       this.logger.warn({ error, notebookId }, 'Failed to resolve notebook drive item');
       return null;
     }
+  }
+
+  private escapeODataString(value: string): string {
+    return value.replace(/'/g, "''");
   }
 
   @Span()
@@ -209,6 +211,15 @@ export class OneNoteGraphService {
     return SectionSchema.parse(response);
   }
 
+  private escapeXhtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   @Span()
   public async createPage(
     client: Client,
@@ -216,9 +227,10 @@ export class OneNoteGraphService {
     title: string,
     contentHtml: string,
   ): Promise<Page> {
+    const escapedTitle = this.escapeXhtml(title);
     const html = `<!DOCTYPE html>
 <html>
-  <head><title>${title}</title></head>
+  <head><title>${escapedTitle}</title></head>
   <body>${contentHtml}</body>
 </html>`;
 

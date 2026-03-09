@@ -66,7 +66,6 @@ export class UpdateOneNotePageTool {
         target,
         action: input.action,
         content: input.contentHtml,
-        ...(input.action !== 'replace' && { position: 'after' }),
       },
     ];
 
