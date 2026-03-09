@@ -9,7 +9,6 @@ import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { MAIN_EXCHANGE } from '../../amqp/amqp.constants';
-import { subscriptionMailFilters } from '../../db/schema/subscription/subscription-mail-filters.dto';
 import {
   CreateSubscriptionRequestSchema,
   LifecycleEventDto,
@@ -246,9 +245,6 @@ export class SubscriptionCreateService {
         expiresAt: graphSubscription.expirationDateTime,
         userProfileId: userProfileId.toString(),
         subscriptionId: graphSubscription.id,
-        filters: subscriptionMailFilters.encode({
-          dateFrom: filters.dateFrom,
-        }),
       })
       .returning();
 

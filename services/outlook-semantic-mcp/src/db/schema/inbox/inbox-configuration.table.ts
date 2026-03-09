@@ -21,7 +21,7 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
       onUpdate: 'cascade',
     }),
 
-  filters: jsonb<SubscriptionMailFilters>(`filters`),
+  filters: jsonb(`filters`).$type<SubscriptionMailFilters>(),
   lastFullSyncRunAt: timestamp(`last_full_sync_run_at`),
   syncState: inboxSyncState(`sync_state`).notNull().default('idle'),
   syncStartedAt: timestamp(`sync_started_at`),
