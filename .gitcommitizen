@@ -42,6 +42,8 @@ utils = packages/utils/**
 unique-api = packages/unique-api/**
 
 # Special scopes
-ci = .github/**
+ci = .github/**, .gitcommitizen, biome.json, turbo.json, tsconfig.json, vitest.config.ts, pnpm-workspace.yaml, Makefile, docker-compose.yaml, flake.nix, flake.lock, .dockerignore, .nvmrc, release-please-config.json, .release-please-manifest.json, .syncpackrc.json
+charts = charts/**
+scripts = scripts/**
 main = *, .*
 deps = package.json, pnpm-lock.yaml
