@@ -29,10 +29,11 @@ export class OneNoteDeltaService {
 
     let items: DriveItemDelta[];
     let nextDeltaLink: string;
-    let isFullSync = !existing;
+    const validDeltaLink = existing?.deltaLink || undefined;
+    let isFullSync = !validDeltaLink;
 
     try {
-      const result = await this.graphService.getDelta(client, existing?.deltaLink);
+      const result = await this.graphService.getDelta(client, validDeltaLink);
       items = result.items;
       nextDeltaLink = result.nextDeltaLink;
     } catch (error: unknown) {

@@ -55,7 +55,11 @@ export class VerifyOneNoteSyncStatusTool {
     const isDisabled = state.lastSyncStatus === 'disabled';
     const isError = state.lastSyncStatus === 'error';
 
-    const status = isDisabled ? ('disabled' as const) : isError ? ('error' as const) : ('active' as const);
+    const status = isDisabled
+      ? ('disabled' as const)
+      : isError
+        ? ('error' as const)
+        : ('active' as const);
     const messageMap = {
       disabled: 'OneNote sync is disabled. Use start_onenote_sync to re-enable.',
       error: 'Last sync encountered an error',

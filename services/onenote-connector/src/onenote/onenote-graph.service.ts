@@ -154,8 +154,20 @@ export class OneNoteGraphService {
   @Span()
   public async getGroupMembers(client: Client, groupId: string): Promise<GroupMember[]> {
     try {
-      const response = await client.api(`/groups/${groupId}/members`).get();
-      return (response.value as unknown[]).map((m) => GroupMemberSchema.parse(m));
+      const members: GroupMember[] = [];
+      let url: string | undefined = `/groups/${groupId}/members`;
+
+      while (url) {
+        const response = await client.api(url).get();
+        if (response.value) {
+          for (const m of response.value) {
+            members.push(GroupMemberSchema.parse(m));
+          }
+        }
+        url = response['@odata.nextLink'];
+      }
+
+      return members;
     } catch (error) {
       this.logger.warn({ error, groupId }, 'Failed to fetch group members');
       return [];
