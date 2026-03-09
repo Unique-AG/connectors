@@ -106,22 +106,36 @@ export class OneNoteGraphService {
     notebookId: string,
   ): Promise<{ driveId: string; itemId: string } | null> {
     try {
-      const response = await client
+      const notebook = await client
         .api(`/me/onenote/notebooks/${notebookId}`)
         .select('id,displayName')
         .get();
 
-      const escapedName = this.escapeODataString(response.displayName);
-      const driveItem = await client
-        .api("/me/drive/root/search(q='.onetoc2')")
-        .select('id,name,parentReference')
-        .filter(`name eq '${escapedName}.onetoc2' or name eq 'Open Notebook.onetoc2'`)
-        .top(1)
+      const notebookName = notebook.displayName as string;
+      const searchResults = await client
+        .api(`/me/drive/root/search(q='${this.escapeODataString(notebookName)}')`)
+        .select('id,name,parentReference,package')
         .get();
 
-      const item = driveItem?.value?.[0];
-      if (item?.parentReference?.driveId && item?.id) {
-        return { driveId: item.parentReference.driveId, itemId: item.id };
+      type DriveSearchItem = {
+        id: string;
+        name?: string;
+        parentReference?: { driveId?: string; id?: string };
+        package?: { type?: string };
+      };
+      const items = searchResults?.value as DriveSearchItem[] | undefined;
+      if (!items?.length) return null;
+
+      const notebookFolder = items.find(
+        (item) => item.package?.type === 'oneNote' && item.name === notebookName,
+      );
+      if (notebookFolder?.parentReference?.driveId) {
+        return { driveId: notebookFolder.parentReference.driveId, itemId: notebookFolder.id };
+      }
+
+      const tocFile = items.find((item) => item.name === `${notebookName}.onetoc2`);
+      if (tocFile?.parentReference?.driveId && tocFile?.parentReference?.id) {
+        return { driveId: tocFile.parentReference.driveId, itemId: tocFile.parentReference.id };
       }
 
       return null;
