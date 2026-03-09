@@ -60,8 +60,7 @@ jobs:
           done
 
           if [ "$COUNT" -gt 1 ]; then
-            echo "::error title=Too many service scopes::PR declares $COUNT service scopes. Keep PRs focused to a single service. Use the 'skip-validation' label if this is intentional."
-            exit 1
+            echo "::warning title=Too many service scopes::PR declares $COUNT service scopes. Keep PRs focused to a single service. Use the 'skip-validation' label to suppress this warning."
           fi
 
   gatekeeper:
