@@ -6,9 +6,9 @@ import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
-const ConnectInboxInputSchema = z.object({});
+const ReconnectInboxInputSchema = z.object({});
 
-const ConnectInboxOutputSchema = z.object({
+const ReconnectInboxOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   subscription: z
@@ -22,20 +22,20 @@ const ConnectInboxOutputSchema = z.object({
 });
 
 @Injectable()
-export class ConnectInboxTool {
+export class ReconnectInboxTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(private readonly subscriptionCreate: SubscriptionCreateService) {}
 
   @Tool({
-    name: 'connect_inbox',
-    title: 'Connect Inbox',
+    name: 'reconnect_inbox',
+    title: 'Reconnect Inbox',
     description:
-      'Start the knowledge base integration to begin ingesting Microsoft Outlook emails. This creates a subscription with Microsoft Graph to receive notifications when new emails are available.',
-    parameters: ConnectInboxInputSchema,
-    outputSchema: ConnectInboxOutputSchema,
+      'Manually re-establish the Microsoft Outlook inbox subscription when it has been disconnected or is no longer active. Use this to restore email ingestion after a broken or expired subscription.',
+    parameters: ReconnectInboxInputSchema,
+    outputSchema: ReconnectInboxOutputSchema,
     annotations: {
-      title: 'Connect Inbox',
+      title: 'Reconnect Inbox',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: true,
@@ -44,19 +44,19 @@ export class ConnectInboxTool {
     _meta: {
       'unique.app/icon': 'play',
       'unique.app/system-prompt':
-        'Connects the inbox for outlook email ingestion. Use verify_inbox_connection first to check if it is already running. If already active, inform the user that ingestion is already running.',
+        'Re-establishes the inbox subscription for outlook email ingestion. Use verify_inbox_connection first to check if it is already running. If already active, inform the user that ingestion is already running.',
     },
   })
   @Span()
-  public async connectInbox(
-    _input: z.infer<typeof ConnectInboxInputSchema>,
+  public async reconnectInbox(
+    _input: z.infer<typeof ReconnectInboxInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {
     const userProfileTypeid = extractUserProfileId(request);
     const userProfileId = userProfileTypeid.toString();
 
-    this.logger.log({ userProfileId, msg: 'Starting knowledge base integration for user' });
+    this.logger.log({ userProfileId, msg: 'Reconnecting inbox subscription for user' });
 
     const result = await this.subscriptionCreate.subscribe(userProfileTypeid);
     const { status, subscription } = result;
@@ -66,13 +66,13 @@ export class ConnectInboxTool {
 
     const messages: Record<typeof status, string> = {
       created:
-        'Knowledge base integration started successfully. Outlook emails will now be ingested automatically.',
-      already_active: 'Knowledge base integration is already active.',
-      expiring_soon: `Knowledge base integration is active but expiring in ${minutesUntilExpiration} minutes. It will be automatically renewed.`,
+        'Inbox subscription re-established successfully. Outlook emails will now be ingested automatically.',
+      already_active: 'Inbox subscription is already active.',
+      expiring_soon: `Inbox subscription is active but expiring in ${minutesUntilExpiration} minutes. It will be automatically renewed.`,
     };
 
     this.logger.log({
-      msg: 'Knowledge base integration operation completed',
+      msg: 'Inbox subscription reconnect operation completed',
       userProfileId,
       subscriptionId: subscription.id,
       status,

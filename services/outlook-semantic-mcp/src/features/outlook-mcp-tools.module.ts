@@ -17,7 +17,7 @@ import { MailSubscriptionController } from './mail-subscription.controller';
 import { InboxConfigurationListener } from './subscriptions/inbox-configuration.listener';
 import { SubscriptionModule } from './subscriptions/subscription.module';
 import {
-  ConnectInboxTool,
+  ReconnectInboxTool,
   RemoveInboxConnectionTool,
   VerifyInboxConnectionTool,
 } from './subscriptions/tools';
@@ -27,7 +27,7 @@ const TOOLS = [
   RunFullSyncTool,
   SyncProgressTool,
   VerifyInboxConnectionTool,
-  ConnectInboxTool,
+  ReconnectInboxTool,
   RemoveInboxConnectionTool,
   SearchEmailsTool,
   OpenEmailTool,
