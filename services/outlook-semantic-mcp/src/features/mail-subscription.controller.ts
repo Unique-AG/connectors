@@ -141,8 +141,8 @@ export class MailSubscriptionController {
     );
 
     traceAttrs({
-      notifications_to_process_count: notificationsToProcess.length,
-      notifications_to_ignore_count: notificationsToIgnore.length,
+      notificationsToProcessCount: notificationsToProcess.length,
+      notificationsToIgnoreCount: notificationsToIgnore.length,
     });
 
     if (!notificationsToProcess.length) {

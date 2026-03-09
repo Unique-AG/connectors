@@ -1,18 +1,19 @@
 import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, Smeared } from '@unique-ag/utils';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { indexBy, isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, UserProfile, inboxConfiguration } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { getRootScopePathForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { NonNullishProps } from '~/utils/non-nullish-props';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
 import {
   SubscriptionMailFilters,
@@ -46,12 +47,11 @@ export class FullSyncCommand {
 
   @Span()
   public async run(subscriptionId: string): Promise<{ status: FullSyncRunStatus }> {
-    traceAttrs({ subscription_id: subscriptionId });
+    traceAttrs({ subscriptionId: subscriptionId });
     this.logger.log({ subscriptionId, msg: `Starting full sync` });
 
-    const { userProfile } =
-      await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
-    traceAttrs({ user_profile_id: userProfile.id });
+    const { userProfile } = await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
+    traceAttrs({ userProfileId: userProfile.id });
     const userEmail = createSmeared(userProfile.email);
     this.logger.log({
       subscriptionId,
@@ -60,34 +60,202 @@ export class FullSyncCommand {
       msg: `Resolved subscription and user profile`,
     });
 
-    await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
+    const guardResult = await this.acquireSyncLock(userProfile.id);
+    if (guardResult.kind === 'skipped') {
+      const attributes = {
+        reason: guardResult.reason,
+        lastFullSyncRunAt:
+          guardResult.reason !== 'missing' ? guardResult.lastFullSyncRunAt?.toISOString() : `null`,
+      };
+      traceEvent('full sync skipped', attributes);
+      this.logger.log({
+        ...attributes,
+        subscriptionId,
+        userProfileId: userProfile.id,
+        userEmail,
+        msg: `Full sync skipped: ${guardResult.reason}`,
+      });
+      return { status: 'skipped' };
+    }
 
-    // Transactional concurrency guard: SELECT FOR UPDATE on inbox_configuration
-    const guardResult = await this.db.transaction(async (tx) => {
-      const result = await tx.execute<{
-        sync_state: 'idle' | 'running' | 'failed';
-        last_full_sync_run_at: string | null;
-        filters: unknown;
-      }>(
-        sql`SELECT sync_state, last_full_sync_run_at, filters FROM inbox_configuration WHERE user_profile_id = ${userProfile.id} FOR UPDATE`,
-      );
-      const locked = result.rows[0];
+    try {
+      return this.runSync({ subscriptionId, userProfile, userEmail, filters: guardResult.filters });
+    } catch (error) {
+      await this.db
+        .update(inboxConfiguration)
+        .set({ syncState: 'failed' })
+        .where(eq(inboxConfiguration.userProfileId, userProfile.id))
+        .execute();
+      throw error;
+    }
+  }
+
+  private async runSync({
+    subscriptionId,
+    userProfile,
+    userEmail,
+    filters: filtersRaw,
+  }: {
+    subscriptionId: string;
+    userProfile: NonNullishProps<UserProfile, 'email'>;
+    userEmail: Smeared;
+    filters: Record<string, unknown> | null;
+  }): Promise<{ status: FullSyncRunStatus }> {
+    await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
+    const filters = subscriptionMailFilters.parse(filtersRaw);
+    this.logger.log({
+      subscriptionId,
+      userProfileId: userProfile.id,
+      userEmail,
+      dateFrom: filters.dateFrom,
+      msg: `Fetching emails with filters`,
+    });
+
+    const allGraphEmails = await this.fetchAllEmails({
+      userProfileId: userProfile.id,
+      filters,
+    });
+    traceEvent('emails fetched', { count: allGraphEmails.length });
+    this.logger.log({
+      subscriptionId,
+      userProfileId: userProfile.id,
+      userEmail,
+      emailCount: allGraphEmails.length,
+      msg: `Emails fetched`,
+    });
+
+    await this.db
+      .update(inboxConfiguration)
+      .set({ messagesFromMicrosoft: allGraphEmails.length })
+      .where(eq(inboxConfiguration.userProfileId, userProfile.id))
+      .execute();
+
+    const filesList = allGraphEmails.map((item) => ({
+      key: getUniqueKeyForMessage(userProfile.email, item),
+      url: item.webLink,
+      updatedAt: item.lastModifiedDateTime,
+    }));
+
+    const fileDiffResponse = await this.uniqueApi.ingestion.performFileDiff(
+      filesList,
+      getRootScopePathForUser(userProfile.email),
+      INGESTION_SOURCE_KIND,
+      INGESTION_SOURCE_NAME,
+    );
+    traceEvent('file diff completed', {
+      new: fileDiffResponse.newFiles.length,
+      updated: fileDiffResponse.updatedFiles.length,
+      deleted: fileDiffResponse.deletedFiles.length,
+      moved: fileDiffResponse.movedFiles.length,
+    });
+    this.logger.log({
+      subscriptionId,
+      userProfileId: userProfile.id,
+      userEmail,
+      newFiles: fileDiffResponse.newFiles.length,
+      updatedFiles: fileDiffResponse.updatedFiles.length,
+      deletedFiles: fileDiffResponse.deletedFiles.length,
+      movedFiles: fileDiffResponse.movedFiles.length,
+      msg: `File diff completed`,
+    });
+
+    const filesRecord = indexBy(allGraphEmails, (item) =>
+      getUniqueKeyForMessage(userProfile.email, item),
+    );
+    const toIngest = [...fileDiffResponse.updatedFiles, ...fileDiffResponse.newFiles];
+    this.logger.log({
+      subscriptionId,
+      userProfileId: userProfile.id,
+      userEmail,
+      count: toIngest.length,
+      msg: `Publishing ingestion events`,
+    });
+
+    let messagesQueuedForSync = 0;
+    for (const fileKey of toIngest) {
+      const message = filesRecord[fileKey];
+      assert.ok(message, `Missing message for file key: ${fileKey}`);
+      const event = MessageEventDto.encode({
+        type: 'unique.outlook-semantic-mcp.mail-event.full-sync-change-notification-scheduled',
+        payload: { messageId: message.id, userProfileId: userProfile.id },
+      });
+      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
+        priority: IngestionPriority.Low,
+      });
+      messagesQueuedForSync += 1;
+    }
+
+    await this.db
+      .update(inboxConfiguration)
+      .set({ messagesQueuedForSync })
+      .where(eq(inboxConfiguration.userProfileId, userProfile.id))
+      .execute();
+
+    if (fileDiffResponse.movedFiles.length) {
+      this.logger.error({
+        msg: `We found moved files: ${fileDiffResponse.movedFiles.length}`,
+        subscriptionId,
+        userProfileId: userProfile.id,
+        userEmail,
+        keys: fileDiffResponse.movedFiles.join(', '),
+      });
+    }
+    const filesToDelete = await this.uniqueApi.files.getByKeys(fileDiffResponse.deletedFiles);
+    if (filesToDelete.length) {
+      this.logger.log({
+        subscriptionId,
+        userProfileId: userProfile.id,
+        userEmail,
+        count: filesToDelete.length,
+        msg: `Deleting files from unique`,
+      });
+      await this.uniqueApi.files.deleteByIds(filesToDelete.map((file) => file.id));
+    }
+
+    await this.db
+      .update(inboxConfiguration)
+      .set({ syncState: 'idle', lastFullSyncRunAt: new Date() })
+      .where(eq(inboxConfiguration.userProfileId, userProfile.id))
+      .execute();
+
+    return { status: 'success' };
+  }
+
+  private async acquireSyncLock(userProfileId: string): Promise<AcuireLockResult> {
+    return this.db.transaction(async (tx): Promise<AcuireLockResult> => {
+      const locked = await tx
+        .select({
+          syncState: inboxConfiguration.syncState,
+          lastFullSyncRunAt: inboxConfiguration.lastFullSyncRunAt,
+          filters: inboxConfiguration.filters,
+        })
+        .from(inboxConfiguration)
+        .where(eq(inboxConfiguration.userProfileId, userProfileId))
+        .for('update')
+        .then((rows) => rows[0]);
 
       if (!locked) {
-        return { kind: 'skipped', reason: 'missing' } as const;
+        return { kind: 'skipped', reason: 'missing' };
       }
 
-      if (locked.sync_state === 'running') {
-        return { kind: 'skipped', reason: 'already running' } as const;
+      if (locked.syncState === 'running') {
+        return {
+          kind: 'skipped',
+          reason: 'already running',
+          filters: locked.filters,
+          lastFullSyncRunAt: locked.lastFullSyncRunAt,
+        };
       }
 
       const twoDaysAgo = new Date();
       twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      const lastFullSyncRunAt = locked.last_full_sync_run_at
-        ? new Date(locked.last_full_sync_run_at)
-        : null;
-      if (isNonNullish(lastFullSyncRunAt) && lastFullSyncRunAt > twoDaysAgo) {
-        return { kind: 'skipped', reason: 'ran recently', lastFullSyncRunAt } as const;
+      if (isNonNullish(locked.lastFullSyncRunAt) && locked.lastFullSyncRunAt > twoDaysAgo) {
+        return {
+          kind: 'skipped',
+          reason: 'ran recently',
+          filters: locked.filters,
+          lastFullSyncRunAt: locked.lastFullSyncRunAt,
+        };
       }
 
       await tx
@@ -99,163 +267,15 @@ export class FullSyncCommand {
           messagesQueuedForSync: 0,
           messagesProcessed: 0,
         })
-        .where(eq(inboxConfiguration.userProfileId, userProfile.id))
+        .where(eq(inboxConfiguration.userProfileId, userProfileId))
         .execute();
 
-      return { kind: 'proceed', filters: locked.filters } as const;
+      return {
+        kind: 'proceed',
+        filters: locked.filters,
+        lastFullSyncRunAt: locked.lastFullSyncRunAt,
+      };
     });
-
-    if (guardResult.kind === 'skipped') {
-      if (guardResult.reason === 'ran recently') {
-        traceEvent('full sync skipped', {
-          reason: 'ran recently',
-          last_full_sync_run_at: guardResult.lastFullSyncRunAt.toISOString(),
-        });
-        this.logger.log({
-          subscriptionId,
-          userProfileId: userProfile.id,
-          userEmail,
-          lastFullSyncRunAt: guardResult.lastFullSyncRunAt,
-          msg: `Full sync skipped: ran recently`,
-        });
-      } else {
-        traceEvent('full sync skipped', { reason: guardResult.reason });
-        this.logger.log({
-          subscriptionId,
-          userProfileId: userProfile.id,
-          userEmail,
-          msg: `Full sync skipped: ${guardResult.reason}`,
-        });
-      }
-      return { status: 'skipped' };
-    }
-
-    try {
-      const filters = subscriptionMailFilters.parse(guardResult.filters);
-      this.logger.log({
-        subscriptionId,
-        userProfileId: userProfile.id,
-        userEmail,
-        dateFrom: filters.dateFrom,
-        msg: `Fetching emails with filters`,
-      });
-
-      const allGraphEmails = await this.fetchAllEmails({
-        userProfileId: userProfile.id,
-        filters,
-      });
-      traceEvent('emails fetched', { count: allGraphEmails.length });
-      this.logger.log({
-        subscriptionId,
-        userProfileId: userProfile.id,
-        userEmail,
-        emailCount: allGraphEmails.length,
-        msg: `Emails fetched`,
-      });
-
-      await this.db
-        .update(inboxConfiguration)
-        .set({ messagesFromMicrosoft: allGraphEmails.length })
-        .where(eq(inboxConfiguration.userProfileId, userProfile.id))
-        .execute();
-
-      const filesList = allGraphEmails.map((item) => ({
-        key: getUniqueKeyForMessage(userProfile.email, item),
-        url: item.webLink,
-        updatedAt: item.lastModifiedDateTime,
-      }));
-
-      const fileDiffResponse = await this.uniqueApi.ingestion.performFileDiff(
-        filesList,
-        getRootScopePathForUser(userProfile.email),
-        INGESTION_SOURCE_KIND,
-        INGESTION_SOURCE_NAME,
-      );
-      traceEvent('file diff completed', {
-        new: fileDiffResponse.newFiles.length,
-        updated: fileDiffResponse.updatedFiles.length,
-        deleted: fileDiffResponse.deletedFiles.length,
-        moved: fileDiffResponse.movedFiles.length,
-      });
-      this.logger.log({
-        subscriptionId,
-        userProfileId: userProfile.id,
-        userEmail,
-        newFiles: fileDiffResponse.newFiles.length,
-        updatedFiles: fileDiffResponse.updatedFiles.length,
-        deletedFiles: fileDiffResponse.deletedFiles.length,
-        movedFiles: fileDiffResponse.movedFiles.length,
-        msg: `File diff completed`,
-      });
-
-      const filesRecord = indexBy(allGraphEmails, (item) =>
-        getUniqueKeyForMessage(userProfile.email, item),
-      );
-      const toIngest = [...fileDiffResponse.updatedFiles, ...fileDiffResponse.newFiles];
-      this.logger.log({
-        subscriptionId,
-        userProfileId: userProfile.id,
-        userEmail,
-        count: toIngest.length,
-        msg: `Publishing ingestion events`,
-      });
-
-      let messagesQueuedForSync = 0;
-      for (const fileKey of toIngest) {
-        const message = filesRecord[fileKey];
-        assert.ok(message, `Missing message for file key: ${fileKey}`);
-        const event = MessageEventDto.encode({
-          type: 'unique.outlook-semantic-mcp.mail-event.full-sync-change-notification-scheduled',
-          payload: { messageId: message.id, userProfileId: userProfile.id },
-        });
-        await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
-          priority: IngestionPriority.Low,
-        });
-        messagesQueuedForSync += 1;
-      }
-
-      await this.db
-        .update(inboxConfiguration)
-        .set({ messagesQueuedForSync })
-        .where(eq(inboxConfiguration.userProfileId, userProfile.id))
-        .execute();
-
-      if (fileDiffResponse.movedFiles.length) {
-        this.logger.error({
-          msg: `We found moved files: ${fileDiffResponse.movedFiles.length}`,
-          subscriptionId,
-          userProfileId: userProfile.id,
-          userEmail,
-          keys: fileDiffResponse.movedFiles.join(', '),
-        });
-      }
-      const filesToDelete = await this.uniqueApi.files.getByKeys(fileDiffResponse.deletedFiles);
-      if (filesToDelete.length) {
-        this.logger.log({
-          subscriptionId,
-          userProfileId: userProfile.id,
-          userEmail,
-          count: filesToDelete.length,
-          msg: `Deleting files from unique`,
-        });
-        await this.uniqueApi.files.deleteByIds(filesToDelete.map((file) => file.id));
-      }
-
-      await this.db
-        .update(inboxConfiguration)
-        .set({ syncState: 'idle', lastFullSyncRunAt: new Date() })
-        .where(eq(inboxConfiguration.userProfileId, userProfile.id))
-        .execute();
-
-      return { status: 'success' };
-    } catch (error) {
-      await this.db
-        .update(inboxConfiguration)
-        .set({ syncState: 'failed' })
-        .where(eq(inboxConfiguration.userProfileId, userProfile.id))
-        .execute();
-      throw error;
-    }
   }
 
   private async fetchAllEmails({
@@ -289,3 +309,17 @@ export class FullSyncCommand {
     return emails;
   }
 }
+
+type AcuireLockResult =
+  | { kind: 'skipped'; reason: 'missing' }
+  | {
+      kind: 'skipped';
+      reason: 'already running' | 'ran recently';
+      filters: Record<string, unknown> | null;
+      lastFullSyncRunAt: Date | null;
+    }
+  | {
+      kind: 'proceed';
+      filters: Record<string, unknown> | null;
+      lastFullSyncRunAt: Date | null;
+    };

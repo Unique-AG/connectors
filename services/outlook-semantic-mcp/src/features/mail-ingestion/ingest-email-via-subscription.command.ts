@@ -21,7 +21,7 @@ export class IngestEmailViaSubscriptionCommand {
     subscriptionId: string;
     messageId: string;
   }): Promise<void> {
-    traceAttrs({ subscription_id: subscriptionId, message_id: messageId });
+    traceAttrs({ subscriptionId: subscriptionId, messageId: messageId });
     const subscription = await this.db.query.subscriptions.findFirst({
       columns: { userProfileId: true },
       where: eq(subscriptions.subscriptionId, subscriptionId),

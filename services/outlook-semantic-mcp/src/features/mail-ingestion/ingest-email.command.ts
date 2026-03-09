@@ -56,7 +56,7 @@ export class IngestEmailCommand {
     userProfileId: string;
     messageId: string;
   }): Promise<void> {
-    traceAttrs({ user_profile_id: userProfileId, message_id: messageId });
+    traceAttrs({ userProfileId: userProfileId, messageId: messageId });
     const userProfile = await this.db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });

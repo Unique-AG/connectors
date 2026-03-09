@@ -86,8 +86,8 @@ export class VerifyInboxConnectionTool {
     const minutesUntilExpiration = Math.floor(diffFromNow / (1000 * 60));
 
     traceAttrs({
-      'subscription.expires_at': expiresAt.toISOString(),
-      'subscription.minutes_until_expiration': minutesUntilExpiration,
+      'subscription.expiresAt': expiresAt.toISOString(),
+      'subscription.minutesUntilExpiration': minutesUntilExpiration,
     });
 
     let status: SubscriptionStatus;

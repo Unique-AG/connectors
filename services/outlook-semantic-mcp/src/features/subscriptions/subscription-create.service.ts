@@ -42,7 +42,7 @@ export class SubscriptionCreateService {
   @Span()
   public async subscribe(userProfileId: UserProfileTypeID): Promise<SubscribeResult> {
     traceAttrs({
-      user_profile_id: userProfileId.toString(),
+      userProfileId: userProfileId.toString(),
       operation: 'create_subscription',
     });
 
@@ -169,7 +169,7 @@ export class SubscriptionCreateService {
     }
 
     traceAttrs({
-      'user_profile.provider_user_id': userProfile.providerUserId,
+      'userProfile.providerUserId': userProfile.providerUserId,
     });
     this.logger.debug({
       msg: 'Successfully retrieved user profile from database',
@@ -213,7 +213,7 @@ export class SubscriptionCreateService {
       .post(payload)) as unknown;
     const graphSubscription = await Subscription.parseAsync(graphResponse);
 
-    traceAttrs({ 'graph_subscription.id': graphSubscription.id });
+    traceAttrs({ 'graphSubscription.id': graphSubscription.id });
     traceEvent('Graph API subscription created', {
       subscriptionId: graphSubscription.id,
     });

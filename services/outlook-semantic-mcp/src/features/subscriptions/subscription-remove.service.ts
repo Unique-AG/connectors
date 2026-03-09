@@ -35,7 +35,7 @@ export class SubscriptionRemoveService {
   @Span()
   public async enqueueSubscriptionRemoved(subscriptionId: string): Promise<void> {
     traceAttrs({
-      subscription_id: subscriptionId,
+      subscriptionId: subscriptionId,
       operation: 'enqueue_removal',
     });
 
@@ -71,7 +71,7 @@ export class SubscriptionRemoveService {
   @Span()
   public async removeByUserProfileId(userProfileId: UserProfileTypeID): Promise<RemoveResult> {
     traceAttrs({
-      user_profile_id: userProfileId.toString(),
+      userProfileId: userProfileId.toString(),
       operation: 'remove_subscription_by_user',
     });
 
@@ -94,7 +94,7 @@ export class SubscriptionRemoveService {
   @Span()
   public async remove(subscriptionId: string): Promise<RemoveResult> {
     traceAttrs({
-      subscription_id: subscriptionId,
+      subscriptionId: subscriptionId,
       operation: 'remove_subscription',
     });
 
@@ -139,7 +139,7 @@ export class SubscriptionRemoveService {
       userProfileId: deletedSubscription.userProfileId,
     });
 
-    traceAttrs({ user_profile_id: deletedSubscription.userProfileId });
+    traceAttrs({ userProfileId: deletedSubscription.userProfileId });
     this.logger.debug({
       msg: 'Sending deletion request to Microsoft Graph API for subscription',
       subscriptionId,

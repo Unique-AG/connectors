@@ -20,7 +20,7 @@ export class IngestEmailFromFullSyncCommand {
     userProfileId: string;
     messageId: string;
   }): Promise<void> {
-    traceAttrs({ user_profile_id: userProfileId, message_id: messageId });
+    traceAttrs({ userProfileId: userProfileId, messageId: messageId });
     await this.ingestEmailCommand.run({ userProfileId, messageId });
     await this.db
       .update(inboxConfiguration)
