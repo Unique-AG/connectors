@@ -44,4 +44,4 @@ unique-api = packages/unique-api/**
 # Special scopes
 ci = .github/**
 main = *, .*
-deps = **/package.json, **/pnpm-lock.yaml, pnpm-lock.yaml
+deps = package.json, pnpm-lock.yaml

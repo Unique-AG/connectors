@@ -45,6 +45,25 @@ jobs:
           # Alternative: nix shell (currently has stdin/stdout issues in GitHub Actions)
           # nix shell github:proventuslabs/scriptorium#cz --command bash -c 'printenv PR_TITLE | cz lint --paths "$(printenv FILES)"'
 
+      - name: Validate single-service scope
+        run: |
+          SCOPE=$(printenv PR_TITLE | grep -oP '\(\K[^)]+' || true)
+
+          # Derive service list from release-please-config.json (stays in sync automatically)
+          SERVICES=$(jq -r '.packages | keys[] | ltrimstr("services/")' release-please-config.json)
+
+          COUNT=0
+          for service in $SERVICES; do
+            if echo "$SCOPE" | tr ',' '\n' | tr -d ' ' | grep -qx "$service"; then
+              COUNT=$((COUNT + 1))
+            fi
+          done
+
+          if [ "$COUNT" -gt 1 ]; then
+            echo "::error title=Too many service scopes::PR declares $COUNT service scopes. Keep PRs focused to a single service. Use the 'skip-validation' label if this is intentional."
+            exit 1
+          fi
+
   gatekeeper:
     runs-on: ubuntu-latest
     permissions:
