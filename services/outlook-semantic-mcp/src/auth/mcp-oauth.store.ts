@@ -11,6 +11,7 @@ import {
   RefreshTokenMetadata,
 } from '@unique-ag/mcp-oauth';
 import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cache } from 'cache-manager';
 import { eq, lt } from 'drizzle-orm';
 import { typeid } from 'typeid-js';
@@ -42,6 +43,7 @@ export class McpOAuthStore implements IOAuthStore {
     private readonly drizzle: DrizzleDatabase,
     private readonly encryptionService: IEncryptionService,
     private readonly cacheManager: Cache,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   public async storeClient(client: OAuthClient): Promise<OAuthClient> {
@@ -166,7 +168,9 @@ export class McpOAuthStore implements IOAuthStore {
       .returning({ id: userProfiles.id });
     if (!saved) throw new Error('Failed to upsert user profile');
 
-    return saved.id;
+    const userProfileId = saved.id;
+    this.eventEmitter.emit('user.authorized', { userProfileId });
+    return userProfileId;
   }
 
   public async getUserProfileById(
