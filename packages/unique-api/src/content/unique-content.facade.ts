@@ -9,5 +9,5 @@ export interface GetContentByIdRequest {
 export interface UniqueContentFacade {
   search(request: PublicSearchRequest): Promise<SearchResult>;
   getContentById(request: GetContentByIdRequest): Promise<Content>;
-  getIngestionStats(scopePath: string): Promise<Partial<Record<IngestionState, number>>>;
+  getIngestionStats(scopeId: string): Promise<Partial<Record<IngestionState, number>>>;
 }

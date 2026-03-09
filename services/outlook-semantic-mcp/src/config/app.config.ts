@@ -1,6 +1,6 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-import { subscriptionMailFilters } from '~/db/schema/subscription/subscription-mail-filters.dto';
+import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { enabledDisabledBoolean, json, stringToURL } from '~/utils/zod';
 
 const ConfigSchema = z
@@ -22,11 +22,9 @@ const ConfigSchema = z
       .prefault('info')
       .describe('The log level at which the services outputs (pino).'),
     selfUrl: stringToURL().describe('The URL of the MCP Server. Used for OAuth callbacks.'),
-    defaultMailFilters: json(subscriptionMailFilters)
-      .optional()
-      .describe(
-        'Default mail filters applied when syncing emails (e.g. {"dateFrom":"2024-01-01"}). Optional.',
-      ),
+    defaultMailFilters: json(inboxConfigurationMailFilters).describe(
+      'Default mail filters applied when syncing emails (e.g. {"dateFrom":"2024-01-01"}). Optional.',
+    ),
   })
   .transform((c) => ({
     ...c,

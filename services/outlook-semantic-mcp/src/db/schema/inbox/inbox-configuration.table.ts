@@ -2,7 +2,7 @@ import { relations } from 'drizzle-orm';
 import { integer, jsonb, pgEnum, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
-import { SubscriptionMailFilters } from '../subscription/subscription-mail-filters.dto';
+import { InboxConfigurationMailFilters } from './inbox-configuration-mail-filters.dto';
 import { userProfiles } from '../user-profiles.table';
 
 export const inboxSyncState = pgEnum('inbox_sync_state', ['idle', 'running', 'failed']);
@@ -21,7 +21,7 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
       onUpdate: 'cascade',
     }),
 
-  filters: jsonb(`filters`).$type<SubscriptionMailFilters>(),
+  filters: jsonb(`filters`).$type<InboxConfigurationMailFilters>().notNull(),
   lastFullSyncRunAt: timestamp(`last_full_sync_run_at`),
   syncState: inboxSyncState(`sync_state`).notNull().default('idle'),
   syncStartedAt: timestamp(`sync_started_at`),

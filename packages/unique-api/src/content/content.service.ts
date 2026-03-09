@@ -15,6 +15,7 @@ import {
 } from './content.queries';
 import { PublicSearchRequest, SearchResult, SearchResultSchema } from './search-content.dto';
 import type { GetContentByIdRequest, UniqueContentFacade } from './unique-content.facade';
+import { UniqueOwnerType } from '../types';
 
 export class ContentService implements UniqueContentFacade {
   public constructor(
@@ -52,14 +53,16 @@ export class ContentService implements UniqueContentFacade {
   }
 
   public async getIngestionStats(
-    scopePath: string,
+    scopeId: string,
   ): Promise<Partial<Record<IngestionState, number>>> {
     const result = await this.uniqueGraphqlClient.request<
       StatisticsIngestionQueryOutput,
       StatisticsIngestionQueryInput
-    >(STATISTICS_INGESTION_QUERY, { scopePath });
+    >(STATISTICS_INGESTION_QUERY, {
+      where: { ownerId: { equals: scopeId }, ownerType: { equals: UniqueOwnerType.Scope } },
+    });
 
     assert.ok(result?.statisticsIngestion, 'Invalid response from Unique API statistics');
-    return Object.fromEntries(result.statisticsIngestion.map(({ state, count }) => [state, count]));
+    return result?.statisticsIngestion.counts;
   }
 }

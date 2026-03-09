@@ -16,9 +16,9 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
 import {
-  SubscriptionMailFilters,
-  subscriptionMailFilters,
-} from '../../db/schema/subscription/subscription-mail-filters.dto';
+  InboxConfigurationMailFilters,
+  inboxConfigurationMailFilters,
+} from '../../db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { SyncDirectoriesCommand } from '../directories-sync/sync-directories.command';
 import { MessageEventDto } from '../mail-ingestion/dtos/message-event.dto';
 import {
@@ -101,7 +101,7 @@ export class FullSyncCommand {
     filters: Record<string, unknown> | null;
   }): Promise<{ status: FullSyncRunStatus }> {
     await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
-    const filters = subscriptionMailFilters.parse(filtersRaw);
+    const filters = inboxConfigurationMailFilters.parse(filtersRaw);
     this.logger.log({
       subscriptionId,
       userProfileId: userProfile.id,
@@ -281,7 +281,7 @@ export class FullSyncCommand {
     filters,
     userProfileId,
   }: {
-    filters: SubscriptionMailFilters;
+    filters: InboxConfigurationMailFilters;
     userProfileId: string;
   }): Promise<FileDiffGraphMessage[]> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);

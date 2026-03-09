@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import z from 'zod';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
-import { getRootScopePathForUser } from '~/unique/get-root-scope-path';
+import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
@@ -69,8 +69,13 @@ export class GetFullSyncStatsQuery {
     };
 
     try {
-      const rootScopePath = getRootScopePathForUser(userProfile.providerUserId);
-      const ingestionStats = await this.uniqueApi.content.getIngestionStats(rootScopePath);
+      const rootScopeId = getRootScopeExternalIdForUser(userProfile.providerUserId);
+      const rootScope = await this.uniqueApi.scopes.getByExternalId(rootScopeId);
+      if (!rootScope) {
+        this.logger.debug({ userProfileId, msg: 'Root scope is missing' });
+        return configFields;
+      }
+      const ingestionStats = await this.uniqueApi.content.getIngestionStats(rootScope.id);
 
       this.logger.debug({ userProfileId, msg: 'Full sync progress retrieved' });
 

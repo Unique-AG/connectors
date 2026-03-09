@@ -1,6 +1,7 @@
 import { gql } from 'graphql-request';
 import type { IngestionState } from '../ingestion/ingestion.types';
 import { Content } from './content.dto';
+import { UniqueOwnerType } from '../types';
 
 export interface GetContentByIdQueryOutput {
   contentById: Content[];
@@ -27,24 +28,23 @@ export const GET_CONTENT_BY_ID_QUERY = gql`
   }
 `;
 
-export interface StatisticsIngestionQueryInput {
-  scopePath: string;
+interface StatisticsIngestionQueryCondition {
+  ownerId: { equals: string };
+  ownerType: { equals: UniqueOwnerType };
 }
 
-export interface StatisticsIngestionItem {
-  state: IngestionState;
-  count: number;
+export interface StatisticsIngestionQueryInput {
+  where: StatisticsIngestionQueryCondition;
 }
 
 export interface StatisticsIngestionQueryOutput {
-  statisticsIngestion: StatisticsIngestionItem[];
+  statisticsIngestion: { counts: Record<IngestionState, number> };
 }
 
 export const STATISTICS_INGESTION_QUERY = gql`
-  query StatisticsIngestion($scopePath: String!) {
-    statisticsIngestion(scopePath: $scopePath) {
-      state
-      count
+  query StatisticsIngestion($where: StatisticsIngestionWhereInput!) {
+    statisticsIngestion(where: $where) {
+      counts
     }
   }
 `;
