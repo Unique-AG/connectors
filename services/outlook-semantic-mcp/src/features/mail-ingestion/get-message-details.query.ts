@@ -12,7 +12,7 @@ export class GetMessageDetailsQuery {
 
   @Span()
   public async run({ userProfileId, messageId }: { userProfileId: string; messageId: string }) {
-    traceAttrs({ message_id: messageId });
+    traceAttrs({ messageId: messageId });
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const messageRaw = await client
       .api(`me/messages/${messageId}`)
