@@ -9,7 +9,7 @@ import { DirectoriesSyncModule } from './directories-sync/directories-sync.modul
 import { ListFoldersTool } from './directories-sync/tools';
 import { CreateDraftEmailTool } from './email-management/create-draft-email.tool';
 import { EmailManagementModule } from './email-management/email-management.module';
-import { FullSyncProgressTool, RunFullSyncTool } from './full-sync';
+import { RunFullSyncTool, SyncProgressTool } from './full-sync';
 import { FullSyncModule } from './full-sync/full-sync.module';
 import { IngestionListener } from './ingestion.listener';
 import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
@@ -25,7 +25,7 @@ import {
 const TOOLS = [
   ListFoldersTool,
   RunFullSyncTool,
-  FullSyncProgressTool,
+  SyncProgressTool,
   VerifyInboxConnectionTool,
   ConnectInboxTool,
   RemoveInboxConnectionTool,

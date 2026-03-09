@@ -2,8 +2,8 @@ import { relations } from 'drizzle-orm';
 import { integer, jsonb, pgEnum, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
-import { userProfiles } from '../user-profiles.table';
 import { SubscriptionMailFilters } from '../subscription/subscription-mail-filters.dto';
+import { userProfiles } from '../user-profiles.table';
 
 export const inboxSyncState = pgEnum('inbox_sync_state', ['idle', 'running', 'failed']);
 

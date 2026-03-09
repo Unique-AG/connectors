@@ -51,15 +51,15 @@ export class ContentService implements UniqueContentFacade {
     return ContentSchema.parse(item);
   }
 
-  public async getIngestionStats(scopePath: string): Promise<Partial<Record<IngestionState, number>>> {
+  public async getIngestionStats(
+    scopePath: string,
+  ): Promise<Partial<Record<IngestionState, number>>> {
     const result = await this.uniqueGraphqlClient.request<
       StatisticsIngestionQueryOutput,
       StatisticsIngestionQueryInput
     >(STATISTICS_INGESTION_QUERY, { scopePath });
 
     assert.ok(result?.statisticsIngestion, 'Invalid response from Unique API statistics');
-    return Object.fromEntries(
-      result.statisticsIngestion.map(({ state, count }) => [state, count]),
-    );
+    return Object.fromEntries(result.statisticsIngestion.map(({ state, count }) => [state, count]));
   }
 }

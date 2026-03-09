@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq, gt, sql } from 'drizzle-orm';
+import { Span } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, directoriesSync, subscriptions } from '~/db';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SyncDirectoriesCommand } from './sync-directories.command';
-import { Span } from 'nestjs-otel';
 
 @Injectable()
 export class SyncDirectoriesForSubscriptionsCommand {

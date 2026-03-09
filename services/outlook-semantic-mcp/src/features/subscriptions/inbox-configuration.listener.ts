@@ -1,10 +1,14 @@
 import assert from 'node:assert';
-import { defaultNackErrorHandler, RabbitPayload, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
+import {
+  defaultNackErrorHandler,
+  RabbitPayload,
+  RabbitSubscribe,
+} from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
-import { appConfig, type AppConfig } from '~/config';
+import { type AppConfig, appConfig } from '~/config';
 import { DRIZZLE, type DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import { FullSyncCommand } from '../full-sync/full-sync.command';
 import { SubscriptionCreatedEventDto } from './subscription.dtos';
@@ -31,7 +35,10 @@ export class InboxConfigurationListener {
   })
   public async onSubscriptionCreated(@RabbitPayload() payload: unknown): Promise<void> {
     const event = SubscriptionCreatedEventDto.parse(payload);
-    this.logger.log({ subscriptionId: event.subscriptionId, msg: 'Subscription created event received' });
+    this.logger.log({
+      subscriptionId: event.subscriptionId,
+      msg: 'Subscription created event received',
+    });
 
     const subscription = await this.db.query.subscriptions.findFirst({
       where: eq(subscriptions.subscriptionId, event.subscriptionId),

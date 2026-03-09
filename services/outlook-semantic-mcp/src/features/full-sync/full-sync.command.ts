@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { indexBy, isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, UserProfile, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfiguration, UserProfile } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { getRootScopePathForUser } from '~/unique/get-root-scope-path';
@@ -51,7 +51,6 @@ export class FullSyncCommand {
     this.logger.log({ subscriptionId, msg: `Starting full sync` });
 
     const { userProfile } = await this.getSubscriptionAndUserProfileQuery.run(subscriptionId);
-    traceAttrs({ userProfileId: userProfile.id });
     const userEmail = createSmeared(userProfile.email);
     this.logger.log({
       subscriptionId,

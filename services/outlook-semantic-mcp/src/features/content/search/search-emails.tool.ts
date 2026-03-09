@@ -1,16 +1,15 @@
-import { IngestionState, type UniqueApiClient } from '@unique-ag/unique-api';
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { IngestionState } from '@unique-ag/unique-api';
+import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import { isNullish } from 'remeda';
 import * as z from 'zod';
-import { DRIZZLE, type DrizzleDatabase, inboxConfiguration, userProfiles } from '~/db';
 import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
 import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
+import { GetFullSyncStatsQuery } from '~/features/full-sync/get-full-sync-stats.query';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
-import { getRootScopePathForUser } from '~/unique/get-root-scope-path';
-import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 
 const SearchEmailResultSchema = z.object({
@@ -32,9 +31,6 @@ const SearchEmailsOutputSchema = z.object({
   syncWarning: z.string().optional(),
 });
 
-const INCOMPLETE_INGESTION_WARNING =
-  'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox.';
-
 const INCOMPLETE_INGESTION_STATES = new Set([
   IngestionState.Queued,
   IngestionState.IngestionChunking,
@@ -51,13 +47,10 @@ const INCOMPLETE_INGESTION_STATES = new Set([
 
 @Injectable()
 export class SearchEmailsTool {
-  private readonly logger = new Logger(this.constructor.name);
-
   public constructor(
-    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     private readonly searchEmailsQuery: SearchEmailsQuery,
+    private readonly getFullSyncStatsQuery: GetFullSyncStatsQuery,
   ) {}
 
   @Tool({
@@ -95,54 +88,49 @@ export class SearchEmailsTool {
 
     const results = await this.searchEmailsQuery.run(userProfileTypeId.toString(), input);
 
-    const syncWarning = await this.buildSyncWarning(userProfileTypeId.toString());
+    const syncWarningResult = await this.buildSyncWarning(userProfileTypeId);
 
-    return { success: true, results, ...( syncWarning !== undefined && { syncWarning }) };
+    return { success: true, ...syncWarningResult, results };
   }
 
-  private async buildSyncWarning(userProfileId: string): Promise<string | undefined> {
-    try {
-      const config = await this.db.query.inboxConfiguration.findFirst({
-        where: eq(inboxConfiguration.userProfileId, userProfileId),
-      });
+  private async buildSyncWarning(
+    userProfileTypeId: UserProfileTypeID,
+  ): Promise<{ syncWarning?: string }> {
+    const config = await this.getFullSyncStatsQuery.run(userProfileTypeId);
+    if (isNullish(config.syncStats) && isNullish(config.ingestionStats)) {
+      return {
+        syncWarning: `Could not fetch email ingestion statistics. Search results may be incomplete and not reflect all emails in the inbox.`,
+      };
+    }
 
-      if (!config) {
-        return undefined;
-      }
+    const incompleteIngestionWarning = {
+      syncWarning:
+        'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox.',
+    };
 
-      const isSyncRunning = config.syncState === 'running';
+    if (config.syncStats) {
+      const isSyncRunning = config.syncStats.state === 'running';
       const hasUnprocessedMessages =
-        config.messagesQueuedForSync !== null &&
-        config.messagesProcessed !== null &&
-        config.messagesProcessed < config.messagesQueuedForSync;
+        config.syncStats.messages.queuedForSync !== null &&
+        config.syncStats.messages.processed !== null &&
+        config.syncStats.messages.processed < config.syncStats.messages.queuedForSync;
 
       if (isSyncRunning || hasUnprocessedMessages) {
-        return INCOMPLETE_INGESTION_WARNING;
+        return incompleteIngestionWarning;
       }
+    }
 
-      const userProfile = await this.db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, userProfileId),
-      });
-
-      if (!userProfile?.email) {
-        return undefined;
-      }
-
-      const rootScopePath = getRootScopePathForUser(userProfile.email);
-      const ingestionStats = await this.uniqueApi.content.getIngestionStats(rootScopePath);
-
-      const hasPendingItems = Object.entries(ingestionStats).some(
+    if (config.ingestionStats) {
+      const hasPendingItems = Object.entries(config.ingestionStats).some(
         ([state, count]) =>
           INCOMPLETE_INGESTION_STATES.has(state as IngestionState) && (count ?? 0) > 0,
       );
 
       if (hasPendingItems) {
-        return INCOMPLETE_INGESTION_WARNING;
+        return incompleteIngestionWarning;
       }
-    } catch (error) {
-      this.logger.warn({ userProfileId, msg: 'Failed to build sync warning', error });
     }
 
-    return undefined;
+    return {};
   }
 }

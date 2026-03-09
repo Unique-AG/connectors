@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DRIZZLE, inboxConfiguration } from '~/db';
 import { createMockDrizzleDatabase, MockDrizzleDatabase } from '~/__mocks__';
+import { inboxConfiguration } from '~/db';
 import { IngestEmailCommand } from './ingest-email.command';
 import { IngestEmailFromFullSyncCommand } from './ingest-email-from-full-sync.command';
 
