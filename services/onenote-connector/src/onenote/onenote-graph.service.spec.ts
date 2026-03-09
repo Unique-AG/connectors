@@ -202,6 +202,91 @@ describe('OneNoteGraphService', () => {
     });
   });
 
+  describe('getNotebookDriveItem', () => {
+    it('percent-encodes special characters in notebook name for OData search', async () => {
+      const notebookName = "Project (2024) $budget's";
+      const mockApi = vi.fn();
+      const client = { api: mockApi };
+
+      const chainMethods = {
+        select: vi.fn().mockReturnThis(),
+        get: vi.fn(),
+      };
+      mockApi.mockReturnValue(chainMethods);
+
+      chainMethods.get
+        .mockResolvedValueOnce({ displayName: notebookName })
+        .mockResolvedValueOnce({
+          value: [
+            {
+              id: 'item-1',
+              name: notebookName,
+              parentReference: { driveId: 'drive-1', id: 'parent-1' },
+              package: { type: 'oneNote' },
+            },
+          ],
+        });
+
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock
+      const result = await service.getNotebookDriveItem(client as any, 'nb-1');
+
+      const searchCallPath = mockApi.mock.calls[1]?.[0] as string;
+      expect(searchCallPath).not.toContain("'s");
+      expect(searchCallPath).not.toContain('(2024)');
+      expect(searchCallPath).not.toContain('$budget');
+      expect(searchCallPath).toBe(
+        `/me/drive/root/search(q='Project%20%282024%29%20%24budget%27s')`,
+      );
+      expect(result).toEqual({ driveId: 'drive-1', itemId: 'item-1' });
+    });
+
+    it('returns null when no drive items match', async () => {
+      const mockApi = vi.fn();
+      const client = { api: mockApi };
+
+      const chainMethods = {
+        select: vi.fn().mockReturnThis(),
+        get: vi.fn(),
+      };
+      mockApi.mockReturnValue(chainMethods);
+
+      chainMethods.get
+        .mockResolvedValueOnce({ displayName: 'Notebook' })
+        .mockResolvedValueOnce({ value: [] });
+
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock
+      const result = await service.getNotebookDriveItem(client as any, 'nb-1');
+      expect(result).toBeNull();
+    });
+
+    it('falls back to .onetoc2 file when no oneNote package found', async () => {
+      const mockApi = vi.fn();
+      const client = { api: mockApi };
+
+      const chainMethods = {
+        select: vi.fn().mockReturnThis(),
+        get: vi.fn(),
+      };
+      mockApi.mockReturnValue(chainMethods);
+
+      chainMethods.get
+        .mockResolvedValueOnce({ displayName: 'My Notes' })
+        .mockResolvedValueOnce({
+          value: [
+            {
+              id: 'toc-1',
+              name: 'My Notes.onetoc2',
+              parentReference: { driveId: 'drive-1', id: 'parent-1' },
+            },
+          ],
+        });
+
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock
+      const result = await service.getNotebookDriveItem(client as any, 'nb-1');
+      expect(result).toEqual({ driveId: 'drive-1', itemId: 'parent-1' });
+    });
+  });
+
   describe('getNotebookPermissions', () => {
     it('returns parsed permissions', async () => {
       const mockPermissions = [

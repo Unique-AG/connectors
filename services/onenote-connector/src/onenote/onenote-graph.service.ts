@@ -146,7 +146,10 @@ export class OneNoteGraphService {
   }
 
   private escapeODataString(value: string): string {
-    return value.replace(/'/g, "''");
+    return encodeURIComponent(value)
+      .replace(/'/g, '%27')
+      .replace(/\(/g, '%28')
+      .replace(/\)/g, '%29');
   }
 
   @Span()
