@@ -3,23 +3,10 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
-const oneYearAgo = () => {
-  const date = new Date();
-  date.setFullYear(date.getFullYear() - 1);
-  return date;
-};
-
-const ConnectInboxInputSchema = z.object({
-  dateFrom: z.iso
-    .date()
-    .transform((value) => new Date(value))
-    .refine((date) => date >= oneYearAgo(), { message: 'Minimum date can be one year ago' })
-    .describe('Start date for date range filter (ISO format: YYYY-MM-DD)'),
-});
+const ConnectInboxInputSchema = z.object({});
 
 const ConnectInboxOutputSchema = z.object({
   success: z.boolean(),
@@ -38,10 +25,7 @@ const ConnectInboxOutputSchema = z.object({
 export class ConnectInboxTool {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(
-    private readonly subscriptionCreate: SubscriptionCreateService,
-    private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
-  ) {}
+  public constructor(private readonly subscriptionCreate: SubscriptionCreateService) {}
 
   @Tool({
     name: 'connect_inbox',
@@ -65,7 +49,7 @@ export class ConnectInboxTool {
   })
   @Span()
   public async connectInbox(
-    input: z.infer<typeof ConnectInboxInputSchema>,
+    _input: z.infer<typeof ConnectInboxInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {
@@ -74,9 +58,7 @@ export class ConnectInboxTool {
 
     this.logger.log({ userProfileId, msg: 'Starting knowledge base integration for user' });
 
-    // We first sync all directories because if the webhook receives notifications we should be able to process them.
-    await this.syncDirectoriesCommand.run(userProfileTypeid);
-    const result = await this.subscriptionCreate.subscribe(userProfileTypeid, input);
+    const result = await this.subscriptionCreate.subscribe(userProfileTypeid);
     const { status, subscription } = result;
 
     const expiresAt = new Date(subscription.expiresAt);

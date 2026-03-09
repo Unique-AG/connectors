@@ -40,10 +40,7 @@ export class SubscriptionCreateService {
   ) {}
 
   @Span()
-  public async subscribe(
-    userProfileId: UserProfileTypeID,
-    filters: { dateFrom: Date },
-  ): Promise<SubscribeResult> {
+  public async subscribe(userProfileId: UserProfileTypeID): Promise<SubscribeResult> {
     traceAttrs({
       user_profile_id: userProfileId.toString(),
       operation: 'create_subscription',
@@ -110,10 +107,7 @@ export class SubscriptionCreateService {
           id: existingSubscription.id,
           count: result.rowCount ?? NaN,
         });
-        return await this.createNewSubscription({
-          userProfileId: userProfileId.toString(),
-          filters,
-        });
+        return await this.createNewSubscription(userProfileId.toString());
       }
 
       if (diffFromNow <= minimalTimeForLifecycleNotificationsInMinutes * 60 * 1000) {
@@ -144,19 +138,10 @@ export class SubscriptionCreateService {
       return { status: 'already_active', subscription: existingSubscription };
     }
     traceEvent('no existing subscription found');
-    return await this.createNewSubscription({
-      userProfileId: userProfileId.toString(),
-      filters,
-    });
+    return await this.createNewSubscription(userProfileId.toString());
   }
 
-  private async createNewSubscription({
-    userProfileId,
-    filters,
-  }: {
-    userProfileId: string;
-    filters: { dateFrom: Date };
-  }): Promise<SubscribeResult> {
+  private async createNewSubscription(userProfileId: string): Promise<SubscribeResult> {
     this.logger.debug({
       msg: 'No existing subscription found, proceeding with new subscription creation',
     });
