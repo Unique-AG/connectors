@@ -3,11 +3,15 @@ import { sanitizePath } from '@unique-ag/utils';
 import { first } from 'remeda';
 import { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueHttpClient } from '../clients/unique-http.client';
+import type { IngestionState } from '../ingestion/ingestion.types';
 import { Content, ContentSchema } from './content.dto';
 import {
   GET_CONTENT_BY_ID_QUERY,
   GetContentByIdQueryInput,
   GetContentByIdQueryOutput,
+  STATISTICS_INGESTION_QUERY,
+  StatisticsIngestionQueryInput,
+  StatisticsIngestionQueryOutput,
 } from './content.queries';
 import { PublicSearchRequest, SearchResult, SearchResultSchema } from './search-content.dto';
 import type { GetContentByIdRequest, UniqueContentFacade } from './unique-content.facade';
@@ -45,5 +49,17 @@ export class ContentService implements UniqueContentFacade {
     const item = first(result.contentById);
     assert.ok(item, 'Unique API Content not found');
     return ContentSchema.parse(item);
+  }
+
+  public async getIngestionStats(scopePath: string): Promise<Partial<Record<IngestionState, number>>> {
+    const result = await this.uniqueGraphqlClient.request<
+      StatisticsIngestionQueryOutput,
+      StatisticsIngestionQueryInput
+    >(STATISTICS_INGESTION_QUERY, { scopePath });
+
+    assert.ok(result?.statisticsIngestion, 'Invalid response from Unique API statistics');
+    return Object.fromEntries(
+      result.statisticsIngestion.map(({ state, count }) => [state, count]),
+    );
   }
 }
