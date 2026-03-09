@@ -1,6 +1,8 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
+import { OAuthClient } from '@unique-ag/mcp-oauth';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Cache } from 'cache-manager';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DrizzleDatabase } from '~/db';
 import { MockCacheManager, MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
 import { McpOAuthStore } from './mcp-oauth.store';
 
@@ -46,7 +48,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextInsertReturningRows = [savedClient];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.storeClient(mockClient);
 
@@ -69,7 +76,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextSelectRows = [drizzleClient];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.getClient('test-client-id');
 
@@ -80,7 +92,12 @@ describe('McpOAuthStore', () => {
     it('returns undefined when client not found', async () => {
       mockDrizzle.__nextSelectRows = [];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.getClient('non-existent');
 
@@ -102,7 +119,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextSelectRows = [drizzleClient];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.findClient('Test Client');
 
@@ -111,11 +133,16 @@ describe('McpOAuthStore', () => {
     });
 
     it('generates client ID with normalized name', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = unit.generateClientId({
         client_name: 'Test Client App!',
-      } as any);
+      } as unknown as OAuthClient);
 
       expect(result).toMatch(/^testclientapp_[a-z0-9]+$/);
     });
@@ -134,7 +161,12 @@ describe('McpOAuthStore', () => {
     };
 
     it('stores authorization code', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       await unit.storeAuthCode(mockAuthCode);
 
@@ -157,7 +189,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextSelectRows = [drizzleAuthCode];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.getAuthCode('test-auth-code');
 
@@ -186,7 +223,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextSelectRows = [expiredAuthCode];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.getAuthCode('expired-code');
 
@@ -195,7 +237,12 @@ describe('McpOAuthStore', () => {
     });
 
     it('removes authorization code', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       await unit.removeAuthCode('test-code');
 
@@ -221,7 +268,12 @@ describe('McpOAuthStore', () => {
       const userProfileId = 'user_profile_01kcrvsne6fq9att23mp4z5ef2';
       mockDrizzle.__nextInsertReturningRows = [{ id: userProfileId }];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.upsertUserProfile(mockUser);
 
@@ -248,7 +300,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextSelectRows = [mockProfile];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.getUserProfileById('profile-123');
 
@@ -285,7 +342,12 @@ describe('McpOAuthStore', () => {
         },
       ];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       await unit.storeAccessToken('test-token', mockAccessTokenMetadata);
 
@@ -301,7 +363,12 @@ describe('McpOAuthStore', () => {
     it('gets access token from cache first', async () => {
       mockCache.get.mockResolvedValue(mockAccessTokenMetadata);
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.getAccessToken('test-token');
 
@@ -324,7 +391,12 @@ describe('McpOAuthStore', () => {
         },
       ];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.getAccessToken('test-token');
 
@@ -343,7 +415,12 @@ describe('McpOAuthStore', () => {
     });
 
     it('removes access token and clears cache', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       await unit.removeAccessToken('test-token');
 
@@ -354,7 +431,12 @@ describe('McpOAuthStore', () => {
 
   describe('Refresh Token Family management', () => {
     it('revokes token family', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       await unit.revokeTokenFamily('family-123');
 
@@ -362,7 +444,12 @@ describe('McpOAuthStore', () => {
     });
 
     it('marks refresh token as used', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       await unit.markRefreshTokenAsUsed('refresh-token');
 
@@ -372,7 +459,12 @@ describe('McpOAuthStore', () => {
     it('checks if refresh token is used', async () => {
       mockDrizzle.__nextSelectRows = [{ usedAt: new Date() }];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.isRefreshTokenUsed('refresh-token');
 
@@ -384,7 +476,12 @@ describe('McpOAuthStore', () => {
   describe('Token cleanup', () => {
     it('cleans up expired tokens', async () => {
       mockDrizzle.__nextDeleteReturningRows = [{ id: 't1' }, { id: 't2' }];
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any, mockEventEmitter as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockEventEmitter as unknown as EventEmitter2,
+      );
 
       const result = await unit.cleanupExpiredTokens(30);
 

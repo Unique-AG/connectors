@@ -101,7 +101,14 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     McpOAuthModule.forRootAsync({
       imports: [DrizzleModule],
-      inject: [ConfigService, AesGcmEncryptionService, DRIZZLE, CACHE_MANAGER, MetricService, EventEmitter2],
+      inject: [
+        ConfigService,
+        AesGcmEncryptionService,
+        DRIZZLE,
+        CACHE_MANAGER,
+        MetricService,
+        EventEmitter2,
+      ],
       useFactory: async (
         configService: ConfigService<
           AppConfigNamespaced & MicrosoftConfigNamespaced & AuthConfigNamespaced,
