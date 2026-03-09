@@ -20,7 +20,6 @@ import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { traceAttrs, traceError, traceEvent } from '~/features/tracing.utils';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
-import { FullSyncCommand } from './full-sync/full-sync.command';
 import { MessageEventDto } from './mail-ingestion/dtos/message-event.dto';
 import { IngestionPriority } from './mail-ingestion/utils/ingestion-queue.utils';
 import {
@@ -41,7 +40,6 @@ export class MailSubscriptionController {
     private readonly subscriptionRemove: SubscriptionRemoveService,
     private readonly utils: MailSubscriptionUtilsService,
     private readonly amqpConnection: AmqpConnection,
-    private readonly fullSyncCommand: FullSyncCommand,
   ) {}
 
   @Post('lifecycle')
@@ -186,9 +184,6 @@ export class MailSubscriptionController {
     this.logger.log({ event, msg: 'Processing lifecycle event from message queue' });
 
     switch (event.type) {
-      case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created': {
-        return this.fullSyncCommand.run(event.subscriptionId);
-      }
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-removed': {
         return this.subscriptionRemove.remove(event.subscriptionId);
       }
