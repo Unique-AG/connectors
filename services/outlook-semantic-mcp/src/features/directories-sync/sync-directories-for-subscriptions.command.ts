@@ -3,6 +3,7 @@ import { eq, gt, sql } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDatabase, directoriesSync, subscriptions } from '~/db';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SyncDirectoriesCommand } from './sync-directories.command';
+import { Span } from 'nestjs-otel';
 
 @Injectable()
 export class SyncDirectoriesForSubscriptionsCommand {
@@ -11,6 +12,7 @@ export class SyncDirectoriesForSubscriptionsCommand {
     private syncDirectoriesCommand: SyncDirectoriesCommand,
   ) {}
 
+  @Span()
   public async run() {
     const results = await this.db
       .select()
