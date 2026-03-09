@@ -10,7 +10,7 @@ const makeCommand = (
   ingestEmailCommand: IngestEmailCommand,
 ): IngestEmailFromFullSyncCommand => {
   const cmd = new IngestEmailFromFullSyncCommand(
-    db as unknown as Parameters<typeof IngestEmailFromFullSyncCommand.prototype.constructor>[0],
+    db as unknown as ConstructorParameters<typeof IngestEmailFromFullSyncCommand>[0],
     ingestEmailCommand,
   );
   return cmd;
@@ -40,7 +40,8 @@ describe('IngestEmailFromFullSyncCommand', () => {
     await command.run(payload);
 
     expect(db.update).toHaveBeenCalledOnce();
-    const updateBuilder = db.update.mock.results[0].value;
+    const updateBuilder = db.update.mock.results?.[0]?.value;
+    expect(updateBuilder).toBeDefined();
     expect(updateBuilder.set).toHaveBeenCalledOnce();
     expect(updateBuilder.set).toHaveBeenCalledWith({
       messagesProcessed: sql`${inboxConfiguration.messagesProcessed} + 1`,
