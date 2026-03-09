@@ -3,6 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
+import { OneNoteDeltaService } from '../onenote-delta.service';
 import { OneNoteSyncService } from '../onenote-sync.service';
 
 const StartSyncOutputSchema = z.object({
@@ -14,7 +15,10 @@ const StartSyncOutputSchema = z.object({
 export class StartOneNoteSyncTool {
   private readonly logger = new Logger(StartOneNoteSyncTool.name);
 
-  public constructor(private readonly syncService: OneNoteSyncService) {}
+  public constructor(
+    private readonly syncService: OneNoteSyncService,
+    private readonly deltaService: OneNoteDeltaService,
+  ) {}
 
   @Tool({
     name: 'start_onenote_sync',
@@ -45,6 +49,7 @@ export class StartOneNoteSyncTool {
 
     this.logger.log({ userProfileId }, 'Manual sync triggered');
 
+    await this.deltaService.enableSync(userProfileId);
     await this.syncService.syncUser(userProfileId);
 
     return {

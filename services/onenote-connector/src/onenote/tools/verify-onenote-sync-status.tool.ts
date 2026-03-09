@@ -6,7 +6,7 @@ import * as z from 'zod';
 import { OneNoteDeltaService } from '../onenote-delta.service';
 
 const VerifySyncStatusOutputSchema = z.object({
-  status: z.enum(['active', 'inactive', 'error']),
+  status: z.enum(['active', 'inactive', 'disabled', 'error']),
   message: z.string(),
   lastSyncedAt: z.string().optional(),
   lastSyncStatus: z.string().optional(),
@@ -52,11 +52,19 @@ export class VerifyOneNoteSyncStatusTool {
       };
     }
 
+    const isDisabled = state.lastSyncStatus === 'disabled';
     const isError = state.lastSyncStatus === 'error';
 
+    const status = isDisabled ? ('disabled' as const) : isError ? ('error' as const) : ('active' as const);
+    const messageMap = {
+      disabled: 'OneNote sync is disabled. Use start_onenote_sync to re-enable.',
+      error: 'Last sync encountered an error',
+      active: 'OneNote sync is active',
+    } as const;
+
     return {
-      status: isError ? 'error' : 'active',
-      message: isError ? 'Last sync encountered an error' : 'OneNote sync is active',
+      status,
+      message: messageMap[status],
       lastSyncedAt: state.lastSyncedAt?.toISOString(),
       lastSyncStatus: state.lastSyncStatus ?? undefined,
     };

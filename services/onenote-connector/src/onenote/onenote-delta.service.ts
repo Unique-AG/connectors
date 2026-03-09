@@ -144,6 +144,19 @@ export class OneNoteDeltaService {
     }
   }
 
+  public async enableSync(userProfileId: string): Promise<void> {
+    const existing = await this.drizzle.query.deltaState.findFirst({
+      where: eq(deltaState.userProfileId, userProfileId),
+    });
+
+    if (existing?.lastSyncStatus === 'disabled') {
+      await this.drizzle
+        .update(deltaState)
+        .set({ lastSyncStatus: 'enabled' })
+        .where(eq(deltaState.userProfileId, userProfileId));
+    }
+  }
+
   public async isSyncDisabled(userProfileId: string): Promise<boolean> {
     const state = await this.drizzle.query.deltaState.findFirst({
       where: eq(deltaState.userProfileId, userProfileId),
