@@ -1,7 +1,7 @@
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
 import type { SyncConfigNamespaced, UniqueConfigNamespaced } from '~/config';
 import { DRIZZLE, DrizzleDatabase } from '~/drizzle/drizzle.module';
@@ -34,6 +34,11 @@ export class OneNoteSyncService {
   public async syncUser(userProfileId: string): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
+
+    if (await this.deltaService.isSyncDisabled(userProfileId)) {
+      this.logger.debug({ userProfileId }, 'Sync disabled for user, skipping');
+      return;
+    }
 
     this.logger.log({ userProfileId }, 'Starting sync for user');
 
@@ -281,7 +286,10 @@ export class OneNoteSyncService {
   }
 
   public async getAllUserProfileIds(): Promise<string[]> {
-    const profiles = await this.drizzle.select({ id: userProfiles.id }).from(userProfiles);
+    const profiles = await this.drizzle
+      .select({ id: userProfiles.id })
+      .from(userProfiles)
+      .where(and(isNotNull(userProfiles.accessToken), isNotNull(userProfiles.refreshToken)));
 
     return profiles.map((p) => p.id);
   }

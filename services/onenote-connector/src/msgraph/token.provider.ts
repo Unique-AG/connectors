@@ -87,11 +87,10 @@ export class TokenProvider implements AuthenticationProvider {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
         this.logger.error(
           {
             status: response.status,
-            errorText,
+            statusText: response.statusText,
             userProfileId: this.userProfileId,
             tokenRefreshFailed: true,
           },

@@ -43,13 +43,13 @@ export class StopOneNoteSyncTool {
     const userProfileId = request.user?.userProfileId;
     if (!userProfileId) throw new UnauthorizedException('User not authenticated');
 
-    await this.deltaService.clearDelta(userProfileId);
+    await this.deltaService.disableSync(userProfileId);
 
     this.logger.log({ userProfileId }, 'OneNote sync stopped');
 
     return {
       success: true,
-      message: 'OneNote sync stopped. Delta state cleared.',
+      message: 'OneNote sync stopped for this user.',
     };
   }
 }

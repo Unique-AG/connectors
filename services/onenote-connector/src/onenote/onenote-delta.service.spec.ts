@@ -75,14 +75,15 @@ describe('OneNoteDeltaService', () => {
       mockDrizzle.query.deltaState.findFirst.mockResolvedValue({
         deltaLink: 'https://graph.microsoft.com/delta?token=expired',
       });
+      const goneError = Object.assign(new Error('Gone'), { statusCode: 410 });
       (mockGraphService.getDelta as ReturnType<typeof vi.fn>)
-        .mockRejectedValueOnce(new Error('410 Gone'))
+        .mockRejectedValueOnce(goneError)
         .mockResolvedValueOnce({
           items: [
             {
               id: 'nb-1',
               name: 'test.onetoc2',
-              parentReference: { name: 'Work Notebook' },
+              parentReference: { name: 'Work Notebook', path: '/drive/root:/Work Notebook' },
             },
           ],
           nextDeltaLink: 'https://graph.microsoft.com/delta?token=fresh',
@@ -99,7 +100,11 @@ describe('OneNoteDeltaService', () => {
       mockDrizzle.query.deltaState.findFirst.mockResolvedValue(null);
       (mockGraphService.getDelta as ReturnType<typeof vi.fn>).mockResolvedValue({
         items: [
-          { id: 'section-1', name: 'Section.one', parentReference: { name: 'Study Notes' } },
+          {
+            id: 'section-1',
+            name: 'Section.one',
+            parentReference: { name: 'Study Notes', path: '/drive/root:/Study Notes' },
+          },
           { id: 'doc-1', name: 'Document.docx' },
           { id: 'nb-1', package: { type: 'oneNote' }, name: 'Work Notebook' },
         ],

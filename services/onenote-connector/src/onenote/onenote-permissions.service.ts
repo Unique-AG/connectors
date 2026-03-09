@@ -42,10 +42,10 @@ export class OneNotePermissionsService {
 
     const resolvePromises = [...emails].map((email) =>
       limit(async () => {
+        if (resolvedEmails.has(email)) return;
+        resolvedEmails.add(email);
         const user = await this.userService.findUserByEmail(email);
-        if (user && !resolvedEmails.has(email)) {
-          resolvedEmails.add(email);
-
+        if (user) {
           if (email === ownerEmail) {
             accesses.push(
               {
@@ -83,9 +83,9 @@ export class OneNotePermissionsService {
           for (const member of members) {
             const memberEmail = member.mail ?? member.userPrincipalName;
             if (memberEmail && !resolvedEmails.has(memberEmail)) {
+              resolvedEmails.add(memberEmail);
               const user = await this.userService.findUserByEmail(memberEmail);
               if (user) {
-                resolvedEmails.add(memberEmail);
                 accesses.push({
                   entityId: user.id,
                   entityType: ScopeAccessEntityType.User,
