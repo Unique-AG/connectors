@@ -117,12 +117,12 @@ export class OneNoteGraphService {
         .select('id,name,parentReference,package')
         .get();
 
-      type DriveSearchItem = {
+      interface DriveSearchItem {
         id: string;
         name?: string;
         parentReference?: { driveId?: string; id?: string };
         package?: { type?: string };
-      };
+      }
       const items = searchResults?.value as DriveSearchItem[] | undefined;
       if (!items?.length) return null;
 

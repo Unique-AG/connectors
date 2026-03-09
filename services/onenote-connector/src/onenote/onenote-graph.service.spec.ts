@@ -214,18 +214,16 @@ describe('OneNoteGraphService', () => {
       };
       mockApi.mockReturnValue(chainMethods);
 
-      chainMethods.get
-        .mockResolvedValueOnce({ displayName: notebookName })
-        .mockResolvedValueOnce({
-          value: [
-            {
-              id: 'item-1',
-              name: notebookName,
-              parentReference: { driveId: 'drive-1', id: 'parent-1' },
-              package: { type: 'oneNote' },
-            },
-          ],
-        });
+      chainMethods.get.mockResolvedValueOnce({ displayName: notebookName }).mockResolvedValueOnce({
+        value: [
+          {
+            id: 'item-1',
+            name: notebookName,
+            parentReference: { driveId: 'drive-1', id: 'parent-1' },
+            package: { type: 'oneNote' },
+          },
+        ],
+      });
 
       // biome-ignore lint/suspicious/noExplicitAny: Test mock
       const result = await service.getNotebookDriveItem(client as any, 'nb-1');
@@ -269,17 +267,15 @@ describe('OneNoteGraphService', () => {
       };
       mockApi.mockReturnValue(chainMethods);
 
-      chainMethods.get
-        .mockResolvedValueOnce({ displayName: 'My Notes' })
-        .mockResolvedValueOnce({
-          value: [
-            {
-              id: 'toc-1',
-              name: 'My Notes.onetoc2',
-              parentReference: { driveId: 'drive-1', id: 'parent-1' },
-            },
-          ],
-        });
+      chainMethods.get.mockResolvedValueOnce({ displayName: 'My Notes' }).mockResolvedValueOnce({
+        value: [
+          {
+            id: 'toc-1',
+            name: 'My Notes.onetoc2',
+            parentReference: { driveId: 'drive-1', id: 'parent-1' },
+          },
+        ],
+      });
 
       // biome-ignore lint/suspicious/noExplicitAny: Test mock
       const result = await service.getNotebookDriveItem(client as any, 'nb-1');
