@@ -129,6 +129,7 @@ export class TokenRefreshMiddleware implements Middleware {
         },
         'Failed to refresh token or retry Microsoft Graph request for user',
       );
+      throw error;
     }
   }
 

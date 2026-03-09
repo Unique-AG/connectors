@@ -60,9 +60,11 @@ export class OneNoteSyncService {
 
     const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
 
+    const userScope = await this.scopeService.createScope(rootScopeId, userProfileId, false);
+
     for (const notebook of notebooksToSync) {
       try {
-        await this.syncNotebook(client, userProfileId, notebook, rootScopeId);
+        await this.syncNotebook(client, userProfileId, notebook, userScope.id);
       } catch (error) {
         this.logger.error(
           { error, notebookId: notebook.id, notebookName: notebook.displayName },
@@ -224,7 +226,9 @@ export class OneNoteSyncService {
           key: contentKey,
           mimeType: 'text/html',
           title: pageTitle,
+          byteSize: Buffer.byteLength(htmlContent, 'utf-8'),
           url: oneNoteWebUrl,
+          metadata,
         },
       });
     } catch (error) {

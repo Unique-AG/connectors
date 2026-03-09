@@ -33,7 +33,7 @@ export class UniqueUserMappingService {
 
     const uniqueUser = await this.userService.findUserByEmail(profile.email);
     if (!uniqueUser) {
-      throw new Error(`User not found in Unique for email: ${profile.email}`);
+      throw new Error(`User not found in Unique for profile: ${userProfileId}`);
     }
 
     const headers = this.config.get('unique.serviceExtraHeaders', { infer: true });
