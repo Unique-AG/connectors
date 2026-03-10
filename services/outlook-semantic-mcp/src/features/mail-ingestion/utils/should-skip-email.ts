@@ -4,16 +4,20 @@ import { traceEvent } from '~/features/tracing.utils';
 
 const logger = new Logger('shouldSkipEmail');
 
-type EmailInput = {
+interface EmailInput {
   from?: { emailAddress?: { address?: string } | null } | null;
   subject?: string;
   uniqueBody?: { content?: string } | null;
   createdDateTime?: string;
-};
+}
 
 type SkipResult =
   | { skip: false }
-  | { skip: true; reason: 'ignoredBefore' | 'ignoredSenders' | 'ignoredContents'; matchedPattern?: string };
+  | {
+      skip: true;
+      reason: 'ignoredBefore' | 'ignoredSenders' | 'ignoredContents';
+      matchedPattern?: string;
+    };
 
 export function shouldSkipEmail(
   email: EmailInput,

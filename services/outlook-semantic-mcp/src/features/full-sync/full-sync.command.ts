@@ -27,8 +27,8 @@ import {
   fileDiffGraphMessageResponseSchema,
 } from '../mail-ingestion/dtos/microsoft-graph.dtos';
 import { getUniqueKeyForMessage } from '../mail-ingestion/utils/get-unique-key-for-message';
-import { shouldSkipEmail } from '../mail-ingestion/utils/should-skip-email';
 import { IngestionPriority } from '../mail-ingestion/utils/ingestion-queue.utils';
+import { shouldSkipEmail } from '../mail-ingestion/utils/should-skip-email';
 import { GetSubscriptionAndUserProfileQuery } from '../user-utils/get-subscription-and-user-profile.query';
 
 export type FullSyncRunStatus = 'skipped' | 'success';

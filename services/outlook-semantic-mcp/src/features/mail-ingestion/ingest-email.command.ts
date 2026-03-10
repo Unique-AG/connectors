@@ -9,6 +9,7 @@ import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish, omit } from 'remeda';
 import { UniqueConfigNamespaced } from '~/config';
 import { DirectoryType, DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/db';
+import { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
@@ -18,7 +19,6 @@ import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kin
 import { UpsertDirectoryCommand } from '../directories-sync/upsert-directory.command';
 import { GraphMessage } from './dtos/microsoft-graph.dtos';
 import { GetMessageDetailsQuery } from './get-message-details.query';
-import { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
 import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
 import { shouldSkipEmail } from './utils/should-skip-email';
@@ -76,7 +76,13 @@ export class IngestEmailCommand {
       if (skipResult.skip) {
         const { reason, matchedPattern } = skipResult;
         traceEvent('email skipped by filter', { reason, matchedPattern, userProfileId });
-        this.logger.log({ messageId, userProfileId, reason, matchedPattern, msg: 'Email skipped by filter' });
+        this.logger.log({
+          messageId,
+          userProfileId,
+          reason,
+          matchedPattern,
+          msg: 'Email skipped by filter',
+        });
         return;
       }
     }

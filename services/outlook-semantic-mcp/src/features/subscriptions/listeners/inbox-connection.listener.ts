@@ -8,10 +8,9 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
-import { type AppConfig, appConfig } from '~/config';
-import { DRIZZLE, type DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
-import { FullSyncCommand } from '../full-sync/full-sync.command';
-import { SubscriptionCreatedEventDto } from './subscription.dtos';
+import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/db';
+import { FullSyncCommand } from '../../full-sync/full-sync.command';
+import { SubscriptionCreatedEventDto } from '../subscription.dtos';
 
 @Injectable()
 export class InboxConfigurationListener {
@@ -19,7 +18,6 @@ export class InboxConfigurationListener {
 
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
     private readonly fullSyncCommand: FullSyncCommand,
   ) {}
 
@@ -44,14 +42,6 @@ export class InboxConfigurationListener {
       where: eq(subscriptions.subscriptionId, event.subscriptionId),
     });
     assert.ok(subscription, `Subscription missing for: ${event.subscriptionId}`);
-
-    await this.db
-      .insert(inboxConfiguration)
-      .values({
-        userProfileId: subscription.userProfileId,
-        filters: this.config.defaultMailFilters,
-      })
-      .onConflictDoNothing();
 
     this.logger.log({
       subscriptionId: event.subscriptionId,

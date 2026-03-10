@@ -35,7 +35,9 @@ export class IngestEmailViaSubscriptionCommand {
       where: eq(inboxConfiguration.userProfileId, subscription.userProfileId),
     });
 
-    const filters = inboxConfig ? inboxConfigurationMailFilters.parse(inboxConfig.filters) : undefined;
+    const filters = inboxConfig
+      ? inboxConfigurationMailFilters.parse(inboxConfig.filters)
+      : undefined;
 
     await this.ingestEmailCommand.run({
       userProfileId: subscription.userProfileId,

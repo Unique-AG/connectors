@@ -10,11 +10,12 @@ import {
   PassportUser,
   RefreshTokenMetadata,
 } from '@unique-ag/mcp-oauth';
+import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cache } from 'cache-manager';
 import { eq, lt } from 'drizzle-orm';
 import { typeid } from 'typeid-js';
+import { MAIN_EXCHANGE } from '../amqp/amqp.constants';
 import { DrizzleDatabase } from '../db/drizzle.module';
 import {
   authorizationCodes,
@@ -31,6 +32,7 @@ import {
   toDrizzleOAuthClientInsert,
   toDrizzleSessionInsert,
 } from '../utils/case-converter';
+import { UserAuthorizedEventDto } from './dtos/user-authorized-event.dto';
 
 export class McpOAuthStore implements IOAuthStore {
   private readonly logger = new Logger(this.constructor.name);
@@ -43,7 +45,7 @@ export class McpOAuthStore implements IOAuthStore {
     private readonly drizzle: DrizzleDatabase,
     private readonly encryptionService: IEncryptionService,
     private readonly cacheManager: Cache,
-    private readonly eventEmitter: EventEmitter2,
+    private readonly amqpConnection: AmqpConnection,
   ) {}
 
   public async storeClient(client: OAuthClient): Promise<OAuthClient> {
@@ -169,7 +171,11 @@ export class McpOAuthStore implements IOAuthStore {
     if (!saved) throw new Error('Failed to upsert user profile');
 
     const userProfileId = saved.id;
-    this.eventEmitter.emit('user.authorized', { userProfileId });
+    const event = UserAuthorizedEventDto.parse({
+      type: 'unique.outlook-semantic-mcp.auth.user-authorized',
+      payload: { userProfileId },
+    });
+    await this.amqpConnection.publish(MAIN_EXCHANGE.name, event.type, event);
     return userProfileId;
   }
 

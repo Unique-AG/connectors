@@ -8,7 +8,6 @@ import { GetFullSyncStatsQuery, GetFullSyncStatsResponse } from './get-full-sync
 
 const InputSchema = z.object({});
 
-// When inbox is not connected, only `message` is populated and configuration fields are null.
 const OutputSchema = GetFullSyncStatsResponse.extend({
   message: z.string(),
 });

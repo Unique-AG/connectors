@@ -4,7 +4,14 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, type DrizzleDatabase, subscriptions, userProfiles } from '~/db';
+import { AppConfig, appConfig } from '~/config';
+import {
+  DRIZZLE,
+  type DrizzleDatabase,
+  inboxConfiguration,
+  subscriptions,
+  userProfiles,
+} from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -35,6 +42,7 @@ export class SubscriptionCreateService {
   public constructor(
     private readonly amqp: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly utils: MailSubscriptionUtilsService,
   ) {}
@@ -177,6 +185,16 @@ export class SubscriptionCreateService {
       userEmail: createSmeared(userProfile.email ?? `___Empty Email__`),
       providerUserId: userProfile.providerUserId,
     });
+
+    // We create the inbox configuration before we do the subscription because we do not want
+    // to create a rance condition between webhook events and not having the subscription.
+    await this.db
+      .insert(inboxConfiguration)
+      .values({
+        userProfileId,
+        filters: this.config.defaultMailFilters,
+      })
+      .onConflictDoNothing();
 
     const payload = await CreateSubscriptionRequestSchema.encodeAsync({
       changeType: ['created'],

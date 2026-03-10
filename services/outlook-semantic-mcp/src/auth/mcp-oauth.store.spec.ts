@@ -1,5 +1,5 @@
 import { OAuthClient } from '@unique-ag/mcp-oauth';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Cache } from 'cache-manager';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DrizzleDatabase } from '~/db';
@@ -10,13 +10,13 @@ describe('McpOAuthStore', () => {
   let mockDrizzle: MockDrizzleDatabase;
   let mockEncryption: MockEncryptionService;
   let mockCache: MockCacheManager;
-  let mockEventEmitter: { emit: ReturnType<typeof vi.fn> };
+  let mockAmqpConnection: { publish: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     mockDrizzle = new MockDrizzleDatabase();
     mockEncryption = new MockEncryptionService();
     mockCache = new MockCacheManager();
-    mockEventEmitter = { emit: vi.fn() };
+    mockAmqpConnection = { publish: vi.fn().mockResolvedValue(undefined) };
     vi.clearAllMocks();
   });
 
@@ -52,7 +52,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.storeClient(mockClient);
@@ -80,7 +80,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.getClient('test-client-id');
@@ -96,7 +96,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.getClient('non-existent');
@@ -123,7 +123,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.findClient('Test Client');
@@ -137,7 +137,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = unit.generateClientId({
@@ -165,7 +165,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       await unit.storeAuthCode(mockAuthCode);
@@ -193,7 +193,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.getAuthCode('test-auth-code');
@@ -227,7 +227,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.getAuthCode('expired-code');
@@ -241,7 +241,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       await unit.removeAuthCode('test-code');
@@ -272,14 +272,18 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.upsertUserProfile(mockUser);
 
       expect(result).toBe(userProfileId);
       expect(mockDrizzle.insert).toHaveBeenCalled();
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith('user.authorized', { userProfileId });
+      expect(mockAmqpConnection.publish).toHaveBeenCalledWith(
+        'unique.outlook-semantic-mcp.main',
+        'unique.outlook-semantic-mcp.auth.user-authorized',
+        { userProfileId },
+      );
     });
 
     it('gets user profile by ID', async () => {
@@ -304,7 +308,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.getUserProfileById('profile-123');
@@ -346,7 +350,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       await unit.storeAccessToken('test-token', mockAccessTokenMetadata);
@@ -367,7 +371,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.getAccessToken('test-token');
@@ -395,7 +399,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.getAccessToken('test-token');
@@ -419,7 +423,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       await unit.removeAccessToken('test-token');
@@ -435,7 +439,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       await unit.revokeTokenFamily('family-123');
@@ -448,7 +452,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       await unit.markRefreshTokenAsUsed('refresh-token');
@@ -463,7 +467,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.isRefreshTokenUsed('refresh-token');
@@ -480,7 +484,7 @@ describe('McpOAuthStore', () => {
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
         mockCache as unknown as Cache,
-        mockEventEmitter as unknown as EventEmitter2,
+        mockAmqpConnection as unknown as AmqpConnection,
       );
 
       const result = await unit.cleanupExpiredTokens(30);

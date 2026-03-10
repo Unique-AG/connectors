@@ -6,12 +6,12 @@ import { Span } from 'nestjs-otel';
 import { omit, sumBy, values } from 'remeda';
 import z from 'zod';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, UserProfile } from '~/db';
+import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
-import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 
 const ingestionKnwonState = z.object({
   state: z.enum(['idle', 'running']),

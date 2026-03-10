@@ -1,5 +1,12 @@
+import {
+  defaultNackErrorHandler,
+  RabbitPayload,
+  RabbitSubscribe,
+} from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
+import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
+import { UserAuthorizedEventDto } from '~/auth/dtos/user-authorized-event.dto';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
@@ -9,21 +16,32 @@ export class PostAuthorizationListener {
 
   public constructor(private readonly subscriptionCreateService: SubscriptionCreateService) {}
 
-  @OnEvent('user.authorized')
-  public async onUserAuthorized(payload: { userProfileId: string }): Promise<void> {
+  @RabbitSubscribe({
+    exchange: MAIN_EXCHANGE.name,
+    queue: 'unique.outlook-semantic-mcp.auth.post-authorization',
+    routingKey: ['unique.outlook-semantic-mcp.auth.user-authorized'],
+    createQueueIfNotExists: true,
+    queueOptions: {
+      deadLetterExchange: DEAD_EXCHANGE.name,
+    },
+    errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
+  })
+  public async onUserAuthorized(@RabbitPayload() payload: unknown): Promise<void> {
+    const event = UserAuthorizedEventDto.parse(payload);
+    const { userProfileId } = event.payload;
     try {
       const result = await this.subscriptionCreateService.subscribe(
-        convertUserProfileIdToTypeId(payload.userProfileId),
+        convertUserProfileIdToTypeId(userProfileId),
       );
       this.logger.log({
         msg: 'Subscription outcome after user authorization',
-        userProfileId: payload.userProfileId,
+        userProfileId,
         status: result.status,
       });
     } catch (error) {
       this.logger.error({
         msg: 'Failed to subscribe user after authorization',
-        userProfileId: payload.userProfileId,
+        userProfileId,
         error,
       });
     }

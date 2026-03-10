@@ -14,7 +14,7 @@ import { FullSyncModule } from './full-sync/full-sync.module';
 import { IngestionListener } from './ingestion.listener';
 import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
 import { MailSubscriptionController } from './mail-subscription.controller';
-import { InboxConfigurationListener } from './subscriptions/inbox-configuration.listener';
+import { InboxConfigurationListener as InboxConnectionListener } from './subscriptions/listeners/inbox-connection.listener';
 import { SubscriptionModule } from './subscriptions/subscription.module';
 import {
   ReconnectInboxTool,
@@ -53,7 +53,7 @@ const TOOLS = [
     SearchModule,
     UniqueApiFeatureModule,
   ],
-  providers: [MailSubscriptionController, IngestionListener, InboxConfigurationListener, ...TOOLS],
+  providers: [MailSubscriptionController, IngestionListener, InboxConnectionListener, ...TOOLS],
   controllers: [MailSubscriptionController],
 })
 export class OutlookMcpToolsModule {}
