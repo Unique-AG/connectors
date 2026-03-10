@@ -55,7 +55,7 @@ const toQueueForIngestionUnknownState = z.object({
   }),
 });
 
-const toQueueForIngestionSchema = z.discriminatedUnion('syncStats', [
+const toQueueForIngestionSchema = z.discriminatedUnion('state', [
   toQueueForIngestionKnwonState,
   toQueueForIngestionUnknownState,
 ]);
