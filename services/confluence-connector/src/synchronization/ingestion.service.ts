@@ -49,7 +49,8 @@ export class IngestionService {
       const registrationResponse =
         await this.uniqueApiClient.ingestion.registerContent(registrationRequest);
 
-      await this.uploadBuffer(registrationResponse.writeUrl, htmlBuffer, INGESTION_MIME_TYPE);
+      const uploadUrl = this.correctWriteUrl(registrationResponse.writeUrl);
+      await this.uploadBuffer(uploadUrl, htmlBuffer, INGESTION_MIME_TYPE);
 
       const finalizationRequest = this.buildFinalizationRequest(
         registrationRequest,
@@ -128,6 +129,21 @@ export class IngestionService {
     readUrl: string,
   ): IngestionFinalizationRequest {
     return { ...registration, fileUrl: readUrl };
+  }
+
+  /**
+   * When running in cluster_local auth mode, rewrite the writeUrl to route through the ingestion
+   * service's scoped upload endpoint. This avoids requiring external network access (hairpinning
+   * through the gateway).
+   */
+  private correctWriteUrl(writeUrl: string): string {
+    if (this.config.unique.serviceAuthMode !== 'cluster_local') {
+      return writeUrl;
+    }
+    const url = new URL(writeUrl);
+    const key = url.searchParams.get('key');
+    assert.ok(key, 'writeUrl is missing key parameter');
+    return `${this.config.unique.ingestionServiceBaseUrl}/scoped/upload?key=${encodeURIComponent(key)}`;
   }
 
   private async uploadBuffer(writeUrl: string, buffer: Buffer, contentType: string): Promise<void> {
