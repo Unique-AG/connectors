@@ -166,20 +166,18 @@ export class GetFullSyncStatsQuery {
         return { ingestionStats, toQueueForIngestionStats, state: 'idle', progressPercentage: 100 };
       }
 
-      const total =
+      const totalCount =
         toQueueForIngestionStats.messages.queuedForSync +
         toQueueForIngestionStats.messages.processed +
-        ingestionStats.inProgress;
+        ingestionStats.inProgress +
+        ingestionStats.failed +
+        ingestionStats.finished;
+      const inProgressCount =
+        toQueueForIngestionStats.messages.processed +
+        ingestionStats.finished +
+        ingestionStats.failed;
 
-      const progressPercentage = Number(
-        (
-          ((toQueueForIngestionStats.messages.processed +
-            ingestionStats.finished +
-            ingestionStats.failed) *
-            100) /
-          total
-        ).toFixed(2),
-      );
+      const progressPercentage = Number(((inProgressCount / totalCount) * 100).toFixed(2));
 
       return { ingestionStats, toQueueForIngestionStats, state: 'running', progressPercentage };
     }
