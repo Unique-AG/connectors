@@ -6,7 +6,6 @@ import { Span } from 'nestjs-otel';
 import { omit, sumBy, values } from 'remeda';
 import z from 'zod';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, UserProfile } from '~/db';
-import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -33,7 +32,9 @@ const toQueueForIngestionKnwonState = z.object({
   state: z.enum(['idle', 'running', 'failed']),
   runAt: z.string().nullable(),
   startedAt: z.string().nullable(),
-  filters: inboxConfigurationMailFilters,
+  filters: z.object({
+    dateFrom: z.iso.datetime().nullable(),
+  }),
   messages: z.object({
     received: z.number(),
     queuedForSync: z.number(),
@@ -124,7 +125,7 @@ export class GetFullSyncStatsQuery {
           state: config.syncState,
           runAt: config.lastFullSyncRunAt?.toISOString() ?? null,
           startedAt: config.syncStartedAt?.toISOString() ?? null,
-          filters: config.filters,
+          filters: { dateFrom: config.filters.dateFrom.toISOString() ?? null },
           messages: {
             received: config.messagesFromMicrosoft,
             queuedForSync: config.messagesQueuedForSync,
