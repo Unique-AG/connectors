@@ -14,7 +14,7 @@ export class ChatService {
   ) {}
 
   @Span()
-  public async listChats(userProfileId: string): Promise<MsChat[]> {
+  public async listChats(userProfileId: string, limit = 50): Promise<MsChat[]> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
 
@@ -24,7 +24,7 @@ export class ChatService {
     const response = await client
       .api('/me/chats')
       .expand('members')
-      .top(50)
+      .top(limit)
       .select('id,chatType,topic,members')
       .get();
 
@@ -41,6 +41,7 @@ export class ChatService {
     userProfileId: string,
     chatId: string,
     limit: number,
+    orderBy = 'createdDateTime desc',
   ): Promise<MsChatMessage[]> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
@@ -56,7 +57,7 @@ export class ChatService {
     const response = await client
       .api(`/chats/${chatId}/messages`)
       .top(limit)
-      .orderby('createdDateTime desc')
+      .orderby(orderBy)
       .get();
 
     const messages = z.array(MsChatMessageSchema).parse(response.value);
