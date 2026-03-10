@@ -236,8 +236,8 @@ export class FullSyncCommand {
     return { status: 'success' };
   }
 
-  private async acquireSyncLock(userProfileId: string): Promise<AcuireLockResult> {
-    return this.db.transaction(async (tx): Promise<AcuireLockResult> => {
+  private async acquireSyncLock(userProfileId: string): Promise<AcquireLockResult> {
+    return this.db.transaction(async (tx): Promise<AcquireLockResult> => {
       const locked = await tx
         .select({
           syncState: inboxConfiguration.syncState,
@@ -325,7 +325,7 @@ export class FullSyncCommand {
   }
 }
 
-type AcuireLockResult =
+type AcquireLockResult =
   | { kind: 'skipped'; reason: 'missing' }
   | {
       kind: 'skipped';

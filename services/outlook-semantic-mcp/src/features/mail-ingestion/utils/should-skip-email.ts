@@ -29,13 +29,13 @@ export function shouldSkipEmail(
 
     for (const pattern of filters.ignoredSenders) {
       if (pattern.test(email.from?.emailAddress?.address ?? '')) {
-        return { skip: true, reason: 'ignoredSenders', matchedPattern: pattern.source };
+        return { skip: true, reason: 'ignoredSenders', matchedPattern: pattern.toString() };
       }
     }
 
     for (const pattern of filters.ignoredContents) {
       if (pattern.test(email.subject ?? '') || pattern.test(email.uniqueBody?.content ?? '')) {
-        return { skip: true, reason: 'ignoredContents', matchedPattern: pattern.source };
+        return { skip: true, reason: 'ignoredContents', matchedPattern: pattern.toString() };
       }
     }
 

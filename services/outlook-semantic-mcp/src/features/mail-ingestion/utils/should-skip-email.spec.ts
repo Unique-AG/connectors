@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { shouldSkipEmail } from './should-skip-email';
 import type { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 
+vi.mock('~/features/tracing.utils', () => ({ traceEvent: vi.fn() }));
+
 const baseFilters = (): InboxConfigurationMailFilters => ({
   dateFrom: new Date('2020-01-01T00:00:00Z'),
   ignoredSenders: [],
@@ -52,7 +54,7 @@ describe('shouldSkipEmail', () => {
         filters,
         context,
       );
-      expect(result).toEqual({ skip: true, reason: 'ignoredSenders', matchedPattern: '^noreply@example\\.com$' });
+      expect(result).toEqual({ skip: true, reason: 'ignoredSenders', matchedPattern: '/^noreply@example\\.com$/' });
     });
 
     it('skips on partial regex match against sender address', () => {
@@ -63,7 +65,7 @@ describe('shouldSkipEmail', () => {
         filters,
         context,
       );
-      expect(result).toEqual({ skip: true, reason: 'ignoredSenders', matchedPattern: 'no-?reply' });
+      expect(result).toEqual({ skip: true, reason: 'ignoredSenders', matchedPattern: '/no-?reply/i' });
     });
 
     it('does not skip when sender does not match', () => {
@@ -90,7 +92,7 @@ describe('shouldSkipEmail', () => {
       const filters = baseFilters();
       filters.ignoredContents = [/unsubscribe/i];
       const result = shouldSkipEmail({ subject: 'Click here to Unsubscribe' }, filters, context);
-      expect(result).toEqual({ skip: true, reason: 'ignoredContents', matchedPattern: 'unsubscribe' });
+      expect(result).toEqual({ skip: true, reason: 'ignoredContents', matchedPattern: '/unsubscribe/i' });
     });
 
     it('skips when pattern matches uniqueBody.content', () => {
@@ -101,7 +103,7 @@ describe('shouldSkipEmail', () => {
         filters,
         context,
       );
-      expect(result).toEqual({ skip: true, reason: 'ignoredContents', matchedPattern: 'newsletter' });
+      expect(result).toEqual({ skip: true, reason: 'ignoredContents', matchedPattern: '/newsletter/i' });
     });
 
     it('does not skip when pattern matches neither subject nor body', () => {
@@ -112,6 +114,13 @@ describe('shouldSkipEmail', () => {
         filters,
         context,
       );
+      expect(result).toEqual({ skip: false });
+    });
+
+    it('does not skip when uniqueBody is null', () => {
+      const filters = baseFilters();
+      filters.ignoredContents = [/newsletter/i];
+      const result = shouldSkipEmail({ subject: 'Hello', uniqueBody: null }, filters, context);
       expect(result).toEqual({ skip: false });
     });
   });
@@ -130,16 +139,18 @@ describe('shouldSkipEmail', () => {
         context,
       );
 
-      expect(result).toEqual({ skip: true, reason: 'ignoredSenders', matchedPattern: 'noreply' });
+      expect(result).toEqual({ skip: true, reason: 'ignoredSenders', matchedPattern: '/noreply/' });
       expect(contentsPattern.test).not.toHaveBeenCalled();
     });
   });
 
   describe('error handling', () => {
-    it('returns { skip: false } and fails open when a filter throws', () => {
+    it('returns { skip: false } and emits traceEvent with userProfileId when a filter throws', async () => {
+      const { traceEvent } = await import('~/features/tracing.utils');
       const throwingPattern = {
         test: () => { throw new Error('regex engine failure'); },
         source: 'bad',
+        toString: () => '/bad/',
       } as unknown as RegExp;
 
       const filters = baseFilters();
@@ -152,6 +163,7 @@ describe('shouldSkipEmail', () => {
       );
 
       expect(result).toEqual({ skip: false });
+      expect(traceEvent).toHaveBeenCalledWith('shouldSkipEmail.error', { userProfileId: context.userProfileId });
     });
   });
 });
