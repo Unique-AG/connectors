@@ -29,7 +29,7 @@
   "dependencies": {
     "@golevelup/nestjs-rabbitmq": "^6.0.2",
     "@microsoft/microsoft-graph-client": "^3.0.7",
-    "@modelcontextprotocol/sdk": "1.25.2",
+    "@modelcontextprotocol/sdk": "1.26.0",
     "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
