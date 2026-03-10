@@ -196,77 +196,196 @@ describe('FileDiffService', () => {
   });
 
   describe('accidental deletion guard', () => {
-    it('allows deletions when there are new and recognized files', async () => {
-      // 2 submitted: 1 new + 1 recognized (not new) → remainingKnownFiles = 1 → allowed
-      const { service } = makeService(async () => ({
-        newFiles: ['p-2'],
-        updatedFiles: [],
-        deletedFiles: ['p-old'],
-        movedFiles: [],
-      }));
+    // The guard prevents accidental full deletion of all previously-known files for a space.
+    // It checks: remainingKnownFiles = submittedItems - newFiles
+    //   - If remainingKnownFiles > 0: at least one recognized item survives → allow
+    //   - If remainingKnownFiles <= 0: no recognized items survive → abort
 
-      const result = await service.computeDiff([basePage, { ...basePage, id: 'p-2' }]);
-
-      expect(result.deletedPageIds).toEqual(['p-old']);
-    });
-
-    it('allows deletions when there are updated files', async () => {
-      const { service } = makeService(async () => ({
-        newFiles: [],
-        updatedFiles: ['p-1'],
-        deletedFiles: ['p-old'],
-        movedFiles: [],
-      }));
-
-      const result = await service.computeDiff([basePage]);
-
-      expect(result.deletedPageIds).toEqual(['p-old']);
-    });
-
-    it('allows deletions when submitted items are recognized (not new)', async () => {
-      // 1 submitted item that the API already knows (not in newFiles) + 3 deletions = legitimate
-      const { service } = makeService(async () => ({
-        newFiles: [],
-        updatedFiles: [],
-        deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3'],
-        movedFiles: [],
-      }));
-
-      const result = await service.computeDiff([basePage]);
-
-      expect(result.deletedPageIds).toEqual(['p-old-1', 'p-old-2', 'p-old-3']);
-    });
-
-    it('aborts when all submitted items are new and there are deletions', async () => {
-      // All submitted items are "new" (API does not recognize them) + deletions = suspicious
-      const { service } = makeService(async () => ({
-        newFiles: ['p-1'],
-        updatedFiles: [],
-        deletedFiles: ['p-old-1', 'p-old-2'],
-        movedFiles: [],
-      }));
-
-      await expect(service.computeDiff([basePage])).rejects.toThrow(
-        'File diff would delete 2 files with 0 recognized items remaining. Aborting sync to prevent accidental full deletion.',
-      );
-    });
-
-    it('aborts when zero items are submitted and there are deletions', async () => {
-      const { service } = makeService(async () => emptyDiffResponse);
-
-      // This case is unreachable in practice (loop doesn't iterate for 0 pages),
-      // but validates the guard logic directly
-      expect(() =>
-        // @ts-expect-error -- calling private method for testing
-        service.validateNoAccidentalFullDeletion([], {
+    describe('when deletions should be ALLOWED', () => {
+      it('should allow deletions when all submitted pages are unchanged (labels removed from other pages)', async () => {
+        // User removed labels from 3 pages, 3 remain labeled and unchanged
+        // submitted=3, new=0 → remainingKnown=3
+        const { service } = makeService(async () => ({
           newFiles: [],
+          updatedFiles: [],
+          deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3'],
+          movedFiles: [],
+        }));
+
+        const result = await service.computeDiff([
+          basePage,
+          { ...basePage, id: 'p-2' },
+          { ...basePage, id: 'p-3' },
+        ]);
+
+        expect(result.deletedPageIds).toEqual(['p-old-1', 'p-old-2', 'p-old-3']);
+      });
+
+      it('should allow deletions when a single recognized page remains (leave-one-file workflow)', async () => {
+        // User removed labels from all pages except one to trigger intentional cleanup
+        // submitted=1, new=0 → remainingKnown=1
+        const { service } = makeService(async () => ({
+          newFiles: [],
+          updatedFiles: [],
+          deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3', 'p-old-4', 'p-old-5'],
+          movedFiles: [],
+        }));
+
+        const result = await service.computeDiff([basePage]);
+
+        expect(result.deletedPageIds).toEqual(['p-old-1', 'p-old-2', 'p-old-3', 'p-old-4', 'p-old-5']);
+      });
+
+      it('should allow deletions when submitted page was updated', async () => {
+        // Page content changed + other pages deleted
+        // submitted=1, new=0 (updated ≠ new) → remainingKnown=1
+        const { service } = makeService(async () => ({
+          newFiles: [],
+          updatedFiles: ['p-1'],
+          deletedFiles: ['p-old'],
+          movedFiles: [],
+        }));
+
+        const result = await service.computeDiff([basePage]);
+
+        expect(result.deletedPageIds).toEqual(['p-old']);
+      });
+
+      it('should allow deletions when there is a mix of new and recognized pages', async () => {
+        // Some pages are new, some are recognized, some old pages deleted
+        // submitted=3, new=1 → remainingKnown=2
+        const { service } = makeService(async () => ({
+          newFiles: ['p-3'],
+          updatedFiles: [],
+          deletedFiles: ['p-old-1', 'p-old-2'],
+          movedFiles: [],
+        }));
+
+        const result = await service.computeDiff([
+          basePage,
+          { ...basePage, id: 'p-2' },
+          { ...basePage, id: 'p-3' },
+        ]);
+
+        expect(result.deletedPageIds).toEqual(['p-old-1', 'p-old-2']);
+      });
+
+      it('should allow deletions when submitted page has a moved URL', async () => {
+        // Page URL changed + other pages deleted; moved pages are still recognized
+        // submitted=1, new=0 → remainingKnown=1
+        const { service } = makeService(async () => ({
+          newFiles: [],
+          updatedFiles: [],
+          deletedFiles: ['p-old'],
+          movedFiles: ['p-1'],
+        }));
+
+        const result = await service.computeDiff([basePage]);
+
+        expect(result.deletedPageIds).toEqual(['p-old']);
+      });
+
+      it('should not trigger when there are no deletions', async () => {
+        // All pages are new, no old pages exist → no deletions, guard irrelevant
+        // submitted=2, new=2, deleted=0
+        const { service } = makeService(async () => ({
+          newFiles: ['p-1', 'p-2'],
+          updatedFiles: [],
+          deletedFiles: [],
+          movedFiles: [],
+        }));
+
+        const result = await service.computeDiff([
+          basePage,
+          { ...basePage, id: 'p-2' },
+        ]);
+
+        expect(result.deletedPageIds).toEqual([]);
+      });
+
+      it('should allow deletions when more items are deleted than submitted', async () => {
+        // 1 recognized page remains, many old pages to clean up
+        // submitted=1, new=0 → remainingKnown=1
+        const { service } = makeService(async () => ({
+          newFiles: [],
+          updatedFiles: [],
+          deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3', 'p-old-4', 'p-old-5', 'p-old-6', 'p-old-7', 'p-old-8', 'p-old-9', 'p-old-10'],
+          movedFiles: [],
+        }));
+
+        const result = await service.computeDiff([basePage]);
+
+        expect(result.deletedPageIds).toHaveLength(10);
+      });
+    });
+
+    describe('when deletions should be BLOCKED', () => {
+      it('should abort when all submitted items are new and there are deletions (possible key format change)', async () => {
+        // API does not recognize any submitted items but has old items to delete
+        // submitted=1, new=1 → remainingKnown=0
+        const { service } = makeService(async () => ({
+          newFiles: ['p-1'],
+          updatedFiles: [],
+          deletedFiles: ['p-old-1', 'p-old-2'],
+          movedFiles: [],
+        }));
+
+        await expect(service.computeDiff([basePage])).rejects.toThrow(
+          'File diff would delete 2 files with 0 recognized items remaining. Aborting sync to prevent accidental full deletion.',
+        );
+      });
+
+      it('should abort when multiple submitted items are all new with deletions', async () => {
+        // All 3 submitted items are new + old items deleted → total state replacement, suspicious
+        // submitted=3, new=3 → remainingKnown=0
+        const { service } = makeService(async () => ({
+          newFiles: ['p-1', 'p-2', 'p-3'],
           updatedFiles: [],
           deletedFiles: ['p-old-1'],
           movedFiles: [],
-        }),
-      ).toThrow(
-        'File diff would delete 1 files with 0 recognized items remaining.',
-      );
+        }));
+
+        await expect(
+          service.computeDiff([
+            basePage,
+            { ...basePage, id: 'p-2' },
+            { ...basePage, id: 'p-3' },
+          ]),
+        ).rejects.toThrow(
+          'File diff would delete 1 files with 0 recognized items remaining.',
+        );
+      });
+
+      it('should abort when zero items are submitted and there are deletions (unreachable via computeDiff but validates guard)', async () => {
+        // submitted=0, new=0 → remainingKnown=0
+        const { service } = makeService(async () => emptyDiffResponse);
+
+        expect(() =>
+          // @ts-expect-error -- calling private method for testing
+          service.validateNoAccidentalFullDeletion([], {
+            newFiles: [],
+            updatedFiles: [],
+            deletedFiles: ['p-old-1', 'p-old-2'],
+            movedFiles: [],
+          }),
+        ).toThrow(
+          'File diff would delete 2 files with 0 recognized items remaining.',
+        );
+      });
+
+      it('should abort when single new item replaces single old item (1:1 swap, suspicious)', async () => {
+        // submitted=1, new=1 → remainingKnown=0
+        const { service } = makeService(async () => ({
+          newFiles: ['p-1'],
+          updatedFiles: [],
+          deletedFiles: ['p-old'],
+          movedFiles: [],
+        }));
+
+        await expect(service.computeDiff([basePage])).rejects.toThrow(
+          'File diff would delete 1 files with 0 recognized items remaining.',
+        );
+      });
     });
   });
 });
