@@ -5,7 +5,7 @@ import { z } from 'zod/v4';
 const regexPattern = z.string().transform((pattern, ctx) => {
   const regexParts = /\/(.*)\/(.*)/.exec(pattern);
   const patternPart = regexParts?.[1];
-  const flagsPart = regexParts?.[0];
+  const flagsPart = regexParts?.[2];
   if (isNullish(patternPart) || isNullish(flagsPart)) {
     ctx.addIssue({ code: 'custom', message: `Invalid regex pattern: ${pattern}` });
     return z.NEVER;
