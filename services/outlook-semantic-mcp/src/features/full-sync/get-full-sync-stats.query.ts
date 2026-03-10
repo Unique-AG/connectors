@@ -166,14 +166,20 @@ export class GetFullSyncStatsQuery {
         return { ingestionStats, toQueueForIngestionStats, state: 'idle', progressPercentage: 100 };
       }
 
-      const totalCount = toQueueForIngestionStats.messages.queuedForSync;
-      ingestionStats.inProgress + ingestionStats.failed + ingestionStats.finished;
-      const inProgressCount =
+      // We intentionally double count the messages because ingestion is the slow operation
+      // probably we will have 50% progress pretty fast but the rest will slowly go until
+      // ingestion finishes.
+      const totalCount =
+        toQueueForIngestionStats.messages.queuedForSync +
+        ingestionStats.inProgress +
+        ingestionStats.failed +
+        ingestionStats.finished;
+      const completedCount =
         toQueueForIngestionStats.messages.processed +
         ingestionStats.finished +
         ingestionStats.failed;
 
-      const progressPercentage = Number(((inProgressCount / totalCount) * 100).toFixed(2));
+      const progressPercentage = Number(((completedCount / totalCount) * 100).toFixed(2));
 
       return { ingestionStats, toQueueForIngestionStats, state: 'running', progressPercentage };
     }
