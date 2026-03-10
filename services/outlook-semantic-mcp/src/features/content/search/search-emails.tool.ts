@@ -40,7 +40,7 @@ export class SearchEmailsTool {
     name: 'search_emails',
     title: 'Search Emails',
     description:
-      'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by folder, call `list_folders` first to obtain valid folder ids. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` with the result\'s id. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete.',
+      "Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by folder, call `list_folders` first to obtain valid folder ids. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` with the result's id. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete.",
     parameters: SearchEmailsInputSchema,
     outputSchema: SearchEmailsOutputSchema,
     annotations: {
@@ -84,7 +84,7 @@ export class SearchEmailsTool {
       return {
         success: true,
         syncWarning:
-          'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox.',
+          'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox. The sync process syncronizes newest emails first.',
         results,
       };
     }
