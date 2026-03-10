@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-alpha.2](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.1...confluence-connector@2.0.0-alpha.2) (2026-03-10)
+
+
+### Bug Fixes
+
+* **confluence-connector:** correctWriteUrl when using cluster_local ([#345](https://github.com/Unique-AG/connectors/issues/345)) ([2bde377](https://github.com/Unique-AG/connectors/commit/2bde37745f499c1d2b88ffbe9ad8e7439e12ff09))
+
 ## [2.0.0-alpha.1](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.0...confluence-connector@2.0.0-alpha.1) (2026-03-10)
 
 
