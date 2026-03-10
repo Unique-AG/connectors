@@ -5,7 +5,7 @@ import type { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-conf
 vi.mock('~/features/tracing.utils', () => ({ traceEvent: vi.fn() }));
 
 const baseFilters = (): InboxConfigurationMailFilters => ({
-  dateFrom: new Date('2020-01-01T00:00:00Z'),
+  ignoredBefore: new Date('2020-01-01T00:00:00Z'),
   ignoredSenders: [],
   ignoredContents: [],
 });
@@ -20,17 +20,17 @@ describe('shouldSkipEmail', () => {
     });
   });
 
-  describe('dateFrom', () => {
-    it('skips when createdDateTime is before dateFrom', () => {
+  describe('ignoredBefore', () => {
+    it('skips when createdDateTime is before ignoredBefore', () => {
       const result = shouldSkipEmail(
         { createdDateTime: '2019-06-01T00:00:00Z' },
         baseFilters(),
         context,
       );
-      expect(result).toEqual({ skip: true, reason: 'dateFrom' });
+      expect(result).toEqual({ skip: true, reason: 'ignoredBefore' });
     });
 
-    it('does not skip when createdDateTime is after dateFrom', () => {
+    it('does not skip when createdDateTime is after ignoredBefore', () => {
       const result = shouldSkipEmail(
         { createdDateTime: '2021-01-01T00:00:00Z' },
         baseFilters(),

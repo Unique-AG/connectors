@@ -10,7 +10,7 @@ const regexPattern = z.string().transform((pattern, ctx) => {
 });
 
 export const inboxConfigurationMailFilters = z.object({
-  dateFrom: z.coerce.date(),
+  ignoredBefore: z.coerce.date(),
   ignoredSenders: z.array(regexPattern).optional().default([]),
   ignoredContents: z.array(regexPattern).optional().default([]),
 });

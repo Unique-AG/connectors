@@ -34,7 +34,7 @@ const toQueueForIngestionKnwonState = z.object({
   runAt: z.string().nullable(),
   startedAt: z.string().nullable(),
   filters: z.object({
-    dateFrom: z.iso.datetime().nullable(),
+    ignoredBefore: z.iso.datetime().nullable(),
   }),
   messages: z.object({
     received: z.number(),
@@ -127,7 +127,7 @@ export class GetFullSyncStatsQuery {
           state: config.syncState,
           runAt: config.lastFullSyncRunAt?.toISOString() ?? null,
           startedAt: config.syncStartedAt?.toISOString() ?? null,
-          filters: { dateFrom: filters?.dateFrom.toISOString() ?? null },
+          filters: { ignoredBefore: filters?.ignoredBefore.toISOString() ?? null },
           messages: {
             received: config.messagesFromMicrosoft,
             queuedForSync: config.messagesQueuedForSync,

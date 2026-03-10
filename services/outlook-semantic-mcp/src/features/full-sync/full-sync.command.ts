@@ -107,7 +107,7 @@ export class FullSyncCommand {
       subscriptionId,
       userProfileId: userProfile.id,
       userEmail,
-      dateFrom: filters.dateFrom,
+      ignoredBefore: filters.ignoredBefore,
       msg: `Fetching emails with filters`,
     });
 
@@ -306,7 +306,7 @@ export class FullSyncCommand {
       .api(`me/messages`)
       .header('Prefer', 'IdType="ImmutableId"')
       .select(FileDiffGraphMessageFields)
-      .filter(`createdDateTime gt ${filters.dateFrom.toISOString()}`)
+      .filter(`createdDateTime gt ${filters.ignoredBefore.toISOString()}`)
       .orderby(`createdDateTime desc`)
       .top(200)
       .get();

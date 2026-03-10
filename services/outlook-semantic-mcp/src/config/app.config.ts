@@ -32,7 +32,7 @@ const ConfigSchema = z
         }
       }),
     ).describe(
-      'Default mail filters applied when syncing emails (e.g. {"dateFrom":"2024-01-01"}). Optional.',
+      'Default mail filters applied when syncing emails (e.g. {"ignoredBefore":"2024-01-01"}). Optional.',
     ),
   })
   .transform((c) => ({

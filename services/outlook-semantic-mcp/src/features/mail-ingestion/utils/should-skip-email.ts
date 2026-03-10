@@ -13,7 +13,7 @@ type EmailInput = {
 
 type SkipResult =
   | { skip: false }
-  | { skip: true; reason: 'dateFrom' | 'ignoredSenders' | 'ignoredContents'; matchedPattern?: string };
+  | { skip: true; reason: 'ignoredBefore' | 'ignoredSenders' | 'ignoredContents'; matchedPattern?: string };
 
 export function shouldSkipEmail(
   email: EmailInput,
@@ -21,9 +21,9 @@ export function shouldSkipEmail(
   context: { userProfileId: string },
 ): SkipResult {
   try {
-    if (filters.dateFrom && email.createdDateTime) {
-      if (new Date(email.createdDateTime) < filters.dateFrom) {
-        return { skip: true, reason: 'dateFrom' };
+    if (filters.ignoredBefore && email.createdDateTime) {
+      if (new Date(email.createdDateTime) < filters.ignoredBefore) {
+        return { skip: true, reason: 'ignoredBefore' };
       }
     }
 
