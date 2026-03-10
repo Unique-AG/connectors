@@ -2,8 +2,8 @@ apiVersion: v2
 name: confluence-connector
 description: Take content from Confluence and send it to Unique AI for RAG ingestion.
 type: application
-version: 2.0.0-alpha.0
-appVersion: 2.0.0-alpha.0
+version: 2.0.0-alpha.1
+appVersion: 2.0.0-alpha.1
 dependencies:
   - alias: connector
     name: backend-service
