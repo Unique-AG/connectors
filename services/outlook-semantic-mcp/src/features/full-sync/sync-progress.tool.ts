@@ -2,7 +2,6 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { isNullish } from 'remeda';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetFullSyncStatsQuery, GetFullSyncStatsResponse } from './get-full-sync-stats.query';
@@ -46,15 +45,21 @@ export class SyncProgressTool {
   ) {
     const userProfileTypeid = extractUserProfileId(request);
     const stats = await this.getFullSyncStatsQuery.run(userProfileTypeid);
-    if (isNullish(stats.syncStats) && isNullish(stats.ingestionStats)) {
-      return { ...stats, message: 'Inbox not connected — use `connect_inbox` first.' };
-    }
-    if (isNullish(stats.ingestionStats)) {
+    if (stats.state === 'unknown') {
       return {
         ...stats,
-        message: 'Ingestion quing stats available. Ingestion stats not available',
+        message:
+          'Search results may be inaccurate. Ingestion Statistics could not be fetched. Your inbox is a unknown state try to use the tools `remove_inbox_connection` and `reconnect_inbox` to get it into a proper state',
       };
     }
-    return { ...stats, message: 'All stats received succesfully' };
+    if (stats.state === 'running') {
+      return {
+        ...stats,
+        message:
+          'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox.',
+      };
+    }
+
+    return { ...stats, message: '' };
   }
 }

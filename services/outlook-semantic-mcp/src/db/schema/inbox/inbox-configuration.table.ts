@@ -2,8 +2,8 @@ import { relations } from 'drizzle-orm';
 import { integer, jsonb, pgEnum, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
-import { InboxConfigurationMailFilters } from './inbox-configuration-mail-filters.dto';
 import { userProfiles } from '../user-profiles.table';
+import { InboxConfigurationMailFilters } from './inbox-configuration-mail-filters.dto';
 
 export const inboxSyncState = pgEnum('inbox_sync_state', ['idle', 'running', 'failed']);
 
@@ -25,9 +25,9 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   lastFullSyncRunAt: timestamp(`last_full_sync_run_at`),
   syncState: inboxSyncState(`sync_state`).notNull().default('idle'),
   syncStartedAt: timestamp(`sync_started_at`),
-  messagesFromMicrosoft: integer(`messages_from_microsoft`).default(0),
-  messagesQueuedForSync: integer(`messages_queued_for_sync`).default(0),
-  messagesProcessed: integer(`messages_processed`).default(0),
+  messagesFromMicrosoft: integer(`messages_from_microsoft`).notNull().default(0),
+  messagesQueuedForSync: integer(`messages_queued_for_sync`).notNull().default(0),
+  messagesProcessed: integer(`messages_processed`).notNull().default(0),
 
   ...timestamps,
 });

@@ -10,6 +10,9 @@ import {
   ContentUpdateMetadataResponse,
   type ContentUpsertMutationInput,
   type ContentUpsertMutationResult,
+  STATISTICS_INGESTION_QUERY,
+  StatisticsIngestionQueryInput,
+  StatisticsIngestionQueryOutput,
 } from './ingestion.queries';
 import type {
   ContentRegistrationRequest,
@@ -18,6 +21,7 @@ import type {
   FileDiffResponse,
   IngestionApiResponse,
   IngestionFinalizationRequest,
+  IngestionState,
 } from './ingestion.types';
 import { UniqueIngestionFacade } from './unique-ingestion.facade';
 
@@ -134,5 +138,17 @@ export class FileIngestionService implements UniqueIngestionFacade {
     const responseData = await body.json();
     assert.ok(responseData, 'Invalid response from Unique API file diff');
     return responseData as FileDiffResponse;
+  }
+
+  public async getIngestionStats(
+    scopeId: string,
+  ): Promise<Partial<Record<IngestionState, number>>> {
+    const result = await this.ingestionClient.request<
+      StatisticsIngestionQueryOutput,
+      StatisticsIngestionQueryInput
+    >(STATISTICS_INGESTION_QUERY, { ownerId: scopeId });
+
+    assert.ok(result?.statisticsIngestion, 'Invalid response from Unique API statistics');
+    return result?.statisticsIngestion.counts;
   }
 }

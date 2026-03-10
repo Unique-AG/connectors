@@ -1,15 +1,12 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { IngestionState } from '@unique-ag/unique-api';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { isNullish } from 'remeda';
 import * as z from 'zod';
 import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
 import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import { GetFullSyncStatsQuery } from '~/features/full-sync/get-full-sync-stats.query';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
-import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 
 const SearchEmailResultSchema = z.object({
@@ -30,20 +27,6 @@ const SearchEmailsOutputSchema = z.object({
   status: z.string().optional(),
   syncWarning: z.string().optional(),
 });
-
-const INCOMPLETE_INGESTION_STATES = new Set([
-  IngestionState.Queued,
-  IngestionState.IngestionChunking,
-  IngestionState.IngestionEmbedding,
-  IngestionState.IngestionReading,
-  IngestionState.MetadataValidation,
-  IngestionState.CheckingIntegrity,
-  IngestionState.MalwareScanning,
-  IngestionState.Retrying,
-  IngestionState.ReEmbedding,
-  IngestionState.ReIngesting,
-  IngestionState.RebuildingMetadata,
-]);
 
 @Injectable()
 export class SearchEmailsTool {
@@ -87,50 +70,25 @@ export class SearchEmailsTool {
     }
 
     const results = await this.searchEmailsQuery.run(userProfileTypeId.toString(), input);
+    const stats = await this.getFullSyncStatsQuery.run(userProfileTypeId);
 
-    const syncWarningResult = await this.buildSyncWarning(userProfileTypeId);
-
-    return { success: true, ...syncWarningResult, results };
-  }
-
-  private async buildSyncWarning(
-    userProfileTypeId: UserProfileTypeID,
-  ): Promise<{ syncWarning?: string }> {
-    const config = await this.getFullSyncStatsQuery.run(userProfileTypeId);
-    if (isNullish(config.syncStats) && isNullish(config.ingestionStats)) {
+    if (stats.state === 'unknown') {
       return {
-        syncWarning: `Could not fetch email ingestion statistics. Search results may be incomplete and not reflect all emails in the inbox.`,
+        success: true,
+        syncWarning:
+          'Search results may be inaccurate. Ingestion Statistics could not be fetched. Your inbox is a unknown state try to use the tools `remove_inbox_connection` and `reconnect_inbox` to get it into a proper state',
+        results,
+      };
+    }
+    if (stats.state === 'running') {
+      return {
+        success: true,
+        syncWarning:
+          'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox.',
+        results,
       };
     }
 
-    const incompleteIngestionWarning = {
-      syncWarning:
-        'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox.',
-    };
-
-    if (config.syncStats) {
-      const isSyncRunning = config.syncStats.state === 'running';
-      const hasUnprocessedMessages =
-        config.syncStats.messages.queuedForSync !== null &&
-        config.syncStats.messages.processed !== null &&
-        config.syncStats.messages.processed < config.syncStats.messages.queuedForSync;
-
-      if (isSyncRunning || hasUnprocessedMessages) {
-        return incompleteIngestionWarning;
-      }
-    }
-
-    if (config.ingestionStats) {
-      const hasPendingItems = Object.entries(config.ingestionStats).some(
-        ([state, count]) =>
-          INCOMPLETE_INGESTION_STATES.has(state as IngestionState) && (count ?? 0) > 0,
-      );
-
-      if (hasPendingItems) {
-        return incompleteIngestionWarning;
-      }
-    }
-
-    return {};
+    return { success: true, results };
   }
 }
