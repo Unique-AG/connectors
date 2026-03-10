@@ -46,7 +46,7 @@ export class FileDiffService {
         this.confluenceConfig.baseUrl,
       );
 
-      this.validateNoAccidentalFullDeletion(fileDiffItems, diffResponse);
+      await this.validateNoAccidentalFullDeletion(fileDiffItems, diffResponse, partialKey);
 
       result.newPageIds.push(...diffResponse.newFiles);
       result.updatedPageIds.push(...diffResponse.updatedFiles);
@@ -73,28 +73,37 @@ export class FileDiffService {
     }));
   }
 
-  private validateNoAccidentalFullDeletion(
+  private async validateNoAccidentalFullDeletion(
     submittedItems: FileDiffItem[],
     diffResponse: FileDiffResponse,
-  ): void {
+    partialKey: string,
+  ): Promise<void> {
     if (diffResponse.deletedFiles.length === 0) {
       return;
     }
 
-    // Items the API already knows about that will survive the sync.
-    // submittedItems minus newFiles = previously-known items still present.
-    const remainingKnownFiles = submittedItems.length - diffResponse.newFiles.length;
-
-    if (remainingKnownFiles <= 0 && diffResponse.deletedFiles.length > 0) {
+    if (submittedItems.length === 0 && diffResponse.deletedFiles.length > 0) {
       this.logger.error({
-        submittedCount: submittedItems.length,
-        newCount: diffResponse.newFiles.length,
+        submittedCount: 0,
         deletedCount: diffResponse.deletedFiles.length,
-        remainingKnownFiles,
-        msg: 'File diff would delete all previously known files with no recognized items remaining. Aborting to prevent accidental full deletion.',
+        msg: 'File diff would delete all files because zero items were submitted. Aborting to prevent accidental full deletion.',
       });
       assert.fail(
-        `File diff would delete ${diffResponse.deletedFiles.length} files with ${remainingKnownFiles} recognized items remaining. Aborting sync to prevent accidental full deletion.`,
+        `Submitted 0 items to file diff but ${diffResponse.deletedFiles.length} files would be deleted. Aborting sync.`,
+      );
+    }
+
+    const totalFilesInUnique = await this.uniqueApiClient.files.getCountByKeyPrefix(partialKey);
+    if (diffResponse.deletedFiles.length === totalFilesInUnique) {
+      this.logger.error({
+        submittedCount: submittedItems.length,
+        deletedCount: diffResponse.deletedFiles.length,
+        totalFilesInUnique,
+        partialKey,
+        msg: 'File diff would delete all files stored in Unique. Aborting to prevent accidental full deletion.',
+      });
+      assert.fail(
+        `File diff would delete all ${diffResponse.deletedFiles.length} files stored in Unique for partialKey "${partialKey}". Aborting sync to prevent accidental full deletion.`,
       );
     }
   }
