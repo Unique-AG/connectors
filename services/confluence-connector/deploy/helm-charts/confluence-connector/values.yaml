@@ -120,8 +120,12 @@ connectorConfig:
           mode: oauth_2lo
           # -- OAuth 2.0 (2LO) application client ID
           clientId: unset_default_value
+          # -- OAuth 2.0 client secret. Use "os.environ/ENV_VAR_NAME" to read from environment variable at runtime.
+          # This default is overridden per-tenant in the monorepo app.yaml values.
+          clientSecret: "os.environ/CONFLUENCE_CLIENT_SECRET"
         # -- Number of Confluence API requests allowed per minute
-        apiRateLimitPerMinute: 100
+        # Atlassian recommends DC admins allow at least 20 req/s (1200 RPM). Cloud uses a points-based quota.
+        apiRateLimitPerMinute: 1200
         # -- Label to trigger single-page sync
         ingestSingleLabel: ai-ingest
         # -- Label to trigger full sync of all labeled pages
@@ -165,8 +169,6 @@ connectorConfig:
           projectId: unset_default_value
 
       processing:
-        # -- timeout in seconds for a page processing step before it will stop and skip processing the page
-        stepTimeoutSeconds: 300
         # -- how many pages you want to submit for ingestion into Unique at once
         concurrency: 1
         # -- cron expression for the scheduled Confluence scan interval default: every 15 minutes
