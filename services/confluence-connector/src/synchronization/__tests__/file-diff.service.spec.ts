@@ -29,14 +29,21 @@ const emptyDiffResponse = {
 
 function makeService(
   performFileDiffImpl: UniqueApiClient['ingestion']['performFileDiff'],
-  options?: { useV1KeyFormat?: boolean; instanceType?: 'cloud' | 'data-center' },
+  options?: {
+    useV1KeyFormat?: boolean;
+    instanceType?: 'cloud' | 'data-center';
+    totalFilesInUnique?: number;
+  },
 ): {
   service: FileDiffService;
   performFileDiff: ReturnType<typeof vi.fn>;
+  getCountByKeyPrefix: ReturnType<typeof vi.fn>;
 } {
   const performFileDiff = vi.fn(performFileDiffImpl);
+  const getCountByKeyPrefix = vi.fn().mockResolvedValue(options?.totalFilesInUnique ?? 0);
   const uniqueApiClient = {
     ingestion: { performFileDiff },
+    files: { getCountByKeyPrefix },
   } as unknown as UniqueApiClient;
 
   const confluenceConfig = {
@@ -52,6 +59,7 @@ function makeService(
       uniqueApiClient,
     ),
     performFileDiff,
+    getCountByKeyPrefix,
   };
 }
 
@@ -94,12 +102,15 @@ describe('FileDiffService', () => {
     });
 
     it('returns categorized ids from file diff response', async () => {
-      const { service } = makeService(async () => ({
-        newFiles: ['p-1', 'p-1_file.pdf'],
-        updatedFiles: ['p-2'],
-        deletedFiles: ['p-3', 'p-3_old.pdf'],
-        movedFiles: ['p-4', 'p-4_new.pdf'],
-      }));
+      const { service } = makeService(
+        async () => ({
+          newFiles: ['p-1', 'p-1_file.pdf'],
+          updatedFiles: ['p-2'],
+          deletedFiles: ['p-3', 'p-3_old.pdf'],
+          movedFiles: ['p-4', 'p-4_new.pdf'],
+        }),
+        { totalFilesInUnique: 10 },
+      );
 
       const result = await service.computeDiff([
         basePage,
@@ -141,14 +152,17 @@ describe('FileDiffService', () => {
 
     it('aggregates results across multiple spaces', async () => {
       let callCount = 0;
-      const { service } = makeService(async () => {
-        callCount++;
-        if (callCount === 1) {
-          // Space A: 1 recognized item (not new) + 1 deletion
-          return { newFiles: [], updatedFiles: [], deletedFiles: ['p-old'], movedFiles: [] };
-        }
-        return { newFiles: ['p-2'], updatedFiles: ['p-3'], deletedFiles: [], movedFiles: [] };
-      });
+      const { service } = makeService(
+        async () => {
+          callCount++;
+          if (callCount === 1) {
+            return { newFiles: ['p-1'], updatedFiles: [], deletedFiles: ['p-old'], movedFiles: [] };
+          }
+          return { newFiles: ['p-2'], updatedFiles: ['p-3'], deletedFiles: [], movedFiles: [] };
+        },
+        // Space A has 5 total files → deleting 1 is not full deletion
+        { totalFilesInUnique: 5 },
+      );
 
       const result = await service.computeDiff([
         { ...basePage, spaceKey: 'SA', spaceId: 'sa-id' },
@@ -157,7 +171,7 @@ describe('FileDiffService', () => {
       ]);
 
       expect(result).toEqual({
-        newPageIds: ['p-2'],
+        newPageIds: ['p-1', 'p-2'],
         updatedPageIds: ['p-3'],
         deletedPageIds: ['p-old'],
         movedPageIds: [],
@@ -196,21 +210,24 @@ describe('FileDiffService', () => {
   });
 
   describe('accidental deletion guard', () => {
-    // The guard prevents accidental full deletion of all previously-known files for a space.
-    // It checks: remainingKnownFiles = submittedItems - newFiles
-    //   - If remainingKnownFiles > 0: at least one recognized item survives → allow
-    //   - If remainingKnownFiles <= 0: no recognized items survive → abort
+    // The guard prevents accidental full deletion of all files for a space.
+    // It has two checks:
+    //   1. If zero items were submitted and there are deletions → abort (discovery probably failed)
+    //   2. If deletedFiles === totalFilesInUnique → abort (would delete everything stored in Unique)
 
     describe('when deletions should be ALLOWED', () => {
       it('should allow deletions when all submitted pages are unchanged (labels removed from other pages)', async () => {
-        // User removed labels from 3 pages, 3 remain labeled and unchanged
-        // submitted=3, new=0 → remainingKnown=3
-        const { service } = makeService(async () => ({
-          newFiles: [],
-          updatedFiles: [],
-          deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3'],
-          movedFiles: [],
-        }));
+        // Previously 6 files in Unique. User removed labels from 3 pages, 3 remain.
+        // Deleting 3 out of 6 → not full deletion → allowed
+        const { service } = makeService(
+          async () => ({
+            newFiles: [],
+            updatedFiles: [],
+            deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3'],
+            movedFiles: [],
+          }),
+          { totalFilesInUnique: 6 },
+        );
 
         const result = await service.computeDiff([
           basePage,
@@ -222,14 +239,17 @@ describe('FileDiffService', () => {
       });
 
       it('should allow deletions when a single recognized page remains (leave-one-file workflow)', async () => {
-        // User removed labels from all pages except one to trigger intentional cleanup
-        // submitted=1, new=0 → remainingKnown=1
-        const { service } = makeService(async () => ({
-          newFiles: [],
-          updatedFiles: [],
-          deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3', 'p-old-4', 'p-old-5'],
-          movedFiles: [],
-        }));
+        // Previously 6 files in Unique. User removed labels from all except one.
+        // Deleting 5 out of 6 → not full deletion → allowed
+        const { service } = makeService(
+          async () => ({
+            newFiles: [],
+            updatedFiles: [],
+            deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3', 'p-old-4', 'p-old-5'],
+            movedFiles: [],
+          }),
+          { totalFilesInUnique: 6 },
+        );
 
         const result = await service.computeDiff([basePage]);
 
@@ -237,14 +257,16 @@ describe('FileDiffService', () => {
       });
 
       it('should allow deletions when submitted page was updated', async () => {
-        // Page content changed + other pages deleted
-        // submitted=1, new=0 (updated ≠ new) → remainingKnown=1
-        const { service } = makeService(async () => ({
-          newFiles: [],
-          updatedFiles: ['p-1'],
-          deletedFiles: ['p-old'],
-          movedFiles: [],
-        }));
+        // 1 page updated + 1 old page deleted out of 5 total → allowed
+        const { service } = makeService(
+          async () => ({
+            newFiles: [],
+            updatedFiles: ['p-1'],
+            deletedFiles: ['p-old'],
+            movedFiles: [],
+          }),
+          { totalFilesInUnique: 5 },
+        );
 
         const result = await service.computeDiff([basePage]);
 
@@ -252,14 +274,16 @@ describe('FileDiffService', () => {
       });
 
       it('should allow deletions when there is a mix of new and recognized pages', async () => {
-        // Some pages are new, some are recognized, some old pages deleted
-        // submitted=3, new=1 → remainingKnown=2
-        const { service } = makeService(async () => ({
-          newFiles: ['p-3'],
-          updatedFiles: [],
-          deletedFiles: ['p-old-1', 'p-old-2'],
-          movedFiles: [],
-        }));
+        // 1 new page + 2 recognized pages, 2 deletions out of 10 total → allowed
+        const { service } = makeService(
+          async () => ({
+            newFiles: ['p-3'],
+            updatedFiles: [],
+            deletedFiles: ['p-old-1', 'p-old-2'],
+            movedFiles: [],
+          }),
+          { totalFilesInUnique: 10 },
+        );
 
         const result = await service.computeDiff([
           basePage,
@@ -271,14 +295,16 @@ describe('FileDiffService', () => {
       });
 
       it('should allow deletions when submitted page has a moved URL', async () => {
-        // Page URL changed + other pages deleted; moved pages are still recognized
-        // submitted=1, new=0 → remainingKnown=1
-        const { service } = makeService(async () => ({
-          newFiles: [],
-          updatedFiles: [],
-          deletedFiles: ['p-old'],
-          movedFiles: ['p-1'],
-        }));
+        // Page URL changed + 1 deletion out of 5 total → allowed
+        const { service } = makeService(
+          async () => ({
+            newFiles: [],
+            updatedFiles: [],
+            deletedFiles: ['p-old'],
+            movedFiles: ['p-1'],
+          }),
+          { totalFilesInUnique: 5 },
+        );
 
         const result = await service.computeDiff([basePage]);
 
@@ -286,9 +312,8 @@ describe('FileDiffService', () => {
       });
 
       it('should not trigger when there are no deletions', async () => {
-        // All pages are new, no old pages exist → no deletions, guard irrelevant
-        // submitted=2, new=2, deleted=0
-        const { service } = makeService(async () => ({
+        // All pages are new, no deletions → guard irrelevant
+        const { service, getCountByKeyPrefix } = makeService(async () => ({
           newFiles: ['p-1', 'p-2'],
           updatedFiles: [],
           deletedFiles: [],
@@ -301,49 +326,96 @@ describe('FileDiffService', () => {
         ]);
 
         expect(result.deletedPageIds).toEqual([]);
+        expect(getCountByKeyPrefix).not.toHaveBeenCalled();
       });
 
-      it('should allow deletions when more items are deleted than submitted', async () => {
-        // 1 recognized page remains, many old pages to clean up
-        // submitted=1, new=0 → remainingKnown=1
-        const { service } = makeService(async () => ({
-          newFiles: [],
-          updatedFiles: [],
-          deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3', 'p-old-4', 'p-old-5', 'p-old-6', 'p-old-7', 'p-old-8', 'p-old-9', 'p-old-10'],
-          movedFiles: [],
-        }));
+      it('should allow deletions when more items are deleted than submitted but not all', async () => {
+        // 1 submitted, 10 deleted out of 20 total → partial deletion → allowed
+        const { service } = makeService(
+          async () => ({
+            newFiles: [],
+            updatedFiles: [],
+            deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3', 'p-old-4', 'p-old-5', 'p-old-6', 'p-old-7', 'p-old-8', 'p-old-9', 'p-old-10'],
+            movedFiles: [],
+          }),
+          { totalFilesInUnique: 20 },
+        );
 
         const result = await service.computeDiff([basePage]);
 
         expect(result.deletedPageIds).toHaveLength(10);
       });
+
+      it('should allow deletions when all submitted items are new but deletion is not full', async () => {
+        // All submitted are new + 1 deletion out of 5 total → partial → allowed
+        const { service } = makeService(
+          async () => ({
+            newFiles: ['p-1'],
+            updatedFiles: [],
+            deletedFiles: ['p-old'],
+            movedFiles: [],
+          }),
+          { totalFilesInUnique: 5 },
+        );
+
+        const result = await service.computeDiff([basePage]);
+
+        expect(result.deletedPageIds).toEqual(['p-old']);
+      });
     });
 
     describe('when deletions should be BLOCKED', () => {
-      it('should abort when all submitted items are new and there are deletions (possible key format change)', async () => {
-        // API does not recognize any submitted items but has old items to delete
-        // submitted=1, new=1 → remainingKnown=0
+      it('should abort when zero items are submitted and there are deletions', async () => {
+        // Discovery returned 0 pages but API has files → probably a discovery bug
         const { service } = makeService(async () => ({
-          newFiles: ['p-1'],
+          newFiles: [],
           updatedFiles: [],
           deletedFiles: ['p-old-1', 'p-old-2'],
           movedFiles: [],
         }));
 
-        await expect(service.computeDiff([basePage])).rejects.toThrow(
-          'File diff would delete 2 files with 0 recognized items remaining. Aborting sync to prevent accidental full deletion.',
+        // This case is unreachable via computeDiff (loop doesn't iterate for 0 pages),
+        // but validates the guard logic directly
+        await expect(
+          // @ts-expect-error -- calling private method for testing
+          service.validateNoAccidentalFullDeletion(
+            [],
+            { newFiles: [], updatedFiles: [], deletedFiles: ['p-old-1', 'p-old-2'], movedFiles: [] },
+            'test-tenant/space-1_SP',
+          ),
+        ).rejects.toThrow(
+          'Submitted 0 items to file diff but 2 files would be deleted. Aborting sync.',
         );
       });
 
-      it('should abort when multiple submitted items are all new with deletions', async () => {
-        // All 3 submitted items are new + old items deleted → total state replacement, suspicious
-        // submitted=3, new=3 → remainingKnown=0
-        const { service } = makeService(async () => ({
-          newFiles: ['p-1', 'p-2', 'p-3'],
-          updatedFiles: [],
-          deletedFiles: ['p-old-1'],
-          movedFiles: [],
-        }));
+      it('should abort when file diff would delete all files stored in Unique', async () => {
+        // 3 submitted, 3 deleted, and those 3 are ALL files in Unique for this space
+        const { service } = makeService(
+          async () => ({
+            newFiles: ['p-1'],
+            updatedFiles: [],
+            deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3'],
+            movedFiles: [],
+          }),
+          { totalFilesInUnique: 3 },
+        );
+
+        await expect(service.computeDiff([basePage])).rejects.toThrow(
+          'File diff would delete all 3 files stored in Unique for partialKey',
+        );
+      });
+
+      it('should abort when key format changed causing full replacement', async () => {
+        // All submitted are new (keys changed) + all old files deleted = totalFilesInUnique
+        const { service } = makeService(
+          async () => ({
+            newFiles: ['p-1', 'p-2', 'p-3'],
+            updatedFiles: [],
+            deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3'],
+            movedFiles: [],
+          }),
+          { totalFilesInUnique: 3 },
+        );
 
         await expect(
           service.computeDiff([
@@ -352,38 +424,24 @@ describe('FileDiffService', () => {
             { ...basePage, id: 'p-3' },
           ]),
         ).rejects.toThrow(
-          'File diff would delete 1 files with 0 recognized items remaining.',
+          'File diff would delete all 3 files stored in Unique for partialKey',
         );
       });
 
-      it('should abort when zero items are submitted and there are deletions (unreachable via computeDiff but validates guard)', async () => {
-        // submitted=0, new=0 → remainingKnown=0
-        const { service } = makeService(async () => emptyDiffResponse);
-
-        expect(() =>
-          // @ts-expect-error -- calling private method for testing
-          service.validateNoAccidentalFullDeletion([], {
-            newFiles: [],
+      it('should abort when single file in Unique would be deleted', async () => {
+        // Only 1 file in Unique and it would be deleted
+        const { service } = makeService(
+          async () => ({
+            newFiles: ['p-1'],
             updatedFiles: [],
-            deletedFiles: ['p-old-1', 'p-old-2'],
+            deletedFiles: ['p-old'],
             movedFiles: [],
           }),
-        ).toThrow(
-          'File diff would delete 2 files with 0 recognized items remaining.',
+          { totalFilesInUnique: 1 },
         );
-      });
-
-      it('should abort when single new item replaces single old item (1:1 swap, suspicious)', async () => {
-        // submitted=1, new=1 → remainingKnown=0
-        const { service } = makeService(async () => ({
-          newFiles: ['p-1'],
-          updatedFiles: [],
-          deletedFiles: ['p-old'],
-          movedFiles: [],
-        }));
 
         await expect(service.computeDiff([basePage])).rejects.toThrow(
-          'File diff would delete 1 files with 0 recognized items remaining.',
+          'File diff would delete all 1 files stored in Unique for partialKey',
         );
       });
     });
