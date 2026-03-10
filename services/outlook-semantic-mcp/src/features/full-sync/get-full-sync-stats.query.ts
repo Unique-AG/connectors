@@ -179,7 +179,8 @@ export class GetFullSyncStatsQuery {
         ingestionStats.finished +
         ingestionStats.failed;
 
-      const progressPercentage = Number(((completedCount / totalCount) * 100).toFixed(2));
+      const progressPercentage =
+        totalCount === 0 ? 100 : Number(((completedCount / totalCount) * 100).toFixed(2));
 
       return { ingestionStats, toQueueForIngestionStats, state: 'running', progressPercentage };
     }
