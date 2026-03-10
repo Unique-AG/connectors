@@ -3,7 +3,6 @@ import { integer, jsonb, pgEnum, pgTable, timestamp, varchar } from 'drizzle-orm
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
-import { InboxConfigurationMailFilters } from './inbox-configuration-mail-filters.dto';
 
 export const inboxSyncState = pgEnum('inbox_sync_state', ['idle', 'running', 'failed']);
 
@@ -21,7 +20,7 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
       onUpdate: 'cascade',
     }),
 
-  filters: jsonb(`filters`).$type<InboxConfigurationMailFilters>().notNull(),
+  filters: jsonb(`filters`).$type<Record<string, unknown>>().notNull(),
   lastFullSyncRunAt: timestamp(`last_full_sync_run_at`),
   syncState: inboxSyncState(`sync_state`).notNull().default('idle'),
   syncStartedAt: timestamp(`sync_started_at`),

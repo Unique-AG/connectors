@@ -22,7 +22,16 @@ const ConfigSchema = z
       .prefault('info')
       .describe('The log level at which the services outputs (pino).'),
     selfUrl: stringToURL().describe('The URL of the MCP Server. Used for OAuth callbacks.'),
-    defaultMailFilters: json(inboxConfigurationMailFilters).describe(
+    defaultMailFilters: json(
+      z.record(z.unknown()).superRefine((raw, ctx) => {
+        const result = inboxConfigurationMailFilters.safeParse(raw);
+        if (!result.success) {
+          for (const issue of result.error.issues) {
+            ctx.addIssue(issue);
+          }
+        }
+      }),
+    ).describe(
       'Default mail filters applied when syncing emails (e.g. {"dateFrom":"2024-01-01"}). Optional.',
     ),
   })
