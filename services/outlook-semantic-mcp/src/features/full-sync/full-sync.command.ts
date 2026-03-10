@@ -5,7 +5,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { indexBy, isNonNullish } from 'remeda';
+import { indexBy, isNonNullish, partition } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, UserProfile } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
@@ -27,6 +27,7 @@ import {
   fileDiffGraphMessageResponseSchema,
 } from '../mail-ingestion/dtos/microsoft-graph.dtos';
 import { getUniqueKeyForMessage } from '../mail-ingestion/utils/get-unique-key-for-message';
+import { shouldSkipEmail } from '../mail-ingestion/utils/should-skip-email';
 import { IngestionPriority } from '../mail-ingestion/utils/ingestion-queue.utils';
 import { GetSubscriptionAndUserProfileQuery } from '../user-utils/get-subscription-and-user-profile.query';
 
@@ -129,7 +130,22 @@ export class FullSyncCommand {
       .where(eq(inboxConfiguration.userProfileId, userProfile.id))
       .execute();
 
-    const filesList = allGraphEmails.map((item) => ({
+    const [filteredGraphEmails, skippedGraphEmails] = partition(
+      allGraphEmails,
+      (item) => !shouldSkipEmail(item, filters, { userProfileId: userProfile.id }).skip,
+    );
+    if (skippedGraphEmails.length > 0) {
+      traceEvent('emails skipped by filter', { count: skippedGraphEmails.length });
+      this.logger.log({
+        subscriptionId,
+        userProfileId: userProfile.id,
+        userEmail,
+        skippedCount: skippedGraphEmails.length,
+        msg: 'Emails skipped by filter',
+      });
+    }
+
+    const filesList = filteredGraphEmails.map((item) => ({
       key: getUniqueKeyForMessage(userProfile.email, item),
       url: item.webLink,
       updatedAt: item.lastModifiedDateTime,
@@ -158,7 +174,7 @@ export class FullSyncCommand {
       msg: `File diff completed`,
     });
 
-    const filesRecord = indexBy(allGraphEmails, (item) =>
+    const filesRecord = indexBy(filteredGraphEmails, (item) =>
       getUniqueKeyForMessage(userProfile.email, item),
     );
     const toIngest = [...fileDiffResponse.updatedFiles, ...fileDiffResponse.newFiles];
