@@ -20,7 +20,7 @@ export class ListCategoriesTool {
     name: 'list_categories',
     title: 'List Categories',
     description:
-      'List all Outlook mail categories available for the user. Returns the display names of all master categories configured in Outlook.',
+      'List all Outlook mail categories available for the user. Returns display names of all master categories configured in Outlook. Category names can be passed to the `categories` filter in `search_emails` to narrow results.',
     parameters: InputSchema,
     outputSchema: ListCategoriesQueryOutputSchema,
     annotations: {

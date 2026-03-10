@@ -37,7 +37,7 @@ export class VerifyInboxConnectionTool {
     name: 'verify_inbox_connection',
     title: 'Verify Inbox Connection',
     description:
-      'Check the status of the inbox connection for Microsoft Outlook emails. Returns whether ingestion is active, expiring soon, expired, or not configured.',
+      'Check the status of the inbox connection for Microsoft Outlook emails. Returns whether ingestion is active, expiring soon, expired, or not configured. If status is `expired` or `not_configured`, call `reconnect_inbox` to restore email ingestion.',
     parameters: VerifyInboxConnectionInputSchema,
     outputSchema: VerifyInboxConnectionOutputSchema,
     annotations: {

@@ -28,7 +28,8 @@ export class RunFullSyncTool {
   @Tool({
     name: 'run_full_sync',
     title: 'Run Full Sync',
-    description: 'Run Full Sync',
+    description:
+      'Trigger a full re-sync of the Outlook mailbox into the knowledge base. Skips if a sync was run recently. Use `sync_progress` to monitor ingestion status after triggering.',
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {

@@ -20,7 +20,7 @@ export class SyncProgressTool {
     name: 'sync_progress',
     title: 'Sync Progress',
     description:
-      'Check the current progress of the full email sync. Returns inbox configuration details and ingestion statistics from the knowledge base.',
+      'Check the current progress of the full email sync. Returns inbox configuration details and ingestion statistics. Use after `run_full_sync` to monitor progress, or when `search_emails` returns a `syncWarning`.',
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {

@@ -40,7 +40,7 @@ export class SearchEmailsTool {
     name: 'search_emails',
     title: 'Search Emails',
     description:
-      'Search emails semantically with optional structured filters (sender, date range, recipients, folder, attachments, categories). Returns matched email passages.',
+      'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by folder, call `list_folders` first to obtain valid folder ids. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` with the result\'s id. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete.',
     parameters: SearchEmailsInputSchema,
     outputSchema: SearchEmailsOutputSchema,
     annotations: {

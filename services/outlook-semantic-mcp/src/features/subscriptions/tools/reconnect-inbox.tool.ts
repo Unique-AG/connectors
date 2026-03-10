@@ -31,7 +31,7 @@ export class ReconnectInboxTool {
     name: 'reconnect_inbox',
     title: 'Reconnect Inbox',
     description:
-      'Manually re-establish the Microsoft Outlook inbox subscription when it has been disconnected or is no longer active. Use this to restore email ingestion after a broken or expired subscription.',
+      'Re-establish the Microsoft Outlook inbox subscription when disconnected or expired. Call `verify_inbox_connection` first to confirm the current status before reconnecting.',
     parameters: ReconnectInboxInputSchema,
     outputSchema: ReconnectInboxOutputSchema,
     annotations: {
