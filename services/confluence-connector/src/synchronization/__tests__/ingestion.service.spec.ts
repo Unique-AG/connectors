@@ -84,6 +84,10 @@ function makeService(): {
       instanceType: 'cloud',
       baseUrl: CONFLUENCE_BASE_URL,
     },
+    unique: {
+      serviceAuthMode: 'external',
+      ingestionServiceBaseUrl: 'http://node-ingestion:8091',
+    },
     ingestion: {
       storeInternally: true,
       useV1KeyFormat: false,
@@ -225,5 +229,50 @@ describe('IngestionService', () => {
 
     expect(uniqueApiClient.files.getByKeys).not.toHaveBeenCalled();
     expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
+  });
+
+  it('rewrites writeUrl to in-cluster ingestion endpoint in cluster_local mode', async () => {
+    const clusterLocalConfig = {
+      confluence: { instanceType: 'cloud', baseUrl: CONFLUENCE_BASE_URL },
+      unique: {
+        serviceAuthMode: 'cluster_local',
+        ingestionServiceBaseUrl: 'http://node-ingestion:8091',
+      },
+      ingestion: { storeInternally: true, useV1KeyFormat: false },
+    } as unknown as TenantConfig;
+
+    const uniqueApiClient = {
+      ingestion: {
+        registerContent: vi.fn().mockResolvedValue(
+          makeRegistrationResponse({
+            writeUrl: 'https://gateway.qa.unique.app/ingestion/scoped/upload?key=encrypted-key',
+          }),
+        ),
+        finalizeIngestion: vi.fn().mockResolvedValue({ id: 'id-1' }),
+      },
+      files: { getByKeys: vi.fn(), deleteByIds: vi.fn() },
+    } as unknown as UniqueApiClient;
+
+    const service = new IngestionService(clusterLocalConfig, TENANT_NAME, uniqueApiClient);
+    mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+
+    await service.ingestPage(pageFixture, 'space-scope-1');
+
+    expect(mockRequest).toHaveBeenCalledWith(
+      'http://node-ingestion:8091/scoped/upload?key=encrypted-key',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+  });
+
+  it('passes writeUrl unchanged in external auth mode', async () => {
+    const { service } = makeService();
+    mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+
+    await service.ingestPage(pageFixture, 'space-scope-1');
+
+    expect(mockRequest).toHaveBeenCalledWith(
+      'https://blob.example.com/write',
+      expect.objectContaining({ method: 'PUT' }),
+    );
   });
 });
