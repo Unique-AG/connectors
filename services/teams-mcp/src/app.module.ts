@@ -17,6 +17,7 @@ import * as packageJson from '../package.json';
 import { AMQPModule } from './amqp/amqp.module';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { MicrosoftOAuthProvider } from './auth/microsoft.provider';
+import { ChatModule } from './chat/chat.module';
 import {
   type AppConfig,
   type AppConfigNamespaced,
@@ -136,6 +137,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     MsGraphModule,
     AMQPModule,
     TranscriptModule,
+    ChatModule,
   ],
   controllers: [ManifestController],
   providers: [
