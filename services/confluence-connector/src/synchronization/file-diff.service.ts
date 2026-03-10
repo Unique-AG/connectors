@@ -78,14 +78,22 @@ export class FileDiffService {
     diffResponse: FileDiffResponse,
     partialKey: string,
   ): Promise<void> {
+    // If there are no files to be deleted, there's no point in checking further, we will surely not
+    // perform full deletion.
     if (diffResponse.deletedFiles.length === 0) {
       return;
     }
 
+    // If the file diff indicated we should delete all files by having submitted no files to the
+    // diff, it most probably means that we have some kind of bug in fetching the pages from
+    // Confluence and we should not proceed with the sync to avoid costly re-ingestions. In case
+    // user actually wants to delete all files from a space, they should leave one page labeled
+    // for synchronization.
     if (submittedItems.length === 0 && diffResponse.deletedFiles.length > 0) {
       this.logger.error({
         submittedCount: 0,
         deletedCount: diffResponse.deletedFiles.length,
+        partialKey,
         msg: 'File diff would delete all files because zero items were submitted. Aborting to prevent accidental full deletion.',
       });
       assert.fail(
@@ -93,6 +101,11 @@ export class FileDiffService {
       );
     }
 
+    // If the file diff indicated we should delete all files even when we submitted some files to
+    // the diff, it most probably means that we have some kind of bug in file diff or something
+    // unexpected changed in the logic (e.g. key format change). We should not proceed with the
+    // sync to avoid costly re-ingestions. If user actually wants to delete all files from a space,
+    // they should leave one page labeled for synchronization.
     const totalFilesInUnique = await this.uniqueApiClient.files.getCountByKeyPrefix(partialKey);
     if (diffResponse.deletedFiles.length === totalFilesInUnique) {
       this.logger.error({
