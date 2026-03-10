@@ -12,6 +12,7 @@ import {
   subscriptions,
   userProfiles,
 } from '~/db';
+import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -192,7 +193,7 @@ export class SubscriptionCreateService {
       .insert(inboxConfiguration)
       .values({
         userProfileId,
-        filters: this.config.defaultMailFilters,
+        filters: serializeMailFilters(this.config.defaultMailFilters),
       })
       .onConflictDoNothing();
 
