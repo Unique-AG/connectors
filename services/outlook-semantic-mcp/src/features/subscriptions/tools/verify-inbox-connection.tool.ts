@@ -75,7 +75,8 @@ export class VerifyInboxConnectionTool {
       this.logger.debug({ userProfileId, msg: 'No mail subscription found for user' });
       return {
         status: 'not_configured' as SubscriptionStatus,
-        message: 'Inbox connection is not configured. Use connect_inbox to begin ingesting emails.',
+        message:
+          'Inbox connection is not configured. Use reconnect_inbox to begin ingesting emails.',
         subscription: null,
       };
     }
@@ -96,7 +97,7 @@ export class VerifyInboxConnectionTool {
     if (diffFromNow < 0) {
       status = 'expired';
       message =
-        'Inbox connection subscription has expired. Use connect_inbox to restart ingestion.';
+        'Inbox connection subscription has expired. Use reconnect_inbox to restart ingestion.';
     } else if (minutesUntilExpiration <= 15) {
       status = 'expiring_soon';
       message = `Inbox connection is active but expiring in ${minutesUntilExpiration} minutes. It will be automatically renewed.`;
