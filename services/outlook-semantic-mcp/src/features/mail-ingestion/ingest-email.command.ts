@@ -18,8 +18,10 @@ import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kin
 import { UpsertDirectoryCommand } from '../directories-sync/upsert-directory.command';
 import { GraphMessage } from './dtos/microsoft-graph.dtos';
 import { GetMessageDetailsQuery } from './get-message-details.query';
+import { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
 import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
+import { shouldSkipEmail } from './utils/should-skip-email';
 
 type LogContext = Partial<{
   messageId: string;
@@ -52,9 +54,11 @@ export class IngestEmailCommand {
   public async run({
     userProfileId,
     messageId,
+    filters,
   }: {
     userProfileId: string;
     messageId: string;
+    filters?: InboxConfigurationMailFilters;
   }): Promise<void> {
     traceAttrs({ userProfileId: userProfileId, messageId: messageId });
     const userProfile = await this.db.query.userProfiles.findFirst({
@@ -66,6 +70,16 @@ export class IngestEmailCommand {
       userProfileId: userProfile.id,
       messageId,
     });
+
+    if (filters) {
+      const skipResult = shouldSkipEmail(graphMessage, filters, { userProfileId });
+      if (skipResult.skip) {
+        const { reason, matchedPattern } = skipResult;
+        traceEvent('email skipped by filter', { reason, matchedPattern, userProfileId });
+        this.logger.log({ messageId, userProfileId, reason, matchedPattern, msg: 'Email skipped by filter' });
+        return;
+      }
+    }
 
     const metadata = getMetadataFromMessage(graphMessage);
     const fileKey = getUniqueKeyForMessage(userProfile.email, graphMessage);
