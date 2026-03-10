@@ -11,6 +11,7 @@ import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
+import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 
 const ingestionKnwonState = z.object({
   state: z.enum(['idle', 'running']),
@@ -119,13 +120,14 @@ export class GetFullSyncStatsQuery {
       where: eq(inboxConfiguration.userProfileId, userProfile.id),
     });
     const ingestionStats = await this.getIngestionStats(userProfile);
+    const filters = config ? inboxConfigurationMailFilters.parse(config.filters) : null;
 
     const toQueueForIngestionStats: z.Infer<typeof toQueueForIngestionSchema> = config
       ? {
           state: config.syncState,
           runAt: config.lastFullSyncRunAt?.toISOString() ?? null,
           startedAt: config.syncStartedAt?.toISOString() ?? null,
-          filters: { dateFrom: config.filters.dateFrom.toISOString() ?? null },
+          filters: { dateFrom: filters?.dateFrom.toISOString() ?? null },
           messages: {
             received: config.messagesFromMicrosoft,
             queuedForSync: config.messagesQueuedForSync,
