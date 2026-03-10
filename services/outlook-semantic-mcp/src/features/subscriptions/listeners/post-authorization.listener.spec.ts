@@ -21,7 +21,10 @@ describe('PostAuthorizationListener', () => {
   it('calls subscribe with the converted userProfileId', async () => {
     const listener = makeListener(mockSubscriptionCreateService);
 
-    await listener.onUserAuthorized({ userProfileId });
+    await listener.onUserAuthorized({
+      type: 'unique.outlook-semantic-mcp.auth.user-authorized',
+      payload: { userProfileId },
+    });
 
     expect(mockSubscriptionCreateService.subscribe).toHaveBeenCalledOnce();
     expect(mockSubscriptionCreateService.subscribe).toHaveBeenCalledWith(
@@ -33,7 +36,12 @@ describe('PostAuthorizationListener', () => {
     mockSubscriptionCreateService.subscribe.mockRejectedValue(new Error('subscription failed'));
     const listener = makeListener(mockSubscriptionCreateService);
 
-    await expect(listener.onUserAuthorized({ userProfileId })).resolves.toBeUndefined();
+    await expect(
+      listener.onUserAuthorized({
+        type: 'unique.outlook-semantic-mcp.auth.user-authorized',
+        payload: { userProfileId },
+      }),
+    ).resolves.toBeUndefined();
 
     expect(mockSubscriptionCreateService.subscribe).toHaveBeenCalledWith(
       convertUserProfileIdToTypeId(userProfileId),

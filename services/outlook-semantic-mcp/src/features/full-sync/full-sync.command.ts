@@ -79,7 +79,12 @@ export class FullSyncCommand {
     }
 
     try {
-      return this.runSync({ subscriptionId, userProfile, userEmail, filters: guardResult.filters });
+      return await this.runSync({
+        subscriptionId,
+        userProfile,
+        userEmail,
+        filters: guardResult.filters,
+      });
     } catch (error) {
       await this.db
         .update(inboxConfiguration)

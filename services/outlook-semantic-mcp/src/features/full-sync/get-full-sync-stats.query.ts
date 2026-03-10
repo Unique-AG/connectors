@@ -166,12 +166,8 @@ export class GetFullSyncStatsQuery {
         return { ingestionStats, toQueueForIngestionStats, state: 'idle', progressPercentage: 100 };
       }
 
-      const totalCount =
-        toQueueForIngestionStats.messages.queuedForSync +
-        toQueueForIngestionStats.messages.processed +
-        ingestionStats.inProgress +
-        ingestionStats.failed +
-        ingestionStats.finished;
+      const totalCount = toQueueForIngestionStats.messages.queuedForSync;
+      ingestionStats.inProgress + ingestionStats.failed + ingestionStats.finished;
       const inProgressCount =
         toQueueForIngestionStats.messages.processed +
         ingestionStats.finished +

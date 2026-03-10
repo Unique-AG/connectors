@@ -282,7 +282,12 @@ describe('McpOAuthStore', () => {
       expect(mockAmqpConnection.publish).toHaveBeenCalledWith(
         'unique.outlook-semantic-mcp.main',
         'unique.outlook-semantic-mcp.auth.user-authorized',
-        { userProfileId },
+        {
+          payload: {
+            userProfileId,
+          },
+          type: 'unique.outlook-semantic-mcp.auth.user-authorized',
+        },
       );
     });
 
