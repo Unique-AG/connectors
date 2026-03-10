@@ -81,28 +81,20 @@ export class FileDiffService {
       return;
     }
 
-    const hasNewOrUpdated =
-      diffResponse.newFiles.length > 0 || diffResponse.updatedFiles.length > 0;
+    // Items the API already knows about that will survive the sync.
+    // submittedItems minus newFiles = previously-known items still present.
+    const remainingKnownFiles = submittedItems.length - diffResponse.newFiles.length;
 
-    if (submittedItems.length === 0 && diffResponse.deletedFiles.length > 0) {
-      this.logger.error({
-        submittedCount: 0,
-        deletedCount: diffResponse.deletedFiles.length,
-        msg: 'File diff would delete all files because zero items were submitted. Aborting to prevent accidental full deletion.',
-      });
-      assert.fail(
-        `Submitted 0 items to file diff but ${diffResponse.deletedFiles.length} files would be deleted. Aborting sync.`,
-      );
-    }
-
-    if (!hasNewOrUpdated && diffResponse.deletedFiles.length >= submittedItems.length) {
+    if (remainingKnownFiles <= 0 && diffResponse.deletedFiles.length > 0) {
       this.logger.error({
         submittedCount: submittedItems.length,
+        newCount: diffResponse.newFiles.length,
         deletedCount: diffResponse.deletedFiles.length,
-        msg: 'File diff would delete all files with zero new or updated items. Aborting to prevent accidental full deletion.',
+        remainingKnownFiles,
+        msg: 'File diff would delete all previously known files with no recognized items remaining. Aborting to prevent accidental full deletion.',
       });
       assert.fail(
-        `File diff would delete ${diffResponse.deletedFiles.length} files with zero new or updated items. Aborting sync.`,
+        `File diff would delete ${diffResponse.deletedFiles.length} files with ${remainingKnownFiles} recognized items remaining. Aborting sync to prevent accidental full deletion.`,
       );
     }
   }
