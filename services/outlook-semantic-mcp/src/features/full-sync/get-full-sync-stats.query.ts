@@ -36,9 +36,16 @@ const ingestionStats = z.discriminatedUnion('state', [ingestionStateSuccess, ing
 
 const toQueueForIngestionKnwonState = z.object({
   state: z
-    .enum(['idle', 'running', 'failed'])
+    .enum([
+      'full-sync-finished',
+      'running',
+      'failed',
+      'fetching-emails',
+      'performing-file-diff',
+      'processing-file-diff-changes',
+    ])
     .describe(
-      '"idle" means the fetch-and-queue phase is complete, "running" means it is in progress, "failed" means it encountered an error.',
+      '"full-sync-finished" means the fetch-and-queue phase is complete, "failed" means it encountered an error, all other values mean it is in progress.',
     ),
   runAt: z
     .string()
@@ -101,7 +108,7 @@ const toQueueForIngestionSchema = z.discriminatedUnion('state', [
 ]);
 
 export const GetFullSyncStatsResponse = z.object({
-  state: z.enum(['idle', 'running', 'failed', 'error']),
+  state: z.enum(['error', 'running', 'finished']),
   message: z.string(),
   progressPercentage: z
     .number()
@@ -178,6 +185,15 @@ export class GetFullSyncStatsQuery {
         message: `Your inbox is disconnected. Use \`reconnect_inbox\` tool to reconnect`,
       };
     }
+    if (inboxConfig.fullSyncState === 'failed') {
+      return {
+        state: 'error',
+        toQueueForIngestionStats: null,
+        ingestionStats: null,
+        progressPercentage: null,
+        message: `Full sync failed. Use \`run_full_sync\` tool to sync your inbox`,
+      };
+    }
     const ingestionStats = await this.getIngestionStats(userProfile);
     if (ingestionStats.state === 'error') {
       return {
@@ -191,9 +207,9 @@ export class GetFullSyncStatsQuery {
     const filters = inboxConfig ? inboxConfigurationMailFilters.parse(inboxConfig.filters) : null;
 
     const toQueueForIngestionStats: z.Infer<typeof toQueueForIngestionSchema> = {
-      state: inboxConfig.syncState,
+      state: inboxConfig.fullSyncState,
       runAt: inboxConfig.lastFullSyncRunAt?.toISOString() ?? null,
-      startedAt: inboxConfig.syncStartedAt?.toISOString() ?? null,
+      startedAt: inboxConfig.lastFullSyncStartedAt?.toISOString() ?? null,
       filters: {
         ignoredBefore: filters?.ignoredBefore.toISOString() ?? null,
         ignoredSenders: filters?.ignoredSenders.map((r) => r.toString()) ?? [],
@@ -207,7 +223,7 @@ export class GetFullSyncStatsQuery {
     };
 
     const isRunning =
-      toQueueForIngestionStats.state === 'running' ||
+      toQueueForIngestionStats.state !== 'full-sync-finished' ||
       ingestionStats.state === 'running' ||
       toQueueForIngestionStats.messages.processed < toQueueForIngestionStats.messages.queuedForSync;
 
@@ -222,13 +238,11 @@ export class GetFullSyncStatsQuery {
     const completedCount =
       toQueueForIngestionStats.messages.processed + ingestionStats.finished + ingestionStats.failed;
 
-    const overallState =
-      toQueueForIngestionStats.state === 'failed' ? 'failed' : !isRunning ? 'idle' : 'running';
     return {
       message: ``,
       ingestionStats,
       toQueueForIngestionStats,
-      state: overallState,
+      state: isRunning ? 'running' : 'finished',
       progressPercentage:
         totalCount === 0 ? null : Number(((completedCount / totalCount) * 100).toFixed(2)),
     };

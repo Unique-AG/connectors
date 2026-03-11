@@ -88,7 +88,7 @@ export class FullSyncCommand {
     } catch (error) {
       await this.db
         .update(inboxConfiguration)
-        .set({ syncState: 'failed' })
+        .set({ fullSyncState: 'failed' })
         .where(eq(inboxConfiguration.userProfileId, userProfile.id))
         .execute();
       throw error;
@@ -248,7 +248,7 @@ export class FullSyncCommand {
 
     await this.db
       .update(inboxConfiguration)
-      .set({ syncState: 'idle', lastFullSyncRunAt: new Date() })
+      .set({ fullSyncState: 'full-sync-finished', lastFullSyncRunAt: new Date() })
       .where(eq(inboxConfiguration.userProfileId, userProfile.id))
       .execute();
 
@@ -259,7 +259,7 @@ export class FullSyncCommand {
     return this.db.transaction(async (tx): Promise<AcquireLockResult> => {
       const inboxConfig = await tx
         .select({
-          syncState: inboxConfiguration.syncState,
+          fullSyncState: inboxConfiguration.fullSyncState,
           lastFullSyncRunAt: inboxConfiguration.lastFullSyncRunAt,
           filters: inboxConfiguration.filters,
         })
@@ -273,7 +273,7 @@ export class FullSyncCommand {
         return { kind: 'skipped', reason: 'missing' };
       }
 
-      if (inboxConfig.syncState === 'running') {
+      if (inboxConfig.fullSyncState === 'running') {
         return {
           kind: 'skipped',
           reason: 'already running',
@@ -300,8 +300,8 @@ export class FullSyncCommand {
       await tx
         .update(inboxConfiguration)
         .set({
-          syncState: 'running', // initialized-full-sync
-          syncStartedAt: new Date(),
+          fullSyncState: 'running',
+          lastFullSyncStartedAt: new Date(),
           messagesFromMicrosoft: 0,
           messagesQueuedForSync: 0,
           messagesProcessed: 0,
