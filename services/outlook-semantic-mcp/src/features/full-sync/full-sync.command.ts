@@ -1,9 +1,10 @@
 import assert from 'node:assert';
+import crypto from 'node:crypto';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { createSmeared, Smeared } from '@unique-ag/utils';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { indexBy, isNonNullish, partition } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
@@ -84,12 +85,18 @@ export class FullSyncCommand {
         userProfile,
         userEmail,
         filters: guardResult.filters,
+        version: guardResult.version,
       });
     } catch (error) {
       await this.db
         .update(inboxConfiguration)
         .set({ fullSyncState: 'failed' })
-        .where(eq(inboxConfiguration.userProfileId, userProfile.id))
+        .where(
+          and(
+            eq(inboxConfiguration.userProfileId, userProfile.id),
+            eq(inboxConfiguration.fullSyncVersion, guardResult.version),
+          ),
+        )
         .execute();
       throw error;
     }
@@ -100,11 +107,13 @@ export class FullSyncCommand {
     userProfile,
     userEmail,
     filters: filtersRaw,
+    version,
   }: {
     subscriptionId: string;
     userProfile: NonNullishProps<UserProfile, 'email'>;
     userEmail: Smeared;
     filters: Record<string, unknown> | null;
+    version: string;
   }): Promise<{ status: FullSyncRunStatus }> {
     await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
     const filters = inboxConfigurationMailFilters.parse(filtersRaw);
@@ -131,8 +140,13 @@ export class FullSyncCommand {
 
     await this.db
       .update(inboxConfiguration)
-      .set({ messagesFromMicrosoft: allGraphEmails.length })
-      .where(eq(inboxConfiguration.userProfileId, userProfile.id))
+      .set({ fullSyncState: 'performing-file-diff' })
+      .where(
+        and(
+          eq(inboxConfiguration.userProfileId, userProfile.id),
+          eq(inboxConfiguration.fullSyncVersion, version),
+        ),
+      )
       .execute();
 
     const graphEmailsWithSkipResult = allGraphEmails.map((email) => ({
@@ -193,6 +207,17 @@ export class FullSyncCommand {
       msg: `File diff completed`,
     });
 
+    await this.db
+      .update(inboxConfiguration)
+      .set({ fullSyncState: 'processing-file-diff-changes', messagesFromMicrosoft: allGraphEmails.length })
+      .where(
+        and(
+          eq(inboxConfiguration.userProfileId, userProfile.id),
+          eq(inboxConfiguration.fullSyncVersion, version),
+        ),
+      )
+      .execute();
+
     const filesRecord = indexBy(filteredGraphEmails, ({ email }) =>
       getUniqueKeyForMessage(userProfile.email, email),
     );
@@ -222,7 +247,12 @@ export class FullSyncCommand {
     await this.db
       .update(inboxConfiguration)
       .set({ messagesQueuedForSync })
-      .where(eq(inboxConfiguration.userProfileId, userProfile.id))
+      .where(
+        and(
+          eq(inboxConfiguration.userProfileId, userProfile.id),
+          eq(inboxConfiguration.fullSyncVersion, version),
+        ),
+      )
       .execute();
 
     if (fileDiffResponse.movedFiles.length) {
@@ -249,7 +279,12 @@ export class FullSyncCommand {
     await this.db
       .update(inboxConfiguration)
       .set({ fullSyncState: 'full-sync-finished', lastFullSyncRunAt: new Date() })
-      .where(eq(inboxConfiguration.userProfileId, userProfile.id))
+      .where(
+        and(
+          eq(inboxConfiguration.userProfileId, userProfile.id),
+          eq(inboxConfiguration.fullSyncVersion, version),
+        ),
+      )
       .execute();
 
     return { status: 'success' };
@@ -273,7 +308,10 @@ export class FullSyncCommand {
         return { kind: 'skipped', reason: 'missing' };
       }
 
-      if (inboxConfig.fullSyncState === 'running') {
+      if (
+        inboxConfig.fullSyncState !== 'full-sync-finished' &&
+        inboxConfig.fullSyncState !== 'failed'
+      ) {
         return {
           kind: 'skipped',
           reason: 'already running',
@@ -297,10 +335,13 @@ export class FullSyncCommand {
         };
       }
 
+      const version = crypto.randomUUID();
+
       await tx
         .update(inboxConfiguration)
         .set({
-          fullSyncState: 'running',
+          fullSyncState: 'fetching-emails',
+          fullSyncVersion: version,
           lastFullSyncStartedAt: new Date(),
           messagesFromMicrosoft: 0,
           messagesQueuedForSync: 0,
@@ -311,6 +352,7 @@ export class FullSyncCommand {
 
       return {
         kind: 'proceed',
+        version,
         filters: inboxConfig.filters,
         lastFullSyncRunAt: inboxConfig.lastFullSyncRunAt,
       };
@@ -359,6 +401,7 @@ type AcquireLockResult =
     }
   | {
       kind: 'proceed';
+      version: string;
       filters: Record<string, unknown> | null;
       lastFullSyncRunAt: Date | null;
     };
