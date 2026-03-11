@@ -235,8 +235,10 @@ export class GetFullSyncStatsQuery {
         ingestionStats.finished +
         ingestionStats.failed;
 
+      // If total count is 0 and the status is running than progress is 0 because we are reading emails
+      // from microsoft.
       const progressPercentage =
-        totalCount === 0 ? 100 : Number(((completedCount / totalCount) * 100).toFixed(2));
+        totalCount === 0 ? 0 : Number(((completedCount / totalCount) * 100).toFixed(2));
 
       return { ingestionStats, toQueueForIngestionStats, state: 'running', progressPercentage };
     }
