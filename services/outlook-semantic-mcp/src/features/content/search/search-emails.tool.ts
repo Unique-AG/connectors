@@ -68,7 +68,10 @@ export class SearchEmailsTool {
       return subscriptionStatus;
     }
 
-    const { results, searchSummary } = await this.searchEmailsQuery.run(userProfileTypeId.toString(), input);
+    const { results, searchSummary } = await this.searchEmailsQuery.run(
+      userProfileTypeId.toString(),
+      input,
+    );
     const stats = await this.getFullSyncStatsQuery.run(userProfileTypeId);
 
     if (stats.state === 'error') {

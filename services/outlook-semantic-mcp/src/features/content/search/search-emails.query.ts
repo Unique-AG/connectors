@@ -1,20 +1,20 @@
 import assert from 'node:assert';
 import { SearchType, type UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
-import { findBestMatch } from '~/utils/find-best-match';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
+import { isNonNull } from 'remeda';
 import * as z from 'zod';
-import { DRIZZLE, type DrizzleDatabase, directories, type Directory, userProfiles } from '~/db';
+import { type Directory, DRIZZLE, type DrizzleDatabase, directories, userProfiles } from '~/db';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { findBestMatch } from '~/utils/find-best-match';
 import {
   buildSearchFilter,
-  SearchEmailsInputSchema,
   type SearchCondition,
+  SearchEmailsInputSchema,
 } from './search-conditions.dto';
-import { isNonNull } from 'remeda';
 
 export interface SearchEmailResult {
   id: string;
@@ -151,6 +151,9 @@ export class SearchEmailsQuery {
     const unrecognized: string[] = [];
 
     for (const rawDirectoryId of rawDirectoryIds) {
+      if (!rawDirectoryId.trim().length) {
+        continue;
+      }
       const exactMatch = userDirectories.find(
         ({ providerDirectoryId }) => providerDirectoryId === rawDirectoryId,
       );

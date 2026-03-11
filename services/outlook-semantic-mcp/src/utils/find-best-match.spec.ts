@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { findBestMatch } from './find-best-match';
 
-type Item = { id: string; label: string };
+interface Item {
+  id: string;
+  label: string;
+}
 
 const items: Item[] = [
   { id: 'inbox', label: 'Inbox' },

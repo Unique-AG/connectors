@@ -4,10 +4,10 @@ import { SearchEmailsQuery } from './search-emails.query';
 // biome-ignore lint/suspicious/noExplicitAny: constructor args not needed for this private method
 const query = new SearchEmailsQuery(null as any, null as any);
 
-type MockDirectory = {
+interface MockDirectory {
   providerDirectoryId: string;
   displayName: string;
-};
+}
 
 const inboxDir: MockDirectory = { providerDirectoryId: 'inbox-id-123', displayName: 'Inbox' };
 const sentDir: MockDirectory = { providerDirectoryId: 'sent-id-456', displayName: 'Sent Items' };
