@@ -1,7 +1,6 @@
 <!-- confluence-page-id: 1547731088 -->
 <!-- confluence-space-key: PUBDOC -->
 
-
 ## Overview
 
 The SharePoint Connector is a cloud-native application that automatically synchronizes documents from SharePoint Online to the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
@@ -22,11 +21,11 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Microsoft 365 / SharePoint Online
 
-| Requirement | Details |
-|-------------|---------|
-| **SharePoint Online** | Active tenant with document libraries |
-| **Azure AD** | Tenant with Global Administrator or Application Administrator rights |
-| **License** | Standard SharePoint Online license (included in most Microsoft 365 plans) |
+| Requirement           | Details                                                                   |
+| --------------------- | ------------------------------------------------------------------------- |
+| **SharePoint Online** | Active tenant with document libraries                                     |
+| **Azure AD**          | Tenant with Global Administrator or Application Administrator rights      |
+| **License**           | Standard SharePoint Online license (included in most Microsoft 365 plans) |
 
 **Prerequisites:**
 
@@ -149,7 +148,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 flowchart TB
   Start(("Scheduler"))
   GetSites["Get Configured Sites"]
-  
+
   subgraph SiteLoop["For Each Site"]
     direction TB
 
@@ -255,30 +254,31 @@ See [Content Sync Flow](./technical/flows.md#content-sync-flow) for additional d
 
 ### Not Supported
 
-- The version `2.0.0` has a limitation of maximum 100,000 objects to sync
+- Maximum 100,000 objects to sync per site
 - Multiple SharePoint tenants (requires separate deployments)
 - Real-time synchronization (periodic scanning only)
 - Detection of sensitivity/classification levels (can be configured via Ingestion Metadata Filter on the Unique side)
 
 ### Considerations
 
-| Constraint | Impact | Mitigation |
-|------------|--------|------------|
-| **Files must be explicitly flagged** | No automatic sync | Document user workflow clearly |
-| **Requires custom column per library** | Setup overhead per library | Provide setup guide |
-| **One connector per SharePoint tenant** | Multiple deployments for multi-tenant | Document multi-origin workaround |
-| **Horizontal scaling not supported** | Single pod deployment | Adequate resource allocation |
-| **Permission sync group visibility** | App principal needs member/owner or Full Control | Document requirement |
+| Constraint                              | Impact                                                           | Mitigation                                                                          |
+| --------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Files must be explicitly flagged**    | No automatic sync                                                | Document user workflow clearly                                                      |
+| **Requires custom column per library**  | Setup overhead per library                                       | Provide setup guide                                                                 |
+| **One connector per SharePoint tenant** | Multiple deployments for multi-tenant                            | Document multi-origin workaround                                                    |
+| **Horizontal scaling not supported**    | Single pod deployment                                            | Adequate resource allocation                                                        |
+| **Singleton per site**                  | A site must not be configured in more than one connector process | Ensure non-overlapping sites across multiple processes for the same Unique instance |
+| **Permission sync group visibility**    | App principal needs member/owner or Full Control                 | Document requirement                                                                |
 
 ## Future Versions
 
 Planned enhancements:
 
-| Enhancement | Rationale |
-|-------------|-----------|
-| Multi-SharePoint / Multi-Microsoft-Tenant Support | High priority on roadmap |
-| Admin UI for configuration | Needs feature parity first |
-| On-demand syncing mechanics | Business case not yet clear |
+| Enhancement                                       | Rationale                   |
+| ------------------------------------------------- | --------------------------- |
+| Multi-SharePoint / Multi-Microsoft-Tenant Support | High priority on roadmap    |
+| Admin UI for configuration                        | Needs feature parity first  |
+| On-demand syncing mechanics                       | Business case not yet clear |
 
 ## Related Documentation
 

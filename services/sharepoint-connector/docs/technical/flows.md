@@ -21,27 +21,29 @@ flowchart TB
     end
 
     subgraph Processing["Processing Phase"]
-        Filter["Filter Flagged Items"]
-        Diff["Compare with Local State"]
-        Download["Download Content"]
+        Validate["Validate MIME type & size"]
+        Diff["Server-Side File Diff<br/>(Unique Platform)"]
     end
 
-    subgraph Ingestion["Ingestion Phase"]
-        Upload["Upload to Unique"]
-        UpdateState["Update Local State"]
+    subgraph Sync["Sync Phase"]
+        Delete["Delete removed files"]
+        Move["Move relocated files"]
+        Ingest["Download & ingest<br/>new/updated files"]
     end
 
     Scheduler --> FetchSites
     FetchSites --> FetchDrives
     FetchDrives --> FetchItems
-    FetchItems --> Filter
-    Filter --> Diff
-    Diff --> Download
-    Download --> Upload
-    Upload --> UpdateState
+    FetchItems --> Validate
+    Validate --> Diff
+    Diff --> Delete
+    Diff --> Move
+    Diff --> Ingest
 ```
 
 ### Sequence Diagram
+
+The connector is **stateless** — it does not maintain local state between sync cycles. Change detection is performed by the Unique platform's file diff API.
 
 ```mermaid
 sequenceDiagram
@@ -64,22 +66,28 @@ sequenceDiagram
         loop For each drive
             Connector->>Graph: GET /drives/{driveId}/root/children<br/>?$expand=listItem($expand=fields)
             Graph->>Connector: Items with custom fields
+        end
 
-            Note over Connector: Filter items where<br/>sync column = Yes
+        Note over Connector: Validate MIME type & file size
 
-            Connector->>Connector: Compare with local state<br/>(detect new, modified, deleted)
+        Connector->>Unique: POST /v2/content/file-diff<br/>(key, url, updatedAt per file)
+        Unique->>Connector: newFiles, updatedFiles,<br/>movedFiles, deletedFiles
 
-            par Process new/modified files
-                Connector->>Graph: GET /drives/{driveId}/items/{itemId}/content
-                Graph->>Connector: File content (stream)
-                Connector->>Unique: POST /ingestion/files
-                Unique->>Connector: Ingestion confirmation
-            and Remove deleted files
-                Connector->>Unique: DELETE /scopes/{scopeId}/files/{fileId}
-                Unique->>Connector: Deletion confirmation
-            end
+        opt Deleted files
+            Connector->>Unique: DELETE files
+            Unique->>Connector: Deletion confirmation
+        end
 
-            Connector->>Connector: Update local state
+        opt Moved files
+            Connector->>Unique: Move files to new scopes
+            Unique->>Connector: Move confirmation
+        end
+
+        opt New/updated files
+            Connector->>Graph: GET /drives/{driveId}/items/{itemId}/content
+            Graph->>Connector: File content (stream)
+            Connector->>Unique: POST /ingestion/files
+            Unique->>Connector: Ingestion confirmation
         end
     end
 
@@ -296,70 +304,61 @@ For public SharePoint sites, permissions can include tenant-wide principals such
 
 ## File Diff Mechanism
 
-The connector maintains local state to detect changes between sync cycles.
+The connector uses the Unique platform's server-side file diff API (`/v2/content/file-diff`) to detect changes between sync cycles. The connector does **not** compute local content hashes — instead, it sends each file's `key`, `url`, and `updatedAt` timestamp to the diff endpoint, which returns categorized results.
 
 ### State Comparison
 
 ```mermaid
 flowchart TB
     subgraph Input["Input"]
-        SharePointState["SharePoint State<br/>(current scan)"]
-        LocalState["Local State<br/>(previous scan)"]
+        SharePointState["SharePoint State<br/>(current scan: key, url, updatedAt per file)"]
     end
 
-    subgraph Comparison["Comparison"]
-        Compare["Compare States"]
+    subgraph Comparison["Server-Side Diff"]
+        Compare["POST /v2/content/file-diff<br/>(Unique Platform)"]
     end
 
     subgraph Output["Output"]
-        New["New Files<br/>(in SP, not in local)"]
-        Modified["Modified Files<br/>(hash changed)"]
-        Deleted["Deleted Files<br/>(in local, not in SP)"]
-        Unchanged["Unchanged Files<br/>(skip processing)"]
+        New["New Files"]
+        Modified["Updated Files"]
+        Moved["Moved Files<br/>(key changed, content same)"]
+        Deleted["Deleted Files"]
     end
 
     SharePointState --> Compare
-    LocalState --> Compare
     Compare --> New
     Compare --> Modified
+    Compare --> Moved
     Compare --> Deleted
-    Compare --> Unchanged
 ```
 
 ### Change Detection Logic
 
 ```mermaid
 flowchart TB
-    Start["For each item<br/>in SharePoint"] --> InLocal{"In local<br/>state?"}
+    Start["Collect all flagged items<br/>from SharePoint"] --> BuildList["Build file list<br/>(key, url, updatedAt)"]
+    BuildList --> CallDiff["POST /v2/content/file-diff"]
 
-    InLocal -->|No| NewFile["Mark as NEW"]
-    InLocal -->|Yes| CheckHash{"Content hash<br/>changed?"}
+    CallDiff --> NewFiles["newFiles: keys not previously known"]
+    CallDiff --> UpdatedFiles["updatedFiles: keys with changed updatedAt"]
+    CallDiff --> MovedFiles["movedFiles: keys that were renamed/relocated"]
+    CallDiff --> DeletedFiles["deletedFiles: previously known keys no longer in list"]
 
-    CheckHash -->|Yes| ModifiedFile["Mark as MODIFIED"]
-    CheckHash -->|No| CheckMeta{"Metadata<br/>changed?"}
-
-    CheckMeta -->|Yes| ModifiedFile
-    CheckMeta -->|No| UnchangedFile["Mark as UNCHANGED"]
-
-    subgraph LocalOnly["Process local-only items"]
-        LocalItem["For each item<br/>in local state"] --> InSP{"Still in<br/>SharePoint?"}
-        InSP -->|No| CheckFlag{"Was sync<br/>column = Yes?"}
-        CheckFlag -->|No| DeletedFile["Mark as DELETED"]
-        CheckFlag -->|Yes, now No| UnflaggedFile["Mark as UNFLAGGED<br/>(treat as deleted)"]
-        InSP -->|Yes| AlreadyProcessed["Already processed"]
-    end
+    NewFiles --> Ingest["Download & ingest"]
+    UpdatedFiles --> Ingest
+    MovedFiles --> Move["Move file in Unique"]
+    DeletedFiles --> Delete["Delete from Unique"]
 ```
 
-### State Attributes
+### File Diff Item Attributes
+
+Each item sent to the diff API contains:
 
 | Attribute | Description | Used For |
 |-----------|-------------|----------|
-| `itemId` | SharePoint item ID | Unique identifier |
-| `driveId` | Document library ID | Scope identification |
-| `contentHash` | SHA-256 of content | Change detection |
-| `lastModified` | Last modification timestamp | Change detection |
-| `syncColumnValue` | Current flag state | Unflag detection |
-| `uniqueFileId` | Unique platform file ID | Deletion |
+| `key` | Unique key identifying the file (derived from SharePoint drive/item path) | Identity and change tracking |
+| `url` | SharePoint URL of the file | Location tracking |
+| `updatedAt` | Last modification timestamp from SharePoint | Change detection |
 
 ## ASPX Page Processing
 
