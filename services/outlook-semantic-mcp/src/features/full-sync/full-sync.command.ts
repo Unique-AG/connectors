@@ -236,7 +236,7 @@ export class FullSyncCommand {
       assert.ok(message, `Missing message for file key: ${fileKey}`);
       const event = MessageEventDto.encode({
         type: 'unique.outlook-semantic-mcp.mail-event.full-sync-change-notification-scheduled',
-        payload: { messageId: message.id, userProfileId: userProfile.id },
+        payload: { messageId: message.id, userProfileId: userProfile.id, fullSyncVersion: version },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
         priority: IngestionPriority.Low,

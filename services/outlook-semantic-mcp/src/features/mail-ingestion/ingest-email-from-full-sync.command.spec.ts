@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockDrizzleDatabase, MockDrizzleDatabase } from '~/__mocks__';
 import { inboxConfiguration } from '~/db';
@@ -21,7 +21,7 @@ describe('IngestEmailFromFullSyncCommand', () => {
   let ingestEmailCommand: { run: ReturnType<typeof vi.fn> };
   let command: IngestEmailFromFullSyncCommand;
 
-  const payload = { userProfileId: 'user-1', messageId: 'msg-1' };
+  const payload = { userProfileId: 'user-1', messageId: 'msg-1', fullSyncVersion: 'version-1' };
 
   beforeEach(() => {
     db = createMockDrizzleDatabase();
@@ -33,7 +33,7 @@ describe('IngestEmailFromFullSyncCommand', () => {
     await command.run(payload);
 
     expect(ingestEmailCommand.run).toHaveBeenCalledOnce();
-    expect(ingestEmailCommand.run).toHaveBeenCalledWith(payload);
+    expect(ingestEmailCommand.run).toHaveBeenCalledWith({ userProfileId: payload.userProfileId, messageId: payload.messageId });
   });
 
   it('increments messagesProcessed after a successful ingest', async () => {
@@ -48,7 +48,10 @@ describe('IngestEmailFromFullSyncCommand', () => {
     });
     expect(updateBuilder.where).toHaveBeenCalledOnce();
     expect(updateBuilder.where).toHaveBeenCalledWith(
-      eq(inboxConfiguration.userProfileId, payload.userProfileId),
+      and(
+        eq(inboxConfiguration.userProfileId, payload.userProfileId),
+        eq(inboxConfiguration.fullSyncVersion, payload.fullSyncVersion),
+      ),
     );
   });
 

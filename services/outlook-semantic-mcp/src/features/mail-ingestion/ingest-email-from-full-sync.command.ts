@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 import { traceAttrs } from '~/features/tracing.utils';
@@ -16,15 +16,22 @@ export class IngestEmailFromFullSyncCommand {
   public async run({
     userProfileId,
     messageId,
+    fullSyncVersion,
   }: {
     userProfileId: string;
     messageId: string;
+    fullSyncVersion: string;
   }): Promise<void> {
     traceAttrs({ userProfileId: userProfileId, messageId: messageId });
     await this.ingestEmailCommand.run({ userProfileId, messageId });
     await this.db
       .update(inboxConfiguration)
       .set({ messagesProcessed: sql`${inboxConfiguration.messagesProcessed} + 1` })
-      .where(eq(inboxConfiguration.userProfileId, userProfileId));
+      .where(
+        and(
+          eq(inboxConfiguration.userProfileId, userProfileId),
+          eq(inboxConfiguration.fullSyncVersion, fullSyncVersion),
+        ),
+      );
   }
 }
