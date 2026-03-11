@@ -111,6 +111,15 @@ export class SubscriptionCreateService {
           count: result.rowCount ?? NaN,
         });
 
+        await this.db
+          .delete(inboxConfiguration)
+          .where(eq(inboxConfiguration.userProfileId, existingSubscription.userProfileId));
+
+        traceEvent('inbox configuration deleted', {
+          id: existingSubscription.id,
+          count: result.rowCount ?? NaN,
+        });
+
         this.logger.log({
           msg: 'Successfully deleted expired managed subscription from database',
           id: existingSubscription.id,
