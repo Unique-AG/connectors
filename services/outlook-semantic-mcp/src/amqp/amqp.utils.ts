@@ -13,7 +13,7 @@ const logger = new Logger('AMQPErrorHandler');
  */
 export const wrapErrorHandlerOTEL = (handler: MessageErrorHandler) => {
   return (channel: Channel, msg: ConsumeMessage, err: unknown) => {
-    logger.error({ msg: 'RabbitMQ message handler threw', error: err });
+    logger.error({ msg: 'RabbitMQ message handler threw', err });
 
     const span = trace.getActiveSpan();
     if (span?.isRecording()) {

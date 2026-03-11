@@ -175,7 +175,8 @@ export class McpOAuthStore implements IOAuthStore {
       type: 'unique.outlook-semantic-mcp.auth.user-authorized',
       payload: { userProfileId },
     });
-    await this.amqpConnection.publish(MAIN_EXCHANGE.name, event.type, event);
+    // We do not await the publish because we do not want to break the authorization flow in any possible way.
+    this.amqpConnection.publish(MAIN_EXCHANGE.name, event.type, event).then();
     return userProfileId;
   }
 
