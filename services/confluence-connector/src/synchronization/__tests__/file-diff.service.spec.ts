@@ -253,7 +253,13 @@ describe('FileDiffService', () => {
 
         const result = await service.computeDiff([basePage]);
 
-        expect(result.deletedPageIds).toEqual(['p-old-1', 'p-old-2', 'p-old-3', 'p-old-4', 'p-old-5']);
+        expect(result.deletedPageIds).toEqual([
+          'p-old-1',
+          'p-old-2',
+          'p-old-3',
+          'p-old-4',
+          'p-old-5',
+        ]);
       });
 
       it('should allow deletions when submitted page was updated', async () => {
@@ -320,10 +326,7 @@ describe('FileDiffService', () => {
           movedFiles: [],
         }));
 
-        const result = await service.computeDiff([
-          basePage,
-          { ...basePage, id: 'p-2' },
-        ]);
+        const result = await service.computeDiff([basePage, { ...basePage, id: 'p-2' }]);
 
         expect(result.deletedPageIds).toEqual([]);
         expect(getCountByKeyPrefix).not.toHaveBeenCalled();
@@ -335,7 +338,18 @@ describe('FileDiffService', () => {
           async () => ({
             newFiles: [],
             updatedFiles: [],
-            deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3', 'p-old-4', 'p-old-5', 'p-old-6', 'p-old-7', 'p-old-8', 'p-old-9', 'p-old-10'],
+            deletedFiles: [
+              'p-old-1',
+              'p-old-2',
+              'p-old-3',
+              'p-old-4',
+              'p-old-5',
+              'p-old-6',
+              'p-old-7',
+              'p-old-8',
+              'p-old-9',
+              'p-old-10',
+            ],
             movedFiles: [],
           }),
           { totalFilesInUnique: 20 },
@@ -380,7 +394,12 @@ describe('FileDiffService', () => {
           // @ts-expect-error -- calling private method for testing
           service.validateNoAccidentalFullDeletion(
             [],
-            { newFiles: [], updatedFiles: [], deletedFiles: ['p-old-1', 'p-old-2'], movedFiles: [] },
+            {
+              newFiles: [],
+              updatedFiles: [],
+              deletedFiles: ['p-old-1', 'p-old-2'],
+              movedFiles: [],
+            },
             'test-tenant/space-1_SP',
           ),
         ).rejects.toThrow(
@@ -418,14 +437,8 @@ describe('FileDiffService', () => {
         );
 
         await expect(
-          service.computeDiff([
-            basePage,
-            { ...basePage, id: 'p-2' },
-            { ...basePage, id: 'p-3' },
-          ]),
-        ).rejects.toThrow(
-          'File diff would delete all 3 files stored in Unique for partialKey',
-        );
+          service.computeDiff([basePage, { ...basePage, id: 'p-2' }, { ...basePage, id: 'p-3' }]),
+        ).rejects.toThrow('File diff would delete all 3 files stored in Unique for partialKey');
       });
 
       it('should abort when single file in Unique would be deleted', async () => {
