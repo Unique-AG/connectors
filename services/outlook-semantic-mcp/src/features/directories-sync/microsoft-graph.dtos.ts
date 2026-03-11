@@ -34,7 +34,15 @@ export const graphOutlookDirectoriesResponse = z.object({
 
 export const graphOutlookDirectoriesDeltaResponse = z.object({
   '@odata.context': z.string().optional(),
-  value: z.array(graphOutlookDirectory),
+  value: z.array(
+    graphOutlookDirectory.or(
+      z.object({
+        '@odata.type': z.string(),
+        id: z.string(),
+        '@removed': z.object({ reason: z.string() }),
+      }),
+    ),
+  ),
   '@odata.nextLink': z.string().optional(),
   '@odata.deltaLink': z.string().optional(),
 });

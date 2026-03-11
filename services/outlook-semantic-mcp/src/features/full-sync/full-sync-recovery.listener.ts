@@ -8,8 +8,8 @@ import { eq } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
-import { FullSyncCommand } from './full-sync.command';
 import { FullSyncRecoveryEventDto } from './dtos/full-sync-recovery-event.dto';
+import { FullSyncCommand } from './full-sync.command';
 
 @Injectable()
 export class FullSyncRecoveryListener {

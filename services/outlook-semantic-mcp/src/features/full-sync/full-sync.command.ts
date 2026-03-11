@@ -209,7 +209,10 @@ export class FullSyncCommand {
 
     await this.db
       .update(inboxConfiguration)
-      .set({ fullSyncState: 'processing-file-diff-changes', messagesFromMicrosoft: allGraphEmails.length })
+      .set({
+        fullSyncState: 'processing-file-diff-changes',
+        messagesFromMicrosoft: allGraphEmails.length,
+      })
       .where(
         and(
           eq(inboxConfiguration.userProfileId, userProfile.id),
@@ -324,6 +327,7 @@ export class FullSyncCommand {
       const fiveMinutesAgo = new Date();
       fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
       if (
+        inboxConfig.fullSyncState !== 'failed' &&
         isNonNullish(inboxConfig.lastFullSyncRunAt) &&
         inboxConfig.lastFullSyncRunAt > fiveMinutesAgo
       ) {

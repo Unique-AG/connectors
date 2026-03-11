@@ -1,8 +1,8 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { and, lt, notInArray, sql } from 'drizzle-orm';
 import { CronJob } from 'cron';
+import { and, lt, notInArray, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 import { FullSyncRecoveryEventDto } from './dtos/full-sync-recovery-event.dto';
@@ -82,7 +82,10 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
         await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
       }
     } catch (err) {
-      this.logger.error({ msg: 'An unexpected error occurred during stuck sync recovery scan', err });
+      this.logger.error({
+        msg: 'An unexpected error occurred during stuck sync recovery scan',
+        err,
+      });
     }
   }
 }

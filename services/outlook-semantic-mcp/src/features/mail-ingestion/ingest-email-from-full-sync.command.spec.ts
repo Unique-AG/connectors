@@ -33,7 +33,10 @@ describe('IngestEmailFromFullSyncCommand', () => {
     await command.run(payload);
 
     expect(ingestEmailCommand.run).toHaveBeenCalledOnce();
-    expect(ingestEmailCommand.run).toHaveBeenCalledWith({ userProfileId: payload.userProfileId, messageId: payload.messageId });
+    expect(ingestEmailCommand.run).toHaveBeenCalledWith({
+      userProfileId: payload.userProfileId,
+      messageId: payload.messageId,
+    });
   });
 
   it('increments messagesProcessed after a successful ingest', async () => {
