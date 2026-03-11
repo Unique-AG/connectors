@@ -34,6 +34,22 @@ describe('SearchEmailsQuery.sanitizeWrongDirectoryIds', () => {
     expect(result).toEqual({ resolvedIds: [], unrecognized: ['xyz123'] });
   });
 
+  it('resolves a string at exactly the 80% similarity threshold', () => {
+    // "Inboc" vs "Inbox": distance 1, max length 5 → similarity 0.8 (at threshold, should match)
+    // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
+    const result = (query as any).sanitizeWrongDirectoryIds(['Inboc'], [inboxDir]);
+
+    expect(result).toEqual({ resolvedIds: ['inbox-id-123'], unrecognized: [] });
+  });
+
+  it('rejects a string just below the 80% similarity threshold', () => {
+    // "Inbcc" vs "Inbox": distance 2, max length 5 → similarity 0.6 (below threshold)
+    // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
+    const result = (query as any).sanitizeWrongDirectoryIds(['Inbcc'], [inboxDir]);
+
+    expect(result).toEqual({ resolvedIds: [], unrecognized: ['Inbcc'] });
+  });
+
   it('splits mixed input correctly between resolvedIds and unrecognized', () => {
     // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
     const result = (query as any).sanitizeWrongDirectoryIds(

@@ -13,7 +13,8 @@ export function findBestMatch<T>(
   for (const item of items) {
     const lowerLabel = getLabel(item).toLowerCase();
     const dist = distance(lowerQuery, lowerLabel);
-    const similarity = 1 - dist / Math.max(lowerQuery.length, lowerLabel.length);
+    const maxLen = Math.max(lowerQuery.length, lowerLabel.length);
+    const similarity = maxLen === 0 ? 1 : 1 - dist / maxLen;
     if (similarity > bestSimilarity) {
       bestSimilarity = similarity;
       bestItem = item;
