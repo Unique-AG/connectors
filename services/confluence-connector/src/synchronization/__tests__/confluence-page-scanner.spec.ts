@@ -32,7 +32,6 @@ const baseConfluenceConfig: ConfluenceConfig = {
 } as unknown as ConfluenceConfig;
 
 const baseProcessingConfig: ProcessingConfig = {
-  stepTimeoutSeconds: 30,
   concurrency: 1,
   scanIntervalCron: '*/5 * * * *',
 };

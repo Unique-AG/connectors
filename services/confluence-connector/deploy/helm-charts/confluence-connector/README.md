@@ -1,5 +1,7 @@
 # confluence-connector
 
+![Version: 2.0.0-alpha.0](https://img.shields.io/badge/Version-2.0.0--alpha.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.0.0-alpha.0](https://img.shields.io/badge/AppVersion-2.0.0--alpha.0-informational?style=flat-square)
+
 Take content from Confluence and send it to Unique AI for RAG ingestion.
 
 ## Requirements
@@ -91,18 +93,22 @@ spec:
 | connector.volumes[0].name | string | `"tmp"` |  |
 | connector.volumes[1] | object | `{"configMap":{"name":"confluence-connector-tenant-config"},"name":"tenant-config"}` | Tenant configuration YAML file mounted from ConfigMap |
 | connectorConfig.enabled | bool | `true` | if disabled, tenant-config must be removed from the connector.volumes and connector.volumeMounts |
-| connectorConfig.tenants[0].confluence.apiRateLimitPerMinute | int | `100` | Number of Confluence API requests allowed per minute |
+| connectorConfig.tenants[0].confluence.apiRateLimitPerMinute | int | `1200` | Number of Confluence API requests allowed per minute Atlassian recommends DC admins allow at least 20 req/s (1200 RPM). Cloud uses a points-based quota. |
 | connectorConfig.tenants[0].confluence.auth.clientId | string | `"unset_default_value"` | OAuth 2.0 (2LO) application client ID |
+| connectorConfig.tenants[0].confluence.auth.clientSecret | string | `"os.environ/CONFLUENCE_CLIENT_SECRET"` | OAuth 2.0 client secret. Use "os.environ/ENV_VAR_NAME" to read from environment variable at runtime. This default is overridden per-tenant in the monorepo app.yaml values. |
 | connectorConfig.tenants[0].confluence.auth.mode | string | `"oauth_2lo"` | authentication mode possible values: oauth_2lo |
 | connectorConfig.tenants[0].confluence.baseUrl | string | `"unset_default_value"` | base url of the Confluence instance example (cloud): https://acme.atlassian.net example (data-center): https://confluence.acme.com |
 | connectorConfig.tenants[0].confluence.cloudId | string | `"unset_default_value"` | Atlassian Cloud ID (UUID) for the Confluence site (required for cloud instances) |
 | connectorConfig.tenants[0].confluence.ingestAllLabel | string | `"ai-ingest-all"` | Label to trigger full sync of all labeled pages |
 | connectorConfig.tenants[0].confluence.ingestSingleLabel | string | `"ai-ingest"` | Label to trigger single-page sync |
 | connectorConfig.tenants[0].confluence.instanceType | string | `"cloud"` | Confluence instance type: cloud or data-center |
+| connectorConfig.tenants[0].ingestion.ingestionMode | string | `"flat"` | Ingestion traversal mode |
+| connectorConfig.tenants[0].ingestion.scopeId | string | `"unset_default_value"` | Root scope ID for ingestion |
+| connectorConfig.tenants[0].ingestion.storeInternally | string | `"enabled"` | Whether to store content internally in Unique |
+| connectorConfig.tenants[0].ingestion.useV1KeyFormat | string | `"disabled"` | Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix |
 | connectorConfig.tenants[0].name | string | `"default"` |  |
 | connectorConfig.tenants[0].processing.concurrency | int | `1` | how many pages you want to submit for ingestion into Unique at once |
 | connectorConfig.tenants[0].processing.scanIntervalCron | string | `"*/15 * * * *"` | cron expression for the scheduled Confluence scan interval default: every 15 minutes |
-| connectorConfig.tenants[0].processing.stepTimeoutSeconds | int | `300` | timeout in seconds for a page processing step before it will stop and skip processing the page |
 | connectorConfig.tenants[0].unique.apiRateLimitPerMinute | int | `100` | Number of Unique API requests allowed per minute |
 | connectorConfig.tenants[0].unique.authMode | string | `"cluster_local"` | communication mode for the Unique Services possible values: cluster_local, external cluster_local: communicates using in-cluster URLs and requires serviceExtraHeaders with x-company-id and x-user-id external: communicates using external URLs and requires authentication via Zitadel |
 | connectorConfig.tenants[0].unique.ingestionServiceBaseUrl | string | `"unset_default_value"` | base URL for the ingestion service example: https://api.unique.app/ingestion example: http://node-ingestion.finance-gpt:8091 |

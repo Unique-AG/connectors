@@ -180,9 +180,13 @@
                           "clientId": {
                             "type": "string",
                             "description": "OAuth 2.0 (2LO) application client ID"
+                          },
+                          "clientSecret": {
+                            "type": "string",
+                            "description": "OAuth 2.0 client secret. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
                           }
                         },
-                        "required": ["mode", "clientId"],
+                        "required": ["mode", "clientId", "clientSecret"],
                         "additionalProperties": false
                       },
                       {
@@ -191,9 +195,13 @@
                             "type": "string",
                             "enum": ["pat"],
                             "description": "Personal Access Token (Data Center only)"
+                          },
+                          "token": {
+                            "type": "string",
+                            "description": "Personal Access Token. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
                           }
                         },
-                        "required": ["mode"],
+                        "required": ["mode", "token"],
                         "additionalProperties": false
                       }
                     ]
@@ -334,10 +342,6 @@
                 "type": "object",
                 "description": "Page processing configuration",
                 "properties": {
-                  "stepTimeoutSeconds": {
-                    "type": "integer",
-                    "description": "Timeout in seconds for page processing steps"
-                  },
                   "concurrency": {
                     "type": "integer",
                     "description": "Number of concurrent page processing operations"
