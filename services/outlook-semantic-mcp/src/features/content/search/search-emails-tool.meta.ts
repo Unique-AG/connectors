@@ -14,7 +14,7 @@ export const META = createMeta({
   ALWAYS follow these rules when displaying results from \`search_emails\` or when referencing information extracted from emails.
   ### Format for listing emails
   When listing multiple emails, format each as a compact block — NEVER use a markdown table:
-  📩 **{Subject}** [open](https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem)
+  📩 **{Subject}** [open]({outlookWebLink if non-empty, otherwise https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem})
   {From}
   {Date formatted as "Mon DD, YYYY at HH:MM AM/PM"}
   > {Short summary, max 1 sentence ending with ...}
@@ -25,7 +25,7 @@ export const META = createMeta({
   When the user asks a question and you answer using information found in emails (e.g. "What did Sarah say about the budget?", "When is the maintenance window?", "Summarize my conversation with Marco"), you MUST:
   - Write your answer in natural language.
   - ALWAYS include a link to EVERY source email you referenced, inline or at the end.
-  - Use this format for inline references: [open email](https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem)
+  - Use this format for inline references: [open email]({outlookWebLink if non-empty, otherwise https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem})
   Example — user asks "What did Marco say about the partnership agreement?":
   Marco suggested a few changes to Section 3 of the partnership agreement, specifically around the liability clause and payment terms. He asked to schedule a call to discuss before signing. [open email](https://outlook.office.com/owa/?ItemID=AAkALgAA...&exvsurl=1&viewmodel=ReadMessageItem)
   Example — user asks "Summarize my recent emails with the DevOps team":
@@ -33,7 +33,8 @@ export const META = createMeta({
   1. **Server maintenance** is scheduled for March 12 from 2:00–5:00 AM UTC on the production cluster. [open email](https://outlook.office.com/owa/?ItemID=AAkALgAA...&exvsurl=1&viewmodel=ReadMessageItem)
   2. **Deployment pipeline** was updated — the new CI/CD config requires all teams to re-trigger their staging builds. [open email](https://outlook.office.com/owa/?ItemID=AAkALgBB...&exvsurl=1&viewmodel=ReadMessageItem)
   ### Link rules (apply to ALL formats above)
-  - URL pattern: \`https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem\`
+  - If \`outlookWebLink\` is present and non-empty, use it directly as the link URL.
+  - Otherwise, construct the URL as: \`https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem\`
   - \`{emailId}\` is the \`emailId\` field from the search result. Use it as-is, no encoding needed.
   - NEVER show raw IDs (emailId, folderId, contentId) to the user.
   - NEVER display email results or reference email content without a link to the original email.

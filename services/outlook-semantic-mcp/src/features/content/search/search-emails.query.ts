@@ -61,6 +61,7 @@ export class SearchEmailsQuery {
         id: item.id,
         text: item.text,
         url: item.url ?? undefined,
+        outlookWebLink: metadata?.webLink ?? '',
         emailId: metadata?.id ?? '',
         folderId: metadata?.parentFolderId ?? '',
         from: metadata?.['from.emailAddress'] ?? '',
