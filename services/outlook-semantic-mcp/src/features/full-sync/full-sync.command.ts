@@ -142,7 +142,7 @@ export class FullSyncCommand {
 
     const [filteredGraphEmails, skippedGraphEmails] = partition(
       graphEmailsWithSkipResult,
-      (item) => item.skipCheckResult.skip,
+      (item) => !item.skipCheckResult.skip,
     );
     if (skippedGraphEmails.length > 0) {
       traceEvent('emails skipped by filter', {
