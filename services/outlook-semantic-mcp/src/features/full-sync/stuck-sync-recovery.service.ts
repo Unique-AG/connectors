@@ -5,8 +5,8 @@ import { and, lt, notInArray, sql } from 'drizzle-orm';
 import { CronJob } from 'cron';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { FullSyncRecoveryEventDto } from './dtos/full-sync-recovery-event.dto';
 
-const RECOVERY_ROUTING_KEY = 'unique.outlook-semantic-mcp.full-sync.recovery-requested';
 const STUCK_SYNC_THRESHOLD_MINUTES = 15;
 const RECOVERY_CRON_SCHEDULE = '* * * * *';
 
@@ -75,9 +75,11 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
 
       for (const config of stuckConfigs) {
         this.logger.log({ msg: 'Publishing recovery event', userProfileId: config.userProfileId });
-        await this.amqp.publish(MAIN_EXCHANGE.name, RECOVERY_ROUTING_KEY, {
-          userProfileId: config.userProfileId,
+        const event = FullSyncRecoveryEventDto.parse({
+          type: 'unique.outlook-semantic-mcp.full-sync.recovery-requested',
+          payload: { userProfileId: config.userProfileId },
         });
+        await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
       }
     } catch (err) {
       this.logger.error({ msg: 'An unexpected error occurred during stuck sync recovery scan', err });

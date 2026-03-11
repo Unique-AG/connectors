@@ -29,7 +29,7 @@ export class FullSyncRecoveryListener {
   })
   public async onRecoveryRequested(@RabbitPayload() payload: unknown): Promise<void> {
     const event = FullSyncRecoveryEventDto.parse(payload);
-    const { userProfileId } = event;
+    const { userProfileId } = event.payload;
 
     this.logger.log({ msg: 'Full sync recovery requested', userProfileId });
 
