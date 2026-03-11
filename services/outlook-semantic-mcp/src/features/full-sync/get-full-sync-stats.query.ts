@@ -218,10 +218,6 @@ export class GetFullSyncStatsQuery {
         toQueueForIngestionStats.messages.processed <
           toQueueForIngestionStats.messages.queuedForSync;
 
-      if (!isRunning) {
-        return { ingestionStats, toQueueForIngestionStats, state: 'idle', progressPercentage: 100 };
-      }
-
       // We intentionally double count the messages because ingestion is the slow operation
       // probably we will have 50% progress pretty fast but the rest will slowly go until
       // ingestion finishes.
@@ -235,12 +231,13 @@ export class GetFullSyncStatsQuery {
         ingestionStats.finished +
         ingestionStats.failed;
 
-      // If total count is 0 and the status is running than progress is 0 because we are reading emails
-      // from microsoft.
-      const progressPercentage =
-        totalCount === 0 ? 0 : Number(((completedCount / totalCount) * 100).toFixed(2));
-
-      return { ingestionStats, toQueueForIngestionStats, state: 'running', progressPercentage };
+      return {
+        ingestionStats,
+        toQueueForIngestionStats,
+        state: !isRunning ? 'idle' : 'running',
+        progressPercentage:
+          totalCount === 0 ? null : Number(((completedCount / totalCount) * 100).toFixed(2)),
+      };
     }
 
     return {

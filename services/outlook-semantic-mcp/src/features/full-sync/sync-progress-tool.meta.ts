@@ -16,7 +16,9 @@ export const META = createMeta({
   If \`message\` is present, show it as a blockquote below the status line.
 
   **Fetch & Queue** ({toQueueForIngestionStats.state}) — received / queued / processed: {received} / {queuedForSync} / {processed}
+  If state is `failed`, append: ⚠️ _Fetch & queue phase encountered an error._
   **Ingestion** ({ingestionStats.state}) — finished / in progress / failed: {finished} / {inProgress} / {failed} - Emails are ingested from newest emails received to oldest emails.
+  If `failed` > 0, append: ⚠️ _{failed} email(s) failed ingestion._
 
   ### Active filters
   Always show the active filters section so the user understands what is being ingested.
