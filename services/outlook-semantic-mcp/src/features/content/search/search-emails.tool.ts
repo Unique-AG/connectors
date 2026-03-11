@@ -8,6 +8,7 @@ import { SearchEmailsQuery } from '~/features/content/search/search-emails.query
 import { GetFullSyncStatsQuery } from '~/features/full-sync/get-full-sync-stats.query';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { META } from './search-emails-tool.meta';
 
 const SearchEmailResultSchema = z.object({
   id: z.string(),
@@ -50,11 +51,7 @@ export class SearchEmailsTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'search',
-      'unique.app/system-prompt':
-        'Searches ingested Outlook emails semantically. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns matched passages from emails with metadata. Call list_folders first to get folder IDs for directory filtering.',
-    },
+    _meta: META,
   })
   @Span()
   public async searchEmails(

@@ -7,6 +7,7 @@ import * as z from 'zod';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/db';
 import { traceAttrs } from '~/features/tracing.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { META } from './verify-inbox-connection-tool.meta';
 
 const VerifyInboxConnectionInputSchema = z.object({});
 
@@ -47,11 +48,7 @@ export class VerifyInboxConnectionTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'status',
-      'unique.app/system-prompt':
-        'Returns the current status of the inbox connection for outlook emails. Use this to verify if email ingestion is running before suggesting to connect or remove the inbox connection.',
-    },
+    _meta: META,
   })
   @Span()
   public async verifyInboxConnection(

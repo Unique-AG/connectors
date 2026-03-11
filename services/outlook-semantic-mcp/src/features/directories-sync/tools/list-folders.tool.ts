@@ -7,6 +7,7 @@ import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscri
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { ListDirectoriesQuery, type UserDirectory } from '../list-directories.query';
 import { SyncDirectoriesCommand } from '../sync-directories.command';
+import { META } from './list-folders-tool.meta';
 
 const InputSchema = z.object({});
 
@@ -49,11 +50,7 @@ export class ListFoldersTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'folder',
-      'unique.app/system-prompt':
-        'Returns a hierarchical tree of Outlook mail folders. Each folder has an id and displayName. Use folder ids when calling the email search tool to filter results to a specific folder. Call this tool first when the user wants to search emails in a specific folder or asks which folders are available.',
-    },
+    _meta: META,
   })
   @Span()
   public async listFolders(

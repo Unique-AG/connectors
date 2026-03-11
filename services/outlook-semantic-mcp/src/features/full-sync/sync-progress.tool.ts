@@ -5,6 +5,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetFullSyncStatsQuery, GetFullSyncStatsResponse } from './get-full-sync-stats.query';
+import { META } from './sync-progress-tool.meta';
 
 const InputSchema = z.object({});
 
@@ -30,11 +31,7 @@ export class SyncProgressTool {
       idempotentHint: true,
       openWorldHint: true,
     },
-    _meta: {
-      'unique.app/icon': 'status',
-      'unique.app/system-prompt':
-        'Returns the current full sync progress including inbox configuration and ingestion statistics. Use this to monitor how many emails have been processed and their ingestion states.',
-    },
+    _meta: META,
   })
   @Span()
   public async fullSyncProgress(

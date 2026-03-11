@@ -5,6 +5,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
+import { META } from './reconnect-inbox-tool.meta';
 
 const ReconnectInboxInputSchema = z.object({});
 
@@ -41,11 +42,7 @@ export class ReconnectInboxTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'play',
-      'unique.app/system-prompt':
-        'Re-establishes the inbox subscription for outlook email ingestion. Use verify_inbox_connection first to check if it is already running. If already active, inform the user that ingestion is already running.',
-    },
+    _meta: META,
   })
   @Span()
   public async reconnectInbox(

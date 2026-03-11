@@ -8,6 +8,7 @@ import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { FullSyncCommand, FullSyncRunStatus } from '~/features/full-sync/full-sync.command';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { META } from './run-full-sync-tool.meta';
 
 const InputSchema = z.object({});
 
@@ -39,10 +40,7 @@ export class RunFullSyncTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'play',
-      'unique.app/system-prompt': 'Starts full sync',
-    },
+    _meta: META,
   })
   @Span()
   public async startKbIntegration(
