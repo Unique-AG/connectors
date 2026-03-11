@@ -1,12 +1,10 @@
-export const createMeta = (
-  input: {
-    icon?: string;
-    systemPrompt?: string;
-    userPrompt?: string;
-    toolFormatInformation?: string;
-    category?: string;
-  },
-): Record<string, string> => {
+export const createMeta = (input: {
+  icon?: string;
+  systemPrompt?: string;
+  userPrompt?: string;
+  toolFormatInformation?: string;
+  category?: string;
+}): Record<string, string> => {
   const output: Record<string, string> = {};
   if (input.icon) {
     output['unique.app/icon'] = input.icon;
