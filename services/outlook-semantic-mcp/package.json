@@ -67,7 +67,7 @@
     "reflect-metadata": "^0.2.2",
     "remeda": "^2.32.0",
     "rxjs": "^7.8.2",
-    "safe-regex2": "^5.0.0",
+    "safe-regex2": "~5.0.0",
     "serialize-error-cjs": "^0.2.0",
     "typeid-js": "^1.2.0",
     "undici": "^7.18.2",
