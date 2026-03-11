@@ -103,9 +103,9 @@ const toQueueForIngestionSchema = z.discriminatedUnion('state', [
 
 export const GetFullSyncStatsResponse = z.object({
   state: z
-    .enum(['idle', 'running', 'unknown'])
+    .enum(['idle', 'running', 'unknown', 'failed'])
     .describe(
-      'Overall sync state. "idle" means sync is complete, "running" means sync is in progress and results may be incomplete, "unknown" means the inbox connection could not be found.',
+      'Overall sync state. "idle" means sync is complete, "running" means sync is in progress and results may be incomplete, "failed" means the fetch-and-queue phase encountered an error, "unknown" means the inbox connection could not be found.',
     ),
   progressPercentage: z
     .number()
@@ -231,10 +231,11 @@ export class GetFullSyncStatsQuery {
         ingestionStats.finished +
         ingestionStats.failed;
 
+      const overallState = toQueueForIngestionStats.state === 'failed' ? 'failed' : !isRunning ? 'idle' : 'running';
       return {
         ingestionStats,
         toQueueForIngestionStats,
-        state: !isRunning ? 'idle' : 'running',
+        state: overallState,
         progressPercentage:
           totalCount === 0 ? null : Number(((completedCount / totalCount) * 100).toFixed(2)),
       };
@@ -244,9 +245,9 @@ export class GetFullSyncStatsQuery {
       ingestionStats,
       toQueueForIngestionStats,
       state:
-        toQueueForIngestionStats.state !== 'unknown' || ingestionStats.state !== 'unknown'
-          ? 'running'
-          : 'idle',
+        toQueueForIngestionStats.state !== 'unknown'
+          ? toQueueForIngestionStats.state
+          : ingestionStats.state,
       progressPercentage: null,
     };
   }

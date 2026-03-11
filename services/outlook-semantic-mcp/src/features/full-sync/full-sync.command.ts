@@ -281,9 +281,9 @@ export class FullSyncCommand {
         };
       }
 
-      const twoDaysAgo = new Date();
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      if (isNonNullish(locked.lastFullSyncRunAt) && locked.lastFullSyncRunAt > twoDaysAgo) {
+      const fiveMinutesAgo = new Date();
+      fiveMinutesAgo.setMinutes(fiveMinutesAgo.getDate() - 5);
+      if (isNonNullish(locked.lastFullSyncRunAt) && locked.lastFullSyncRunAt > fiveMinutesAgo) {
         return {
           kind: 'skipped',
           reason: 'ran recently',

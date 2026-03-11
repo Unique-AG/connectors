@@ -11,6 +11,7 @@ export const META = createMeta({
   **Status line:**
   - \`idle\` → ✅ **Sync complete**
   - \`running\` → 🔄 **Sync in progress** — {progressPercentage}%
+  - \`failed\` → ❌ **Sync failed** — fetch & queue phase encountered an error.
   - \`unknown\` → ⚠️ **Sync state unknown** — inbox connection could not be found.
 
   If \`message\` is present, show it as a blockquote below the status line.
