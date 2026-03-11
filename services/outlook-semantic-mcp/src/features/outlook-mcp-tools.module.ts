@@ -9,14 +9,15 @@ import { DirectoriesSyncModule } from './directories-sync/directories-sync.modul
 import { ListFoldersTool } from './directories-sync/tools';
 import { CreateDraftEmailTool } from './email-management/create-draft-email.tool';
 import { EmailManagementModule } from './email-management/email-management.module';
-import { RunFullSyncTool } from './full-sync';
+import { RunFullSyncTool, SyncProgressTool } from './full-sync';
 import { FullSyncModule } from './full-sync/full-sync.module';
+import { FullSyncRecoveryListener } from './full-sync/full-sync-recovery.listener';
 import { IngestionListener } from './ingestion.listener';
 import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
 import { MailSubscriptionController } from './mail-subscription.controller';
 import { SubscriptionModule } from './subscriptions/subscription.module';
 import {
-  ConnectInboxTool,
+  ReconnectInboxTool,
   RemoveInboxConnectionTool,
   VerifyInboxConnectionTool,
 } from './subscriptions/tools';
@@ -24,8 +25,9 @@ import {
 const TOOLS = [
   ListFoldersTool,
   RunFullSyncTool,
+  SyncProgressTool,
   VerifyInboxConnectionTool,
-  ConnectInboxTool,
+  ReconnectInboxTool,
   RemoveInboxConnectionTool,
   SearchEmailsTool,
   OpenEmailTool,
@@ -51,7 +53,7 @@ const TOOLS = [
     SearchModule,
     UniqueApiFeatureModule,
   ],
-  providers: [MailSubscriptionController, IngestionListener, ...TOOLS],
+  providers: [MailSubscriptionController, IngestionListener, FullSyncRecoveryListener, ...TOOLS],
   controllers: [MailSubscriptionController],
 })
 export class OutlookMcpToolsModule {}

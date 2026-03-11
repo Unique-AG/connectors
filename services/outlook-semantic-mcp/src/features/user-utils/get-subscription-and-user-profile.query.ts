@@ -18,7 +18,7 @@ export class GetSubscriptionAndUserProfileQuery {
     subscription: Subscription;
     userProfile: NonNullishProps<UserProfile, 'email'>;
   }> {
-    traceAttrs({ subscription_id: subscriptionId.toString() });
+    traceAttrs({ subscriptionId: subscriptionId.toString() });
     const subscription = await this.db.query.subscriptions.findFirst({
       where: eq(subscriptions.subscriptionId, subscriptionId),
     });

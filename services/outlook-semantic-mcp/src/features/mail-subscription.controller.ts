@@ -143,8 +143,8 @@ export class MailSubscriptionController {
     );
 
     traceAttrs({
-      notifications_to_process_count: notificationsToProcess.length,
-      notifications_to_ignore_count: notificationsToIgnore.length,
+      notificationsToProcessCount: notificationsToProcess.length,
+      notificationsToIgnoreCount: notificationsToIgnore.length,
     });
 
     if (!notificationsToProcess.length) {
@@ -187,7 +187,7 @@ export class MailSubscriptionController {
 
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created': {
-        return this.fullSyncCommand.run(event.subscriptionId);
+        return await this.fullSyncCommand.run(event.subscriptionId);
       }
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-removed': {
         return this.subscriptionRemove.remove(event.subscriptionId);

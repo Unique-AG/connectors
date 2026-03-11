@@ -4,12 +4,19 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, type DrizzleDatabase, subscriptions, userProfiles } from '~/db';
+import { AppConfig, appConfig } from '~/config';
+import {
+  DRIZZLE,
+  type DrizzleDatabase,
+  inboxConfiguration,
+  subscriptions,
+  userProfiles,
+} from '~/db';
+import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { MAIN_EXCHANGE } from '../../amqp/amqp.constants';
-import { subscriptionMailFilters } from '../../db/schema/subscription/subscription-mail-filters.dto';
 import {
   CreateSubscriptionRequestSchema,
   LifecycleEventDto,
@@ -36,17 +43,15 @@ export class SubscriptionCreateService {
   public constructor(
     private readonly amqp: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly utils: MailSubscriptionUtilsService,
   ) {}
 
   @Span()
-  public async subscribe(
-    userProfileId: UserProfileTypeID,
-    filters: { dateFrom: Date },
-  ): Promise<SubscribeResult> {
+  public async subscribe(userProfileId: UserProfileTypeID): Promise<SubscribeResult> {
     traceAttrs({
-      user_profile_id: userProfileId.toString(),
+      userProfileId: userProfileId.toString(),
       operation: 'create_subscription',
     });
 
@@ -106,15 +111,21 @@ export class SubscriptionCreateService {
           count: result.rowCount ?? NaN,
         });
 
+        await this.db
+          .delete(inboxConfiguration)
+          .where(eq(inboxConfiguration.userProfileId, existingSubscription.userProfileId));
+
+        traceEvent('inbox configuration deleted', {
+          id: existingSubscription.id,
+          count: result.rowCount ?? NaN,
+        });
+
         this.logger.log({
           msg: 'Successfully deleted expired managed subscription from database',
           id: existingSubscription.id,
           count: result.rowCount ?? NaN,
         });
-        return await this.createNewSubscription({
-          userProfileId: userProfileId.toString(),
-          filters,
-        });
+        return await this.createNewSubscription(userProfileId.toString());
       }
 
       if (diffFromNow <= minimalTimeForLifecycleNotificationsInMinutes * 60 * 1000) {
@@ -145,19 +156,10 @@ export class SubscriptionCreateService {
       return { status: 'already_active', subscription: existingSubscription };
     }
     traceEvent('no existing subscription found');
-    return await this.createNewSubscription({
-      userProfileId: userProfileId.toString(),
-      filters,
-    });
+    return await this.createNewSubscription(userProfileId.toString());
   }
 
-  private async createNewSubscription({
-    userProfileId,
-    filters,
-  }: {
-    userProfileId: string;
-    filters: { dateFrom: Date };
-  }): Promise<SubscribeResult> {
+  private async createNewSubscription(userProfileId: string): Promise<SubscribeResult> {
     this.logger.debug({
       msg: 'No existing subscription found, proceeding with new subscription creation',
     });
@@ -185,7 +187,7 @@ export class SubscriptionCreateService {
     }
 
     traceAttrs({
-      'user_profile.provider_user_id': userProfile.providerUserId,
+      'userProfile.providerUserId': userProfile.providerUserId,
     });
     this.logger.debug({
       msg: 'Successfully retrieved user profile from database',
@@ -193,6 +195,16 @@ export class SubscriptionCreateService {
       userEmail: createSmeared(userProfile.email ?? `___Empty Email__`),
       providerUserId: userProfile.providerUserId,
     });
+
+    // We create the inbox configuration before we do the subscription because we do not want
+    // to create a rance condition between webhook events and not having the subscription.
+    await this.db
+      .insert(inboxConfiguration)
+      .values({
+        userProfileId,
+        filters: serializeMailFilters(this.config.defaultMailFilters),
+      })
+      .onConflictDoNothing();
 
     const payload = await CreateSubscriptionRequestSchema.encodeAsync({
       changeType: ['created'],
@@ -229,7 +241,7 @@ export class SubscriptionCreateService {
       .post(payload)) as unknown;
     const graphSubscription = await Subscription.parseAsync(graphResponse);
 
-    traceAttrs({ 'graph_subscription.id': graphSubscription.id });
+    traceAttrs({ 'graphSubscription.id': graphSubscription.id });
     traceEvent('Graph API subscription created', {
       subscriptionId: graphSubscription.id,
     });
@@ -246,9 +258,6 @@ export class SubscriptionCreateService {
         expiresAt: graphSubscription.expirationDateTime,
         userProfileId: userProfileId.toString(),
         subscriptionId: graphSubscription.id,
-        filters: subscriptionMailFilters.encode({
-          dateFrom: filters.dateFrom,
-        }),
       })
       .returning();
 

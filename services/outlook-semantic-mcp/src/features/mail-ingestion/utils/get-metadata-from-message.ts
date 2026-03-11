@@ -25,6 +25,7 @@ export interface MessageMetadata extends Record<string, ContentMetadataValue> {
   hasAttachments: boolean;
   importance: string;
   inferenceClassification: string;
+  webLink: string;
   'flag.flagStatus': string;
 }
 
@@ -80,6 +81,7 @@ export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata =
     categories: filterOutNilOrEmptyValues(message.categories),
     isRead: message.isRead ?? false,
     isDraft: message.isDraft ?? false,
+    webLink: message.webLink ?? '',
     hasAttachments: message.hasAttachments ?? false,
     importance: message.importance ?? '',
     inferenceClassification: message.inferenceClassification ?? '',

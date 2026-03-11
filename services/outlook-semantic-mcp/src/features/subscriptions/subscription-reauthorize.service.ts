@@ -28,7 +28,7 @@ export class SubscriptionReauthorizeService {
   @Span()
   public async enqueueReauthorizationRequired(subscriptionId: string): Promise<void> {
     traceAttrs({
-      subscription_id: subscriptionId,
+      subscriptionId: subscriptionId,
       operation: 'enqueue_reauthorization',
     });
 
@@ -64,7 +64,7 @@ export class SubscriptionReauthorizeService {
   @Span()
   public async reauthorize(subscriptionId: string): Promise<void> {
     traceAttrs({
-      subscription_id: subscriptionId,
+      subscriptionId: subscriptionId,
       operation: 'reauthorize_subscription',
     });
 
@@ -91,7 +91,7 @@ export class SubscriptionReauthorizeService {
     }
 
     traceAttrs({
-      user_profile_id: subscription.userProfileId,
+      userProfileId: subscription.userProfileId,
       'subscription.id': subscription.id,
     });
 

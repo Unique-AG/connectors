@@ -12,6 +12,6 @@ export const extractUserProfileId = (request: McpAuthenticatedRequest): UserProf
     throw new UnauthorizedException('User not authenticated');
   }
 
-  traceAttrs({ user_profile_id: userProfileId });
+  traceAttrs({ userProfileId: userProfileId });
   return convertUserProfileIdToTypeId(userProfileId);
 };

@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { RemoveRootScopeAndDirectoriesCommand } from '~/features/directories-sync/remove-root-scope-and-directories.command';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SubscriptionRemoveService } from '../subscription-remove.service';
+import { META } from './remove-inbox-connection-tool.meta';
 
 const RemoveInboxConnectionInputSchema = z.object({});
 
@@ -43,11 +44,7 @@ export class RemoveInboxConnectionTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'stop',
-      'unique.app/system-prompt':
-        'Removes the inbox connection for outlook emails. After removing, new emails will no longer be ingested. Use verify_inbox_connection first to check if it is running.',
-    },
+    _meta: META,
   })
   @Span()
   public async removeInboxConnection(

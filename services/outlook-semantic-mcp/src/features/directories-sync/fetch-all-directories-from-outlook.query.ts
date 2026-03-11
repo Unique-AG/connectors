@@ -19,7 +19,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
 
   @Span()
   public async run(userProfileId: string): Promise<GraphOutlookDirectory[]> {
-    traceAttrs({ user_profile_id: userProfileId });
+    traceAttrs({ userProfileId: userProfileId });
     this.logger.log({ userProfileId, msg: `Fetching all directories from Outlook` });
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
@@ -127,7 +127,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
         .get();
       parsedResult = graphOutlookDirectoriesResponse.parse(graphResponse);
       output.push(...parsedResult.value);
-      traceEvent('directories page fetched', { page: pageCount, running_total: output.length });
+      traceEvent('directories page fetched', { page: pageCount, runningTotal: output.length });
     }
 
     return output;

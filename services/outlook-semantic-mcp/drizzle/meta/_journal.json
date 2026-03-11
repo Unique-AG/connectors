@@ -57,6 +57,48 @@
       "when": 1772089562833,
       "tag": "0007_zippy_mikhail_rasputin",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773042739266,
+      "tag": "0008_legal_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773062426953,
+      "tag": "0009_makeFiltersNotNull",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773100000000,
+      "tag": "0010_daring_wolverine",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773200000000,
+      "tag": "0011_renameFiltersDateFrom",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1773300000000,
+      "tag": "0012_fullSyncVersionAndGranularStates",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1773259038334,
+      "tag": "0013_colorful_veda",
+      "breakpoints": true
     }
   ]
 }

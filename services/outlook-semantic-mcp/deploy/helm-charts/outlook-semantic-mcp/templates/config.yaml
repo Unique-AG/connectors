@@ -29,6 +29,10 @@ data:
   UNIQUE_ZITADEL_PROJECT_ID: {{ .Values.mcpConfig.unique.zitadel.projectId | quote }}
   {{- end }}
 
+  {{- if .Values.mcpConfig.defaultMailFilters }}
+  DEFAULT_MAIL_FILTERS: {{ .Values.mcpConfig.defaultMailFilters | quote }}
+  {{- end }}
+
   # Auth token expiration
   AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.accessTokenExpiresInSeconds | quote }}
   AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.refreshTokenExpiresInSeconds | quote }}

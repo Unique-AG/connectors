@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
 import { CreateDraftEmailCommand } from './create-draft-email.command';
+import { META } from './create-draft-email-tool.meta';
 
 const CreateDraftEmailInputSchema = z.object({
   subject: z.string().describe('The subject line of the draft email.'),
@@ -78,11 +79,7 @@ export class CreateDraftEmailTool {
       idempotentHint: false,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'mail',
-      'unique.app/system-prompt':
-        "Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and base64-encoded file attachments. The draft is saved and can be reviewed or sent later.",
-    },
+    _meta: META,
   })
   @Span()
   public async createDraftEmail(

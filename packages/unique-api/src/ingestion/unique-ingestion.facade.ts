@@ -8,6 +8,7 @@ import type {
   FileDiffResponse,
   IngestionApiResponse,
   IngestionFinalizationRequest,
+  IngestionState,
 } from './ingestion.types';
 
 export interface UniqueIngestionFacade {
@@ -22,4 +23,5 @@ export interface UniqueIngestionFacade {
   updateMetadata(
     request: ContentUpdateMetadataMutationInput,
   ): Promise<ContentUpdateMetadataResponse>;
+  getIngestionStats(scopeId: string): Promise<Partial<Record<IngestionState, number>>>;
 }

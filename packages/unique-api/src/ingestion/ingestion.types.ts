@@ -87,7 +87,6 @@ export interface FileDiffResponse {
 }
 
 export enum IngestionState {
-  CheckingIntegrity = 'CHECKING_INTEGRITY',
   Failed = 'FAILED',
   FailedCreatingChunks = 'FAILED_CREATING_CHUNKS',
   FailedEmbedding = 'FAILED_EMBEDDING',
@@ -101,6 +100,7 @@ export enum IngestionState {
   FailedTimeout = 'FAILED_TIMEOUT',
   FailedTooLessContent = 'FAILED_TOO_LESS_CONTENT',
   FailedTableLimitExceeded = 'FAILED_TABLE_LIMIT_EXCEEDED',
+  CheckingIntegrity = 'CHECKING_INTEGRITY',
   Finished = 'FINISHED',
   IngestionChunking = 'INGESTION_CHUNKING',
   IngestionEmbedding = 'INGESTION_EMBEDDING',
@@ -113,4 +113,5 @@ export enum IngestionState {
   Retrying = 'RETRYING',
   ReEmbedding = 'RE_EMBEDDING',
   ReIngesting = 'RE_INGESTING',
+  ExtractingMetadata = 'EXTRACTING_METADATA',
 }

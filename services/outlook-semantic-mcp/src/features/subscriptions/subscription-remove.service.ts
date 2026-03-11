@@ -4,7 +4,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/db';
+import { DRIZZLE, type DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -35,7 +35,7 @@ export class SubscriptionRemoveService {
   @Span()
   public async enqueueSubscriptionRemoved(subscriptionId: string): Promise<void> {
     traceAttrs({
-      subscription_id: subscriptionId,
+      subscriptionId: subscriptionId,
       operation: 'enqueue_removal',
     });
 
@@ -71,7 +71,7 @@ export class SubscriptionRemoveService {
   @Span()
   public async removeByUserProfileId(userProfileId: UserProfileTypeID): Promise<RemoveResult> {
     traceAttrs({
-      user_profile_id: userProfileId.toString(),
+      userProfileId: userProfileId.toString(),
       operation: 'remove_subscription_by_user',
     });
 
@@ -94,7 +94,7 @@ export class SubscriptionRemoveService {
   @Span()
   public async remove(subscriptionId: string): Promise<RemoveResult> {
     traceAttrs({
-      subscription_id: subscriptionId,
+      subscriptionId: subscriptionId,
       operation: 'remove_subscription',
     });
 
@@ -129,7 +129,17 @@ export class SubscriptionRemoveService {
       return { status: 'not_found', subscription: null };
     }
 
-    traceAttrs({ user_profile_id: deletedSubscription.userProfileId });
+    await this.db
+      .delete(inboxConfiguration)
+      .where(eq(inboxConfiguration.userProfileId, deletedSubscription.userProfileId));
+
+    traceEvent('deleted inbox configuration', { userProfileId: deletedSubscription.userProfileId });
+    this.logger.log({
+      msg: 'Successfully deleted inbox configuration record from database',
+      userProfileId: deletedSubscription.userProfileId,
+    });
+
+    traceAttrs({ userProfileId: deletedSubscription.userProfileId });
     this.logger.debug({
       msg: 'Sending deletion request to Microsoft Graph API for subscription',
       subscriptionId,

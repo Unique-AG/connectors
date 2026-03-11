@@ -41,14 +41,14 @@ export class SyncDirectoriesForUserProfileCommand {
 
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
-    traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
+    traceAttrs({ userProfileTypeId: userProfileTypeId.toString() });
     this.logger.log({
       userProfileId: userProfileTypeId.toString(),
       msg: `Starting full directories sync for user profile`,
     });
 
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
-    traceAttrs({ user_profile_id: userProfile.id });
+    traceAttrs({ userProfileId: userProfile.id });
     const userEmail = createSmeared(userProfile.email);
     this.logger.log({
       userProfileId: userProfile.id,
@@ -67,7 +67,7 @@ export class SyncDirectoriesForUserProfileCommand {
       .execute();
 
     const existingDirectoryCount = totalDirectories.at(0)?.count ?? 0;
-    traceAttrs({ existing_directory_count: existingDirectoryCount });
+    traceAttrs({ existingDirectoryCount: existingDirectoryCount });
 
     // We only sync the system directories once.
     if (!totalDirectories.length || existingDirectoryCount === 0) {
@@ -184,9 +184,9 @@ export class SyncDirectoriesForUserProfileCommand {
         microsoftDirectories,
       });
     traceEvent('directories to remove computed', {
-      delete_count: idsToDeleteInDatabase.length,
-      ignore_count: ignoredDirectoryIds.length,
-      unique_delete_count: providerParentIdsToDeleteInUnique.length,
+      deleteCount: idsToDeleteInDatabase.length,
+      ignoreCount: ignoredDirectoryIds.length,
+      uniqueDeleteCount: providerParentIdsToDeleteInUnique.length,
     });
     this.logger.log({
       userProfileId,

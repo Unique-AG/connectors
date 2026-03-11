@@ -248,6 +248,10 @@
           },
           "required": ["serviceAuthMode"]
         },
+        "defaultMailFilters": {
+          "type": "string",
+          "description": "Default mail filters applied when syncing emails (JSON string). Example: '{\"ignoredBefore\":\"2025-06-06\",\"ignoredContents\":[],\"ignoredSenders\":[]}'"
+        },
         "auth": {
           "type": "object",
           "description": "Authentication configuration for the MCP server",

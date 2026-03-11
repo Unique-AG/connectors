@@ -22,5 +22,13 @@
   },
   "peerDependencies": {
     "@nestjs/common": "^10 || ^11"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
   }
 }

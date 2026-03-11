@@ -7,6 +7,7 @@ import * as z from 'zod';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/db';
 import { traceAttrs } from '~/features/tracing.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { META } from './verify-inbox-connection-tool.meta';
 
 const VerifyInboxConnectionInputSchema = z.object({});
 
@@ -37,7 +38,7 @@ export class VerifyInboxConnectionTool {
     name: 'verify_inbox_connection',
     title: 'Verify Inbox Connection',
     description:
-      'Check the status of the inbox connection for Microsoft Outlook emails. Returns whether ingestion is active, expiring soon, expired, or not configured.',
+      'Check the status of the inbox connection for Microsoft Outlook emails. Returns whether ingestion is active, expiring soon, expired, or not configured. If status is `expired` or `not_configured`, call `reconnect_inbox` to restore email ingestion.',
     parameters: VerifyInboxConnectionInputSchema,
     outputSchema: VerifyInboxConnectionOutputSchema,
     annotations: {
@@ -47,11 +48,7 @@ export class VerifyInboxConnectionTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'status',
-      'unique.app/system-prompt':
-        'Returns the current status of the inbox connection for outlook emails. Use this to verify if email ingestion is running before suggesting to connect or remove the inbox connection.',
-    },
+    _meta: META,
   })
   @Span()
   public async verifyInboxConnection(
@@ -75,7 +72,8 @@ export class VerifyInboxConnectionTool {
       this.logger.debug({ userProfileId, msg: 'No mail subscription found for user' });
       return {
         status: 'not_configured' as SubscriptionStatus,
-        message: 'Inbox connection is not configured. Use connect_inbox to begin ingesting emails.',
+        message:
+          'Inbox connection is not configured. Use reconnect_inbox to begin ingesting emails.',
         subscription: null,
       };
     }
@@ -86,8 +84,8 @@ export class VerifyInboxConnectionTool {
     const minutesUntilExpiration = Math.floor(diffFromNow / (1000 * 60));
 
     traceAttrs({
-      'subscription.expires_at': expiresAt.toISOString(),
-      'subscription.minutes_until_expiration': minutesUntilExpiration,
+      'subscription.expiresAt': expiresAt.toISOString(),
+      'subscription.minutesUntilExpiration': minutesUntilExpiration,
     });
 
     let status: SubscriptionStatus;
@@ -96,7 +94,7 @@ export class VerifyInboxConnectionTool {
     if (diffFromNow < 0) {
       status = 'expired';
       message =
-        'Inbox connection subscription has expired. Use connect_inbox to restart ingestion.';
+        'Inbox connection subscription has expired. Use reconnect_inbox to restart ingestion.';
     } else if (minutesUntilExpiration <= 15) {
       status = 'expiring_soon';
       message = `Inbox connection is active but expiring in ${minutesUntilExpiration} minutes. It will be automatically renewed.`;
