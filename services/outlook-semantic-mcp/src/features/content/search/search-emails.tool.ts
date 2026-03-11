@@ -28,6 +28,7 @@ const SearchEmailsOutputSchema = z.object({
   results: z.array(SearchEmailResultSchema).optional(),
   status: z.string().optional(),
   syncWarning: z.string().optional(),
+  searchSummary: z.string().optional(),
 });
 
 @Injectable()
@@ -67,7 +68,7 @@ export class SearchEmailsTool {
       return subscriptionStatus;
     }
 
-    const results = await this.searchEmailsQuery.run(userProfileTypeId.toString(), input);
+    const { results, searchSummary } = await this.searchEmailsQuery.run(userProfileTypeId.toString(), input);
     const stats = await this.getFullSyncStatsQuery.run(userProfileTypeId);
 
     if (stats.state === 'error') {
@@ -76,6 +77,7 @@ export class SearchEmailsTool {
         syncWarning:
           'Search results may be inaccurate. Ingestion Statistics could not be fetched. Your inbox is a unknown state try to use the tools `remove_inbox_connection` and `reconnect_inbox` to get it into a proper state',
         results,
+        searchSummary,
       };
     }
     if (stats.state === 'running') {
@@ -84,9 +86,10 @@ export class SearchEmailsTool {
         syncWarning:
           'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox. The sync process syncronizes newest emails first.',
         results,
+        searchSummary,
       };
     }
 
-    return { success: true, results };
+    return { success: true, results, searchSummary };
   }
 }
