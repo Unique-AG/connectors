@@ -23,9 +23,9 @@ const ingestionStatsError = z.object({
 });
 const ingestionStateSuccess = z.object({
   state: z
-    .enum(['idle', 'running'])
+    .enum(['finished', 'running'])
     .describe(
-      '"idle" means all queued emails have been ingested, "running" means ingestion is still in progress.',
+      '"finished" means all queued emails have been ingested, "running" means ingestion is still in progress.',
     ),
   failed: z.number().describe('Number of emails that failed ingestion.'),
   finished: z.number().describe('Number of emails successfully ingested into the vector store.'),
@@ -274,7 +274,7 @@ export class GetFullSyncStatsQuery {
         (item) => item ?? 0,
       );
 
-      return { failed, finished, inProgress, state: inProgress > 0 ? 'running' : 'idle' };
+      return { failed, finished, inProgress, state: inProgress > 0 ? 'running' : 'finished' };
     } catch (error) {
       this.logger.warn({
         userProfileId,
