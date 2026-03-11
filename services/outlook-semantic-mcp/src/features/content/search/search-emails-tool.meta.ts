@@ -6,8 +6,10 @@ export const META = createMeta({
 
   Per default ALWAYS search in the inbox only.
 
-  Use the ID of that folder for the "directories" parameter
-  But ALWAYS ask at the end if other folders should be considered for the search`,
+  Use the ID of that folder for the "directories" parameter.
+  But ALWAYS ask at the end if other folders should be considered for the search.
+
+  If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.`,
   toolFormatInformation: `## Email Display Rules
   ALWAYS follow these rules when displaying results from \`search_emails\` or when referencing information extracted from emails.
   ### Format for listing emails

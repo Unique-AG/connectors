@@ -14,14 +14,14 @@ import { NonNullishProps } from '~/utils/non-nullish-props';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 
 const ingestionKnwonState = z.object({
-  state: z.enum(['idle', 'running']),
-  failed: z.number(),
-  finished: z.number(),
-  inProgress: z.number(),
+  state: z.enum(['idle', 'running']).describe('"idle" means all queued emails have been ingested, "running" means ingestion is still in progress.'),
+  failed: z.number().describe('Number of emails that failed ingestion.'),
+  finished: z.number().describe('Number of emails successfully ingested into the vector store.'),
+  inProgress: z.number().describe('Number of emails currently being ingested.'),
 });
 
 const ingestionUnknownState = z.object({
-  state: z.enum(['unknown']),
+  state: z.enum(['unknown']).describe('Ingestion stats could not be retrieved from the Unique API.'),
   failed: z.null(),
   finished: z.null(),
   inProgress: z.null(),
@@ -30,21 +30,23 @@ const ingestionUnknownState = z.object({
 const ingestionStats = z.discriminatedUnion('state', [ingestionUnknownState, ingestionKnwonState]);
 
 const toQueueForIngestionKnwonState = z.object({
-  state: z.enum(['idle', 'running', 'failed']),
-  runAt: z.string().nullable(),
-  startedAt: z.string().nullable(),
+  state: z.enum(['idle', 'running', 'failed']).describe('"idle" means the fetch-and-queue phase is complete, "running" means it is in progress, "failed" means it encountered an error.'),
+  runAt: z.string().nullable().describe('ISO timestamp of when the last full sync run was scheduled, or null if not yet run.'),
+  startedAt: z.string().nullable().describe('ISO timestamp of when the last full sync run started, or null if not yet started.'),
   filters: z.object({
-    ignoredBefore: z.iso.datetime().nullable(),
+    ignoredBefore: z.iso.datetime().nullable().describe('Emails received before this timestamp are excluded from sync. Null means no date filter is applied.'),
+    ignoredSenders: z.array(z.string()).describe('Regex patterns (as strings) matched against the sender email address. Emails matching any pattern are excluded from sync.'),
+    ignoredContents: z.array(z.string()).describe('Regex patterns (as strings) matched against the email subject and body. Emails matching any pattern are excluded from sync.'),
   }),
   messages: z.object({
-    received: z.number(),
-    queuedForSync: z.number(),
-    processed: z.number(),
+    received: z.number().describe('Total number of emails received from Microsoft during the sync.'),
+    queuedForSync: z.number().describe('Number of emails queued for ingestion into the vector store.'),
+    processed: z.number().describe('Number of emails that have been processed (handed off for ingestion).'),
   }),
 });
 
 const toQueueForIngestionUnknownState = z.object({
-  state: z.enum(['unknown']),
+  state: z.enum(['unknown']).describe('The inbox configuration could not be found; sync state is unknown.'),
   runAt: z.null(),
   startedAt: z.null(),
   filters: z.null(),
@@ -61,10 +63,21 @@ const toQueueForIngestionSchema = z.discriminatedUnion('state', [
 ]);
 
 export const GetFullSyncStatsResponse = z.object({
-  state: z.enum(['idle', 'running', 'unknown']),
-  progressPercentage: z.number().nullable(),
-  toQueueForIngestionStats: toQueueForIngestionSchema,
-  ingestionStats,
+  state: z
+    .enum(['idle', 'running', 'unknown'])
+    .describe(
+      'Overall sync state. "idle" means sync is complete, "running" means sync is in progress and results may be incomplete, "unknown" means the inbox connection could not be found.',
+    ),
+  progressPercentage: z
+    .number()
+    .nullable()
+    .describe('Overall sync progress as a percentage (0–100), or null when state is "unknown".'),
+  toQueueForIngestionStats: toQueueForIngestionSchema.describe(
+    'Stats for the phase that fetches emails from Microsoft and queues them for ingestion.',
+  ),
+  ingestionStats: ingestionStats.describe(
+    'Stats for the phase that ingests queued emails into the vector store.',
+  ),
 });
 
 type FullSyncStats = z.infer<typeof GetFullSyncStatsResponse>;
@@ -127,7 +140,11 @@ export class GetFullSyncStatsQuery {
           state: config.syncState,
           runAt: config.lastFullSyncRunAt?.toISOString() ?? null,
           startedAt: config.syncStartedAt?.toISOString() ?? null,
-          filters: { ignoredBefore: filters?.ignoredBefore.toISOString() ?? null },
+          filters: {
+            ignoredBefore: filters?.ignoredBefore.toISOString() ?? null,
+            ignoredSenders: filters?.ignoredSenders.map((r) => r.toString()) ?? [],
+            ignoredContents: filters?.ignoredContents.map((r) => r.toString()) ?? [],
+          },
           messages: {
             received: config.messagesFromMicrosoft,
             queuedForSync: config.messagesQueuedForSync,

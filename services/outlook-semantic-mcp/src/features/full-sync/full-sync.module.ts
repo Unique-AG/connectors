@@ -6,6 +6,7 @@ import { DirectoriesSyncModule } from '../directories-sync/directories-sync.modu
 import { SubscriptionUtilsModule } from '../user-utils/subscription-utils.module';
 import { FullSyncCommand } from './full-sync.command';
 import { GetFullSyncStatsQuery } from './get-full-sync-stats.query';
+import { SyncOnFilterChangeService } from './sync-on-filter-change.service';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { GetFullSyncStatsQuery } from './get-full-sync-stats.query';
     DirectoriesSyncModule,
     UniqueApiFeatureModule,
   ],
-  providers: [FullSyncCommand, GetFullSyncStatsQuery],
-  exports: [FullSyncCommand, GetFullSyncStatsQuery],
+  providers: [FullSyncCommand, GetFullSyncStatsQuery, SyncOnFilterChangeService],
+  exports: [FullSyncCommand, GetFullSyncStatsQuery, SyncOnFilterChangeService],
 })
 export class FullSyncModule {}

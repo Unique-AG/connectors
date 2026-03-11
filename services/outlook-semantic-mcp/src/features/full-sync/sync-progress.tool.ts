@@ -10,7 +10,7 @@ import { META } from './sync-progress-tool.meta';
 const InputSchema = z.object({});
 
 const OutputSchema = GetFullSyncStatsResponse.extend({
-  message: z.string(),
+  message: z.string().optional(),
 });
 
 @Injectable()
@@ -56,6 +56,6 @@ export class SyncProgressTool {
       };
     }
 
-    return { ...stats, message: '' };
+    return stats;
   }
 }
