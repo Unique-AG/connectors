@@ -18,6 +18,7 @@ const SearchEmailResultSchema = z.object({
   from: z.string(),
   receivedDateTime: z.string().optional().nullable(),
   text: z.string(),
+  outlookWebLink: z.string().optional(),
   url: z.string().optional(),
 });
 
@@ -69,7 +70,7 @@ export class SearchEmailsTool {
     const results = await this.searchEmailsQuery.run(userProfileTypeId.toString(), input);
     const stats = await this.getFullSyncStatsQuery.run(userProfileTypeId);
 
-    if (stats.state === 'unknown') {
+    if (stats.state === 'error') {
       return {
         success: true,
         syncWarning:

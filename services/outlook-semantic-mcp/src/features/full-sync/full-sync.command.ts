@@ -257,7 +257,7 @@ export class FullSyncCommand {
 
   private async acquireSyncLock(userProfileId: string): Promise<AcquireLockResult> {
     return this.db.transaction(async (tx): Promise<AcquireLockResult> => {
-      const locked = await tx
+      const inboxConfig = await tx
         .select({
           syncState: inboxConfiguration.syncState,
           lastFullSyncRunAt: inboxConfiguration.lastFullSyncRunAt,
@@ -268,34 +268,39 @@ export class FullSyncCommand {
         .for('update')
         .then((rows) => rows[0]);
 
-      if (!locked) {
+      if (!inboxConfig) {
+        // We only reach this state unless somebody deleted the inbox connection in the meanwhile.
         return { kind: 'skipped', reason: 'missing' };
       }
 
-      if (locked.syncState === 'running') {
+      if (inboxConfig.syncState === 'running') {
         return {
           kind: 'skipped',
           reason: 'already running',
-          filters: locked.filters,
-          lastFullSyncRunAt: locked.lastFullSyncRunAt,
+          filters: inboxConfig.filters,
+          lastFullSyncRunAt: inboxConfig.lastFullSyncRunAt,
         };
       }
 
+      // Before production release change to a reasonable number.
       const fiveMinutesAgo = new Date();
-      fiveMinutesAgo.setMinutes(fiveMinutesAgo.getDate() - 5);
-      if (isNonNullish(locked.lastFullSyncRunAt) && locked.lastFullSyncRunAt > fiveMinutesAgo) {
+      fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
+      if (
+        isNonNullish(inboxConfig.lastFullSyncRunAt) &&
+        inboxConfig.lastFullSyncRunAt > fiveMinutesAgo
+      ) {
         return {
           kind: 'skipped',
           reason: 'ran recently',
-          filters: locked.filters,
-          lastFullSyncRunAt: locked.lastFullSyncRunAt,
+          filters: inboxConfig.filters,
+          lastFullSyncRunAt: inboxConfig.lastFullSyncRunAt,
         };
       }
 
       await tx
         .update(inboxConfiguration)
         .set({
-          syncState: 'running',
+          syncState: 'running', // initialized-full-sync
           syncStartedAt: new Date(),
           messagesFromMicrosoft: 0,
           messagesQueuedForSync: 0,
@@ -306,8 +311,8 @@ export class FullSyncCommand {
 
       return {
         kind: 'proceed',
-        filters: locked.filters,
-        lastFullSyncRunAt: locked.lastFullSyncRunAt,
+        filters: inboxConfig.filters,
+        lastFullSyncRunAt: inboxConfig.lastFullSyncRunAt,
       };
     });
   }

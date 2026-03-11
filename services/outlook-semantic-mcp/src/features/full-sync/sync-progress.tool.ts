@@ -9,9 +9,7 @@ import { META } from './sync-progress-tool.meta';
 
 const InputSchema = z.object({});
 
-const OutputSchema = GetFullSyncStatsResponse.extend({
-  message: z.string().optional(),
-});
+const OutputSchema = GetFullSyncStatsResponse;
 
 @Injectable()
 export class SyncProgressTool {
@@ -40,22 +38,6 @@ export class SyncProgressTool {
     request: McpAuthenticatedRequest,
   ) {
     const userProfileTypeid = extractUserProfileId(request);
-    const stats = await this.getFullSyncStatsQuery.run(userProfileTypeid);
-    if (stats.state === 'unknown') {
-      return {
-        ...stats,
-        message:
-          'Search results may be inaccurate. Ingestion Statistics could not be fetched. Your inbox is a unknown state try to use the tools `remove_inbox_connection` and `reconnect_inbox` to get it into a proper state',
-      };
-    }
-    if (stats.state === 'running') {
-      return {
-        ...stats,
-        message:
-          'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox.',
-      };
-    }
-
-    return stats;
+    return await this.getFullSyncStatsQuery.run(userProfileTypeid);
   }
 }

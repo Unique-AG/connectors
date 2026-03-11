@@ -13,7 +13,15 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 
-const ingestionKnwonState = z.object({
+const ingestionStatsError = z.object({
+  state: z
+    .enum(['error'])
+    .describe(
+      '"error" means all eighter your inbox connection is somehow broken we cannot find your root scope. Or calling ingestion failed see "errorMessage" property for details',
+    ),
+  message: z.string(),
+});
+const ingestionStateSuccess = z.object({
   state: z
     .enum(['idle', 'running'])
     .describe(
@@ -24,16 +32,7 @@ const ingestionKnwonState = z.object({
   inProgress: z.number().describe('Number of emails currently being ingested.'),
 });
 
-const ingestionUnknownState = z.object({
-  state: z
-    .enum(['unknown'])
-    .describe('Ingestion stats could not be retrieved from the Unique API.'),
-  failed: z.null(),
-  finished: z.null(),
-  inProgress: z.null(),
-});
-
-const ingestionStats = z.discriminatedUnion('state', [ingestionUnknownState, ingestionKnwonState]);
+const ingestionStats = z.discriminatedUnion('state', [ingestionStateSuccess, ingestionStatsError]);
 
 const toQueueForIngestionKnwonState = z.object({
   state: z
@@ -102,21 +101,20 @@ const toQueueForIngestionSchema = z.discriminatedUnion('state', [
 ]);
 
 export const GetFullSyncStatsResponse = z.object({
-  state: z
-    .enum(['idle', 'running', 'unknown', 'failed'])
-    .describe(
-      'Overall sync state. "idle" means sync is complete, "running" means sync is in progress and results may be incomplete, "failed" means the fetch-and-queue phase encountered an error, "unknown" means the inbox connection could not be found.',
-    ),
+  state: z.enum(['idle', 'running', 'failed', 'error']),
+  message: z.string(),
   progressPercentage: z
     .number()
     .nullable()
     .describe('Overall sync progress as a percentage (0–100), or null when state is "unknown".'),
-  toQueueForIngestionStats: toQueueForIngestionSchema.describe(
-    'Stats for the phase that fetches emails from Microsoft and queues them for ingestion.',
-  ),
-  ingestionStats: ingestionStats.describe(
-    'Stats for the phase that ingests queued emails into the vector store.',
-  ),
+  toQueueForIngestionStats: toQueueForIngestionSchema
+    .nullable()
+    .describe(
+      'Stats for the phase that fetches emails from Microsoft and queues them for ingestion.',
+    ),
+  ingestionStats: ingestionStats
+    .nullable()
+    .describe('Stats for the phase that ingests queued emails into the vector store.'),
 });
 
 type FullSyncStats = z.infer<typeof GetFullSyncStatsResponse>;
@@ -168,87 +166,71 @@ export class GetFullSyncStatsQuery {
   @Span()
   public async run(userProfileId: UserProfileTypeID): Promise<FullSyncStats> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const config = await this.db.query.inboxConfiguration.findFirst({
+    const inboxConfig = await this.db.query.inboxConfiguration.findFirst({
       where: eq(inboxConfiguration.userProfileId, userProfile.id),
     });
-    const ingestionStats = await this.getIngestionStats(userProfile);
-    const filters = config ? inboxConfigurationMailFilters.parse(config.filters) : null;
-
-    const toQueueForIngestionStats: z.Infer<typeof toQueueForIngestionSchema> = config
-      ? {
-          state: config.syncState,
-          runAt: config.lastFullSyncRunAt?.toISOString() ?? null,
-          startedAt: config.syncStartedAt?.toISOString() ?? null,
-          filters: {
-            ignoredBefore: filters?.ignoredBefore.toISOString() ?? null,
-            ignoredSenders: filters?.ignoredSenders.map((r) => r.toString()) ?? [],
-            ignoredContents: filters?.ignoredContents.map((r) => r.toString()) ?? [],
-          },
-          messages: {
-            received: config.messagesFromMicrosoft,
-            queuedForSync: config.messagesQueuedForSync,
-            processed: config.messagesProcessed,
-          },
-        }
-      : {
-          state: 'unknown',
-          runAt: null,
-          startedAt: null,
-          filters: null,
-          messages: {
-            received: null,
-            queuedForSync: null,
-            processed: null,
-          },
-        };
-
-    if (toQueueForIngestionStats.state === 'unknown' && ingestionStats.state === 'unknown') {
+    if (!inboxConfig) {
       return {
-        toQueueForIngestionStats,
-        ingestionStats,
-        state: 'unknown',
+        state: 'error',
+        toQueueForIngestionStats: null,
+        ingestionStats: null,
         progressPercentage: null,
+        message: `Your inbox is disconnected. Use \`reconnect_inbox\` tool to reconnect`,
       };
     }
-
-    if (toQueueForIngestionStats.state !== 'unknown' && ingestionStats.state !== 'unknown') {
-      const isRunning =
-        toQueueForIngestionStats.state === 'running' ||
-        ingestionStats.state === 'running' ||
-        toQueueForIngestionStats.messages.processed <
-          toQueueForIngestionStats.messages.queuedForSync;
-
-      // We intentionally double count the messages because ingestion is the slow operation
-      // probably we will have 50% progress pretty fast but the rest will slowly go until
-      // ingestion finishes.
-      const totalCount =
-        toQueueForIngestionStats.messages.queuedForSync +
-        ingestionStats.inProgress +
-        ingestionStats.failed +
-        ingestionStats.finished;
-      const completedCount =
-        toQueueForIngestionStats.messages.processed +
-        ingestionStats.finished +
-        ingestionStats.failed;
-
-      const overallState = toQueueForIngestionStats.state === 'failed' ? 'failed' : !isRunning ? 'idle' : 'running';
+    const ingestionStats = await this.getIngestionStats(userProfile);
+    if (ingestionStats.state === 'error') {
       return {
-        ingestionStats,
-        toQueueForIngestionStats,
-        state: overallState,
-        progressPercentage:
-          totalCount === 0 ? null : Number(((completedCount / totalCount) * 100).toFixed(2)),
+        state: 'error',
+        toQueueForIngestionStats: null,
+        ingestionStats: null,
+        progressPercentage: null,
+        message: ingestionStats.message,
       };
     }
+    const filters = inboxConfig ? inboxConfigurationMailFilters.parse(inboxConfig.filters) : null;
 
+    const toQueueForIngestionStats: z.Infer<typeof toQueueForIngestionSchema> = {
+      state: inboxConfig.syncState,
+      runAt: inboxConfig.lastFullSyncRunAt?.toISOString() ?? null,
+      startedAt: inboxConfig.syncStartedAt?.toISOString() ?? null,
+      filters: {
+        ignoredBefore: filters?.ignoredBefore.toISOString() ?? null,
+        ignoredSenders: filters?.ignoredSenders.map((r) => r.toString()) ?? [],
+        ignoredContents: filters?.ignoredContents.map((r) => r.toString()) ?? [],
+      },
+      messages: {
+        received: inboxConfig.messagesFromMicrosoft,
+        queuedForSync: inboxConfig.messagesQueuedForSync,
+        processed: inboxConfig.messagesProcessed,
+      },
+    };
+
+    const isRunning =
+      toQueueForIngestionStats.state === 'running' ||
+      ingestionStats.state === 'running' ||
+      toQueueForIngestionStats.messages.processed < toQueueForIngestionStats.messages.queuedForSync;
+
+    // We intentionally double count the messages because ingestion is the slow operation
+    // probably we will have 50% progress pretty fast but the rest will slowly go until
+    // ingestion finishes.
+    const totalCount =
+      toQueueForIngestionStats.messages.queuedForSync +
+      ingestionStats.inProgress +
+      ingestionStats.failed +
+      ingestionStats.finished;
+    const completedCount =
+      toQueueForIngestionStats.messages.processed + ingestionStats.finished + ingestionStats.failed;
+
+    const overallState =
+      toQueueForIngestionStats.state === 'failed' ? 'failed' : !isRunning ? 'idle' : 'running';
     return {
+      message: ``,
       ingestionStats,
       toQueueForIngestionStats,
-      state:
-        toQueueForIngestionStats.state !== 'unknown'
-          ? toQueueForIngestionStats.state
-          : ingestionStats.state,
-      progressPercentage: null,
+      state: overallState,
+      progressPercentage:
+        totalCount === 0 ? null : Number(((completedCount / totalCount) * 100).toFixed(2)),
     };
   }
 
@@ -256,19 +238,16 @@ export class GetFullSyncStatsQuery {
     userProfile: NonNullishProps<UserProfile, 'email'>,
   ): Promise<z.infer<typeof ingestionStats>> {
     const userProfileId = userProfile.id;
-    const unknownState = {
-      failed: null,
-      finished: null,
-      inProgress: null,
-      state: 'unknown',
-    } as const;
 
     try {
       const rootScopeId = getRootScopeExternalIdForUser(userProfile.providerUserId);
       const rootScope = await this.uniqueApi.scopes.getByExternalId(rootScopeId);
       if (!rootScope) {
         this.logger.debug({ userProfileId, msg: 'Root scope is missing' });
-        return unknownState;
+        return {
+          state: 'error',
+          message: `Could not find root scope, please reconnect your inbox`,
+        };
       }
       const ingestionStats = await this.uniqueApi.ingestion.getIngestionStats(rootScope.id);
 
@@ -288,7 +267,10 @@ export class GetFullSyncStatsQuery {
         msg: 'Failed to fetch ingestion stats from Unique API',
         error,
       });
-      return unknownState;
+      return {
+        state: 'error',
+        message: `Ingestion service is not reachable`,
+      };
     }
   }
 }
