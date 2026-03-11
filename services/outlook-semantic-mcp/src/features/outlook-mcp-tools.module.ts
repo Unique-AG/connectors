@@ -10,6 +10,7 @@ import { ListFoldersTool } from './directories-sync/tools';
 import { CreateDraftEmailTool } from './email-management/create-draft-email.tool';
 import { EmailManagementModule } from './email-management/email-management.module';
 import { RunFullSyncTool, SyncProgressTool } from './full-sync';
+import { FullSyncRecoveryListener } from './full-sync/full-sync-recovery.listener';
 import { FullSyncModule } from './full-sync/full-sync.module';
 import { IngestionListener } from './ingestion.listener';
 import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
@@ -52,7 +53,7 @@ const TOOLS = [
     SearchModule,
     UniqueApiFeatureModule,
   ],
-  providers: [MailSubscriptionController, IngestionListener, ...TOOLS],
+  providers: [MailSubscriptionController, IngestionListener, FullSyncRecoveryListener, ...TOOLS],
   controllers: [MailSubscriptionController],
 })
 export class OutlookMcpToolsModule {}
