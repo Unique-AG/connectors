@@ -135,14 +135,25 @@ export class FullSyncCommand {
       .where(eq(inboxConfiguration.userProfileId, userProfile.id))
       .execute();
 
+    const graphEmailsWithSkipResult = allGraphEmails.map((email) => ({
+      email,
+      skipCheckResult: shouldSkipEmail(email, filters, { userProfileId: userProfile.id }),
+    }));
+
     const [filteredGraphEmails, skippedGraphEmails] = partition(
-      allGraphEmails,
-      (item) => !shouldSkipEmail(item, filters, { userProfileId: userProfile.id }).skip,
+      graphEmailsWithSkipResult,
+      (item) => item.skipCheckResult.skip,
     );
     if (skippedGraphEmails.length > 0) {
       traceEvent('emails skipped by filter', {
         count: skippedGraphEmails.length,
-        skippedGraphEmails: JSON.stringify(skippedGraphEmails),
+        skippedGraphEmails: JSON.stringify(
+          skippedGraphEmails.map((item) => ({
+            id: item.email.id,
+            internetMessageId: item.email.internetMessageId,
+            skipCheckResult: item.skipCheckResult,
+          })),
+        ),
       });
       this.logger.log({
         subscriptionId,
@@ -153,10 +164,10 @@ export class FullSyncCommand {
       });
     }
 
-    const filesList = filteredGraphEmails.map((item) => ({
-      key: getUniqueKeyForMessage(userProfile.email, item),
-      url: item.webLink,
-      updatedAt: item.lastModifiedDateTime,
+    const filesList = filteredGraphEmails.map(({ email }) => ({
+      key: getUniqueKeyForMessage(userProfile.email, email),
+      url: email.webLink,
+      updatedAt: email.lastModifiedDateTime,
     }));
 
     const fileDiffResponse = await this.uniqueApi.ingestion.performFileDiff(
@@ -182,8 +193,8 @@ export class FullSyncCommand {
       msg: `File diff completed`,
     });
 
-    const filesRecord = indexBy(filteredGraphEmails, (item) =>
-      getUniqueKeyForMessage(userProfile.email, item),
+    const filesRecord = indexBy(filteredGraphEmails, ({ email }) =>
+      getUniqueKeyForMessage(userProfile.email, email),
     );
     const toIngest = [...fileDiffResponse.updatedFiles, ...fileDiffResponse.newFiles];
     this.logger.log({
@@ -196,7 +207,7 @@ export class FullSyncCommand {
 
     let messagesQueuedForSync = 0;
     for (const fileKey of toIngest) {
-      const message = filesRecord[fileKey];
+      const message = filesRecord[fileKey]?.email;
       assert.ok(message, `Missing message for file key: ${fileKey}`);
       const event = MessageEventDto.encode({
         type: 'unique.outlook-semantic-mcp.mail-event.full-sync-change-notification-scheduled',
