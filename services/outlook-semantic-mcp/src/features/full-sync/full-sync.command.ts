@@ -140,7 +140,10 @@ export class FullSyncCommand {
       (item) => !shouldSkipEmail(item, filters, { userProfileId: userProfile.id }).skip,
     );
     if (skippedGraphEmails.length > 0) {
-      traceEvent('emails skipped by filter', { count: skippedGraphEmails.length });
+      traceEvent('emails skipped by filter', {
+        count: skippedGraphEmails.length,
+        skippedGraphEmails: JSON.stringify(skippedGraphEmails),
+      });
       this.logger.log({
         subscriptionId,
         userProfileId: userProfile.id,
