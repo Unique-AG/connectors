@@ -176,7 +176,12 @@ export class McpOAuthStore implements IOAuthStore {
       payload: { userProfileId },
     });
     // We do not await the publish because we do not want to break the authorization flow in any possible way.
-    this.amqpConnection.publish(MAIN_EXCHANGE.name, event.type, event).then();
+    this.amqpConnection
+      .publish(MAIN_EXCHANGE.name, event.type, event)
+      .then()
+      .catch((err) => {
+        this.logger.error({ msg: 'Failed to publish user authenticated', userProfileId, err });
+      });
     return userProfileId;
   }
 
