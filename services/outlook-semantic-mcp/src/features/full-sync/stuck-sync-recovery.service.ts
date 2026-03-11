@@ -2,7 +2,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, lt, notInArray, sql } from 'drizzle-orm';
+import { and, eq, lt, notInArray, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 import { FullSyncRecoveryEventDto } from './dtos/full-sync-recovery-event.dto';
@@ -58,11 +58,14 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
         .select({ userProfileId: inboxConfiguration.userProfileId })
         .from(inboxConfiguration)
         .where(
-          and(
-            notInArray(inboxConfiguration.fullSyncState, ['full-sync-finished', 'failed']),
-            lt(
-              sql`GREATEST(COALESCE(${inboxConfiguration.lastFullSyncStartedAt}, '-infinity'::timestamptz), ${inboxConfiguration.updatedAt})`,
-              sql`NOW() - ${STUCK_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
+          or(
+            eq(inboxConfiguration.fullSyncState, 'failed'),
+            and(
+              notInArray(inboxConfiguration.fullSyncState, ['full-sync-finished']),
+              lt(
+                sql`GREATEST(COALESCE(${inboxConfiguration.lastFullSyncStartedAt}, '-infinity'::timestamptz), ${inboxConfiguration.updatedAt})`,
+                sql`NOW() - ${STUCK_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
+              ),
             ),
           ),
         );
