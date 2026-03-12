@@ -383,6 +383,31 @@
                     "enum": ["enabled", "disabled"],
                     "description": "Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix",
                     "default": "disabled"
+                  },
+                  "attachments": {
+                    "type": "object",
+                    "description": "File attachment ingestion configuration",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "description": "Enable attachment ingestion",
+                        "default": false
+                      },
+                      "allowedExtensions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "File extensions to include when ingesting attachments",
+                        "default": ["pdf", "doc", "docx", "xls", "xlsx", "pptx", "txt", "csv", "html"]
+                      },
+                      "maxFileSizeBytes": {
+                        "type": "integer",
+                        "description": "Maximum file size in bytes for attachment ingestion",
+                        "default": 209715200
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false

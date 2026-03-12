@@ -66,5 +66,18 @@ data:
       scopeId: {{ $tenant.ingestion.scopeId | quote }}
       storeInternally: {{ $tenant.ingestion.storeInternally | quote }}
       useV1KeyFormat: {{ $tenant.ingestion.useV1KeyFormat | quote }}
+      {{- if $tenant.ingestion.attachments }}
+      attachments:
+        enabled: {{ $tenant.ingestion.attachments.enabled | default false }}
+        {{- if $tenant.ingestion.attachments.allowedExtensions }}
+        allowedExtensions:
+          {{- range $tenant.ingestion.attachments.allowedExtensions }}
+          - {{ . | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if $tenant.ingestion.attachments.maxFileSizeBytes }}
+        maxFileSizeBytes: {{ $tenant.ingestion.attachments.maxFileSizeBytes | int }}
+        {{- end }}
+      {{- end }}
   {{- end }}
 {{- end }}

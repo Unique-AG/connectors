@@ -33,3 +33,10 @@ connectorConfig:
         scopeId: test-scope-id
         storeInternally: enabled
         useV1KeyFormat: disabled
+        attachments:
+          enabled: true
+          allowedExtensions:
+            - pdf
+            - docx
+            - xlsx
+          maxFileSizeBytes: 104857600

@@ -185,3 +185,20 @@ connectorConfig:
         storeInternally: enabled
         # -- Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix
         useV1KeyFormat: disabled
+        # -- File attachment ingestion configuration (optional, all fields have defaults)
+        # attachments:
+        #   # -- Enable attachment ingestion (default: false)
+        #   enabled: false
+        #   # -- File extensions to include (default: pdf, doc, docx, xls, xlsx, pptx, txt, csv, html)
+        #   allowedExtensions:
+        #     - pdf
+        #     - doc
+        #     - docx
+        #     - xls
+        #     - xlsx
+        #     - pptx
+        #     - txt
+        #     - csv
+        #     - html
+        #   # -- Maximum file size in bytes (default: 209715200 = 200MB, or MAX_FILE_SIZE_BYTES env)
+        #   maxFileSizeBytes: 209715200
