@@ -34,19 +34,20 @@ const EXAMPLE_FOLDER_IDS = {
     'AQMkADllMDJjNDk0LWNiNmEtNDhlOC04YjA4LWMzNDZlOTkANzlhMmMALgAAA8XAUl8fmjpEkM39lOfyshYBAMjQHeJoK_1Bt2gTZjb69YQAAAIBWQAAAA==',
 };
 
-const emailConditionsSchema = SingularConditionFieldSchema(
-  z
-    .email()
-    .describe(
-      `Sender email address to filter by, e.g. "alice@example.com". Recommended operators: equals, contains`,
-    ),
-)
-  .or(
-    ArrayConditionFieldSchema(z.array(z.email())).describe(
-      'Sender email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Recommended operators: in, notIn.',
-    ),
+const emailConditionsSchema = (label: string) =>
+  SingularConditionFieldSchema(
+    z
+      .email()
+      .describe(
+        `${label} email address to filter by, e.g. "alice@example.com". Recommended operators: equals, contains`,
+      ),
   )
-  .optional();
+    .or(
+      ArrayConditionFieldSchema(z.array(z.email())).describe(
+        `${label} email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Recommended operators: in, notIn.`,
+      ),
+    )
+    .optional();
 
 export const SearchConditionSchema = z
   .object({
@@ -64,9 +65,9 @@ export const SearchConditionSchema = z
           'Filter emails received on or before this date. ISO 8601 format, e.g. "2024-12-31T23:59:59Z". Recommended operators: lessThanOrEqual, lessThan.',
         ),
     ).optional(),
-    fromSenders: emailConditionsSchema,
-    toRecipients: emailConditionsSchema,
-    ccRecipients: emailConditionsSchema,
+    fromSenders: emailConditionsSchema('Sender'),
+    toRecipients: emailConditionsSchema('To recipient'),
+    ccRecipients: emailConditionsSchema('CC recipient'),
     directories: ArrayConditionFieldSchema(
       z
         .array(z.string())
