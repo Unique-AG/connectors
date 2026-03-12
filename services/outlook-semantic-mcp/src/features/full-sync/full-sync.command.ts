@@ -391,23 +391,25 @@ export class FullSyncCommand {
             internetMessageId: email.internetMessageId,
           });
         }
-
-        // We ping that we get more emails so that next recovery mechanism does not stop the current fetching.
-        const updateResult = await this.db
-          .update(inboxConfiguration)
-          .set({ messagesFromMicrosoft: output.emailsToIngest.length + output.emailsToSkip.length })
-          .where(
-            and(
-              eq(inboxConfiguration.userProfileId, userProfile.id),
-              eq(inboxConfiguration.fullSyncVersion, version),
-            ),
-          )
-          .returning();
-
-        if (updateResult.length === 0) {
-          return { ...output, stopSync: true };
-        }
       }
+
+      // We ping that we get more emails so that next recovery mechanism does not stop the current fetching.
+      const updateResult = await this.db
+        .update(inboxConfiguration)
+        .set({ messagesFromMicrosoft: output.emailsToIngest.length + output.emailsToSkip.length })
+        .where(
+          and(
+            eq(inboxConfiguration.userProfileId, userProfile.id),
+            eq(inboxConfiguration.fullSyncVersion, version),
+          ),
+        )
+        .returning();
+
+      if (updateResult.length === 0) {
+        return { ...output, stopSync: true };
+      }
+
+      emailResponse.value = [];
 
       if (emailResponse['@odata.nextLink']) {
         emailsRaw = await client
@@ -416,7 +418,7 @@ export class FullSyncCommand {
           .get();
         emailResponse = fileDiffGraphMessageResponseSchema.parse(emailsRaw);
       }
-    } while (emailResponse['@odata.nextLink']);
+    } while (emailResponse.value.length);
 
     return { ...output, stopSync: false };
   }
