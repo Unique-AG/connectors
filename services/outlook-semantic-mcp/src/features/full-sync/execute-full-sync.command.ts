@@ -50,6 +50,7 @@ export class ExecuteFullSyncCommand {
         fullSyncVersion: inboxConfiguration.fullSyncVersion,
         filters: inboxConfiguration.filters,
         oldestLastModifiedDateTime: inboxConfiguration.oldestLastModifiedDateTime,
+        fullSyncNextLink: inboxConfiguration.fullSyncNextLink,
       })
       .from(inboxConfiguration)
       .where(eq(inboxConfiguration.userProfileId, userProfileId))
@@ -94,11 +95,12 @@ export class ExecuteFullSyncCommand {
         version,
         isResume,
         oldestLastModifiedDateTime: inboxConfig.oldestLastModifiedDateTime,
+        nextLink: inboxConfig.fullSyncNextLink,
       });
 
       await this.db
         .update(inboxConfiguration)
-        .set({ fullSyncState: 'ready', lastFullSyncRunAt: new Date() })
+        .set({ fullSyncState: 'ready', lastFullSyncRunAt: new Date(), fullSyncNextLink: null })
         .where(
           and(
             eq(inboxConfiguration.userProfileId, userProfileId),
@@ -134,30 +136,42 @@ export class ExecuteFullSyncCommand {
     version,
     isResume,
     oldestLastModifiedDateTime,
+    nextLink,
   }: {
     userProfileId: string;
     filters: InboxConfigurationMailFilters;
     version: string;
     isResume: boolean;
     oldestLastModifiedDateTime: Date | null;
+    nextLink: string | null;
   }): Promise<void> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     let totalScheduled = 0;
     let batchNumber = 0;
 
-    let filterExpression = `createdDateTime gt ${filters.ignoredBefore.toISOString()}`;
-    if (isResume && oldestLastModifiedDateTime) {
-      filterExpression += ` and lastModifiedDateTime lte ${oldestLastModifiedDateTime.toISOString()}`;
+    let emailsRaw: unknown;
+
+    if (nextLink) {
+      // Primary resume path: continue from the exact pagination cursor saved after the last successful batch
+      emailsRaw = await client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get();
+    } else {
+      let filterExpression = `createdDateTime gt ${filters.ignoredBefore.toISOString()}`;
+      // Fallback resume path: when nextLink is absent (e.g. expired and cleared, or crash before first save),
+      // use the watermark filter to skip already-processed pages
+      if (isResume && oldestLastModifiedDateTime) {
+        filterExpression += ` and lastModifiedDateTime lte ${oldestLastModifiedDateTime.toISOString()}`;
+      }
+
+      emailsRaw = await client
+        .api(`me/messages`)
+        .header('Prefer', 'IdType="ImmutableId"')
+        .select(FullSyncGraphMessageFields)
+        .filter(filterExpression)
+        .orderby(`lastModifiedDateTime desc`)
+        .top(200)
+        .get();
     }
 
-    let emailsRaw = await client
-      .api(`me/messages`)
-      .header('Prefer', 'IdType="ImmutableId"')
-      .select(FullSyncGraphMessageFields)
-      .filter(filterExpression)
-      .orderby(`lastModifiedDateTime desc`)
-      .top(200)
-      .get();
     let emailResponse = fullSyncGraphMessageResponseSchema.parse(emailsRaw);
 
     while (true) {
@@ -199,14 +213,24 @@ export class ExecuteFullSyncCommand {
         return;
       }
 
-      if (!emailResponse['@odata.nextLink']) {
+      const currentNextLink = emailResponse['@odata.nextLink'] ?? null;
+
+      await this.db
+        .update(inboxConfiguration)
+        .set({ fullSyncNextLink: currentNextLink })
+        .where(
+          and(
+            eq(inboxConfiguration.userProfileId, userProfileId),
+            eq(inboxConfiguration.fullSyncVersion, version),
+          ),
+        )
+        .execute();
+
+      if (!currentNextLink) {
         break;
       }
 
-      emailsRaw = await client
-        .api(emailResponse['@odata.nextLink'])
-        .header('Prefer', 'IdType="ImmutableId"')
-        .get();
+      emailsRaw = await client.api(currentNextLink).header('Prefer', 'IdType="ImmutableId"').get();
       emailResponse = fullSyncGraphMessageResponseSchema.parse(emailsRaw);
     }
 

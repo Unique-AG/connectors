@@ -130,6 +130,7 @@ export class StartFullSyncCommand {
         updateSet.oldestCreatedDateTime = null;
         updateSet.newestLastModifiedDateTime = inboxConfig.newestLastModifiedDateTime ?? now;
         updateSet.oldestLastModifiedDateTime = null;
+        updateSet.fullSyncNextLink = null;
       }
 
       await tx
