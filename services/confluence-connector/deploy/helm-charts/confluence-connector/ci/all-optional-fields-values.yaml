@@ -39,4 +39,4 @@ connectorConfig:
             - pdf
             - docx
             - xlsx
-          maxFileSizeBytes: 104857600
+          maxFileSizeMb: 100

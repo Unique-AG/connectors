@@ -75,8 +75,8 @@ data:
           - {{ . | quote }}
           {{- end }}
         {{- end }}
-        {{- if $tenant.ingestion.attachments.maxFileSizeBytes }}
-        maxFileSizeBytes: {{ $tenant.ingestion.attachments.maxFileSizeBytes | int }}
+        {{- if $tenant.ingestion.attachments.maxFileSizeMb }}
+        maxFileSizeMb: {{ $tenant.ingestion.attachments.maxFileSizeMb | int }}
         {{- end }}
       {{- end }}
   {{- end }}

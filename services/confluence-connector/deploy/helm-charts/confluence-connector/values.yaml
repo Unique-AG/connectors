@@ -6,7 +6,7 @@ connector:
   env:
     LOG_LEVEL: info
     LOGS_DIAGNOSTICS_DATA_POLICY: conceal
-    MAX_FILE_SIZE_BYTES: "209715200"
+    MAX_FILE_SIZE_MB: "200"
     MAX_HEAP_MB: 896
     NODE_ENV: production
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
@@ -200,5 +200,5 @@ connectorConfig:
         #     - txt
         #     - csv
         #     - html
-        #   # -- Maximum file size in bytes (default: 209715200 = 200MB, or MAX_FILE_SIZE_BYTES env)
-        #   maxFileSizeBytes: 209715200
+        #   # -- Maximum file size in megabytes (default: 200, or MAX_FILE_SIZE_MB env)
+        #   maxFileSizeMb: 200

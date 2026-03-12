@@ -40,13 +40,13 @@ const baseProcessingConfig: ProcessingConfig = {
 const disabledAttachmentConfig: AttachmentConfig = {
   enabled: false,
   allowedExtensions: ['pdf', 'docx'],
-  maxFileSizeBytes: 10_000_000,
+  maxFileSizeMb: 10,
 };
 
 const enabledAttachmentConfig: AttachmentConfig = {
   enabled: true,
   allowedExtensions: ['pdf', 'docx'],
-  maxFileSizeBytes: 10_000_000,
+  maxFileSizeMb: 10,
 };
 
 function makeAttachment(

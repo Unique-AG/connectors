@@ -402,10 +402,10 @@
                         "description": "File extensions to include when ingesting attachments",
                         "default": ["pdf", "doc", "docx", "xls", "xlsx", "pptx", "txt", "csv", "html"]
                       },
-                      "maxFileSizeBytes": {
+                      "maxFileSizeMb": {
                         "type": "integer",
-                        "description": "Maximum file size in bytes for attachment ingestion",
-                        "default": 209715200
+                        "description": "Maximum file size in megabytes for attachment ingestion",
+                        "default": 200
                       }
                     },
                     "additionalProperties": false

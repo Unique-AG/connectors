@@ -1,22 +1,24 @@
 import { z } from 'zod';
 import {
   DEFAULT_ALLOWED_EXTENSIONS,
-  DEFAULT_MAX_FILE_SIZE_BYTES,
+  DEFAULT_MAX_FILE_SIZE_MB,
 } from '../constants/defaults.constants';
 import { EnabledDisabledMode, IngestionMode } from '../constants/ingestion.constants';
 
 const IngestionModeSchema = z.enum([IngestionMode.Flat]).prefault(IngestionMode.Flat);
 
-function getMaxFileSizeBytesDefault(): number {
-  const envValue = process.env.MAX_FILE_SIZE_BYTES;
+function getMaxFileSizeMbDefault(): number {
+  const envValue = process.env.MAX_FILE_SIZE_MB;
   if (envValue) {
     const parsed = Number(envValue);
     if (Number.isFinite(parsed) && parsed > 0) {
       return parsed;
     }
   }
-  return DEFAULT_MAX_FILE_SIZE_BYTES;
+  return DEFAULT_MAX_FILE_SIZE_MB;
 }
+
+const BYTES_PER_MB = 1024 * 1024;
 
 const AttachmentConfigSchema = z.object({
   enabled: z
@@ -28,12 +30,12 @@ const AttachmentConfigSchema = z.object({
     .array(z.string().min(1))
     .prefault([...DEFAULT_ALLOWED_EXTENSIONS])
     .describe('File extensions to include when ingesting attachments'),
-  maxFileSizeBytes: z
+  maxFileSizeMb: z
     .number()
     .int()
     .positive()
-    .prefault(getMaxFileSizeBytesDefault())
-    .describe('Maximum file size in bytes for attachment ingestion'),
+    .prefault(getMaxFileSizeMbDefault())
+    .describe('Maximum file size in megabytes for attachment ingestion'),
 });
 
 export const IngestionConfigSchema = z.object({
@@ -58,3 +60,4 @@ export const IngestionConfigSchema = z.object({
 
 export type IngestionConfig = z.infer<typeof IngestionConfigSchema>;
 export type AttachmentConfig = z.infer<typeof AttachmentConfigSchema>;
+export { BYTES_PER_MB };

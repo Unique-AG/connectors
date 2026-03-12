@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
-import type { AttachmentConfig } from '../config/ingestion.schema';
+import { BYTES_PER_MB, type AttachmentConfig } from '../config/ingestion.schema';
 import type { ConfluenceAttachment, ConfluencePage } from '../confluence-api';
 import { type ConfluenceApiClient, ContentType } from '../confluence-api';
 import type { DiscoveredAttachment, DiscoveredPage, DiscoveryResult } from './sync.types';
@@ -127,12 +127,13 @@ export class ConfluencePageScanner {
   }
 
   private isAttachmentAllowed(attachment: ConfluenceAttachment): boolean {
-    if (attachment.extensions.fileSize > this.attachmentConfig.maxFileSizeBytes) {
+    const maxFileSizeBytes = this.attachmentConfig.maxFileSizeMb * BYTES_PER_MB;
+    if (attachment.extensions.fileSize > maxFileSizeBytes) {
       this.logger.debug({
         attachmentId: attachment.id,
         title: attachment.title,
         fileSize: attachment.extensions.fileSize,
-        maxFileSizeBytes: this.attachmentConfig.maxFileSizeBytes,
+        maxFileSizeMb: this.attachmentConfig.maxFileSizeMb,
         msg: 'Attachment exceeds max file size',
       });
       return false;
