@@ -392,7 +392,7 @@ export class FullSyncCommand {
           });
         }
 
-        // We ping that we get more emails so that next recovery mechanism breaks.
+        // We ping that we get more emails so that next recovery mechanism does not stop the current fetching.
         const updateResult = await this.db
           .update(inboxConfiguration)
           .set({ messagesFromMicrosoft: output.emailsToIngest.length + output.emailsToSkip.length })
