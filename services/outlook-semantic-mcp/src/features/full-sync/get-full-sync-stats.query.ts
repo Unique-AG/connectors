@@ -34,94 +34,29 @@ const ingestionStateSuccess = z.object({
 
 const ingestionStats = z.discriminatedUnion('state', [ingestionStateSuccess, ingestionStatsError]);
 
-const toQueueForIngestionKnwonState = z.object({
-  state: z
-    .enum([
-      'full-sync-finished',
-      'running',
-      'failed',
-      'fetching-emails',
-      'performing-file-diff',
-      'processing-file-diff-changes',
-    ])
-    .describe(
-      '"full-sync-finished" means the fetch-and-queue phase is complete, "failed" means it encountered an error, all other values mean it is in progress.',
-    ),
-  runAt: z
-    .string()
-    .nullable()
-    .describe(
-      'ISO timestamp of when the last full sync run was scheduled, or null if not yet run.',
-    ),
-  startedAt: z
-    .string()
-    .nullable()
-    .describe('ISO timestamp of when the last full sync run started, or null if not yet started.'),
-  filters: z.object({
-    ignoredBefore: z.iso
-      .datetime()
-      .nullable()
-      .describe(
-        'Emails received before this timestamp are excluded from sync. Null means no date filter is applied.',
-      ),
-    ignoredSenders: z
-      .array(z.string())
-      .describe(
-        'Regex patterns (as strings) matched against the sender email address. Emails matching any pattern are excluded from sync.',
-      ),
-    ignoredContents: z
-      .array(z.string())
-      .describe(
-        'Regex patterns (as strings) matched against the email subject and body. Emails matching any pattern are excluded from sync.',
-      ),
-  }),
-  messages: z.object({
-    received: z
-      .number()
-      .describe('Total number of emails received from Microsoft during the sync.'),
-    queuedForSync: z
-      .number()
-      .describe('Number of emails queued for ingestion into the vector store.'),
-    processed: z
-      .number()
-      .describe('Number of emails that have been processed (handed off for ingestion).'),
-  }),
-});
-
-const toQueueForIngestionUnknownState = z.object({
-  state: z
-    .enum(['unknown'])
-    .describe('The inbox configuration could not be found; sync state is unknown.'),
-  runAt: z.null(),
-  startedAt: z.null(),
-  filters: z.null(),
-  messages: z.object({
-    received: z.null(),
-    queuedForSync: z.null(),
-    processed: z.null(),
-  }),
-});
-
-const toQueueForIngestionSchema = z.discriminatedUnion('state', [
-  toQueueForIngestionKnwonState,
-  toQueueForIngestionUnknownState,
-]);
-
 export const GetFullSyncStatsResponse = z.object({
   state: z.enum(['error', 'running', 'finished']),
   message: z.string(),
-  progressPercentage: z
-    .number()
-    .nullable()
-    .describe('Overall sync progress as a percentage (0–100), or null when state is "unknown".'),
-  toQueueForIngestionStats: toQueueForIngestionSchema
-    .nullable()
-    .describe(
-      'Stats for the phase that fetches emails from Microsoft and queues them for ingestion.',
-    ),
-  ingestionStats: ingestionStats
-    .nullable()
-    .describe('Stats for the phase that ingests queued emails into the vector store.'),
+  syncStats: z
+    .object({
+      fullSyncState: z.enum(['ready', 'running', 'failed', 'fetching-emails']),
+      liveCatchUpState: z.enum(['ready', 'running', 'failed']),
+      runAt: z.string().nullable(),
+      startedAt: z.string().nullable(),
+      filters: z.object({
+        ignoredBefore: z.string().nullable(),
+        ignoredSenders: z.array(z.string()),
+        ignoredContents: z.array(z.string()),
+      }),
+      dateWindow: z.object({
+        newestCreatedDateTime: z.string().nullable(),
+        oldestCreatedDateTime: z.string().nullable(),
+        newestLastModifiedDateTime: z.string().nullable(),
+        oldestLastModifiedDateTime: z.string().nullable(),
+      }),
+    })
+    .nullable(),
+  ingestionStats: ingestionStats.nullable(),
 });
 
 type FullSyncStats = z.infer<typeof GetFullSyncStatsResponse>;
@@ -179,72 +114,58 @@ export class GetFullSyncStatsQuery {
     if (!inboxConfig) {
       return {
         state: 'error',
-        toQueueForIngestionStats: null,
+        syncStats: null,
         ingestionStats: null,
-        progressPercentage: null,
         message: `Your inbox is disconnected. Use \`reconnect_inbox\` tool to reconnect`,
       };
     }
     if (inboxConfig.fullSyncState === 'failed') {
       return {
         state: 'error',
-        toQueueForIngestionStats: null,
+        syncStats: null,
         ingestionStats: null,
-        progressPercentage: null,
         message: `Full sync failed. Use \`run_full_sync\` tool to sync your inbox`,
       };
     }
-    const ingestionStats = await this.getIngestionStats(userProfile);
-    if (ingestionStats.state === 'error') {
+    const ingestionResult = await this.getIngestionStats(userProfile);
+    if (ingestionResult.state === 'error') {
       return {
         state: 'error',
-        toQueueForIngestionStats: null,
+        syncStats: null,
         ingestionStats: null,
-        progressPercentage: null,
-        message: ingestionStats.message,
+        message: ingestionResult.message,
       };
     }
-    const filters = inboxConfig ? inboxConfigurationMailFilters.parse(inboxConfig.filters) : null;
+    const filters = inboxConfigurationMailFilters.parse(inboxConfig.filters);
 
-    const toQueueForIngestionStats: z.Infer<typeof toQueueForIngestionSchema> = {
-      state: inboxConfig.fullSyncState,
+    const syncStats = {
+      fullSyncState: inboxConfig.fullSyncState,
+      liveCatchUpState: inboxConfig.liveCatchUpState,
       runAt: inboxConfig.lastFullSyncRunAt?.toISOString() ?? null,
       startedAt: inboxConfig.lastFullSyncStartedAt?.toISOString() ?? null,
       filters: {
-        ignoredBefore: filters?.ignoredBefore.toISOString() ?? null,
-        ignoredSenders: filters?.ignoredSenders.map((r) => r.toString()) ?? [],
-        ignoredContents: filters?.ignoredContents.map((r) => r.toString()) ?? [],
+        ignoredBefore: filters.ignoredBefore.toISOString() ?? null,
+        ignoredSenders: filters.ignoredSenders.map((r) => r.toString()),
+        ignoredContents: filters.ignoredContents.map((r) => r.toString()),
       },
-      messages: {
-        received: inboxConfig.messagesFromMicrosoft,
-        queuedForSync: inboxConfig.messagesQueuedForSync,
-        processed: inboxConfig.messagesProcessed,
+      dateWindow: {
+        newestCreatedDateTime: inboxConfig.newestCreatedDateTime?.toISOString() ?? null,
+        oldestCreatedDateTime: inboxConfig.oldestCreatedDateTime?.toISOString() ?? null,
+        newestLastModifiedDateTime: inboxConfig.newestLastModifiedDateTime?.toISOString() ?? null,
+        oldestLastModifiedDateTime: inboxConfig.oldestLastModifiedDateTime?.toISOString() ?? null,
       },
     };
 
     const isRunning =
-      toQueueForIngestionStats.state !== 'full-sync-finished' ||
-      ingestionStats.state === 'running' ||
-      toQueueForIngestionStats.messages.processed < toQueueForIngestionStats.messages.queuedForSync;
-
-    // We intentionally double count the messages because ingestion is the slow operation
-    // probably we will have 50% progress pretty fast but the rest will slowly go until
-    // ingestion finishes.
-    const totalCount =
-      toQueueForIngestionStats.messages.queuedForSync +
-      ingestionStats.inProgress +
-      ingestionStats.failed +
-      ingestionStats.finished;
-    const completedCount =
-      toQueueForIngestionStats.messages.processed + ingestionStats.finished + ingestionStats.failed;
+      inboxConfig.fullSyncState !== 'ready' ||
+      inboxConfig.liveCatchUpState !== 'ready' ||
+      ingestionResult.inProgress > 0;
 
     return {
       message: ``,
-      ingestionStats,
-      toQueueForIngestionStats,
+      ingestionStats: ingestionResult,
+      syncStats,
       state: isRunning ? 'running' : 'finished',
-      progressPercentage:
-        totalCount === 0 ? null : Number(((completedCount / totalCount) * 100).toFixed(2)),
     };
   }
 

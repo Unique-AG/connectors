@@ -7,9 +7,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { MessageEventDto } from './mail-ingestion/dtos/message-event.dto';
-import { IngestEmailFromFullSyncCommand } from './mail-ingestion/ingest-email-from-full-sync.command';
 import { IngestEmailViaSubscriptionCommand } from './mail-ingestion/ingest-email-via-subscription.command';
 import { IngestionPriority } from './mail-ingestion/utils/ingestion-queue.utils';
+import { IngestEmailCommand } from './mail-ingestion/ingest-email.command';
 
 @Injectable()
 export class IngestionListener {
@@ -17,7 +17,7 @@ export class IngestionListener {
 
   public constructor(
     private readonly ingestEmailViaSubscriptionCommand: IngestEmailViaSubscriptionCommand,
-    private readonly ingestEmailFromFullSyncCommand: IngestEmailFromFullSyncCommand,
+    private readonly ingestEmailCommand: IngestEmailCommand,
   ) {}
 
   @RabbitSubscribe({
@@ -39,7 +39,7 @@ export class IngestionListener {
       case 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received':
         return await this.ingestEmailViaSubscriptionCommand.run(event.payload);
       case 'unique.outlook-semantic-mcp.mail-event.full-sync-change-notification-scheduled':
-        return await this.ingestEmailFromFullSyncCommand.run(event.payload);
+        await this.ingestEmailCommand.run(event.payload);
     }
   }
 }

@@ -54,41 +54,77 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
     try {
       this.logger.log({ msg: 'Stuck sync recovery scan triggered' });
 
-      const stuckConfigs = await this.db
-        .select({ userProfileId: inboxConfiguration.userProfileId })
-        .from(inboxConfiguration)
-        .where(
-          or(
-            eq(inboxConfiguration.fullSyncState, 'failed'),
-            and(
-              notInArray(inboxConfiguration.fullSyncState, ['ready']),
-              lt(
-                sql`GREATEST(COALESCE(${inboxConfiguration.lastFullSyncStartedAt}, '-infinity'::timestamptz), ${inboxConfiguration.updatedAt})`,
-                sql`NOW() - ${STUCK_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
-              ),
-            ),
-          ),
-        );
-
-      if (stuckConfigs.length === 0) {
-        return;
-      }
-
-      this.logger.log({ msg: 'Found stuck inbox configurations', count: stuckConfigs.length });
-
-      for (const config of stuckConfigs) {
-        this.logger.log({ msg: 'Publishing recovery event', userProfileId: config.userProfileId });
-        const event = FullSyncEventDto.parse({
-          type: 'unique.outlook-semantic-mcp.full-sync.recovery-requested',
-          payload: { userProfileId: config.userProfileId },
-        });
-        await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
-      }
+      await Promise.all([
+        this.recoverStuckFullSyncs(),
+        this.recoverStuckLiveCatchUps(),
+      ]);
     } catch (err) {
       this.logger.error({
         msg: 'An unexpected error occurred during stuck sync recovery scan',
         err,
       });
+    }
+  }
+
+  private async recoverStuckFullSyncs(): Promise<void> {
+    const stuckConfigs = await this.db
+      .select({ userProfileId: inboxConfiguration.userProfileId })
+      .from(inboxConfiguration)
+      .where(
+        or(
+          eq(inboxConfiguration.fullSyncState, 'failed'),
+          and(
+            notInArray(inboxConfiguration.fullSyncState, ['ready']),
+            lt(
+              sql`GREATEST(COALESCE(${inboxConfiguration.lastFullSyncStartedAt}, '-infinity'::timestamptz), ${inboxConfiguration.updatedAt})`,
+              sql`NOW() - ${STUCK_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
+            ),
+          ),
+        ),
+      );
+
+    if (stuckConfigs.length === 0) {
+      return;
+    }
+
+    this.logger.log({ msg: 'Found stuck full sync configurations', count: stuckConfigs.length });
+
+    for (const config of stuckConfigs) {
+      this.logger.log({ msg: 'Publishing full sync recovery event', userProfileId: config.userProfileId });
+      const event = FullSyncEventDto.parse({
+        type: 'unique.outlook-semantic-mcp.full-sync.recovery-requested',
+        payload: { userProfileId: config.userProfileId },
+      });
+      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
+    }
+  }
+
+  private async recoverStuckLiveCatchUps(): Promise<void> {
+    const stuckConfigs = await this.db
+      .select({ userProfileId: inboxConfiguration.userProfileId })
+      .from(inboxConfiguration)
+      .where(
+        and(
+          notInArray(inboxConfiguration.liveCatchUpState, ['ready']),
+          lt(
+            inboxConfiguration.updatedAt,
+            sql`NOW() - ${STUCK_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
+          ),
+        ),
+      );
+
+    if (stuckConfigs.length === 0) {
+      return;
+    }
+
+    this.logger.log({ msg: 'Found stuck live catch-up configurations', count: stuckConfigs.length });
+
+    for (const config of stuckConfigs) {
+      this.logger.log({ msg: 'Resetting stuck live catch-up state', userProfileId: config.userProfileId });
+      await this.db
+        .update(inboxConfiguration)
+        .set({ liveCatchUpState: 'ready' })
+        .where(eq(inboxConfiguration.userProfileId, config.userProfileId));
     }
   }
 }

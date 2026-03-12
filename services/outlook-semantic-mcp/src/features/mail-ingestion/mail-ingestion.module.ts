@@ -6,12 +6,9 @@ import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';
 import { GetMessageDetailsQuery } from './get-message-details.query';
 import { IngestEmailCommand } from './ingest-email.command';
-import { IngestEmailFromFullSyncCommand } from './ingest-email-from-full-sync.command';
 import { IngestEmailViaSubscriptionCommand } from './ingest-email-via-subscription.command';
 
-const PRIVATE_COMMANDS: Provider[] = [IngestEmailCommand];
-
-const COMMANDS: Provider[] = [IngestEmailViaSubscriptionCommand, IngestEmailFromFullSyncCommand];
+const COMMANDS: Provider[] = [IngestEmailCommand, IngestEmailViaSubscriptionCommand];
 
 const QUERIES: Provider[] = [GetMessageDetailsQuery];
 
@@ -23,7 +20,7 @@ const QUERIES: Provider[] = [GetMessageDetailsQuery];
     DirectoriesSyncModule,
     UniqueApiFeatureModule,
   ],
-  providers: [...PRIVATE_COMMANDS, ...COMMANDS, ...QUERIES],
+  providers: [...COMMANDS, ...QUERIES],
   exports: [...COMMANDS, ...QUERIES],
 })
 export class MailIngestionModule {}

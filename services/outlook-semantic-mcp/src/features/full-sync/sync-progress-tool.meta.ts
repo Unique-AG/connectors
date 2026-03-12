@@ -3,21 +3,20 @@ import { createMeta } from '@unique-ag/mcp-server-module';
 export const META = createMeta({
   icon: 'status',
   systemPrompt:
-    'Returns the current full sync progress including inbox configuration and ingestion statistics. Use this to monitor how many emails have been processed and their ingestion states.',
+    'Returns the current sync progress including inbox configuration, date windows, and ingestion statistics. Use this to monitor sync state and ingestion progress.',
   toolFormatInformation: `## Sync Progress Display Rules
 
-  Open with a status line, then show the two phases as compact sections. Omit any field that is \`null\`.
+  Open with a status line, then show the sync state and ingestion as compact sections. Omit any field that is \`null\`.
 
   **Status line:**
-  - \`idle\` → ✅ **Sync complete**
-  - \`running\` → 🔄 **Sync in progress** — {progressPercentage}%
-  - \`failed\` → ❌ **Sync failed** — fetch & queue phase encountered an error.
-  - \`unknown\` → ⚠️ **Sync state unknown** — inbox connection could not be found.
+  - \`finished\` → ✅ **Sync complete**
+  - \`running\` → 🔄 **Sync in progress**
+  - \`error\` → ❌ **Sync error**
 
   If \`message\` is present, show it as a blockquote below the status line.
 
-  **Fetch & Queue** ({toQueueForIngestionStats.state}) — received / queued / processed: {received} / {queuedForSync} / {processed}
-  If state is \`failed\`, append: ⚠️ _Fetch & queue phase encountered an error._
+  **Sync State** — Full sync: {syncStats.fullSyncState}, Live catch-up: {syncStats.liveCatchUpState}
+  **Date Window** — Newest created: {newestCreatedDateTime}, Oldest created: {oldestCreatedDateTime}, Newest modified: {newestLastModifiedDateTime}, Oldest modified: {oldestLastModifiedDateTime}
   **Ingestion** ({ingestionStats.state}) — finished / in progress / failed: {finished} / {inProgress} / {failed} - Emails are ingested from newest emails received to oldest emails.
   If \`failed\` > 0, append: ⚠️ _{failed} email(s) failed ingestion._
 

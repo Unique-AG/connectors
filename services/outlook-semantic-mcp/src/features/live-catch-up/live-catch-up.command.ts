@@ -33,7 +33,11 @@ export class LiveCatchUpCommand {
     messageIds?: string[];
   }): Promise<void> {
     traceAttrs({ subscriptionId });
-    this.logger.log({ subscriptionId, webhookMessageIds: messageIds.length, msg: 'Live catch-up triggered' });
+    this.logger.log({
+      subscriptionId,
+      webhookMessageIds: messageIds.length,
+      msg: 'Live catch-up triggered',
+    });
 
     const subscription = await this.db.query.subscriptions.findFirst({
       columns: { userProfileId: true },
@@ -100,9 +104,7 @@ export class LiveCatchUpCommand {
     }
   }
 
-  private async acquireLock(
-    userProfileId: string,
-  ): Promise<{ watermark: Date } | undefined> {
+  private async acquireLock(userProfileId: string): Promise<{ watermark: Date } | undefined> {
     return this.db.transaction(async (tx) => {
       const inboxConfig = await tx
         .select({
@@ -125,7 +127,10 @@ export class LiveCatchUpCommand {
       }
 
       if (!inboxConfig.newestLastModifiedDateTime) {
-        this.logger.log({ userProfileId, msg: 'No watermark yet (full sync not started), skipping' });
+        this.logger.log({
+          userProfileId,
+          msg: 'No watermark yet (full sync not started), skipping',
+        });
         return undefined;
       }
 
