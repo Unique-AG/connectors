@@ -58,6 +58,7 @@ export class SyncDirectoriesForUserProfileCommand {
 
     await this.createRootScopeCommand.run({
       userProviderUserId: userProfile.providerUserId,
+      userEmail: userProfile.email,
     });
 
     const totalDirectories = await this.db
