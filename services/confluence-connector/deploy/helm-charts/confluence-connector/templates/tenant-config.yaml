@@ -68,7 +68,7 @@ data:
       useV1KeyFormat: {{ $tenant.ingestion.useV1KeyFormat | quote }}
       {{- if $tenant.ingestion.attachments }}
       attachments:
-        ingest: {{ $tenant.ingestion.attachments.ingest | default "enabled" | quote }}
+        mode: {{ $tenant.ingestion.attachments.mode | default "enabled" | quote }}
         {{- if $tenant.ingestion.attachments.allowedExtensions }}
         allowedExtensions:
           {{- range $tenant.ingestion.attachments.allowedExtensions }}

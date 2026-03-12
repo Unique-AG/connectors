@@ -50,7 +50,7 @@ export class TenantRegistry implements OnModuleInit {
           this.confluenceAuthFactory.createAuthStrategy(config.confluence),
         );
         const apiClient = this.confluenceApiClientFactory.create(config.confluence, {
-          attachmentsEnabled: config.ingestion.attachments.ingest,
+          attachmentsEnabled: config.ingestion.attachments.mode,
         });
         this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
 

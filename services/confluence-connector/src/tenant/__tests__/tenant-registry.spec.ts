@@ -51,7 +51,7 @@ function createMockTenantConfig(): TenantConfig {
       scopeId: 'scope-1',
       storeInternally: 'enabled',
       useV1KeyFormat: 'disabled',
-      attachments: { ingest: false, allowedExtensions: [], maxFileSizeMb: 10 },
+      attachments: { mode: false, allowedExtensions: [], maxFileSizeMb: 10 },
     },
     processing: {},
   } as unknown as TenantConfig;

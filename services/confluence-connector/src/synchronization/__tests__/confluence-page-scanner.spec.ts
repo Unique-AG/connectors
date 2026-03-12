@@ -47,13 +47,13 @@ const baseProcessingConfig: ProcessingConfig = {
 };
 
 const disabledAttachmentConfig: AttachmentConfig = {
-  ingest: false,
+  mode: false,
   allowedExtensions: ['pdf', 'docx'],
   maxFileSizeMb: 10,
 };
 
 const enabledAttachmentConfig: AttachmentConfig = {
-  ingest: true,
+  mode: true,
   allowedExtensions: ['pdf', 'docx'],
   maxFileSizeMb: 10,
 };
