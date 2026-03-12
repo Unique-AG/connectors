@@ -25,13 +25,13 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: cachix/install-nix-action@v30
+      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
 
       - name: Pre-build cz
-        run: nix build --no-link github:proventuslabs/scriptorium#cz
+        run: nix build --no-link github:proventuslabs/scriptorium/db7be54d3f1b10f77e96f20694f4bcf9799de19e#cz
 
       - name: Validate PR title
-        shell: nix shell github:proventuslabs/scriptorium#cz -c bash -e {0}
+        shell: nix shell github:proventuslabs/scriptorium/db7be54d3f1b10f77e96f20694f4bcf9799de19e#cz -c bash -e {0}
         run: |
           FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path')
           export FILES
@@ -42,7 +42,7 @@ jobs:
 
       - name: Validate single-service scope
         run: |
-          SCOPE=$(printenv PR_TITLE | grep -oP '\(\K[^)]+' || true)
+          SCOPE=$(printenv PR_TITLE | grep -oP '^[a-z]+\(\K[^)]+' || true)
 
           # Derive service list from release-please-config.json (stays in sync automatically)
           SERVICES=$(jq -r '.packages | keys[] | ltrimstr("services/")' release-please-config.json)
