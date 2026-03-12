@@ -64,39 +64,21 @@ export class GraphApiService {
     syncColumnName: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const logPrefix = `[Site: ${siteId}]`;
-    const [aspxPagesResult, filesResult] = await Promise.allSettled([
+
+    // Both scans must succeed — partial results would cause the diff to treat missing items as
+    // deletions and result in unnecessary re-ingestions. We have retries in place to handle
+    // transient errors so if any call for site fails, so does entire site scan.
+    const [aspxPages, filesResult] = await Promise.all([
       this.getAspxPagesForSite(siteId, syncColumnName),
       this.getAllFilesForSite(siteId, syncColumnName),
     ]);
 
-    const sharepointContentItemsToSync: SharepointContentItem[] = [];
-    const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
-
-    if (aspxPagesResult.status === 'fulfilled') {
-      sharepointContentItemsToSync.push(...aspxPagesResult.value);
-    } else {
-      this.logger.error({
-        msg: `${logPrefix} Failed to scan pages`,
-        siteId,
-        error: sanitizeError(aspxPagesResult.reason),
-      });
-    }
-
-    if (filesResult.status === 'fulfilled') {
-      sharepointContentItemsToSync.push(...filesResult.value.items);
-      sharepointDirectoryItemsToSync.push(...filesResult.value.directories);
-    } else {
-      this.logger.error({
-        msg: `${logPrefix} Failed to scan drive files`,
-        siteId,
-        error: sanitizeError(filesResult.reason),
-      });
-    }
+    const items = [...aspxPages, ...filesResult.items];
 
     this.logger.log(
-      `${logPrefix} Completed scan. Found ${sharepointContentItemsToSync.length} total items marked for synchronization.`,
+      `${logPrefix} Completed scan. Found ${items.length} total items marked for synchronization.`,
     );
-    return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
+    return { items, directories: filesResult.directories };
   }
 
   public async getAllFilesForSite(
@@ -121,8 +103,8 @@ export class GraphApiService {
       }
 
       const smearedDriveName = createSmeared(drive.name);
-
       const driveColumns = await this.getDriveColumns(drive.id);
+
       const resolvedColumnName = this.resolveSyncColumnName(driveColumns, syncColumnName);
       if (!resolvedColumnName) {
         this.logger.warn(

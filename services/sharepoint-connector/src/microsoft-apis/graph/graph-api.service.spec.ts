@@ -226,6 +226,16 @@ describe('GraphApiService', () => {
       );
     });
 
+    it('propagates error when getDriveColumns throws', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).getDrivesForSite = vi.fn().mockResolvedValue([mockDrive]);
+      vi.spyOn(service, 'getDriveColumns').mockRejectedValue(new Error('API Error'));
+
+      await expect(
+        service.getAllFilesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge'),
+      ).rejects.toThrow('API Error');
+    });
+
     it('prioritizes display name match over internal name match', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
       (service as any).getDrivesForSite = vi.fn().mockResolvedValue([mockDrive]);
@@ -291,6 +301,17 @@ describe('GraphApiService', () => {
         'FinanceGPTKnowledge',
         undefined,
       );
+    });
+
+    it('propagates error when getListColumns throws', async () => {
+      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
+        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
+      ]);
+      vi.spyOn(service, 'getListColumns').mockRejectedValue(new Error('API Error'));
+
+      await expect(
+        service.getAspxPagesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge'),
+      ).rejects.toThrow('API Error');
     });
 
     it('resolves display name to internal API name for SitePages', async () => {
@@ -527,6 +548,27 @@ describe('GraphApiService', () => {
         expect(result.items[0].itemType === 'driveItem').toBe(true);
         expect((result.items[0].item as DriveItem).name).toBe('test.pdf');
       }
+    });
+
+    it('throws when getAllFilesForSite rejects', async () => {
+      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockRejectedValue(new Error('Drive scan failed'));
+
+      await expect(
+        service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn'),
+      ).rejects.toThrow('Drive scan failed');
+    });
+
+    it('throws when getAspxPagesForSite rejects', async () => {
+      vi.spyOn(service, 'getAspxPagesForSite').mockRejectedValue(new Error('Pages scan failed'));
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
+        items: [mockSharepointContentItem],
+        directories: [],
+      });
+
+      await expect(
+        service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn'),
+      ).rejects.toThrow('Pages scan failed');
     });
 
     it('limits site pages by maxFilesToScan', async () => {
