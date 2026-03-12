@@ -40,8 +40,8 @@ export const MsChatMessageSchema = z
     createdDateTime: z.string(),
     from: z
       .object({
-        user: z.object({ displayName: z.string().optional() }).optional(),
-        application: z.object({ displayName: z.string().optional() }).optional(),
+        user: z.object({ displayName: z.string().optional() }).nullish(),
+        application: z.object({ displayName: z.string().optional() }).nullish(),
       })
       .nullish(),
     body: z.object({
