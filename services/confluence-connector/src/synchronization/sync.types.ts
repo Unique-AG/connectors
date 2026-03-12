@@ -39,8 +39,8 @@ export interface DeletedItem {
 export interface FileDiffResult {
   newItemIds: string[];
   updatedItemIds: string[];
-  deletedItems: DeletedItem[];
   movedItemIds: string[];
+  deletedItems: DeletedItem[];
 }
 
 export interface FetchedPage {
