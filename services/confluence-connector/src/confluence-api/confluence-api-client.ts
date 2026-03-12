@@ -1,5 +1,9 @@
 import type { ConfluencePage } from './types/confluence-api.types';
 
+export interface ApiClientOptions {
+  attachmentsEnabled: boolean;
+}
+
 export abstract class ConfluenceApiClient {
   public abstract searchPagesByLabel(): Promise<ConfluencePage[]>;
 

@@ -62,6 +62,11 @@ export const confluencePageSchema = z.object({
         start: z.number().optional(),
         limit: z.number().optional(),
         size: z.number().optional(),
+        _links: z
+          .object({
+            next: z.string().optional(),
+          })
+          .optional(),
       }),
     })
     .optional(),
