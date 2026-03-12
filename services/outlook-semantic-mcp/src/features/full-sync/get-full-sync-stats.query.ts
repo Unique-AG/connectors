@@ -39,7 +39,7 @@ export const GetFullSyncStatsResponse = z.object({
   message: z.string(),
   syncStats: z
     .object({
-      fullSyncState: z.enum(['ready', 'running', 'failed', 'fetching-emails']),
+      fullSyncState: z.enum(['ready', 'failed', 'fetching-emails']),
       liveCatchUpState: z.enum(['ready', 'running', 'failed']),
       runAt: z.string().nullable(),
       startedAt: z.string().nullable(),

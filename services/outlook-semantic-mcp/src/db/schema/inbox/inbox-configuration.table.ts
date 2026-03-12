@@ -4,12 +4,7 @@ import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 
-export const inboxSyncState = pgEnum('inbox_sync_state', [
-  'ready',
-  'running',
-  'failed',
-  'fetching-emails',
-]);
+export const inboxSyncState = pgEnum('inbox_sync_state', ['ready', 'failed', 'fetching-emails']);
 
 export const liveCatchUpState = pgEnum('live_catch_up_state', ['ready', 'running', 'failed']);
 

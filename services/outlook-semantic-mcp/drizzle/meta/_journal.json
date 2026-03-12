@@ -106,6 +106,13 @@
       "when": 1773319948710,
       "tag": "0014_sync_redesign_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1773400000000,
+      "tag": "0015_remove_running_from_inbox_sync_state",
+      "breakpoints": true
     }
   ]
 }

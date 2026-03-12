@@ -9,6 +9,8 @@ import { LiveCatchUpCommand } from './live-catch-up.command';
 const SUBSCRIPTION_ID = 'sub-001';
 const USER_PROFILE_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 const WATERMARK = new Date('2024-06-01T00:00:00Z');
+const IGNORED_BEFORE = '2024-01-01T00:00:00.000Z';
+const DEFAULT_FILTERS = { ignoredBefore: IGNORED_BEFORE, ignoredSenders: [], ignoredContents: [] };
 
 function makeEmail(id: string, created: string, modified: string) {
   return {
@@ -71,6 +73,7 @@ function createMockDb({
   lockResult?: {
     liveCatchUpState: string;
     newestLastModifiedDateTime: Date | null;
+    filters: Record<string, unknown>;
   };
 }) {
   const txExecuteFn = vi.fn().mockResolvedValue(undefined);
@@ -166,6 +169,7 @@ describe('LiveCatchUpCommand', () => {
       lockResult: {
         liveCatchUpState: 'running',
         newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -184,6 +188,7 @@ describe('LiveCatchUpCommand', () => {
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: null,
+        filters: DEFAULT_FILTERS,
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -221,6 +226,7 @@ describe('LiveCatchUpCommand', () => {
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -253,6 +259,7 @@ describe('LiveCatchUpCommand', () => {
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -275,6 +282,7 @@ describe('LiveCatchUpCommand', () => {
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -305,6 +313,7 @@ describe('LiveCatchUpCommand', () => {
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -334,6 +343,7 @@ describe('LiveCatchUpCommand', () => {
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -355,6 +365,7 @@ describe('LiveCatchUpCommand', () => {
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -377,6 +388,7 @@ describe('LiveCatchUpCommand', () => {
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -384,7 +396,7 @@ describe('LiveCatchUpCommand', () => {
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
     expect(graphApi.filter).toHaveBeenCalledWith(
-      `lastModifiedDateTime ge ${WATERMARK.toISOString()}`,
+      `createdDateTime gt ${IGNORED_BEFORE} and lastModifiedDateTime ge ${WATERMARK.toISOString()}`,
     );
   });
 });
