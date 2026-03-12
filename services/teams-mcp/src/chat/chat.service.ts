@@ -58,6 +58,7 @@ export class ChatService {
       .api(`/chats/${chatId}/messages`)
       .top(limit)
       .orderby(orderBy)
+      .select('id,createdDateTime,from,body,attachments')
       .get();
 
     const messages = z.array(MsChatMessageSchema).parse(response.value);

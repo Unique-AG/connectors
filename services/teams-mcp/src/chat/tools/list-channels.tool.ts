@@ -4,17 +4,25 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { ChannelService } from '../channel.service';
-import { MsChannelSchema } from '../chat.dtos';
 
 const ListChannelsInputSchema = z.object({
   teamName: z.string().describe('Display name of the team (case-insensitive)'),
+  includeDescriptions: z
+    .boolean()
+    .default(false)
+    .describe(
+      'Include channel descriptions. Useful when multiple channels have similar names and disambiguation is needed. Default: false',
+    ),
 });
 
 const ListChannelsOutputSchema = z.object({
-  teamId: z.string(),
   teamName: z.string(),
-  channels: z.array(MsChannelSchema),
-  count: z.number(),
+  channels: z.array(
+    z.object({
+      displayName: z.string(),
+      description: z.string().optional(),
+    }),
+  ),
 });
 
 @Injectable()
@@ -64,6 +72,17 @@ export class ListChannelsTool {
 
     span?.setAttribute('result_count', channels.length);
 
-    return { teamId: team.id, teamName: team.displayName, channels, count: channels.length };
+    return {
+      teamName: team.displayName,
+      channels: channels.map((c) => {
+        const channel: { displayName: string; description?: string } = {
+          displayName: c.displayName,
+        };
+        if (input.includeDescriptions && c.description) {
+          channel.description = c.description;
+        }
+        return channel;
+      }),
+    };
   }
 }

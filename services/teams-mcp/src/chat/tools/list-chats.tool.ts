@@ -6,23 +6,40 @@ import * as z from 'zod';
 import { MsChat } from '../chat.dtos';
 import { ChatService } from '../chat.service';
 
-const ListChatsInputSchema = z.object({});
+const LIMIT = 50;
+
+const ListChatsInputSchema = z.object({
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .default(LIMIT)
+    .describe('Maximum number of chats to return. Default: 50'),
+  includeMemberEmails: z
+    .boolean()
+    .default(false)
+    .describe(
+      'Include member email addresses. Useful for disambiguation when two members share a display name. Default: false',
+    ),
+});
 
 const ListChatsOutputSchema = z.object({
   chats: z.array(
     z.object({
-      id: z.string(),
       chatType: z.string(),
       topic: z.string().nullable(),
-      members: z.array(
-        z.object({
-          displayName: z.string().nullable(),
-          email: z.string().nullable(),
-        }),
-      ),
+      members: z
+        .array(
+          z.object({
+            displayName: z.string().nullable(),
+            email: z.string().nullable().optional(),
+          }),
+        )
+        .optional(),
     }),
   ),
-  count: z.number(),
+  truncated: z.boolean(),
 });
 
 @Injectable()
@@ -54,7 +71,7 @@ export class ListChatsTool {
   })
   @Span()
   public async listChats(
-    _input: z.infer<typeof ListChatsInputSchema>,
+    input: z.infer<typeof ListChatsInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof ListChatsOutputSchema>> {
@@ -66,22 +83,43 @@ export class ListChatsTool {
 
     this.logger.log({ userProfileId }, 'Listing chats for user');
 
-    const chats = await this.chatService.listChats(userProfileId);
+    const effectiveLimit = input.limit ?? LIMIT;
+    const chats = await this.chatService.listChats(userProfileId, effectiveLimit);
 
     span?.setAttribute('result_count', chats.length);
 
-    return { chats: chats.map((c) => this.mapChat(c)), count: chats.length };
+    return {
+      chats: chats.map((c) => this.mapChat(c, input.includeMemberEmails)),
+      truncated: chats.length === effectiveLimit,
+    };
   }
 
-  private mapChat(c: MsChat): z.output<typeof ListChatsOutputSchema>['chats'][number] {
-    return {
-      id: c.id,
+  private mapChat(
+    c: MsChat,
+    includeMemberEmails: boolean,
+  ): z.output<typeof ListChatsOutputSchema>['chats'][number] {
+    const chat: {
+      chatType: string;
+      topic: string | null;
+      members?: { displayName: string | null; email?: string | null }[];
+    } = {
       chatType: c.chatType,
       topic: c.topic ?? null,
-      members: c.members.map((m) => ({
-        displayName: m.displayName ?? null,
-        email: m.email ?? null,
-      })),
     };
+
+    // Only include members for chats without a topic (1:1 chats need member names as their identifier)
+    if (!c.topic) {
+      chat.members = c.members.map((m) => {
+        const member: { displayName: string | null; email?: string | null } = {
+          displayName: m.displayName ?? null,
+        };
+        if (includeMemberEmails) {
+          member.email = m.email ?? null;
+        }
+        return member;
+      });
+    }
+
+    return chat;
   }
 }

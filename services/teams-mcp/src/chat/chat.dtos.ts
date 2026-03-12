@@ -48,6 +48,14 @@ export const MsChatMessageSchema = z
       contentType: z.string(),
       content: z.string(),
     }),
+    attachments: z
+      .array(
+        z.object({
+          id: z.string(),
+          name: z.string().nullish(),
+        }),
+      )
+      .nullish(),
   })
   .transform((msg) => ({
     id: msg.id,
@@ -56,6 +64,7 @@ export const MsChatMessageSchema = z
       msg.from?.user?.displayName ?? msg.from?.application?.displayName ?? undefined,
     content: msg.body.content,
     contentType: msg.body.contentType,
+    attachments: (msg.attachments ?? []).map((a) => ({ id: a.id, name: a.name ?? null })),
   }));
 
 export type MsChatMember = z.infer<typeof MsChatMemberSchema>;
