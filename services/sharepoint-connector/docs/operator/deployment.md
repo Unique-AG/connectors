@@ -78,12 +78,12 @@ connectorConfig:
       privateKeyPath: /app/key.pem
       thumbprintSha1: "AB12CD34..."
     sitesSource: config_file
-    # sites:
-    #   - siteId: "site-id-1"
-    #     syncColumnName: FinanceGPTKnowledge
-    #     ingestionMode: recursive
-    #     scopeId: scope_xxx
-    #     syncMode: content_and_permissions
+    sites:
+      - siteId: "site-id-1"
+        syncColumnName: FinanceGPTKnowledge
+        ingestionMode: recursive
+        scopeId: scope_xxx
+        syncMode: content_and_permissions
   unique:
     serviceAuthMode: cluster_local
     ingestionServiceBaseUrl: "http://node-ingestion.finance-gpt:8091"
