@@ -99,7 +99,9 @@ export class ProxyService implements OnModuleDestroy {
     return new ProxyAgent(proxyOptions);
   }
 
-  private buildProxyUrl(proxyConfig: NoAuthProxyConfig | BasicProxyConfig | TlsProxyConfig): string {
+  private buildProxyUrl(
+    proxyConfig: NoAuthProxyConfig | BasicProxyConfig | TlsProxyConfig,
+  ): string {
     return `${proxyConfig.protocol}://${proxyConfig.host}:${proxyConfig.port}`;
   }
 }
