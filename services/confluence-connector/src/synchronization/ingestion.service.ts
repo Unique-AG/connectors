@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import type { Readable } from 'node:stream';
 import type {
   ContentRegistrationRequest,
   IngestionFinalizationRequest,
@@ -6,6 +7,7 @@ import type {
 } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import { request } from 'undici';
+import type { ConfluenceApiClient } from '../confluence-api';
 import type { TenantConfig } from '../config';
 import {
   getSourceKind,
@@ -13,7 +15,7 @@ import {
   OWNER_TYPE,
   SOURCE_OWNER_TYPE,
 } from '../constants/ingestion.constants';
-import type { FetchedPage } from './sync.types';
+import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 export class IngestionService {
   private readonly logger = new Logger(IngestionService.name);
@@ -24,6 +26,7 @@ export class IngestionService {
     private readonly config: TenantConfig,
     private readonly tenantName: string,
     private readonly uniqueApiClient: UniqueApiClient,
+    private readonly confluenceApiClient: ConfluenceApiClient,
   ) {
     this.sourceKind = getSourceKind(this.config.confluence.instanceType);
     this.sourceName = this.config.confluence.baseUrl;
@@ -65,6 +68,55 @@ export class IngestionService {
         title: page.title,
         err: error,
         msg: 'Failed to ingest page, skipping',
+      });
+    }
+  }
+
+  public async ingestAttachment(attachment: DiscoveredAttachment, scopeId: string): Promise<void> {
+    if (attachment.fileSize === 0) {
+      this.logger.log({
+        attachmentId: attachment.id,
+        title: attachment.title,
+        msg: 'Skipping zero-byte attachment',
+      });
+      return;
+    }
+
+    try {
+      const baseKey = `${attachment.spaceId}_${attachment.spaceKey}/${attachment.id}`;
+      const key = this.config.ingestion.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
+
+      const registrationRequest = this.buildAttachmentRegistrationRequest(
+        attachment,
+        key,
+        scopeId,
+      );
+      const registrationResponse =
+        await this.uniqueApiClient.ingestion.registerContent(registrationRequest);
+
+      const uploadUrl = this.correctWriteUrl(registrationResponse.writeUrl);
+      const stream = await this.confluenceApiClient.getAttachmentDownloadStream(
+        attachment.downloadPath,
+      );
+      await this.uploadStream(uploadUrl, stream, attachment.mediaType, attachment.fileSize);
+
+      const finalizationRequest = this.buildFinalizationRequest(
+        registrationRequest,
+        registrationResponse.readUrl,
+      );
+      await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
+
+      this.logger.debug({
+        attachmentId: attachment.id,
+        title: attachment.title,
+        msg: 'Attachment sent for ingestion',
+      });
+    } catch (error) {
+      this.logger.error({
+        attachmentId: attachment.id,
+        title: attachment.title,
+        err: error,
+        msg: 'Failed to ingest attachment, skipping',
       });
     }
   }
@@ -124,6 +176,31 @@ export class IngestionService {
     };
   }
 
+  private buildAttachmentRegistrationRequest(
+    attachment: DiscoveredAttachment,
+    key: string,
+    scopeId: string,
+  ): ContentRegistrationRequest {
+    return {
+      key,
+      title: attachment.title,
+      mimeType: attachment.mediaType,
+      ownerType: OWNER_TYPE,
+      scopeId,
+      sourceOwnerType: SOURCE_OWNER_TYPE,
+      sourceKind: this.sourceKind,
+      sourceName: this.sourceName,
+      url: attachment.webUrl,
+      baseUrl: this.config.confluence.baseUrl,
+      byteSize: attachment.fileSize,
+      metadata: {
+        spaceKey: attachment.spaceKey,
+        spaceName: attachment.spaceName,
+      },
+      storeInternally: this.config.ingestion.storeInternally,
+    };
+  }
+
   private buildFinalizationRequest(
     registration: ContentRegistrationRequest,
     readUrl: string,
@@ -155,6 +232,25 @@ export class IngestionService {
         'x-ms-blob-type': 'BlockBlob',
       },
       body: buffer,
+    });
+
+    assert.ok(statusCode >= 200 && statusCode < 300, `Upload failed with status ${statusCode}`);
+  }
+
+  private async uploadStream(
+    writeUrl: string,
+    stream: Readable,
+    contentType: string,
+    contentLength: number,
+  ): Promise<void> {
+    const { statusCode } = await request(writeUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': String(contentLength),
+        'x-ms-blob-type': 'BlockBlob',
+      },
+      body: stream,
     });
 
     assert.ok(statusCode >= 200 && statusCode < 300, `Upload failed with status ${statusCode}`);
