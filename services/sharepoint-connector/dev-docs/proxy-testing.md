@@ -1,8 +1,9 @@
 # Sharepoint Connector Proxy Testing (Local)
 
 This guide documents the local proxy testing flow used for `sharepoint-connector`.
-It covers both proxy authentication modes:
+It covers the following proxy modes:
 
+- `no_auth` (Proxy enabled without authentication)
 - `username_password` (Basic auth)
 - `ssl_tls` (mTLS client cert)
 
