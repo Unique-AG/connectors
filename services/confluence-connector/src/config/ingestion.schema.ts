@@ -7,17 +7,6 @@ import { EnabledDisabledMode, IngestionMode } from '../constants/ingestion.const
 
 const IngestionModeSchema = z.enum([IngestionMode.Flat]).prefault(IngestionMode.Flat);
 
-function getMaxFileSizeMbDefault(): number {
-  const envValue = process.env.MAX_FILE_SIZE_MB;
-  if (envValue) {
-    const parsed = Number(envValue);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-  return DEFAULT_MAX_FILE_SIZE_MB;
-}
-
 const BYTES_PER_MB = 1024 * 1024;
 
 const AttachmentConfigSchema = z.object({
@@ -34,7 +23,7 @@ const AttachmentConfigSchema = z.object({
     .number()
     .int()
     .positive()
-    .prefault(getMaxFileSizeMbDefault())
+    .prefault(DEFAULT_MAX_FILE_SIZE_MB)
     .describe('Maximum file size in megabytes for attachment ingestion'),
 });
 
