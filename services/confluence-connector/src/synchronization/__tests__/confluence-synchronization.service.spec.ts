@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
 import {
+  CONFLUENCE_BASE_URL,
   createMockTenant,
   discoveredPagesFixture,
   discoveryResultFixture,
@@ -13,7 +14,7 @@ import { ConfluenceSynchronizationService } from '../confluence-synchronization.
 import type { FileDiffService } from '../file-diff.service';
 import type { IngestionService } from '../ingestion.service';
 import type { ScopeManagementService } from '../scope-management.service';
-import type { FileDiffResult } from '../sync.types';
+import type { DiscoveredAttachment, FileDiffResult } from '../sync.types';
 
 const mockLogger = vi.hoisted(() => ({
   log: vi.fn(),
@@ -39,7 +40,7 @@ function createService(
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
   contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>,
   fileDiffService: Pick<FileDiffService, 'computeDiff'>,
-  ingestionService: Pick<IngestionService, 'ingestPage' | 'deleteContentByKeys'>,
+  ingestionService: Pick<IngestionService, 'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'>,
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
     scanner as ConfluencePageScanner,
@@ -55,7 +56,7 @@ describe('ConfluenceSynchronizationService', () => {
   let mockScanner: Pick<ConfluencePageScanner, 'discoverPages'>;
   let mockContentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>;
   let mockFileDiffService: Pick<FileDiffService, 'computeDiff'>;
-  let mockIngestionService: Pick<IngestionService, 'ingestPage' | 'deleteContentByKeys'>;
+  let mockIngestionService: Pick<IngestionService, 'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'>;
   let service: ConfluenceSynchronizationService;
 
   beforeEach(() => {
@@ -81,6 +82,7 @@ describe('ConfluenceSynchronizationService', () => {
     };
     mockIngestionService = {
       ingestPage: vi.fn().mockResolvedValue(undefined),
+      ingestAttachment: vi.fn().mockResolvedValue(undefined),
       deleteContentByKeys: vi.fn().mockResolvedValue(undefined),
     };
     service = createService(
@@ -252,6 +254,107 @@ describe('ConfluenceSynchronizationService', () => {
         expect.objectContaining({ id: '1' }),
         expect.anything(),
       );
+    });
+
+    it('ingests new and updated attachments from diff', async () => {
+      const attachment: DiscoveredAttachment = {
+        id: 'att-1',
+        title: 'report.pdf',
+        mediaType: 'application/pdf',
+        fileSize: 1024,
+        downloadPath: '/download/attachments/1/report.pdf',
+        versionTimestamp: '2026-02-01T00:00:00.000Z',
+        pageId: '1',
+        spaceId: 'space-1',
+        spaceKey: 'SP',
+        spaceName: 'Space',
+        webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/att-1`,
+      };
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: discoveredPagesFixture,
+        attachments: [attachment],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['1', 'att-1'],
+        updatedItemIds: [],
+        deletedItemIds: [],
+        movedItemIds: [],
+      });
+
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(attachment, 'scope-1');
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        fetchedPagesFixture[0],
+        'scope-1',
+      );
+    });
+
+    it('does not ingest attachments not in diff result', async () => {
+      const attachment: DiscoveredAttachment = {
+        id: 'att-1',
+        title: 'report.pdf',
+        mediaType: 'application/pdf',
+        fileSize: 1024,
+        downloadPath: '/download/attachments/1/report.pdf',
+        versionTimestamp: '2026-02-01T00:00:00.000Z',
+        pageId: '1',
+        spaceId: 'space-1',
+        spaceKey: 'SP',
+        spaceName: 'Space',
+        webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/att-1`,
+      };
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: discoveredPagesFixture,
+        attachments: [attachment],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['1'],
+        updatedItemIds: [],
+        deletedItemIds: [],
+        movedItemIds: [],
+      });
+
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalled();
+    });
+
+    it('ensures space scopes include attachment spaces', async () => {
+      const attachment: DiscoveredAttachment = {
+        id: 'att-1',
+        title: 'report.pdf',
+        mediaType: 'application/pdf',
+        fileSize: 1024,
+        downloadPath: '/download/attachments/1/report.pdf',
+        versionTimestamp: '2026-02-01T00:00:00.000Z',
+        pageId: '1',
+        spaceId: 'space-2',
+        spaceKey: 'SP2',
+        spaceName: 'Space 2',
+        webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP2/pages/1/attachments/att-1`,
+      };
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: [],
+        attachments: [attachment],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['att-1'],
+        updatedItemIds: [],
+        deletedItemIds: [],
+        movedItemIds: [],
+      });
+      vi.mocked(mockScopeManagementService.ensureSpaceScopes).mockResolvedValue(
+        new Map([['SP2', 'scope-2']]),
+      );
+
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(mockScopeManagementService.ensureSpaceScopes).toHaveBeenCalledWith(
+        '/Confluence',
+        ['SP2'],
+      );
+      expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(attachment, 'scope-2');
     });
   });
 });

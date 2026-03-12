@@ -7,7 +7,7 @@ import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
 import type { ScopeManagementService } from './scope-management.service';
-import type { DiscoveredPage } from './sync.types';
+import type { DiscoveredAttachment, DiscoveredPage } from './sync.types';
 
 export class ConfluenceSynchronizationService {
   private readonly logger = new Logger(ConfluenceSynchronizationService.name);
@@ -43,22 +43,25 @@ export class ConfluenceSynchronizationService {
         discoveredAttachments,
       );
 
-      const pageIdsToFetch = new Set([...diffResult.newItemIds, ...diffResult.updatedItemIds]);
+      const itemIdsToProcess = new Set([...diffResult.newItemIds, ...diffResult.updatedItemIds]);
+      const pagesToFetch = discoveredPages.filter((p) => itemIdsToProcess.has(p.id));
+      const attachmentsToIngest = discoveredAttachments.filter((a) => itemIdsToProcess.has(a.id));
 
-      if (pageIdsToFetch.size > 0) {
-        const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
-
-        const spaceKeys = [...new Set(pagesToFetch.map((p) => p.spaceKey))];
+      if (pagesToFetch.length > 0 || attachmentsToIngest.length > 0) {
+        const spaceKeys = [
+          ...new Set([
+            ...pagesToFetch.map((p) => p.spaceKey),
+            ...attachmentsToIngest.map((a) => a.spaceKey),
+          ]),
+        ];
         const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(
           rootScopePath,
           spaceKeys,
         );
 
-        await this.fetchAndIngestPages(
-          pagesToFetch,
-          spaceScopes,
-          tenant.config.processing.concurrency,
-        );
+        const concurrency = tenant.config.processing.concurrency;
+        await this.fetchAndIngestPages(pagesToFetch, spaceScopes, concurrency);
+        await this.ingestAttachments(attachmentsToIngest, spaceScopes, concurrency);
       }
 
       if (diffResult.deletedItemIds.length > 0) {
@@ -109,5 +112,35 @@ export class ConfluenceSynchronizationService {
         this.logger.error({ err: result.reason, msg: 'Page ingestion failed' });
       }
     }
+  }
+
+  private async ingestAttachments(
+    attachments: DiscoveredAttachment[],
+    spaceScopes: Map<string, string>,
+    concurrency: number,
+  ): Promise<void> {
+    if (attachments.length === 0) {
+      return;
+    }
+
+    const limit = pLimit(concurrency);
+
+    const results = await Promise.allSettled(
+      attachments.map((attachment) =>
+        limit(async () => {
+          const scopeId = spaceScopes.get(attachment.spaceKey);
+          assert.ok(scopeId, `No scope resolved for space: ${attachment.spaceKey}`);
+          await this.ingestionService.ingestAttachment(attachment, scopeId);
+        }),
+      ),
+    );
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error({ err: result.reason, msg: 'Attachment ingestion failed' });
+      }
+    }
+
+    this.logger.log({ count: attachments.length, msg: 'Attachment ingestion completed' });
   }
 }
