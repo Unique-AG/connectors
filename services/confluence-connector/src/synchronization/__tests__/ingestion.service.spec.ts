@@ -1,5 +1,14 @@
 import { Readable } from 'node:stream';
 import type { IngestionApiResponse, UniqueApiClient } from '@unique-ag/unique-api';
+import { Smeared } from '@unique-ag/utils';
+
+vi.mock('@unique-ag/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@unique-ag/utils')>();
+  return {
+    ...actual,
+    createSmeared: (value: string) => new actual.Smeared(value, false),
+  };
+});
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceApiClient } from '../../confluence-api';
 import type { TenantConfig } from '../../config';
@@ -169,7 +178,7 @@ describe('IngestionService', () => {
     expect(uniqueApiClient.ingestion.registerContent).not.toHaveBeenCalled();
     expect(mockLogger.log).toHaveBeenCalledWith({
       pageId: '42',
-      title: 'Architecture',
+      title: new Smeared('Architecture', false),
       msg: 'Skipping page with empty body',
     });
   });
@@ -186,7 +195,7 @@ describe('IngestionService', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         pageId: '42',
-        title: 'Architecture',
+        title: new Smeared('Architecture', false),
         err: expect.anything(),
         msg: 'Failed to ingest page, skipping',
       }),
@@ -320,7 +329,7 @@ describe('IngestionService', () => {
       expect(uniqueApiClient.ingestion.registerContent).not.toHaveBeenCalled();
       expect(mockLogger.log).toHaveBeenCalledWith({
         attachmentId: 'att-100',
-        title: 'diagram.png',
+        title: new Smeared('diagram.png', false),
         msg: 'Skipping zero-byte attachment',
       });
     });
@@ -383,7 +392,7 @@ describe('IngestionService', () => {
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           attachmentId: 'att-100',
-          title: 'diagram.png',
+          title: new Smeared('diagram.png', false),
           err: expect.anything(),
           msg: 'Failed to ingest attachment, skipping',
         }),

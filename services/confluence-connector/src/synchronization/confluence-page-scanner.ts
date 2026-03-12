@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { createSmeared } from '@unique-ag/utils';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
 import { BYTES_PER_MB, type AttachmentConfig } from '../config/ingestion.schema';
 import type { ConfluenceAttachment, ConfluencePage } from '../confluence-api';
@@ -60,7 +61,7 @@ export class ConfluencePageScanner {
       if (SKIPPED_CONTENT_TYPES.includes(page.type)) {
         this.logger.debug({
           pageId: page.id,
-          title: page.title,
+          title: createSmeared(page.title),
           type: page.type,
           msg: 'Skipping non-page content type',
         });
@@ -131,7 +132,7 @@ export class ConfluencePageScanner {
     if (attachment.extensions.fileSize > maxFileSizeBytes) {
       this.logger.debug({
         attachmentId: attachment.id,
-        title: attachment.title,
+        title: createSmeared(attachment.title),
         fileSize: attachment.extensions.fileSize,
         maxFileSizeMb: this.attachmentConfig.maxFileSizeMb,
         msg: 'Attachment exceeds max file size',
@@ -143,7 +144,7 @@ export class ConfluencePageScanner {
     if (!extension || !this.attachmentConfig.allowedExtensions.includes(extension)) {
       this.logger.debug({
         attachmentId: attachment.id,
-        title: attachment.title,
+        title: createSmeared(attachment.title),
         extension,
         msg: 'Attachment extension not allowed',
       });

@@ -1,3 +1,12 @@
+import { Smeared } from '@unique-ag/utils';
+
+vi.mock('@unique-ag/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@unique-ag/utils')>();
+  return {
+    ...actual,
+    createSmeared: (value: string) => new actual.Smeared(value, false),
+  };
+});
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import type { ConfluencePage } from '../../confluence-api';
@@ -140,7 +149,7 @@ describe('ConfluenceContentFetcher', () => {
     expect(result).toBeNull();
     expect(mockLogger.warn).toHaveBeenCalledWith({
       pageId: 'missing',
-      title: 'Page missing',
+      title: new Smeared('Page missing', false),
       msg: 'Page not found, possibly deleted',
     });
   });
@@ -157,7 +166,7 @@ describe('ConfluenceContentFetcher', () => {
     expect(result).toBeNull();
     expect(mockLogger.log).toHaveBeenCalledWith({
       pageId: 'empty',
-      title: 'Page empty',
+      title: new Smeared('Page empty', false),
       msg: 'Page has no body, skipping',
     });
   });

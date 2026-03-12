@@ -1,3 +1,12 @@
+import { Smeared } from '@unique-ag/utils';
+
+vi.mock('@unique-ag/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@unique-ag/utils')>();
+  return {
+    ...actual,
+    createSmeared: (value: string) => new actual.Smeared(value, false),
+  };
+});
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig, ProcessingConfig } from '../../config';
 import type { AttachmentConfig } from '../../config/ingestion.schema';
@@ -259,7 +268,7 @@ describe('ConfluencePageScanner', () => {
     expect(result.pages.map((page) => page.id)).toEqual(['parent', 'page-child']);
     expect(mockLogger.debug).toHaveBeenCalledWith({
       pageId: 'db-child',
-      title: 'Page db-child',
+      title: new Smeared('Page db-child', false),
       type: 'database',
       msg: 'Skipping non-page content type',
     });

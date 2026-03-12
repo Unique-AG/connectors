@@ -6,6 +6,7 @@ import type {
   UniqueApiClient,
 } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
+import { createSmeared } from '@unique-ag/utils';
 import { request } from 'undici';
 import type { ConfluenceApiClient } from '../confluence-api';
 import type { TenantConfig } from '../config';
@@ -34,7 +35,7 @@ export class IngestionService {
 
   public async ingestPage(page: FetchedPage, scopeId: string): Promise<void> {
     if (!page.body) {
-      this.logger.log({ pageId: page.id, title: page.title, msg: 'Skipping page with empty body' });
+      this.logger.log({ pageId: page.id, title: createSmeared(page.title), msg: 'Skipping page with empty body' });
       return;
     }
 
@@ -61,11 +62,11 @@ export class IngestionService {
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
 
-      this.logger.debug({ pageId: page.id, title: page.title, msg: 'Page sent for ingestion' });
+      this.logger.debug({ pageId: page.id, title: createSmeared(page.title), msg: 'Page sent for ingestion' });
     } catch (error) {
       this.logger.error({
         pageId: page.id,
-        title: page.title,
+        title: createSmeared(page.title),
         err: error,
         msg: 'Failed to ingest page, skipping',
       });
@@ -76,7 +77,7 @@ export class IngestionService {
     if (attachment.fileSize === 0) {
       this.logger.log({
         attachmentId: attachment.id,
-        title: attachment.title,
+        title: createSmeared(attachment.title),
         msg: 'Skipping zero-byte attachment',
       });
       return;
@@ -108,13 +109,13 @@ export class IngestionService {
 
       this.logger.debug({
         attachmentId: attachment.id,
-        title: attachment.title,
+        title: createSmeared(attachment.title),
         msg: 'Attachment sent for ingestion',
       });
     } catch (error) {
       this.logger.error({
         attachmentId: attachment.id,
-        title: attachment.title,
+        title: createSmeared(attachment.title),
         err: error,
         msg: 'Failed to ingest attachment, skipping',
       });
