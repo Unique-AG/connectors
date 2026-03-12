@@ -64,41 +64,58 @@ function createMockAmqp() {
  * - `db.query.subscriptions.findFirst()` for subscription lookup
  * - `db.transaction(cb)` with a mock tx supporting select...from...where...for('update')...then()
  * - `db.update().set().where().execute()` for state transitions and watermark updates
+ *
+ * The `db.transaction` mock handles two calls: the first uses `lockResult` for the
+ * acquireLock transaction, and the second uses `flushResult` for flushPendingMessages.
  */
 function createMockDb({
   subscription,
   lockResult,
+  flushResult,
 }: {
   subscription?: { userProfileId: string } | undefined;
   lockResult?: {
     liveCatchUpState: string;
     newestLastModifiedDateTime: Date | null;
     filters: Record<string, unknown>;
+    pendingLiveMessageIds: string[];
   };
+  flushResult?: { pendingLiveMessageIds: string[] };
 }) {
-  const txExecuteFn = vi.fn().mockResolvedValue(undefined);
-  const txSelect = {
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        for: vi.fn().mockReturnValue({
-          then: vi.fn().mockImplementation((cb: (rows: any[]) => any) =>
-            Promise.resolve(cb(lockResult ? [lockResult] : [])),
-          ),
+  let transactionCallCount = 0;
+
+  function createMockTx(selectRows: any[]) {
+    const txExecuteFn = vi.fn().mockResolvedValue(undefined);
+    const txSelect = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          for: vi.fn().mockReturnValue({
+            then: vi.fn().mockImplementation((cb: (rows: any[]) => any) =>
+              Promise.resolve(cb(selectRows)),
+            ),
+          }),
         }),
       }),
-    }),
-  };
-  const txUpdate = {
-    set: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        execute: txExecuteFn,
+    };
+    const txUpdate = {
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          execute: txExecuteFn,
+        }),
       }),
-    }),
-  };
-  const mockTx = {
-    select: vi.fn().mockReturnValue(txSelect),
-    update: vi.fn().mockReturnValue(txUpdate),
-  };
+    };
+    return {
+      select: vi.fn().mockReturnValue(txSelect),
+      update: vi.fn().mockReturnValue(txUpdate),
+      __txExecuteFn: txExecuteFn,
+      __txUpdate: txUpdate,
+    };
+  }
+
+  const lockTx = createMockTx(lockResult ? [lockResult] : []);
+  const flushTx = createMockTx(
+    flushResult ? [flushResult] : [{ pendingLiveMessageIds: [] }],
+  );
 
   const dbExecuteFn = vi.fn().mockResolvedValue(undefined);
   const db = {
@@ -107,7 +124,13 @@ function createMockDb({
         findFirst: vi.fn().mockResolvedValue(subscription),
       },
     },
-    transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(mockTx)),
+    transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => {
+      transactionCallCount++;
+      if (transactionCallCount === 1) {
+        return cb(lockTx);
+      }
+      return cb(flushTx);
+    }),
     update: vi.fn().mockReturnValue({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -115,7 +138,8 @@ function createMockDb({
         }),
       }),
     }),
-    __mockTx: mockTx,
+    __lockTx: lockTx,
+    __flushTx: flushTx,
     __dbExecuteFn: dbExecuteFn,
   };
 
@@ -170,6 +194,7 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpState: 'running',
         newestLastModifiedDateTime: WATERMARK,
         filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -189,6 +214,7 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: null,
         filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -227,6 +253,7 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
         filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -239,9 +266,9 @@ describe('LiveCatchUpCommand', () => {
       expect(call[3]).toEqual(expect.objectContaining({ priority: 2 }));
     }
 
-    // State set to 'ready' via db.update (outside transaction)
-    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1].value.set;
-    expect(lastUpdateSetCall).toHaveBeenCalledWith(
+    // State set to 'ready' via flush transaction
+    const flushUpdate = db.__flushTx.__txUpdate;
+    expect(flushUpdate.set).toHaveBeenCalledWith(
       expect.objectContaining({ liveCatchUpState: 'ready' }),
     );
   });
@@ -260,6 +287,7 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
         filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -283,6 +311,7 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
         filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -314,6 +343,7 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
         filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -344,6 +374,7 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
         filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -366,6 +397,7 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
         filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -389,6 +421,7 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
         filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
       },
     });
     const command = createCommand({ graphApi, amqp, db });
@@ -397,6 +430,154 @@ describe('LiveCatchUpCommand', () => {
 
     expect(graphApi.filter).toHaveBeenCalledWith(
       `createdDateTime gt ${IGNORED_BEFORE} and lastModifiedDateTime ge ${WATERMARK.toISOString()}`,
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // Live catch-up buffering
+  // ---------------------------------------------------------------------------
+
+  it('buffers message IDs when live catch-up is already running', async () => {
+    const db = createMockDb({
+      subscription: { userProfileId: USER_PROFILE_ID },
+      lockResult: {
+        liveCatchUpState: 'running',
+        newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
+      },
+    });
+    const command = createCommand({ graphApi, amqp, db });
+
+    await command.run({
+      subscriptionId: SUBSCRIPTION_ID,
+      messageIds: ['msg-a', 'msg-b'],
+    });
+
+    // The array_cat update was called inside the lock transaction
+    expect(db.__lockTx.update).toHaveBeenCalled();
+    expect(db.__lockTx.__txUpdate.set).toHaveBeenCalled();
+
+    // No graph call or publish — returns early after buffering
+    expect(graphApi.get).not.toHaveBeenCalled();
+    expect(amqp.publish).not.toHaveBeenCalled();
+  });
+
+  it('skips pending message IDs during batch publishing', async () => {
+    const emails = [
+      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
+      makeEmail('msg-2', '2024-06-02T00:00:00Z', '2024-06-02T01:00:00Z'),
+    ];
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
+
+    const db = createMockDb({
+      subscription: { userProfileId: USER_PROFILE_ID },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: ['msg-1'],
+      },
+    });
+    const command = createCommand({ graphApi, amqp, db });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+
+    // msg-1 is in pendingLiveMessageIds, so only msg-2 is published from batch
+    const publishedMessageIds = amqp.publish.mock.calls.map((call: any[]) => {
+      const event = call[2] as { payload: { messageId: string } };
+      return event.payload.messageId;
+    });
+    expect(publishedMessageIds).toContain('msg-2');
+    expect(publishedMessageIds).not.toContain('msg-1');
+  });
+
+  it('flushes pending messages not already scheduled', async () => {
+    const emails = [
+      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
+    ];
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
+
+    const db = createMockDb({
+      subscription: { userProfileId: USER_PROFILE_ID },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
+      },
+      flushResult: { pendingLiveMessageIds: ['flush-1', 'flush-2'] },
+    });
+    const command = createCommand({ graphApi, amqp, db });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+
+    // msg-1 from batch + flush-1 and flush-2 from pending flush = 3 publishes
+    expect(amqp.publish).toHaveBeenCalledTimes(3);
+    const publishedMessageIds = amqp.publish.mock.calls.map((call: any[]) => {
+      const event = call[2] as { payload: { messageId: string } };
+      return event.payload.messageId;
+    });
+    expect(publishedMessageIds).toEqual(['msg-1', 'flush-1', 'flush-2']);
+
+    // Flush transaction clears pendingLiveMessageIds and sets state to ready
+    expect(db.__flushTx.__txUpdate.set).toHaveBeenCalledWith(
+      expect.objectContaining({ pendingLiveMessageIds: [], liveCatchUpState: 'ready' }),
+    );
+  });
+
+  it('flush skips IDs already scheduled during the run', async () => {
+    const emails = [
+      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
+    ];
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
+
+    const db = createMockDb({
+      subscription: { userProfileId: USER_PROFILE_ID },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
+      },
+      flushResult: { pendingLiveMessageIds: ['msg-1', 'flush-1'] },
+    });
+    const command = createCommand({ graphApi, amqp, db });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+
+    // msg-1 from batch + flush-1 from flush (msg-1 not re-published by flush) = 2 publishes
+    expect(amqp.publish).toHaveBeenCalledTimes(2);
+    const publishedMessageIds = amqp.publish.mock.calls.map((call: any[]) => {
+      const event = call[2] as { payload: { messageId: string } };
+      return event.payload.messageId;
+    });
+    expect(publishedMessageIds).toEqual(['msg-1', 'flush-1']);
+  });
+
+  it('flush is a no-op when no pending IDs exist', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: { userProfileId: USER_PROFILE_ID },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        filters: DEFAULT_FILTERS,
+        pendingLiveMessageIds: [],
+      },
+      flushResult: { pendingLiveMessageIds: [] },
+    });
+    const command = createCommand({ graphApi, amqp, db });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+
+    // No publishes at all — empty batch and empty pending
+    expect(amqp.publish).not.toHaveBeenCalled();
+
+    // State still set to ready via flush transaction
+    expect(db.__flushTx.__txUpdate.set).toHaveBeenCalledWith(
+      expect.objectContaining({ liveCatchUpState: 'ready' }),
     );
   });
 });
