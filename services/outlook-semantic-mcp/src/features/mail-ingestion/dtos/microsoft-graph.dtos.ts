@@ -28,19 +28,19 @@ const graphFollowupFlagSchema = z.object({
 });
 
 export const graphMessageSchema = z.object({
-  bccRecipients: z.array(graphRecipientSchema).optional(),
+  bccRecipients: z.array(graphRecipientSchema).optional().nullable(),
   body: graphItemBodySchema.optional().nullable(),
-  bodyPreview: z.string().optional(),
-  categories: z.array(z.string()).optional(),
-  ccRecipients: z.array(graphRecipientSchema).optional(),
-  conversationId: z.string().optional(),
+  bodyPreview: z.string().optional().nullable(),
+  categories: z.array(z.string()).optional().nullable(),
+  ccRecipients: z.array(graphRecipientSchema).optional().nullable(),
+  conversationId: z.string().optional().nullable(),
   createdDateTime: z.string(),
   flag: graphFollowupFlagSchema.optional().nullable(),
   from: graphRecipientSchema.optional().nullable(),
-  hasAttachments: z.boolean().optional(),
+  hasAttachments: z.boolean().optional().nullable(),
   id: z.string(),
-  importance: z.enum(['low', 'normal', 'high']).optional(),
-  inferenceClassification: z.enum(['focused', 'other']).optional(),
+  importance: z.enum(['low', 'normal', 'high']).optional().nullable(),
+  inferenceClassification: z.enum(['focused', 'other']).optional().nullable(),
   internetMessageHeaders: z
     .array(
       z.object({
@@ -48,9 +48,10 @@ export const graphMessageSchema = z.object({
         value: z.string(),
       }),
     )
-    .optional(),
+    .optional()
+    .nullable(),
   webLink: z.string(),
-  internetMessageId: z.string().optional(),
+  internetMessageId: z.string().optional().nullable(),
   isDeliveryReceiptRequested: z.boolean().optional().nullable(),
   isDraft: z.boolean().optional().nullable(),
   isRead: z.boolean().optional().nullable(),
@@ -58,11 +59,11 @@ export const graphMessageSchema = z.object({
   lastModifiedDateTime: z.string(),
   parentFolderId: z.string(),
   receivedDateTime: z.string(),
-  replyTo: z.array(graphRecipientSchema).optional(),
+  replyTo: z.array(graphRecipientSchema).optional().nullable(),
   sender: graphRecipientSchema.optional().nullable(),
-  sentDateTime: z.string().optional(),
-  subject: z.string().optional(),
-  toRecipients: z.array(graphRecipientSchema).optional(),
+  sentDateTime: z.string().optional().nullable(),
+  subject: z.string().optional().nullable(),
+  toRecipients: z.array(graphRecipientSchema).optional().nullable(),
   uniqueBody: graphItemBodySchema.optional().nullable(),
 });
 

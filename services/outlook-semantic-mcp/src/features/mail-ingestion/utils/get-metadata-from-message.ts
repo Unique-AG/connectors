@@ -45,16 +45,17 @@ const filterOutNilOrEmptyValues = (
 };
 
 interface EmailAddress {
-  address?: string | undefined;
-  name?: string | undefined;
+  address?: string | undefined | null;
+  name?: string | undefined | null;
 }
 
 const extractFromEmailArray = (
   input:
     | {
-        emailAddress?: EmailAddress | undefined;
+        emailAddress?: EmailAddress | undefined | null;
       }[]
-    | undefined,
+    | undefined
+    | null,
   prop: keyof EmailAddress,
 ): string[] => {
   return filterOutNilOrEmptyValues(input?.map((item) => item.emailAddress?.[prop]));

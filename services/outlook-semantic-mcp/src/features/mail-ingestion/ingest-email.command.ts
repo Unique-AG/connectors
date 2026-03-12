@@ -190,7 +190,7 @@ export class IngestEmailCommand {
     traceEvent(`File Ingestion Started`);
     const createContentRequest = {
       key: fileKey,
-      title: `${graphMessage.subject} - ${graphMessage.id}.eml`,
+      title: `${graphMessage.subject ?? '__empty-title__'} - ${graphMessage.id}.eml`,
       mimeType: `message/rfc822`,
       // We pass byteSize as 1 because if we do not pass it the register content request will
       // create the content but the content will not be visible in Knowledge base.
