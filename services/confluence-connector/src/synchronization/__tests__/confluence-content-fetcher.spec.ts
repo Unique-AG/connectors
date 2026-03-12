@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSmeared } from '@unique-ag/utils';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import type { ConfluencePage } from '../../confluence-api';
 import { ConfluenceApiClient, ContentType } from '../../confluence-api';
@@ -168,9 +168,7 @@ describe('ConfluenceContentFetcher', () => {
     const apiClient = {
       getPageById: vi
         .fn()
-        .mockResolvedValue(
-          makeFullPage('1', { labels: ['zebra', 'alpha', 'ai-ingest'] }),
-        ),
+        .mockResolvedValue(makeFullPage('1', { labels: ['zebra', 'alpha', 'ai-ingest'] })),
     };
 
     const fetcher = createFetcher(apiClient);

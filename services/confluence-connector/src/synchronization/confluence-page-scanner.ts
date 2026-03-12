@@ -1,15 +1,11 @@
-import { Logger } from '@nestjs/common';
 import { createSmeared } from '@unique-ag/utils';
+import { Logger } from '@nestjs/common';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
 import type { ConfluencePage } from '../confluence-api';
 import { type ConfluenceApiClient, ContentType } from '../confluence-api';
 import type { DiscoveredPage } from './sync.types';
 
-const SKIPPED_CONTENT_TYPES = [
-  ContentType.DATABASE,
-  ContentType.WHITEBOARD,
-  ContentType.EMBED,
-];
+const SKIPPED_CONTENT_TYPES = [ContentType.DATABASE, ContentType.WHITEBOARD, ContentType.EMBED];
 
 export class ConfluencePageScanner {
   private readonly logger = new Logger(ConfluencePageScanner.name);

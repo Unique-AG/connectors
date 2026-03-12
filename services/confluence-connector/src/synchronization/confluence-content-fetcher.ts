@@ -63,6 +63,9 @@ export class ConfluenceContentFetcher {
       this.confluenceConfig.ingestAllLabel,
     ];
 
-    return labels.map((label) => label.name).filter((name) => !ingestLabels.includes(name)).sort();
+    return labels
+      .map((label) => label.name)
+      .filter((name) => !ingestLabels.includes(name))
+      .sort();
   }
 }
