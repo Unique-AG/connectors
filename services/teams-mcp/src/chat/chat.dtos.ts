@@ -34,13 +34,29 @@ export const MsChatSchema = z.object({
   members: z.array(MsChatMemberSchema),
 });
 
-export const MsChatMessageSchema = z.object({
-  id: z.string(),
-  createdDateTime: z.string(),
-  senderDisplayName: z.string().optional(),
-  content: z.string(),
-  contentType: z.string(),
-});
+export const MsChatMessageSchema = z
+  .object({
+    id: z.string(),
+    createdDateTime: z.string(),
+    from: z
+      .object({
+        user: z.object({ displayName: z.string().optional() }).optional(),
+        application: z.object({ displayName: z.string().optional() }).optional(),
+      })
+      .optional(),
+    body: z.object({
+      contentType: z.string(),
+      content: z.string(),
+    }),
+  })
+  .transform((msg) => ({
+    id: msg.id,
+    createdDateTime: msg.createdDateTime,
+    senderDisplayName:
+      msg.from?.user?.displayName ?? msg.from?.application?.displayName ?? undefined,
+    content: msg.body.content,
+    contentType: msg.body.contentType,
+  }));
 
 export type MsChatMember = z.infer<typeof MsChatMemberSchema>;
 export type MsChat = z.infer<typeof MsChatSchema>;
