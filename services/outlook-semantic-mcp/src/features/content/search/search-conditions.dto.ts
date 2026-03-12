@@ -2,42 +2,110 @@ import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
 import { first } from 'remeda';
 import { z } from 'zod';
 
-const ConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
+const ArrayConditionFieldSchema = <T extends z.ZodArray>(itemSchema: T) =>
   z.object({
-    value: valueSchema.describe('The value to filter by.'),
-    operator: z.enum(UniqueQLOperator).describe('The comparison operator to apply.'),
+    value: itemSchema,
+    operator: z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN]),
   });
+
+const SingularConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
+  z.object({
+    value: valueSchema,
+    operator: z.enum([
+      UniqueQLOperator.EQUALS,
+      UniqueQLOperator.NOT_EQUALS,
+      UniqueQLOperator.GREATER_THAN,
+      UniqueQLOperator.GREATER_THAN_OR_EQUAL,
+      UniqueQLOperator.LESS_THAN,
+      UniqueQLOperator.LESS_THAN_OR_EQUAL,
+      UniqueQLOperator.CONTAINS,
+      UniqueQLOperator.NOT_CONTAINS,
+      UniqueQLOperator.IS_NULL,
+      UniqueQLOperator.IS_NOT_NULL,
+      UniqueQLOperator.IS_EMPTY,
+      UniqueQLOperator.IS_NOT_EMPTY,
+    ]),
+  });
+
+const EXAMPLE_FOLDER_IDS = {
+  first:
+    'AQMkADllMDJjNDk0LWNiNmEtNDhlOC04YjA4LWMzNDZlOTkANzlhMmMALgAAA8XAUl8fmjpEkM39lOfyshYBAMjQHeJoK_1Bt2gTZjb69YQAAAIBCAAAAA==',
+  second:
+    'AQMkADllMDJjNDk0LWNiNmEtNDhlOC04YjA4LWMzNDZlOTkANzlhMmMALgAAA8XAUl8fmjpEkM39lOfyshYBAMjQHeJoK_1Bt2gTZjb69YQAAAIBWQAAAA==',
+};
+
+const emailConditionsSchema = SingularConditionFieldSchema(
+  z
+    .email()
+    .describe(
+      `Sender email address to filter by, e.g. "alice@example.com". Recommended operators: equals, contains`,
+    ),
+)
+  .or(
+    ArrayConditionFieldSchema(z.array(z.email())).describe(
+      'Sender email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Recommended operators: in, notIn.',
+    ),
+  )
+  .optional();
 
 export const SearchConditionSchema = z
   .object({
-    dateFrom: ConditionFieldSchema(z.iso.datetime())
-      .optional()
-      .describe('Filter emails received on or after this date (ISO 8601 format).'),
-    dateTo: ConditionFieldSchema(z.iso.datetime())
-      .optional()
-      .describe('Filter emails received on or before this date (ISO 8601 format).'),
-    fromSenders: ConditionFieldSchema(z.array(z.email()).or(z.email()))
-      .optional()
-      .describe('Filter emails sent by any of the given sender email addresses.'),
-    toRecipients: ConditionFieldSchema(z.array(z.email()).or(z.email()))
-      .optional()
-      .describe('Filter emails addressed to any of the given recipient email addresses.'),
-    ccRecipients: ConditionFieldSchema(z.array(z.email()).or(z.email()))
-      .optional()
-      .describe('Filter emails CC-ed to any of the given email addresses.'),
-    directories: ConditionFieldSchema(z.array(z.string()).or(z.string()))
-      .optional()
-      .describe('Filter emails located in any of the given folder IDs.'),
-    hasAttachments: ConditionFieldSchema(z.boolean())
-      .optional()
-      .describe('Filter emails by whether they have attachments.'),
-    categories: ConditionFieldSchema(z.array(z.string()).or(z.string()))
-      .optional()
-      .describe('Filter emails tagged with any of the given categories.'),
+    dateFrom: SingularConditionFieldSchema(
+      z.iso
+        .datetime()
+        .describe(
+          'Filter emails received on or after this date. ISO 8601 format, e.g. "2024-01-01T00:00:00Z". Recommended operators: greaterThanOrEqual, greaterThan.',
+        ),
+    ).optional(),
+    dateTo: SingularConditionFieldSchema(
+      z.iso
+        .datetime()
+        .describe(
+          'Filter emails received on or before this date. ISO 8601 format, e.g. "2024-12-31T23:59:59Z". Recommended operators: lessThanOrEqual, lessThan.',
+        ),
+    ).optional(),
+    fromSenders: emailConditionsSchema,
+    toRecipients: emailConditionsSchema,
+    ccRecipients: emailConditionsSchema,
+    directories: ArrayConditionFieldSchema(
+      z
+        .array(z.string())
+        .describe(
+          `Folder ID(s) to filter by, e.g. ["${EXAMPLE_FOLDER_IDS.first}", "${EXAMPLE_FOLDER_IDS.second}"]. Folder ids can be found using \`list_folders\` tool. Recommended operators: in or notIn.`,
+        ),
+    ).optional(),
+    hasAttachments: SingularConditionFieldSchema(
+      z
+        .boolean()
+        .describe(
+          'Whether the email has attachments, e.g. true or false. Recommended operator: equals, notEquals.',
+        ),
+    ).optional(),
+    categories: SingularConditionFieldSchema(
+      z
+        .string()
+        .describe(
+          `Category label(s) to filter by, e.g. "Important". Categories can be found using \`list_categories\` tool. Recommended operators: equals or contains.`,
+        ),
+    )
+      .or(
+        ArrayConditionFieldSchema(
+          z
+            .array(z.string())
+            .describe(
+              `Category label(s) to filter by, e.g. ["Important", "Project-X"]. Categories can be found using \`list_categories\` tool. Recommended operators: in or notIn.`,
+            ),
+        ),
+      )
+      .optional(),
   })
   .refine((obj) => Object.values(obj).some((v) => v !== undefined), {
-    message: 'At least one condition field must be provided',
-  });
+    message:
+      'At least one condition field must be provided. Example: { fromSenders: { value: "alice@example.com", operator: "equals" } }',
+  })
+  .describe(
+    `Condition to narrow down the search, AND operator is applied between mutiple conditions fields`,
+  );
 
 export type SearchCondition = z.infer<typeof SearchConditionSchema>;
 
@@ -47,15 +115,16 @@ export const SearchEmailsInputSchema = z.object({
     .array(SearchConditionSchema)
     .optional()
     .describe(
-      `Conditions to narrow down the search, If we pass multiple conditions we apply AND operator between them.`,
+      `Conditions to narrow down the search, If we pass multiple conditions we apply OR operator between them.`,
     ),
   limit: z
     .number()
     .int()
-    .min(1)
+    .min(40)
     .max(100)
-    .default(10)
-    .describe('Maximum number of results to return. Must be between 1 and 100.'),
+    .optional()
+    .prefault(40)
+    .describe('Maximum number of results to return. Must be between 40 and 100.'),
   scoreThreshold: z
     .number()
     .min(0)
