@@ -54,7 +54,7 @@ export const SearchConditionSchema = z
         .array(z.email())
         .or(z.email())
         .describe(
-          'CC email address(es) to filter by, e.g. "carol@example.com" or ["carol@example.com"]. Recommended operators: equals, in.',
+          'CC email address(es) to filter by, e.g. "carol@example.com" or ["carol@example.com"]. Recommended operators: equals for string parameter, in for array or contains.',
         ),
     ).optional(),
     directories: ConditionFieldSchema(
@@ -62,7 +62,7 @@ export const SearchConditionSchema = z
         .array(z.string())
         .or(z.string())
         .describe(
-          `Folder ID(s) to filter by, e.g. "${EXAMPLE_FOLDER_IDS.first}" or ["${EXAMPLE_FOLDER_IDS.second}", "${EXAMPLE_FOLDER_IDS.third}"]. Folder ids can be found using \`list_folders\` tool. Recommended operators: equals, in.`,
+          `Folder ID(s) to filter by, e.g. "${EXAMPLE_FOLDER_IDS.first}" or ["${EXAMPLE_FOLDER_IDS.second}", "${EXAMPLE_FOLDER_IDS.third}"]. Folder ids can be found using \`list_folders\` tool. Recommended operators: equals for string parameter, in for array or contains.`,
         ),
     ).optional(),
     hasAttachments: ConditionFieldSchema(
@@ -77,14 +77,17 @@ export const SearchConditionSchema = z
         .array(z.string())
         .or(z.string())
         .describe(
-          `Category label(s) to filter by, e.g. "Important" or ["Important", "Project-X"]. Categories can be found using \`list_categories\` tool. Recommended operators: equals, in.`,
+          `Category label(s) to filter by, e.g. "Important" or ["Important", "Project-X"]. Categories can be found using \`list_categories\` tool. Recommended operators: equals for string parameter, in for array or contains.`,
         ),
     ).optional(),
   })
   .refine((obj) => Object.values(obj).some((v) => v !== undefined), {
     message:
       'At least one condition field must be provided. Example: { fromSenders: { value: "alice@example.com", operator: "Equal" } }',
-  });
+  })
+  .describe(
+    `Condition to narrow down the search, AND operator is applied between mutiple conditions fields`,
+  );
 
 export type SearchCondition = z.infer<typeof SearchConditionSchema>;
 
@@ -94,7 +97,7 @@ export const SearchEmailsInputSchema = z.object({
     .array(SearchConditionSchema)
     .optional()
     .describe(
-      `Conditions to narrow down the search, If we pass multiple conditions we apply AND operator between them.`,
+      `Conditions to narrow down the search, If we pass multiple conditions we apply OR operator between them.`,
     ),
   limit: z
     .number()
