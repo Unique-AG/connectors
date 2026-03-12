@@ -11,7 +11,7 @@ interface EmailInput {
   createdDateTime?: string;
 }
 
-type SkipResult =
+export type SkipResult =
   | { skip: false }
   | {
       skip: true;

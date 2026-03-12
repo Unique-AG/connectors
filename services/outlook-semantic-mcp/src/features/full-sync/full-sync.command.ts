@@ -6,7 +6,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { indexBy, isNonNullish, partition } from 'remeda';
+import { indexBy, isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, UserProfile } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
@@ -23,13 +23,12 @@ import {
 import { SyncDirectoriesCommand } from '../directories-sync/sync-directories.command';
 import { MessageEventDto } from '../mail-ingestion/dtos/message-event.dto';
 import {
-  FileDiffGraphMessage,
   FileDiffGraphMessageFields,
   fileDiffGraphMessageResponseSchema,
 } from '../mail-ingestion/dtos/microsoft-graph.dtos';
 import { getUniqueKeyForMessage } from '../mail-ingestion/utils/get-unique-key-for-message';
 import { IngestionPriority } from '../mail-ingestion/utils/ingestion-queue.utils';
-import { shouldSkipEmail } from '../mail-ingestion/utils/should-skip-email';
+import { SkipResult, shouldSkipEmail } from '../mail-ingestion/utils/should-skip-email';
 import { GetSubscriptionAndUserProfileQuery } from '../user-utils/get-subscription-and-user-profile.query';
 
 export type FullSyncRunStatus = 'skipped' | 'success';
@@ -132,18 +131,20 @@ export class FullSyncCommand {
       msg: `Fetching emails with filters`,
     });
 
-    const allGraphEmails = await this.fetchAllEmails({
-      userProfileId: userProfile.id,
+    const { stopSync, emailsToSkip, emailsToIngest } = await this.fetchAllEmails({
+      userProfile,
+      version,
       filters,
     });
-    traceEvent('emails fetched', { count: allGraphEmails.length });
-    this.logger.log({
-      subscriptionId,
-      userProfileId: userProfile.id,
-      userEmail,
-      emailCount: allGraphEmails.length,
-      msg: `Emails fetched`,
-    });
+    if (stopSync) {
+      traceEvent('sync stopped recovery version changed');
+      this.logger.log({
+        subscriptionId,
+        userProfileId: userProfile.id,
+        userEmail,
+        msg: `Sync was stopped, version changed`,
+      });
+    }
 
     await this.db
       .update(inboxConfiguration)
@@ -156,43 +157,22 @@ export class FullSyncCommand {
       )
       .execute();
 
-    const graphEmailsWithSkipResult = allGraphEmails.map((email) => ({
-      email,
-      skipCheckResult: shouldSkipEmail(email, filters, { userProfileId: userProfile.id }),
-    }));
-
-    const [filteredGraphEmails, skippedGraphEmails] = partition(
-      graphEmailsWithSkipResult,
-      (item) => !item.skipCheckResult.skip,
-    );
-    if (skippedGraphEmails.length > 0) {
+    if (emailsToSkip.length > 0) {
       traceEvent('emails skipped by filter', {
-        count: skippedGraphEmails.length,
-        skippedGraphEmails: JSON.stringify(
-          skippedGraphEmails.map((item) => ({
-            id: item.email.id,
-            internetMessageId: item.email.internetMessageId,
-            skipCheckResult: item.skipCheckResult,
-          })),
-        ),
+        count: emailsToSkip.length,
+        skippedGraphEmails: JSON.stringify(emailsToSkip),
       });
       this.logger.log({
         subscriptionId,
         userProfileId: userProfile.id,
         userEmail,
-        skippedCount: skippedGraphEmails.length,
+        skippedCount: emailsToSkip.length,
         msg: 'Emails skipped by filter',
       });
     }
 
-    const filesList = filteredGraphEmails.map(({ email }) => ({
-      key: getUniqueKeyForMessage(userProfile.email, email),
-      url: email.webLink,
-      updatedAt: email.lastModifiedDateTime,
-    }));
-
     const fileDiffResponse = await this.uniqueApi.ingestion.performFileDiff(
-      filesList,
+      emailsToIngest,
       getRootScopePathForUser(userProfile.email),
       INGESTION_SOURCE_KIND,
       INGESTION_SOURCE_NAME,
@@ -214,23 +194,7 @@ export class FullSyncCommand {
       msg: `File diff completed`,
     });
 
-    await this.db
-      .update(inboxConfiguration)
-      .set({
-        fullSyncState: 'processing-file-diff-changes',
-        messagesFromMicrosoft: allGraphEmails.length,
-      })
-      .where(
-        and(
-          eq(inboxConfiguration.userProfileId, userProfile.id),
-          eq(inboxConfiguration.fullSyncVersion, version),
-        ),
-      )
-      .execute();
-
-    const filesRecord = indexBy(filteredGraphEmails, ({ email }) =>
-      getUniqueKeyForMessage(userProfile.email, email),
-    );
+    const filesRecord = indexBy(emailsToIngest, ({ key }) => key);
     const toIngest = [...fileDiffResponse.updatedFiles, ...fileDiffResponse.newFiles];
     this.logger.log({
       subscriptionId,
@@ -242,7 +206,7 @@ export class FullSyncCommand {
 
     let messagesQueuedForSync = 0;
     for (const fileKey of toIngest) {
-      const message = filesRecord[fileKey]?.email;
+      const message = filesRecord[fileKey];
       assert.ok(message, `Missing message for file key: ${fileKey}`);
       const event = MessageEventDto.encode({
         type: 'unique.outlook-semantic-mcp.mail-event.full-sync-change-notification-scheduled',
@@ -372,12 +336,33 @@ export class FullSyncCommand {
 
   private async fetchAllEmails({
     filters,
-    userProfileId,
+    userProfile,
+    version,
   }: {
     filters: InboxConfigurationMailFilters;
-    userProfileId: string;
-  }): Promise<FileDiffGraphMessage[]> {
-    const client = this.graphClientFactory.createClientForUser(userProfileId);
+    version: string;
+    userProfile: NonNullishProps<UserProfile, 'email'>;
+  }): Promise<{
+    stopSync: boolean;
+    emailsToIngest: { id: string; key: string; url: string; updatedAt: string }[];
+    emailsToSkip: {
+      id: string;
+      internetMessageId: string | null | undefined;
+      skipCheckResult: SkipResult;
+    }[];
+  }> {
+    const output: {
+      emailsToIngest: { id: string; key: string; url: string; updatedAt: string }[];
+      emailsToSkip: {
+        id: string;
+        internetMessageId: string | null | undefined;
+        skipCheckResult: SkipResult;
+      }[];
+    } = {
+      emailsToIngest: [],
+      emailsToSkip: [],
+    };
+    const client = this.graphClientFactory.createClientForUser(userProfile.id);
 
     let emailsRaw = await client
       .api(`me/messages`)
@@ -388,17 +373,52 @@ export class FullSyncCommand {
       .top(200)
       .get();
     let emailResponse = fileDiffGraphMessageResponseSchema.parse(emailsRaw);
-    const emails: FileDiffGraphMessage[] = emailResponse.value;
 
-    while (emailResponse['@odata.nextLink']) {
-      emailsRaw = await client
-        .api(emailResponse['@odata.nextLink'])
-        .header('Prefer', 'IdType="ImmutableId"')
-        .get();
-      emailResponse = fileDiffGraphMessageResponseSchema.parse(emailsRaw);
-      emails.push(...emailResponse.value);
-    }
-    return emails;
+    do {
+      for (const email of emailResponse.value ?? []) {
+        const skipCheckResult = shouldSkipEmail(email, filters, { userProfileId: userProfile.id });
+        if (!skipCheckResult.skip) {
+          output.emailsToIngest.push({
+            id: email.id,
+            key: getUniqueKeyForMessage(userProfile.email, email),
+            url: email.webLink,
+            updatedAt: email.lastModifiedDateTime,
+          });
+        } else {
+          output.emailsToSkip.push({
+            skipCheckResult,
+            id: email.id,
+            internetMessageId: email.internetMessageId,
+          });
+        }
+
+        // We ping that we get more emails so that next recovery mechanism breaks.
+        const updateResult = await this.db
+          .update(inboxConfiguration)
+          .set({ messagesFromMicrosoft: output.emailsToIngest.length + output.emailsToSkip.length })
+          .where(
+            and(
+              eq(inboxConfiguration.userProfileId, userProfile.id),
+              eq(inboxConfiguration.fullSyncVersion, version),
+            ),
+          )
+          .returning();
+
+        if (updateResult.length === 0) {
+          return { ...output, stopSync: true };
+        }
+      }
+
+      if (emailResponse['@odata.nextLink']) {
+        emailsRaw = await client
+          .api(emailResponse['@odata.nextLink'])
+          .header('Prefer', 'IdType="ImmutableId"')
+          .get();
+        emailResponse = fileDiffGraphMessageResponseSchema.parse(emailsRaw);
+      }
+    } while (emailResponse['@odata.nextLink']);
+
+    return { ...output, stopSync: false };
   }
 }
 
