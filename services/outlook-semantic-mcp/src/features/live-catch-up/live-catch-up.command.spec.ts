@@ -89,11 +89,7 @@ function createMockDb({
     const txSelect = {
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          for: vi.fn().mockReturnValue({
-            then: vi.fn().mockImplementation((cb: (rows: any[]) => any) =>
-              Promise.resolve(cb(selectRows)),
-            ),
-          }),
+          for: vi.fn().mockResolvedValue(selectRows),
         }),
       }),
     };
@@ -113,9 +109,7 @@ function createMockDb({
   }
 
   const lockTx = createMockTx(lockResult ? [lockResult] : []);
-  const flushTx = createMockTx(
-    flushResult ? [flushResult] : [{ pendingLiveMessageIds: [] }],
-  );
+  const flushTx = createMockTx(flushResult ? [flushResult] : [{ pendingLiveMessageIds: [] }]);
 
   const dbExecuteFn = vi.fn().mockResolvedValue(undefined);
   const db = {
@@ -363,9 +357,7 @@ describe('LiveCatchUpCommand', () => {
   });
 
   it('does not double-publish when all webhook IDs are covered by batch', async () => {
-    const emails = [
-      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
-    ];
+    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
     graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
 
     const db = createMockDb({
@@ -406,7 +398,7 @@ describe('LiveCatchUpCommand', () => {
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
     // State set to 'failed'
-    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1].value.set;
+    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]!.value.set;
     expect(lastUpdateSetCall).toHaveBeenCalledWith(
       expect.objectContaining({ liveCatchUpState: 'failed' }),
     );
@@ -493,9 +485,7 @@ describe('LiveCatchUpCommand', () => {
   });
 
   it('flushes pending messages not already scheduled', async () => {
-    const emails = [
-      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
-    ];
+    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
     graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
 
     const db = createMockDb({
@@ -527,9 +517,7 @@ describe('LiveCatchUpCommand', () => {
   });
 
   it('flush skips IDs already scheduled during the run', async () => {
-    const emails = [
-      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
-    ];
+    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
     graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
 
     const db = createMockDb({

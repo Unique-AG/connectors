@@ -37,9 +37,7 @@ function makeFilters() {
   };
 }
 
-function makeInboxConfig(
-  overrides: Record<string, unknown> = {},
-): Record<string, unknown> {
+function makeInboxConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     fullSyncState: 'fetching-emails',
     fullSyncVersion: VERSION,
@@ -155,7 +153,7 @@ describe('ExecuteFullSyncCommand', () => {
     }
 
     // State updated to 'ready' — last update call sets fullSyncState
-    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1].value.set;
+    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]?.value.set;
     expect(lastUpdateSetCall).toHaveBeenCalledWith(
       expect.objectContaining({ fullSyncState: 'ready' }),
     );
@@ -181,7 +179,7 @@ describe('ExecuteFullSyncCommand', () => {
     expect(graphApi.get).toHaveBeenCalledTimes(2);
 
     // State set to 'ready'
-    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1].value.set;
+    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]?.value.set;
     expect(lastUpdateSetCall).toHaveBeenCalledWith(
       expect.objectContaining({ fullSyncState: 'ready' }),
     );
@@ -230,7 +228,7 @@ describe('ExecuteFullSyncCommand', () => {
     await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
 
     // State should be set to 'failed'
-    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1].value.set;
+    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]?.value.set;
     expect(lastUpdateSetCall).toHaveBeenCalledWith(
       expect.objectContaining({ fullSyncState: 'failed' }),
     );
@@ -322,9 +320,7 @@ describe('ExecuteFullSyncCommand', () => {
   });
 
   it('resumes from saved next link, skipping initial filter-based call', async () => {
-    const emails = [
-      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
-    ];
+    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
     graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
 
     const db = createMockDb(
@@ -349,9 +345,7 @@ describe('ExecuteFullSyncCommand', () => {
     const batch2 = [makeEmail('msg-2', '2024-05-01T00:00:00Z', '2024-05-01T01:00:00Z')];
 
     graphApi.get
-      .mockResolvedValueOnce(
-        makeGraphResponse(batch1, 'https://graph.microsoft.com/nextPage2'),
-      )
+      .mockResolvedValueOnce(makeGraphResponse(batch1, 'https://graph.microsoft.com/nextPage2'))
       .mockResolvedValueOnce(makeGraphResponse(batch2));
 
     const db = createMockDb(makeInboxConfig());
@@ -361,7 +355,7 @@ describe('ExecuteFullSyncCommand', () => {
 
     // The set mock captures all calls. After batch 1: updateWatermarks + updateNextLink.
     // updateNextLink for batch 1 should persist the next link.
-    const setCalls = db.update.mock.results[0].value.set.mock.calls;
+    const setCalls = db.update.mock.results[0]?.value.set.mock.calls;
     const nextLinkUpdates = setCalls.filter(
       (call: any[]) => 'fullSyncNextLink' in call[0] && !('fullSyncState' in call[0]),
     );
@@ -372,9 +366,7 @@ describe('ExecuteFullSyncCommand', () => {
   });
 
   it('clears next link on completion', async () => {
-    const emails = [
-      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
-    ];
+    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
     graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
 
     const db = createMockDb(makeInboxConfig());
@@ -383,16 +375,14 @@ describe('ExecuteFullSyncCommand', () => {
     await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
 
     // Final update sets state to ready and clears next link
-    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1].value.set;
+    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]?.value.set;
     expect(lastUpdateSetCall).toHaveBeenCalledWith(
       expect.objectContaining({ fullSyncState: 'ready', fullSyncNextLink: null }),
     );
   });
 
   it('falls back to fresh fetch when saved next link fails', async () => {
-    const emails = [
-      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
-    ];
+    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
 
     // First get rejects (expired link), second get resolves with emails
     graphApi.get
@@ -413,7 +403,7 @@ describe('ExecuteFullSyncCommand', () => {
     expect(amqp.publish).toHaveBeenCalledTimes(1);
 
     // Final state is ready with next link cleared
-    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1].value.set;
+    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]?.value.set;
     expect(lastUpdateSetCall).toHaveBeenCalledWith(
       expect.objectContaining({ fullSyncState: 'ready', fullSyncNextLink: null }),
     );

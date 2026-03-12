@@ -29,10 +29,7 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   fullSyncVersion: uuid(`full_sync_version`),
   liveCatchUpState: liveCatchUpState(`live_catch_up_state`).notNull().default('ready'),
   fullSyncNextLink: text(`full_sync_next_link`),
-  pendingLiveMessageIds: text(`pending_live_message_ids`)
-    .array()
-    .notNull()
-    .default(sql`'{}'`),
+  pendingLiveMessageIds: text(`pending_live_message_ids`).array().notNull().default(sql`'{}'`),
 
   // Date watermarks for sync coordination
   newestCreatedDateTime: timestamp(`newest_created_date_time`),

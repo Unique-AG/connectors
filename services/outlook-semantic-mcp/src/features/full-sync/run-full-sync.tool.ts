@@ -7,8 +7,8 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import {
-  StartFullSyncCommand,
   FullSyncRunStatus,
+  StartFullSyncCommand,
 } from '~/features/full-sync/start-full-sync.command';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { META } from './run-full-sync-tool.meta';

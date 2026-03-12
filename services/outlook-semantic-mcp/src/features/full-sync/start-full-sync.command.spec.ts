@@ -50,11 +50,7 @@ function createMockDb(inboxConfig: Record<string, unknown> | undefined) {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          for: vi.fn().mockReturnValue({
-            then: vi.fn().mockImplementation((cb: (rows: any[]) => any) =>
-              Promise.resolve(cb(inboxConfig ? [inboxConfig] : [])),
-            ),
-          }),
+          for: vi.fn().mockResolvedValue(inboxConfig ? [inboxConfig] : []),
         }),
       }),
     }),
@@ -75,10 +71,16 @@ function createCommand({
   db,
 }: {
   amqp: ReturnType<typeof createMockAmqp>;
-  getSubscriptionAndUserProfileQuery: ReturnType<typeof createMockGetSubscriptionAndUserProfileQuery>;
+  getSubscriptionAndUserProfileQuery: ReturnType<
+    typeof createMockGetSubscriptionAndUserProfileQuery
+  >;
   db: ReturnType<typeof createMockDb>;
 }): StartFullSyncCommand {
-  return new StartFullSyncCommand(amqp as any, getSubscriptionAndUserProfileQuery as any, db as any);
+  return new StartFullSyncCommand(
+    amqp as any,
+    getSubscriptionAndUserProfileQuery as any,
+    db as any,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -127,9 +129,7 @@ describe('StartFullSyncCommand', () => {
     expect(result.status).toBe('started');
 
     const setCall = db.__tx.__txUpdate.set.mock.calls[0]?.[0];
-    expect(setCall).toEqual(
-      expect.objectContaining({ fullSyncState: 'fetching-emails' }),
-    );
+    expect(setCall).toEqual(expect.objectContaining({ fullSyncState: 'fetching-emails' }));
     expect(setCall).not.toHaveProperty('fullSyncNextLink');
   });
 

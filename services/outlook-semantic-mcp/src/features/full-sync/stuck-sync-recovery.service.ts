@@ -54,10 +54,7 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
     try {
       this.logger.log({ msg: 'Stuck sync recovery scan triggered' });
 
-      await Promise.all([
-        this.recoverStuckFullSyncs(),
-        this.recoverStuckLiveCatchUps(),
-      ]);
+      await Promise.all([this.recoverStuckFullSyncs(), this.recoverStuckLiveCatchUps()]);
     } catch (err) {
       this.logger.error({
         msg: 'An unexpected error occurred during stuck sync recovery scan',
@@ -90,7 +87,10 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
     this.logger.log({ msg: 'Found stuck full sync configurations', count: stuckConfigs.length });
 
     for (const config of stuckConfigs) {
-      this.logger.log({ msg: 'Publishing full sync recovery event', userProfileId: config.userProfileId });
+      this.logger.log({
+        msg: 'Publishing full sync recovery event',
+        userProfileId: config.userProfileId,
+      });
       const event = FullSyncEventDto.parse({
         type: 'unique.outlook-semantic-mcp.full-sync.recovery-requested',
         payload: { userProfileId: config.userProfileId },
@@ -117,10 +117,16 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.logger.log({ msg: 'Found stuck live catch-up configurations', count: stuckConfigs.length });
+    this.logger.log({
+      msg: 'Found stuck live catch-up configurations',
+      count: stuckConfigs.length,
+    });
 
     for (const config of stuckConfigs) {
-      this.logger.log({ msg: 'Resetting stuck live catch-up state', userProfileId: config.userProfileId });
+      this.logger.log({
+        msg: 'Resetting stuck live catch-up state',
+        userProfileId: config.userProfileId,
+      });
       await this.db
         .update(inboxConfiguration)
         .set({ liveCatchUpState: 'ready' })
