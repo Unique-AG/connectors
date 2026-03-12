@@ -81,7 +81,7 @@ sharepoint:
     listId: 00000000-0000-0000-0000-000000000000
 ```
 
-You can use [the CSV import template](./Template [env-name] Sites to Sync to Unique.csv) when populating the SharePoint list for `sharepoint_list`-based configuration.
+You can use [the CSV import template](./sites-to-sync-template.csv) when populating the SharePoint list for `sharepoint_list`-based configuration.
 
 ## SharePoint Base Configuration
 
