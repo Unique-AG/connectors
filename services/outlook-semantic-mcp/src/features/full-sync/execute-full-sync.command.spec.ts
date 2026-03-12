@@ -45,6 +45,7 @@ function makeInboxConfig(
     fullSyncVersion: VERSION,
     filters: makeFilters(),
     oldestLastModifiedDateTime: null,
+    fullSyncNextLink: null,
     ...overrides,
   };
 }
@@ -318,5 +319,103 @@ describe('ExecuteFullSyncCommand', () => {
 
     // Only 1 of 2 emails should be published (the old one is filtered by shouldSkipEmail)
     expect(amqp.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('resumes from saved next link, skipping initial filter-based call', async () => {
+    const emails = [
+      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
+    ];
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
+
+    const db = createMockDb(
+      makeInboxConfig({ fullSyncNextLink: 'https://graph.microsoft.com/savedLink' }),
+    );
+    const command = createCommand({ graphApi, amqp, syncDirectories, db });
+
+    await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+    // No filter-based call — resumed directly from saved link
+    expect(graphApi.filter).not.toHaveBeenCalled();
+
+    // Graph API was called to fetch from the saved link
+    expect(graphApi.get).toHaveBeenCalled();
+
+    // Email from the response was published
+    expect(amqp.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists next link to DB after each batch', async () => {
+    const batch1 = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
+    const batch2 = [makeEmail('msg-2', '2024-05-01T00:00:00Z', '2024-05-01T01:00:00Z')];
+
+    graphApi.get
+      .mockResolvedValueOnce(
+        makeGraphResponse(batch1, 'https://graph.microsoft.com/nextPage2'),
+      )
+      .mockResolvedValueOnce(makeGraphResponse(batch2));
+
+    const db = createMockDb(makeInboxConfig());
+    const command = createCommand({ graphApi, amqp, syncDirectories, db });
+
+    await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+    // The set mock captures all calls. After batch 1: updateWatermarks + updateNextLink.
+    // updateNextLink for batch 1 should persist the next link.
+    const setCalls = db.update.mock.results[0].value.set.mock.calls;
+    const nextLinkUpdates = setCalls.filter(
+      (call: any[]) => 'fullSyncNextLink' in call[0] && !('fullSyncState' in call[0]),
+    );
+
+    expect(nextLinkUpdates[0][0]).toEqual(
+      expect.objectContaining({ fullSyncNextLink: 'https://graph.microsoft.com/nextPage2' }),
+    );
+  });
+
+  it('clears next link on completion', async () => {
+    const emails = [
+      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
+    ];
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
+
+    const db = createMockDb(makeInboxConfig());
+    const command = createCommand({ graphApi, amqp, syncDirectories, db });
+
+    await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+    // Final update sets state to ready and clears next link
+    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1].value.set;
+    expect(lastUpdateSetCall).toHaveBeenCalledWith(
+      expect.objectContaining({ fullSyncState: 'ready', fullSyncNextLink: null }),
+    );
+  });
+
+  it('falls back to fresh fetch when saved next link fails', async () => {
+    const emails = [
+      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
+    ];
+
+    // First get rejects (expired link), second get resolves with emails
+    graphApi.get
+      .mockRejectedValueOnce(new Error('Gone — next link expired'))
+      .mockResolvedValueOnce(makeGraphResponse(emails));
+
+    const db = createMockDb(
+      makeInboxConfig({ fullSyncNextLink: 'https://graph.microsoft.com/expiredLink' }),
+    );
+    const command = createCommand({ graphApi, amqp, syncDirectories, db });
+
+    await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+    // Fell back to filter-based fetch
+    expect(graphApi.filter).toHaveBeenCalled();
+
+    // Email still published
+    expect(amqp.publish).toHaveBeenCalledTimes(1);
+
+    // Final state is ready with next link cleared
+    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1].value.set;
+    expect(lastUpdateSetCall).toHaveBeenCalledWith(
+      expect.objectContaining({ fullSyncState: 'ready', fullSyncNextLink: null }),
+    );
   });
 });
