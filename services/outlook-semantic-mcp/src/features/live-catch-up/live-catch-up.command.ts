@@ -56,12 +56,13 @@ export class LiveCatchUpCommand {
     const { userProfileId } = subscription;
     traceAttrs({ userProfileId });
 
-    const lockResult = await this.acquireLock(userProfileId);
+    const lockResult = await this.acquireLock(userProfileId, messageIds);
     if (!lockResult) {
       return;
     }
 
-    const { watermark, filters } = lockResult;
+    const { watermark, filters, pendingLiveMessageIds } = lockResult;
+    const pendingMessageIds = new Set(pendingLiveMessageIds);
 
     try {
       const { totalScheduled, scheduledIds } = await this.fetchAndScheduleBatches({
@@ -69,6 +70,7 @@ export class LiveCatchUpCommand {
         subscriptionId,
         watermark,
         filters,
+        pendingMessageIds,
       });
 
       const remainingIds = messageIds.filter((id) => !scheduledIds.has(id));
@@ -111,13 +113,18 @@ export class LiveCatchUpCommand {
 
   private async acquireLock(
     userProfileId: string,
-  ): Promise<{ watermark: Date; filters: InboxConfigurationMailFilters } | undefined> {
+    messageIds: string[],
+  ): Promise<
+    | { watermark: Date; filters: InboxConfigurationMailFilters; pendingLiveMessageIds: string[] }
+    | undefined
+  > {
     return this.db.transaction(async (tx) => {
       const inboxConfig = await tx
         .select({
           liveCatchUpState: inboxConfiguration.liveCatchUpState,
           newestLastModifiedDateTime: inboxConfiguration.newestLastModifiedDateTime,
           filters: inboxConfiguration.filters,
+          pendingLiveMessageIds: inboxConfiguration.pendingLiveMessageIds,
         })
         .from(inboxConfiguration)
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
@@ -130,7 +137,23 @@ export class LiveCatchUpCommand {
       }
 
       if (inboxConfig.liveCatchUpState === 'running') {
-        this.logger.log({ userProfileId, msg: 'Live catch-up already running, skipping' });
+        if (messageIds.length === 0) {
+          this.logger.log({ userProfileId, msg: 'Live catch-up already running, skipping' });
+          return undefined;
+        }
+
+        await tx
+          .update(inboxConfiguration)
+          .set({
+            pendingLiveMessageIds: sql`array_cat(${inboxConfiguration.pendingLiveMessageIds}, ${messageIds})`,
+          })
+          .where(eq(inboxConfiguration.userProfileId, userProfileId))
+          .execute();
+        this.logger.log({
+          userProfileId,
+          bufferedCount: messageIds.length,
+          msg: 'Live catch-up already running, buffered message IDs',
+        });
         return undefined;
       }
 
@@ -151,6 +174,7 @@ export class LiveCatchUpCommand {
       return {
         watermark: inboxConfig.newestLastModifiedDateTime,
         filters: inboxConfigurationMailFilters.parse(inboxConfig.filters),
+        pendingLiveMessageIds: inboxConfig.pendingLiveMessageIds,
       };
     });
   }
@@ -160,11 +184,13 @@ export class LiveCatchUpCommand {
     subscriptionId,
     watermark,
     filters,
+    pendingMessageIds,
   }: {
     userProfileId: string;
     subscriptionId: string;
     filters: InboxConfigurationMailFilters;
     watermark: Date;
+    pendingMessageIds: Set<string>;
   }): Promise<{ totalScheduled: number; scheduledIds: Set<string> }> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     let totalScheduled = 0;
@@ -191,7 +217,11 @@ export class LiveCatchUpCommand {
         break;
       }
 
-      const batchScheduledIds = await this.publishBatch({ batch, subscriptionId });
+      const batchScheduledIds = await this.publishBatch({
+        batch,
+        subscriptionId,
+        pendingMessageIds,
+      });
       for (const id of batchScheduledIds) {
         scheduledIds.add(id);
       }
@@ -230,13 +260,18 @@ export class LiveCatchUpCommand {
   private async publishBatch({
     batch,
     subscriptionId,
+    pendingMessageIds,
   }: {
     batch: FullSyncGraphMessage[];
     subscriptionId: string;
+    pendingMessageIds: Set<string>;
   }): Promise<string[]> {
     const publishedIds: string[] = [];
 
     for (const email of batch) {
+      if (pendingMessageIds.has(email.id)) {
+        continue;
+      }
       const event = MessageEventDto.encode({
         type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
         payload: { subscriptionId, messageId: email.id },
