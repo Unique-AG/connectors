@@ -32,8 +32,6 @@ const EXAMPLE_FOLDER_IDS = {
     'AQMkADllMDJjNDk0LWNiNmEtNDhlOC04YjA4LWMzNDZlOTkANzlhMmMALgAAA8XAUl8fmjpEkM39lOfyshYBAMjQHeJoK_1Bt2gTZjb69YQAAAIBCAAAAA==',
   second:
     'AQMkADllMDJjNDk0LWNiNmEtNDhlOC04YjA4LWMzNDZlOTkANzlhMmMALgAAA8XAUl8fmjpEkM39lOfyshYBAMjQHeJoK_1Bt2gTZjb69YQAAAIBWQAAAA==',
-  third:
-    'AQMkADllMDJjNDk0LWNiNmEtNDhlOC04YjA4LWMzNDZlOTkANzlhMmMALgAAA8XAUl8fmjpEkM39lOfyshYBAMjQHeJoK_1Bt2gTZjb69YQAAAIBCgAAAA==',
 };
 
 const emailConditionsSchema = SingularConditionFieldSchema(
@@ -73,7 +71,7 @@ export const SearchConditionSchema = z
       z
         .array(z.string())
         .describe(
-          `Folder ID(s) to filter by, e.g. ["${EXAMPLE_FOLDER_IDS.second}", "${EXAMPLE_FOLDER_IDS.third}"]. Folder ids can be found using \`list_folders\` tool. Recommended operators: in or notIn.`,
+          `Folder ID(s) to filter by, e.g. ["${EXAMPLE_FOLDER_IDS.first}", "${EXAMPLE_FOLDER_IDS.second}"]. Folder ids can be found using \`list_folders\` tool. Recommended operators: in or notIn.`,
         ),
     ).optional(),
     hasAttachments: SingularConditionFieldSchema(
