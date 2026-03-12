@@ -37,7 +37,7 @@ export class RateLimitedHttpClient {
   private async executeRequest(
     url: string,
     headers: Record<string, string>,
-  ): Promise<Dispatcher.BodyReadable> {
+  ): Promise<Dispatcher.ResponseData['body']> {
     return this.limiter.schedule(async () => {
       const response = await request(url, {
         method: 'GET',
