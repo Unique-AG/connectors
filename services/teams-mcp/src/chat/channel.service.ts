@@ -14,18 +14,14 @@ export class ChannelService {
   ) {}
 
   @Span()
-  public async listTeams(userProfileId: string, pageSize = 999): Promise<MsTeam[]> {
+  public async listTeams(userProfileId: string): Promise<MsTeam[]> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
 
     this.logger.debug({ userProfileId }, 'Fetching joined teams from Microsoft Graph');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    const response = await client
-      .api('/me/joinedTeams')
-      .select('id,displayName,description')
-      .top(pageSize)
-      .get();
+    const response = await client.api('/me/joinedTeams').select('id,displayName,description').get();
 
     const teams = z.array(MsTeamSchema).parse(response.value);
 
@@ -36,11 +32,7 @@ export class ChannelService {
   }
 
   @Span()
-  public async listChannels(
-    userProfileId: string,
-    teamId: string,
-    pageSize = 999,
-  ): Promise<MsChannel[]> {
+  public async listChannels(userProfileId: string, teamId: string): Promise<MsChannel[]> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
     span?.setAttribute('team_id', teamId);
@@ -51,7 +43,6 @@ export class ChannelService {
     const response = await client
       .api(`/teams/${teamId}/channels`)
       .select('id,displayName,description')
-      .top(pageSize)
       .get();
 
     const channels = z.array(MsChannelSchema).parse(response.value);
