@@ -103,7 +103,7 @@ export const SearchConditionSchema = z
   })
   .refine((obj) => Object.values(obj).some((v) => v !== undefined), {
     message:
-      'At least one condition field must be provided. Example: { fromSenders: { value: "alice@example.com", operator: "Equal" } }',
+      'At least one condition field must be provided. Example: { fromSenders: { value: "alice@example.com", operator: "equals" } }',
   })
   .describe(
     `Condition to narrow down the search, AND operator is applied between mutiple conditions fields`,
