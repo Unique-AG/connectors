@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.9](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.8...outlook-semantic-mcp@0.2.9) (2026-03-12)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** address bugbot comment regarding parameter labels ([#351](https://github.com/Unique-AG/connectors/issues/351)) ([e7e91ca](https://github.com/Unique-AG/connectors/commit/e7e91ca1523fd008935d2a7dd3ced941d2f22cf1))
+
 ## [0.2.8](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.7...outlook-semantic-mcp@0.2.8) (2026-03-12)
 
 
