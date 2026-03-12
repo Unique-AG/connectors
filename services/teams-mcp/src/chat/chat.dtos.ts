@@ -43,7 +43,7 @@ export const MsChatMessageSchema = z
         user: z.object({ displayName: z.string().optional() }).optional(),
         application: z.object({ displayName: z.string().optional() }).optional(),
       })
-      .optional(),
+      .nullish(),
     body: z.object({
       contentType: z.string(),
       content: z.string(),
