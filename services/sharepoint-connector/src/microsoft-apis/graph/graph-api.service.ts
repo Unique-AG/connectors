@@ -120,6 +120,23 @@ export class GraphApiService {
         continue;
       }
 
+      const smearedDriveName = createSmeared(drive.name);
+
+      const driveColumns = await this.getDriveColumns(drive.id);
+      const resolvedColumnName = this.resolveSyncColumnName(driveColumns, syncColumnName);
+      if (!resolvedColumnName) {
+        this.logger.warn(
+          `[Site: ${siteId}] Drive "${smearedDriveName}" does not have sync column "${syncColumnName}", skipping`,
+        );
+        continue;
+      }
+
+      if (resolvedColumnName !== syncColumnName) {
+        this.logger.log(
+          `[Site: ${siteId}] Drive "${smearedDriveName}": resolved sync column display name "${syncColumnName}" to API name "${resolvedColumnName}"`,
+        );
+      }
+
       const remainingLimit = maxFilesToScan ? maxFilesToScan - totalScanned : undefined;
       if (remainingLimit !== undefined && remainingLimit <= 0) {
         this.logger.log(`Reached file scan limit of ${maxFilesToScan}, stopping drive scan`);
@@ -131,7 +148,7 @@ export class GraphApiService {
         'root',
         siteId,
         drive.name,
-        syncColumnName,
+        resolvedColumnName,
         remainingLimit,
       );
 
@@ -190,18 +207,32 @@ export class GraphApiService {
       this.logger.warn(`Items scan limit set to ${maxFilesToScan} items for testing purpose.`);
     }
 
-    // Scan ASPX files from SitePages list
     const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
     if (!sitePagesList?.id) {
       this.logger.warn(`${logPrefix} Cannot scan Site Pages because SitePages list was not found`);
       return [];
     }
 
+    const sitePagesColumns = await this.getListColumns(siteId, sitePagesList.id);
+    const resolvedColumnName = this.resolveSyncColumnName(sitePagesColumns, syncColumnName);
+    if (!resolvedColumnName) {
+      this.logger.warn(
+        `${logPrefix} SitePages list does not have sync column "${syncColumnName}", skipping`,
+      );
+      return [];
+    }
+
+    if (resolvedColumnName !== syncColumnName) {
+      this.logger.log(
+        `${logPrefix} SitePages: resolved sync column display name "${syncColumnName}" to API name "${resolvedColumnName}"`,
+      );
+    }
+
     try {
       const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
         siteId,
         sitePagesList.id,
-        syncColumnName,
+        resolvedColumnName,
         maxFilesToScan,
       );
       this.logger.log(
@@ -266,6 +297,28 @@ export class GraphApiService {
       this.logger.error({
         msg: `${logPrefix} Failed to fetch subsites. Check Sites.Selected permission.`,
         siteId,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
+  }
+
+  public async getDriveColumns(driveId: string): Promise<ListColumn[]> {
+    const logPrefix = `[Drive: ${driveId}]`;
+
+    try {
+      const columns = await this.paginateGraphApiRequest<ListColumn>(
+        `/drives/${driveId}/list/columns`,
+        (url) => this.graphClient.api(url).select('id,name,displayName').get(),
+      );
+
+      this.logger.log(`${logPrefix} Found ${columns.length} columns`);
+
+      return columns;
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to fetch drive list columns`,
+        driveId,
         error: sanitizeError(error),
       });
       throw error;
@@ -650,6 +703,16 @@ export class GraphApiService {
     }
 
     return allItems;
+  }
+
+  private resolveSyncColumnName(columns: ListColumn[], syncColumnName: string): string | undefined {
+    const byDisplayName = columns.find((col) => col.displayName === syncColumnName);
+    if (byDisplayName) {
+      return byDisplayName.name;
+    }
+
+    const byName = columns.find((col) => col.name === syncColumnName);
+    return byName?.name;
   }
 
   private isFolder(driveItem: DriveItem): boolean {
