@@ -219,22 +219,22 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 
 **Important:** The connector is a singleton — each SharePoint site must be configured in at most one connector process per Unique instance. Configuring the same site in multiple processes leads to conflicting state and unexpected behavior of the connector.
 
-| Option                       | Values                                    | Description                                                                         |
-| ---------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------- |
-| `siteId`                     | UUID or compound ID                       | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId` |
-| `syncColumnName`             | String                                    | Name of the sync flag column                                                        |
-| `ingestionMode`              | `flat`, `recursive`                       | Flat ingests all to one scope; recursive maintains hierarchy                        |
-| `scopeId`                    | String                                    | Root scope ID in Unique                                                             |
-| `maxFilesToIngest`           | Number                                    | Maximum new + updated files per sync cycle; sync fails for the site if exceeded     |
-| `storeInternally`            | `enabled`, `disabled`                     | Whether to store content in Unique                                                  |
-| `syncStatus`                 | `active`, `inactive`, `deleted`           | Control sync behavior                                                               |
-| `syncMode`                   | `content_only`, `content_and_permissions` | What to sync                                                                        |
-| `permissionsInheritanceMode` | See below                                 | Inheritance settings (content_only mode)                                            |
-| `subsitesScan`               | `enabled`, `disabled`                     | Recursively discover and sync content from subsites (default: `disabled`)           |
+| Option                       | Values                                    | Default                      | Description                                                                         |
+| ---------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
+| `siteId`                     | UUID or compound ID                       | — (required)                 | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId` |
+| `syncColumnName`             | String                                    | `FinanceGPTKnowledge`        | Name of the sync flag column                                                        |
+| `ingestionMode`              | `flat`, `recursive`                       | — (required)                 | Flat ingests all to one scope; recursive maintains hierarchy                        |
+| `scopeId`                    | String                                    | — (required)                 | Root scope ID in Unique                                                             |
+| `maxFilesToIngest`           | Number                                    | — (unlimited)                | Maximum new + updated files per sync cycle; sync fails for the site if exceeded     |
+| `storeInternally`            | `enabled`, `disabled`                     | `enabled`                    | Whether to store content in Unique                                                  |
+| `syncStatus`                 | `active`, `inactive`, `deleted`           | `active`                     | Control sync behavior                                                               |
+| `syncMode`                   | `content_only`, `content_and_permissions` | — (required)                 | What to sync                                                                        |
+| `permissionsInheritanceMode` | See below                                 | `inherit_scopes_and_files`   | Inheritance settings for content_only mode                                          |
+| `subsitesScan`               | `enabled`, `disabled`                     | `disabled`                   | Recursively discover and sync content from subsites                                 |
 
 ### Permissions Inheritance Modes
 
-Only used when `syncMode` is `content_only`:
+Only used when `syncMode` is `content_only`. It controls whether newly created scopes / files inherit permissions from their parent. If scopes / files are configured to not inherit permissions, any newly created scopes / files will not be visible to platform users, only to service user. To grant access to these new scopes / files, admin has to use API on behalf of the service user.
 
 | Mode                       | Scopes Inherit | Files Inherit |
 | -------------------------- | -------------- | ------------- |
@@ -373,11 +373,14 @@ The `processing` section of the tenant configuration file controls file processi
 
 ```yaml
 processing:
-  stepTimeoutSeconds: 300
-  concurrency: 5
-  maxFileSizeToIngestBytes: 52428800
+  stepTimeoutSeconds: 30
+  concurrency: 1
+  maxFileSizeToIngestBytes: 209715200
   allowedMimeTypes:
     - application/pdf
+    - text/plain
+    - text/html
+    - application/x-asp
     - application/vnd.openxmlformats-officedocument.wordprocessingml.document
     - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
     - application/vnd.openxmlformats-officedocument.presentationml.presentation

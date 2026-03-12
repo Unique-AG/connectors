@@ -71,6 +71,7 @@ connectorConfig:
   sharepoint:
     tenantId: "your-tenant-id"
     baseUrl: "https://acme.sharepoint.com"
+    graphApiRateLimitPerMinuteThousands: 780
     auth:
       mode: certificate
       clientId: "your-client-id"
@@ -84,9 +85,10 @@ connectorConfig:
     #     scopeId: scope_xxx
     #     syncMode: content_and_permissions
   unique:
-    authMode: cluster_local
+    serviceAuthMode: cluster_local
     ingestionServiceBaseUrl: "http://node-ingestion.finance-gpt:8091"
     scopeManagementServiceBaseUrl: "http://node-scope-management.finance-gpt:8094"
+    apiRateLimitPerMinute: 100
     serviceExtraHeaders:
       x-company-id: "company-id"
       x-user-id: "service-user-id"
@@ -95,6 +97,9 @@ connectorConfig:
     concurrency: 1
     allowedMimeTypes:
       - application/pdf
+      - text/plain
+      - text/html
+      - application/x-asp
       - application/vnd.openxmlformats-officedocument.wordprocessingml.document
       - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
       - application/vnd.openxmlformats-officedocument.presentationml.presentation

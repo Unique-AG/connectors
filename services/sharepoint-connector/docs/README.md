@@ -98,6 +98,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
   - Microsoft Excel (`.xlsx`)
   - Microsoft PowerPoint (`.pptx`)
   - Text files (`.txt`)
+  - HTML files (`.html`)
   - SharePoint Sites (`.aspx`)
 
 **Automatic Change Detection**

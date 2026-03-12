@@ -1,7 +1,6 @@
 <!-- confluence-page-id: 1952546867 -->
 <!-- confluence-space-key: PUBDOC -->
 
-
 ## Content Sync Flow
 
 The content sync flow runs periodically (default: every 15 minutes) to synchronize flagged documents from SharePoint to Unique.
@@ -74,12 +73,12 @@ sequenceDiagram
         Unique->>Connector: newFiles, updatedFiles,<br/>movedFiles, deletedFiles
 
         opt Deleted files
-            Connector->>Unique: DELETE files
+            Connector->>Unique: GraphQL: contentDeleteByContentIds
             Unique->>Connector: Deletion confirmation
         end
 
         opt Moved files
-            Connector->>Unique: Move files to new scopes
+            Connector->>Unique: GraphQL: contentUpdate<br/>(update ownerId and url)
             Unique->>Connector: Move confirmation
         end
 
@@ -269,10 +268,12 @@ sequenceDiagram
             end
         end
 
-        Connector->>Unique: GET /users?email={email}
-        Unique->>Connector: Unique user IDs
+        Connector->>Unique: GraphQL: listUsers (fetch all active users)
+        Unique->>Connector: All Unique users (id, email)
+        Note over Connector: Match SharePoint emails<br/>to Unique user IDs locally
 
-        Connector->>Unique: PUT /scopes/{scopeId}/permissions
+        Connector->>Unique: GraphQL: createScopeAccesses / deleteScopeAccesses <br/> (scope permissions)
+        Connector->>Unique: GraphQL: createFileAccessesForContents / removeFileAccessesForContents <br/> (file permissions)
         Unique->>Connector: Permissions updated
     end
 ```
@@ -281,12 +282,12 @@ sequenceDiagram
 
 The connector handles different permission sources:
 
-| Source | API | Resolution |
-|--------|-----|------------|
-| Direct user grant | Graph API | Map email to Unique user |
-| Entra ID (Azure AD) group | Graph API | Expand group members |
-| SharePoint site group | SharePoint REST | Expand group members |
-| Sharing link | Graph API | Extract grantees |
+| Source                    | API             | Resolution               |
+| ------------------------- | --------------- | ------------------------ |
+| Direct user grant         | Graph API       | Map email to Unique user |
+| Entra ID (Azure AD) group | Graph API       | Expand group members     |
+| SharePoint site group     | SharePoint REST | Expand group members     |
+| Sharing link              | Graph API       | Extract grantees         |
 
 ### Group Visibility Requirement
 
@@ -354,11 +355,11 @@ flowchart TB
 
 Each item sent to the diff API contains:
 
-| Attribute | Description | Used For |
-|-----------|-------------|----------|
-| `key` | Unique key identifying the file (derived from SharePoint drive/item path) | Identity and change tracking |
-| `url` | SharePoint URL of the file | Location tracking |
-| `updatedAt` | Last modification timestamp from SharePoint | Change detection |
+| Attribute   | Description                                                               | Used For                     |
+| ----------- | ------------------------------------------------------------------------- | ---------------------------- |
+| `key`       | Unique key identifying the file (derived from SharePoint drive/item path) | Identity and change tracking |
+| `url`       | SharePoint URL of the file                                                | Location tracking            |
+| `updatedAt` | Last modification timestamp from SharePoint                               | Change detection             |
 
 ## ASPX Page Processing
 
@@ -393,10 +394,10 @@ sequenceDiagram
 
 ASPX pages contain structured content in special fields:
 
-| Field | Content Type | Description |
-|-------|--------------|-------------|
-| `CanvasContent1` | JSON/HTML | Modern page web parts |
-| `WikiField` | HTML | Classic wiki content |
+| Field            | Content Type | Description           |
+| ---------------- | ------------ | --------------------- |
+| `CanvasContent1` | JSON/HTML    | Modern page web parts |
+| `WikiField`      | HTML         | Classic wiki content  |
 
 The connector extracts text content from these fields for ingestion.
 
@@ -406,13 +407,13 @@ The connector extracts text content from these fields for ingestion.
 
 The connector applies scenario-specific behavior to keep sync cycles stable while avoiding incorrect permission or content updates:
 
-| Scenario | Typical Cause | Connector Behavior |
-|----------|---------------|--------------------|
-| Authentication/configuration error | Invalid certificate, wrong tenant/app configuration | Fail the current cycle early, log actionable error, require operator fix |
-| Transient API/network error | 429/5xx, temporary network failures | Retry with backoff up to retry limit, then skip affected item and continue |
-| Permission denied (`403`) | Missing site/library grant or group visibility restriction | Skip affected item/permission sync path and continue remaining work |
-| Not found (`404`) | Item deleted/renamed or stale state | Treat as deleted where applicable and reconcile local state |
-| Malformed/unsupported content | Corrupt file or parser failure | Log item-level error, skip item, continue cycle |
+| Scenario                           | Typical Cause                                              | Connector Behavior                                                         |
+| ---------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Authentication/configuration error | Invalid certificate, wrong tenant/app configuration        | Fail the current cycle early, log actionable error, require operator fix   |
+| Transient API/network error        | 429/5xx, temporary network failures                        | Retry with backoff up to retry limit, then skip affected item and continue |
+| Permission denied (`403`)          | Missing site/library grant or group visibility restriction | Skip affected item/permission sync path and continue remaining work        |
+| Not found (`404`)                  | Item deleted/renamed or stale state                        | Treat as deleted where applicable and reconcile local state                |
+| Malformed/unsupported content      | Corrupt file or parser failure                             | Log item-level error, skip item, continue cycle                            |
 
 ### Retry Logic
 
@@ -432,22 +433,22 @@ flowchart TB
 
 ### Retryable Errors
 
-| Error Code | Description | Retry |
-|------------|-------------|-------|
-| 429 | Rate limited | Yes (with backoff) |
-| 500 | Server error | Yes |
-| 502 | Bad gateway | Yes |
-| 503 | Service unavailable | Yes |
-| 504 | Gateway timeout | Yes |
-| 401 | Unauthorized | Yes (refresh token) |
+| Error Code | Description         | Retry               |
+| ---------- | ------------------- | ------------------- |
+| 429        | Rate limited        | Yes (with backoff)  |
+| 500        | Server error        | Yes                 |
+| 502        | Bad gateway         | Yes                 |
+| 503        | Service unavailable | Yes                 |
+| 504        | Gateway timeout     | Yes                 |
+| 401        | Unauthorized        | Yes (refresh token) |
 
 ### Non-Retryable Errors
 
-| Error Code | Description | Action |
-|------------|-------------|--------|
-| 400 | Bad request | Skip item, log error |
-| 403 | Forbidden | Skip item, log error |
-| 404 | Not found | Mark as deleted |
+| Error Code | Description | Action               |
+| ---------- | ----------- | -------------------- |
+| 400        | Bad request | Skip item, log error |
+| 403        | Forbidden   | Skip item, log error |
+| 404        | Not found   | Mark as deleted      |
 
 ## Related Documentation
 
