@@ -66,7 +66,7 @@ The connector maintains state to detect changes:
 - **Modified files**: Files with changed content hash or metadata
 - **Deleted files**: Previously synced files no longer flagged or deleted from SharePoint
 
-See [File Diff Flow](./flows.md#file-diff-mechanism) for details.
+See [File Diff Flow](./flows.md#File-Diff-Mechanism) for details.
 
 ## Related Documentation
 
