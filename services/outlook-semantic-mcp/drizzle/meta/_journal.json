@@ -113,6 +113,13 @@
       "when": 1773400000000,
       "tag": "0015_remove_running_from_inbox_sync_state",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1773344281033,
+      "tag": "0016_sync_checkpoint_and_buffering",
+      "breakpoints": true
     }
   ]
 }
