@@ -6,7 +6,10 @@ import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
-import { FullSyncCommand, FullSyncRunStatus } from '~/features/full-sync/full-sync.command';
+import {
+  StartFullSyncCommand,
+  FullSyncRunStatus,
+} from '~/features/full-sync/start-full-sync.command';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { META } from './run-full-sync-tool.meta';
 
@@ -23,7 +26,7 @@ export class RunFullSyncTool {
 
   public constructor(
     @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
-    private readonly fullSyncCommand: FullSyncCommand,
+    private readonly startFullSyncCommand: StartFullSyncCommand,
   ) {}
 
   @Tool({
@@ -57,11 +60,11 @@ export class RunFullSyncTool {
     });
     assert.ok(subscription, `Missing subscription for userProfile: ${userProfileId}`);
 
-    const { status } = await this.fullSyncCommand.run(subscription.subscriptionId);
+    const { status } = await this.startFullSyncCommand.run(subscription.subscriptionId);
 
     const responseByStatus: Record<FullSyncRunStatus, { success: boolean; message: string }> = {
       skipped: { success: false, message: `Skipped running full sync, it was run recently` },
-      success: { success: true, message: `Successfully run full sync` },
+      started: { success: true, message: `Full sync started` },
     };
 
     return responseByStatus[status];

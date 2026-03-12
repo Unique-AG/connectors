@@ -5,7 +5,7 @@ import { CronJob } from 'cron';
 import { and, eq, lt, notInArray, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
-import { FullSyncRecoveryEventDto } from './dtos/full-sync-recovery-event.dto';
+import { FullSyncEventDto } from './dtos/full-sync-event.dto';
 
 const STUCK_SYNC_THRESHOLD_MINUTES = 15;
 const RECOVERY_CRON_SCHEDULE = '* * * * *';
@@ -61,7 +61,7 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
           or(
             eq(inboxConfiguration.fullSyncState, 'failed'),
             and(
-              notInArray(inboxConfiguration.fullSyncState, ['full-sync-finished']),
+              notInArray(inboxConfiguration.fullSyncState, ['ready']),
               lt(
                 sql`GREATEST(COALESCE(${inboxConfiguration.lastFullSyncStartedAt}, '-infinity'::timestamptz), ${inboxConfiguration.updatedAt})`,
                 sql`NOW() - ${STUCK_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
@@ -78,7 +78,7 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
 
       for (const config of stuckConfigs) {
         this.logger.log({ msg: 'Publishing recovery event', userProfileId: config.userProfileId });
-        const event = FullSyncRecoveryEventDto.parse({
+        const event = FullSyncEventDto.parse({
           type: 'unique.outlook-semantic-mcp.full-sync.recovery-requested',
           payload: { userProfileId: config.userProfileId },
         });

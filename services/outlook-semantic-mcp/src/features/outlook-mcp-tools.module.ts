@@ -11,7 +11,6 @@ import { CreateDraftEmailTool } from './email-management/create-draft-email.tool
 import { EmailManagementModule } from './email-management/email-management.module';
 import { RunFullSyncTool, SyncProgressTool } from './full-sync';
 import { FullSyncModule } from './full-sync/full-sync.module';
-import { FullSyncRecoveryListener } from './full-sync/full-sync-recovery.listener';
 import { IngestionListener } from './ingestion.listener';
 import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
 import { MailSubscriptionController } from './mail-subscription.controller';
@@ -53,7 +52,7 @@ const TOOLS = [
     SearchModule,
     UniqueApiFeatureModule,
   ],
-  providers: [MailSubscriptionController, IngestionListener, FullSyncRecoveryListener, ...TOOLS],
+  providers: [MailSubscriptionController, IngestionListener, ...TOOLS],
   controllers: [MailSubscriptionController],
 })
 export class OutlookMcpToolsModule {}

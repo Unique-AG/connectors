@@ -5,8 +5,11 @@ import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';
 import { SubscriptionUtilsModule } from '../user-utils/subscription-utils.module';
-import { FullSyncCommand } from './full-sync.command';
+import { ExecuteFullSyncCommand } from './execute-full-sync.command';
+import { FullSyncListener } from './full-sync.listener';
 import { GetFullSyncStatsQuery } from './get-full-sync-stats.query';
+import { RecoverFullSyncCommand } from './recover-full-sync.command';
+import { StartFullSyncCommand } from './start-full-sync.command';
 import { StuckSyncRecoveryService } from './stuck-sync-recovery.service';
 import { SyncOnFilterChangeService } from './sync-on-filter-change.service';
 
@@ -20,13 +23,16 @@ import { SyncOnFilterChangeService } from './sync-on-filter-change.service';
     UniqueApiFeatureModule,
   ],
   providers: [
-    FullSyncCommand,
+    StartFullSyncCommand,
+    ExecuteFullSyncCommand,
+    RecoverFullSyncCommand,
+    FullSyncListener,
     GetFullSyncStatsQuery,
     SyncOnFilterChangeService,
     StuckSyncRecoveryService,
   ],
   exports: [
-    FullSyncCommand,
+    StartFullSyncCommand,
     GetFullSyncStatsQuery,
     SyncOnFilterChangeService,
     StuckSyncRecoveryService,
