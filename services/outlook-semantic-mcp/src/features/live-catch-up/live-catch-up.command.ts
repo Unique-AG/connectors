@@ -13,6 +13,10 @@ import {
   fullSyncGraphMessageResponseSchema,
 } from '../mail-ingestion/dtos/microsoft-graph.dtos';
 import { IngestionPriority } from '../mail-ingestion/utils/ingestion-queue.utils';
+import {
+  inboxConfigurationMailFilters,
+  InboxConfigurationMailFilters,
+} from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 
 @Injectable()
 export class LiveCatchUpCommand {
@@ -57,13 +61,14 @@ export class LiveCatchUpCommand {
       return;
     }
 
-    const { watermark } = lockResult;
+    const { watermark, filters } = lockResult;
 
     try {
       const { totalScheduled, scheduledIds } = await this.fetchAndScheduleBatches({
         userProfileId,
         subscriptionId,
         watermark,
+        filters,
       });
 
       const remainingIds = messageIds.filter((id) => !scheduledIds.has(id));
@@ -104,12 +109,15 @@ export class LiveCatchUpCommand {
     }
   }
 
-  private async acquireLock(userProfileId: string): Promise<{ watermark: Date } | undefined> {
+  private async acquireLock(
+    userProfileId: string,
+  ): Promise<{ watermark: Date; filters: InboxConfigurationMailFilters } | undefined> {
     return this.db.transaction(async (tx) => {
       const inboxConfig = await tx
         .select({
           liveCatchUpState: inboxConfiguration.liveCatchUpState,
           newestLastModifiedDateTime: inboxConfiguration.newestLastModifiedDateTime,
+          filters: inboxConfiguration.filters,
         })
         .from(inboxConfiguration)
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
@@ -140,7 +148,10 @@ export class LiveCatchUpCommand {
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
         .execute();
 
-      return { watermark: inboxConfig.newestLastModifiedDateTime };
+      return {
+        watermark: inboxConfig.newestLastModifiedDateTime,
+        filters: inboxConfigurationMailFilters.parse(inboxConfig.filters),
+      };
     });
   }
 
@@ -148,9 +159,11 @@ export class LiveCatchUpCommand {
     userProfileId,
     subscriptionId,
     watermark,
+    filters,
   }: {
     userProfileId: string;
     subscriptionId: string;
+    filters: InboxConfigurationMailFilters;
     watermark: Date;
   }): Promise<{ totalScheduled: number; scheduledIds: Set<string> }> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
@@ -158,14 +171,14 @@ export class LiveCatchUpCommand {
     const scheduledIds = new Set<string>();
     let batchNumber = 0;
 
-    const filterExpression = `lastModifiedDateTime ge ${watermark.toISOString()}`;
+    const filterExpression = `createdDateTime gt ${filters.ignoredBefore.toISOString()} and lastModifiedDateTime ge ${watermark.toISOString()}`;
 
     let emailsRaw = await client
       .api('me/messages')
       .header('Prefer', 'IdType="ImmutableId"')
       .select(FullSyncGraphMessageFields)
       .filter(filterExpression)
-      .orderby('lastModifiedDateTime desc')
+      .orderby('lastModifiedDateTime asc')
       .top(200)
       .get();
     let emailResponse = fullSyncGraphMessageResponseSchema.parse(emailsRaw);
