@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
@@ -31,6 +32,22 @@ export class RateLimitedHttpClient {
 
       await handleErrorStatus(response.statusCode, response.body, url);
       return response.body.json();
+    });
+  }
+
+  public async rateLimitedStreamRequest(
+    url: string,
+    headers: Record<string, string>,
+  ): Promise<Readable> {
+    return await this.limiter.schedule(async () => {
+      const response = await request(url, {
+        method: 'GET',
+        headers,
+        dispatcher: this.dispatcher,
+      });
+
+      await handleErrorStatus(response.statusCode, response.body, url);
+      return response.body;
     });
   }
 

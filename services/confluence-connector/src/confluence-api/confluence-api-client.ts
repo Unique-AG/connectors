@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import type { ConfluencePage } from './types/confluence-api.types';
 
 export interface ApiClientOptions {
@@ -12,4 +13,6 @@ export abstract class ConfluenceApiClient {
   public abstract getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]>;
 
   public abstract buildPageWebUrl(page: ConfluencePage): string;
+
+  public abstract getAttachmentDownloadStream(downloadPath: string): Promise<Readable>;
 }

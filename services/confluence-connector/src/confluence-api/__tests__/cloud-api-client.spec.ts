@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import type { RateLimitedHttpClient } from '../../utils/rate-limited-http-client';
@@ -12,6 +13,7 @@ const mockAuth = { acquireToken: vi.fn().mockResolvedValue('cloud-token') };
 
 const mockHttpClient = {
   rateLimitedRequest: vi.fn(),
+  rateLimitedStreamRequest: vi.fn(),
 } as unknown as RateLimitedHttpClient;
 
 const mockConfig: ConfluenceConfig = {
@@ -237,6 +239,31 @@ describe('CloudConfluenceApiClient', () => {
       const url = client.buildPageWebUrl(page);
 
       expect(url).toBe(`${BASE_URL}/wiki/spaces/SP/pages/100/Test+Page`);
+    });
+  });
+
+  describe('getAttachmentDownloadStream', () => {
+    it('builds download URL with /wiki prefix under Cloud API base', async () => {
+      const mockStream = new Readable({ read() {} });
+      vi.mocked(mockHttpClient.rateLimitedStreamRequest).mockResolvedValueOnce(mockStream);
+
+      await client.getAttachmentDownloadStream(
+        '/download/attachments/123/report.pdf?version=1&api=v2',
+      );
+
+      expect(mockHttpClient.rateLimitedStreamRequest).toHaveBeenCalledWith(
+        `${API_BASE_URL}/wiki/download/attachments/123/report.pdf?version=1&api=v2`,
+        { Authorization: 'Bearer cloud-token' },
+      );
+    });
+
+    it('returns the stream from the HTTP client', async () => {
+      const mockStream = new Readable({ read() {} });
+      vi.mocked(mockHttpClient.rateLimitedStreamRequest).mockResolvedValueOnce(mockStream);
+
+      const result = await client.getAttachmentDownloadStream('/download/attachments/123/file.txt');
+
+      expect(result).toBe(mockStream);
     });
   });
 });

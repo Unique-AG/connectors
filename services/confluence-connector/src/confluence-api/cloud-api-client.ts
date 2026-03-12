@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import { chunk, uniqueBy } from 'remeda';
 import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
@@ -103,6 +104,12 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
 
   public buildPageWebUrl(page: ConfluencePage): string {
     return `${this.config.baseUrl}/wiki${page._links.webui}`;
+  }
+
+  public async getAttachmentDownloadStream(downloadPath: string): Promise<Readable> {
+    const url = `${this.apiBaseUrl}/wiki${downloadPath}`;
+    const token = await this.confluenceAuth.acquireToken();
+    return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
   }
 
   private async makeAuthenticatedRequest(url: string): Promise<unknown> {
