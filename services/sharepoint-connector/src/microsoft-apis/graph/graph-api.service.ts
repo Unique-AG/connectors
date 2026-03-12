@@ -121,9 +121,20 @@ export class GraphApiService {
       }
 
       const smearedDriveName = createSmeared(drive.name);
+      let resolvedColumnName: string | undefined;
+      try {
+        const driveColumns = await this.getDriveColumns(drive.id);
+        resolvedColumnName = this.resolveSyncColumnName(driveColumns, syncColumnName);
+      } catch (error) {
+        this.logger.warn({
+          msg: `[Site: ${siteId}] Failed to fetch columns for drive "${smearedDriveName}", skipping`,
+          siteId,
+          driveId: drive.id,
+          error: sanitizeError(error),
+        });
+        continue;
+      }
 
-      const driveColumns = await this.getDriveColumns(drive.id);
-      const resolvedColumnName = this.resolveSyncColumnName(driveColumns, syncColumnName);
       if (!resolvedColumnName) {
         this.logger.warn(
           `[Site: ${siteId}] Drive "${smearedDriveName}" does not have sync column "${syncColumnName}", skipping`,
@@ -213,22 +224,22 @@ export class GraphApiService {
       return [];
     }
 
-    const sitePagesColumns = await this.getListColumns(siteId, sitePagesList.id);
-    const resolvedColumnName = this.resolveSyncColumnName(sitePagesColumns, syncColumnName);
-    if (!resolvedColumnName) {
-      this.logger.warn(
-        `${logPrefix} SitePages list does not have sync column "${syncColumnName}", skipping`,
-      );
-      return [];
-    }
-
-    if (resolvedColumnName !== syncColumnName) {
-      this.logger.log(
-        `${logPrefix} SitePages: resolved sync column display name "${syncColumnName}" to API name "${resolvedColumnName}"`,
-      );
-    }
-
     try {
+      const sitePagesColumns = await this.getListColumns(siteId, sitePagesList.id);
+      const resolvedColumnName = this.resolveSyncColumnName(sitePagesColumns, syncColumnName);
+      if (!resolvedColumnName) {
+        this.logger.warn(
+          `${logPrefix} SitePages list does not have sync column "${syncColumnName}", skipping`,
+        );
+        return [];
+      }
+
+      if (resolvedColumnName !== syncColumnName) {
+        this.logger.log(
+          `${logPrefix} SitePages: resolved sync column display name "${syncColumnName}" to API name "${resolvedColumnName}"`,
+        );
+      }
+
       const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
         siteId,
         sitePagesList.id,

@@ -252,6 +252,41 @@ describe('GraphApiService', () => {
         undefined,
       );
     });
+
+    it('continues scanning remaining drives when fetching columns fails for one drive', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).getDrivesForSite = vi.fn().mockResolvedValue([
+        { id: 'drive-1', name: 'First Drive' },
+        { id: 'drive-2', name: 'Second Drive' },
+      ]);
+      vi.spyOn(service, 'getDriveColumns').mockImplementation(async (driveId: string) => {
+        if (driveId === 'drive-1') {
+          throw new Error('Column fetch failed');
+        }
+
+        return [{ id: '2', name: 'FinanceGPTKnowledge', displayName: 'Finance GPT Knowledge' }];
+      });
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).recursivelyFetchDriveItems = vi.fn().mockResolvedValue({
+        items: [],
+        directories: [],
+      });
+
+      await service.getAllFilesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge');
+
+      expect(service.getDriveColumns).toHaveBeenCalledTimes(2);
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method call
+      expect((service as any).recursivelyFetchDriveItems).toHaveBeenCalledTimes(1);
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method call
+      expect((service as any).recursivelyFetchDriveItems).toHaveBeenCalledWith(
+        'drive-2',
+        'root',
+        new Smeared('site-1', false),
+        'Second Drive',
+        'FinanceGPTKnowledge',
+        undefined,
+      );
+    });
   });
 
   describe('getAspxPagesForSite', () => {
@@ -311,6 +346,22 @@ describe('GraphApiService', () => {
         'InternalSyncName',
         undefined,
       );
+    });
+
+    it('returns empty list when fetching SitePages columns fails', async () => {
+      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
+        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
+      ]);
+      vi.spyOn(service, 'getListColumns').mockRejectedValue(new Error('API Error'));
+      const getAspxListItemsSpy = vi.spyOn(service, 'getAspxListItems');
+
+      const result = await service.getAspxPagesForSite(
+        new Smeared('site-1', false),
+        'FinanceGPTKnowledge',
+      );
+
+      expect(result).toEqual([]);
+      expect(getAspxListItemsSpy).not.toHaveBeenCalled();
     });
   });
 
