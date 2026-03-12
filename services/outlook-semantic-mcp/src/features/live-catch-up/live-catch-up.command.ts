@@ -82,15 +82,14 @@ export class LiveCatchUpCommand {
         });
       }
 
-      const alreadyScheduledIds = new Set(scheduledIds);
       for (const id of remainingIds) {
-        alreadyScheduledIds.add(id);
+        scheduledIds.add(id);
       }
 
       const flushedCount = await this.flushPendingMessages({
         userProfileId,
         subscriptionId,
-        alreadyScheduledIds,
+        alreadyScheduledIds: scheduledIds,
       });
 
       this.logger.log({
@@ -320,7 +319,7 @@ export class LiveCatchUpCommand {
     subscriptionId: string;
     alreadyScheduledIds: Set<string>;
   }): Promise<number> {
-    return this.db.transaction(async (tx) => {
+    const idsToFlush = await this.db.transaction(async (tx) => {
       const row = await tx
         .select({ pendingLiveMessageIds: inboxConfiguration.pendingLiveMessageIds })
         .from(inboxConfiguration)
@@ -329,14 +328,10 @@ export class LiveCatchUpCommand {
         .then((rows) => rows[0]);
 
       if (!row) {
-        return 0;
+        return [];
       }
 
-      const idsToFlush = row.pendingLiveMessageIds.filter((id) => !alreadyScheduledIds.has(id));
-
-      if (idsToFlush.length > 0) {
-        await this.publishMessages({ messageIds: idsToFlush, subscriptionId });
-      }
+      const filtered = row.pendingLiveMessageIds.filter((id) => !alreadyScheduledIds.has(id));
 
       await tx
         .update(inboxConfiguration)
@@ -344,8 +339,14 @@ export class LiveCatchUpCommand {
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
         .execute();
 
-      return idsToFlush.length;
+      return filtered;
     });
+
+    if (idsToFlush.length > 0) {
+      await this.publishMessages({ messageIds: idsToFlush, subscriptionId });
+    }
+
+    return idsToFlush.length;
   }
 
   private async updateWatermarks({
