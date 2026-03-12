@@ -36,6 +36,10 @@ export interface FileDiffResult {
   updatedPageIds: string[];
   deletedPageIds: string[];
   movedPageIds: string[];
+  newAttachmentKeys: string[];
+  updatedAttachmentKeys: string[];
+  deletedAttachmentKeys: string[];
+  movedAttachmentKeys: string[];
 }
 
 export interface FetchedPage {

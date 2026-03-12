@@ -75,6 +75,10 @@ describe('ConfluenceSynchronizationService', () => {
       updatedPageIds: [],
       deletedPageIds: [],
       movedPageIds: [],
+      newAttachmentKeys: [],
+      updatedAttachmentKeys: [],
+      deletedAttachmentKeys: [],
+      movedAttachmentKeys: [],
     };
     mockFileDiffService = {
       computeDiff: vi.fn().mockResolvedValue(diffResult),
@@ -111,7 +115,10 @@ describe('ConfluenceSynchronizationService', () => {
         expect.objectContaining({ msg: 'Starting sync' }),
       );
       expect(mockScanner.discoverPages).toHaveBeenCalledOnce();
-      expect(mockFileDiffService.computeDiff).toHaveBeenCalledWith(discoveredPagesFixture);
+      expect(mockFileDiffService.computeDiff).toHaveBeenCalledWith(
+        discoveredPagesFixture,
+        discoveryResultFixture.attachments,
+      );
       expect(mockContentFetcher.fetchPageContent).toHaveBeenCalledWith(
         expect.objectContaining({ id: '1' }),
       );
@@ -163,6 +170,10 @@ describe('ConfluenceSynchronizationService', () => {
         updatedPageIds: [],
         deletedPageIds: ['99', '99_attachment.pdf'],
         movedPageIds: [],
+        newAttachmentKeys: [],
+        updatedAttachmentKeys: [],
+        deletedAttachmentKeys: [],
+        movedAttachmentKeys: [],
       });
 
       await tenantStorage.run(tenant, () => service.synchronize());
@@ -179,6 +190,10 @@ describe('ConfluenceSynchronizationService', () => {
         updatedPageIds: [],
         deletedPageIds: [],
         movedPageIds: [],
+        newAttachmentKeys: [],
+        updatedAttachmentKeys: [],
+        deletedAttachmentKeys: [],
+        movedAttachmentKeys: [],
       });
       await tenantStorage.run(tenant, () => service.synchronize());
 
@@ -213,6 +228,10 @@ describe('ConfluenceSynchronizationService', () => {
         updatedPageIds: ['3'],
         deletedPageIds: [],
         movedPageIds: [],
+        newAttachmentKeys: [],
+        updatedAttachmentKeys: [],
+        deletedAttachmentKeys: [],
+        movedAttachmentKeys: [],
       });
       // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction
       const baseFetched = fetchedPagesFixture[0]!;

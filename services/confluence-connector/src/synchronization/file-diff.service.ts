@@ -4,7 +4,7 @@ import { Logger } from '@nestjs/common';
 import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind } from '../constants/ingestion.constants';
-import type { DiscoveredPage, FileDiffResult } from './sync.types';
+import type { DiscoveredAttachment, DiscoveredPage, FileDiffResult } from './sync.types';
 
 export class FileDiffService {
   private readonly logger = new Logger(FileDiffService.name);
@@ -16,10 +16,22 @@ export class FileDiffService {
     private readonly uniqueApiClient: UniqueApiClient,
   ) {}
 
-  public async computeDiff(discoveredPages: DiscoveredPage[]): Promise<FileDiffResult> {
-    this.logger.log({ pageCount: discoveredPages.length, msg: 'Performing file diff' });
+  public async computeDiff(
+    discoveredPages: DiscoveredPage[],
+    discoveredAttachments: DiscoveredAttachment[] = [],
+  ): Promise<FileDiffResult> {
+    this.logger.log({
+      pageCount: discoveredPages.length,
+      attachmentCount: discoveredAttachments.length,
+      msg: 'Performing file diff',
+    });
 
     const pagesBySpace = groupBy(discoveredPages, (page) => page.spaceKey);
+    const attachmentsBySpace = groupBy(discoveredAttachments, (att) => att.spaceKey);
+    const allSpaceKeys = new Set([
+      ...Object.keys(pagesBySpace),
+      ...Object.keys(attachmentsBySpace),
+    ]);
     const sourceKind = getSourceKind(this.confluenceConfig.instanceType);
 
     const result: FileDiffResult = {
@@ -27,14 +39,24 @@ export class FileDiffService {
       updatedPageIds: [],
       deletedPageIds: [],
       movedPageIds: [],
+      newAttachmentKeys: [],
+      updatedAttachmentKeys: [],
+      deletedAttachmentKeys: [],
+      movedAttachmentKeys: [],
     };
 
-    for (const [spaceKey, pages] of Object.entries(pagesBySpace)) {
-      const fileDiffItems = this.buildFileDiffItems(pages);
-      const firstPage = pages[0];
-      assert.ok(firstPage, `Expected at least one page for space "${spaceKey}"`);
+    for (const spaceKey of allSpaceKeys) {
+      const pages = pagesBySpace[spaceKey] ?? [];
+      const attachments = attachmentsBySpace[spaceKey] ?? [];
 
-      const basePartialKey = `${firstPage.spaceId}_${spaceKey}`;
+      const pageItems = this.buildPageDiffItems(pages);
+      const attachmentItems = this.buildAttachmentDiffItems(attachments);
+      const fileDiffItems = [...pageItems, ...attachmentItems];
+
+      const firstItem = pages[0] ?? attachments[0];
+      assert.ok(firstItem, `Expected at least one page or attachment for space "${spaceKey}"`);
+
+      const basePartialKey = `${firstItem.spaceId}_${spaceKey}`;
       const partialKey = this.useV1KeyFormat
         ? basePartialKey
         : `${this.tenantName}/${basePartialKey}`;
@@ -48,28 +70,64 @@ export class FileDiffService {
 
       this.validateNoAccidentalFullDeletion(fileDiffItems, diffResponse);
 
-      result.newPageIds.push(...diffResponse.newFiles);
-      result.updatedPageIds.push(...diffResponse.updatedFiles);
-      result.deletedPageIds.push(...diffResponse.deletedFiles);
-      result.movedPageIds.push(...diffResponse.movedFiles);
+      for (const key of diffResponse.newFiles) {
+        if (key.includes('/')) {
+          result.newAttachmentKeys.push(key);
+        } else {
+          result.newPageIds.push(key);
+        }
+      }
+      for (const key of diffResponse.updatedFiles) {
+        if (key.includes('/')) {
+          result.updatedAttachmentKeys.push(key);
+        } else {
+          result.updatedPageIds.push(key);
+        }
+      }
+      for (const key of diffResponse.deletedFiles) {
+        if (key.includes('/')) {
+          result.deletedAttachmentKeys.push(key);
+        } else {
+          result.deletedPageIds.push(key);
+        }
+      }
+      for (const key of diffResponse.movedFiles) {
+        if (key.includes('/')) {
+          result.movedAttachmentKeys.push(key);
+        } else {
+          result.movedPageIds.push(key);
+        }
+      }
     }
 
     this.logger.log({
-      new: result.newPageIds.length,
-      updated: result.updatedPageIds.length,
-      deleted: result.deletedPageIds.length,
-      moved: result.movedPageIds.length,
+      newPages: result.newPageIds.length,
+      updatedPages: result.updatedPageIds.length,
+      deletedPages: result.deletedPageIds.length,
+      movedPages: result.movedPageIds.length,
+      newAttachments: result.newAttachmentKeys.length,
+      updatedAttachments: result.updatedAttachmentKeys.length,
+      deletedAttachments: result.deletedAttachmentKeys.length,
+      movedAttachments: result.movedAttachmentKeys.length,
       msg: 'File diff completed',
     });
 
     return result;
   }
 
-  private buildFileDiffItems(pages: DiscoveredPage[]): FileDiffItem[] {
+  private buildPageDiffItems(pages: DiscoveredPage[]): FileDiffItem[] {
     return pages.map((page) => ({
       key: page.id,
       url: page.webUrl,
       updatedAt: page.versionTimestamp,
+    }));
+  }
+
+  private buildAttachmentDiffItems(attachments: DiscoveredAttachment[]): FileDiffItem[] {
+    return attachments.map((att) => ({
+      key: `${att.pageId}/${att.id}`,
+      url: att.webUrl,
+      updatedAt: att.versionTimestamp ?? '',
     }));
   }
 
