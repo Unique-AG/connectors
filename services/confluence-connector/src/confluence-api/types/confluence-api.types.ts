@@ -9,6 +9,25 @@ export enum ContentType {
   EMBED = 'embed',
 }
 
+export const confluenceAttachmentSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  extensions: z.object({
+    mediaType: z.string(),
+    fileSize: z.number(),
+  }),
+  version: z
+    .object({
+      when: z.string(),
+    })
+    .optional(),
+  _links: z.object({
+    download: z.string(),
+  }),
+});
+
+export type ConfluenceAttachment = z.infer<typeof confluenceAttachmentSchema>;
+
 export const confluencePageSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -36,6 +55,16 @@ export const confluencePageSchema = z.object({
       results: z.array(z.object({ name: z.string() })),
     }),
   }),
+  children: z
+    .object({
+      attachment: z.object({
+        results: z.array(confluenceAttachmentSchema),
+        start: z.number().optional(),
+        limit: z.number().optional(),
+        size: z.number().optional(),
+      }),
+    })
+    .optional(),
 });
 
 export type ConfluencePage = z.infer<typeof confluencePageSchema>;
