@@ -9,13 +9,14 @@ const SendChannelMessageInputSchema = z.object({
   teamName: z.string().describe('Display name of the team (case-insensitive)'),
   channelName: z.string().describe('Display name of the channel (case-insensitive)'),
   message: z.string().describe('Plain text message content to send'),
+  includeWebUrl: z
+    .boolean()
+    .default(false)
+    .describe('Include the Teams web URL of the sent message. Default: false'),
 });
 
 const SendChannelMessageOutputSchema = z.object({
-  success: z.boolean(),
   messageId: z.string(),
-  teamId: z.string(),
-  channelId: z.string(),
   webUrl: z.string().optional(),
 });
 
@@ -68,7 +69,13 @@ export class SendChannelMessageTool {
       'Sending channel message',
     );
 
-    return this.resolveAndSend(userProfileId, input.teamName, input.channelName, input.message);
+    return this.resolveAndSend(
+      userProfileId,
+      input.teamName,
+      input.channelName,
+      input.message,
+      input.includeWebUrl,
+    );
   }
 
   private async resolveAndSend(
@@ -76,6 +83,7 @@ export class SendChannelMessageTool {
     teamName: string,
     channelName: string,
     message: string,
+    includeWebUrl: boolean,
   ): Promise<z.output<typeof SendChannelMessageOutputSchema>> {
     const team = await this.channelService.resolveTeamByName(userProfileId, teamName);
     const channel = await this.channelService.resolveChannelByName(
@@ -91,11 +99,8 @@ export class SendChannelMessageTool {
       message,
     );
     return {
-      success: true,
       messageId: result.id,
-      teamId: team.id,
-      channelId: channel.id,
-      webUrl: result.webUrl,
+      ...(includeWebUrl && result.webUrl ? { webUrl: result.webUrl } : {}),
     };
   }
 }

@@ -4,13 +4,23 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { ChannelService } from '../channel.service';
-import { MsTeamSchema } from '../chat.dtos';
 
-const ListTeamsInputSchema = z.object({});
+const ListTeamsInputSchema = z.object({
+  includeDescriptions: z
+    .boolean()
+    .default(false)
+    .describe(
+      'Include team descriptions. Useful when multiple teams have similar names and disambiguation is needed. Default: false',
+    ),
+});
 
 const ListTeamsOutputSchema = z.object({
-  teams: z.array(MsTeamSchema),
-  count: z.number(),
+  teams: z.array(
+    z.object({
+      displayName: z.string(),
+      description: z.string().optional(),
+    }),
+  ),
 });
 
 @Injectable()
@@ -42,7 +52,7 @@ export class ListTeamsTool {
   })
   @Span()
   public async listTeams(
-    _input: z.infer<typeof ListTeamsInputSchema>,
+    input: z.infer<typeof ListTeamsInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof ListTeamsOutputSchema>> {
@@ -58,6 +68,16 @@ export class ListTeamsTool {
 
     span?.setAttribute('result_count', teams.length);
 
-    return { teams, count: teams.length };
+    return {
+      teams: teams.map((t) => {
+        const team: { displayName: string; description?: string } = {
+          displayName: t.displayName,
+        };
+        if (input.includeDescriptions && t.description) {
+          team.description = t.description;
+        }
+        return team;
+      }),
+    };
   }
 }

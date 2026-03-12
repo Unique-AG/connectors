@@ -11,7 +11,6 @@ const SendChatMessageInputSchema = z.object({
 });
 
 const SendChatMessageOutputSchema = z.object({
-  success: z.boolean(),
   messageId: z.string(),
   chatId: z.string(),
 });
@@ -74,6 +73,6 @@ export class SendChatMessageTool {
   ): Promise<z.output<typeof SendChatMessageOutputSchema>> {
     const chat = await this.chatService.resolveChatByNameOrMember(userProfileId, chatIdentifier);
     const result = await this.chatService.sendChatMessage(userProfileId, chat.id, message);
-    return { success: true, messageId: result.id, chatId: chat.id };
+    return { messageId: result.id, chatId: chat.id };
   }
 }

@@ -5,6 +5,7 @@ import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { MsChatMessage } from '../chat.dtos';
 import { ChatService } from '../chat.service';
+import { normalizeContent } from '../utils/normalize-content';
 
 const GetChatMessagesInputSchema = z.object({
   chatIdentifier: z.string().describe('Chat topic or member display name (case-insensitive)'),
@@ -15,6 +16,30 @@ const GetChatMessagesInputSchema = z.object({
     .max(50)
     .default(20)
     .describe('Maximum number of messages to return (newest first)'),
+  contentFormat: z
+    .enum(['normalized', 'raw'])
+    .default('normalized')
+    .describe(
+      'normalized converts HTML to readable text with @mentions and [attachment: name] placeholders. raw returns Teams HTML verbatim. Default: normalized',
+    ),
+  includeSystemMessages: z
+    .boolean()
+    .default(false)
+    .describe(
+      'System messages are event notifications (member added, call ended). Default false excludes them',
+    ),
+  timestampFormat: z
+    .enum(['full', 'short', 'none'])
+    .default('short')
+    .describe(
+      'full = ISO 8601 with ms, short = YYYY-MM-DD HH:mm, none = omit timestamps. Default: short',
+    ),
+  detail: z
+    .enum(['standard', 'full'])
+    .default('standard')
+    .describe(
+      'standard returns sender, content, and timestamp. full adds contentType (source format from Graph). Default: standard',
+    ),
 });
 
 const GetChatMessagesOutputSchema = z.object({
@@ -23,13 +48,12 @@ const GetChatMessagesOutputSchema = z.object({
   messages: z.array(
     z.object({
       id: z.string(),
-      createdDateTime: z.string(),
+      createdDateTime: z.string().optional(),
       senderDisplayName: z.string().nullable(),
       content: z.string(),
-      contentType: z.string(),
+      contentType: z.string().optional(),
     }),
   ),
-  count: z.number(),
 });
 
 @Injectable()
@@ -86,23 +110,43 @@ export class GetChatMessagesTool {
 
     span?.setAttribute('result_count', messages.length);
 
+    const filtered = input.includeSystemMessages
+      ? messages
+      : messages.filter((m) => m.senderDisplayName !== undefined);
+
     return {
       chatId: chat.id,
       chatTopic: chat.topic ?? null,
-      messages: messages.map((m) => this.mapMessage(m)),
-      count: messages.length,
+      messages: filtered.map((m) => this.mapMessage(m, input)),
     };
   }
 
   private mapMessage(
     m: MsChatMessage,
+    input: z.infer<typeof GetChatMessagesInputSchema>,
   ): z.output<typeof GetChatMessagesOutputSchema>['messages'][number] {
-    return {
+    const content =
+      input.contentFormat === 'normalized'
+        ? normalizeContent(m.content, m.contentType, m.attachments)
+        : m.content;
+
+    const msg: z.output<typeof GetChatMessagesOutputSchema>['messages'][number] = {
       id: m.id,
-      createdDateTime: m.createdDateTime,
       senderDisplayName: m.senderDisplayName ?? null,
-      content: m.content,
-      contentType: m.contentType,
+      content,
     };
+
+    if (input.timestampFormat !== 'none') {
+      msg.createdDateTime =
+        input.timestampFormat === 'full'
+          ? m.createdDateTime
+          : m.createdDateTime.replace('T', ' ').slice(0, 16);
+    }
+
+    if (input.detail === 'full') {
+      msg.contentType = m.contentType;
+    }
+
+    return msg;
   }
 }
