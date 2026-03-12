@@ -3,7 +3,7 @@ import { SearchType, type UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNull } from 'remeda';
+import { first, isNonNull } from 'remeda';
 import * as z from 'zod';
 import { type Directory, DRIZZLE, type DrizzleDatabase, directories, userProfiles } from '~/db';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
@@ -125,11 +125,13 @@ export class SearchEmailsQuery {
         continue;
       }
 
+      const firstDirectory = first(resolvedIds);
+
       resolvedConditions.push({
         ...condition,
         directories: {
           ...condition.directories,
-          value: resolvedIds,
+          value: resolvedIds.length === 1 && firstDirectory ? firstDirectory : resolvedIds,
         },
       });
     }
