@@ -9,7 +9,7 @@ const IngestionModeSchema = z.enum([IngestionMode.Flat]).prefault(IngestionMode.
 
 
 const AttachmentConfigSchema = z.object({
-  enabled: z
+  ingest: z
     .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
     .prefault(EnabledDisabledMode.Enabled)
     .transform((v) => v === EnabledDisabledMode.Enabled)

@@ -88,7 +88,7 @@ export class ConfluencePageScanner {
         labels: page.metadata.labels.results.map((label) => label.name),
       });
 
-      if (this.attachmentConfig.enabled && page.children?.attachment) {
+      if (this.attachmentConfig.ingest && page.children?.attachment) {
         const attachments = this.extractAttachments(page, webUrl);
         allAttachments.push(...attachments);
       }

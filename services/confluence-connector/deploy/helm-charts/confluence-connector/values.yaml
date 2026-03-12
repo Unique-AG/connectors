@@ -188,7 +188,7 @@ connectorConfig:
         # -- File attachment ingestion configuration (optional, all fields have defaults)
         # attachments:
         #   # -- Enable attachment ingestion (default: enabled)
-        #   enabled: enabled
+        #   ingest: enabled
         #   # -- File extensions to include (default: pdf, doc, docx, xls, xlsx, pptx, txt, csv, html)
         #   allowedExtensions:
         #     - pdf
