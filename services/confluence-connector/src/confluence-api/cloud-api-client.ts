@@ -106,8 +106,12 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return `${this.config.baseUrl}/wiki${page._links.webui}`;
   }
 
-  public async getAttachmentDownloadStream(downloadPath: string): Promise<Readable> {
-    const url = `${this.apiBaseUrl}/wiki${downloadPath}`;
+  public async getAttachmentDownloadStream(
+    attachmentId: string,
+    pageId: string,
+    _downloadPath: string,
+  ): Promise<Readable> {
+    const url = `${this.apiBaseUrl}/wiki/rest/api/content/${pageId}/child/attachment/${attachmentId}/download`;
     const token = await this.confluenceAuth.acquireToken();
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
   }

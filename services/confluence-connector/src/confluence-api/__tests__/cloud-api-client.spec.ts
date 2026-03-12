@@ -243,16 +243,18 @@ describe('CloudConfluenceApiClient', () => {
   });
 
   describe('getAttachmentDownloadStream', () => {
-    it('builds download URL with /wiki prefix under Cloud API base', async () => {
+    it('builds v1 REST API download URL with pageId and attachmentId', async () => {
       const mockStream = new Readable({ read() {} });
       vi.mocked(mockHttpClient.rateLimitedStreamRequest).mockResolvedValueOnce(mockStream);
 
       await client.getAttachmentDownloadStream(
+        'att456',
+        '123',
         '/download/attachments/123/report.pdf?version=1&api=v2',
       );
 
       expect(mockHttpClient.rateLimitedStreamRequest).toHaveBeenCalledWith(
-        `${API_BASE_URL}/wiki/download/attachments/123/report.pdf?version=1&api=v2`,
+        `${API_BASE_URL}/wiki/rest/api/content/123/child/attachment/att456/download`,
         { Authorization: 'Bearer cloud-token' },
       );
     });
@@ -261,7 +263,7 @@ describe('CloudConfluenceApiClient', () => {
       const mockStream = new Readable({ read() {} });
       vi.mocked(mockHttpClient.rateLimitedStreamRequest).mockResolvedValueOnce(mockStream);
 
-      const result = await client.getAttachmentDownloadStream('/download/attachments/123/file.txt');
+      const result = await client.getAttachmentDownloadStream('att789', '123', '/download/attachments/123/file.txt');
 
       expect(result).toBe(mockStream);
     });

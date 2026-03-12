@@ -31,10 +31,15 @@ export interface DiscoveryResult {
   attachments: DiscoveredAttachment[];
 }
 
+export interface DeletedItem {
+  id: string;
+  partialKey: string;
+}
+
 export interface FileDiffResult {
   newItemIds: string[];
   updatedItemIds: string[];
-  deletedItemIds: string[];
+  deletedItems: DeletedItem[];
   movedItemIds: string[];
 }
 

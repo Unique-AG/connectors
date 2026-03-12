@@ -14,5 +14,9 @@ export abstract class ConfluenceApiClient {
 
   public abstract buildPageWebUrl(page: ConfluencePage): string;
 
-  public abstract getAttachmentDownloadStream(downloadPath: string): Promise<Readable>;
+  public abstract getAttachmentDownloadStream(
+    attachmentId: string,
+    pageId: string,
+    downloadPath: string,
+  ): Promise<Readable>;
 }

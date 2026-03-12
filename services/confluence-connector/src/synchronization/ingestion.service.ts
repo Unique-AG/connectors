@@ -97,6 +97,8 @@ export class IngestionService {
 
       const uploadUrl = this.correctWriteUrl(registrationResponse.writeUrl);
       const stream = await this.confluenceApiClient.getAttachmentDownloadStream(
+        attachment.id,
+        attachment.pageId,
         attachment.downloadPath,
       );
       await this.uploadStream(uploadUrl, stream, attachment.mediaType, attachment.fileSize);

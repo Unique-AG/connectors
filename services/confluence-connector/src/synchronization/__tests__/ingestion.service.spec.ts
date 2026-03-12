@@ -357,6 +357,8 @@ describe('IngestionService', () => {
       );
 
       expect(confluenceApiClient.getAttachmentDownloadStream).toHaveBeenCalledWith(
+        'att-100',
+        '42',
         '/download/attachments/42/diagram.png',
       );
 

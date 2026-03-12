@@ -80,7 +80,7 @@ describe('FileDiffService', () => {
       expect(result).toEqual({
         newItemIds: [],
         updatedItemIds: [],
-        deletedItemIds: [],
+        deletedItems: [],
         movedItemIds: [],
       });
     });
@@ -102,7 +102,7 @@ describe('FileDiffService', () => {
       expect(result).toEqual({
         newItemIds: ['p-1'],
         updatedItemIds: [],
-        deletedItemIds: [],
+        deletedItems: [],
         movedItemIds: [],
       });
     });
@@ -133,7 +133,10 @@ describe('FileDiffService', () => {
       expect(result).toEqual({
         newItemIds: ['p-1', 'att-1'],
         updatedItemIds: ['p-2', 'att-2'],
-        deletedItemIds: ['p-3', 'att-3'],
+        deletedItems: [
+          { id: 'p-3', partialKey: 'test-tenant/space-1_SP' },
+          { id: 'att-3', partialKey: 'test-tenant/space-1_SP' },
+        ],
         movedItemIds: ['p-4', 'att-4'],
       });
     });
@@ -180,7 +183,7 @@ describe('FileDiffService', () => {
       expect(result).toEqual({
         newItemIds: ['p-1', 'p-2'],
         updatedItemIds: ['p-3'],
-        deletedItemIds: ['p-old'],
+        deletedItems: [{ id: 'p-old', partialKey: 'test-tenant/sa-id_SA' }],
         movedItemIds: [],
       });
     });
@@ -270,7 +273,7 @@ describe('FileDiffService', () => {
       expect(result).toEqual({
         newItemIds: ['att-1'],
         updatedItemIds: [],
-        deletedItemIds: [],
+        deletedItems: [],
         movedItemIds: [],
       });
     });
@@ -320,7 +323,7 @@ describe('FileDiffService', () => {
 
       const result = await service.computeDiff([basePage]);
 
-      expect(result.deletedItemIds).toEqual(['p-old']);
+      expect(result.deletedItems).toEqual([{ id: 'p-old', partialKey: 'test-tenant/space-1_SP' }]);
     });
 
     it('allows deletions when there are updated files', async () => {
@@ -333,7 +336,7 @@ describe('FileDiffService', () => {
 
       const result = await service.computeDiff([basePage]);
 
-      expect(result.deletedItemIds).toEqual(['p-old']);
+      expect(result.deletedItems).toEqual([{ id: 'p-old', partialKey: 'test-tenant/space-1_SP' }]);
     });
 
     it('aborts when all submitted items would be deleted with no new or updated files', async () => {
@@ -372,7 +375,7 @@ describe('FileDiffService', () => {
 
       const result = await service.computeDiff([basePage, { ...basePage, id: 'p-2' }]);
 
-      expect(result.deletedItemIds).toEqual(['p-old']);
+      expect(result.deletedItems).toEqual([{ id: 'p-old', partialKey: 'test-tenant/space-1_SP' }]);
     });
   });
 });

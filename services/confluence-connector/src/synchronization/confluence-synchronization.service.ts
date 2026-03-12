@@ -64,10 +64,13 @@ export class ConfluenceSynchronizationService {
         await this.ingestAttachments(attachmentsToIngest, spaceScopes, concurrency);
       }
 
-      if (diffResult.deletedItemIds.length > 0) {
-        await this.ingestionService.deleteContentByKeys(diffResult.deletedItemIds);
+      if (diffResult.deletedItems.length > 0) {
+        const contentKeys = diffResult.deletedItems.map(
+          (item) => `${item.partialKey}/${item.id}`,
+        );
+        await this.ingestionService.deleteContentByKeys(contentKeys);
         this.logger.log({
-          count: diffResult.deletedItemIds.length,
+          count: diffResult.deletedItems.length,
           msg: 'Deleted content processed',
         });
       }

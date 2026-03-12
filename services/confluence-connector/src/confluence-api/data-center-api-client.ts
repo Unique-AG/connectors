@@ -99,7 +99,11 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     return `${this.config.baseUrl}/pages/viewpage.action?pageId=${page.id}`;
   }
 
-  public async getAttachmentDownloadStream(downloadPath: string): Promise<Readable> {
+  public async getAttachmentDownloadStream(
+    _attachmentId: string,
+    _pageId: string,
+    downloadPath: string,
+  ): Promise<Readable> {
     const url = `${this.config.baseUrl}${downloadPath}`;
     const token = await this.confluenceAuth.acquireToken();
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });

@@ -74,7 +74,7 @@ describe('ConfluenceSynchronizationService', () => {
     const diffResult: FileDiffResult = {
       newItemIds: ['1'],
       updatedItemIds: [],
-      deletedItemIds: [],
+      deletedItems: [],
       movedItemIds: [],
     };
     mockFileDiffService = {
@@ -166,15 +166,18 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newItemIds: ['1'],
         updatedItemIds: [],
-        deletedItemIds: ['99', '99_attachment.pdf'],
+        deletedItems: [
+          { id: '99', partialKey: 'test-tenant/space-1_SP' },
+          { id: '99_attachment.pdf', partialKey: 'test-tenant/space-1_SP' },
+        ],
         movedItemIds: [],
       });
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(mockIngestionService.deleteContentByKeys).toHaveBeenCalledWith([
-        '99',
-        '99_attachment.pdf',
+        'test-tenant/space-1_SP/99',
+        'test-tenant/space-1_SP/99_attachment.pdf',
       ]);
     });
 
@@ -182,7 +185,7 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newItemIds: [],
         updatedItemIds: [],
-        deletedItemIds: [],
+        deletedItems: [],
         movedItemIds: [],
       });
       await tenantStorage.run(tenant, () => service.synchronize());
@@ -219,7 +222,7 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newItemIds: ['2'],
         updatedItemIds: ['3'],
-        deletedItemIds: [],
+        deletedItems: [],
         movedItemIds: [],
       });
       // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction
@@ -277,7 +280,7 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newItemIds: ['1', 'att-1'],
         updatedItemIds: [],
-        deletedItemIds: [],
+        deletedItems: [],
         movedItemIds: [],
       });
 
@@ -311,7 +314,7 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newItemIds: ['1'],
         updatedItemIds: [],
-        deletedItemIds: [],
+        deletedItems: [],
         movedItemIds: [],
       });
 
@@ -341,7 +344,7 @@ describe('ConfluenceSynchronizationService', () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newItemIds: ['att-1'],
         updatedItemIds: [],
-        deletedItemIds: [],
+        deletedItems: [],
         movedItemIds: [],
       });
       vi.mocked(mockScopeManagementService.ensureSpaceScopes).mockResolvedValue(

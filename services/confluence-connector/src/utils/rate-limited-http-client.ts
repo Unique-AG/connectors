@@ -11,7 +11,7 @@ export class RateLimitedHttpClient {
   private readonly dispatcher: Dispatcher;
 
   public constructor(ratePerMinute: number) {
-    this.dispatcher = new Agent().compose([interceptors.redirect(), interceptors.retry()]);
+    this.dispatcher = new Agent().compose([interceptors.redirect({ maxRedirections: 10 }), interceptors.retry()]);
 
     this.limiter = new Bottleneck({
       reservoir: ratePerMinute,

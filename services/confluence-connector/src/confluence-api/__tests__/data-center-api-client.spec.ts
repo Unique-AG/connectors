@@ -235,11 +235,13 @@ describe('DataCenterConfluenceApiClient', () => {
   });
 
   describe('getAttachmentDownloadStream', () => {
-    it('builds download URL with baseUrl prefix', async () => {
+    it('builds download URL with baseUrl prefix using downloadPath', async () => {
       const mockStream = new Readable({ read() {} });
       vi.mocked(mockHttpClient.rateLimitedStreamRequest).mockResolvedValueOnce(mockStream);
 
       await client.getAttachmentDownloadStream(
+        'att456',
+        '123',
         '/download/attachments/123/report.pdf?version=1&api=v2',
       );
 
@@ -253,7 +255,7 @@ describe('DataCenterConfluenceApiClient', () => {
       const mockStream = new Readable({ read() {} });
       vi.mocked(mockHttpClient.rateLimitedStreamRequest).mockResolvedValueOnce(mockStream);
 
-      const result = await client.getAttachmentDownloadStream('/download/attachments/123/file.txt');
+      const result = await client.getAttachmentDownloadStream('att789', '123', '/download/attachments/123/file.txt');
 
       expect(result).toBe(mockStream);
     });
