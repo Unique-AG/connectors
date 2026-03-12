@@ -43,7 +43,7 @@ export class ConfluenceSynchronizationService {
         discoveredAttachments,
       );
 
-      const pageIdsToFetch = new Set([...diffResult.newPageIds, ...diffResult.updatedPageIds]);
+      const pageIdsToFetch = new Set([...diffResult.newItemIds, ...diffResult.updatedItemIds]);
 
       if (pageIdsToFetch.size > 0) {
         const pagesToFetch = discoveredPages.filter((p) => pageIdsToFetch.has(p.id));
@@ -61,10 +61,10 @@ export class ConfluenceSynchronizationService {
         );
       }
 
-      if (diffResult.deletedPageIds.length > 0) {
-        await this.ingestionService.deleteContentByKeys(diffResult.deletedPageIds);
+      if (diffResult.deletedItemIds.length > 0) {
+        await this.ingestionService.deleteContentByKeys(diffResult.deletedItemIds);
         this.logger.log({
-          count: diffResult.deletedPageIds.length,
+          count: diffResult.deletedItemIds.length,
           msg: 'Deleted content processed',
         });
       }

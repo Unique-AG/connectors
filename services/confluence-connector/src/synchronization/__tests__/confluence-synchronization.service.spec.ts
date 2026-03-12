@@ -71,14 +71,10 @@ describe('ConfluenceSynchronizationService', () => {
       }),
     };
     const diffResult: FileDiffResult = {
-      newPageIds: ['1'],
-      updatedPageIds: [],
-      deletedPageIds: [],
-      movedPageIds: [],
-      newAttachmentKeys: [],
-      updatedAttachmentKeys: [],
-      deletedAttachmentKeys: [],
-      movedAttachmentKeys: [],
+      newItemIds: ['1'],
+      updatedItemIds: [],
+      deletedItemIds: [],
+      movedItemIds: [],
     };
     mockFileDiffService = {
       computeDiff: vi.fn().mockResolvedValue(diffResult),
@@ -166,14 +162,10 @@ describe('ConfluenceSynchronizationService', () => {
 
     it('deletes content for deleted keys returned by file diff', async () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
-        newPageIds: ['1'],
-        updatedPageIds: [],
-        deletedPageIds: ['99', '99_attachment.pdf'],
-        movedPageIds: [],
-        newAttachmentKeys: [],
-        updatedAttachmentKeys: [],
-        deletedAttachmentKeys: [],
-        movedAttachmentKeys: [],
+        newItemIds: ['1'],
+        updatedItemIds: [],
+        deletedItemIds: ['99', '99_attachment.pdf'],
+        movedItemIds: [],
       });
 
       await tenantStorage.run(tenant, () => service.synchronize());
@@ -186,14 +178,10 @@ describe('ConfluenceSynchronizationService', () => {
 
     it('handles no-change diffs without deleting content', async () => {
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
-        newPageIds: [],
-        updatedPageIds: [],
-        deletedPageIds: [],
-        movedPageIds: [],
-        newAttachmentKeys: [],
-        updatedAttachmentKeys: [],
-        deletedAttachmentKeys: [],
-        movedAttachmentKeys: [],
+        newItemIds: [],
+        updatedItemIds: [],
+        deletedItemIds: [],
+        movedItemIds: [],
       });
       await tenantStorage.run(tenant, () => service.synchronize());
 
@@ -222,16 +210,15 @@ describe('ConfluenceSynchronizationService', () => {
         { ...baseDiscovered, id: '2', title: 'Page 2' },
         { ...baseDiscovered, id: '3', title: 'Page 3' },
       ];
-      vi.mocked(mockScanner.discoverPages).mockResolvedValue({ pages: discovered, attachments: [] });
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: discovered,
+        attachments: [],
+      });
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
-        newPageIds: ['2'],
-        updatedPageIds: ['3'],
-        deletedPageIds: [],
-        movedPageIds: [],
-        newAttachmentKeys: [],
-        updatedAttachmentKeys: [],
-        deletedAttachmentKeys: [],
-        movedAttachmentKeys: [],
+        newItemIds: ['2'],
+        updatedItemIds: ['3'],
+        deletedItemIds: [],
+        movedItemIds: [],
       });
       // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction
       const baseFetched = fetchedPagesFixture[0]!;

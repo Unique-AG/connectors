@@ -32,14 +32,10 @@ export interface DiscoveryResult {
 }
 
 export interface FileDiffResult {
-  newPageIds: string[];
-  updatedPageIds: string[];
-  deletedPageIds: string[];
-  movedPageIds: string[];
-  newAttachmentKeys: string[];
-  updatedAttachmentKeys: string[];
-  deletedAttachmentKeys: string[];
-  movedAttachmentKeys: string[];
+  newItemIds: string[];
+  updatedItemIds: string[];
+  deletedItemIds: string[];
+  movedItemIds: string[];
 }
 
 export interface FetchedPage {
