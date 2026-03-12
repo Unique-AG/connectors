@@ -12,6 +12,7 @@ import { EmailManagementModule } from './email-management/email-management.modul
 import { RunFullSyncTool, SyncProgressTool } from './full-sync';
 import { FullSyncModule } from './full-sync/full-sync.module';
 import { IngestionListener } from './ingestion.listener';
+import { LiveCatchUpModule } from './live-catch-up/live-catch-up.module';
 import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
 import { MailSubscriptionController } from './mail-subscription.controller';
 import { SubscriptionModule } from './subscriptions/subscription.module';
@@ -47,6 +48,7 @@ const TOOLS = [
     CategoriesModule,
     EmailManagementModule,
     FullSyncModule,
+    LiveCatchUpModule,
     MailIngestionModule,
     DirectoriesSyncModule,
     SearchModule,
