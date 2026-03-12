@@ -88,6 +88,13 @@ export class FullSyncCommand {
         version: guardResult.version,
       });
     } catch (error) {
+      this.logger.error({
+        err: error,
+        msg: `Failed to run full sync`,
+        userPrfileId: userProfile.id,
+        userEmail,
+        subscriptionId,
+      });
       await this.db
         .update(inboxConfiguration)
         .set({ fullSyncState: 'failed' })
