@@ -195,7 +195,7 @@ Microsoft Graph enforces rate limits:
 
 The connector respects these limits via:
 
-- Configurable rate limiting (`GRAPH_API_RATE_LIMIT`)
+- Configurable rate limiting (`graphApiRateLimitPerMinuteThousands` in the tenant configuration YAML)
 - Exponential backoff on 429 responses
 - Concurrent request limiting
 

@@ -121,7 +121,7 @@ In cluster-internal mode, Zitadel token validation is not needed as services com
 - [ ] App registration created
 - [ ] API permissions granted
 - [ ] Admin consent completed
-- [ ] Certificate or client secret configured
+- [ ] Certificate configured
 - [ ] Site or library-specific access granted
 
 ### 3. Unique Platform
