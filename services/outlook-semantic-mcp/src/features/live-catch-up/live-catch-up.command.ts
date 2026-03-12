@@ -82,18 +82,24 @@ export class LiveCatchUpCommand {
         });
       }
 
-      await this.db
-        .update(inboxConfiguration)
-        .set({ liveCatchUpState: 'ready' })
-        .where(eq(inboxConfiguration.userProfileId, userProfileId))
-        .execute();
+      const alreadyScheduledIds = new Set(scheduledIds);
+      for (const id of remainingIds) {
+        alreadyScheduledIds.add(id);
+      }
+
+      const flushedCount = await this.flushPendingMessages({
+        userProfileId,
+        subscriptionId,
+        alreadyScheduledIds,
+      });
 
       this.logger.log({
         userProfileId,
         subscriptionId,
-        totalScheduled: totalScheduled + webhookScheduled,
+        totalScheduled: totalScheduled + webhookScheduled + flushedCount,
         fromBatches: totalScheduled,
         fromWebhook: webhookScheduled,
+        fromPendingFlush: flushedCount,
         msg: 'Live catch-up completed',
       });
     } catch (error) {
@@ -303,6 +309,43 @@ export class LiveCatchUpCommand {
     }
 
     return messageIds.length;
+  }
+
+  private async flushPendingMessages({
+    userProfileId,
+    subscriptionId,
+    alreadyScheduledIds,
+  }: {
+    userProfileId: string;
+    subscriptionId: string;
+    alreadyScheduledIds: Set<string>;
+  }): Promise<number> {
+    return this.db.transaction(async (tx) => {
+      const row = await tx
+        .select({ pendingLiveMessageIds: inboxConfiguration.pendingLiveMessageIds })
+        .from(inboxConfiguration)
+        .where(eq(inboxConfiguration.userProfileId, userProfileId))
+        .for('update')
+        .then((rows) => rows[0]);
+
+      if (!row) {
+        return 0;
+      }
+
+      const idsToFlush = row.pendingLiveMessageIds.filter((id) => !alreadyScheduledIds.has(id));
+
+      if (idsToFlush.length > 0) {
+        await this.publishMessages({ messageIds: idsToFlush, subscriptionId });
+      }
+
+      await tx
+        .update(inboxConfiguration)
+        .set({ pendingLiveMessageIds: [], liveCatchUpState: 'ready' })
+        .where(eq(inboxConfiguration.userProfileId, userProfileId))
+        .execute();
+
+      return idsToFlush.length;
+    });
   }
 
   private async updateWatermarks({
