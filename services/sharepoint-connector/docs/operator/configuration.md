@@ -161,13 +161,14 @@ unique:
 
 The connector supports HTTP/HTTPS proxy for environments where internet access is only available through a proxy. Proxy settings are configured via environment variables (managed by the Helm chart's `proxyConfig` section).
 
-| Mode                | Description                  |
-| ------------------- | ---------------------------- |
-| `none`              | Proxy disabled (default)     |
-| `username_password` | Basic authentication proxy   |
-| `ssl_tls`           | TLS client certificate proxy |
+| Mode                | Description                          |
+| ------------------- | ------------------------------------ |
+| `none`              | Proxy disabled (default)             |
+| `no_auth`           | Proxy enabled without authentication |
+| `username_password` | Basic authentication proxy           |
+| `ssl_tls`           | TLS client certificate proxy         |
 
-**Common options** (required for `username_password` and `ssl_tls` modes):
+**Common options** (required for `no_auth`, `username_password`, and `ssl_tls` modes):
 
 | Variable                   | Description                                                      |
 | -------------------------- | ---------------------------------------------------------------- |
@@ -219,18 +220,18 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 
 **Important:** The connector is a singleton — each SharePoint site must be configured in at most one connector process per Unique instance. Configuring the same site in multiple processes leads to conflicting state and unexpected behavior of the connector.
 
-| Option                       | Values                                    | Default                      | Description                                                                         |
-| ---------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
-| `siteId`                     | UUID or compound ID                       | — (required)                 | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId` |
-| `syncColumnName`             | String                                    | `FinanceGPTKnowledge`        | Name of the sync flag column                                                        |
-| `ingestionMode`              | `flat`, `recursive`                       | — (required)                 | Flat ingests all to one scope; recursive maintains hierarchy                        |
-| `scopeId`                    | String                                    | — (required)                 | Root scope ID in Unique                                                             |
-| `maxFilesToIngest`           | Number                                    | — (unlimited)                | Maximum new + updated files per sync cycle; sync fails for the site if exceeded     |
-| `storeInternally`            | `enabled`, `disabled`                     | `enabled`                    | Whether to store content in Unique                                                  |
-| `syncStatus`                 | `active`, `inactive`, `deleted`           | `active`                     | Control sync behavior                                                               |
-| `syncMode`                   | `content_only`, `content_and_permissions` | — (required)                 | What to sync                                                                        |
-| `permissionsInheritanceMode` | See below                                 | `inherit_scopes_and_files`   | Inheritance settings for content_only mode                                          |
-| `subsitesScan`               | `enabled`, `disabled`                     | `disabled`                   | Recursively discover and sync content from subsites                                 |
+| Option                       | Values                                    | Default                    | Description                                                                         |
+| ---------------------------- | ----------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------- |
+| `siteId`                     | UUID or compound ID                       | — (required)               | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId` |
+| `syncColumnName`             | String                                    | `FinanceGPTKnowledge`      | Name of the sync flag column                                                        |
+| `ingestionMode`              | `flat`, `recursive`                       | — (required)               | Flat ingests all to one scope; recursive maintains hierarchy                        |
+| `scopeId`                    | String                                    | — (required)               | Root scope ID in Unique                                                             |
+| `maxFilesToIngest`           | Number                                    | — (unlimited)              | Maximum new + updated files per sync cycle; sync fails for the site if exceeded     |
+| `storeInternally`            | `enabled`, `disabled`                     | `enabled`                  | Whether to store content in Unique                                                  |
+| `syncStatus`                 | `active`, `inactive`, `deleted`           | `active`                   | Control sync behavior                                                               |
+| `syncMode`                   | `content_only`, `content_and_permissions` | — (required)               | What to sync                                                                        |
+| `permissionsInheritanceMode` | See below                                 | `inherit_scopes_and_files` | Inheritance settings for content_only mode                                          |
+| `subsitesScan`               | `enabled`, `disabled`                     | `disabled`                 | Recursively discover and sync content from subsites                                 |
 
 ### Permissions Inheritance Modes
 

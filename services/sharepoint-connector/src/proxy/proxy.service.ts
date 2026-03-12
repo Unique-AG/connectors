@@ -3,7 +3,12 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Agent, Dispatcher, ProxyAgent } from 'undici';
 import { Config } from '../config';
-import { BasicProxyConfig, ProxyConfig, TlsProxyConfig } from '../config/proxy.config';
+import {
+  BasicProxyConfig,
+  NoAuthProxyConfig,
+  ProxyConfig,
+  TlsProxyConfig,
+} from '../config/proxy.config';
 
 export type ProxyMode = 'always' | 'for-external-only';
 
@@ -94,7 +99,7 @@ export class ProxyService implements OnModuleDestroy {
     return new ProxyAgent(proxyOptions);
   }
 
-  private buildProxyUrl(proxyConfig: BasicProxyConfig | TlsProxyConfig): string {
+  private buildProxyUrl(proxyConfig: NoAuthProxyConfig | BasicProxyConfig | TlsProxyConfig): string {
     return `${proxyConfig.protocol}://${proxyConfig.host}:${proxyConfig.port}`;
   }
 }

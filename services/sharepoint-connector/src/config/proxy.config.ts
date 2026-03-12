@@ -38,6 +38,11 @@ const noneProxyConfigSchema = z.object({
   authMode: z.literal('none').describe('Proxy disabled'),
 });
 
+const noAuthProxyConfigSchema = z.object({
+  authMode: z.literal('no_auth').describe('Proxy enabled without authentication'),
+  ...baseProxyFields,
+});
+
 const basicProxyConfigSchema = z.object({
   authMode: z.literal('username_password').describe('Basic authentication'),
   ...baseProxyFields,
@@ -59,6 +64,7 @@ export const ProxyConfigSchema = z.preprocess(
   (input) => (isEmptyish(input) ? { authMode: 'none' } : input),
   z.discriminatedUnion('authMode', [
     noneProxyConfigSchema,
+    noAuthProxyConfigSchema,
     basicProxyConfigSchema,
     tlsProxyConfigSchema,
   ]),
@@ -70,5 +76,6 @@ export type ProxyConfig = ConfigType<typeof proxyConfig>;
 export type ProxyConfigNamespaced = NamespacedConfigType<typeof proxyConfig>;
 
 export type NoneProxyConfig = Extract<ProxyConfig, { authMode: 'none' }>;
+export type NoAuthProxyConfig = Extract<ProxyConfig, { authMode: 'no_auth' }>;
 export type BasicProxyConfig = Extract<ProxyConfig, { authMode: 'username_password' }>;
 export type TlsProxyConfig = Extract<ProxyConfig, { authMode: 'ssl_tls' }>;
