@@ -4,6 +4,7 @@ import { tenantStorage } from '../../tenant/tenant-context.storage';
 import {
   createMockTenant,
   discoveredPagesFixture,
+  discoveryResultFixture,
   fetchedPagesFixture,
 } from '../__mocks__/sync.fixtures';
 import type { ConfluenceContentFetcher } from '../confluence-content-fetcher';
@@ -61,7 +62,7 @@ describe('ConfluenceSynchronizationService', () => {
     vi.clearAllMocks();
     tenant = createMockTenant('test-tenant');
     mockScanner = {
-      discoverPages: vi.fn().mockResolvedValue(discoveredPagesFixture),
+      discoverPages: vi.fn().mockResolvedValue(discoveryResultFixture),
     };
     mockContentFetcher = {
       fetchPageContent: vi.fn().mockImplementation((page: { id: string }) => {
@@ -206,7 +207,7 @@ describe('ConfluenceSynchronizationService', () => {
         { ...baseDiscovered, id: '2', title: 'Page 2' },
         { ...baseDiscovered, id: '3', title: 'Page 3' },
       ];
-      vi.mocked(mockScanner.discoverPages).mockResolvedValue(discovered);
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({ pages: discovered, attachments: [] });
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
         newPageIds: ['2'],
         updatedPageIds: ['3'],

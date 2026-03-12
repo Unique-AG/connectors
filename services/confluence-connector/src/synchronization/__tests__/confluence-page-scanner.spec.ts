@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig, ProcessingConfig } from '../../config';
-import type { ConfluencePage } from '../../confluence-api';
+import type { AttachmentConfig } from '../../config/ingestion.schema';
+import type { ConfluenceAttachment, ConfluencePage } from '../../confluence-api';
 import { ConfluenceApiClient, ContentType } from '../../confluence-api';
 import { ConfluencePageScanner } from '../confluence-page-scanner';
 
@@ -36,12 +37,46 @@ const baseProcessingConfig: ProcessingConfig = {
   scanIntervalCron: '*/5 * * * *',
 };
 
+const disabledAttachmentConfig: AttachmentConfig = {
+  enabled: false,
+  allowedExtensions: ['pdf', 'docx'],
+  maxFileSizeBytes: 10_000_000,
+};
+
+const enabledAttachmentConfig: AttachmentConfig = {
+  enabled: true,
+  allowedExtensions: ['pdf', 'docx'],
+  maxFileSizeBytes: 10_000_000,
+};
+
+function makeAttachment(
+  id: string,
+  title: string,
+  overrides: Partial<{
+    fileSize: number;
+    mediaType: string;
+    versionWhen: string;
+  }> = {},
+): ConfluenceAttachment {
+  return {
+    id,
+    title,
+    extensions: {
+      mediaType: overrides.mediaType ?? 'application/pdf',
+      fileSize: overrides.fileSize ?? 1_000,
+    },
+    version: overrides.versionWhen ? { when: overrides.versionWhen } : undefined,
+    _links: { download: `/download/attachments/${id}/${title}` },
+  };
+}
+
 function makePage(
   id: string,
   options: {
     type?: ContentType;
     labels?: string[];
     title?: string;
+    attachments?: ConfluenceAttachment[];
   } = {},
 ): ConfluencePage {
   return {
@@ -56,6 +91,9 @@ function makePage(
         results: (options.labels ?? []).map((name) => ({ name })),
       },
     },
+    children: options.attachments
+      ? { attachment: { results: options.attachments } }
+      : undefined,
   };
 }
 
@@ -65,11 +103,13 @@ function createScanner(
     'searchPagesByLabel' | 'getDescendantPages' | 'buildPageWebUrl'
   >,
   processingConfig: ProcessingConfig = baseProcessingConfig,
+  attachmentConfig: AttachmentConfig = disabledAttachmentConfig,
 ): ConfluencePageScanner {
   return new ConfluencePageScanner(
     baseConfluenceConfig,
     processingConfig,
     apiClient as unknown as ConfluenceApiClient,
+    attachmentConfig,
   );
 }
 
@@ -94,7 +134,7 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
-    expect(result.map((page) => page.id)).toEqual(['parent', 'standalone', 'child']);
+    expect(result.pages.map((page) => page.id)).toEqual(['parent', 'standalone', 'child']);
     expect(apiClient.getDescendantPages).toHaveBeenCalledWith(['parent']);
   });
 
@@ -116,7 +156,7 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
-    expect(result.map((item) => item.id)).toEqual(['page-root']);
+    expect(result.pages.map((item) => item.id)).toEqual(['page-root']);
     expect(apiClient.getDescendantPages).not.toHaveBeenCalled();
   });
 
@@ -138,7 +178,7 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
-    expect(result.map((item) => item.id)).toEqual(['child-page']);
+    expect(result.pages.map((item) => item.id)).toEqual(['child-page']);
     expect(apiClient.getDescendantPages).toHaveBeenCalledWith(['db-root']);
   });
 
@@ -161,11 +201,11 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient, limitedConfig);
     const result = await scanner.discoverPages();
 
-    expect(result.map((item) => item.id)).toEqual(['first']);
+    expect(result.pages.map((item) => item.id)).toEqual(['first']);
     expect(mockLogger.log).toHaveBeenCalledWith({ limit: 1, msg: 'maxPagesToScan limit reached' });
   });
 
-  it('returns empty array and logs completion when searchPagesByLabel returns no pages', async () => {
+  it('returns empty pages and attachments when searchPagesByLabel returns no pages', async () => {
     const apiClient = {
       searchPagesByLabel: vi.fn().mockResolvedValue([]),
       getDescendantPages: vi.fn().mockResolvedValue([]),
@@ -177,7 +217,8 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
-    expect(result).toEqual([]);
+    expect(result.pages).toEqual([]);
+    expect(result.attachments).toEqual([]);
     expect(apiClient.getDescendantPages).not.toHaveBeenCalled();
     expect(mockLogger.log).toHaveBeenCalledWith({ count: 0, msg: 'Page discovery completed' });
   });
@@ -215,7 +256,7 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
-    expect(result.map((page) => page.id)).toEqual(['parent', 'page-child']);
+    expect(result.pages.map((page) => page.id)).toEqual(['parent', 'page-child']);
     expect(mockLogger.debug).toHaveBeenCalledWith({
       pageId: 'db-child',
       title: 'Page db-child',
@@ -244,7 +285,7 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient, limitedConfig);
     const result = await scanner.discoverPages();
 
-    expect(result.map((page) => page.id)).toEqual(['parent', 'child']);
+    expect(result.pages.map((page) => page.id)).toEqual(['parent', 'child']);
     expect(mockLogger.log).toHaveBeenCalledWith({ limit: 2, msg: 'maxPagesToScan limit reached' });
   });
 
@@ -263,7 +304,7 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient);
     const result = await scanner.discoverPages();
 
-    expect(result.map((page) => page.id)).toEqual(['parent', 'labeled-child']);
+    expect(result.pages.map((page) => page.id)).toEqual(['parent', 'labeled-child']);
   });
 
   it('rejects when descendant fetching fails', async () => {
@@ -281,5 +322,220 @@ describe('ConfluencePageScanner', () => {
     const scanner = createScanner(apiClient);
 
     await expect(scanner.discoverPages()).rejects.toThrow('descendant lookup failed');
+  });
+
+  describe('attachment extraction', () => {
+    it('extracts attachments from pages when attachments are enabled', async () => {
+      const attachment = makeAttachment('att-1', 'report.pdf', {
+        versionWhen: '2026-03-01T00:00:00.000Z',
+      });
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [attachment],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments).toEqual([
+        {
+          id: 'att-1',
+          title: 'report.pdf',
+          mediaType: 'application/pdf',
+          fileSize: 1_000,
+          downloadPath: '/download/attachments/att-1/report.pdf',
+          versionTimestamp: '2026-03-01T00:00:00.000Z',
+          pageId: 'page-1',
+          spaceId: 'space-1',
+          spaceKey: 'SP',
+          spaceName: 'Space',
+          webUrl: 'https://confluence.example.com/wiki/page-1',
+        },
+      ]);
+    });
+
+    it('returns no attachments when attachments are disabled', async () => {
+      const attachment = makeAttachment('att-1', 'report.pdf');
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [attachment],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, disabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments).toEqual([]);
+    });
+
+    it('filters out attachments with disallowed extensions', async () => {
+      const allowed = makeAttachment('att-1', 'report.pdf');
+      const disallowed = makeAttachment('att-2', 'image.png');
+
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [allowed, disallowed],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments.map((a) => a.id)).toEqual(['att-1']);
+    });
+
+    it('filters out attachments exceeding max file size', async () => {
+      const small = makeAttachment('att-1', 'small.pdf', { fileSize: 1_000 });
+      const large = makeAttachment('att-2', 'large.pdf', { fileSize: 50_000_000 });
+
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [small, large],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments.map((a) => a.id)).toEqual(['att-1']);
+    });
+
+    it('filters out attachments with no file extension', async () => {
+      const noExt = makeAttachment('att-1', 'README');
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [noExt],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments).toEqual([]);
+    });
+
+    it('handles attachments with undefined version timestamp', async () => {
+      const attachment = makeAttachment('att-1', 'report.pdf');
+
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [attachment],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments[0]?.versionTimestamp).toBeUndefined();
+    });
+
+    it('extracts attachments from descendant pages', async () => {
+      const parent = makePage('parent', { labels: ['ai-ingest-all'] });
+      const attachment = makeAttachment('att-1', 'child-doc.docx');
+      const child = makePage('child', {
+        labels: ['engineering'],
+        attachments: [attachment],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([parent]),
+        getDescendantPages: vi.fn().mockResolvedValue([child]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments).toHaveLength(1);
+      expect(result.attachments[0]?.pageId).toBe('child');
+    });
+
+    it('normalizes file extension to lowercase for filtering', async () => {
+      const attachment = makeAttachment('att-1', 'Report.PDF');
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [attachment],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments.map((a) => a.id)).toEqual(['att-1']);
+    });
+
+    it('logs attachment count when attachments are discovered', async () => {
+      const att1 = makeAttachment('att-1', 'a.pdf');
+      const att2 = makeAttachment('att-2', 'b.docx');
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [att1, att2],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      await scanner.discoverPages();
+
+      expect(mockLogger.log).toHaveBeenCalledWith({ count: 2, msg: 'Attachments discovered' });
+    });
   });
 });

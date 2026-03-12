@@ -54,7 +54,7 @@ export class TenantRegistry implements OnModuleInit {
         });
         this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
 
-        const scanner = new ConfluencePageScanner(config.confluence, config.processing, apiClient);
+        const scanner = new ConfluencePageScanner(config.confluence, config.processing, apiClient, config.ingestion.attachments);
         this.serviceRegistry.register(tenantName, ConfluencePageScanner, scanner);
 
         const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient);

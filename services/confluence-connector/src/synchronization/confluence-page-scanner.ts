@@ -1,8 +1,9 @@
 import { Logger } from '@nestjs/common';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
-import type { ConfluencePage } from '../confluence-api';
+import type { AttachmentConfig } from '../config/ingestion.schema';
+import type { ConfluenceAttachment, ConfluencePage } from '../confluence-api';
 import { type ConfluenceApiClient, ContentType } from '../confluence-api';
-import type { DiscoveredPage } from './sync.types';
+import type { DiscoveredAttachment, DiscoveredPage, DiscoveryResult } from './sync.types';
 
 const SKIPPED_CONTENT_TYPES = [
   ContentType.DATABASE,
@@ -18,12 +19,14 @@ export class ConfluencePageScanner {
     private readonly confluenceConfig: ConfluenceConfig,
     private readonly processingConfig: ProcessingConfig,
     private readonly apiClient: ConfluenceApiClient,
+    private readonly attachmentConfig: AttachmentConfig,
   ) {}
 
-  public async discoverPages(): Promise<DiscoveredPage[]> {
+  public async discoverPages(): Promise<DiscoveryResult> {
     const seenPageIds = new Set<string>();
+    const allAttachments: DiscoveredAttachment[] = [];
     const labeledPages = await this.apiClient.searchPagesByLabel();
-    const discoveredPages = this.mapToDiscoveredPages(labeledPages, seenPageIds);
+    const discoveredPages = this.mapToDiscoveredPages(labeledPages, seenPageIds, allAttachments);
 
     const ingestAllRootPageIds = labeledPages
       .filter((page) => this.hasIngestAllLabel(page))
@@ -32,17 +35,21 @@ export class ConfluencePageScanner {
     if (ingestAllRootPageIds.length > 0) {
       // we are fetching descendants on content marked with ai-ingest-all label regardless of the content type
       const descendants = await this.apiClient.getDescendantPages(ingestAllRootPageIds);
-      const mappedDescendantPages = this.mapToDiscoveredPages(descendants, seenPageIds);
+      const mappedDescendantPages = this.mapToDiscoveredPages(descendants, seenPageIds, allAttachments);
       discoveredPages.push(...mappedDescendantPages);
     }
 
     this.logger.log({ count: discoveredPages.length, msg: 'Page discovery completed' });
-    return discoveredPages;
+    if (allAttachments.length > 0) {
+      this.logger.log({ count: allAttachments.length, msg: 'Attachments discovered' });
+    }
+    return { pages: discoveredPages, attachments: allAttachments };
   }
 
   private mapToDiscoveredPages(
     pages: ConfluencePage[],
     seenPageIds: Set<string>,
+    allAttachments: DiscoveredAttachment[],
   ): DiscoveredPage[] {
     const discoveredPages: DiscoveredPage[] = [];
     for (const page of pages) {
@@ -66,6 +73,8 @@ export class ConfluencePageScanner {
 
       seenPageIds.add(page.id);
 
+      const webUrl = this.apiClient.buildPageWebUrl(page);
+
       discoveredPages.push({
         id: page.id,
         title: page.title,
@@ -74,12 +83,81 @@ export class ConfluencePageScanner {
         spaceKey: page.space.key,
         spaceName: page.space.name,
         versionTimestamp: page.version.when,
-        webUrl: this.apiClient.buildPageWebUrl(page),
+        webUrl,
         labels: page.metadata.labels.results.map((label) => label.name),
       });
+
+      if (this.attachmentConfig.enabled && page.children?.attachment) {
+        const attachments = this.extractAttachments(page, webUrl);
+        allAttachments.push(...attachments);
+      }
     }
 
     return discoveredPages;
+  }
+
+  private extractAttachments(page: ConfluencePage, pageWebUrl: string): DiscoveredAttachment[] {
+    const results = page.children?.attachment?.results;
+    if (!results || results.length === 0) {
+      return [];
+    }
+
+    const attachments: DiscoveredAttachment[] = [];
+    for (const attachment of results) {
+      if (!this.isAttachmentAllowed(attachment)) {
+        continue;
+      }
+
+      attachments.push({
+        id: attachment.id,
+        title: attachment.title,
+        mediaType: attachment.extensions.mediaType,
+        fileSize: attachment.extensions.fileSize,
+        downloadPath: attachment._links.download,
+        versionTimestamp: attachment.version?.when,
+        pageId: page.id,
+        spaceId: page.space.id,
+        spaceKey: page.space.key,
+        spaceName: page.space.name,
+        webUrl: pageWebUrl,
+      });
+    }
+
+    return attachments;
+  }
+
+  private isAttachmentAllowed(attachment: ConfluenceAttachment): boolean {
+    if (attachment.extensions.fileSize > this.attachmentConfig.maxFileSizeBytes) {
+      this.logger.debug({
+        attachmentId: attachment.id,
+        title: attachment.title,
+        fileSize: attachment.extensions.fileSize,
+        maxFileSizeBytes: this.attachmentConfig.maxFileSizeBytes,
+        msg: 'Attachment exceeds max file size',
+      });
+      return false;
+    }
+
+    const extension = this.extractExtension(attachment.title);
+    if (!extension || !this.attachmentConfig.allowedExtensions.includes(extension)) {
+      this.logger.debug({
+        attachmentId: attachment.id,
+        title: attachment.title,
+        extension,
+        msg: 'Attachment extension not allowed',
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  private extractExtension(filename: string): string | undefined {
+    const lastDot = filename.lastIndexOf('.');
+    if (lastDot === -1 || lastDot === filename.length - 1) {
+      return undefined;
+    }
+    return filename.slice(lastDot + 1).toLowerCase();
   }
 
   private hasIngestAllLabel(page: ConfluencePage): boolean {

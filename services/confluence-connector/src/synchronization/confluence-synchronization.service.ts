@@ -7,7 +7,7 @@ import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
 import type { ScopeManagementService } from './scope-management.service';
-import type { DiscoveredPage } from './sync.types';
+import type { DiscoveredPage, DiscoveryResult } from './sync.types';
 
 export class ConfluenceSynchronizationService {
   private readonly logger = new Logger(ConfluenceSynchronizationService.name);
@@ -34,7 +34,7 @@ export class ConfluenceSynchronizationService {
 
       const rootScopePath = await this.scopeManagementService.initialize();
 
-      const discoveredPages = await this.scanner.discoverPages();
+      const { pages: discoveredPages } = await this.scanner.discoverPages();
       this.logger.log({ count: discoveredPages.length, msg: 'Discovery completed' });
 
       const diffResult = await this.fileDiffService.computeDiff(discoveredPages);
