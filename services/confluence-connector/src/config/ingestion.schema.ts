@@ -7,7 +7,6 @@ import { EnabledDisabledMode, IngestionMode } from '../constants/ingestion.const
 
 const IngestionModeSchema = z.enum([IngestionMode.Flat]).prefault(IngestionMode.Flat);
 
-const BYTES_PER_MB = 1024 * 1024;
 
 const AttachmentConfigSchema = z.object({
   enabled: z
@@ -47,6 +46,7 @@ export const IngestionConfigSchema = z.object({
   ),
 });
 
+export const BYTES_PER_MB = 1024 * 1024;
+
 export type IngestionConfig = z.infer<typeof IngestionConfigSchema>;
 export type AttachmentConfig = z.infer<typeof AttachmentConfigSchema>;
-export { BYTES_PER_MB };

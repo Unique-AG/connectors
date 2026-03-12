@@ -23,23 +23,22 @@ export class RateLimitedHttpClient {
   }
 
   public async rateLimitedRequest(url: string, headers: Record<string, string>): Promise<unknown> {
-    return await this.limiter.schedule(async () => {
-      const response = await request(url, {
-        method: 'GET',
-        headers,
-        dispatcher: this.dispatcher,
-      });
-
-      await handleErrorStatus(response.statusCode, response.body, url);
-      return response.body.json();
-    });
+    const body = await this.executeRequest(url, headers);
+    return body.json();
   }
 
   public async rateLimitedStreamRequest(
     url: string,
     headers: Record<string, string>,
   ): Promise<Readable> {
-    return await this.limiter.schedule(async () => {
+    return this.executeRequest(url, headers);
+  }
+
+  private async executeRequest(
+    url: string,
+    headers: Record<string, string>,
+  ): Promise<Dispatcher.BodyReadable> {
+    return this.limiter.schedule(async () => {
       const response = await request(url, {
         method: 'GET',
         headers,
