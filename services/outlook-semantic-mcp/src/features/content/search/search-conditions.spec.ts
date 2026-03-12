@@ -41,12 +41,12 @@ describe('buildSearchFilter', () => {
 
   it('passes array value as-is for an array field', () => {
     const result = buildSearchFilter([
-      { fromSenders: { value: ['alice@example.com'], operator: UniqueQLOperator.EQUALS } },
+      { fromSenders: { value: ['alice@example.com'], operator: UniqueQLOperator.IN } },
     ]);
 
     expect(result).toEqual({
       path: ['from.emailAddress'],
-      operator: UniqueQLOperator.EQUALS,
+      operator: UniqueQLOperator.IN,
       value: ['alice@example.com'],
     });
   });
@@ -56,14 +56,14 @@ describe('buildSearchFilter', () => {
       {
         fromSenders: {
           value: ['alice@example.com', 'bob@example.com'],
-          operator: UniqueQLOperator.EQUALS,
+          operator: UniqueQLOperator.IN,
         },
       },
     ]);
 
     expect(result).toEqual({
       path: ['from.emailAddress'],
-      operator: UniqueQLOperator.EQUALS,
+      operator: UniqueQLOperator.IN,
       value: ['alice@example.com', 'bob@example.com'],
     });
   });
@@ -72,7 +72,7 @@ describe('buildSearchFilter', () => {
     const result = buildSearchFilter([
       {
         dateFrom: { value: '2024-01-01', operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL },
-        fromSenders: { value: ['alice@example.com'], operator: UniqueQLOperator.EQUALS },
+        fromSenders: { value: ['alice@example.com'], operator: UniqueQLOperator.IN },
       },
     ]);
 
@@ -85,7 +85,7 @@ describe('buildSearchFilter', () => {
         },
         {
           path: ['from.emailAddress'],
-          operator: UniqueQLOperator.EQUALS,
+          operator: UniqueQLOperator.IN,
           value: ['alice@example.com'],
         },
       ],
@@ -95,7 +95,7 @@ describe('buildSearchFilter', () => {
   it('ORs multiple condition groups', () => {
     const result = buildSearchFilter([
       { dateFrom: { value: '2024-01-01', operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL } },
-      { directories: { value: ['inbox-id'], operator: UniqueQLOperator.EQUALS } },
+      { directories: { value: ['inbox-id'], operator: UniqueQLOperator.IN } },
     ]);
 
     expect(result).toEqual({
@@ -107,7 +107,7 @@ describe('buildSearchFilter', () => {
         },
         {
           path: ['parentFolderId'],
-          operator: UniqueQLOperator.EQUALS,
+          operator: UniqueQLOperator.IN,
           value: ['inbox-id'],
         },
       ],
@@ -117,9 +117,9 @@ describe('buildSearchFilter', () => {
   it('uses correct metadata paths for toRecipients, ccRecipients, and categories', () => {
     const result = buildSearchFilter([
       {
-        toRecipients: { value: ['carol@example.com'], operator: UniqueQLOperator.EQUALS },
-        ccRecipients: { value: ['dave@example.com'], operator: UniqueQLOperator.EQUALS },
-        categories: { value: ['important'], operator: UniqueQLOperator.EQUALS },
+        toRecipients: { value: ['carol@example.com'], operator: UniqueQLOperator.IN },
+        ccRecipients: { value: ['dave@example.com'], operator: UniqueQLOperator.IN },
+        categories: { value: ['important'], operator: UniqueQLOperator.IN },
       },
     ]);
 
@@ -127,17 +127,17 @@ describe('buildSearchFilter', () => {
       and: [
         {
           path: ['toRecipients.emailAddresses'],
-          operator: UniqueQLOperator.EQUALS,
+          operator: UniqueQLOperator.IN,
           value: ['carol@example.com'],
         },
         {
           path: ['ccRecipients.emailAddresses'],
-          operator: UniqueQLOperator.EQUALS,
+          operator: UniqueQLOperator.IN,
           value: ['dave@example.com'],
         },
         {
           path: ['categories'],
-          operator: UniqueQLOperator.EQUALS,
+          operator: UniqueQLOperator.IN,
           value: ['important'],
         },
       ],

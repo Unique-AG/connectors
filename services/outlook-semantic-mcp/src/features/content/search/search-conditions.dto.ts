@@ -2,10 +2,29 @@ import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
 import { first } from 'remeda';
 import { z } from 'zod';
 
-const ConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
+const ArrayConditionFieldSchema = <T extends z.ZodArray>(itemSchema: T) =>
+  z.object({
+    value: itemSchema,
+    operator: z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN]),
+  });
+
+const SingularConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
   z.object({
     value: valueSchema,
-    operator: z.enum(UniqueQLOperator),
+    operator: z.enum([
+      UniqueQLOperator.EQUALS,
+      UniqueQLOperator.NOT_EQUALS,
+      UniqueQLOperator.GREATER_THAN,
+      UniqueQLOperator.GREATER_THAN_OR_EQUAL,
+      UniqueQLOperator.LESS_THAN,
+      UniqueQLOperator.LESS_THAN_OR_EQUAL,
+      UniqueQLOperator.CONTAINS,
+      UniqueQLOperator.NOT_CONTAINS,
+      UniqueQLOperator.IS_NULL,
+      UniqueQLOperator.IS_NOT_NULL,
+      UniqueQLOperator.IS_EMPTY,
+      UniqueQLOperator.IS_NOT_EMPTY,
+    ]),
   });
 
 const EXAMPLE_FOLDER_IDS = {
@@ -17,69 +36,70 @@ const EXAMPLE_FOLDER_IDS = {
     'AQMkADllMDJjNDk0LWNiNmEtNDhlOC04YjA4LWMzNDZlOTkANzlhMmMALgAAA8XAUl8fmjpEkM39lOfyshYBAMjQHeJoK_1Bt2gTZjb69YQAAAIBCgAAAA==',
 };
 
+const emailConditionsSchema = SingularConditionFieldSchema(
+  z
+    .email()
+    .describe(
+      `Sender email address(es) to filter by, e.g. "alice@example.com". Recommended operators: equals, contains`,
+    ),
+)
+  .or(
+    ArrayConditionFieldSchema(z.array(z.email())).describe(
+      'Sender email address(es) to filter by, e.g. ["alice@example.com", "bob@example.com"]. Recommended operators: in, notIn.',
+    ),
+  )
+  .optional();
+
 export const SearchConditionSchema = z
   .object({
-    dateFrom: ConditionFieldSchema(
+    dateFrom: SingularConditionFieldSchema(
       z.iso
         .datetime()
         .describe(
           'Filter emails received on or after this date. ISO 8601 format, e.g. "2024-01-01T00:00:00Z". Recommended operators: greaterThanOrEqual, greaterThan.',
         ),
     ).optional(),
-    dateTo: ConditionFieldSchema(
+    dateTo: SingularConditionFieldSchema(
       z.iso
         .datetime()
         .describe(
           'Filter emails received on or before this date. ISO 8601 format, e.g. "2024-12-31T23:59:59Z". Recommended operators: lessThanOrEqual, lessThan.',
         ),
     ).optional(),
-    fromSenders: ConditionFieldSchema(
-      z
-        .array(z.email())
-        .or(z.email())
-        .describe(
-          'Sender email address(es) to filter by, e.g. "alice@example.com" or ["alice@example.com", "bob@example.com"]. Recommended operators: equals, in.',
-        ),
-    ).optional(),
-    toRecipients: ConditionFieldSchema(
-      z
-        .array(z.email())
-        .or(z.email())
-        .describe(
-          'Recipient email address(es) to filter by, e.g. "carol@example.com" or ["carol@example.com"]. Recommended operators: equals for string parameter, in for array or contains.',
-        ),
-    ).optional(),
-    ccRecipients: ConditionFieldSchema(
-      z
-        .array(z.email())
-        .or(z.email())
-        .describe(
-          'CC email address(es) to filter by, e.g. "carol@example.com" or ["carol@example.com"]. Recommended operators: equals for string parameter, in for array or contains.',
-        ),
-    ).optional(),
-    directories: ConditionFieldSchema(
+    fromSenders: emailConditionsSchema,
+    toRecipients: emailConditionsSchema,
+    ccRecipients: emailConditionsSchema,
+    directories: ArrayConditionFieldSchema(
       z
         .array(z.string())
-        .or(z.string())
         .describe(
-          `Folder ID(s) to filter by, e.g. "${EXAMPLE_FOLDER_IDS.first}" or ["${EXAMPLE_FOLDER_IDS.second}", "${EXAMPLE_FOLDER_IDS.third}"]. Folder ids can be found using \`list_folders\` tool. Recommended operators: equals for string parameter, in for array or contains.`,
+          `Folder ID(s) to filter by, e.g. ["${EXAMPLE_FOLDER_IDS.second}", "${EXAMPLE_FOLDER_IDS.third}"]. Folder ids can be found using \`list_folders\` tool. Recommended operators: in or notIn.`,
         ),
     ).optional(),
-    hasAttachments: ConditionFieldSchema(
+    hasAttachments: SingularConditionFieldSchema(
       z
         .boolean()
         .describe(
-          'Whether the email has attachments, e.g. true or false. Recommended operator: equals.',
+          'Whether the email has attachments, e.g. true or false. Recommended operator: equals, notEquals.',
         ),
     ).optional(),
-    categories: ConditionFieldSchema(
+    categories: SingularConditionFieldSchema(
       z
-        .array(z.string())
-        .or(z.string())
+        .string()
         .describe(
-          `Category label(s) to filter by, e.g. "Important" or ["Important", "Project-X"]. Categories can be found using \`list_categories\` tool. Recommended operators: equals for string parameter, in for array or contains.`,
+          `Category label(s) to filter by, e.g. "Important". Categories can be found using \`list_categories\` tool. Recommended operators: equals or contains.`,
         ),
-    ).optional(),
+    )
+      .or(
+        ArrayConditionFieldSchema(
+          z
+            .array(z.string())
+            .describe(
+              `Category label(s) to filter by, e.g. ["Important", "Project-X"]. Categories can be found using \`list_categories\` tool. Recommended operators: in or notIn.`,
+            ),
+        ),
+      )
+      .optional(),
   })
   .refine((obj) => Object.values(obj).some((v) => v !== undefined), {
     message:
