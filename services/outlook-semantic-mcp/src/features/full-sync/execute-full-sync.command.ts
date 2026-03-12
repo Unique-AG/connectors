@@ -1,6 +1,6 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, SQL, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
@@ -21,6 +21,8 @@ import {
 } from '../mail-ingestion/dtos/microsoft-graph.dtos';
 import { IngestionPriority } from '../mail-ingestion/utils/ingestion-queue.utils';
 import { shouldSkipEmail } from '../mail-ingestion/utils/should-skip-email';
+
+type InboxConfiguration = typeof inboxConfiguration.$inferSelect;
 
 @Injectable()
 export class ExecuteFullSyncCommand {
@@ -98,16 +100,11 @@ export class ExecuteFullSyncCommand {
         nextLink: inboxConfig.fullSyncNextLink,
       });
 
-      await this.db
-        .update(inboxConfiguration)
-        .set({ fullSyncState: 'ready', lastFullSyncRunAt: new Date(), fullSyncNextLink: null })
-        .where(
-          and(
-            eq(inboxConfiguration.userProfileId, userProfileId),
-            eq(inboxConfiguration.fullSyncVersion, version),
-          ),
-        )
-        .execute();
+      await this.updateInboxConfigByVersion(userProfileId, version, {
+        fullSyncState: 'ready',
+        lastFullSyncRunAt: new Date(),
+        fullSyncNextLink: null,
+      });
 
       this.logger.log({ userProfileId, version, msg: 'Full sync completed' });
     } catch (error) {
@@ -117,16 +114,9 @@ export class ExecuteFullSyncCommand {
         userProfileId,
         version,
       });
-      await this.db
-        .update(inboxConfiguration)
-        .set({ fullSyncState: 'failed' })
-        .where(
-          and(
-            eq(inboxConfiguration.userProfileId, userProfileId),
-            eq(inboxConfiguration.fullSyncVersion, version),
-          ),
-        )
-        .execute();
+      await this.updateInboxConfigByVersion(userProfileId, version, {
+        fullSyncState: 'failed',
+      });
     }
   }
 
@@ -152,12 +142,25 @@ export class ExecuteFullSyncCommand {
     let emailsRaw: unknown;
 
     if (nextLink) {
-      // Primary resume path: continue from the exact pagination cursor saved after the last successful batch
-      emailsRaw = await client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get();
-    } else {
+      try {
+        emailsRaw = await client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get();
+      } catch (error) {
+        this.logger.warn({
+          err: error,
+          userProfileId,
+          msg: 'Next link fetch failed, clearing and falling back to fresh fetch',
+        });
+
+        await this.updateInboxConfigByVersion(userProfileId, version, {
+          fullSyncNextLink: null,
+        });
+
+        nextLink = null;
+      }
+    }
+
+    if (!nextLink) {
       let filterExpression = `createdDateTime gt ${filters.ignoredBefore.toISOString()}`;
-      // Fallback resume path: when nextLink is absent (e.g. expired and cleared, or crash before first save),
-      // use the watermark filter to skip already-processed pages
       if (isResume && oldestLastModifiedDateTime) {
         filterExpression += ` and lastModifiedDateTime lte ${oldestLastModifiedDateTime.toISOString()}`;
       }
@@ -215,16 +218,9 @@ export class ExecuteFullSyncCommand {
 
       const currentNextLink = emailResponse['@odata.nextLink'] ?? null;
 
-      await this.db
-        .update(inboxConfiguration)
-        .set({ fullSyncNextLink: currentNextLink })
-        .where(
-          and(
-            eq(inboxConfiguration.userProfileId, userProfileId),
-            eq(inboxConfiguration.fullSyncVersion, version),
-          ),
-        )
-        .execute();
+      await this.updateInboxConfigByVersion(userProfileId, version, {
+        fullSyncNextLink: currentNextLink,
+      });
 
       if (!currentNextLink) {
         break;
@@ -295,14 +291,22 @@ export class ExecuteFullSyncCommand {
     const batchNewestModified = new Date(Math.max(...modifiedDates.map((d) => d.getTime())));
     const batchOldestModified = new Date(Math.min(...modifiedDates.map((d) => d.getTime())));
 
+    return await this.updateInboxConfigByVersion(userProfileId, version, {
+      newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestCreatedDateTime}, '-infinity'::timestamptz), ${batchNewestCreated})`,
+      oldestCreatedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestCreatedDateTime}, 'infinity'::timestamptz), ${batchOldestCreated})`,
+      newestLastModifiedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestLastModifiedDateTime}, '-infinity'::timestamptz), ${batchNewestModified})`,
+      oldestLastModifiedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestLastModifiedDateTime}, 'infinity'::timestamptz), ${batchOldestModified})`,
+    });
+  }
+
+  private async updateInboxConfigByVersion(
+    userProfileId: string,
+    version: string,
+    values: Partial<{ [key in keyof InboxConfiguration]: InboxConfiguration[key] | SQL<unknown> }>,
+  ): Promise<boolean> {
     const result = await this.db
       .update(inboxConfiguration)
-      .set({
-        newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestCreatedDateTime}, '-infinity'::timestamptz), ${batchNewestCreated})`,
-        oldestCreatedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestCreatedDateTime}, 'infinity'::timestamptz), ${batchOldestCreated})`,
-        newestLastModifiedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestLastModifiedDateTime}, '-infinity'::timestamptz), ${batchNewestModified})`,
-        oldestLastModifiedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestLastModifiedDateTime}, 'infinity'::timestamptz), ${batchOldestModified})`,
-      })
+      .set(values)
       .where(
         and(
           eq(inboxConfiguration.userProfileId, userProfileId),
