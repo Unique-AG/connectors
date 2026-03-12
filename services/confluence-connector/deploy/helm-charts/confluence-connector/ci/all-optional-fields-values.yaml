@@ -34,7 +34,7 @@ connectorConfig:
         storeInternally: enabled
         useV1KeyFormat: disabled
         attachments:
-          enabled: true
+          enabled: enabled
           allowedExtensions:
             - pdf
             - docx

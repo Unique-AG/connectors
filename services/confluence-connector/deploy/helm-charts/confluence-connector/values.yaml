@@ -187,8 +187,8 @@ connectorConfig:
         useV1KeyFormat: disabled
         # -- File attachment ingestion configuration (optional, all fields have defaults)
         # attachments:
-        #   # -- Enable attachment ingestion (default: false)
-        #   enabled: false
+        #   # -- Enable attachment ingestion (default: enabled)
+        #   enabled: enabled
         #   # -- File extensions to include (default: pdf, doc, docx, xls, xlsx, pptx, txt, csv, html)
         #   allowedExtensions:
         #     - pdf

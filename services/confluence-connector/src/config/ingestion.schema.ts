@@ -20,8 +20,9 @@ function getMaxFileSizeBytesDefault(): number {
 
 const AttachmentConfigSchema = z.object({
   enabled: z
-    .boolean()
-    .prefault(false)
+    .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+    .prefault(EnabledDisabledMode.Enabled)
+    .transform((v) => v === EnabledDisabledMode.Enabled)
     .describe('Whether to ingest file attachments from Confluence pages'),
   allowedExtensions: z
     .array(z.string().min(1))

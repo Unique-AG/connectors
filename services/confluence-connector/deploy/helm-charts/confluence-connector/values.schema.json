@@ -389,9 +389,10 @@
                     "description": "File attachment ingestion configuration",
                     "properties": {
                       "enabled": {
-                        "type": "boolean",
+                        "type": "string",
+                        "enum": ["enabled", "disabled"],
                         "description": "Enable attachment ingestion",
-                        "default": false
+                        "default": "enabled"
                       },
                       "allowedExtensions": {
                         "type": "array",
