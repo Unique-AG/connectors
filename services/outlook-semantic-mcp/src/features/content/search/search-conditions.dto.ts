@@ -38,12 +38,12 @@ const emailConditionsSchema = SingularConditionFieldSchema(
   z
     .email()
     .describe(
-      `Sender email address(es) to filter by, e.g. "alice@example.com". Recommended operators: equals, contains`,
+      `Sender email address to filter by, e.g. "alice@example.com". Recommended operators: equals, contains`,
     ),
 )
   .or(
     ArrayConditionFieldSchema(z.array(z.email())).describe(
-      'Sender email address(es) to filter by, e.g. ["alice@example.com", "bob@example.com"]. Recommended operators: in, notIn.',
+      'Sender email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Recommended operators: in, notIn.',
     ),
   )
   .optional();
