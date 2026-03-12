@@ -29,6 +29,13 @@ import {
   SharepointDirectoryItem,
 } from './types/sharepoint-content-item.interface';
 
+const SCAN_PROGRESS_LOG_INTERVAL = 100;
+
+interface ScanProgress {
+  filesScanned: number;
+  maxFiles?: number;
+}
+
 @Injectable()
 export class GraphApiService {
   private readonly logger = new Logger(this.constructor.name);
@@ -104,13 +111,15 @@ export class GraphApiService {
     syncColumnName: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
+    const logPrefix = `[Site: ${siteId}]`;
     const sharepointContentFilesToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
-    let totalScanned = 0;
-    const LOG_INTERVAL = 20;
+    const progress: ScanProgress = { filesScanned: 0, maxFiles: maxFilesToScan };
 
-    if (maxFilesToScan) {
-      this.logger.warn(`File scan limit set to ${maxFilesToScan} files for testing purpose.`);
+    if (progress.maxFiles) {
+      this.logger.warn(
+        `${logPrefix} File scan limit set to ${progress.maxFiles} files for testing purpose.`,
+      );
     }
 
     const drives = await this.getDrivesForSite(siteId);
@@ -120,40 +129,27 @@ export class GraphApiService {
         continue;
       }
 
-      const remainingLimit = maxFilesToScan ? maxFilesToScan - totalScanned : undefined;
-      if (remainingLimit !== undefined && remainingLimit <= 0) {
-        this.logger.log(`Reached file scan limit of ${maxFilesToScan}, stopping drive scan`);
-        break;
-      }
-
       const { items, directories } = await this.recursivelyFetchDriveItems(
         drive.id,
         'root',
         siteId,
         drive.name,
         syncColumnName,
-        remainingLimit,
+        progress,
       );
 
       sharepointContentFilesToSync.push(...items);
       sharepointDirectoryItemsToSync.push(...directories);
-      totalScanned += items.length;
 
-      // Log progress every 20 files
-      if (totalScanned % LOG_INTERVAL === 0) {
-        this.logger.log(
-          `Scanning in progress for site ${siteId}: ${totalScanned} files scanned so far`,
+      if (progress.maxFiles && progress.filesScanned >= progress.maxFiles) {
+        this.logger.warn(
+          `${logPrefix} Reached file scan limit of ${progress.maxFiles}, stopping scan`,
         );
-      }
-
-      // Stop scanning if we've reached the limit for testing
-      if (maxFilesToScan && totalScanned >= maxFilesToScan) {
-        this.logger.log(`Reached file scan limit of ${maxFilesToScan}, stopping scan`);
         break;
       }
     }
 
-    this.logger.log(`Found ${sharepointContentFilesToSync.length} drive files for site ${siteId}`);
+    this.logger.log(`${logPrefix} Found ${sharepointContentFilesToSync.length} drive files`);
     return { items: sharepointContentFilesToSync, directories: sharepointDirectoryItemsToSync };
   }
 
@@ -510,8 +506,10 @@ export class GraphApiService {
     siteId: Smeared,
     driveName: string,
     syncColumnName: string,
-    maxFiles?: number,
+    progress: ScanProgress,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
+    const logPrefix = `[Site: ${siteId}][Drive: ${driveId}]`;
+    const smearedDriveName = createSmeared(driveName);
     const sharepointContentItemsToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
     try {
@@ -519,24 +517,18 @@ export class GraphApiService {
 
       for (const driveItem of allItems) {
         // Check if we've reached the file limit for local testing
-        if (maxFiles && sharepointContentItemsToSync.length >= maxFiles) {
-          this.logger.warn(
-            `Reached file limit of ${maxFiles}, stopping scan in drive ${driveId}, item ${itemId} for site ${siteId}`,
-          );
+        if (progress.maxFiles && progress.filesScanned >= progress.maxFiles) {
           break;
         }
 
         if (this.isFolder(driveItem)) {
-          const remainingLimit = maxFiles
-            ? maxFiles - sharepointContentItemsToSync.length
-            : undefined;
           const { items, directories } = await this.recursivelyFetchDriveItems(
             driveId,
             driveItem.id,
             siteId,
             driveName,
             syncColumnName,
-            remainingLimit,
+            progress,
           );
 
           // We simply do not care about subtree of the site that contains no files to sync.
@@ -566,21 +558,26 @@ export class GraphApiService {
             folderPath,
             fileName: driveItem.name,
           });
+
+          progress.filesScanned++;
+          if (progress.filesScanned % SCAN_PROGRESS_LOG_INTERVAL === 0) {
+            this.logger.log(
+              `${logPrefix} Scanning drive "${smearedDriveName}", ${progress.filesScanned} files found so far for site`,
+            );
+          }
         }
       }
 
       return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
     } catch (error) {
       this.logger.error({
-        msg: 'Failed to fetch items for drive',
+        msg: `${logPrefix} Failed to fetch items`,
         driveId,
         itemId,
         error: sanitizeError(error),
       });
 
-      this.logger.warn(
-        `Continuing scan with results collected so far from drive ${driveId}, item ${itemId} for site ${siteId}`,
-      );
+      this.logger.warn(`${logPrefix} Continuing scan with results collected so far`);
       return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
     }
   }
