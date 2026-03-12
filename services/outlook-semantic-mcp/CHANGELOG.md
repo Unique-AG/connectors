@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.8](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.7...outlook-semantic-mcp@0.2.8) (2026-03-12)
+
+
+### Features
+
+* **outlook-semantic-mcp,unique-api,deps,mcp-server-module,aes-gcm-encryption:** add support for inbox filtering, add inbox sync progress ([#343](https://github.com/Unique-AG/connectors/issues/343)) ([0591a3a](https://github.com/Unique-AG/connectors/commit/0591a3a7ec7afff5847964482eb132d7c94d57b1))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** fix equals operator, describe search fields better for the llm ([#349](https://github.com/Unique-AG/connectors/issues/349)) ([29702ce](https://github.com/Unique-AG/connectors/commit/29702ce5a485ecb8d09c2c2d8ea45cb87f4f24e6))
+
 ## [0.2.7](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.6...outlook-semantic-mcp@0.2.7) (2026-03-06)
 
 
