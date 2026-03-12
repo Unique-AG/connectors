@@ -91,7 +91,7 @@ export class FullSyncCommand {
       this.logger.error({
         err: error,
         msg: `Failed to run full sync`,
-        userPrfileId: userProfile.id,
+        userProfileId: userProfile.id,
         userEmail,
         subscriptionId,
       });
