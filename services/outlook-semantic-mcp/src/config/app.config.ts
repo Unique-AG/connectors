@@ -25,6 +25,9 @@ const ConfigSchema = z
     defaultMailFilters: json(inboxConfigurationMailFilters).describe(
       'Default mail filters applied when syncing emails (e.g. {"ignoredBefore":"2024-01-01", "ignoredSenders": [], "ignoredContents": [] }). ',
     ),
+    mcpDebugMode: enabledDisabledBoolean(
+      `Enables debug mode. In debug mode tools responses contain debugging data.`,
+    ),
     globalScopeAccess: json(
       z.object({
         entityId: z.string().describe(`The id of the entity which will get scope access`),
@@ -48,6 +51,7 @@ export const appConfig = registerConfig('app', ConfigSchema, {
     'SELF_URL',
     'DEFAULT_MAIL_FILTERS',
     'GLOBAL_SCOPE_ACCESS',
+    'TOOLS_DEBUGGING',
   ]),
 });
 

@@ -5,7 +5,8 @@ import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { omit, sumBy, values } from 'remeda';
 import z from 'zod';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration, UserProfile } from '~/db';
+import { AppConfig, appConfig } from '~/config';
+import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions, UserProfile } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
@@ -57,6 +58,13 @@ export const GetFullSyncStatsResponse = z.object({
     })
     .nullable(),
   ingestionStats: ingestionStats.nullable(),
+  debugData: z
+    .object({
+      providerUserId: z.string().nullable().optional(),
+      userProfileId: z.string().nullable().optional(),
+      subscriptionId: z.string().nullable().optional(),
+    })
+    .optional(),
 });
 
 type FullSyncStats = z.infer<typeof GetFullSyncStatsResponse>;
@@ -102,6 +110,7 @@ export class GetFullSyncStatsQuery {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
     private getUserProfileQuery: GetUserProfileQuery,
   ) {}
 
@@ -110,6 +119,9 @@ export class GetFullSyncStatsQuery {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const inboxConfig = await this.db.query.inboxConfiguration.findFirst({
       where: eq(inboxConfiguration.userProfileId, userProfile.id),
+    });
+    const subscription = await this.db.query.subscriptions.findFirst({
+      where: eq(subscriptions.userProfileId, userProfile.id),
     });
     if (!inboxConfig) {
       return {
@@ -145,6 +157,11 @@ export class GetFullSyncStatsQuery {
       };
     }
     const filters = inboxConfigurationMailFilters.parse(inboxConfig.filters);
+    const debugData = {
+      providerUserId: userProfile.providerUserId,
+      userProfileId: userProfile.id,
+      subscriptionId: subscription?.id,
+    };
 
     const syncStats = {
       fullSyncState: inboxConfig.fullSyncState,
@@ -170,9 +187,10 @@ export class GetFullSyncStatsQuery {
       ingestionResult.inProgress > 0;
 
     return {
-      message: ``,
+      message: `Stats retrieved succesfully`,
       ingestionStats: ingestionResult,
       syncStats,
+      debugData: this.config.mcpDebugMode ? debugData : undefined,
       state: isRunning ? 'running' : 'finished',
     };
   }
