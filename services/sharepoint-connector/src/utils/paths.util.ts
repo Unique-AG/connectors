@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { createSmeared } from './smeared';
 
 export const normalizeSlashes = (value: string): string => {
   // 1. Remove leading/trailing whitespace
@@ -21,6 +22,7 @@ export interface SitePathInfo {
 }
 
 export function extractSitePathInfoFromWebUrl(webUrl: string): SitePathInfo {
+  const logWebUrl = createSmeared(webUrl);
   const { pathname } = new URL(webUrl);
   for (const managedPath of MANAGED_PATHS) {
     const prefix = `/${managedPath}/`;
@@ -28,12 +30,11 @@ export function extractSitePathInfoFromWebUrl(webUrl: string): SitePathInfo {
       continue;
     }
 
-    return {
-      managedPath,
-      siteName: normalizeSlashes(decodeURIComponent(pathname.substring(prefix.length))),
-    };
+    const siteName = normalizeSlashes(decodeURIComponent(pathname.substring(prefix.length)));
+    assert.ok(siteName, `Site path info extraction failed: empty site name in ${logWebUrl}`);
+    return { managedPath, siteName };
   }
-  assert.fail(`Site name not found in URL: no /sites/ or /teams/ prefix in ${webUrl}`);
+  assert.fail(`Site path info extraction failed: no /sites/ or /teams/ prefix in ${logWebUrl}`);
 }
 
 export function extractSiteNameFromWebUrl(webUrl: string): string {

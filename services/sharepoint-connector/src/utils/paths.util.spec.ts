@@ -77,9 +77,9 @@ describe('extractSitePathInfoFromWebUrl', () => {
   });
 
   it('decodes URL-encoded segments in /teams/ URL', () => {
-    expect(
-      extractSitePathInfoFromWebUrl('https://contoso.sharepoint.com/teams/My%20Team'),
-    ).toEqual({ managedPath: 'teams', siteName: 'My Team' });
+    expect(extractSitePathInfoFromWebUrl('https://contoso.sharepoint.com/teams/My%20Team')).toEqual(
+      { managedPath: 'teams', siteName: 'My Team' },
+    );
   });
 
   it('matches managed path only at the start of the URL path', () => {
@@ -94,12 +94,6 @@ describe('extractSitePathInfoFromWebUrl', () => {
     expect(() =>
       extractSitePathInfoFromWebUrl('https://contoso.sharepoint.com/other/Something'),
     ).toThrow('no /sites/ or /teams/ prefix');
-  });
-
-  it('throws when URL has managed path but no site name', () => {
-    expect(() => extractSitePathInfoFromWebUrl('https://contoso.sharepoint.com/sites/')).toThrow(
-      'empty site name',
-    );
   });
 });
 

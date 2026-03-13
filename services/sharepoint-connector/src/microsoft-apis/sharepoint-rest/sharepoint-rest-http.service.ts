@@ -7,7 +7,7 @@ import { Dispatcher, interceptors } from 'undici';
 import { Config } from '../../config';
 import { ProxyService } from '../../proxy';
 import { shouldConcealLogs } from '../../utils/logging.util';
-import { type ManagedPath, encodeSiteNameForPath } from '../../utils/paths.util';
+import { encodeSiteNameForPath, type ManagedPath } from '../../utils/paths.util';
 import type { Smeared } from '../../utils/smeared';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { createLoggingInterceptor } from './logging.interceptor';
