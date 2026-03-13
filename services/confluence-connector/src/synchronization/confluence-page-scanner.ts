@@ -118,7 +118,7 @@ export class ConfluencePageScanner {
       const webUrl = this.apiClient.buildPageWebUrl(page);
 
       for (const attachment of results) {
-        if (remainingCapacity !== undefined && remainingCapacity <= 0) {
+        if (remainingCapacity <= 0) {
           return allAttachments;
         }
 
@@ -140,9 +140,7 @@ export class ConfluencePageScanner {
           webUrl,
         });
 
-        if (remainingCapacity !== undefined) {
-          remainingCapacity--;
-        }
+        remainingCapacity--;
       }
     }
 
@@ -202,10 +200,10 @@ export class ConfluencePageScanner {
     return false;
   }
 
-  private remainingCapacity(currentCount: number): number | undefined {
+  private remainingCapacity(currentCount: number): number {
     const limit = this.processingConfig.maxItemsToScan;
     if (limit === undefined) {
-      return undefined;
+      return Infinity;
     }
     return Math.max(0, limit - currentCount);
   }
