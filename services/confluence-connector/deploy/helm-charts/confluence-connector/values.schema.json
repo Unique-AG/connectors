@@ -400,7 +400,7 @@
                           "type": "string"
                         },
                         "description": "File extensions to include when ingesting attachments",
-                        "default": ["pdf", "doc", "docx", "xls", "xlsx", "pptx", "txt", "csv", "html"]
+                        "default": ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv", "html"]
                       },
                       "maxFileSizeMb": {
                         "type": "integer",
