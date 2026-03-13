@@ -1,5 +1,6 @@
 import { createSmeared } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
+import { uniqueBy } from 'remeda';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
 import { type AttachmentConfig, BYTES_PER_MB } from '../config/ingestion.schema';
 import type { ConfluenceAttachment, ConfluencePage } from '../confluence-api';
@@ -24,47 +25,47 @@ export class ConfluencePageScanner {
   ) {}
 
   public async discoverPages(): Promise<DiscoveryResult> {
-    const seenPageIds = new Set<string>();
-    const allRawPages: ConfluencePage[] = [];
+    const pagesLabeledForIngestion = await this.apiClient.searchPagesByLabel();
 
-    const labeledPages = await this.apiClient.searchPagesByLabel();
-    allRawPages.push(...labeledPages);
-    const discoveredPages = this.mapToDiscoveredPages(labeledPages, seenPageIds);
-
-    const ingestAllRootPageIds = labeledPages
+    const pageIdsLabeledWithIngestAll = pagesLabeledForIngestion
       .filter((page) => this.hasIngestAllLabel(page))
       .map((page) => page.id);
 
-    if (ingestAllRootPageIds.length > 0) {
-      const descendants = await this.apiClient.getDescendantPages(ingestAllRootPageIds);
-      allRawPages.push(...descendants);
-      discoveredPages.push(...this.mapToDiscoveredPages(descendants, seenPageIds));
+    let descendantPages: ConfluencePage[] = [];
+    if (pageIdsLabeledWithIngestAll.length > 0) {
+      descendantPages = await this.apiClient.getDescendantPages(pageIdsLabeledWithIngestAll);
     }
 
-    this.logger.log({ count: discoveredPages.length, msg: 'Page discovery completed' });
+    const allUniquePages = uniqueBy([...pagesLabeledForIngestion, ...descendantPages], (p) => p.id);
+    const discoveredPagesForIngestion = this.mapToDiscoveredPages(allUniquePages);
+
+    this.logger.log({ count: discoveredPagesForIngestion.length, msg: 'Page discovery completed' });
 
     // Attachments are already present on page objects from the expand=children.attachment
     // parameter in searchPagesByLabel/getDescendantPages. We just extract and filter them here.
-    const filteredRawPages = allRawPages.filter((p) => seenPageIds.has(p.id));
-    const attachments = this.attachmentConfig.mode
-      ? this.extractDiscoveredAttachments(filteredRawPages)
-      : [];
+    const acceptedPageIds = new Set(discoveredPagesForIngestion.map((p) => p.id));
+    const acceptedRawPages = allUniquePages.filter((p) => acceptedPageIds.has(p.id));
 
+    let discoveredAttachments: DiscoveredAttachment[] = [];
     if (this.attachmentConfig.mode) {
-      this.logger.log({ count: attachments.length, msg: 'Attachment discovery completed' });
+      discoveredAttachments = this.extractDiscoveredAttachments(
+        acceptedRawPages,
+        discoveredPagesForIngestion.length,
+      );
+      this.logger.log({
+        count: discoveredAttachments.length,
+        msg: 'Attachment discovery completed',
+      });
     }
 
-    return { pages: discoveredPages, attachments };
+    return { pages: discoveredPagesForIngestion, attachments: discoveredAttachments };
   }
 
-  private mapToDiscoveredPages(
-    pages: ConfluencePage[],
-    seenPageIds: Set<string>,
-  ): DiscoveredPage[] {
+  private mapToDiscoveredPages(pages: ConfluencePage[]): DiscoveredPage[] {
     const discoveredPages: DiscoveredPage[] = [];
 
     for (const page of pages) {
-      if (this.isLimitReached(seenPageIds.size)) {
+      if (this.isLimitReached(discoveredPages.length)) {
         break;
       }
 
@@ -77,12 +78,6 @@ export class ConfluencePageScanner {
         });
         continue;
       }
-
-      if (seenPageIds.has(page.id)) {
-        continue;
-      }
-
-      seenPageIds.add(page.id);
 
       discoveredPages.push({
         id: page.id,
@@ -105,9 +100,12 @@ export class ConfluencePageScanner {
    * contain attachment data from the `expand=children.attachment` parameter —
    * no additional API requests are made here.
    */
-  private extractDiscoveredAttachments(rawPages: ConfluencePage[]): DiscoveredAttachment[] {
+  private extractDiscoveredAttachments(
+    rawPages: ConfluencePage[],
+    acceptedPageCount: number,
+  ): DiscoveredAttachment[] {
     const allAttachments: DiscoveredAttachment[] = [];
-    let remainingCapacity = this.remainingCapacity(rawPages.length);
+    let remainingCapacity = this.remainingCapacity(acceptedPageCount);
 
     for (const page of rawPages) {
       const results = page.children?.attachment?.results;
