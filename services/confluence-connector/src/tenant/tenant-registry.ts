@@ -49,10 +49,17 @@ export class TenantRegistry implements OnModuleInit {
           ConfluenceAuth,
           this.confluenceAuthFactory.createAuthStrategy(config.confluence),
         );
-        const apiClient = this.confluenceApiClientFactory.create(config.confluence);
+        const apiClient = this.confluenceApiClientFactory.create(config.confluence, {
+          attachmentsEnabled: config.ingestion.attachments.mode,
+        });
         this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
 
-        const scanner = new ConfluencePageScanner(config.confluence, config.processing, apiClient);
+        const scanner = new ConfluencePageScanner(
+          config.confluence,
+          config.processing,
+          apiClient,
+          config.ingestion.attachments,
+        );
         this.serviceRegistry.register(tenantName, ConfluencePageScanner, scanner);
 
         const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient);
@@ -90,7 +97,7 @@ export class TenantRegistry implements OnModuleInit {
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
 
-        const ingestionService = new IngestionService(config, tenantName, uniqueClient);
+        const ingestionService = new IngestionService(config, tenantName, uniqueClient, apiClient);
         this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
 
         const confluenceSynchronizationService = new ConfluenceSynchronizationService(

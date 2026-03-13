@@ -13,11 +13,35 @@ export interface DiscoveredPage {
   labels: string[];
 }
 
+export interface DiscoveredAttachment {
+  id: string;
+  title: string;
+  mediaType: string;
+  fileSize: number;
+  downloadPath: string;
+  versionTimestamp: string | undefined;
+  pageId: string;
+  spaceId: string;
+  spaceKey: string;
+  spaceName: string;
+  webUrl: string;
+}
+
+export interface DiscoveryResult {
+  pages: DiscoveredPage[];
+  attachments: DiscoveredAttachment[];
+}
+
+export interface DeletedItem {
+  id: string;
+  partialKey: string;
+}
+
 export interface FileDiffResult {
-  newPageIds: string[];
-  updatedPageIds: string[];
-  deletedPageIds: string[];
-  movedPageIds: string[];
+  newItemIds: string[];
+  updatedItemIds: string[];
+  movedItemIds: string[];
+  deletedItems: DeletedItem[];
 }
 
 export interface FetchedPage {

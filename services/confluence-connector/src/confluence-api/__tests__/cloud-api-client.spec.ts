@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import type { RateLimitedHttpClient } from '../../utils/rate-limited-http-client';
@@ -12,6 +13,7 @@ const mockAuth = { acquireToken: vi.fn().mockResolvedValue('cloud-token') };
 
 const mockHttpClient = {
   rateLimitedRequest: vi.fn(),
+  rateLimitedStreamRequest: vi.fn(),
 } as unknown as RateLimitedHttpClient;
 
 const mockConfig: ConfluenceConfig = {
@@ -237,6 +239,220 @@ describe('CloudConfluenceApiClient', () => {
       const url = client.buildPageWebUrl(page);
 
       expect(url).toBe(`${BASE_URL}/wiki/spaces/SP/pages/100/Test+Page`);
+    });
+  });
+
+  describe('attachmentsEnabled option', () => {
+    it('includes attachment expand fields when attachmentsEnabled is true', async () => {
+      const clientWithAttachments = new CloudConfluenceApiClient(
+        mockConfig as never,
+        mockAuth as never,
+        mockHttpClient,
+        { attachmentsEnabled: true },
+      );
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
+
+      await clientWithAttachments.searchPagesByLabel();
+
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
+      expect(url).toContain('children.attachment');
+      expect(url).toContain('children.attachment.version');
+      expect(url).toContain('children.attachment.extensions');
+    });
+
+    it('excludes attachment expand fields when attachmentsEnabled is false', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
+
+      await client.searchPagesByLabel();
+
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
+      expect(url).not.toContain('children.attachment');
+    });
+  });
+
+  describe('fetchMoreAttachments', () => {
+    it('uses v2 API to fetch all attachments when page has more than initial limit', async () => {
+      const clientWithAttachments = new CloudConfluenceApiClient(
+        mockConfig as never,
+        mockAuth as never,
+        mockHttpClient,
+        { attachmentsEnabled: true },
+      );
+
+      const pageWithPaginatedAttachments = makePage({
+        children: {
+          attachment: {
+            results: [
+              {
+                id: 'att-1',
+                title: 'a.pdf',
+                extensions: { mediaType: 'application/pdf', fileSize: 100 },
+                version: { when: '2024-01-01' },
+                _links: { download: '/d/a.pdf' },
+              },
+            ],
+            size: 25,
+            limit: 25,
+            _links: { next: '/rest/api/content/100/child/attachment?start=25&limit=25' },
+          },
+        },
+      });
+
+      vi.mocked(mockHttpClient.rateLimitedRequest)
+        .mockResolvedValueOnce({
+          results: [pageWithPaginatedAttachments],
+          _links: {},
+        })
+        .mockResolvedValueOnce({
+          results: [
+            {
+              id: 'att-1',
+              title: 'a.pdf',
+              mediaType: 'application/pdf',
+              fileSize: 100,
+              downloadLink: '/d/a.pdf',
+              version: { createdAt: '2024-01-01' },
+            },
+            {
+              id: 'att-2',
+              title: 'b.pdf',
+              mediaType: 'application/pdf',
+              fileSize: 200,
+              downloadLink: '/d/b.pdf',
+              version: { createdAt: '2024-01-02' },
+            },
+          ],
+          _links: {},
+        });
+
+      const pages = await clientWithAttachments.searchPagesByLabel();
+
+      expect(pages[0]?.children?.attachment?.results).toHaveLength(2);
+      expect(pages[0]?.children?.attachment?.results[0]?.id).toBe('att-1');
+      expect(pages[0]?.children?.attachment?.results[1]?.id).toBe('att-2');
+      const v2Url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[1]?.[0] as string;
+      expect(v2Url).toContain(`${API_BASE_URL}/wiki/api/v2/pages/100/attachments`);
+    });
+
+    it('maps v2 response to v1 attachment shape', async () => {
+      const clientWithAttachments = new CloudConfluenceApiClient(
+        mockConfig as never,
+        mockAuth as never,
+        mockHttpClient,
+        { attachmentsEnabled: true },
+      );
+
+      const page = makePage({
+        children: {
+          attachment: {
+            results: [],
+            size: 30,
+            limit: 25,
+            _links: { next: '/rest/api/content/100/child/attachment?start=25' },
+          },
+        },
+      });
+
+      vi.mocked(mockHttpClient.rateLimitedRequest)
+        .mockResolvedValueOnce({ results: [page], _links: {} })
+        .mockResolvedValueOnce({
+          results: [
+            {
+              id: 'att-v2',
+              title: 'doc.pdf',
+              mediaType: 'application/pdf',
+              fileSize: 5000,
+              downloadLink: '/download/doc.pdf',
+              version: { createdAt: '2024-06-15T10:00:00Z' },
+            },
+          ],
+          _links: {},
+        });
+
+      const pages = await clientWithAttachments.searchPagesByLabel();
+      const attachment = pages[0]?.children?.attachment?.results[0];
+
+      expect(attachment).toEqual({
+        id: 'att-v2',
+        title: 'doc.pdf',
+        extensions: { mediaType: 'application/pdf', fileSize: 5000 },
+        version: { when: '2024-06-15T10:00:00Z' },
+        _links: { download: '/download/doc.pdf' },
+      });
+    });
+
+    it('does not fetch remaining attachments when size < limit', async () => {
+      const clientWithAttachments = new CloudConfluenceApiClient(
+        mockConfig as never,
+        mockAuth as never,
+        mockHttpClient,
+        { attachmentsEnabled: true },
+      );
+
+      const pageWithFewAttachments = makePage({
+        children: {
+          attachment: {
+            results: [
+              {
+                id: 'att-1',
+                title: 'a.pdf',
+                extensions: { mediaType: 'application/pdf', fileSize: 100 },
+                version: { when: '2024-01-01' },
+                _links: { download: '/d/a.pdf' },
+              },
+            ],
+            size: 1,
+            limit: 25,
+            _links: {},
+          },
+        },
+      });
+
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [pageWithFewAttachments],
+        _links: {},
+      });
+
+      await clientWithAttachments.searchPagesByLabel();
+
+      expect(mockHttpClient.rateLimitedRequest).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getAttachmentDownloadStream', () => {
+    it('builds v1 REST API download URL with pageId and attachmentId', async () => {
+      const mockStream = new Readable({ read() {} });
+      vi.mocked(mockHttpClient.rateLimitedStreamRequest).mockResolvedValueOnce(mockStream);
+
+      await client.getAttachmentDownloadStream(
+        'att456',
+        '123',
+        '/download/attachments/123/report.pdf?version=1&api=v2',
+      );
+
+      expect(mockHttpClient.rateLimitedStreamRequest).toHaveBeenCalledWith(
+        `${API_BASE_URL}/wiki/rest/api/content/123/child/attachment/att456/download`,
+        { Authorization: 'Bearer cloud-token' },
+      );
+    });
+
+    it('returns the stream from the HTTP client', async () => {
+      const mockStream = new Readable({ read() {} });
+      vi.mocked(mockHttpClient.rateLimitedStreamRequest).mockResolvedValueOnce(mockStream);
+
+      const result = await client.getAttachmentDownloadStream(
+        'att789',
+        '123',
+        '/download/attachments/123/file.txt',
+      );
+
+      expect(result).toBe(mockStream);
     });
   });
 });

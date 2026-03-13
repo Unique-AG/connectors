@@ -5,7 +5,7 @@ import type { ConfluenceConfig } from '../../config';
 import { ContentType } from '../../confluence-api/types/confluence-api.types';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { FileDiffService } from '../file-diff.service';
-import type { DiscoveredPage } from '../sync.types';
+import type { DiscoveredAttachment, DiscoveredPage } from '../sync.types';
 
 const TENANT_NAME = 'test-tenant';
 
@@ -19,6 +19,20 @@ const basePage: DiscoveredPage = {
   versionTimestamp: '2026-02-01T00:00:00.000Z',
   webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1`,
   labels: ['ai-ingest'],
+};
+
+const baseAttachment: DiscoveredAttachment = {
+  id: 'att-1',
+  title: 'file.pdf',
+  mediaType: 'application/pdf',
+  fileSize: 1024,
+  downloadPath: '/download/attachments/p-1/file.pdf',
+  versionTimestamp: '2026-02-01T00:00:00.000Z',
+  pageId: 'p-1',
+  spaceId: 'space-1',
+  spaceKey: 'SP',
+  spaceName: 'Space',
+  webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/file.pdf`,
 };
 
 const emptyDiffResponse = {
@@ -66,17 +80,17 @@ function makeService(
 
 describe('FileDiffService', () => {
   describe('computeDiff', () => {
-    it('returns empty result when no pages are provided', async () => {
+    it('returns empty result when no pages or attachments are provided', async () => {
       const { service, performFileDiff } = makeService(async () => emptyDiffResponse);
 
-      const result = await service.computeDiff([]);
+      const result = await service.computeDiff([], []);
 
       expect(performFileDiff).not.toHaveBeenCalled();
       expect(result).toEqual({
-        newPageIds: [],
-        updatedPageIds: [],
-        deletedPageIds: [],
-        movedPageIds: [],
+        newItemIds: [],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
       });
     });
 
@@ -86,7 +100,7 @@ describe('FileDiffService', () => {
         newFiles: ['p-1'],
       }));
 
-      const result = await service.computeDiff([basePage]);
+      const result = await service.computeDiff([basePage], []);
 
       expect(performFileDiff).toHaveBeenCalledWith(
         [{ key: 'p-1', url: basePage.webUrl, updatedAt: basePage.versionTimestamp }],
@@ -95,36 +109,44 @@ describe('FileDiffService', () => {
         CONFLUENCE_BASE_URL,
       );
       expect(result).toEqual({
-        newPageIds: ['p-1'],
-        updatedPageIds: [],
-        deletedPageIds: [],
-        movedPageIds: [],
+        newItemIds: ['p-1'],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
       });
     });
 
-    it('returns categorized ids from file diff response', async () => {
-      const { service } = makeService(
-        async () => ({
-          newFiles: ['p-1', 'p-1_file.pdf'],
-          updatedFiles: ['p-2'],
-          deletedFiles: ['p-3', 'p-3_old.pdf'],
-          movedFiles: ['p-4', 'p-4_new.pdf'],
-        }),
-        { totalFilesInUnique: 10 },
+    it('includes both page and attachment ids in result arrays', async () => {
+      const { service } = makeService(async () => ({
+        newFiles: ['p-1', 'att-1'],
+        updatedFiles: ['p-2', 'att-2'],
+        deletedFiles: ['p-3', 'att-3'],
+        movedFiles: ['p-4', 'att-4'],
+      }));
+
+      const result = await service.computeDiff(
+        [
+          basePage,
+          { ...basePage, id: 'p-2' },
+          { ...basePage, id: 'p-3' },
+          { ...basePage, id: 'p-4' },
+        ],
+        [
+          baseAttachment,
+          { ...baseAttachment, id: 'att-2', pageId: 'p-2' },
+          { ...baseAttachment, id: 'att-3', pageId: 'p-3' },
+          { ...baseAttachment, id: 'att-4', pageId: 'p-4' },
+        ],
       );
 
-      const result = await service.computeDiff([
-        basePage,
-        { ...basePage, id: 'p-2' },
-        { ...basePage, id: 'p-3' },
-        { ...basePage, id: 'p-4' },
-      ]);
-
       expect(result).toEqual({
-        newPageIds: ['p-1', 'p-1_file.pdf'],
-        updatedPageIds: ['p-2'],
-        deletedPageIds: ['p-3', 'p-3_old.pdf'],
-        movedPageIds: ['p-4', 'p-4_new.pdf'],
+        newItemIds: ['p-1', 'att-1'],
+        updatedItemIds: ['p-2', 'att-2'],
+        deletedItems: [
+          { id: 'p-3', partialKey: 'test-tenant/space-1_SP' },
+          { id: 'att-3', partialKey: 'test-tenant/space-1_SP' },
+        ],
+        movedItemIds: ['p-4', 'att-4'],
       });
     });
 
@@ -134,7 +156,7 @@ describe('FileDiffService', () => {
       const pageInSpaceA = { ...basePage, spaceId: 'sa-id', spaceKey: 'SA' };
       const pageInSpaceB = { ...basePage, id: 'p-2', spaceId: 'sb-id', spaceKey: 'SB' };
 
-      await service.computeDiff([pageInSpaceA, pageInSpaceB]);
+      await service.computeDiff([pageInSpaceA, pageInSpaceB], []);
 
       expect(performFileDiff).toHaveBeenCalledTimes(2);
       expect(performFileDiff).toHaveBeenCalledWith(
@@ -165,17 +187,20 @@ describe('FileDiffService', () => {
         { totalFilesInUnique: 5 },
       );
 
-      const result = await service.computeDiff([
-        { ...basePage, spaceKey: 'SA', spaceId: 'sa-id' },
-        { ...basePage, id: 'p-2', spaceKey: 'SB', spaceId: 'sb-id' },
-        { ...basePage, id: 'p-3', spaceKey: 'SB', spaceId: 'sb-id' },
-      ]);
+      const result = await service.computeDiff(
+        [
+          { ...basePage, spaceKey: 'SA', spaceId: 'sa-id' },
+          { ...basePage, id: 'p-2', spaceKey: 'SB', spaceId: 'sb-id' },
+          { ...basePage, id: 'p-3', spaceKey: 'SB', spaceId: 'sb-id' },
+        ],
+        [],
+      );
 
       expect(result).toEqual({
-        newPageIds: ['p-1', 'p-2'],
-        updatedPageIds: ['p-3'],
-        deletedPageIds: ['p-old'],
-        movedPageIds: [],
+        newItemIds: ['p-1', 'p-2'],
+        updatedItemIds: ['p-3'],
+        deletedItems: [{ id: 'p-old', partialKey: 'test-tenant/sa-id_SA' }],
+        movedItemIds: [],
       });
     });
 
@@ -184,7 +209,7 @@ describe('FileDiffService', () => {
         useV1KeyFormat: true,
       });
 
-      await service.computeDiff([basePage]);
+      await service.computeDiff([basePage], []);
 
       expect(performFileDiff).toHaveBeenCalledWith(
         expect.anything(),
@@ -199,12 +224,105 @@ describe('FileDiffService', () => {
         instanceType: 'data-center',
       });
 
-      await service.computeDiff([basePage]);
+      await service.computeDiff([basePage], []);
 
       expect(performFileDiff).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
         'ATLASSIAN_CONFLUENCE_ONPREM',
+        expect.anything(),
+      );
+    });
+
+    it('includes attachment diff items alongside page diff items', async () => {
+      const { service, performFileDiff } = makeService(async () => ({
+        ...emptyDiffResponse,
+        newFiles: ['p-1', 'att-1'],
+      }));
+
+      await service.computeDiff([basePage], [baseAttachment]);
+
+      expect(performFileDiff).toHaveBeenCalledWith(
+        [
+          { key: 'p-1', url: basePage.webUrl, updatedAt: basePage.versionTimestamp },
+          { key: 'att-1', url: baseAttachment.webUrl, updatedAt: baseAttachment.versionTimestamp },
+        ],
+        `${TENANT_NAME}/space-1_SP`,
+        'ATLASSIAN_CONFLUENCE_CLOUD',
+        CONFLUENCE_BASE_URL,
+      );
+    });
+
+    it('uses empty string for attachment updatedAt when versionTimestamp is undefined', async () => {
+      const { service, performFileDiff } = makeService(async () => emptyDiffResponse);
+
+      const attachment: DiscoveredAttachment = {
+        ...baseAttachment,
+        versionTimestamp: undefined,
+      };
+
+      await service.computeDiff([basePage], [attachment]);
+
+      expect(performFileDiff).toHaveBeenCalledWith(
+        expect.arrayContaining([{ key: 'att-1', url: baseAttachment.webUrl, updatedAt: '' }]),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it('handles attachments-only space with no pages', async () => {
+      const { service, performFileDiff } = makeService(async () => ({
+        ...emptyDiffResponse,
+        newFiles: ['att-1'],
+      }));
+
+      const result = await service.computeDiff([], [baseAttachment]);
+
+      expect(performFileDiff).toHaveBeenCalledTimes(1);
+      expect(performFileDiff).toHaveBeenCalledWith(
+        [{ key: 'att-1', url: baseAttachment.webUrl, updatedAt: baseAttachment.versionTimestamp }],
+        `${TENANT_NAME}/space-1_SP`,
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(result).toEqual({
+        newItemIds: ['att-1'],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+    });
+
+    it('groups attachments by space alongside pages', async () => {
+      const { service, performFileDiff } = makeService(async () => emptyDiffResponse);
+
+      const pageInSpaceA = { ...basePage, spaceId: 'sa-id', spaceKey: 'SA' };
+      const attachmentInSpaceB: DiscoveredAttachment = {
+        ...baseAttachment,
+        spaceId: 'sb-id',
+        spaceKey: 'SB',
+      };
+
+      await service.computeDiff([pageInSpaceA], [attachmentInSpaceB]);
+
+      expect(performFileDiff).toHaveBeenCalledTimes(2);
+      expect(performFileDiff).toHaveBeenCalledWith(
+        [{ key: 'p-1', url: pageInSpaceA.webUrl, updatedAt: pageInSpaceA.versionTimestamp }],
+        `${TENANT_NAME}/sa-id_SA`,
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(performFileDiff).toHaveBeenCalledWith(
+        [
+          {
+            key: 'att-1',
+            url: attachmentInSpaceB.webUrl,
+            updatedAt: attachmentInSpaceB.versionTimestamp,
+          },
+        ],
+        `${TENANT_NAME}/sb-id_SB`,
+        expect.anything(),
         expect.anything(),
       );
     });
@@ -234,9 +352,13 @@ describe('FileDiffService', () => {
           basePage,
           { ...basePage, id: 'p-2' },
           { ...basePage, id: 'p-3' },
-        ]);
+        ], []);
 
-        expect(result.deletedPageIds).toEqual(['p-old-1', 'p-old-2', 'p-old-3']);
+        expect(result.deletedItems).toEqual([
+          { id: 'p-old-1', partialKey: 'test-tenant/space-1_SP' },
+          { id: 'p-old-2', partialKey: 'test-tenant/space-1_SP' },
+          { id: 'p-old-3', partialKey: 'test-tenant/space-1_SP' },
+        ]);
       });
 
       it('should allow deletions when a single recognized page remains (leave-one-file workflow)', async () => {
@@ -252,14 +374,14 @@ describe('FileDiffService', () => {
           { totalFilesInUnique: 6 },
         );
 
-        const result = await service.computeDiff([basePage]);
+        const result = await service.computeDiff([basePage], []);
 
-        expect(result.deletedPageIds).toEqual([
-          'p-old-1',
-          'p-old-2',
-          'p-old-3',
-          'p-old-4',
-          'p-old-5',
+        expect(result.deletedItems).toEqual([
+          { id: 'p-old-1', partialKey: 'test-tenant/space-1_SP' },
+          { id: 'p-old-2', partialKey: 'test-tenant/space-1_SP' },
+          { id: 'p-old-3', partialKey: 'test-tenant/space-1_SP' },
+          { id: 'p-old-4', partialKey: 'test-tenant/space-1_SP' },
+          { id: 'p-old-5', partialKey: 'test-tenant/space-1_SP' },
         ]);
       });
 
@@ -275,9 +397,11 @@ describe('FileDiffService', () => {
           { totalFilesInUnique: 5 },
         );
 
-        const result = await service.computeDiff([basePage]);
+        const result = await service.computeDiff([basePage], []);
 
-        expect(result.deletedPageIds).toEqual(['p-old']);
+        expect(result.deletedItems).toEqual([
+          { id: 'p-old', partialKey: 'test-tenant/space-1_SP' },
+        ]);
       });
 
       it('should allow deletions when there is a mix of new and recognized pages', async () => {
@@ -296,9 +420,12 @@ describe('FileDiffService', () => {
           basePage,
           { ...basePage, id: 'p-2' },
           { ...basePage, id: 'p-3' },
-        ]);
+        ], []);
 
-        expect(result.deletedPageIds).toEqual(['p-old-1', 'p-old-2']);
+        expect(result.deletedItems).toEqual([
+          { id: 'p-old-1', partialKey: 'test-tenant/space-1_SP' },
+          { id: 'p-old-2', partialKey: 'test-tenant/space-1_SP' },
+        ]);
       });
 
       it('should allow deletions when submitted page has a moved URL', async () => {
@@ -313,9 +440,11 @@ describe('FileDiffService', () => {
           { totalFilesInUnique: 5 },
         );
 
-        const result = await service.computeDiff([basePage]);
+        const result = await service.computeDiff([basePage], []);
 
-        expect(result.deletedPageIds).toEqual(['p-old']);
+        expect(result.deletedItems).toEqual([
+          { id: 'p-old', partialKey: 'test-tenant/space-1_SP' },
+        ]);
       });
 
       it('should not trigger when there are no deletions', async () => {
@@ -327,9 +456,9 @@ describe('FileDiffService', () => {
           movedFiles: [],
         }));
 
-        const result = await service.computeDiff([basePage, { ...basePage, id: 'p-2' }]);
+        const result = await service.computeDiff([basePage, { ...basePage, id: 'p-2' }], []);
 
-        expect(result.deletedPageIds).toEqual([]);
+        expect(result.deletedItems).toEqual([]);
         expect(getCountByKeyPrefix).not.toHaveBeenCalled();
       });
 
@@ -356,9 +485,9 @@ describe('FileDiffService', () => {
           { totalFilesInUnique: 20 },
         );
 
-        const result = await service.computeDiff([basePage]);
+        const result = await service.computeDiff([basePage], []);
 
-        expect(result.deletedPageIds).toHaveLength(10);
+        expect(result.deletedItems).toHaveLength(10);
       });
 
       it('should allow deletions when all submitted items are new but deletion is not full', async () => {
@@ -373,9 +502,11 @@ describe('FileDiffService', () => {
           { totalFilesInUnique: 5 },
         );
 
-        const result = await service.computeDiff([basePage]);
+        const result = await service.computeDiff([basePage], []);
 
-        expect(result.deletedPageIds).toEqual(['p-old']);
+        expect(result.deletedItems).toEqual([
+          { id: 'p-old', partialKey: 'test-tenant/space-1_SP' },
+        ]);
       });
     });
 
@@ -420,7 +551,7 @@ describe('FileDiffService', () => {
           { totalFilesInUnique: 3 },
         );
 
-        await expect(service.computeDiff([basePage])).rejects.toThrow(
+        await expect(service.computeDiff([basePage], [])).rejects.toThrow(
           'File diff would delete all 3 files stored in Unique for partialKey',
         );
       });
@@ -438,7 +569,7 @@ describe('FileDiffService', () => {
         );
 
         await expect(
-          service.computeDiff([basePage, { ...basePage, id: 'p-2' }, { ...basePage, id: 'p-3' }]),
+          service.computeDiff([basePage, { ...basePage, id: 'p-2' }, { ...basePage, id: 'p-3' }], []),
         ).rejects.toThrow('File diff would delete all 3 files stored in Unique for partialKey');
       });
 
@@ -454,7 +585,7 @@ describe('FileDiffService', () => {
           { totalFilesInUnique: 1 },
         );
 
-        await expect(service.computeDiff([basePage])).rejects.toThrow(
+        await expect(service.computeDiff([basePage], [])).rejects.toThrow(
           'File diff would delete all 1 files stored in Unique for partialKey',
         );
       });

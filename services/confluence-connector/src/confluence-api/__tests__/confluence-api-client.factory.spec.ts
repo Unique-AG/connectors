@@ -46,6 +46,7 @@ describe('ConfluenceApiClientFactory', () => {
       config,
       mockAuth,
       expect.any(RateLimitedHttpClient),
+      { attachmentsEnabled: false },
     );
   });
 
@@ -64,6 +65,7 @@ describe('ConfluenceApiClientFactory', () => {
       config,
       mockAuth,
       expect.any(RateLimitedHttpClient),
+      { attachmentsEnabled: false },
     );
   });
 

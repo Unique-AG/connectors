@@ -351,9 +351,9 @@
                     "description": "Cron expression for the scheduled page scan interval",
                     "examples": ["*/15 * * * *"]
                   },
-                  "maxPagesToScan": {
+                  "maxItemsToScan": {
                     "type": ["integer", "null"],
-                    "description": "Maximum number of pages to scan (for testing). Unlimited if not set"
+                    "description": "Maximum number of items (pages + attachments) to scan (for testing). Unlimited if not set"
                   }
                 },
                 "additionalProperties": false
@@ -383,6 +383,32 @@
                     "enum": ["enabled", "disabled"],
                     "description": "Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix",
                     "default": "disabled"
+                  },
+                  "attachments": {
+                    "type": "object",
+                    "description": "File attachment ingestion configuration",
+                    "properties": {
+                      "mode": {
+                        "type": "string",
+                        "enum": ["enabled", "disabled"],
+                        "description": "Enable attachment ingestion",
+                        "default": "enabled"
+                      },
+                      "allowedExtensions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "File extensions to include when ingesting attachments",
+                        "default": ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv", "html"]
+                      },
+                      "maxFileSizeMb": {
+                        "type": "integer",
+                        "description": "Maximum file size in megabytes for attachment ingestion",
+                        "default": 200
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
