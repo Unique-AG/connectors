@@ -77,7 +77,7 @@ export class FindTranscriptsTool {
     name: 'find_transcripts',
     title: 'Search Meeting Transcripts',
     description:
-      'Search for content within meeting transcripts using semantic search. Returns relevant passages that can be cited using [N] notation where N is the result index.',
+      'Search for content within meeting transcripts using semantic search. Returns relevant passages that can be cited using [N] notation where N is the result index. This searches all transcripts the user has access to, including meetings ingested by other participants — a running integration is not required.',
     parameters: FindTranscriptsInputSchema,
     outputSchema: FindTranscriptsOutputSchema,
     annotations: {
@@ -90,7 +90,7 @@ export class FindTranscriptsTool {
     _meta: {
       'unique.app/icon': 'search',
       'unique.app/system-prompt':
-        'Use this tool to search meeting transcripts. Cite results using [N] where N is the array index (e.g., [0] for first result, [1] for second). The platform will automatically convert these to proper references.',
+        'Use this tool to search meeting transcripts. This does NOT require a running integration — the user can search all transcripts they have access to, including meetings ingested by other participants. Cite results using [N] where N is the array index (e.g., [0] for first result, [1] for second). The platform will automatically convert these to proper references.',
     },
   })
   @Span()
