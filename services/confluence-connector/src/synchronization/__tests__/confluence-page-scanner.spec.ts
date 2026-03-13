@@ -550,9 +550,10 @@ describe('ConfluencePageScanner', () => {
       const scanner = createScanner(apiClient, limitedConfig, enabledAttachmentConfig);
       const result = await scanner.discoverPages();
 
-      // page-1 (1) + 2 attachments (3) + page-2 (4) = limit reached, page-3 excluded
-      expect(result.pages.map((p) => p.id)).toEqual(['page-1', 'page-2']);
-      expect(result.attachments.map((a) => a.id)).toEqual(['att-1', 'att-2']);
+      // Pages are discovered first (3 pages, all under limit of 4),
+      // then attachments fill the remaining budget (4 - 3 = 1 attachment).
+      expect(result.pages.map((p) => p.id)).toEqual(['page-1', 'page-2', 'page-3']);
+      expect(result.attachments.map((a) => a.id)).toEqual(['att-1']);
     });
 
     it('truncates attachments mid-page when limit is reached', async () => {

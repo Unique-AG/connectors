@@ -48,7 +48,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     );
 
     if (this.options.attachmentsEnabled) {
-      await this.fetchAttachments(pages);
+      await this.completePaginatedAttachments(pages);
     }
 
     return pages;
@@ -62,7 +62,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     const page = response.results[0] ?? null;
 
     if (page && this.options.attachmentsEnabled) {
-      await this.fetchAttachments([page]);
+      await this.completePaginatedAttachments([page]);
     }
 
     return page;
@@ -94,7 +94,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     const uniqueResults = uniqueBy(results, (page) => page.id);
 
     if (this.options.attachmentsEnabled) {
-      await this.fetchAttachments(uniqueResults);
+      await this.completePaginatedAttachments(uniqueResults);
     }
 
     return uniqueResults;

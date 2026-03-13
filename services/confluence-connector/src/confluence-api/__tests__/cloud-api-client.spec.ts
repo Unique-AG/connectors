@@ -276,7 +276,7 @@ describe('CloudConfluenceApiClient', () => {
     });
   });
 
-  describe('fetchAttachments', () => {
+  describe('completePaginatedAttachments', () => {
     it('fetches remaining attachments when page has more than initial limit', async () => {
       const clientWithAttachments = new CloudConfluenceApiClient(
         mockConfig as never,

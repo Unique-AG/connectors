@@ -25,40 +25,45 @@ export class ConfluencePageScanner {
 
   public async discoverPages(): Promise<DiscoveryResult> {
     const seenPageIds = new Set<string>();
-    const allAttachments: DiscoveredAttachment[] = [];
+    const allRawPages: ConfluencePage[] = [];
+
     const labeledPages = await this.apiClient.searchPagesByLabel();
-    const discoveredPages = this.mapToDiscoveredPages(labeledPages, seenPageIds, allAttachments);
+    allRawPages.push(...labeledPages);
+    const discoveredPages = this.mapToDiscoveredPages(labeledPages, seenPageIds);
 
     const ingestAllRootPageIds = labeledPages
       .filter((page) => this.hasIngestAllLabel(page))
       .map((page) => page.id);
 
     if (ingestAllRootPageIds.length > 0) {
-      // we are fetching descendants on content marked with ai-ingest-all label regardless of the content type
       const descendants = await this.apiClient.getDescendantPages(ingestAllRootPageIds);
-      const mappedDescendantPages = this.mapToDiscoveredPages(
-        descendants,
-        seenPageIds,
-        allAttachments,
-      );
-      discoveredPages.push(...mappedDescendantPages);
+      allRawPages.push(...descendants);
+      discoveredPages.push(...this.mapToDiscoveredPages(descendants, seenPageIds));
     }
 
     this.logger.log({ count: discoveredPages.length, msg: 'Page discovery completed' });
+
+    // Attachments are already present on page objects from the expand=children.attachment
+    // parameter in searchPagesByLabel/getDescendantPages. We just extract and filter them here.
+    const attachments = this.attachmentConfig.mode
+      ? this.extractDiscoveredAttachments(discoveredPages, allRawPages)
+      : [];
+
     if (this.attachmentConfig.mode) {
-      this.logger.log({ count: allAttachments.length, msg: 'Attachment discovery completed' });
+      this.logger.log({ count: attachments.length, msg: 'Attachment discovery completed' });
     }
-    return { pages: discoveredPages, attachments: allAttachments };
+
+    return { pages: discoveredPages, attachments };
   }
 
   private mapToDiscoveredPages(
     pages: ConfluencePage[],
     seenPageIds: Set<string>,
-    allAttachments: DiscoveredAttachment[],
   ): DiscoveredPage[] {
     const discoveredPages: DiscoveredPage[] = [];
+
     for (const page of pages) {
-      if (this.isLimitReached(seenPageIds.size + allAttachments.length)) {
+      if (this.isLimitReached(seenPageIds.size)) {
         break;
       }
 
@@ -78,8 +83,6 @@ export class ConfluencePageScanner {
 
       seenPageIds.add(page.id);
 
-      const webUrl = this.apiClient.buildPageWebUrl(page);
-
       discoveredPages.push({
         id: page.id,
         title: page.title,
@@ -88,56 +91,64 @@ export class ConfluencePageScanner {
         spaceKey: page.space.key,
         spaceName: page.space.name,
         versionTimestamp: page.version.when,
-        webUrl,
+        webUrl: this.apiClient.buildPageWebUrl(page),
         labels: page.metadata.labels.results.map((label) => label.name),
       });
-
-      if (this.attachmentConfig.mode && page.children?.attachment) {
-        const remainingCapacity = this.remainingCapacity(seenPageIds.size + allAttachments.length);
-        const attachments = this.extractAttachments(page, webUrl, remainingCapacity);
-        allAttachments.push(...attachments);
-      }
     }
 
     return discoveredPages;
   }
 
-  private extractAttachments(
-    page: ConfluencePage,
-    pageWebUrl: string,
-    remainingCapacity: number | undefined,
+  /**
+   * Extracts attachments from already-fetched page objects. The raw Confluence pages
+   * contain attachment data from the `expand=children.attachment` parameter — no
+   * additional API requests are made here.
+   */
+  private extractDiscoveredAttachments(
+    discoveredPages: DiscoveredPage[],
+    rawPages: ConfluencePage[],
   ): DiscoveredAttachment[] {
-    const results = page.children?.attachment?.results;
-    if (!results || results.length === 0) {
-      return [];
-    }
+    const rawPageById = new Map(rawPages.map((p) => [p.id, p]));
+    const allAttachments: DiscoveredAttachment[] = [];
+    let remainingCapacity = this.remainingCapacity(discoveredPages.length);
 
-    const attachments: DiscoveredAttachment[] = [];
-    for (const attachment of results) {
-      if (remainingCapacity !== undefined && attachments.length >= remainingCapacity) {
-        break;
-      }
-
-      if (!this.isAttachmentAllowed(attachment)) {
+    for (const discovered of discoveredPages) {
+      const rawPage = rawPageById.get(discovered.id);
+      const results = rawPage?.children?.attachment?.results;
+      if (!results || results.length === 0) {
         continue;
       }
 
-      attachments.push({
-        id: attachment.id,
-        title: attachment.title,
-        mediaType: attachment.extensions.mediaType,
-        fileSize: attachment.extensions.fileSize,
-        downloadPath: attachment._links.download,
-        versionTimestamp: attachment.version?.when ?? page.version.when,
-        pageId: page.id,
-        spaceId: page.space.id,
-        spaceKey: page.space.key,
-        spaceName: page.space.name,
-        webUrl: pageWebUrl,
-      });
+      for (const attachment of results) {
+        if (remainingCapacity !== undefined && remainingCapacity <= 0) {
+          return allAttachments;
+        }
+
+        if (!this.isAttachmentAllowed(attachment)) {
+          continue;
+        }
+
+        allAttachments.push({
+          id: attachment.id,
+          title: attachment.title,
+          mediaType: attachment.extensions.mediaType,
+          fileSize: attachment.extensions.fileSize,
+          downloadPath: attachment._links.download,
+          versionTimestamp: attachment.version?.when ?? rawPage.version.when,
+          pageId: discovered.id,
+          spaceId: discovered.spaceId,
+          spaceKey: discovered.spaceKey,
+          spaceName: discovered.spaceName,
+          webUrl: discovered.webUrl,
+        });
+
+        if (remainingCapacity !== undefined) {
+          remainingCapacity--;
+        }
+      }
     }
 
-    return attachments;
+    return allAttachments;
   }
 
   private isAttachmentAllowed(attachment: ConfluenceAttachment): boolean {
