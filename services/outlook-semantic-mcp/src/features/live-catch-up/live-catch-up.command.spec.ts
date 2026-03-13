@@ -421,7 +421,7 @@ describe('LiveCatchUpCommand', () => {
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
     expect(graphApi.filter).toHaveBeenCalledWith(
-      `createdDateTime gt ${IGNORED_BEFORE} and lastModifiedDateTime ge ${WATERMARK.toISOString()}`,
+      `lastModifiedDateTime ge ${WATERMARK.toISOString()}`,
     );
   });
 
