@@ -104,11 +104,20 @@ export class ExecuteFullSyncCommand {
         initialDeltaLink: fullSyncNextLink,
       });
 
-      await this.updateInboxConfigByVersion(userProfileId, version, {
+      const isMarkedAsReady = await this.updateInboxConfigByVersion(userProfileId, version, {
         fullSyncState: 'ready',
         lastFullSyncRunAt: new Date(),
         fullSyncNextLink: null,
       });
+
+      if (!isMarkedAsReady) {
+        this.logger.log({
+          userProfileId,
+          version,
+          msg: 'Full sync completion skipped due to version mismatch',
+        });
+        return;
+      }
 
       this.logger.log({ userProfileId, version, msg: 'Full sync completed' });
     } catch (error) {

@@ -51,7 +51,7 @@ export const appConfig = registerConfig('app', ConfigSchema, {
     'SELF_URL',
     'DEFAULT_MAIL_FILTERS',
     'GLOBAL_SCOPE_ACCESS',
-    'TOOLS_DEBUGGING',
+    'MCP_DEBUG_MODE',
   ]),
 });
 
