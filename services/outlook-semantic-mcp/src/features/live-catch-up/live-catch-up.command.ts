@@ -53,7 +53,7 @@ export class LiveCatchUpCommand {
     traceAttrs({ userProfileId });
 
     const lockResult = await this.acquireLock(userProfileId, messageIds);
-    if (!lockResult) {
+    if (lockResult.status === 'skip') {
       return;
     }
 
@@ -114,7 +114,9 @@ export class LiveCatchUpCommand {
   private async acquireLock(
     userProfileId: string,
     messageIds: string[],
-  ): Promise<{ watermark: Date; pendingLiveMessageIds: string[] } | undefined> {
+  ): Promise<
+    { status: 'proceed'; watermark: Date; pendingLiveMessageIds: string[] } | { status: 'skip' }
+  > {
     return this.db.transaction(async (tx) => {
       const inboxConfig = await tx
         .select({
@@ -129,13 +131,12 @@ export class LiveCatchUpCommand {
 
       if (!inboxConfig) {
         this.logger.warn({ userProfileId, msg: 'No inbox configuration found, skipping' });
-        return undefined;
+        return { status: 'skip' };
       }
 
-      if (inboxConfig.liveCatchUpState === 'running') {
+      const addMessagesToPendingMessages = async (): Promise<void> => {
         if (messageIds.length === 0) {
-          this.logger.log({ userProfileId, msg: 'Live catch-up already running, skipping' });
-          return undefined;
+          return;
         }
 
         await tx
@@ -145,20 +146,27 @@ export class LiveCatchUpCommand {
           })
           .where(eq(inboxConfiguration.userProfileId, userProfileId))
           .execute();
+      };
+
+      if (inboxConfig.liveCatchUpState === 'running') {
+        // We buffer the messages because once the process finishes it will flush the messages.
+        await addMessagesToPendingMessages();
         this.logger.log({
           userProfileId,
           bufferedCount: messageIds.length,
-          msg: 'Live catch-up already running, buffered message IDs',
+          msg: `Live catch-up already running, buffered message IDs count: ${messageIds.length}`,
         });
-        return undefined;
+        return { status: 'skip' };
       }
 
       if (!inboxConfig.newestLastModifiedDateTime) {
+        // We buffer the messages to ensure we do not lose any message, and next live update will ensure it included this messages.
+        await addMessagesToPendingMessages();
         this.logger.log({
           userProfileId,
-          msg: 'No watermark yet (full sync not started), skipping',
+          msg: `No watermark yet (full sync not started), skipping, buffered message IDs count: ${messageIds.length}`,
         });
-        return undefined;
+        return { status: 'skip' };
       }
 
       await tx
@@ -168,6 +176,7 @@ export class LiveCatchUpCommand {
         .execute();
 
       return {
+        status: 'proceed',
         watermark: inboxConfig.newestLastModifiedDateTime,
         pendingLiveMessageIds: inboxConfig.pendingLiveMessageIds,
       };
