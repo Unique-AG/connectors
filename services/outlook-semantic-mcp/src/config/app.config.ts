@@ -25,6 +25,17 @@ const ConfigSchema = z
     defaultMailFilters: json(inboxConfigurationMailFilters).describe(
       'Default mail filters applied when syncing emails (e.g. {"ignoredBefore":"2024-01-01", "ignoredSenders": [], "ignoredContents": [] }). ',
     ),
+    mcpDebugMode: enabledDisabledBoolean(
+      `Enables debug mode. In debug mode tools responses contain debugging data.`,
+    ),
+    globalScopeAccess: json(
+      z.object({
+        entityId: z.string().describe(`The id of the entity which will get scope access`),
+        entityType: z.enum(['GROUP', 'USER']),
+      }),
+    )
+      .optional()
+      .describe('User / Group in unique which will get Access to the outlook mcp'),
   })
   .transform((c) => ({
     ...c,
@@ -33,7 +44,15 @@ const ConfigSchema = z
   }));
 
 export const appConfig = registerConfig('app', ConfigSchema, {
-  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'SELF_URL', 'DEFAULT_MAIL_FILTERS']),
+  whitelistKeys: new Set([
+    'LOG_LEVEL',
+    'PORT',
+    'NODE_ENV',
+    'SELF_URL',
+    'DEFAULT_MAIL_FILTERS',
+    'GLOBAL_SCOPE_ACCESS',
+    'TOOLS_DEBUGGING',
+  ]),
 });
 
 export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;

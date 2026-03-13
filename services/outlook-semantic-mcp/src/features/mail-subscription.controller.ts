@@ -1,4 +1,3 @@
-import assert from 'node:assert';
 import {
   AmqpConnection,
   defaultNackErrorHandler,
@@ -20,9 +19,8 @@ import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { traceAttrs, traceError, traceEvent } from '~/features/tracing.utils';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
-import { FullSyncCommand } from './full-sync/full-sync.command';
-import { MessageEventDto } from './mail-ingestion/dtos/message-event.dto';
-import { IngestionPriority } from './mail-ingestion/utils/ingestion-queue.utils';
+import { StartFullSyncCommand } from './full-sync/start-full-sync.command';
+import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 import {
   ChangeNotificationCollectionDto,
   LifecycleChangeNotificationCollectionDto,
@@ -41,7 +39,7 @@ export class MailSubscriptionController {
     private readonly subscriptionRemove: SubscriptionRemoveService,
     private readonly utils: MailSubscriptionUtilsService,
     private readonly amqpConnection: AmqpConnection,
-    private readonly fullSyncCommand: FullSyncCommand,
+    private readonly startFullSyncCommand: StartFullSyncCommand,
   ) {}
 
   @Post('lifecycle')
@@ -152,22 +150,31 @@ export class MailSubscriptionController {
       return;
     }
 
+    const bySubscription = new Map<string, string[]>();
     for (const notification of notificationsToProcess) {
-      assert.ok(
-        notification.resourceData,
-        `Missing resource data from notification: ${JSON.stringify(notification)}`,
-      );
-      const payload = await MessageEventDto.encodeAsync({
-        type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
-        payload: {
+      const messageId = notification.resourceData?.id;
+      if (!messageId) {
+        this.logger.warn({
+          msg: 'Discarding notification with missing resource data',
           subscriptionId: notification.subscriptionId,
-          messageId: notification.resourceData.id,
-        },
+        });
+        continue;
+      }
+      const existing = bySubscription.get(notification.subscriptionId);
+      if (existing) {
+        existing.push(messageId);
+      } else {
+        bySubscription.set(notification.subscriptionId, [messageId]);
+      }
+    }
+
+    for (const [subscriptionId, messageIds] of bySubscription) {
+      const payload = LiveCatchUpEventDto.parse({
+        type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
+        payload: { subscriptionId, messageIds },
       });
-      this.logger.log({ msg: 'published', payload });
-      await this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload, {
-        priority: IngestionPriority.High,
-      });
+      this.logger.log({ msg: 'Publishing live catch-up event', subscriptionId, messageIds });
+      await this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload);
     }
   }
 
@@ -187,7 +194,7 @@ export class MailSubscriptionController {
 
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created': {
-        return await this.fullSyncCommand.run(event.subscriptionId);
+        return await this.startFullSyncCommand.run(event.subscriptionId);
       }
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-removed': {
         return this.subscriptionRemove.remove(event.subscriptionId);

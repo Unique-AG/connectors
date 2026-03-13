@@ -42,6 +42,8 @@ export class IngestEmailViaSubscriptionCommand {
     await this.ingestEmailCommand.run({
       userProfileId: subscription.userProfileId,
       messageId,
+      // We pass filters in this case because we need to live catchup goes via updated at date and we in that case we need to check the filters
+      // on out side.
       filters,
     });
   }

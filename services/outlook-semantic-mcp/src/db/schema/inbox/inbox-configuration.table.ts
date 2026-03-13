@@ -1,17 +1,12 @@
-import { relations } from 'drizzle-orm';
-import { integer, jsonb, pgEnum, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { relations, sql } from 'drizzle-orm';
+import { jsonb, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 
-export const inboxSyncState = pgEnum('inbox_sync_state', [
-  'full-sync-finished',
-  'running',
-  'failed',
-  'fetching-emails',
-  'performing-file-diff',
-  'processing-file-diff-changes',
-]);
+export const inboxSyncState = pgEnum('inbox_sync_state', ['ready', 'failed', 'fetching-emails']);
+
+export const liveCatchUpState = pgEnum('live_catch_up_state', ['ready', 'running', 'failed']);
 
 export const inboxConfiguration = pgTable('inbox_configuration', {
   id: varchar('id')
@@ -29,12 +24,19 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
 
   filters: jsonb(`filters`).$type<Record<string, unknown>>().notNull(),
   lastFullSyncRunAt: timestamp(`last_full_sync_run_at`),
-  fullSyncState: inboxSyncState(`full_sync_state`).notNull().default('full-sync-finished'),
+  fullSyncState: inboxSyncState(`full_sync_state`).notNull().default('ready'),
   lastFullSyncStartedAt: timestamp(`last_full_sync_started_at`),
   fullSyncVersion: uuid(`full_sync_version`),
-  messagesFromMicrosoft: integer(`messages_from_microsoft`).notNull().default(0),
-  messagesQueuedForSync: integer(`messages_queued_for_sync`).notNull().default(0),
-  messagesProcessed: integer(`messages_processed`).notNull().default(0),
+  liveCatchUpState: liveCatchUpState(`live_catch_up_state`).notNull().default('ready'),
+  liveCatchUpHeartbeatAt: timestamp(`live_catch_up_heartbeat_at`),
+  fullSyncNextLink: text(`full_sync_next_link`),
+  pendingLiveMessageIds: text(`pending_live_message_ids`).array().notNull().default(sql`'{}'`),
+
+  // Date watermarks for sync coordination
+  newestCreatedDateTime: timestamp(`newest_created_date_time`),
+  oldestCreatedDateTime: timestamp(`oldest_created_date_time`),
+  newestLastModifiedDateTime: timestamp(`newest_last_modified_date_time`),
+  oldestLastModifiedDateTime: timestamp(`oldest_last_modified_date_time`),
 
   ...timestamps,
 });

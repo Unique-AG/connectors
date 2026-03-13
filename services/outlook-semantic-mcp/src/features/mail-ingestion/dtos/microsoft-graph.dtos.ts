@@ -140,3 +140,31 @@ export const fileDiffGraphMessageResponseSchema = z.object({
   value: z.array(fileDiffGraphMessage),
   '@odata.nextLink': z.string().optional(),
 });
+
+const fullSyncGraphMessage = graphMessageSchema.pick({
+  id: true,
+  internetMessageId: true,
+  createdDateTime: true,
+  lastModifiedDateTime: true,
+  from: true,
+  subject: true,
+  uniqueBody: true,
+});
+
+export type FullSyncGraphMessage = z.infer<typeof fullSyncGraphMessage>;
+
+export const FullSyncGraphMessageFields = asAllOptions<keyof FullSyncGraphMessage>()([
+  `id`,
+  `internetMessageId`,
+  `createdDateTime`,
+  `lastModifiedDateTime`,
+  `from`,
+  `subject`,
+  `uniqueBody`,
+]);
+
+export const fullSyncGraphMessageResponseSchema = z.object({
+  '@odata.context': z.string().optional(),
+  value: z.array(fullSyncGraphMessage),
+  '@odata.nextLink': z.string().optional(),
+});
