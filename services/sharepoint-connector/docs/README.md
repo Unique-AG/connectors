@@ -227,7 +227,7 @@ sequenceDiagram
     Note over Connector: Sync cycle complete
 ```
 
-See [Content Sync Flow](./technical/flows.md#content-sync-flow) for additional details.
+See [Content Sync Flow](./technical/flows.md#Content-Sync-Flow) for additional details.
 
 ### User Workflow
 
