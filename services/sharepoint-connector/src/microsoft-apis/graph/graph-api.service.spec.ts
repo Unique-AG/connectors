@@ -333,6 +333,21 @@ describe('GraphApiService', () => {
         undefined,
       );
     });
+
+    it('propagates error when getAspxListItems throws', async () => {
+      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
+        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
+      ]);
+      vi.spyOn(service, 'getListColumns').mockResolvedValue([
+        { id: '1', name: 'Title', displayName: 'Title' },
+        { id: '2', name: 'FinanceGPTKnowledge', displayName: 'Finance GPT Knowledge' },
+      ]);
+      vi.spyOn(service, 'getAspxListItems').mockRejectedValue(new Error('ASPX fetch failed'));
+
+      await expect(
+        service.getAspxPagesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge'),
+      ).rejects.toThrow('ASPX fetch failed');
+    });
   });
 
   describe('getAllFilesAndPagesForSite', () => {

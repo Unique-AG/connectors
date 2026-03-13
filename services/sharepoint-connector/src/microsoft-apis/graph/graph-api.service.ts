@@ -210,25 +210,16 @@ export class GraphApiService {
       );
     }
 
-    try {
-      const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
-        siteId,
-        sitePagesList.id,
-        resolvedColumnName,
-        maxFilesToScan,
-      );
-      this.logger.log(
-        `${logPrefix} Found ${aspxSharepointContentItems.length} ASPX files from SitePages`,
-      );
-      return aspxSharepointContentItems;
-    } catch (error) {
-      this.logger.warn({
-        msg: `${logPrefix} Failed to scan ASPX files from SitePages`,
-        siteId,
-        error: sanitizeError(error),
-      });
-      return [];
-    }
+    const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
+      siteId,
+      sitePagesList.id,
+      resolvedColumnName,
+      maxFilesToScan,
+    );
+    this.logger.log(
+      `${logPrefix} Found ${aspxSharepointContentItems.length} ASPX files from SitePages`,
+    );
+    return aspxSharepointContentItems;
   }
 
   public async getSiteLists(siteId: Smeared): Promise<List[]> {
