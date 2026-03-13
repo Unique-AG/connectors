@@ -164,7 +164,7 @@ export class ExecuteFullSyncCommand {
             )
             .then((rows) => rows[0]?.oldestCreatedDateTime ?? new Date());
 
-          conditions.push(`createdDateTime lte ${oldestCreatedDateTime.toISOString()}`);
+          conditions.push(`createdDateTime le ${oldestCreatedDateTime.toISOString()}`);
         }
       }
       return await client
