@@ -1,4 +1,4 @@
-import { createSmeared } from '@unique-ag/utils';
+import { Smeared } from '@unique-ag/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import type { ConfluencePage } from '../../confluence-api';
@@ -37,7 +37,7 @@ const baseConfluenceConfig: ConfluenceConfig = {
 function makeDiscoveredPage(id: string, overrides: Partial<DiscoveredPage> = {}): DiscoveredPage {
   return {
     id,
-    title: createSmeared(`Page ${id}`),
+    title: new Smeared(`Page ${id}`, false),
     type: ContentType.PAGE,
     spaceId: 'space-1',
     spaceKey: 'SP',
@@ -104,7 +104,7 @@ describe('ConfluenceContentFetcher', () => {
 
     expect(result).toEqual({
       id: '1',
-      title: createSmeared('Page 1'),
+      title: new Smeared('Page 1', false),
       body: '<p>content</p>',
       webUrl: 'https://confluence.example.com/wiki/1',
       spaceId: 'space-1',
@@ -141,7 +141,7 @@ describe('ConfluenceContentFetcher', () => {
     expect(result).toBeNull();
     expect(mockLogger.warn).toHaveBeenCalledWith({
       pageId: 'missing',
-      title: createSmeared('Page missing'),
+      title: new Smeared('Page missing', false),
       msg: 'Page not found, possibly deleted',
     });
   });
@@ -158,7 +158,7 @@ describe('ConfluenceContentFetcher', () => {
     expect(result).toBeNull();
     expect(mockLogger.log).toHaveBeenCalledWith({
       pageId: 'empty',
-      title: createSmeared('Page empty'),
+      title: new Smeared('Page empty', false),
       msg: 'Page has no body, skipping',
     });
   });

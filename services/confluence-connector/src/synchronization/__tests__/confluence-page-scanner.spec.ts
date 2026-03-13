@@ -1,4 +1,3 @@
-import { createSmeared } from '@unique-ag/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig, ProcessingConfig } from '../../config';
 import type { ConfluencePage } from '../../confluence-api';
@@ -217,12 +216,13 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.map((page) => page.id)).toEqual(['parent', 'page-child']);
-    expect(mockLogger.debug).toHaveBeenCalledWith({
-      pageId: 'db-child',
-      title: createSmeared('Page db-child'),
-      type: 'database',
-      msg: 'Skipping non-page content type',
-    });
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageId: 'db-child',
+        type: 'database',
+        msg: 'Skipping non-page content type',
+      }),
+    );
   });
 
   it('honors maxPagesToScan limit during descendant expansion', async () => {

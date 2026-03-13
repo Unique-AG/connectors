@@ -63,6 +63,7 @@ export class ConfluenceContentFetcher {
       this.confluenceConfig.ingestAllLabel,
     ];
 
+    // Sorted alphabetically required for deterministic label ordering in downstream consumers
     return labels
       .map((label) => label.name)
       .filter((name) => !ingestLabels.includes(name))
