@@ -31,7 +31,9 @@ describe('MicrosoftAuthenticationService', () => {
 
   it('uses ClientSecretAuthStrategy when corresponding mode is selected', () => {
     mockConfigService.get.mockImplementation((key: string) => {
-      if (key === 'sharepoint.auth.mode') return 'client-secret';
+      if (key === 'sharepoint.auth.mode') {
+        return 'client-secret';
+      }
       if (key === 'sharepoint') {
         return {
           tenantId: 'tenant-123',
@@ -65,7 +67,9 @@ describe('MicrosoftAuthenticationService', () => {
     };
 
     mockConfigService.get.mockImplementation((key: string) => {
-      if (key === 'sharepoint.auth.mode') return 'client-secret';
+      if (key === 'sharepoint.auth.mode') {
+        return 'client-secret';
+      }
       if (key === 'sharepoint') {
         return {
           tenantId: 'tenant-123',

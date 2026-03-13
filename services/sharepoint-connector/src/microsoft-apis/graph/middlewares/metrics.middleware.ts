@@ -53,7 +53,9 @@ export class MetricsMiddleware implements Middleware {
   }
 
   public async execute(context: Context): Promise<void> {
-    if (!this.nextMiddleware) throw new Error('Next middleware not set');
+    if (!this.nextMiddleware) {
+      throw new Error('Next middleware not set');
+    }
 
     const loggedEndpoint = this.extractEndpoint(context.request);
     const httpMethod = this.extractMethod(context.options);
@@ -160,19 +162,27 @@ export class MetricsMiddleware implements Middleware {
   }
 
   private isThrottled(response: Response | undefined): boolean {
-    if (!response) return false;
+    if (!response) {
+      return false;
+    }
 
     // Check for 429 (Too Many Requests) status
-    if (response.status === 429) return true;
+    if (response.status === 429) {
+      return true;
+    }
 
     // Check for 503 (Service Unavailable) with Retry-After header
-    if (response.status === 503 && response.headers.get('Retry-After')) return true;
+    if (response.status === 503 && response.headers.get('Retry-After')) {
+      return true;
+    }
 
     return false;
   }
 
   private getThrottlePolicy(response: Response | undefined): string {
-    if (!response) return 'unknown';
+    if (!response) {
+      return 'unknown';
+    }
 
     // Check for standard Retry-After header
     const retryAfter = response.headers.get('Retry-After');
@@ -241,7 +251,9 @@ export class MetricsMiddleware implements Middleware {
   }
 
   private extractHeadersSafely(headers: unknown) {
-    if (!headers) return undefined;
+    if (!headers) {
+      return undefined;
+    }
 
     if (headers instanceof Headers) {
       return Object.fromEntries(headers.entries());

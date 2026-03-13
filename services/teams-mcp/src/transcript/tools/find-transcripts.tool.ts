@@ -100,7 +100,9 @@ export class FindTranscriptsTool {
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof FindTranscriptsOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
-    if (!userProfileId) throw new UnauthorizedException('User not authenticated');
+    if (!userProfileId) {
+      throw new UnauthorizedException('User not authenticated');
+    }
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);

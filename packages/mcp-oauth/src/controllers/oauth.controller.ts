@@ -66,8 +66,12 @@ export class OAuthController {
       resource,
     });
 
-    if (responseType !== 'code') throw new BadRequestException('Invalid response type');
-    if (!clientId) throw new BadRequestException('Missing client_id parameter');
+    if (responseType !== 'code') {
+      throw new BadRequestException('Invalid response type');
+    }
+    if (!clientId) {
+      throw new BadRequestException('Missing client_id parameter');
+    }
 
     this.metricService.incrementFlowsStarted();
 
@@ -83,10 +87,14 @@ export class OAuthController {
     }
 
     const client = await this.clientService.getClient(clientId);
-    if (!client) throw new BadRequestException('Invalid client_id parameter');
+    if (!client) {
+      throw new BadRequestException('Invalid client_id parameter');
+    }
 
     const validRedirectUri = await this.clientService.validateRedirectUri(clientId, redirectUri);
-    if (!validRedirectUri) throw new BadRequestException('Invalid redirect_uri parameter');
+    if (!validRedirectUri) {
+      throw new BadRequestException('Invalid redirect_uri parameter');
+    }
 
     // OAuth 2.1 compliance: PKCE is mandatory for all clients
     if (!codeChallenge) {
@@ -186,7 +194,9 @@ export class OAuthController {
             const failureMessage = info?.message || 'Authentication failed';
             throw new UnauthorizedException(failureMessage);
           }
-          if (!state) throw new UnauthorizedException('Authentication failed');
+          if (!state) {
+            throw new UnauthorizedException('Authentication failed');
+          }
           const decodedState = JSON.parse(Buffer.from(state, 'base64url').toString('utf-8'));
           const { sessionId, sessionNonce, sessionHmac } = decodedState;
 

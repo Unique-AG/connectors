@@ -77,8 +77,10 @@ export class FactsetClientCredentials implements OnModuleInit {
    * @returns access token for protected resource requests
    */
   public async getAccessToken(): Promise<string> {
-    // biome-ignore lint/style/noNonNullAssertion: We check for the presence of the access token in the token set
-    if (this.tokenSet && !this.isTokenSetExpired()) return this.tokenSet.access_token!;
+    if (this.tokenSet && !this.isTokenSetExpired()) {
+      // biome-ignore lint/style/noNonNullAssertion: We check for the presence of the access token in the token set
+      return this.tokenSet.access_token!;
+    }
 
     this.logger.debug({
       msg: 'No Factset token or token is expired. Fetching new one.',
@@ -91,7 +93,9 @@ export class FactsetClientCredentials implements OnModuleInit {
   }
 
   private async fetchAccessToken(): Promise<void> {
-    if (!this.oauthClient) throw new Error('OAuth client not initialized');
+    if (!this.oauthClient) {
+      throw new Error('OAuth client not initialized');
+    }
 
     // Factset returns
     // {
@@ -103,19 +107,26 @@ export class FactsetClientCredentials implements OnModuleInit {
       grant_type: 'client_credentials',
     });
 
-    if (!tokenSet.access_token || typeof tokenSet.access_token !== 'string')
+    if (!tokenSet.access_token || typeof tokenSet.access_token !== 'string') {
       throw new Error('No access token returned from FactSet');
-    if (!tokenSet.expires_at || typeof tokenSet.expires_at !== 'number')
+    }
+    if (!tokenSet.expires_at || typeof tokenSet.expires_at !== 'number') {
       throw new Error('No expires_at returned from FactSet');
-    if (!tokenSet.token_type || tokenSet.token_type !== 'Bearer')
+    }
+    if (!tokenSet.token_type || tokenSet.token_type !== 'Bearer') {
       throw new Error('Invalid token type returned from FactSet');
+    }
 
     this.tokenSet = tokenSet;
   }
 
   private isTokenSetExpired(): boolean {
-    if (!this.tokenSet) return true;
-    if (!this.tokenSet.expires_at) return true;
+    if (!this.tokenSet) {
+      return true;
+    }
+    if (!this.tokenSet.expires_at) {
+      return true;
+    }
     return this.tokenSet.expires_at < Date.now() / 1000;
   }
 }

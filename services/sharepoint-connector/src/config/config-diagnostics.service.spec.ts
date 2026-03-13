@@ -115,8 +115,9 @@ describe('ConfigDiagnosticsService', () => {
   describe('onModuleInit', () => {
     it('emits all configurations when emit is on with on_startup event', async () => {
       vi.spyOn(configService, 'get').mockImplementation((key) => {
-        if (key === 'app.logsDiagnosticsConfigEmitPolicy')
+        if (key === 'app.logsDiagnosticsConfigEmitPolicy') {
           return { emit: 'on', events: [ConfigEmitEvent.ON_STARTUP] };
+        }
         return { some: 'config' };
       });
 
@@ -127,11 +128,12 @@ describe('ConfigDiagnosticsService', () => {
 
     it('emits all configurations when emit is on with both events', async () => {
       vi.spyOn(configService, 'get').mockImplementation((key) => {
-        if (key === 'app.logsDiagnosticsConfigEmitPolicy')
+        if (key === 'app.logsDiagnosticsConfigEmitPolicy') {
           return {
             emit: 'on',
             events: [ConfigEmitEvent.ON_STARTUP, ConfigEmitEvent.ON_SYNC],
           };
+        }
         return { some: 'config' };
       });
 
@@ -142,7 +144,9 @@ describe('ConfigDiagnosticsService', () => {
 
     it('skips emitting configurations when emit is off', async () => {
       vi.spyOn(configService, 'get').mockImplementation((key) => {
-        if (key === 'app.logsDiagnosticsConfigEmitPolicy') return { emit: 'off' };
+        if (key === 'app.logsDiagnosticsConfigEmitPolicy') {
+          return { emit: 'off' };
+        }
         return { some: 'config' };
       });
 
@@ -153,8 +157,9 @@ describe('ConfigDiagnosticsService', () => {
 
     it('skips emitting configurations when emit is on with only on_sync event', async () => {
       vi.spyOn(configService, 'get').mockImplementation((key) => {
-        if (key === 'app.logsDiagnosticsConfigEmitPolicy')
+        if (key === 'app.logsDiagnosticsConfigEmitPolicy') {
           return { emit: 'on', events: [ConfigEmitEvent.ON_SYNC] };
+        }
         return { some: 'config' };
       });
 

@@ -51,7 +51,9 @@ export class OAuthExceptionFilter implements ExceptionFilter {
         wwwAuthenticate += `, error_description="${errorMessage}"`;
       }
 
-      if (this.options.resource) wwwAuthenticate += `, realm="${this.options.resource}"`;
+      if (this.options.resource) {
+        wwwAuthenticate += `, realm="${this.options.resource}"`;
+      }
 
       response
         .status(HttpStatus.UNAUTHORIZED)
