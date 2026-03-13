@@ -47,6 +47,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
       confluencePageSchema,
     );
 
+    // get attachments if they are more than 25 attachments per page
     if (this.options.attachmentsEnabled) {
       await this.completePaginatedAttachments(pages);
     }
@@ -55,17 +56,11 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
   }
 
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
-    const expand = `body.storage,version,space,metadata.labels${this.attachmentExpand}`;
+    const expand = 'body.storage,version,space,metadata.labels';
     const url = `${this.paginationBaseUrl}/wiki/rest/api/content/search?cql=id%3D${pageId}&expand=${expand}`;
     const raw = await this.makeAuthenticatedRequest(url);
     const response = paginatedResponseSchema(confluencePageSchema).parse(raw);
-    const page = response.results[0] ?? null;
-
-    if (page && this.options.attachmentsEnabled) {
-      await this.completePaginatedAttachments([page]);
-    }
-
-    return page;
+    return response.results[0] ?? null;
   }
 
   // V1 CQL `ancestor` returns all descendants at any depth with labels; V2 bulk pages lacks label support.

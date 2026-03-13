@@ -48,17 +48,11 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
   }
 
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
-    const expand = `body.storage,version,space,metadata.labels${this.attachmentExpand}`;
+    const expand = 'body.storage,version,space,metadata.labels';
     const url = `${this.config.baseUrl}/rest/api/content/${pageId}?os_authType=basic&expand=${expand}`;
     const raw = await this.makeAuthenticatedRequest(url);
     const result = confluencePageSchema.safeParse(raw);
-    const page = result.success ? result.data : null;
-
-    if (page && this.options.attachmentsEnabled) {
-      await this.completePaginatedAttachments([page]);
-    }
-
-    return page;
+    return result.success ? result.data : null;
   }
 
   public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {
