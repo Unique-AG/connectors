@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-alpha.3](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.2...confluence-connector@2.0.0-alpha.3) (2026-03-13)
+
+
+### Bug Fixes
+
+* **confluence-connector:** align v2 with v1 for DC space types, label sorting, and blog posts ([#350](https://github.com/Unique-AG/connectors/issues/350)) ([73698f3](https://github.com/Unique-AG/connectors/commit/73698f31b707e0f9cd56305bf9ad10acb667199b))
+* **confluence-connector:** bring in the totalFilesInUnique deletion guard logic from sharepoint-connector ([#347](https://github.com/Unique-AG/connectors/issues/347)) ([af98e39](https://github.com/Unique-AG/connectors/commit/af98e390dad18624987d086e9d3e18909a294e2e))
+
 ## [2.0.0-alpha.2](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.1...confluence-connector@2.0.0-alpha.2) (2026-03-10)
 
 
