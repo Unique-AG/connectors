@@ -43,7 +43,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     );
 
     if (this.options.attachmentsEnabled) {
-      await this.completePaginatedAttachments(pages);
+      await this.fetchMoreAttachments(pages);
     }
 
     return pages;
@@ -84,7 +84,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     const uniqueResults = uniqueBy(results, (page) => page.id);
 
     if (this.options.attachmentsEnabled) {
-      await this.completePaginatedAttachments(uniqueResults);
+      await this.fetchMoreAttachments(uniqueResults);
     }
 
     return uniqueResults;

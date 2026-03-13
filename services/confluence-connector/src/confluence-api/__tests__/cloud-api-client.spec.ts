@@ -276,7 +276,7 @@ describe('CloudConfluenceApiClient', () => {
     });
   });
 
-  describe('completePaginatedAttachments', () => {
+  describe('fetchMoreAttachments', () => {
     it('fetches remaining attachments when page has more than initial limit', async () => {
       const clientWithAttachments = new CloudConfluenceApiClient(
         mockConfig as never,
@@ -299,7 +299,7 @@ describe('CloudConfluenceApiClient', () => {
             ],
             size: 25,
             limit: 25,
-            _links: { next: '/wiki/rest/api/content/100/child/attachment?start=25&limit=25' },
+            _links: { next: '/rest/api/content/100/child/attachment?start=25&limit=25' },
           },
         },
       });

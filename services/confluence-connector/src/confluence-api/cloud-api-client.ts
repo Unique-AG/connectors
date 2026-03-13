@@ -6,7 +6,9 @@ import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import { type ApiClientOptions, ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
 import {
+  type ConfluenceAttachment,
   type ConfluencePage,
+  confluenceAttachmentSchema,
   confluencePageSchema,
   paginatedResponseSchema,
 } from './types/confluence-api.types';
@@ -51,7 +53,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
 
     // get attachments if they are more than 25 attachments per page
     if (this.options.attachmentsEnabled) {
-      await this.completePaginatedAttachments(pages);
+      await this.fetchMoreAttachments(pages);
     }
 
     return pages;
@@ -95,7 +97,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
 
     // get the remaining of attachments if there are more than 25 per page
     if (this.options.attachmentsEnabled) {
-      await this.completePaginatedAttachments(uniqueResults);
+      await this.fetchMoreAttachments(uniqueResults);
     }
 
     return uniqueResults;
@@ -113,6 +115,20 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     const url = `${this.paginationBaseUrl}/wiki/rest/api/content/${pageId}/child/attachment/${attachmentId}/download`;
     const token = await this.confluenceAuth.acquireToken();
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
+  }
+
+  // Cloud's expanded attachment _links.next omits the /wiki/ prefix,
+  // so we use a base URL that includes it for all attachment pagination requests.
+  protected override async fetchPaginatedAttachments(
+    nextPath: string,
+  ): Promise<ConfluenceAttachment[]> {
+    const baseUrl = `${this.paginationBaseUrl}/wiki`;
+    return fetchAllPaginated(
+      `${baseUrl}${nextPath}`,
+      baseUrl,
+      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
+      confluenceAttachmentSchema,
+    );
   }
 
   protected async makeAuthenticatedRequest(url: string): Promise<unknown> {

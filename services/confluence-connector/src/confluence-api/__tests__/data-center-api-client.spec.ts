@@ -268,7 +268,7 @@ describe('DataCenterConfluenceApiClient', () => {
     });
   });
 
-  describe('completePaginatedAttachments', () => {
+  describe('fetchMoreAttachments', () => {
     it('fetches remaining attachments when page has more than initial limit', async () => {
       const clientWithAttachments = new DataCenterConfluenceApiClient(
         mockConfig,

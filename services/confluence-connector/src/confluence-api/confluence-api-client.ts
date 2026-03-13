@@ -34,9 +34,9 @@ export abstract class ConfluenceApiClient {
    * The initial search request returns up to 25 attachments per page via the
    * `expand=children.attachment` parameter. When a page has more than 25,
    * the response includes `_links.next` — this method follows those pagination
-   * links to complete the attachment list.
+   * links to fetch the remaining attachments.
    */
-  protected async completePaginatedAttachments(pages: ConfluencePage[]): Promise<void> {
+  protected async fetchMoreAttachments(pages: ConfluencePage[]): Promise<void> {
     for (const page of pages) {
       const attachment = page.children?.attachment;
       if (!attachment) {
@@ -54,7 +54,7 @@ export abstract class ConfluenceApiClient {
     }
   }
 
-  private async fetchPaginatedAttachments(nextPath: string): Promise<ConfluenceAttachment[]> {
+  protected async fetchPaginatedAttachments(nextPath: string): Promise<ConfluenceAttachment[]> {
     return fetchAllPaginated(
       `${this.paginationBaseUrl}${nextPath}`,
       this.paginationBaseUrl,
