@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.3.0...sharepoint-connector@2.3.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** support /teams/ sites as well ([#364](https://github.com/Unique-AG/connectors/issues/364)) ([44e8393](https://github.com/Unique-AG/connectors/commit/44e83939c0b23587bd5ca6f020fc2951d40f6364))
+
 ## [2.3.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.2.0...sharepoint-connector@2.3.0) (2026-03-13)
 
 
