@@ -5,6 +5,7 @@ import { CronJob } from 'cron';
 import { and, eq, lt, notInArray, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { traceEvent } from '~/features/tracing.utils';
 import { FullSyncEventDto } from './dtos/full-sync-event.dto';
 
 const STUCK_SYNC_THRESHOLD_MINUTES = 15;
@@ -107,7 +108,7 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
         and(
           notInArray(inboxConfiguration.liveCatchUpState, ['ready']),
           lt(
-            inboxConfiguration.updatedAt,
+            sql`COALESCE(${inboxConfiguration.liveCatchUpHeartbeatAt}, ${inboxConfiguration.updatedAt})`,
             sql`NOW() - ${STUCK_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
           ),
         ),
@@ -116,6 +117,11 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
     if (stuckConfigs.length === 0) {
       return;
     }
+
+    traceEvent('live-catch-up stuck recovery triggered', {
+      count: stuckConfigs.length,
+      userProfileIds: stuckConfigs.map((c) => c.userProfileId),
+    });
 
     this.logger.log({
       msg: 'Found stuck live catch-up configurations',
