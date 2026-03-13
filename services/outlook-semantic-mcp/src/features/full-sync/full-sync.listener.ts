@@ -4,6 +4,7 @@ import {
   RabbitSubscribe,
 } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { Span } from 'nestjs-otel';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { FullSyncEventDto } from './dtos/full-sync-event.dto';
@@ -27,6 +28,7 @@ export class FullSyncListener {
     queueOptions: { deadLetterExchange: DEAD_EXCHANGE.name },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @Span()
   public async onFullSyncEvent(@RabbitPayload() payload: unknown): Promise<void> {
     const event = FullSyncEventDto.parse(payload);
     this.logger.log({ msg: 'Full sync event received', type: event.type });

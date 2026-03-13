@@ -4,6 +4,7 @@ import {
   RabbitSubscribe,
 } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { Span } from 'nestjs-otel';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { MessageEventDto } from './mail-ingestion/dtos/message-event.dto';
@@ -31,6 +32,7 @@ export class IngestionListener {
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @Span()
   public async onIngestionRequested(@RabbitPayload() payload: unknown): Promise<void> {
     const event = MessageEventDto.parse(payload);
     this.logger.log({ msg: 'Email ingestion requested', type: event.type });

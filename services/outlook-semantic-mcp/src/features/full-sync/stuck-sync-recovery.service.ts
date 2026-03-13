@@ -5,6 +5,7 @@ import { CronJob } from 'cron';
 import { and, eq, lt, notInArray, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { NewTrace } from '~/utils/tracing';
 import { traceEvent } from '~/features/tracing.utils';
 import { FullSyncEventDto } from './dtos/full-sync-event.dto';
 
@@ -47,6 +48,7 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
     job.start();
   }
 
+  @NewTrace()
   public async runRecoveryScan(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({ msg: 'Skipping stuck sync recovery scan due to shutdown' });
