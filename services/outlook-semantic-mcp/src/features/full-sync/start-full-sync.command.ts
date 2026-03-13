@@ -4,12 +4,13 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNullish } from 'remeda';
+import { isNonNullish, isNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GetSubscriptionAndUserProfileQuery } from '../user-utils/get-subscription-and-user-profile.query';
 import { FullSyncEventDto } from './dtos/full-sync-event.dto';
+import { START_DELTA_LINK } from './execute-full-sync.command';
 
 export type FullSyncRunStatus = 'skipped' | 'started';
 
@@ -79,6 +80,7 @@ export class StartFullSyncCommand {
           fullSyncState: inboxConfiguration.fullSyncState,
           lastFullSyncRunAt: inboxConfiguration.lastFullSyncRunAt,
           filters: inboxConfiguration.filters,
+          fullSyncNextLink: inboxConfiguration.fullSyncNextLink,
           oldestCreatedDateTime: inboxConfiguration.oldestCreatedDateTime,
           newestLastModifiedDateTime: inboxConfiguration.newestLastModifiedDateTime,
           oldestLastModifiedDateTime: inboxConfiguration.oldestLastModifiedDateTime,
@@ -114,8 +116,6 @@ export class StartFullSyncCommand {
         };
       }
 
-      const isResume =
-        isNonNullish(inboxConfig.oldestCreatedDateTime) && inboxConfig.fullSyncState === 'failed';
       const version = crypto.randomUUID();
       const now = new Date();
 
@@ -125,12 +125,14 @@ export class StartFullSyncCommand {
         lastFullSyncStartedAt: now,
       };
 
-      if (!isResume) {
+      const isResume = isNullish(updateSet.fullSyncNextLink);
+
+      if (isResume) {
         updateSet.newestCreatedDateTime = null;
         updateSet.oldestCreatedDateTime = null;
         updateSet.newestLastModifiedDateTime = inboxConfig.newestLastModifiedDateTime ?? now;
         updateSet.oldestLastModifiedDateTime = null;
-        updateSet.fullSyncNextLink = null;
+        updateSet.fullSyncNextLink = START_DELTA_LINK;
       }
 
       await tx

@@ -2,7 +2,6 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, SQL, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNullish } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
@@ -23,6 +22,8 @@ import { IngestionPriority } from '../mail-ingestion/utils/ingestion-queue.utils
 import { shouldSkipEmail } from '../mail-ingestion/utils/should-skip-email';
 
 type InboxConfiguration = typeof inboxConfiguration.$inferSelect;
+
+export const START_DELTA_LINK = `SYNC_STARTED:__EMPTY_DELTA__`;
 
 @Injectable()
 export class ExecuteFullSyncCommand {
@@ -63,21 +64,27 @@ export class ExecuteFullSyncCommand {
       return;
     }
 
-    if (
-      inboxConfig.fullSyncVersion !== version ||
-      inboxConfig.fullSyncState !== 'fetching-emails'
-    ) {
+    const { fullSyncNextLink, fullSyncVersion, fullSyncState } = inboxConfig;
+    if (!fullSyncNextLink) {
+      this.logger.warn({
+        userProfileId,
+        version,
+        msg: 'Delta link is null cannot resume this full sync',
+      });
+      return;
+    }
+
+    if (fullSyncVersion !== version || fullSyncState !== 'fetching-emails') {
       this.logger.log({
         userProfileId,
         version,
-        currentVersion: inboxConfig.fullSyncVersion,
-        currentState: inboxConfig.fullSyncState,
+        currentVersion: fullSyncVersion,
+        currentState: fullSyncState,
         msg: 'Stale execute event, discarding',
       });
       return;
     }
 
-    const isResume = isNonNullish(inboxConfig.oldestCreatedDateTime);
     const filters = inboxConfigurationMailFilters.parse(inboxConfig.filters);
 
     try {
@@ -87,7 +94,6 @@ export class ExecuteFullSyncCommand {
         userProfileId,
         version,
         ignoredBefore: filters.ignoredBefore,
-        isResume,
         msg: 'Fetching emails in batches',
       });
 
@@ -95,9 +101,7 @@ export class ExecuteFullSyncCommand {
         userProfileId,
         filters,
         version,
-        isResume,
-        oldestCreatedDateTime: inboxConfig.oldestCreatedDateTime,
-        nextLink: inboxConfig.fullSyncNextLink,
+        initialDeltaLink: fullSyncNextLink,
       });
 
       await this.updateInboxConfigByVersion(userProfileId, version, {
@@ -124,65 +128,36 @@ export class ExecuteFullSyncCommand {
     userProfileId,
     filters,
     version,
-    isResume,
-    oldestCreatedDateTime,
-    nextLink,
+    initialDeltaLink,
   }: {
     userProfileId: string;
     filters: InboxConfigurationMailFilters;
     version: string;
-    isResume: boolean;
-    oldestCreatedDateTime: Date | null;
-    nextLink: string | null;
+    initialDeltaLink: string;
   }): Promise<void> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     let totalScheduled = 0;
     let batchNumber = 0;
 
-    let emailsRaw: unknown;
-
-    if (nextLink) {
-      try {
-        emailsRaw = await client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get();
-      } catch (error) {
-        this.logger.warn({
-          err: error,
-          userProfileId,
-          msg: 'Next link fetch failed, clearing and falling back to fresh fetch',
-        });
-
-        await this.updateInboxConfigByVersion(userProfileId, version, {
-          fullSyncNextLink: null,
-        });
-
-        nextLink = null;
+    const fetchBatch = async (nextLink: string): Promise<unknown> => {
+      if (nextLink !== START_DELTA_LINK) {
+        return await client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get();
       }
-    }
-
-    if (!nextLink) {
-      // We filter by createdDateTime (not lastModifiedDateTime) because the intent is to exclude
-      // emails created before ignoredBefore — we do not want to sync old emails regardless of
-      // whether they were recently modified. Microsoft Graph does not support combining a
-      // createdDateTime filter with an orderby on lastModifiedDateTime efficiently
-      // (InefficientFilter error), so we sort by createdDateTime as well.
-      let filterExpression = `createdDateTime gt ${filters.ignoredBefore.toISOString()}`;
-      if (isResume && oldestCreatedDateTime) {
-        filterExpression += ` and createdDateTime lte ${oldestCreatedDateTime.toISOString()}`;
-      }
-
-      emailsRaw = await client
+      return await client
         .api(`me/messages`)
         .header('Prefer', 'IdType="ImmutableId"')
         .select(FullSyncGraphMessageFields)
-        .filter(filterExpression)
+        .filter(`createdDateTime gt ${filters.ignoredBefore.toISOString()}`)
         .orderby(`createdDateTime desc`)
         .top(200)
         .get();
-    }
+    };
 
-    let emailResponse = fullSyncGraphMessageResponseSchema.parse(emailsRaw);
+    let nextLink: string | null = initialDeltaLink;
 
-    while (true) {
+    while (nextLink) {
+      const emailsRaw = await fetchBatch(nextLink);
+      const emailResponse = fullSyncGraphMessageResponseSchema.parse(emailsRaw);
       batchNumber++;
       const batch = emailResponse.value;
 
@@ -221,18 +196,10 @@ export class ExecuteFullSyncCommand {
         return;
       }
 
-      const currentNextLink = emailResponse['@odata.nextLink'] ?? null;
-
+      nextLink = emailResponse['@odata.nextLink'] ?? null;
       await this.updateInboxConfigByVersion(userProfileId, version, {
-        fullSyncNextLink: currentNextLink,
+        fullSyncNextLink: nextLink,
       });
-
-      if (!currentNextLink) {
-        break;
-      }
-
-      emailsRaw = await client.api(currentNextLink).header('Prefer', 'IdType="ImmutableId"').get();
-      emailResponse = fullSyncGraphMessageResponseSchema.parse(emailsRaw);
     }
 
     traceEvent('full sync batches completed', {
