@@ -45,7 +45,9 @@ export class ConfluencePageScanner {
     }
 
     this.logger.log({ count: discoveredPages.length, msg: 'Page discovery completed' });
-    this.logger.log({ count: allAttachments.length, msg: 'Attachment discovery completed' });
+    if (this.attachmentConfig.mode) {
+      this.logger.log({ count: allAttachments.length, msg: 'Attachment discovery completed' });
+    }
     return { pages: discoveredPages, attachments: allAttachments };
   }
 

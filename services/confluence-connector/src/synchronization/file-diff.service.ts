@@ -18,7 +18,7 @@ export class FileDiffService {
 
   public async computeDiff(
     discoveredPages: DiscoveredPage[],
-    discoveredAttachments: DiscoveredAttachment[] = [],
+    discoveredAttachments: DiscoveredAttachment[],
   ): Promise<FileDiffResult> {
     this.logger.log({
       pageCount: discoveredPages.length,

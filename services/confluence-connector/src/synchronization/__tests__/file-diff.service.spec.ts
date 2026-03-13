@@ -91,7 +91,7 @@ describe('FileDiffService', () => {
         newFiles: ['p-1'],
       }));
 
-      const result = await service.computeDiff([basePage]);
+      const result = await service.computeDiff([basePage], []);
 
       expect(performFileDiff).toHaveBeenCalledWith(
         [{ key: 'p-1', url: basePage.webUrl, updatedAt: basePage.versionTimestamp }],
@@ -147,7 +147,7 @@ describe('FileDiffService', () => {
       const pageInSpaceA = { ...basePage, spaceId: 'sa-id', spaceKey: 'SA' };
       const pageInSpaceB = { ...basePage, id: 'p-2', spaceId: 'sb-id', spaceKey: 'SB' };
 
-      await service.computeDiff([pageInSpaceA, pageInSpaceB]);
+      await service.computeDiff([pageInSpaceA, pageInSpaceB], []);
 
       expect(performFileDiff).toHaveBeenCalledTimes(2);
       expect(performFileDiff).toHaveBeenCalledWith(
@@ -174,11 +174,14 @@ describe('FileDiffService', () => {
         return { newFiles: ['p-2'], updatedFiles: ['p-3'], deletedFiles: [], movedFiles: [] };
       });
 
-      const result = await service.computeDiff([
-        { ...basePage, spaceKey: 'SA', spaceId: 'sa-id' },
-        { ...basePage, id: 'p-2', spaceKey: 'SB', spaceId: 'sb-id' },
-        { ...basePage, id: 'p-3', spaceKey: 'SB', spaceId: 'sb-id' },
-      ]);
+      const result = await service.computeDiff(
+        [
+          { ...basePage, spaceKey: 'SA', spaceId: 'sa-id' },
+          { ...basePage, id: 'p-2', spaceKey: 'SB', spaceId: 'sb-id' },
+          { ...basePage, id: 'p-3', spaceKey: 'SB', spaceId: 'sb-id' },
+        ],
+        [],
+      );
 
       expect(result).toEqual({
         newItemIds: ['p-1', 'p-2'],
@@ -193,7 +196,7 @@ describe('FileDiffService', () => {
         useV1KeyFormat: true,
       });
 
-      await service.computeDiff([basePage]);
+      await service.computeDiff([basePage], []);
 
       expect(performFileDiff).toHaveBeenCalledWith(
         expect.anything(),
@@ -208,7 +211,7 @@ describe('FileDiffService', () => {
         instanceType: 'data-center',
       });
 
-      await service.computeDiff([basePage]);
+      await service.computeDiff([basePage], []);
 
       expect(performFileDiff).toHaveBeenCalledWith(
         expect.anything(),
@@ -321,7 +324,7 @@ describe('FileDiffService', () => {
         movedFiles: [],
       }));
 
-      const result = await service.computeDiff([basePage]);
+      const result = await service.computeDiff([basePage], []);
 
       expect(result.deletedItems).toEqual([{ id: 'p-old', partialKey: 'test-tenant/space-1_SP' }]);
     });
@@ -334,7 +337,7 @@ describe('FileDiffService', () => {
         movedFiles: [],
       }));
 
-      const result = await service.computeDiff([basePage]);
+      const result = await service.computeDiff([basePage], []);
 
       expect(result.deletedItems).toEqual([{ id: 'p-old', partialKey: 'test-tenant/space-1_SP' }]);
     });
@@ -347,7 +350,7 @@ describe('FileDiffService', () => {
         movedFiles: [],
       }));
 
-      await expect(service.computeDiff([basePage])).rejects.toThrow(
+      await expect(service.computeDiff([basePage], [])).rejects.toThrow(
         'File diff would delete 1 files with zero new or updated items. Aborting sync.',
       );
     });
@@ -360,7 +363,7 @@ describe('FileDiffService', () => {
         movedFiles: [],
       }));
 
-      await expect(service.computeDiff([basePage])).rejects.toThrow(
+      await expect(service.computeDiff([basePage], [])).rejects.toThrow(
         'File diff would delete 3 files with zero new or updated items. Aborting sync.',
       );
     });
@@ -373,7 +376,7 @@ describe('FileDiffService', () => {
         movedFiles: [],
       }));
 
-      const result = await service.computeDiff([basePage, { ...basePage, id: 'p-2' }]);
+      const result = await service.computeDiff([basePage, { ...basePage, id: 'p-2' }], []);
 
       expect(result.deletedItems).toEqual([{ id: 'p-old', partialKey: 'test-tenant/space-1_SP' }]);
     });
