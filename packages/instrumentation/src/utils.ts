@@ -8,7 +8,9 @@ const createErrorHandler = (name: string, parentSpan: Span, error: unknown) => {
 
   trace.getTracer('default').startActiveSpan(name, { links: [parentLink] }, (span) => {
     console.error(`[${name}] unhandled or uncaught error\n%o`, error);
-    if (error instanceof Error) span.recordException(error);
+    if (error instanceof Error) {
+      span.recordException(error);
+    }
     const message = error instanceof Error ? error.message : new String(error).toString();
     span.setStatus({
       code: SpanStatusCode.ERROR,

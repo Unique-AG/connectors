@@ -45,8 +45,12 @@ export class McpPromptsHandler extends McpHandlerBase {
             : [],
         };
 
-        if (prompt.metadata.title) promptSchema.title = prompt.metadata.title;
-        if (prompt.metadata._meta) promptSchema._meta = prompt.metadata._meta;
+        if (prompt.metadata.title) {
+          promptSchema.title = prompt.metadata.title;
+        }
+        if (prompt.metadata._meta) {
+          promptSchema._meta = prompt.metadata._meta;
+        }
         return promptSchema;
       });
 

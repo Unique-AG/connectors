@@ -88,7 +88,9 @@ export class GraphClientFactory {
       const currentMiddleware = middlewares[i];
       const nextMiddleware = middlewares[i + 1];
 
-      if (currentMiddleware?.setNext && nextMiddleware) currentMiddleware.setNext(nextMiddleware);
+      if (currentMiddleware?.setNext && nextMiddleware) {
+        currentMiddleware.setNext(nextMiddleware);
+      }
     }
 
     // Pass the first middleware in the chain to initialize the client

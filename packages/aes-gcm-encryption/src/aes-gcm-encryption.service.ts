@@ -55,7 +55,9 @@ export class AesGcmEncryptionService {
 
   public decryptFromString(cipherString: string): Buffer {
     const [iv, tag, data] = cipherString.split('.');
-    if (!iv || !tag || !data) throw new Error('Invalid cipher string');
+    if (!iv || !tag || !data) {
+      throw new Error('Invalid cipher string');
+    }
     return this.decrypt({ iv, tag, data });
   }
 }

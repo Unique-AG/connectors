@@ -50,25 +50,36 @@ export class McpOAuthService {
       sessionId,
     });
 
-    if (!user) throw new UnauthorizedException('Authentication failed');
-    if (!sessionId) throw new UnauthorizedException('Authentication failed');
+    if (!user) {
+      throw new UnauthorizedException('Authentication failed');
+    }
+    if (!sessionId) {
+      throw new UnauthorizedException('Authentication failed');
+    }
 
     const session = await this.store.getOAuthSession(sessionId);
-    if (!session) throw new UnauthorizedException('Invalid or expired OAuth session.');
+    if (!session) {
+      throw new UnauthorizedException('Invalid or expired OAuth session.');
+    }
     if (
       !session.clientId ||
       !session.redirectUri ||
       !session.codeChallenge ||
       !session.codeChallengeMethod
-    )
+    ) {
       throw new UnauthorizedException('Invalid or expired OAuth session.');
+    }
 
-    if (session.state !== sessionHmac) throw new UnauthorizedException('Invalid state.');
+    if (session.state !== sessionHmac) {
+      throw new UnauthorizedException('Invalid state.');
+    }
 
     const expectedHmac = createHmac('sha256', this.options.hmacSecret)
       .update(`${session.sessionId}:${sessionNonce}`)
       .digest('base64url');
-    if (sessionHmac !== expectedHmac) throw new UnauthorizedException('Invalid state validation.');
+    if (sessionHmac !== expectedHmac) {
+      throw new UnauthorizedException('Invalid state validation.');
+    }
 
     const userProfileId = await this.store.upsertUserProfile(user);
     const authCode = randomBytes(32).toString('base64url');
@@ -95,7 +106,9 @@ export class McpOAuthService {
     // Build redirect URL with authorization code
     const redirectUrl = new URL(session.redirectUri);
     redirectUrl.searchParams.set('code', authCode);
-    if (session.oauthState) redirectUrl.searchParams.set('state', session.oauthState);
+    if (session.oauthState) {
+      redirectUrl.searchParams.set('state', session.oauthState);
+    }
 
     await this.store.removeOAuthSession(sessionId);
 
@@ -121,7 +134,9 @@ export class McpOAuthService {
         ? (error as { message: string }).message
         : 'Authentication failed';
 
-    if (!state) return { redirectUrl: null, errorMessage };
+    if (!state) {
+      return { redirectUrl: null, errorMessage };
+    }
 
     let redirectUri: string | null = null;
     let oauthState: string | null = null;
@@ -153,13 +168,17 @@ export class McpOAuthService {
       });
     }
 
-    if (!redirectUri) return { redirectUrl: null, errorMessage };
+    if (!redirectUri) {
+      return { redirectUrl: null, errorMessage };
+    }
 
     const errorRedirectUrl = new URL(redirectUri);
     errorRedirectUrl.searchParams.set('error', 'access_denied');
     errorRedirectUrl.searchParams.set('error_description', errorMessage);
 
-    if (oauthState) errorRedirectUrl.searchParams.set('state', oauthState);
+    if (oauthState) {
+      errorRedirectUrl.searchParams.set('state', oauthState);
+    }
 
     return {
       redirectUrl: errorRedirectUrl.toString(),
@@ -171,7 +190,9 @@ export class McpOAuthService {
     const { code, client_id, client_secret, code_verifier, resource } = tokenDto;
 
     // 1. Validate the authorization code
-    if (!code) throw new BadRequestException('Missing code parameter');
+    if (!code) {
+      throw new BadRequestException('Missing code parameter');
+    }
 
     // Immediately consume the code (single-use enforcement)
     const authCode = await this.store.getAuthCode(code);
@@ -239,8 +260,9 @@ export class McpOAuthService {
     }
 
     // 3. Validate the PKCE (mandatory!)
-    if (!authCode.code_challenge || !code_verifier)
+    if (!authCode.code_challenge || !code_verifier) {
       throw new BadRequestException('PKCE is required for all clients.');
+    }
 
     const isValid = this.validatePKCE(
       code_verifier,
@@ -276,14 +298,18 @@ export class McpOAuthService {
   public async exchangeRefreshTokenForToken(tokenDto: TokenRequestDto) {
     const { refresh_token, client_id, client_secret, scope } = tokenDto;
 
-    if (!refresh_token) throw new BadRequestException('Missing refresh_token parameter');
+    if (!refresh_token) {
+      throw new BadRequestException('Missing refresh_token parameter');
+    }
 
     // Validate client credentials
     const isValidClient = await this.clientService.validateClientCredentials(
       client_id,
       client_secret,
     );
-    if (!isValidClient) throw new BadRequestException('Invalid client credentials');
+    if (!isValidClient) {
+      throw new BadRequestException('Invalid client credentials');
+    }
 
     const tokenPair = await this.tokenService.refreshAccessToken(refresh_token, client_id, scope);
     if (!tokenPair) {
@@ -331,7 +357,9 @@ export class McpOAuthService {
     if (!token_type_hint || token_type_hint === 'access_token') {
       const accessTokenResult = await this.tokenService.validateAccessToken(token);
 
-      if (!accessTokenResult) return { active: false };
+      if (!accessTokenResult) {
+        return { active: false };
+      }
 
       if (accessTokenResult.clientId !== client_id) {
         this.logger.warn({
@@ -358,7 +386,9 @@ export class McpOAuthService {
     if (!token_type_hint || token_type_hint === 'refresh_token') {
       const refreshTokenResult = await this.tokenService.validateRefreshToken(token);
 
-      if (!refreshTokenResult) return { active: false };
+      if (!refreshTokenResult) {
+        return { active: false };
+      }
 
       if (refreshTokenResult.clientId !== client_id) {
         this.logger.warn({
@@ -411,7 +441,9 @@ export class McpOAuthService {
     if (!token_type_hint || token_type_hint === 'access_token') {
       const accessTokenResult = await this.tokenService.validateAccessToken(token);
 
-      if (!accessTokenResult) return;
+      if (!accessTokenResult) {
+        return;
+      }
 
       if (accessTokenResult.clientId !== client_id) {
         this.logger.warn({
@@ -435,7 +467,9 @@ export class McpOAuthService {
     if (!token_type_hint || token_type_hint === 'refresh_token') {
       const refreshTokenResult = await this.tokenService.validateRefreshToken(token);
 
-      if (!refreshTokenResult) return;
+      if (!refreshTokenResult) {
+        return;
+      }
 
       if (refreshTokenResult.clientId !== client_id) {
         this.logger.warn({
@@ -475,7 +509,9 @@ export class McpOAuthService {
   }
 
   private validatePKCE(codeVerifier: string, codeChallenge: string, codeChallengeMethod: string) {
-    if (codeChallengeMethod === 'plain') return codeVerifier === codeChallenge;
+    if (codeChallengeMethod === 'plain') {
+      return codeVerifier === codeChallenge;
+    }
     if (codeChallengeMethod === 'S256') {
       const hash = createHash('sha256').update(codeVerifier).digest('base64url');
       return hash === codeChallenge;

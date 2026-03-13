@@ -277,7 +277,9 @@ export const TranscriptVttMetadataSchema = z
     const entries = Array.from(languages.entries());
     const mostSpoken = entries.length > 0 ? entries.reduce((a, b) => (a[1] > b[1] ? a : b))[0] : '';
 
-    if (ctx.issues.length > 0) return z.NEVER;
+    if (ctx.issues.length > 0) {
+      return z.NEVER;
+    }
 
     return { mostSpoken, languages };
   });

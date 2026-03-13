@@ -38,7 +38,9 @@ import { serverInstructions } from './server.instructions';
             level: configService.get(AppSettings.LOG_LEVEL),
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
-              if (!ctx) return typeid('trace').toString();
+              if (!ctx) {
+                return typeid('trace').toString();
+              }
               return ctx.traceId;
             },
           },
