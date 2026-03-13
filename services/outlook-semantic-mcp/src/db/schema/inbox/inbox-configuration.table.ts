@@ -28,6 +28,7 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   lastFullSyncStartedAt: timestamp(`last_full_sync_started_at`),
   fullSyncVersion: uuid(`full_sync_version`),
   liveCatchUpState: liveCatchUpState(`live_catch_up_state`).notNull().default('ready'),
+  liveCatchUpHeartbeatAt: timestamp(`live_catch_up_heartbeat_at`),
   fullSyncNextLink: text(`full_sync_next_link`),
   pendingLiveMessageIds: text(`pending_live_message_ids`).array().notNull().default(sql`'{}'`),
 

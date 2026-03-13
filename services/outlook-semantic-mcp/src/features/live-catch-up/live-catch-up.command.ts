@@ -71,6 +71,10 @@ export class LiveCatchUpCommand {
       const remainingIds = messageIds.filter((id) => !scheduledIds.has(id));
       let webhookScheduled = 0;
       if (remainingIds.length > 0) {
+        this.logger.debug({
+          msg: `Publishing remaining ids: ${remainingIds.length}`,
+          subscriptionId,
+        });
         webhookScheduled = await this.publishMessages({
           messageIds: remainingIds,
           subscriptionId,
@@ -108,6 +112,7 @@ export class LiveCatchUpCommand {
         .set({ liveCatchUpState: 'failed' })
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
         .execute();
+      throw error;
     }
   }
 
@@ -203,15 +208,13 @@ export class LiveCatchUpCommand {
     const scheduledIds = new Set<string>();
     let batchNumber = 0;
 
-    // We cannot combine a createdDateTime filter with orderby on lastModifiedDateTime on the
-    // Microsoft side (InefficientFilter). The ignoredBefore check is applied in-memory below.
-    const filterExpression = `lastModifiedDateTime ge ${watermark.toISOString()}`;
-
     let emailsRaw = await client
       .api('me/messages')
       .header('Prefer', 'IdType="ImmutableId"')
       .select(FullSyncGraphMessageFields)
-      .filter(filterExpression)
+      // We cannot combine a createdDateTime filter with orderby on lastModifiedDateTime on the
+      // Microsoft side (InefficientFilter). The ignoredBefore check is applied in-memory below.
+      .filter(`lastModifiedDateTime ge ${watermark.toISOString()}`)
       .orderby('lastModifiedDateTime asc')
       .top(200)
       .get();
@@ -275,11 +278,15 @@ export class LiveCatchUpCommand {
     pendingMessageIds: Set<string>;
   }): Promise<string[]> {
     const publishedIds: string[] = [];
+    let skippedEvents = 0;
+    let publishedEvents = 0;
 
     for (const email of batch) {
       if (pendingMessageIds.has(email.id)) {
+        skippedEvents++;
         continue;
       }
+      publishedEvents++;
       const event = MessageEventDto.encode({
         type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
         payload: { subscriptionId, messageId: email.id },
@@ -289,6 +296,11 @@ export class LiveCatchUpCommand {
       });
       publishedIds.push(email.id);
     }
+
+    this.logger.debug({
+      subscriptionId,
+      msg: `PublishBatch - Skipped messages ${skippedEvents}. Published Messages: ${publishedEvents}`,
+    });
 
     return publishedIds;
   }
@@ -346,7 +358,10 @@ export class LiveCatchUpCommand {
     });
 
     if (idsToFlush.length > 0) {
+      this.logger.debug({ msg: `Flushing buffered messages while running: ${idsToFlush.length}` });
       await this.publishMessages({ messageIds: idsToFlush, subscriptionId });
+    } else {
+      this.logger.debug({ msg: `No messages to flush buffered messages is empty` });
     }
 
     return idsToFlush.length;

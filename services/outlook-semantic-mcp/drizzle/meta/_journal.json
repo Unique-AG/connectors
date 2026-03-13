@@ -120,6 +120,13 @@
       "when": 1773400001000,
       "tag": "0016_sync_checkpoint_and_buffering",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1773405168826,
+      "tag": "0017_live_catch_up_heartbeat",
+      "breakpoints": true
     }
   ]
 }
