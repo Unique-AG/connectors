@@ -216,6 +216,16 @@ export class ContentSyncService {
           `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files stored ` +
             `in Unique as to be deleted. Aborting sync to prevent accidental full deletion.`,
         );
+      } else {
+        this.logger.warn({
+          msg:
+            `${logPrefix} File diff would delete all ${fileDiffResult.deletedFiles.length} files ` +
+            `in Unique, but ${fileDiffResult.newFiles.length} new files with different item IDs ` +
+            `are being added. Allowing deletion as this appears to be a legitimate content replacement.`,
+          siteId,
+          totalFilesForSiteInUnique,
+          fileDiffResultCounts: mapValues(fileDiffResult, length()),
+        });
       }
     }
   }
