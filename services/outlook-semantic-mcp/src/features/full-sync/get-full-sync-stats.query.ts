@@ -127,6 +127,14 @@ export class GetFullSyncStatsQuery {
         message: `Full sync failed. Use \`run_full_sync\` tool to sync your inbox`,
       };
     }
+    if (inboxConfig.liveCatchUpState === 'failed') {
+      return {
+        state: 'error',
+        syncStats: null,
+        ingestionStats: null,
+        message: `Live catch-up failed. Use \`run_full_sync\` tool to sync your inbox`,
+      };
+    }
     const ingestionResult = await this.getIngestionStats(userProfile);
     if (ingestionResult.state === 'error') {
       return {

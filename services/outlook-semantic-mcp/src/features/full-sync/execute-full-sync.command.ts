@@ -1,4 +1,5 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
+import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, SQL, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -64,7 +65,7 @@ export class ExecuteFullSyncCommand {
       return;
     }
 
-    const { fullSyncNextLink, fullSyncVersion, fullSyncState } = inboxConfig;
+    const { fullSyncNextLink, fullSyncVersion, fullSyncState, oldestCreatedDateTime } = inboxConfig;
     if (!fullSyncNextLink) {
       this.logger.warn({
         userProfileId,
@@ -101,6 +102,7 @@ export class ExecuteFullSyncCommand {
         userProfileId,
         filters,
         version,
+        oldestCreatedDateTime,
         initialDeltaLink: fullSyncNextLink,
       });
 
@@ -129,9 +131,11 @@ export class ExecuteFullSyncCommand {
     filters,
     version,
     initialDeltaLink,
+    oldestCreatedDateTime,
   }: {
     userProfileId: string;
     filters: InboxConfigurationMailFilters;
+    oldestCreatedDateTime: Date | null;
     version: string;
     initialDeltaLink: string;
   }): Promise<void> {
@@ -140,14 +144,29 @@ export class ExecuteFullSyncCommand {
     let batchNumber = 0;
 
     const fetchBatch = async (nextLink: string): Promise<unknown> => {
+      const conditions = [`createdDateTime gt ${filters.ignoredBefore.toISOString()}`];
+
       if (nextLink !== START_DELTA_LINK) {
-        return await client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get();
+        try {
+          return await client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get();
+        } catch (error) {
+          const isExpiredNextLink = error instanceof GraphError && error.statusCode === 410;
+          if (!isExpiredNextLink) {
+            throw error;
+          }
+
+          // If it's expired link we do not throw we resume from what we know to be the oldest created date time
+          // or from now.
+          conditions.push(
+            `createdDateTime lte ${(oldestCreatedDateTime ?? new Date())?.toISOString()}`,
+          );
+        }
       }
       return await client
         .api(`me/messages`)
         .header('Prefer', 'IdType="ImmutableId"')
         .select(FullSyncGraphMessageFields)
-        .filter(`createdDateTime gt ${filters.ignoredBefore.toISOString()}`)
+        .filter(conditions.join(' and '))
         .orderby(`createdDateTime desc`)
         .top(200)
         .get();

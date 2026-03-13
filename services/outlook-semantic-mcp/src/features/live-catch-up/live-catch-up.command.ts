@@ -112,7 +112,6 @@ export class LiveCatchUpCommand {
         .set({ liveCatchUpState: 'failed' })
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
         .execute();
-      throw error;
     }
   }
 
