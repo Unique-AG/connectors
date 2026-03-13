@@ -567,6 +567,61 @@ describe('ContentSyncService', () => {
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
+    it('does not throw an error when all files are deleted but new files are being added', async () => {
+      const items = [
+        {
+          siteId: defaultSiteId,
+          itemType: 'driveItem',
+          item: {
+            id: '1',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/1',
+          },
+        },
+        {
+          siteId: defaultSiteId,
+          itemType: 'driveItem',
+          item: {
+            id: '2',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/2',
+          },
+        },
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootPath: new Smeared('/root', false),
+        siteName: new Smeared('test-site', false),
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
+        discoveredSubsites: [],
+      };
+
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: ['1', '2'],
+        updatedFiles: [],
+        movedFiles: [],
+        deletedFiles: ['old-1'],
+      });
+
+      vi.spyOn(uniqueFilesService, 'getFilesCountForSite').mockResolvedValue(1);
+
+      vi.spyOn(uniqueFilesService, 'getFilesByKeys').mockResolvedValue([
+        {
+          id: 'deleted-file-id',
+          key: 'site-id/old-1',
+          fileAccess: [],
+          ownerType: 'user',
+          ownerId: 'user-id',
+        },
+      ]);
+
+      vi.spyOn(configService, 'get').mockImplementation(() => null);
+
+      await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
+    });
+
     it('does not throw an error for empty site with no deleted files', async () => {
       const items = [] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];

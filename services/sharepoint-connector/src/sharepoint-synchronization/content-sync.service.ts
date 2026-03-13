@@ -187,10 +187,14 @@ export class ContentSyncService {
     // If the file diff indicated we should delete all files even when we submitted some files to
     // diff, it most probably means that we have some kind of bug in file diff or something
     // unexpected changed in the logic. We should not proceed with the sync to avoid costly
-    // re-ingestions. If user actually deleted all the files from the site and uploaded new ones,
-    // they should recursively delete the site data from Unique first via GraphQL API.
+    // re-ingestions. However, if there are new files being added, this is a legitimate content
+    // replacement scenario (e.g. old files were deleted and new ones uploaded) — not an accidental
+    // full deletion.
     const totalFilesForSiteInUnique = await this.uniqueFilesService.getFilesCountForSite(siteId);
-    if (fileDiffResult.deletedFiles.length === totalFilesForSiteInUnique) {
+    if (
+      fileDiffResult.deletedFiles.length === totalFilesForSiteInUnique &&
+      fileDiffResult.newFiles.length === 0
+    ) {
       this.logger.error({
         msg:
           `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files ` +
