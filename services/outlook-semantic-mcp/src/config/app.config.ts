@@ -25,9 +25,14 @@ const ConfigSchema = z
     defaultMailFilters: json(inboxConfigurationMailFilters).describe(
       'Default mail filters applied when syncing emails (e.g. {"ignoredBefore":"2024-01-01", "ignoredSenders": [], "ignoredContents": [] }). ',
     ),
-    addScopePermissionsToUniqueUsers: enabledDisabledBoolean(
-      'Whether to add MANAGE scope permissions to the Unique user matching the user profile when creating root scopes.',
-    ),
+    globalScopeAccess: json(
+      z.object({
+        entityId: z.string().describe(`The id of the entity which will get scope access`),
+        entityType: z.enum(['GROUP', 'USER']),
+      }),
+    )
+      .optional()
+      .describe('User / Group in unique which will get Access to the outlook mcp'),
   })
   .transform((c) => ({
     ...c,
@@ -42,7 +47,7 @@ export const appConfig = registerConfig('app', ConfigSchema, {
     'NODE_ENV',
     'SELF_URL',
     'DEFAULT_MAIL_FILTERS',
-    'ADD_SCOPE_PERMISSIONS_TO_UNIQUE_USERS',
+    'GLOBAL_SCOPE_ACCESS',
   ]),
 });
 

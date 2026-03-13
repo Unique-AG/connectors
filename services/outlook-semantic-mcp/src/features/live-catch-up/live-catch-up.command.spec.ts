@@ -398,7 +398,7 @@ describe('LiveCatchUpCommand', () => {
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
     // State set to 'failed'
-    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]!.value.set;
+    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]?.value.set;
     expect(lastUpdateSetCall).toHaveBeenCalledWith(
       expect.objectContaining({ liveCatchUpState: 'failed' }),
     );

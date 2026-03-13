@@ -41,33 +41,29 @@ export class CreateRootScopeCommand {
       externalId: getRootScopeExternalIdForUser(userProviderUserId),
     });
 
-    if (this.config.addScopePermissionsToUniqueUsers && userScopeCreated) {
-      await this.addPermissionsForUser([parentScopeId, userScopeId], userEmail);
+    if (userScopeCreated) {
+      await this.addPermissions([parentScopeId, userScopeId]);
     }
   }
 
-  private async addPermissionsForUser(scopeIds: string[], userEmail: string | null): Promise<void> {
-    if (!userEmail) {
-      this.logger.warn('Cannot add scope permissions: user email is not available');
-      return;
-    }
-
-    const users = await this.uniqueApi.users.listAll();
-    const uniqueUser = users.find((u) => u.email === userEmail);
-    if (!uniqueUser) {
-      this.logger.warn(
-        `Cannot add scope permissions: no Unique user found with email ${userEmail}`,
-      );
+  private async addPermissions(scopeIds: string[]): Promise<void> {
+    const { globalScopeAccess } = this.config;
+    if (!globalScopeAccess) {
+      this.logger.warn('Cannot add scope permissions: user id is not available');
       return;
     }
 
     this.logger.debug(
-      `Adding MANAGE scope permissions for user ${userEmail} on scopes ${scopeIds.join(', ')}`,
+      `Adding MANAGE scope permissions for user ${globalScopeAccess.entityId}, type: ${globalScopeAccess.entityType} on scopes ${scopeIds.join(', ')}`,
     );
     await Promise.all(
       scopeIds.map((scopeId) =>
         this.uniqueApi.scopes.createAccesses(scopeId, [
-          { type: 'MANAGE', entityId: uniqueUser.id, entityType: 'USER' },
+          {
+            type: 'MANAGE',
+            entityId: globalScopeAccess.entityId,
+            entityType: globalScopeAccess.entityType,
+          },
         ]),
       ),
     );
