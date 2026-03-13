@@ -622,6 +622,55 @@ describe('ContentSyncService', () => {
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
 
+    it('throws an error when all files are deleted and new files share item IDs with deleted keys (key format bug)', async () => {
+      const items = [
+        {
+          siteId: defaultSiteId,
+          itemType: 'driveItem',
+          item: {
+            id: '1',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/1',
+          },
+        },
+        {
+          siteId: defaultSiteId,
+          itemType: 'driveItem',
+          item: {
+            id: '2',
+            lastModifiedDateTime: '2023-01-01',
+            webUrl: 'http://example.com/2',
+          },
+        },
+      ] as SharepointContentItem[];
+      const scopes = [] as ScopeWithPath[];
+      const context: SharepointSyncContext = {
+        serviceUserId: 'user-123',
+        rootPath: new Smeared('/root', false),
+        siteName: new Smeared('test-site', false),
+        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        isInitialSync: false,
+        discoveredSubsites: [],
+      };
+
+      // Submitted keys are "1" and "2", deleted keys are also "1" and "2" — same item IDs,
+      // which indicates a key format change rather than genuinely different files.
+      vi.spyOn(uniqueFileIngestionService, 'performFileDiff').mockResolvedValue({
+        newFiles: ['1', '2'],
+        updatedFiles: [],
+        movedFiles: [],
+        deletedFiles: ['1', '2'],
+      });
+
+      vi.spyOn(uniqueFilesService, 'getFilesCountForSite').mockResolvedValue(2);
+
+      vi.spyOn(configService, 'get').mockImplementation(() => null);
+
+      await expect(service.syncContentForSite(items, scopes, context)).rejects.toThrow(
+        /\[Site: .+\] File diff declares all 2 files stored in Unique as to be deleted\. Aborting sync to prevent accidental full deletion\./,
+      );
+    });
+
     it('does not throw an error for empty site with no deleted files', async () => {
       const items = [] as SharepointContentItem[];
       const scopes = [] as ScopeWithPath[];
