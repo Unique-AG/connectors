@@ -45,11 +45,12 @@ export abstract class ConfluenceApiClient {
 
       const { size, limit, _links } = attachment;
       if (isNullish(size) || isNullish(limit) || size < limit || !_links?.next) {
+        // no more attachments on this page, continue
         continue;
       }
 
-      const remaining = await this.fetchPaginatedAttachments(_links.next);
-      attachment.results.push(...remaining);
+      const attachments = await this.fetchPaginatedAttachments(_links.next);
+      attachment.results.push(...attachments);
     }
   }
 

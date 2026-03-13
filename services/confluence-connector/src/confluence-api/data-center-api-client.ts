@@ -29,6 +29,8 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
 
   public async searchPagesByLabel(): Promise<ConfluencePage[]> {
     const spaceTypeFilter = 'space.type=global';
+    // Attachments are child content in Confluence and would appear as top-level results here.
+    // We exclude them because we already get attachments via the expand=children.attachment parameter.
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
     const expand = `metadata.labels,version,space${this.attachmentExpand}`;
     const url = `${this.config.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=${expand}&os_authType=basic&limit=${SEARCH_PAGE_SIZE}&start=0`;
@@ -65,6 +67,8 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     const expand = `metadata.labels,version,space${this.attachmentExpand}`;
 
     for (const batch of batches) {
+      // Attachments are child content in Confluence and would appear as top-level results here.
+      // We exclude them because we already get attachments via the expand=children.attachment parameter.
       const cql = `ancestor IN (${batch.join(',')}) AND type != attachment`;
       const url = `${this.config.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=${expand}&os_authType=basic&limit=${SEARCH_PAGE_SIZE}`;
 
