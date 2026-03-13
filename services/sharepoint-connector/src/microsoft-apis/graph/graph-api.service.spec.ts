@@ -196,7 +196,7 @@ describe('GraphApiService', () => {
         new Smeared('site-1', false),
         'Documents',
         'FinanceGPTKnowledge',
-        undefined,
+        { filesScanned: 0, maxFiles: undefined },
       );
     });
 
@@ -222,7 +222,7 @@ describe('GraphApiService', () => {
         new Smeared('site-1', false),
         'Documents',
         'InternalSyncName',
-        undefined,
+        { filesScanned: 0, maxFiles: undefined },
       );
     });
 
@@ -259,7 +259,7 @@ describe('GraphApiService', () => {
         new Smeared('site-1', false),
         'Documents',
         'SyncFlag',
-        undefined,
+        { filesScanned: 0, maxFiles: undefined },
       );
     });
   });
