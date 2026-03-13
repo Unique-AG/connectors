@@ -163,9 +163,12 @@ describe('ConfluenceSynchronizationService', () => {
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(tenant.isScanning).toBe(false);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.any(Error), msg: 'Page ingestion summary' }),
-      );
+      expect(mockLogger.log).toHaveBeenCalledWith({
+        total: 1,
+        succeeded: 0,
+        failed: 1,
+        msg: 'Page ingestion summary',
+      });
     });
 
     it('deletes content for deleted keys returned by file diff', async () => {
@@ -404,9 +407,6 @@ describe('ConfluenceSynchronizationService', () => {
       await tenantStorage.run(tenant, () => service.synchronize());
 
       expect(tenant.isScanning).toBe(false);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.any(Error), msg: 'Attachment ingestion summary' }),
-      );
       expect(mockLogger.log).toHaveBeenCalledWith({
         total: 1,
         succeeded: 0,

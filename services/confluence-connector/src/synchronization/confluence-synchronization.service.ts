@@ -138,13 +138,6 @@ export class ConfluenceSynchronizationService {
   private logSettledResults(results: PromiseSettledResult<void>[], msg: string): void {
     const succeeded = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.filter((r) => r.status === 'rejected').length;
-
-    for (const result of results) {
-      if (result.status === 'rejected') {
-        this.logger.error({ err: result.reason, msg });
-      }
-    }
-
     this.logger.log({ total: results.length, succeeded, failed, msg });
   }
 }
