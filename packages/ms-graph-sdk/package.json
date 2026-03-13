@@ -1,0 +1,61 @@
+{
+  "name": "@unique-ag/ms-graph-sdk",
+  "description": "Typed Microsoft Graph API client for NestJS services",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@proventuslabs/nestjs-zod": "^2.0.0",
+    "@proventuslabs/retry-strategies": "0.1.2",
+    "@qfetch/qfetch": "0.1.0",
+    "@unique-ag/utils": "workspace:*",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/testing": "^11.1.6",
+    "@suites/di.nestjs": "^3.0.1",
+    "@suites/doubles.vitest": "^3.0.1",
+    "@suites/unit": "^3.0.1",
+    "@swc/core": "^1.13.5",
+    "@types/node": "^22.13.14",
+    "reflect-metadata": "^0.2.2",
+    "typescript": "^5.9.2",
+    "unplugin-swc": "^1.5.7",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^10 || ^11",
+    "@nestjs/core": "^10 || ^11"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./outlook": {
+      "types": "./src/outlook/index.ts",
+      "import": "./src/outlook/index.ts",
+      "require": "./dist/outlook/index.js",
+      "default": "./dist/outlook/index.js"
+    },
+    "./teams": {
+      "types": "./src/teams/index.ts",
+      "import": "./src/teams/index.ts",
+      "require": "./dist/teams/index.js",
+      "default": "./dist/teams/index.js"
+    }
+  }
+}
