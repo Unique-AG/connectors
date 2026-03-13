@@ -14,6 +14,7 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/unique-groups/unique-groups.utils';
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
+import type { ManagedPath } from '../utils/paths.util';
 import { Smeared } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery, PermissionsMap } from './fetch-graph-permissions-map.query';
@@ -82,6 +83,7 @@ export class PermissionsSyncService {
       currentStep = SyncStep.GroupsMembershipsFetch;
       const groupsWithMembershipsMap = await this.fetchGroupsWithMembershipsForSite(
         siteId,
+        context.managedPath,
         permissionsMap,
       );
 
@@ -167,6 +169,7 @@ export class PermissionsSyncService {
 
   private async fetchGroupsWithMembershipsForSite(
     siteId: Smeared,
+    managedPath: ManagedPath,
     permissionsMap: PermissionsMap,
   ): Promise<SharePointGroupsMap> {
     const logPrefix = `[Site: ${siteId}]`;
@@ -181,7 +184,11 @@ export class PermissionsSyncService {
       `${logPrefix} Fetching groups with memberships from SharePoint & Graph APIs for ` +
         `${uniqueGroupPermissions.length} unique group permissions`,
     );
-    return await this.fetchGroupsWithMembershipsQuery.run(siteId, uniqueGroupPermissions);
+    return await this.fetchGroupsWithMembershipsQuery.run(
+      siteId,
+      managedPath,
+      uniqueGroupPermissions,
+    );
   }
 
   private async getUniqueUsersMap(): Promise<UniqueUsersMap> {

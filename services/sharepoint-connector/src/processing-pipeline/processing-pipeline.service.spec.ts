@@ -144,6 +144,7 @@ describe('ProcessingPipelineService', () => {
   const mockSyncContext: SharepointSyncContext = {
     siteConfig: createMockSiteConfig(),
     siteName: new Smeared('test-site', false),
+    managedPath: 'sites',
     serviceUserId: 'test-user-id',
     rootPath: new Smeared('/Root', false),
     isInitialSync: false,

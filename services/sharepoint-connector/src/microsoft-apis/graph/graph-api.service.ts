@@ -10,7 +10,7 @@ import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
 import { sanitizeError } from '../../utils/normalize-error';
-import { extractSiteNameFromWebUrl } from '../../utils/paths.util';
+import { type ManagedPath, extractSitePathInfoFromWebUrl } from '../../utils/paths.util';
 import { createSmeared, Smeared } from '../../utils/smeared';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
@@ -500,9 +500,12 @@ export class GraphApiService {
     }
   }
 
-  public async getSiteName(siteId: Smeared): Promise<Smeared> {
+  public async getSiteInfo(
+    siteId: Smeared,
+  ): Promise<{ siteName: Smeared; managedPath: ManagedPath }> {
     const siteWebUrl = await this.getSiteWebUrl(siteId);
-    return createSmeared(extractSiteNameFromWebUrl(siteWebUrl));
+    const { siteName, managedPath } = extractSitePathInfoFromWebUrl(siteWebUrl);
+    return { siteName: createSmeared(siteName), managedPath };
   }
 
   private async getDrivesForSite(siteId: Smeared): Promise<Drive[]> {
