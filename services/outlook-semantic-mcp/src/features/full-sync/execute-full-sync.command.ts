@@ -53,7 +53,6 @@ export class ExecuteFullSyncCommand {
         fullSyncState: inboxConfiguration.fullSyncState,
         fullSyncVersion: inboxConfiguration.fullSyncVersion,
         filters: inboxConfiguration.filters,
-        oldestCreatedDateTime: inboxConfiguration.oldestCreatedDateTime,
         fullSyncNextLink: inboxConfiguration.fullSyncNextLink,
       })
       .from(inboxConfiguration)
@@ -65,7 +64,7 @@ export class ExecuteFullSyncCommand {
       return;
     }
 
-    const { fullSyncNextLink, fullSyncVersion, fullSyncState, oldestCreatedDateTime } = inboxConfig;
+    const { fullSyncNextLink, fullSyncVersion, fullSyncState } = inboxConfig;
     if (!fullSyncNextLink) {
       this.logger.warn({
         userProfileId,
@@ -102,7 +101,6 @@ export class ExecuteFullSyncCommand {
         userProfileId,
         filters,
         version,
-        oldestCreatedDateTime,
         initialDeltaLink: fullSyncNextLink,
       });
 
@@ -131,11 +129,9 @@ export class ExecuteFullSyncCommand {
     filters,
     version,
     initialDeltaLink,
-    oldestCreatedDateTime,
   }: {
     userProfileId: string;
     filters: InboxConfigurationMailFilters;
-    oldestCreatedDateTime: Date | null;
     version: string;
     initialDeltaLink: string;
   }): Promise<void> {
@@ -155,11 +151,20 @@ export class ExecuteFullSyncCommand {
             throw error;
           }
 
-          // If it's expired link we do not throw we resume from what we know to be the oldest created date time
-          // or from now.
-          conditions.push(
-            `createdDateTime lte ${(oldestCreatedDateTime ?? new Date())?.toISOString()}`,
-          );
+          // Read fresh from DB so the cutoff reflects watermarks written by batches already
+          // processed in this run, not the snapshot captured before the sync started.
+          const oldestCreatedDateTime = await this.db
+            .select({ oldestCreatedDateTime: inboxConfiguration.oldestCreatedDateTime })
+            .from(inboxConfiguration)
+            .where(
+              and(
+                eq(inboxConfiguration.userProfileId, userProfileId),
+                eq(inboxConfiguration.fullSyncVersion, version),
+              ),
+            )
+            .then((rows) => rows[0]?.oldestCreatedDateTime ?? new Date());
+
+          conditions.push(`createdDateTime lte ${oldestCreatedDateTime.toISOString()}`);
         }
       }
       return await client
