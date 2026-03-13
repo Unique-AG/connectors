@@ -13,6 +13,7 @@ export const DEFAULT_ALLOWED_EXTENSIONS = [
   'docx',
   'xls',
   'xlsx',
+  'ppt',
   'pptx',
   'txt',
   'csv',
