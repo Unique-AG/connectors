@@ -9,6 +9,8 @@ import type { IngestionService } from './ingestion.service';
 import type { ScopeManagementService } from './scope-management.service';
 import type { DiscoveredAttachment, DiscoveredPage } from './sync.types';
 
+const INGESTION_PROGRESS_LOG_INTERVAL = 100;
+
 export class ConfluenceSynchronizationService {
   private readonly logger = new Logger(ConfluenceSynchronizationService.name);
 
@@ -93,6 +95,9 @@ export class ConfluenceSynchronizationService {
       return;
     }
 
+    let processed = 0;
+    const total = pages.length;
+
     const results = await Promise.allSettled(
       pages.map((page) =>
         limit(async () => {
@@ -104,6 +109,11 @@ export class ConfluenceSynchronizationService {
           const scopeId = spaceScopes.get(page.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
           await this.ingestionService.ingestPage(fetched, scopeId);
+        }).finally(() => {
+          processed++;
+          if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
+            this.logger.log({ processed, total, msg: 'Page ingestion in progress' });
+          }
         }),
       ),
     );
@@ -121,6 +131,8 @@ export class ConfluenceSynchronizationService {
     }
 
     const limit = pLimit(concurrency);
+    let processed = 0;
+    const total = attachments.length;
 
     const results = await Promise.allSettled(
       attachments.map((attachment) =>
@@ -128,6 +140,11 @@ export class ConfluenceSynchronizationService {
           const scopeId = spaceScopes.get(attachment.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${attachment.spaceKey}`);
           await this.ingestionService.ingestAttachment(attachment, scopeId);
+        }).finally(() => {
+          processed++;
+          if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
+            this.logger.log({ processed, total, msg: 'Attachment ingestion in progress' });
+          }
         }),
       ),
     );

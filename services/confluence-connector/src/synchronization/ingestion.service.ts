@@ -65,12 +65,6 @@ export class IngestionService {
         registrationResponse.readUrl,
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
-
-      this.logger.debug({
-        pageId: page.id,
-        title: createSmeared(page.title),
-        msg: 'Page sent for ingestion',
-      });
     } catch (error) {
       this.logger.error({
         pageId: page.id,
@@ -113,12 +107,6 @@ export class IngestionService {
         registrationResponse.readUrl,
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
-
-      this.logger.debug({
-        attachmentId: attachment.id,
-        title: createSmeared(attachment.title),
-        msg: 'Attachment sent for ingestion',
-      });
     } catch (error) {
       stream?.destroy();
       this.logger.error({
