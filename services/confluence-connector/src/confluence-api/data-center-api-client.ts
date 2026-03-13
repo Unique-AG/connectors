@@ -108,6 +108,8 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
   }
 
+  // Data Center does not have a v2 REST API, so we follow the v1 _links.next
+  // pagination links to fetch remaining attachments beyond the initial 25.
   protected async fetchMoreAttachments(pages: ConfluencePage[]): Promise<void> {
     for (const page of pages) {
       const attachment = page.children?.attachment;
