@@ -45,8 +45,9 @@ export class ConfluencePageScanner {
 
     // Attachments are already present on page objects from the expand=children.attachment
     // parameter in searchPagesByLabel/getDescendantPages. We just extract and filter them here.
+    const filteredRawPages = allRawPages.filter((p) => seenPageIds.has(p.id));
     const attachments = this.attachmentConfig.mode
-      ? this.extractDiscoveredAttachments(discoveredPages, allRawPages)
+      ? this.extractDiscoveredAttachments(filteredRawPages)
       : [];
 
     if (this.attachmentConfig.mode) {
@@ -101,23 +102,20 @@ export class ConfluencePageScanner {
 
   /**
    * Extracts attachments from already-fetched page objects. The raw Confluence pages
-   * contain attachment data from the `expand=children.attachment` parameter — no
-   * additional API requests are made here.
+   * contain attachment data from the `expand=children.attachment` parameter —
+   * no additional API requests are made here.
    */
-  private extractDiscoveredAttachments(
-    discoveredPages: DiscoveredPage[],
-    rawPages: ConfluencePage[],
-  ): DiscoveredAttachment[] {
-    const rawPageById = new Map(rawPages.map((p) => [p.id, p]));
+  private extractDiscoveredAttachments(rawPages: ConfluencePage[]): DiscoveredAttachment[] {
     const allAttachments: DiscoveredAttachment[] = [];
-    let remainingCapacity = this.remainingCapacity(discoveredPages.length);
+    let remainingCapacity = this.remainingCapacity(rawPages.length);
 
-    for (const discovered of discoveredPages) {
-      const rawPage = rawPageById.get(discovered.id);
-      const results = rawPage?.children?.attachment?.results;
+    for (const page of rawPages) {
+      const results = page.children?.attachment?.results;
       if (!results || results.length === 0) {
         continue;
       }
+
+      const webUrl = this.apiClient.buildPageWebUrl(page);
 
       for (const attachment of results) {
         if (remainingCapacity !== undefined && remainingCapacity <= 0) {
@@ -134,12 +132,12 @@ export class ConfluencePageScanner {
           mediaType: attachment.extensions.mediaType,
           fileSize: attachment.extensions.fileSize,
           downloadPath: attachment._links.download,
-          versionTimestamp: attachment.version?.when ?? rawPage.version.when,
-          pageId: discovered.id,
-          spaceId: discovered.spaceId,
-          spaceKey: discovered.spaceKey,
-          spaceName: discovered.spaceName,
-          webUrl: discovered.webUrl,
+          versionTimestamp: attachment.version?.when ?? page.version.when,
+          pageId: page.id,
+          spaceId: page.space.id,
+          spaceKey: page.space.key,
+          spaceName: page.space.name,
+          webUrl,
         });
 
         if (remainingCapacity !== undefined) {
