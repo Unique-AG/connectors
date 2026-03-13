@@ -42,6 +42,7 @@ describe('AspxProcessingStep', () => {
     syncContext: {
       siteConfig: createMockSiteConfig(),
       siteName: new Smeared('test-site', false),
+      managedPath: 'sites',
       serviceUserId: 'user-1',
       rootPath: new Smeared('/Root', false),
       isInitialSync: false,

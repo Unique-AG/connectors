@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   encodeSiteNameForPath,
   extractSiteNameFromWebUrl,
+  extractSitePathInfoFromWebUrl,
   isAncestorOfRootPath,
   normalizeSlashes,
 } from './paths.util';
@@ -56,10 +57,56 @@ describe('normalizeSlashes', () => {
   });
 });
 
+describe('extractSitePathInfoFromWebUrl', () => {
+  it('extracts site info from a /sites/ URL', () => {
+    expect(
+      extractSitePathInfoFromWebUrl('https://contoso.sharepoint.com/sites/WealthManagement'),
+    ).toEqual({ managedPath: 'sites', siteName: 'WealthManagement' });
+  });
+
+  it('extracts site info from a /teams/ URL', () => {
+    expect(
+      extractSitePathInfoFromWebUrl('https://contoso.sharepoint.com/teams/Engineering'),
+    ).toEqual({ managedPath: 'teams', siteName: 'Engineering' });
+  });
+
+  it('extracts full path for a /teams/ subsite URL', () => {
+    expect(
+      extractSitePathInfoFromWebUrl('https://contoso.sharepoint.com/teams/Engineering/SubTeam'),
+    ).toEqual({ managedPath: 'teams', siteName: 'Engineering/SubTeam' });
+  });
+
+  it('decodes URL-encoded segments in /teams/ URL', () => {
+    expect(extractSitePathInfoFromWebUrl('https://contoso.sharepoint.com/teams/My%20Team')).toEqual(
+      { managedPath: 'teams', siteName: 'My Team' },
+    );
+  });
+
+  it('matches managed path only at the start of the URL path', () => {
+    expect(
+      extractSitePathInfoFromWebUrl(
+        'https://tenant.sharepoint.com/teams/my-team/sites/library/file.pdf',
+      ),
+    ).toEqual({ managedPath: 'teams', siteName: 'my-team/sites/library/file.pdf' });
+  });
+
+  it('throws when URL has no /sites/ or /teams/ prefix', () => {
+    expect(() =>
+      extractSitePathInfoFromWebUrl('https://contoso.sharepoint.com/other/Something'),
+    ).toThrow('no /sites/ or /teams/ prefix');
+  });
+});
+
 describe('extractSiteNameFromWebUrl', () => {
-  it('extracts site name from a regular site URL', () => {
+  it('extracts site name from a /sites/ URL', () => {
     expect(extractSiteNameFromWebUrl('https://contoso.sharepoint.com/sites/WealthManagement')).toBe(
       'WealthManagement',
+    );
+  });
+
+  it('extracts site name from a /teams/ URL', () => {
+    expect(extractSiteNameFromWebUrl('https://contoso.sharepoint.com/teams/Engineering')).toBe(
+      'Engineering',
     );
   });
 
@@ -89,8 +136,10 @@ describe('extractSiteNameFromWebUrl', () => {
     ).toBe('My Site/Sub Site');
   });
 
-  it('throws when URL has no /sites/ prefix', () => {
-    expect(() => extractSiteNameFromWebUrl('https://contoso.sharepoint.com/teams/Team')).toThrow();
+  it('throws when URL has no /sites/ or /teams/ prefix', () => {
+    expect(() =>
+      extractSiteNameFromWebUrl('https://contoso.sharepoint.com/other/Something'),
+    ).toThrow();
   });
 });
 
