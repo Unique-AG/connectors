@@ -573,24 +573,24 @@
         },
         "authMode": {
           "type": "string",
-          "enum": ["none", "username_password", "ssl_tls"],
-          "description": "Proxy authentication mode: none (proxy disabled), username_password (username/password authentication), ssl_tls (TLS client certificate authentication)",
+          "enum": ["none", "no_auth", "username_password", "ssl_tls"],
+          "description": "Proxy authentication mode: none (proxy disabled), no_auth (proxy enabled, no authentication), username_password (username/password authentication), ssl_tls (TLS client certificate authentication)",
           "default": "none"
         },
         "host": {
           "type": "string",
-          "description": "Proxy server hostname (required for username_password/ssl_tls modes)",
+          "description": "Proxy server hostname (required for no_auth/username_password/ssl_tls modes)",
           "examples": ["proxy.example.com"]
         },
         "port": {
           "type": "integer",
-          "description": "Proxy server port (required for username_password/ssl_tls modes)",
+          "description": "Proxy server port (required for no_auth/username_password/ssl_tls modes)",
           "examples": [8080, 3128]
         },
         "protocol": {
           "type": "string",
           "enum": ["http", "https"],
-          "description": "Proxy protocol: http or https (required for username_password/ssl_tls modes)",
+          "description": "Proxy protocol: http or https (required for no_auth/username_password/ssl_tls modes)",
           "default": "http"
         },
         "username": {

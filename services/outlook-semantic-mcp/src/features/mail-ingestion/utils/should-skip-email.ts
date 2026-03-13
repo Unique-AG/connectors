@@ -6,7 +6,7 @@ const logger = new Logger('shouldSkipEmail');
 
 interface EmailInput {
   from?: { emailAddress?: { address?: string } | null } | null;
-  subject?: string;
+  subject?: string | null;
   uniqueBody?: { content?: string } | null;
   createdDateTime?: string;
 }

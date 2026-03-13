@@ -73,6 +73,7 @@ export class PermissionsSyncService {
       const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(
         [...sharePoint.items, ...sharePoint.directories],
         context.siteName,
+        siteId,
       );
       this.logger.log(
         `${logPrefix} Fetched permissions for ${sharePoint.items.length} items in ${elapsedSecondsLog(permissionsFetchStartTime)}`,

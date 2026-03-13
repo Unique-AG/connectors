@@ -158,7 +158,7 @@ In cluster-internal mode:
 
 ## Multi-Origin Support
 
-**Note:** Multi-origin support is not available in the current `2.0.x` GA release line.
+**Note:** Multi-origin support is not available in the current release line.
 
 ### Scenarios
 

@@ -1,4 +1,3 @@
-import { createSmeared } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import type { ConfluenceConfig } from '../config';
 import type { ConfluenceApiClient, ConfluencePage } from '../confluence-api';
@@ -19,7 +18,7 @@ export class ConfluenceContentFetcher {
     } catch (error) {
       this.logger.error({
         pageId: page.id,
-        title: createSmeared(page.title),
+        title: page.title,
         err: error,
         msg: 'Failed to fetch page, possibly deleted in the meantime',
       });
@@ -29,7 +28,7 @@ export class ConfluenceContentFetcher {
     if (!fullPage) {
       this.logger.warn({
         pageId: page.id,
-        title: createSmeared(page.title),
+        title: page.title,
         msg: 'Page not found, possibly deleted',
       });
       return null;
@@ -39,7 +38,7 @@ export class ConfluenceContentFetcher {
     if (!body) {
       this.logger.log({
         pageId: page.id,
-        title: createSmeared(page.title),
+        title: page.title,
         msg: 'Page has no body, skipping',
       });
       return null;
@@ -50,7 +49,7 @@ export class ConfluenceContentFetcher {
 
     this.logger.debug({
       pageId: page.id,
-      title: createSmeared(page.title),
+      title: page.title,
       msg: 'Page content fetched',
     });
 
@@ -72,6 +71,10 @@ export class ConfluenceContentFetcher {
       this.confluenceConfig.ingestAllLabel,
     ];
 
-    return labels.map((label) => label.name).filter((name) => !ingestLabels.includes(name));
+    // Sorted alphabetically required for deterministic label ordering in downstream consumers
+    return labels
+      .map((label) => label.name)
+      .filter((name) => !ingestLabels.includes(name))
+      .sort();
   }
 }

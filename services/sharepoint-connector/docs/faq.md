@@ -1,7 +1,6 @@
 <!-- confluence-page-id: 1953562662 -->
 <!-- confluence-space-key: PUBDOC -->
 
-
 ## General
 
 ### What type of connector is this?
@@ -19,13 +18,13 @@
 
 **Answer:**
 
-| Aspect | v1 (Power Automate) | v2 (SharePoint Connector) |
-|--------|---------------------|---------------------------|
-| Architecture | Push-based | Pull-based |
-| Trigger | Power Automate flow | Scheduled scan |
-| Dependencies | Power Automate license | None (standalone) |
-| Deployment | Power Automate cloud | Kubernetes container |
-| Control | Limited | Full control |
+| Aspect       | v1 (Power Automate)    | v2 (SharePoint Connector) |
+| ------------ | ---------------------- | ------------------------- |
+| Architecture | Push-based             | Pull-based                |
+| Trigger      | Power Automate flow    | Scheduled scan            |
+| Dependencies | Power Automate license | None (standalone)         |
+| Deployment   | Power Automate cloud   | Kubernetes container      |
+| Control      | Limited                | Full control              |
 
 ## Permissions
 
@@ -81,10 +80,10 @@ The connector intentionally does not expand tenant-wide principals (`Everyone`, 
 
 **Answer:** The connector supports two configuration sources:
 
-| Source | Description | Use Case |
-|--------|-------------|----------|
-| `config_file` | Static YAML configuration | Simple deployments, fixed site list |
-| `sharepoint_list` | Dynamic configuration from SharePoint list | Self-service, frequent changes |
+| Source            | Description                                | Use Case                            |
+| ----------------- | ------------------------------------------ | ----------------------------------- |
+| `config_file`     | Static YAML configuration                  | Simple deployments, fixed site list |
+| `sharepoint_list` | Dynamic configuration from SharePoint list | Self-service, frequent changes      |
 
 **Static (YAML file):**
 
@@ -106,24 +105,29 @@ sharepoint:
   sitesSource: sharepoint_list
   sharepointList:
     siteId: "config-site-id"
-    listDisplayName: "SharePoint Sites to Sync"
+    listId: "00000000-0000-0000-0000-000000000000"
 ```
 
 ### What columns are needed for the SharePoint configuration list?
 
 **Answer:** When using `sharepoint_list` as the sites source, create a list with these columns:
 
-| Column Display Name | Type | Required | Description |
-|---------------------|------|----------|-------------|
-| `siteId` | Single line text | Yes | SharePoint site ID (UUID) |
-| `syncColumnName` | Single line text | Yes | Column marking files for sync |
-| `ingestionMode` | Choice | Yes | `flat` or `recursive` |
-| `uniqueScopeId` | Single line text | Yes | Unique scope ID |
-| `syncStatus` | Choice | Yes | `active`, `inactive`, or `deleted` |
-| `syncMode` | Choice | Yes | `content_only` or `content_and_permissions` |
-| `maxFilesToIngest` | Number | No | Optional limit |
-| `storeInternally` | Choice | No | `enabled` or `disabled` |
-| `permissionsInheritanceMode` | Choice | No | Inheritance settings |
+| Column Display Name          | Type             | Required | Description                                   |
+| ---------------------------- | ---------------- | -------- | --------------------------------------------- |
+| `siteId`                     | Single line text | Yes      | SharePoint site ID (UUID)                     |
+| `syncColumnName`             | Single line text | Yes      | Column marking files for sync                 |
+| `ingestionMode`              | Choice           | Yes      | `flat` or `recursive`                         |
+| `uniqueScopeId`              | Single line text | Yes      | Unique scope ID                               |
+| `syncStatus`                 | Choice           | Yes      | `active`, `inactive`, or `deleted`            |
+| `syncMode`                   | Choice           | Yes      | `content_only` or `content_and_permissions`   |
+| `maxFilesToIngest`           | Number           | No       | Optional limit                                |
+| `storeInternally`            | Choice           | No       | `enabled` or `disabled`                       |
+| `permissionsInheritanceMode` | Choice           | No       | Inheritance settings                          |
+| `subsitesScan`               | Choice           | No       | `enabled` or `disabled` (default: `disabled`) |
+
+### Are subsites automatically included?
+
+**Answer:** Only if `subsitesScan` is set to `enabled` for a site. When enabled, the connector recursively discovers all subsites under the configured site and syncs their content using the parent site's `syncColumnName`. See [Subsites Scanning](./operator/configuration.md#Subsites-Scanning) for details.
 
 ### How do I find SharePoint Site IDs?
 
@@ -152,7 +156,23 @@ Get-PnPSite | Select-Object Id
 
 The site ID follows the format: `{hostname},{site-collection-id},{web-id}`
 
+### I renamed my sync column in SharePoint but the connector stopped picking up files. Why?
+
+**Answer:** SharePoint columns have an **internal name** (set at creation, immutable) and a **display name** (changeable). Renaming a column in the SharePoint UI only changes the display name — the Microsoft Graph API still uses the original internal name. The `syncColumnName` in the connector configuration must match the internal name, not the display name.
+
+For example, if you created a column as `UniqueAI` and later renamed it to `SyncToUnique`, the connector configuration must still use `UniqueAI`.
+
+It is recommended to create a new column with desired name and deleting the old one instead of renaming to avoid confusion in the future.
+
 ## Sync Behavior
+
+### What safety guards does the connector have?
+
+**Answer:** The connector includes safeguards to prevent accidental data loss:
+
+- **Full-deletion protection**: If the file diff would delete all files stored in Unique for a site, the sync cycle for that site is aborted. This prevents accidental full deletion due to misconfiguration or transient issues. To intentionally remove all content for a site, set the site's `syncStatus` to `deleted` in the configuration.
+- **Duplicate scope ID detection**: If multiple configured sites share the same `scopeId`, the connector logs a warning and deduplicates to prevent conflicts.
+- **Scope ownership validation**: Each root scope is tagged with the site that owns it. If a scope was already claimed by a different site, the sync for that site fails immediately, preventing two sites from accidentally writing into the same scope.
 
 ### What happens when a file is deleted from SharePoint?
 
@@ -163,41 +183,45 @@ The site ID follows the format: `{hostname},{site-collection-id},{web-id}`
 
 Both are treated as deletions in Unique.
 
+### What happens if I change a site's `scopeId`?
+
+**Answer:** The connector detects that the root scope has changed and automatically migrates all child scopes from the old root to the new root. After migration the old root scope is deleted. If migration fails for any child scope, the error is logged and the sync continues.
+
 ### What happens if I unflag a document?
 
 **Answer:** Setting the sync column to "No" is treated as a deletion request. On the next sync cycle:
 
-1. Connector detects the flag change
-2. File is removed from Unique knowledge base
-3. Local state is updated
+1. Connector detects the flag change via the server-side file diff
+2. File is removed from the Unique knowledge base
 
 ### Are subfolders synced?
 
 **Answer:** It depends on the `ingestionMode` setting for each site:
 
-| Mode | Behavior |
-|------|----------|
+| Mode        | Behavior                                                   |
+| ----------- | ---------------------------------------------------------- |
 | `recursive` | Scans all subfolders, maintains folder hierarchy in Unique |
-| `flat` | All flagged files go to a single root scope |
+| `flat`      | All flagged files go to a single root scope                |
 
 The sync column must be set on individual files (not folders).
 
 ### What file types are supported?
 
-**Answer:** By default:
+**Answer:** The Helm chart ships the following default MIME types:
 
 - PDF (`.pdf`)
 - Word (`.docx`)
 - Excel (`.xlsx`)
 - PowerPoint (`.pptx`)
 - Text (`.txt`)
-- SharePoint pages (`.aspx`)
+- HTML (`.html`)
+- ASP/ASPX (`.asp`, `.aspx`)
 
-Additional types can be configured via `ALLOWED_MIME_TYPES`.
+SharePoint pages (`.aspx`) bypass the MIME type filter and are always eligible regardless of configuration. Additional or fewer types can be configured via `allowedMimeTypes` in the [processing configuration](./operator/configuration.md#Processing-Configuration). Note: there is no schema-level default — `allowedMimeTypes` must be explicitly configured.
 
 ### What is the maximum file size?
 
-**Answer:** Default is 50 MB, configurable via `maxFileSizeToIngestBytes` in the processing configuration. Larger files are skipped with a warning in the logs.
+**Answer:** Default is 200 MB, configurable via `maxFileSizeToIngestBytes` in the [processing configuration](./operator/configuration.md#Processing-Configuration). Larger files are skipped with a warning in the logs.
 
 ## Troubleshooting
 
@@ -220,7 +244,7 @@ Additional types can be configured via `ALLOWED_MIME_TYPES`.
 - non-retryable item errors are logged and skipped
 - configuration/authentication problems require operator action and can fail a cycle early
 
-Detailed behavior by scenario is documented in [Flows](./technical/flows.md#error-handling-strategy).
+Detailed behavior by scenario is documented in [Flows](./technical/flows.md#Error-Handling-Strategy).
 
 ### Why do I see "Site not found" errors?
 
@@ -261,7 +285,7 @@ Detailed behavior by scenario is documented in [Flows](./technical/flows.md#erro
 
 **Solutions:**
 
-1. Increase `CONCURRENT_FILE_DOWNLOADS`
+1. Increase `concurrency` in the [processing configuration](./operator/configuration.md#Processing-Configuration)
 2. Review and reduce flagged files
 3. Check for rate limit warnings in logs
 4. Verify network connectivity

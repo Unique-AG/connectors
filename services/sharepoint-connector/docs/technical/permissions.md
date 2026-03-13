@@ -103,7 +103,7 @@ Grant-PnPAzureADAppSitePermission `
   -Permissions Write
 ```
 
-See [Authentication Guide](../operator/authentication.md#grant-site-specific-access-sitesselected-permission) for detailed instructions.
+See [Authentication Guide](../operator/authentication.md#4.-Grant-Site-Specific-Access) for detailed instructions.
 
 ## Permission Justification
 
@@ -195,7 +195,7 @@ Microsoft Graph enforces rate limits:
 
 The connector respects these limits via:
 
-- Configurable rate limiting (`GRAPH_API_RATE_LIMIT`)
+- Configurable rate limiting (`graphApiRateLimitPerMinuteThousands` in the tenant configuration YAML)
 - Exponential backoff on 429 responses
 - Concurrent request limiting
 

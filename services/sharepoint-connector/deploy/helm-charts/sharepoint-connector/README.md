@@ -84,7 +84,7 @@ spec:
 | connector.envVars | list | `[]` | Environment variables from secrets. Example for loading secrets (uncomment and customize as needed):   envVars:     # For Zitadel authentication (required when authMode is 'external')     - name: ZITADEL_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: sharepoint-connector-secret           key: ZITADEL_CLIENT_SECRET     # For encrypted certificate private key (optional, only if key is password-protected)     - name: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD       valueFrom:         secretKeyRef:           name: sharepoint-connector-secret           key: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD     # For proxy basic auth password (required when proxy.authMode is 'username_password')     - name: PROXY_PASSWORD       valueFrom:         secretKeyRef:           name: sharepoint-connector-secret           key: PROXY_PASSWORD See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options. |
 | connector.extraEnvCM | list | `["sharepoint-connector-proxy-config"]` | List of ConfigMaps to load as environment variables |
 | connector.image.repository | string | `"ghcr.io/unique-ag/connectors/services/sharepoint-connector"` |  |
-| connector.image.tag | string | `"2.0.0"` |  |
+| connector.image.tag | string | `"2.3.0"` |  |
 | connector.ports.application | int | `51345` |  |
 | connector.ports.metrics | int | `51346` |  |
 | connector.resources.limits.memory | string | `"2048Mi"` |  |
@@ -136,7 +136,7 @@ spec:
 | grafana.dashboard.enabled | bool | `false` | Enable Grafana dashboard ConfigMap creation |
 | grafana.dashboard.folder | string | `"connectors"` | Grafana folder where the dashboard will be placed |
 | proxyConfig | object | `{"authMode":"none","enabled":true}` | HTTP proxy configuration for external API calls Required for environments where internet access is only available through a proxy. Users preferring setting all variables by hand disable the enabled flag and remove sharepoint-connector-proxy-config from connector.extraEnvCM. |
-| proxyConfig.authMode | string | `"none"` | Proxy authentication mode none: proxy disabled username_password: username/password authentication ssl_tls: TLS client certificate authentication |
+| proxyConfig.authMode | string | `"none"` | Proxy authentication mode none: proxy disabled no_auth: proxy enabled, no authentication username_password: username/password authentication ssl_tls: TLS client certificate authentication |
 | proxyConfig.enabled | bool | `true` | if disabled, sharepoint-connector-proxy-config must be removed from connector.extraEnvCM. |
 
 ----------------------------------------------

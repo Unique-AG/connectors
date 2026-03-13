@@ -30,7 +30,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
   }
 
   public async searchPagesByLabel(): Promise<ConfluencePage[]> {
-    const spaceTypeFilter = 'space.type=global';
+    const spaceTypeFilter = '(space.type=global OR space.type=collaboration)';
     // Attachments are child content in Confluence and would appear as top-level results here.
     // We exclude them because we already get attachments via the expand=children.attachment parameter.
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;

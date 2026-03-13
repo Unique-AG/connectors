@@ -48,7 +48,7 @@ vi.mock('undici', async (importOriginal) => {
 
 const pageFixture: FetchedPage = {
   id: '42',
-  title: 'Architecture',
+  title: new Smeared('Architecture', false),
   body: '<p>Hello</p>',
   webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/42`,
   spaceId: 'space-1',

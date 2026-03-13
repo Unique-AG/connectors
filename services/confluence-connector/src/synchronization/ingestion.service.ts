@@ -37,7 +37,7 @@ export class IngestionService {
     if (!page.body) {
       this.logger.log({
         pageId: page.id,
-        title: createSmeared(page.title),
+        title: page.title,
         msg: 'Skipping page with empty body',
       });
       return;
@@ -68,7 +68,7 @@ export class IngestionService {
     } catch (error) {
       this.logger.error({
         pageId: page.id,
-        title: createSmeared(page.title),
+        title: page.title,
         err: error,
         msg: 'Failed to ingest page, skipping',
       });
@@ -154,7 +154,7 @@ export class IngestionService {
   ): ContentRegistrationRequest {
     return {
       key,
-      title: page.title,
+      title: page.title.value,
       mimeType: INGESTION_MIME_TYPE,
       ownerType: OWNER_TYPE,
       scopeId,

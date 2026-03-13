@@ -7,12 +7,7 @@ import type { ConfluenceAttachment, ConfluencePage } from '../confluence-api';
 import { type ConfluenceApiClient, ContentType } from '../confluence-api';
 import type { DiscoveredAttachment, DiscoveredPage, DiscoveryResult } from './sync.types';
 
-const SKIPPED_CONTENT_TYPES = [
-  ContentType.DATABASE,
-  ContentType.BLOGPOST,
-  ContentType.WHITEBOARD,
-  ContentType.EMBED,
-];
+const SKIPPED_CONTENT_TYPES = [ContentType.DATABASE, ContentType.WHITEBOARD, ContentType.EMBED];
 
 export class ConfluencePageScanner {
   private readonly logger = new Logger(ConfluencePageScanner.name);
@@ -81,7 +76,7 @@ export class ConfluencePageScanner {
 
       discoveredPages.push({
         id: page.id,
-        title: page.title,
+        title: createSmeared(page.title),
         type: page.type,
         spaceId: page.space.id,
         spaceKey: page.space.key,

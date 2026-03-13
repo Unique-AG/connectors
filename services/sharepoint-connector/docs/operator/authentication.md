@@ -458,6 +458,21 @@ When using permission sync, the app principal must be able to read site group me
 1. Grant site or library access via PowerShell
 2. Complete admin consent in Azure Portal
 
+### TLS Certificate Validation Errors
+
+**Symptom:** `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `SELF_SIGNED_CERT_IN_CHAIN`, or similar TLS errors when connecting to Microsoft APIs.
+
+**Cause:** The pod's default trust store does not include the CA that signed the endpoint certificates. This typically happens in environments with a corporate proxy that re-signs TLS traffic or a custom PKI.
+
+**Resolution:** Provide a CA bundle via the `NODE_EXTRA_CA_CERTS` environment variable:
+
+```yaml
+env:
+  NODE_EXTRA_CA_CERTS: /app/certs/ca-bundle.pem
+```
+
+Mount the PEM file containing the additional CA certificates into the pod and point the variable to its path.
+
 ### Site Not Found
 
 **Symptom:** `Site not found` or `404` errors

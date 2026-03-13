@@ -1,13 +1,4 @@
 import { Smeared } from '@unique-ag/utils';
-
-vi.mock('@unique-ag/utils', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@unique-ag/utils')>();
-  return {
-    ...actual,
-    createSmeared: (value: string) => new actual.Smeared(value, false),
-  };
-});
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import type { ConfluencePage } from '../../confluence-api';
@@ -46,7 +37,7 @@ const baseConfluenceConfig: ConfluenceConfig = {
 function makeDiscoveredPage(id: string, overrides: Partial<DiscoveredPage> = {}): DiscoveredPage {
   return {
     id,
-    title: `Page ${id}`,
+    title: new Smeared(`Page ${id}`, false),
     type: ContentType.PAGE,
     spaceId: 'space-1',
     spaceKey: 'SP',
@@ -113,7 +104,7 @@ describe('ConfluenceContentFetcher', () => {
 
     expect(result).toEqual({
       id: '1',
-      title: 'Page 1',
+      title: new Smeared('Page 1', false),
       body: '<p>content</p>',
       webUrl: 'https://confluence.example.com/wiki/1',
       spaceId: 'space-1',
@@ -170,6 +161,20 @@ describe('ConfluenceContentFetcher', () => {
       title: new Smeared('Page empty', false),
       msg: 'Page has no body, skipping',
     });
+  });
+
+  it('returns labels sorted alphabetically', async () => {
+    const discoveredPage = makeDiscoveredPage('1');
+    const apiClient = {
+      getPageById: vi
+        .fn()
+        .mockResolvedValue(makeFullPage('1', { labels: ['zebra', 'alpha', 'ai-ingest'] })),
+    };
+
+    const fetcher = createFetcher(apiClient);
+    const result = await fetcher.fetchPageContent(discoveredPage);
+
+    expect(result?.metadata?.confluenceLabels).toEqual(['alpha', 'zebra']);
   });
 
   it('continues processing after getPageById error', async () => {

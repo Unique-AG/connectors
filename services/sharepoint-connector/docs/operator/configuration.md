@@ -1,19 +1,43 @@
 <!-- confluence-page-id: 1953824805 -->
 <!-- confluence-space-key: PUBDOC -->
 
-
 ## Configuration Overview
 
 The SharePoint Connector uses a **YAML-based tenant configuration file** for all settings. The configuration file path is specified via the `TENANT_CONFIG_PATH_PATTERN` environment variable.
+
+## Environment Variables
+
+The following environment variables control application-level behavior. They are set outside the tenant configuration YAML (typically in Helm `connector.env`).
+
+| Variable                              | Default                                           | Description                                                                                                          |
+| ------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                            | `production`                                      | Environment mode (`development`, `production`, `test`)                                                               |
+| `PORT`                                | `9542`                                            | HTTP port the application binds to                                                                                   |
+| `LOG_LEVEL`                           | `info`                                            | Log verbosity: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`                                          |
+| `LOGS_DIAGNOSTICS_DATA_POLICY`        | `conceal`                                         | Controls whether sensitive data (site names, file names) is logged in full (`disclose`) or redacted (`conceal`)      |
+| `LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY` | `{"emit":"on","events":["on_startup","on_sync"]}` | JSON object controlling when configuration is logged. Set `emit` to `off` to disable                                 |
+| `TENANT_CONFIG_PATH_PATTERN`          | — (required)                                      | Glob pattern to tenant configuration YAML files (e.g., `/app/tenant-configs/*-tenant-config.yaml`)                   |
+| `OTEL_METRICS_EXPORTER`               | —                                                 | OpenTelemetry metrics exporter (e.g., `prometheus`)                                                                  |
+| `OTEL_EXPORTER_PROMETHEUS_HOST`       | —                                                 | Prometheus exporter bind host                                                                                        |
+| `OTEL_EXPORTER_PROMETHEUS_PORT`       | —                                                 | Prometheus exporter bind port                                                                                        |
+| `NODE_EXTRA_CA_CERTS`                 | —                                                 | Path to a PEM file containing additional CA certificates for TLS verification if pod's trust store doesn't have them |
+
+The following environment variables are loaded from Kubernetes secrets:
+
+| Variable                               | Description                                                                                     |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD` | Password for an encrypted certificate private key (optional, only if key is password-protected) |
+| `ZITADEL_CLIENT_SECRET`                | Zitadel client secret (required when `unique.serviceAuthMode` is `external`)                    |
+| `PROXY_PASSWORD`                       | Proxy password (required when proxy `authMode` is `username_password`)                          |
 
 ## Configuration Sources
 
 Sites can be configured in two ways:
 
-| Source | Description | Use Case |
-|--------|-------------|----------|
-| `config_file` | Static YAML configuration | Simple deployments, fixed site list |
-| `sharepoint_list` | Dynamic configuration from SharePoint list | Self-service, frequent changes |
+| Source            | Description                                | Use Case                            |
+| ----------------- | ------------------------------------------ | ----------------------------------- |
+| `config_file`     | Static YAML configuration                  | Simple deployments, fixed site list |
+| `sharepoint_list` | Dynamic configuration from SharePoint list | Self-service, frequent changes      |
 
 ## Tenant Configuration File
 
@@ -22,7 +46,7 @@ Sites can be configured in two ways:
 ```yaml
 sharepoint:
   # ... auth and base configuration ...
-  
+
   sitesSource: config_file
   sites:
     - siteId: 12345678-1234-1234-1234-123456789abc
@@ -50,31 +74,140 @@ Configure sites dynamically via a SharePoint list:
 ```yaml
 sharepoint:
   # ... auth and base configuration ...
-  
+
   sitesSource: sharepoint_list
   sharepointList:
     siteId: your-config-site-id-here
-    listDisplayName: SharePoint Sites to Sync
+    listId: 00000000-0000-0000-0000-000000000000
 ```
 
-You can use [the CSV import template](./Template [env-name] Sites to Sync to Unique.csv) when populating the SharePoint list for `sharepoint_list`-based configuration.
+You can use [the CSV import template](./sites-to-sync-template.csv) when populating the SharePoint list for `sharepoint_list`-based configuration.
+
+## SharePoint Base Configuration
+
+The `sharepoint` section of the tenant YAML contains authentication and base settings that apply to all sites:
+
+```yaml
+sharepoint:
+  tenantId: 12345678-1234-1234-1234-123456789012
+  baseUrl: https://acme.sharepoint.com
+  graphApiRateLimitPerMinuteThousands: 780
+  auth:
+    mode: certificate
+    clientId: 00000000-0000-0000-0000-000000000000
+    privateKeyPath: /app/key.pem
+    thumbprintSha1: AB12CD34EF56...
+```
+
+| Option                                | Required | Default | Description                                                                                      |
+| ------------------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `tenantId`                            | Yes      | —       | Azure AD tenant ID                                                                               |
+| `baseUrl`                             | Yes      | —       | Company SharePoint URL (e.g., `https://acme.sharepoint.com`). Must not end with a trailing slash |
+| `graphApiRateLimitPerMinuteThousands` | No       | `780`   | Microsoft Graph API rate limit in thousands of requests per minute                               |
+| `auth`                                | Yes      | —       | Authentication configuration (see below)                                                         |
+
+### Authentication
+
+The connector uses certificate-based authentication (`auth.mode: certificate`):
+
+| Option                    | Required                    | Description                                                                          |
+| ------------------------- | --------------------------- | ------------------------------------------------------------------------------------ |
+| `auth.mode`               | Yes                         | `certificate`                                                                        |
+| `auth.clientId`           | Yes                         | Azure AD application client ID                                                       |
+| `auth.privateKeyPath`     | Yes                         | Path to the private key file in PEM format                                           |
+| `auth.thumbprintSha1`     | One of SHA1/SHA256 required | SHA-1 thumbprint of the certificate                                                  |
+| `auth.thumbprintSha256`   | One of SHA1/SHA256 required | SHA-256 thumbprint of the certificate                                                |
+| `auth.privateKeyPassword` | No                          | Injected from `SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD` env var if the key is encrypted |
+
+## Unique Platform Configuration
+
+The `unique` section configures how the connector communicates with the Unique platform:
+
+```yaml
+unique:
+  serviceAuthMode: cluster_local
+  ingestionServiceBaseUrl: http://node-ingestion.finance-gpt:8091
+  scopeManagementServiceBaseUrl: http://node-scope-management.finance-gpt:8094
+  apiRateLimitPerMinute: 100
+  serviceExtraHeaders:
+    x-company-id: "company-id"
+    x-user-id: "service-user-id"
+```
+
+| Option                          | Required | Default | Description                                                                                                    |
+| ------------------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| `serviceAuthMode`               | Yes      | —       | `cluster_local` or `external`                                                                                  |
+| `ingestionServiceBaseUrl`       | Yes      | —       | Base URL for the Unique ingestion service                                                                      |
+| `scopeManagementServiceBaseUrl` | Yes      | —       | Base URL for the Unique scope management service                                                               |
+| `apiRateLimitPerMinute`         | No       | `100`   | Rate limit for Unique API requests per minute                                                                  |
+| `ingestionConfig`               | No       | —       | Optional object passed when submitting files for ingestion (e.g., `{"uniqueIngestionMode": "SKIP_INGESTION"}`) |
+
+**`cluster_local` mode** (in-cluster communication):
+
+| Option                | Required | Description                                         |
+| --------------------- | -------- | --------------------------------------------------- |
+| `serviceExtraHeaders` | Yes      | Must contain `x-company-id` and `x-user-id` headers |
+
+**`external` mode** (authenticates via Zitadel):
+
+| Option                 | Required | Description                                   |
+| ---------------------- | -------- | --------------------------------------------- |
+| `zitadelOauthTokenUrl` | Yes      | Zitadel OAuth token URL                       |
+| `zitadelProjectId`     | Yes      | Zitadel project ID                            |
+| `zitadelClientId`      | Yes      | Zitadel client ID                             |
+| `zitadelClientSecret`  | Yes      | Injected from `ZITADEL_CLIENT_SECRET` env var |
+
+## Proxy Configuration
+
+The connector supports HTTP/HTTPS proxy for environments where internet access is only available through a proxy. Proxy settings are configured via environment variables (managed by the Helm chart's `proxyConfig` section).
+
+| Mode                | Description                          |
+| ------------------- | ------------------------------------ |
+| `none`              | Proxy disabled (default)             |
+| `no_auth`           | Proxy enabled without authentication |
+| `username_password` | Basic authentication proxy           |
+| `ssl_tls`           | TLS client certificate proxy         |
+
+**Common options** (required for `no_auth`, `username_password`, and `ssl_tls` modes):
+
+| Variable                   | Description                                                      |
+| -------------------------- | ---------------------------------------------------------------- |
+| `PROXY_HOST`               | Proxy server hostname                                            |
+| `PROXY_PORT`               | Proxy server port                                                |
+| `PROXY_PROTOCOL`           | `http` or `https`                                                |
+| `PROXY_SSL_CA_BUNDLE_PATH` | (Optional) Path to CA bundle for verifying proxy TLS certificate |
+| `PROXY_HEADERS`            | (Optional) JSON string of custom headers for CONNECT request     |
+
+**`username_password` mode** adds:
+
+| Variable         | Description                         |
+| ---------------- | ----------------------------------- |
+| `PROXY_USERNAME` | Proxy username                      |
+| `PROXY_PASSWORD` | Proxy password (loaded from secret) |
+
+**`ssl_tls` mode** adds:
+
+| Variable              | Description                    |
+| --------------------- | ------------------------------ |
+| `PROXY_SSL_CERT_PATH` | Path to TLS client certificate |
+| `PROXY_SSL_KEY_PATH`  | Path to TLS client key         |
 
 ## SharePoint List Configuration
 
 When using `sharepoint_list` as the sites source, create a SharePoint list with the following columns:
 
-| Column Display Name | Type | Description |
-|---------------------|------|-------------|
-| `siteId` | Single line text | SharePoint site ID (UUID or compound format: `hostname,siteCollectionId,webId` for subsites) |
-| `syncColumnName` | Single line text | Column that marks files for sync |
-| `ingestionMode` | Choice | `flat` or `recursive` |
-| `uniqueScopeId` | Single line text | Unique scope ID |
-| `maxFilesToIngest` | Number | Optional limit per sync cycle |
-| `storeInternally` | Choice | `enabled` or `disabled` |
-| `syncStatus` | Choice | `active`, `inactive`, or `deleted` |
-| `syncMode` | Choice | `content_only` or `content_and_permissions` |
-| `permissionsInheritanceMode` | Choice | Optional inheritance mode |
-| `subsitesScan` | Choice | `enabled` or `disabled` (default: `disabled`) |
+| Column Display Name          | Type             | Description                                                                                  |
+| ---------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
+| `siteId`                     | Single line text | SharePoint site ID (UUID or compound format: `hostname,siteCollectionId,webId` for subsites) |
+| `syncColumnName`             | Single line text | Column that marks files for sync                                                             |
+| `ingestionMode`              | Choice           | `flat` or `recursive`                                                                        |
+| `uniqueScopeId`              | Single line text | Unique scope ID                                                                              |
+| `maxFilesToIngest`           | Number           | Maximum new + updated files per sync cycle; sync fails for the site if exceeded              |
+| `storeInternally`            | Choice           | `enabled` or `disabled`                                                                      |
+| `syncStatus`                 | Choice           | `active`, `inactive`, or `deleted`                                                           |
+| `syncMode`                   | Choice           | `content_only` or `content_and_permissions`                                                  |
+| `permissionsInheritanceMode` | Choice           | Optional inheritance mode                                                                    |
+| `subsitesScan`               | Choice           | `enabled` or `disabled` (default: `disabled`)                                                |
 
 ### Benefits of SharePoint List Configuration
 
@@ -85,29 +218,31 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 
 ## Per-Site Configuration Options
 
-| Option | Values | Description |
-|--------|--------|-------------|
-| `siteId` | UUID or compound ID | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId` |
-| `syncColumnName` | String | Name of the sync flag column |
-| `ingestionMode` | `flat`, `recursive` | Flat ingests all to one scope; recursive maintains hierarchy |
-| `scopeId` | String | Root scope ID in Unique |
-| `maxFilesToIngest` | Number | Optional limit per sync cycle |
-| `storeInternally` | `enabled`, `disabled` | Whether to store content in Unique |
-| `syncStatus` | `active`, `inactive`, `deleted` | Control sync behavior |
-| `syncMode` | `content_only`, `content_and_permissions` | What to sync |
-| `permissionsInheritanceMode` | See below | Inheritance settings (content_only mode) |
-| `subsitesScan` | `enabled`, `disabled` | Recursively discover and sync content from subsites (default: `disabled`) |
+**Important:** The connector is a singleton — each SharePoint site must be configured in at most one connector process per Unique instance. Configuring the same site in multiple processes leads to conflicting state and unexpected behavior of the connector.
+
+| Option                       | Values                                    | Default                      | Description                                                                         |
+| ---------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
+| `siteId`                     | UUID or compound ID                       | — (required)                 | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId` |
+| `syncColumnName`             | String                                    | `FinanceGPTKnowledge`        | Display name or internal name of the sync flag column (display name takes priority) |
+| `ingestionMode`              | `flat`, `recursive`                       | — (required)                 | Flat ingests all to one scope; recursive maintains hierarchy                        |
+| `scopeId`                    | String                                    | — (required)                 | Root scope ID in Unique                                                             |
+| `maxFilesToIngest`           | Number                                    | — (unlimited)                | Maximum new + updated files per sync cycle; sync fails for the site if exceeded     |
+| `storeInternally`            | `enabled`, `disabled`                     | `enabled`                    | Whether to store content in Unique                                                  |
+| `syncStatus`                 | `active`, `inactive`, `deleted`           | `active`                     | Control sync behavior                                                               |
+| `syncMode`                   | `content_only`, `content_and_permissions` | — (required)                 | What to sync                                                                        |
+| `permissionsInheritanceMode` | See below                                 | `inherit_scopes_and_files`   | Inheritance settings for content_only mode                                          |
+| `subsitesScan`               | `enabled`, `disabled`                     | `disabled`                   | Recursively discover and sync content from subsites                                 |
 
 ### Permissions Inheritance Modes
 
-Only used when `syncMode` is `content_only`:
+Only used when `syncMode` is `content_only`. It controls whether newly created scopes / files inherit permissions from their parent. If scopes / files are configured to not inherit permissions, any newly created scopes / files will not be visible to platform users, only to service user. To grant access to these new scopes / files, admin has to use API on behalf of the service user.
 
-| Mode | Scopes Inherit | Files Inherit |
-|------|----------------|---------------|
-| `inherit_scopes_and_files` | Yes | Yes |
-| `inherit_scopes` | Yes | No |
-| `inherit_files` | No | Yes |
-| `none` | No | No |
+| Mode                       | Scopes Inherit | Files Inherit |
+| -------------------------- | -------------- | ------------- |
+| `inherit_scopes_and_files` | Yes            | Yes           |
+| `inherit_scopes`           | Yes            | No            |
+| `inherit_files`            | No             | Yes           |
+| `none`                     | No             | No            |
 
 ## SharePoint Site Configuration
 
@@ -210,64 +345,101 @@ If a subsite is also configured as a standalone site (using its compound site ID
 
 1. Navigate to your SharePoint document library
 2. Click **Add column** → **Yes/No**
-3. Name the column (default: `UniqueAI`)
+3. Name the column (code default if unset: `FinanceGPTKnowledge`)
 4. Set default value to **No**
 5. Click **Save**
 
 #### Column Settings
 
-- **Column name**: Must match `SHAREPOINT_SYNC_COLUMN_NAME` environment variable
+- **Column name**: Must match the `syncColumnName` configured for the site in the tenant configuration YAML or SharePoint configuration list
 - **Type**: Yes/No (Boolean)
 - **Default value**: No (recommended)
 - **Require this column**: No
 
+**Column name resolution:** SharePoint distinguishes between a column's **internal name** (set at creation time and immutable) and its **display name** (which can be changed later in the UI). The connector accepts either name in the `syncColumnName` configuration and resolves it per drive/list as follows:
+
+1. If a column's **display name** matches `syncColumnName`, the connector uses that column's internal name for filtering.
+2. Otherwise, if a column's **internal name** matches `syncColumnName`, that name is used directly.
+3. If neither matches, the drive or SitePages list is **skipped entirely** — the connector logs a warning and moves on to the next drive without scanning any items.
+
+This means you can configure `syncColumnName` using the human-readable display name shown in the SharePoint UI (e.g., `Sync to Unique`) even if the underlying internal name is different (e.g., `Sync_Unique`). When a display name is resolved to a different internal name, the connector logs the mapping for transparency.
+
+**Note on column renaming:** If a column was created as `UniqueAI` and later renamed to `SyncToUnique` in the UI, only the display name changes — the internal name remains `UniqueAI`. You can configure `syncColumnName` as either `SyncToUnique` (the current display name) or `UniqueAI` (the internal name). Using the display name is recommended as it is easier to verify in the SharePoint UI, but please be aware of this behavior in case of conflicts.
+
+#### Drive and List Skipping
+
+The connector checks each document library (drive) and the SitePages list for the presence of the configured sync column before scanning. If the column is not found on a drive, the entire drive is skipped — no items are fetched. This avoids unnecessary API calls for libraries that were never set up for sync. A warning is logged for each skipped drive so operators can verify the configuration.
+
 #### User Workflow
 
 Users mark documents for sync by:
+
 1. Selecting a document in the library
 2. Clicking the sync column
 3. Setting value to **Yes**
 
 The connector picks up flagged files on the next scan cycle.
 
+## Processing Configuration
+
+The `processing` section of the tenant configuration file controls file processing behavior:
+
+```yaml
+processing:
+  stepTimeoutSeconds: 30
+  concurrency: 1
+  maxFileSizeToIngestBytes: 209715200
+  allowedMimeTypes:
+    - application/pdf
+    - text/plain
+    - text/html
+    - application/x-asp
+    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+    - application/vnd.openxmlformats-officedocument.presentationml.presentation
+  scanIntervalCron: "*/15 * * * *"
+```
+
+| Option                     | Default                     | Description                                                                                                                              |
+| -------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `stepTimeoutSeconds`       | `30`                        | Time limit (in seconds) for a single file processing step before the file is skipped                                                     |
+| `concurrency`              | `1`                         | Number of files to ingest into Unique concurrently                                                                                       |
+| `maxFileSizeToIngestBytes` | `209715200` (200 MB)        | Maximum file size in bytes. Files larger than this are skipped with a warning in the logs                                                |
+| `allowedMimeTypes`         | (none — must be configured) | List of MIME types the connector will process. The Helm chart ships sensible defaults; see [Supported File Types](#Supported-File-Types) |
+| `scanIntervalCron`         | `*/15 * * * *`              | Cron expression for the scheduled sync interval                                                                                          |
+
 ## Supported File Types
 
-The connector processes files based on MIME type. Configure allowed types via `ALLOWED_MIME_TYPES`:
+Configure allowed types via the `allowedMimeTypes` processing option. There is no schema-level default — operators must explicitly configure this field. The Helm chart ships the following defaults:
 
-| Extension | MIME Type | Default |
-|-----------|-----------|---------|
-| `.pdf` | `application/pdf` | Yes |
-| `.docx` | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | Yes |
-| `.xlsx` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | Yes |
-| `.pptx` | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | Yes |
-| `.txt` | `text/plain` | Yes |
-| `.aspx` | `text/html` | Yes |
+| Extension      | MIME Type                                                                   | Helm Default |
+| -------------- | --------------------------------------------------------------------------- | ------------ |
+| `.pdf`         | `application/pdf`                                                           | Yes          |
+| `.docx`        | `application/vnd.openxmlformats-officedocument.wordprocessingml.document`   | Yes          |
+| `.xlsx`        | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`         | Yes          |
+| `.pptx`        | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | Yes          |
+| `.txt`         | `text/plain`                                                                | Yes          |
+| `.html`        | `text/html`                                                                 | Yes          |
+| `.asp`/`.aspx` | `application/x-asp`                                                         | Yes          |
+
+**Note:** `.aspx` SharePoint pages bypass the MIME type filter and are always eligible for ingestion regardless of `allowedMimeTypes`.
 
 ## Scheduler Configuration
 
 ### Sync Interval
 
-The connector runs sync cycles at regular intervals:
+The connector runs sync cycles at regular intervals, controlled by `scanIntervalCron` in the `processing` section of the tenant configuration file:
 
 ```yaml
-env:
-  SYNC_INTERVAL_MINUTES: "15"  # Default: every 15 minutes
+processing:
+  scanIntervalCron: "*/15 * * * *" # Default: every 15 minutes
 ```
 
 **Considerations:**
 
-- Lower values increase API usage and may hit rate limits
-- Higher values delay sync of new content
+- Lower intervals increase API usage and may hit rate limits
+- Higher intervals delay sync of new content
 - Recommended range: every hour, every night
-
-### Disabling Automatic Sync
-
-For testing or maintenance:
-
-```yaml
-env:
-  SYNC_ENABLED: "false"
-```
 
 ## Logging
 
@@ -287,12 +459,12 @@ The connector produces structured JSON logs:
 
 ### Log Levels
 
-| Level | Description |
-|-------|-------------|
-| `debug` | Detailed debugging information |
-| `info` | General operational information |
-| `warn` | Warning conditions |
-| `error` | Error conditions |
+| Level   | Description                     |
+| ------- | ------------------------------- |
+| `debug` | Detailed debugging information  |
+| `info`  | General operational information |
+| `warn`  | Warning conditions              |
+| `error` | Error conditions                |
 
 ### Audit Logs
 
@@ -317,15 +489,58 @@ Standard Kubernetes metrics are exposed:
 
 ### Application Telemetry
 
-Custom metrics for monitoring sync operations:
+All custom metrics use the `spc_` prefix (SharePoint Connector).
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `sharepoint_sync_cycles_total` | Counter | Total sync cycles executed |
-| `sharepoint_files_processed_total` | Counter | Files processed (by operation) |
-| `sharepoint_sync_duration_seconds` | Histogram | Sync cycle duration |
-| `sharepoint_api_requests_total` | Counter | API requests (by endpoint) |
-| `sharepoint_api_errors_total` | Counter | API errors (by type) |
+#### Sync Cycle Metrics
+
+| Metric                      | Type      | Labels                              | Description                                                 |
+| --------------------------- | --------- | ----------------------------------- | ----------------------------------------------------------- |
+| `spc_sync_duration_seconds` | Histogram | `sync_type`, `sp_site_id`, `result` | Duration of synchronization cycles (per site and full sync) |
+
+Histogram buckets: 10s, 30s, 60s, 5m, 10m, 30m, 1h
+
+#### File Processing Metrics
+
+| Metric                               | Type    | Labels                              | Description                                                         |
+| ------------------------------------ | ------- | ----------------------------------- | ------------------------------------------------------------------- |
+| `spc_ingestion_file_processed_total` | Counter | `sp_site_id`, `step_name`, `result` | Files processed by ingestion pipeline steps                         |
+| `spc_file_diff_events_total`         | Counter | `sp_site_id`, `diff_result_type`    | File change detection events (`new`, `updated`, `moved`, `deleted`) |
+| `spc_file_moved_total`               | Counter | `sp_site_id`, `result`              | File move operations in Unique                                      |
+| `spc_file_deleted_total`             | Counter | `sp_site_id`, `result`              | File deletion operations in Unique                                  |
+
+#### Microsoft Graph API Metrics
+
+| Metric                                      | Type      | Labels                                                      | Description                                   |
+| ------------------------------------------- | --------- | ----------------------------------------------------------- | --------------------------------------------- |
+| `spc_ms_graph_api_request_duration_seconds` | Histogram | `ms_tenant_id`, `api_method`, `result`, `http_status_class` | Request latency for Microsoft Graph API calls |
+| `spc_ms_graph_api_throttle_events_total`    | Counter   | `ms_tenant_id`, `api_method`, `policy`                      | Microsoft Graph API throttling (429) events   |
+| `spc_ms_graph_api_slow_requests_total`      | Counter   | `ms_tenant_id`, `api_method`, `duration_bucket`             | Slow Microsoft Graph API requests             |
+
+Request duration histogram buckets: 100ms, 500ms, 1s, 2s, 5s, 10s, 20s
+
+Slow request `duration_bucket` values: `>1s`, `>2s`, `>5s`, `>10s`
+
+#### Unique API Metrics
+
+| Metric                                            | Type      | Labels                                      | Description                                  |
+| ------------------------------------------------- | --------- | ------------------------------------------- | -------------------------------------------- |
+| `spc_unique_graphql_api_request_duration_seconds` | Histogram | `api_method`, `result`, `http_status_class` | Request latency for Unique GraphQL API calls |
+| `spc_unique_graphql_api_slow_requests_total`      | Counter   | `api_method`, `duration_bucket`             | Slow Unique GraphQL API calls                |
+| `spc_unique_rest_api_request_duration_seconds`    | Histogram | `api_method`, `result`, `http_status_class` | Request latency for Unique REST API calls    |
+| `spc_unique_rest_api_slow_requests_total`         | Counter   | `api_method`, `duration_bucket`             | Slow Unique REST API calls                   |
+
+Request duration histogram buckets: 100ms, 500ms, 1s, 2s, 5s, 10s, 20s
+
+#### Permissions Sync Metrics
+
+| Metric                                         | Type      | Labels                    | Description                                                       |
+| ---------------------------------------------- | --------- | ------------------------- | ----------------------------------------------------------------- |
+| `spc_permissions_sync_duration_seconds`        | Histogram | `sp_site_id`, `result`    | Duration of the permissions synchronization phase for a site      |
+| `spc_permissions_sync_group_operations_total`  | Counter   | `sp_site_id`, `operation` | Operations performed on SharePoint groups during permissions sync |
+| `spc_permissions_sync_folder_operations_total` | Counter   | `sp_site_id`, `operation` | Folder (scope) permission changes synced (`added`, `removed`)     |
+| `spc_permissions_sync_file_operations_total`   | Counter   | `sp_site_id`, `operation` | File permission changes synced (`added`, `removed`)               |
+
+Permissions sync duration histogram buckets: 5s, 10s, 30s, 60s, 2m, 5m, 10m, 30m
 
 ### Grafana Dashboard
 
@@ -340,14 +555,17 @@ grafana:
 
 ### Alerts
 
-#### Default Alerts
+#### Default Alert Categories
 
-| Alert | Condition | Severity |
-|-------|-----------|----------|
-| SyncCycleFailed | Sync cycle errors > 3 | Warning |
-| AuthenticationError | Auth failures > 0 | Critical |
-| HighAPIErrorRate | API errors > 10% | Warning |
-| SyncCycleStalled | No sync in 1 hour | Warning |
+The Helm chart organizes alerts into three categories, each independently toggleable:
+
+| Category    | Alert Name                           | Description                      |
+| ----------- | ------------------------------------ | -------------------------------- |
+| `graphql`   | `SharepointConnectorGraphQLErrors`   | GraphQL API error rate alert     |
+| `uniqueApi` | `SharepointConnectorUniqueAPIErrors` | Unique REST API error rate alert |
+| `syncs`     | `SharepointConnectorSyncFailures`    | Sync cycle failure alert         |
+
+Each category supports `enabled`, `disabled` (per-alert), and `customRules` (to override `for`, `severity`, `threshold`).
 
 #### Custom Alerts
 
@@ -356,7 +574,7 @@ alerts:
   enabled: true
   rules:
     - alert: LongSyncCycle
-      expr: sharepoint_sync_duration_seconds > 3600
+      expr: histogram_quantile(0.95, rate(spc_sync_duration_seconds_bucket[5m])) > 3600
       for: 5m
       labels:
         severity: warning
