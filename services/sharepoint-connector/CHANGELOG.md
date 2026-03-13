@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.3.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.2.0...sharepoint-connector@2.3.0) (2026-03-13)
+
+
+### Features
+
+* **confluence-connector,unique-api,utils,deps:** implement ingestion pipeline ([#305](https://github.com/Unique-AG/connectors/issues/305)) ([7d2c64c](https://github.com/Unique-AG/connectors/commit/7d2c64c1f4248e06a822a7d827715c4ae001eeec))
+* **sharepoint-connector:** add no_auth proxy mode for unauthenticated proxies ([#356](https://github.com/Unique-AG/connectors/issues/356)) ([1598121](https://github.com/Unique-AG/connectors/commit/15981216772f8d5c728b0e563b9756db4693c226))
+* **sharepoint-connector:** skip drives without sync column, resolve display names, and fail site scan on partial errors ([#357](https://github.com/Unique-AG/connectors/issues/357)) ([e32fe74](https://github.com/Unique-AG/connectors/commit/e32fe74a3f9d2a46a036a9060d860c87f5d31bc7))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** add progress logging during drive scan and permissions fetch ([#353](https://github.com/Unique-AG/connectors/issues/353)) ([a29a0da](https://github.com/Unique-AG/connectors/commit/a29a0da565e3a6224edb4e30f484a18182cf7dab))
+* **sharepoint-connector:** allow deletion guard to pass when new files are being added ([#363](https://github.com/Unique-AG/connectors/issues/363)) ([fd8c8d3](https://github.com/Unique-AG/connectors/commit/fd8c8d392b21b968951c05654ac7ba95b4a1903d))
+
 ## [2.2.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.1.1...sharepoint-connector@2.2.0) (2026-03-04)
 
 
