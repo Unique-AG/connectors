@@ -117,7 +117,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
   }
 
-  // The expand=children.attachment still provides the first 25 for free —
+  // The expand=children.attachment still provides the first 25 for free
   // v2 is only called for pages with more.
   protected override async fetchMoreAttachments(pages: ConfluencePage[]): Promise<void> {
     for (const page of pages) {
