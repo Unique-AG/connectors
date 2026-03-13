@@ -222,7 +222,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | Option                       | Values                                    | Default                      | Description                                                                         |
 | ---------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
 | `siteId`                     | UUID or compound ID                       | — (required)                 | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId` |
-| `syncColumnName`             | String                                    | `FinanceGPTKnowledge`        | Name of the sync flag column                                                        |
+| `syncColumnName`             | String                                    | `FinanceGPTKnowledge`        | Display name or internal name of the sync flag column (display name takes priority) |
 | `ingestionMode`              | `flat`, `recursive`                       | — (required)                 | Flat ingests all to one scope; recursive maintains hierarchy                        |
 | `scopeId`                    | String                                    | — (required)                 | Root scope ID in Unique                                                             |
 | `maxFilesToIngest`           | Number                                    | — (unlimited)                | Maximum new + updated files per sync cycle; sync fails for the site if exceeded     |
@@ -355,7 +355,19 @@ If a subsite is also configured as a standalone site (using its compound site ID
 - **Default value**: No (recommended)
 - **Require this column**: No
 
-**Important — Column Renaming:** SharePoint distinguishes between a column's **internal name** (set at creation time and immutable) and its **display name** (which can be changed later). The Microsoft Graph API returns items using the internal name. If you rename a sync column in the SharePoint UI, only the display name changes — the internal name used by the API remains the original value. The `syncColumnName` in the connector configuration must match the **internal name**, not the current display name. If a column was created as `UniqueAI` and later renamed to `SyncToUnique`, the connector must still use `UniqueAI`. It is recommended to create a new column with desired name instead of renaming to avoid confusion in the future.
+**Column name resolution:** SharePoint distinguishes between a column's **internal name** (set at creation time and immutable) and its **display name** (which can be changed later in the UI). The connector accepts either name in the `syncColumnName` configuration and resolves it per drive/list as follows:
+
+1. If a column's **display name** matches `syncColumnName`, the connector uses that column's internal name for filtering.
+2. Otherwise, if a column's **internal name** matches `syncColumnName`, that name is used directly.
+3. If neither matches, the drive or SitePages list is **skipped entirely** — the connector logs a warning and moves on to the next drive without scanning any items.
+
+This means you can configure `syncColumnName` using the human-readable display name shown in the SharePoint UI (e.g., `Sync to Unique`) even if the underlying internal name is different (e.g., `Sync_Unique`). When a display name is resolved to a different internal name, the connector logs the mapping for transparency.
+
+**Note on column renaming:** If a column was created as `UniqueAI` and later renamed to `SyncToUnique` in the UI, only the display name changes — the internal name remains `UniqueAI`. You can configure `syncColumnName` as either `SyncToUnique` (the current display name) or `UniqueAI` (the internal name). Using the display name is recommended as it is easier to verify in the SharePoint UI, but please be aware of this behavior in case of conflicts.
+
+#### Drive and List Skipping
+
+The connector checks each document library (drive) and the SitePages list for the presence of the configured sync column before scanning. If the column is not found on a drive, the entire drive is skipped — no items are fetched. This avoids unnecessary API calls for libraries that were never set up for sync. A warning is logged for each skipped drive so operators can verify the configuration.
 
 #### User Workflow
 
