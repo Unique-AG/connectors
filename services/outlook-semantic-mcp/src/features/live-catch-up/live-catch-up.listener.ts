@@ -4,6 +4,7 @@ import {
   RabbitSubscribe,
 } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { Span } from 'nestjs-otel';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { LiveCatchUpCommand } from './live-catch-up.command';
@@ -23,6 +24,7 @@ export class LiveCatchUpListener {
     queueOptions: { deadLetterExchange: DEAD_EXCHANGE.name },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @Span()
   public async onLiveCatchUpEvent(@RabbitPayload() payload: unknown): Promise<void> {
     const event = LiveCatchUpEventDto.parse(payload);
     this.logger.log({ msg: 'Live catch-up event received', type: event.type });

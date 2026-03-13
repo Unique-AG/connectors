@@ -1,6 +1,7 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
-import { SpanStatusCode } from '@opentelemetry/api';
+import { context, propagation, ROOT_CONTEXT, SpanStatusCode } from '@opentelemetry/api';
+import type { ConsumeMessage } from 'amqplib';
 import { TraceService } from 'nestjs-otel';
 
 @Injectable()
@@ -43,13 +44,27 @@ export class AMQPService implements OnApplicationBootstrap {
           }
         };
 
+        // Inject the current W3C trace context (traceparent/tracestate) into the
+        // message headers so consumers can restore it and link their spans.
+        const [exchange, routingKey, message, options = {}] = args as Parameters<
+          typeof amqpConn.publish
+        >;
+        const headers: Record<string, unknown> = { ...(options?.headers ?? {}) };
+        propagation.inject(context.active(), headers);
+        const patchedArgs: Parameters<typeof amqpConn.publish> = [
+          exchange,
+          routingKey,
+          message,
+          { ...options, headers },
+        ];
+
         // Listen once for a connection-level 'error' event.
         // Some AMQP errors may occur asynchronously (e.g., broker issues) and not
         // be thrown directly by the publish call; this captures those OOB errors.
         amqpConn.connection.once('error', onError);
 
-        // Delegate to the original publish behavior with the original arguments.
-        return original(...args).finally(() =>
+        // Delegate to the original publish behavior with patched headers.
+        return original(...patchedArgs).finally(() =>
           // Unregister the listener to prevent building them up over time.
           amqpConn.connection.removeListener('error', onError),
         );
@@ -58,6 +73,31 @@ export class AMQPService implements OnApplicationBootstrap {
       // Swap the prototype method to our patched version so all subsequent
       // calls to amqpConn.publish go through our instrumentation.
       proto.publish = patched;
+
+      // Patch wrapConsumer to extract W3C trace context from incoming message headers
+      // and run each delivery inside that context. wrapConsumer is called once per
+      // subscriber setup and wraps the amqplib channel.consume callback, so every
+      // message goes through it before NestJS or any handler decorator touches it.
+      // This allows @RabbitSpan() to simply create a child span of whatever context
+      // is active — either the publisher's span (same trace) or ROOT_CONTEXT (new trace)
+      // — without needing @RabbitRequest() on every listener method.
+      proto.wrapConsumer = function (consumer: (msg: ConsumeMessage | null) => unknown) {
+        return (msg: ConsumeMessage | null) => {
+          const parentContext =
+            msg != null
+              ? propagation.extract(ROOT_CONTEXT, msg.properties?.headers ?? {})
+              : ROOT_CONTEXT;
+          const messageProcessingPromise = Promise.resolve(
+            context.with(parentContext, () => consumer(msg)),
+          );
+          // biome-ignore lint/suspicious/noExplicitAny: internal tracking set
+          (this as any).outstandingMessageProcessing.add(messageProcessingPromise);
+          messageProcessingPromise.finally(() =>
+            // biome-ignore lint/suspicious/noExplicitAny: internal tracking set
+            (this as any).outstandingMessageProcessing.delete(messageProcessingPromise),
+          );
+        };
+      };
 
       // Mark the prototype to prevent double-patching.
       proto.__OOBPublishErrorOtelPatched = true;
