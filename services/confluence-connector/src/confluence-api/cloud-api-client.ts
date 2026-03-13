@@ -1,6 +1,6 @@
 import type { Readable } from 'node:stream';
-import { chunk, uniqueBy } from 'remeda';
-import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
+import { chunk, isNullish, uniqueBy } from 'remeda';
+import type { ConfluenceAuth } from '../auth/confluence-auth';
 import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import { type ApiClientOptions, ConfluenceApiClient } from './confluence-api-client';
@@ -8,7 +8,7 @@ import { fetchAllPaginated } from './confluence-fetch-paginated';
 import {
   type ConfluenceAttachment,
   type ConfluencePage,
-  confluenceAttachmentSchema,
+  confluenceAttachmentV2Schema,
   confluencePageSchema,
   paginatedResponseSchema,
 } from './types/confluence-api.types';
@@ -51,7 +51,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
       confluencePageSchema,
     );
 
-    // get attachments if they are more than 25 attachments per page
+    // get remaining attachments if more than 25 per page
     if (this.options.attachmentsEnabled) {
       await this.fetchMoreAttachments(pages);
     }
@@ -95,7 +95,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
 
     const uniqueResults = uniqueBy(results, (page) => page.id);
 
-    // get the remaining of attachments if there are more than 25 per page
+    // get the remaining of attachments more than 25 per page
     if (this.options.attachmentsEnabled) {
       await this.fetchMoreAttachments(uniqueResults);
     }
@@ -117,14 +117,47 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
   }
 
-  protected async fetchPaginatedAttachments(nextPath: string): Promise<ConfluenceAttachment[]> {
-    const baseUrl = `${this.apiBaseUrl}/wiki`;
-    return fetchAllPaginated(
-      `${baseUrl}${nextPath}`,
-      baseUrl,
-      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
-      confluenceAttachmentSchema,
-    );
+  protected override async fetchMoreAttachments(pages: ConfluencePage[]): Promise<void> {
+    for (const page of pages) {
+      const attachment = page.children?.attachment;
+      if (!attachment) {
+        continue;
+      }
+
+      const { size, limit } = attachment;
+      if (isNullish(size) || isNullish(limit) || size < limit) {
+        continue;
+      }
+
+      const allAttachments = await this.fetchPageAttachmentsV2(page.id);
+      attachment.results = allAttachments;
+    }
+  }
+
+  private async fetchPageAttachmentsV2(pageId: string): Promise<ConfluenceAttachment[]> {
+    const schema = paginatedResponseSchema(confluenceAttachmentV2Schema);
+    const results: ConfluenceAttachment[] = [];
+    let url: string | undefined =
+      `${this.apiBaseUrl}/wiki/api/v2/pages/${pageId}/attachments?limit=250`;
+
+    while (url) {
+      const raw = await this.makeAuthenticatedRequest(url);
+      const response = schema.parse(raw);
+
+      for (const item of response.results) {
+        results.push({
+          id: item.id,
+          title: item.title,
+          extensions: { mediaType: item.mediaType, fileSize: item.fileSize },
+          version: item.version ? { when: item.version.createdAt } : undefined,
+          _links: { download: item.downloadLink },
+        });
+      }
+
+      url = response._links.next ? `${this.apiBaseUrl}${response._links.next}` : undefined;
+    }
+
+    return results;
   }
 
   protected async makeAuthenticatedRequest(url: string): Promise<unknown> {

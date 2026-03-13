@@ -1,6 +1,5 @@
 import type { Readable } from 'node:stream';
-import { isNullish } from 'remeda';
-import type { ConfluenceAttachment, ConfluencePage } from './types/confluence-api.types';
+import type { ConfluencePage } from './types/confluence-api.types';
 
 export interface ApiClientOptions {
   attachmentsEnabled: boolean;
@@ -26,26 +25,7 @@ export abstract class ConfluenceApiClient {
   /**
    * The initial search request returns up to 25 attachments per page via the
    * `expand=children.attachment` parameter. When a page has more than 25,
-   * the response includes `_links.next` — this method follows those pagination
-   * links to fetch the remaining attachments.
+   * this method fetches the remaining attachments.
    */
-  protected async fetchMoreAttachments(pages: ConfluencePage[]): Promise<void> {
-    for (const page of pages) {
-      const attachment = page.children?.attachment;
-      if (!attachment) {
-        continue;
-      }
-
-      const { size, limit, _links } = attachment;
-      if (isNullish(size) || isNullish(limit) || size < limit || !_links?.next) {
-        // no more attachments on this page, continue
-        continue;
-      }
-
-      const attachments = await this.fetchPaginatedAttachments(_links.next);
-      attachment.results.push(...attachments);
-    }
-  }
-
-  protected abstract fetchPaginatedAttachments(nextPath: string): Promise<ConfluenceAttachment[]>;
+  protected abstract fetchMoreAttachments(pages: ConfluencePage[]): Promise<void>;
 }

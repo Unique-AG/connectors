@@ -1,12 +1,11 @@
 import type { Readable } from 'node:stream';
-import { chunk, uniqueBy } from 'remeda';
+import { chunk, isNullish, uniqueBy } from 'remeda';
 import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import { type ApiClientOptions, ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
 import {
-  type ConfluenceAttachment,
   type ConfluencePage,
   confluenceAttachmentSchema,
   confluencePageSchema,
@@ -45,6 +44,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
       confluencePageSchema,
     );
 
+    // get remaining attachments if more than 25 per page
     if (this.options.attachmentsEnabled) {
       await this.fetchMoreAttachments(pages);
     }
@@ -86,6 +86,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
 
     const uniqueResults = uniqueBy(results, (page) => page.id);
 
+    // get remaining attachments if more than 25 per page
     if (this.options.attachmentsEnabled) {
       await this.fetchMoreAttachments(uniqueResults);
     }
@@ -107,13 +108,26 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
   }
 
-  protected async fetchPaginatedAttachments(nextPath: string): Promise<ConfluenceAttachment[]> {
-    return fetchAllPaginated(
-      `${this.config.baseUrl}${nextPath}`,
-      this.config.baseUrl,
-      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
-      confluenceAttachmentSchema,
-    );
+  protected async fetchMoreAttachments(pages: ConfluencePage[]): Promise<void> {
+    for (const page of pages) {
+      const attachment = page.children?.attachment;
+      if (!attachment) {
+        continue;
+      }
+
+      const { size, limit, _links } = attachment;
+      if (isNullish(size) || isNullish(limit) || size < limit || !_links?.next) {
+        continue;
+      }
+
+      const attachments = await fetchAllPaginated(
+        `${this.config.baseUrl}${_links.next}`,
+        this.config.baseUrl,
+        (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
+        confluenceAttachmentSchema,
+      );
+      attachment.results.push(...attachments);
+    }
   }
 
   protected async makeAuthenticatedRequest(url: string): Promise<unknown> {

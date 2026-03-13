@@ -86,3 +86,18 @@ export interface PaginatedResponse<T> {
   results: T[];
   _links: { next?: string };
 }
+
+export const confluenceAttachmentV2Schema = z.object({
+  id: z.string(),
+  title: z.string(),
+  mediaType: z.string(),
+  fileSize: z.number(),
+  downloadLink: z.string(),
+  version: z
+    .object({
+      createdAt: z.string(),
+    })
+    .optional(),
+});
+
+export type ConfluenceAttachmentV2 = z.infer<typeof confluenceAttachmentV2Schema>;
