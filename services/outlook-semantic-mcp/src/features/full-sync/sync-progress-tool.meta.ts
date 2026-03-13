@@ -8,17 +8,23 @@ export const META = createMeta({
 
   Open with a status line, then show the sync state and ingestion as compact sections. Omit any field that is \`null\`.
 
-  **Status line:**
+  **Status line** — based on top-level \`state\`:
   - \`finished\` → ✅ **Sync complete**
   - \`running\` → 🔄 **Sync in progress**
   - \`error\` → ❌ **Sync error**
 
-  If \`message\` is present, show it as a blockquote below the status line.
+  If \`message\` is present and non-empty, show it as a blockquote below the status line.
 
   **Sync State** — Full sync: {syncStats.fullSyncState}, Live catch-up: {syncStats.liveCatchUpState}
-  **Date Window** — Newest created: {newestCreatedDateTime}, Oldest created: {oldestCreatedDateTime}, Newest modified: {newestLastModifiedDateTime}, Oldest modified: {oldestLastModifiedDateTime}
-  **Ingestion** ({ingestionStats.state}) — finished / in progress / failed: {finished} / {inProgress} / {failed} - Emails are ingested from newest emails received to oldest emails.
-  If \`failed\` > 0, append: ⚠️ _{failed} email(s) failed ingestion._
+  - \`fullSyncState\` values: \`ready\` (initial fetch done), \`fetching-emails\` (fetch in progress), \`failed\` (error)
+  - \`liveCatchUpState\` values: \`ready\` (up to date), \`running\` (processing new emails), \`failed\` (error)
+
+  **Date Window** — Newest created: {syncStats.dateWindow.newestCreatedDateTime}, Oldest created: {syncStats.dateWindow.oldestCreatedDateTime}, Newest modified: {syncStats.dateWindow.newestLastModifiedDateTime}, Oldest modified: {syncStats.dateWindow.oldestLastModifiedDateTime}
+
+  **Ingestion** — if \`ingestionStats.state\` is \`error\`, show: ❌ _Ingestion unavailable: {ingestionStats.message}_
+  Otherwise (\`ingestionStats.state\` is \`finished\` or \`running\`):
+  ({ingestionStats.state}) — finished / in progress / failed: {ingestionStats.finished} / {ingestionStats.inProgress} / {ingestionStats.failed} — Emails are ingested from newest to oldest.
+  If \`ingestionStats.failed\` > 0, append: ⚠️ _{ingestionStats.failed} email(s) failed ingestion._
 
   ### Active filters
   Always show the active filters section so the user understands what is being ingested.

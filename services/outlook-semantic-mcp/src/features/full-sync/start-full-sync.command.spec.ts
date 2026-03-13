@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { START_DELTA_LINK } from './execute-full-sync.command';
 import { StartFullSyncCommand } from './start-full-sync.command';
 
 // ---------------------------------------------------------------------------
@@ -97,7 +98,7 @@ describe('StartFullSyncCommand', () => {
     vi.clearAllMocks();
   });
 
-  it('clears fullSyncNextLink on fresh sync', async () => {
+  it('always sets fullSyncNextLink to START_DELTA_LINK when starting', async () => {
     const db = createMockDb(makeInboxConfig({ fullSyncState: 'ready' }));
     const command = createCommand({ amqp, getSubscriptionAndUserProfileQuery: getQuery, db });
 
@@ -109,17 +110,18 @@ describe('StartFullSyncCommand', () => {
     expect(setCall).toEqual(
       expect.objectContaining({
         fullSyncState: 'fetching-emails',
-        fullSyncNextLink: null,
+        fullSyncNextLink: START_DELTA_LINK,
       }),
     );
   });
 
-  it('preserves fullSyncNextLink on resume (failed state with existing watermark)', async () => {
+  it('preserves newestLastModifiedDateTime from previous sync on resume', async () => {
+    const savedModifiedDateTime = new Date('2024-06-15T00:00:00Z');
     const db = createMockDb(
       makeInboxConfig({
         fullSyncState: 'failed',
         oldestCreatedDateTime: new Date('2024-06-01T00:00:00Z'),
-        newestLastModifiedDateTime: new Date('2024-06-15T00:00:00Z'),
+        newestLastModifiedDateTime: savedModifiedDateTime,
       }),
     );
     const command = createCommand({ amqp, getSubscriptionAndUserProfileQuery: getQuery, db });
@@ -129,8 +131,16 @@ describe('StartFullSyncCommand', () => {
     expect(result.status).toBe('started');
 
     const setCall = db.__tx.__txUpdate.set.mock.calls[0]?.[0];
-    expect(setCall).toEqual(expect.objectContaining({ fullSyncState: 'fetching-emails' }));
-    expect(setCall).not.toHaveProperty('fullSyncNextLink');
+    expect(setCall).toEqual(
+      expect.objectContaining({
+        fullSyncState: 'fetching-emails',
+        fullSyncNextLink: START_DELTA_LINK,
+        newestLastModifiedDateTime: savedModifiedDateTime,
+        newestCreatedDateTime: null,
+        oldestCreatedDateTime: null,
+        oldestLastModifiedDateTime: null,
+      }),
+    );
   });
 
   it('skips when inbox configuration is missing', async () => {

@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ExecuteFullSyncCommand } from './execute-full-sync.command';
+import { ExecuteFullSyncCommand, START_DELTA_LINK } from './execute-full-sync.command';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -42,8 +42,8 @@ function makeInboxConfig(overrides: Record<string, unknown> = {}): Record<string
     fullSyncState: 'fetching-emails',
     fullSyncVersion: VERSION,
     filters: makeFilters(),
-    oldestLastModifiedDateTime: null,
-    fullSyncNextLink: null,
+    oldestCreatedDateTime: null,
+    fullSyncNextLink: START_DELTA_LINK,
     ...overrides,
   };
 }
@@ -234,38 +234,30 @@ describe('ExecuteFullSyncCommand', () => {
     );
   });
 
-  it('adds resume filter when oldestLastModifiedDateTime is present', async () => {
-    const oldestModified = new Date('2024-05-15T00:00:00Z');
-    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-05-14T00:00:00Z')];
-    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
-
-    const db = createMockDb(makeInboxConfig({ oldestLastModifiedDateTime: oldestModified }));
-    const command = createCommand({ graphApi, amqp, syncDirectories, db });
-
-    await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
-
-    // The filter call should include the resume condition
-    expect(graphApi.filter).toHaveBeenCalledWith(
-      expect.stringContaining(`lastModifiedDateTime lte ${oldestModified.toISOString()}`),
-    );
-    expect(graphApi.filter).toHaveBeenCalledWith(
-      expect.stringContaining(`createdDateTime gt ${IGNORED_BEFORE.toISOString()}`),
-    );
-  });
-
-  it('does not add resume filter when oldestLastModifiedDateTime is null', async () => {
+  it('uses createdDateTime filter when fetching via START_DELTA_LINK', async () => {
     const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
     graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
 
-    const db = createMockDb(makeInboxConfig({ oldestLastModifiedDateTime: null }));
+    const db = createMockDb(makeInboxConfig());
     const command = createCommand({ graphApi, amqp, syncDirectories, db });
 
     await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
 
-    // Filter should only contain the ignoredBefore condition
+    // Filter should only contain the ignoredBefore condition — no lastModifiedDateTime filter
     const filterArg = graphApi.filter.mock.calls[0]?.[0] as string;
     expect(filterArg).toContain(`createdDateTime gt ${IGNORED_BEFORE.toISOString()}`);
-    expect(filterArg).not.toContain('lastModifiedDateTime lte');
+    expect(filterArg).not.toContain('lastModifiedDateTime');
+  });
+
+  it('returns early when fullSyncNextLink is null', async () => {
+    const db = createMockDb(makeInboxConfig({ fullSyncNextLink: null }));
+    const command = createCommand({ graphApi, amqp, syncDirectories, db });
+
+    await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+    expect(graphApi.get).not.toHaveBeenCalled();
+    expect(amqp.publish).not.toHaveBeenCalled();
+    expect(syncDirectories.run).not.toHaveBeenCalled();
   });
 
   it('stops processing when version becomes stale mid-sync', async () => {
@@ -381,31 +373,4 @@ describe('ExecuteFullSyncCommand', () => {
     );
   });
 
-  it('falls back to fresh fetch when saved next link fails', async () => {
-    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
-
-    // First get rejects (expired link), second get resolves with emails
-    graphApi.get
-      .mockRejectedValueOnce(new Error('Gone — next link expired'))
-      .mockResolvedValueOnce(makeGraphResponse(emails));
-
-    const db = createMockDb(
-      makeInboxConfig({ fullSyncNextLink: 'https://graph.microsoft.com/expiredLink' }),
-    );
-    const command = createCommand({ graphApi, amqp, syncDirectories, db });
-
-    await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
-
-    // Fell back to filter-based fetch
-    expect(graphApi.filter).toHaveBeenCalled();
-
-    // Email still published
-    expect(amqp.publish).toHaveBeenCalledTimes(1);
-
-    // Final state is ready with next link cleared
-    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]?.value.set;
-    expect(lastUpdateSetCall).toHaveBeenCalledWith(
-      expect.objectContaining({ fullSyncState: 'ready', fullSyncNextLink: null }),
-    );
-  });
 });
