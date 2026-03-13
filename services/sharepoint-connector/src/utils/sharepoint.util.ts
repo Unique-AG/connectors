@@ -24,7 +24,7 @@ export function getItemUrl(sharepointContentItem: SharepointContentItem): string
  * because the file-diff API splits stored keys by `/` and compares only the last segment. Using
  * `/` would cause the diff to lose the subsite prefix and produce phantom new+deleted results.
  */
-const SUBSITE_KEY_SEPARATOR = '::';
+export const SUBSITE_KEY_SEPARATOR = '::';
 
 /**
  * Builds the key portion submitted to the file-diff API.
