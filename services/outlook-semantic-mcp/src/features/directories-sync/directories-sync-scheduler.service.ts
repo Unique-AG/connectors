@@ -14,13 +14,13 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
   ) {}
 
   public onModuleInit() {
-    this.logger.log('Triggering initial scan on service startup...');
+    this.logger.log({ msg: 'Triggering initial scan on service startup...' });
     void this.runScheduledScan();
     this.setupScheduledScan();
   }
 
   public onModuleDestroy() {
-    this.logger.log('SchedulerService is shutting down...');
+    this.logger.log({ msg: 'SchedulerService is shutting down...' });
     this.isShuttingDown = true;
     this.destroyCronJobs();
   }
@@ -36,12 +36,12 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
 
   public async runScheduledScan(): Promise<void> {
     if (this.isShuttingDown) {
-      this.logger.log('Skipping scheduled scan due to shutdown');
+      this.logger.log({ msg: 'Skipping scheduled scan due to shutdown' });
       return;
     }
 
     try {
-      this.logger.log('Scheduler triggered');
+      this.logger.log({ msg: 'Scheduler triggered' });
 
       await this.syncDirectoriesForSubscriptionsCommand.run();
     } catch (err) {
@@ -53,7 +53,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
     try {
       const jobs = this.schedulerRegistry.getCronJobs();
       jobs.forEach((job, jobName) => {
-        this.logger.log(`Stopping cron job: ${jobName}`);
+        this.logger.log({ msg: 'Stopping cron job', jobName });
         job.stop();
       });
     } catch (err) {

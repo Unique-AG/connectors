@@ -1,14 +1,22 @@
 import assert from 'node:assert';
+import { createSmeared } from '@unique-ag/utils';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, type DrizzleDatabase, subscriptions, userProfiles } from '~/db';
+import { AppConfig, appConfig } from '~/config';
+import {
+  DRIZZLE,
+  type DrizzleDatabase,
+  inboxConfiguration,
+  subscriptions,
+  userProfiles,
+} from '~/db';
+import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { MAIN_EXCHANGE } from '../../amqp/amqp.constants';
-import { subscriptionMailFilters } from '../../db/schema/subscription/subscription-mail-filters.dto';
 import {
   CreateSubscriptionRequestSchema,
   LifecycleEventDto,
@@ -35,24 +43,22 @@ export class SubscriptionCreateService {
   public constructor(
     private readonly amqp: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly utils: MailSubscriptionUtilsService,
   ) {}
 
   @Span()
-  public async subscribe(
-    userProfileId: UserProfileTypeID,
-    filters: { dateFrom: Date },
-  ): Promise<SubscribeResult> {
+  public async subscribe(userProfileId: UserProfileTypeID): Promise<SubscribeResult> {
     traceAttrs({
-      user_profile_id: userProfileId.toString(),
+      userProfileId: userProfileId.toString(),
       operation: 'create_subscription',
     });
 
-    this.logger.log(
-      { userProfileId: userProfileId.toString() },
-      'Starting Microsoft Graph subscription creation process for user',
-    );
+    this.logger.log({
+      msg: 'Starting Microsoft Graph subscription creation process for user',
+      userProfileId: userProfileId.toString(),
+    });
 
     const existingSubscription = await this.db.query.subscriptions.findFirst({
       where: and(
@@ -65,10 +71,10 @@ export class SubscriptionCreateService {
       traceEvent('found managed subscription', {
         id: existingSubscription.id,
       });
-      this.logger.debug(
-        { id: existingSubscription.id },
-        'Located existing managed subscription in database',
-      );
+      this.logger.debug({
+        msg: 'Located existing managed subscription in database',
+        id: existingSubscription.id,
+      });
 
       const expiresAt = new Date(existingSubscription.expiresAt);
       const now = new Date();
@@ -79,10 +85,13 @@ export class SubscriptionCreateService {
         'subscription.diffFromNowMs': diffFromNow,
       });
 
-      this.logger.debug(
-        { id: existingSubscription.id, expiresAt, now: now, diffFromNow },
-        'Evaluating managed subscription expiration status',
-      );
+      this.logger.debug({
+        msg: 'Evaluating managed subscription expiration status',
+        id: existingSubscription.id,
+        expiresAt,
+        now: now,
+        diffFromNow,
+      });
 
       // NOTE: 15 minutes is the last possible time we can get lifecycle notifications from Microsoft Graph
       // beyond that, we risk missing the notification and thus missing the chance to renew the subscription
@@ -102,14 +111,21 @@ export class SubscriptionCreateService {
           count: result.rowCount ?? NaN,
         });
 
-        this.logger.log(
-          { id: existingSubscription.id, count: result.rowCount ?? NaN },
-          'Successfully deleted expired managed subscription from database',
-        );
-        return await this.createNewSubscription({
-          userProfileId: userProfileId.toString(),
-          filters,
+        await this.db
+          .delete(inboxConfiguration)
+          .where(eq(inboxConfiguration.userProfileId, existingSubscription.userProfileId));
+
+        traceEvent('inbox configuration deleted', {
+          id: existingSubscription.id,
+          count: result.rowCount ?? NaN,
         });
+
+        this.logger.log({
+          msg: 'Successfully deleted expired managed subscription from database',
+          id: existingSubscription.id,
+          count: result.rowCount ?? NaN,
+        });
+        return await this.createNewSubscription(userProfileId.toString());
       }
 
       if (diffFromNow <= minimalTimeForLifecycleNotificationsInMinutes * 60 * 1000) {
@@ -122,43 +138,31 @@ export class SubscriptionCreateService {
           thresholdMinutes: minimalTimeForLifecycleNotificationsInMinutes,
         });
 
-        this.logger.warn(
-          {
-            id: existingSubscription.id,
-            thresholdMinutes: minimalTimeForLifecycleNotificationsInMinutes,
-          },
-          'Subscription expires too soon to renew safely, returning existing',
-        );
+        this.logger.warn({
+          msg: 'Subscription expires too soon to renew safely, returning existing',
+          id: existingSubscription.id,
+          thresholdMinutes: minimalTimeForLifecycleNotificationsInMinutes,
+        });
         return { status: 'expiring_soon', subscription: existingSubscription };
       }
 
       // NOTE: here we have enough time left on the subscription, so we do nothing
       traceEvent('subscription valid, skipping creation');
 
-      this.logger.debug(
-        { id: existingSubscription.id },
-        'Existing subscription is valid, skipping new subscription creation',
-      );
+      this.logger.debug({
+        msg: 'Existing subscription is valid, skipping new subscription creation',
+        id: existingSubscription.id,
+      });
       return { status: 'already_active', subscription: existingSubscription };
     }
     traceEvent('no existing subscription found');
-    return await this.createNewSubscription({
-      userProfileId: userProfileId.toString(),
-      filters,
-    });
+    return await this.createNewSubscription(userProfileId.toString());
   }
 
-  private async createNewSubscription({
-    userProfileId,
-    filters,
-  }: {
-    userProfileId: string;
-    filters: { dateFrom: Date };
-  }): Promise<SubscribeResult> {
-    this.logger.debug(
-      {},
-      'No existing subscription found, proceeding with new subscription creation',
-    );
+  private async createNewSubscription(userProfileId: string): Promise<SubscribeResult> {
+    this.logger.debug({
+      msg: 'No existing subscription found, proceeding with new subscription creation',
+    });
 
     const { notificationUrl, lifecycleNotificationUrl } = this.utils.getSubscriptionURLs();
     const nextScheduledExpiration = this.utils.getNextScheduledExpiration();
@@ -166,6 +170,8 @@ export class SubscriptionCreateService {
 
     const userProfile = await this.db.query.userProfiles.findFirst({
       columns: {
+        id: true,
+        email: true,
         providerUserId: true,
       },
       where: eq(userProfiles.id, userProfileId.toString()),
@@ -181,12 +187,24 @@ export class SubscriptionCreateService {
     }
 
     traceAttrs({
-      'user_profile.provider_user_id': userProfile.providerUserId,
+      'userProfile.providerUserId': userProfile.providerUserId,
     });
-    this.logger.debug(
-      { providerUserId: userProfile.providerUserId },
-      'Successfully retrieved user profile from database',
-    );
+    this.logger.debug({
+      msg: 'Successfully retrieved user profile from database',
+      userProfileId: userProfile.id,
+      userEmail: createSmeared(userProfile.email ?? `___Empty Email__`),
+      providerUserId: userProfile.providerUserId,
+    });
+
+    // We create the inbox configuration before we do the subscription because we do not want
+    // to create a rance condition between webhook events and not having the subscription.
+    await this.db
+      .insert(inboxConfiguration)
+      .values({
+        userProfileId,
+        filters: serializeMailFilters(this.config.defaultMailFilters),
+      })
+      .onConflictDoNothing();
 
     const payload = await CreateSubscriptionRequestSchema.encodeAsync({
       changeType: ['created'],
@@ -203,19 +221,18 @@ export class SubscriptionCreateService {
       expirationDateTime: payload.expirationDateTime,
     });
 
-    this.logger.debug(
-      {
-        notificationUrl: payload.notificationUrl,
-        lifecycleNotificationUrl: payload.lifecycleNotificationUrl,
-        expirationDateTime: payload.expirationDateTime,
-      },
-      'Prepared Microsoft Graph subscription request payload',
-    );
+    this.logger.debug({
+      msg: 'Prepared Microsoft Graph subscription request payload',
+      notificationUrl: payload.notificationUrl,
+      lifecycleNotificationUrl: payload.lifecycleNotificationUrl,
+      expirationDateTime: payload.expirationDateTime,
+    });
 
-    this.logger.debug(
-      { resource: payload.resource, changeType: payload.changeType },
-      'Sending subscription creation request to Microsoft Graph API',
-    );
+    this.logger.debug({
+      msg: 'Sending subscription creation request to Microsoft Graph API',
+      resource: payload.resource,
+      changeType: payload.changeType,
+    });
 
     const client = this.graphClientFactory.createClientForUser(userProfileId.toString());
     const graphResponse = (await client
@@ -224,15 +241,15 @@ export class SubscriptionCreateService {
       .post(payload)) as unknown;
     const graphSubscription = await Subscription.parseAsync(graphResponse);
 
-    traceAttrs({ 'graph_subscription.id': graphSubscription.id });
+    traceAttrs({ 'graphSubscription.id': graphSubscription.id });
     traceEvent('Graph API subscription created', {
       subscriptionId: graphSubscription.id,
     });
 
-    this.logger.log(
-      { subscriptionId: graphSubscription.id },
-      'Microsoft Graph API subscription was created successfully',
-    );
+    this.logger.log({
+      msg: 'Microsoft Graph API subscription was created successfully',
+      subscriptionId: graphSubscription.id,
+    });
 
     const newManagedSubscriptions = await this.db
       .insert(subscriptions)
@@ -241,9 +258,6 @@ export class SubscriptionCreateService {
         expiresAt: graphSubscription.expirationDateTime,
         userProfileId: userProfileId.toString(),
         subscriptionId: graphSubscription.id,
-        filters: subscriptionMailFilters.encode({
-          dateFrom: filters.dateFrom,
-        }),
       })
       .returning();
 
@@ -254,7 +268,10 @@ export class SubscriptionCreateService {
     }
 
     traceEvent('new managed subscription created', { id: created.id });
-    this.logger.log({ id: created.id }, 'Successfully created new managed subscription record');
+    this.logger.log({
+      id: created.id,
+      msg: 'Successfully created new managed subscription record',
+    });
 
     const subscriptionCreated = LifecycleEventDto.encode({
       type: 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created',

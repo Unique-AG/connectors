@@ -20,11 +20,12 @@ export class MailSubscriptionUtilsService {
 
     const isTrusted = state !== null && state.value === webhookSecret.value;
 
-    this.logger.debug(
-      { isTrusted, hasState: state !== null },
-      'Validating webhook authenticity using client state verification',
-    );
-    traceAttrs({ is_trusted: isTrusted });
+    this.logger.debug({
+      msg: 'Validating webhook authenticity using client state verification',
+      isTrusted,
+      hasState: state !== null,
+    });
+    traceAttrs({ isTrusted: isTrusted });
 
     return isTrusted;
   }
@@ -46,13 +47,11 @@ export class MailSubscriptionUtilsService {
       publicWebhookUrl,
     );
 
-    this.logger.debug(
-      {
-        notificationUrl: notificationUrl.toString(),
-        lifecycleNotificationUrl: lifecycleNotificationUrl.toString(),
-      },
-      'Generated webhook URLs for Microsoft Graph subscription endpoints',
-    );
+    this.logger.debug({
+      msg: 'Generated webhook URLs for Microsoft Graph subscription endpoints',
+      notificationUrl: notificationUrl.toString(),
+      lifecycleNotificationUrl: lifecycleNotificationUrl.toString(),
+    });
 
     return {
       notificationUrl,
@@ -100,13 +99,11 @@ export class MailSubscriptionUtilsService {
       nextSync.setUTCDate(nextSync.getUTCDate() + 1);
     }
 
-    this.logger.debug(
-      {
-        now,
-        nextSync,
-      },
-      'Calculated next scheduled subscription expiration time',
-    );
+    this.logger.debug({
+      msg: 'Calculated next scheduled subscription expiration time',
+      now,
+      nextSync,
+    });
 
     return nextSync;
   }

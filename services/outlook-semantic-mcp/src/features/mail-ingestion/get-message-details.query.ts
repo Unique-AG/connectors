@@ -12,17 +12,17 @@ export class GetMessageDetailsQuery {
 
   @Span()
   public async run({ userProfileId, messageId }: { userProfileId: string; messageId: string }) {
-    traceAttrs({ message_id: messageId });
+    traceAttrs({ messageId: messageId });
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const messageRaw = await client
       .api(`me/messages/${messageId}`)
       .header(`Prefer`, `IdType="ImmutableId"`)
       .select(GraphMessageFields)
       .get();
-    this.logger.log(`Received data for messageId: ${messageId}`);
+    this.logger.log({ msg: 'Received data for messageId', userProfileId, messageId });
 
     const output = graphMessageSchema.parse(messageRaw);
-    this.logger.log(`Parsed succesfully the data for message: ${messageId}`);
+    this.logger.log({ msg: 'Parsed succesfully the data for message', userProfileId, messageId });
     return output;
   }
 }

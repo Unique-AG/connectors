@@ -35,6 +35,7 @@ export type {
   IngestionApiResponse,
   IngestionFinalizationRequest,
 } from './ingestion/ingestion.types';
+export { IngestionState } from './ingestion/ingestion.types';
 export type {
   DeleteFolderResult,
   Scope,
@@ -43,7 +44,6 @@ export type {
 } from './scopes/scopes.types';
 export type {
   UniqueAccessType,
-  UniqueApiClient,
   UniqueApiClientFactory,
   UniqueApiClientRegistry,
   UniqueApiScopes,
@@ -54,5 +54,8 @@ export type {
   UniqueIngestionFacade,
   UniqueUsersFacade,
 } from './types';
-export { UniqueOwnerType } from './types';
+export {
+  UniqueApiClient,
+  UniqueOwnerType,
+} from './types';
 export type { SimpleUser } from './users/users.types';

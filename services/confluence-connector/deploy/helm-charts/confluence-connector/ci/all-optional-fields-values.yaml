@@ -9,6 +9,7 @@ connectorConfig:
         auth:
           mode: oauth_2lo
           clientId: test-client-id
+          clientSecret: "os.environ/CONFLUENCE_CLIENT_SECRET"
         apiRateLimitPerMinute: 100
         ingestSingleLabel: ai-ingest
         ingestAllLabel: ai-ingest-all
@@ -24,7 +25,11 @@ connectorConfig:
           uniqueIngestionMode: INGESTION
           customProperty: value
       processing:
-        stepTimeoutSeconds: 300
         concurrency: 1
         scanIntervalCron: "*/30 * * * *"
         maxPagesToScan: 5000
+      ingestion:
+        ingestionMode: flat
+        scopeId: test-scope-id
+        storeInternally: enabled
+        useV1KeyFormat: disabled

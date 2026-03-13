@@ -48,24 +48,22 @@ export class MailSubscriptionController {
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(ValidationCallInterceptor)
   public async lifecycle(@Body() event: LifecycleChangeNotificationCollectionDto) {
-    this.logger.log(
-      {
-        notificationCount: event.value.length,
-        eventSource: 'microsoft_graph',
-        webhookType: 'lifecycle',
-      },
-      'Received lifecycle notification webhook from Microsoft Graph',
-    );
+    this.logger.log({
+      msg: 'Received lifecycle notification webhook from Microsoft Graph',
+      notificationCount: event.value.length,
+      eventSource: 'microsoft_graph',
+      webhookType: 'lifecycle',
+    });
 
     const reauthorizationRequests = event.value
       .filter((notification) => {
         const isTrusted = this.utils.isWebhookTrustedViaState(notification.clientState);
         if (!isTrusted) {
           traceEvent('lifecycle notification invalid');
-          this.logger.warn(
-            { lifecycleNotification: notification },
-            'Discarding lifecycle notification due to invalid authentication state',
-          );
+          this.logger.warn({
+            msg: 'Discarding lifecycle notification due to invalid authentication state',
+            lifecycleNotification: notification,
+          });
         }
         return isTrusted;
       })
@@ -84,13 +82,11 @@ export class MailSubscriptionController {
             traceEvent('lifecycle notification unsupported', {
               type: notification.lifecycleEvent,
             });
-            this.logger.warn(
-              {
-                lifecycleNotification: notification,
-                eventType: notification.lifecycleEvent,
-              },
-              'Discarding lifecycle notification with unsupported event type',
-            );
+            this.logger.warn({
+              msg: 'Discarding lifecycle notification with unsupported event type',
+              lifecycleNotification: notification,
+              eventType: notification.lifecycleEvent,
+            });
             return null;
           }
         }
@@ -106,10 +102,11 @@ export class MailSubscriptionController {
       successful: successful.length,
       failed: failed.length,
     });
-    this.logger.log(
-      { successful: successful.length, failed: failed.length },
-      'Successfully processed all lifecycle notifications from Microsoft Graph',
-    );
+    this.logger.log({
+      msg: 'Successfully processed all lifecycle notifications from Microsoft Graph',
+      successful: successful.length,
+      failed: failed.length,
+    });
 
     // NOTE: if we fail any, we reject this webhook as microsoft will send this again later
     if (failed.length > 0) {
@@ -133,14 +130,12 @@ export class MailSubscriptionController {
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(ValidationCallInterceptor)
   public async notification(@Body() event: ChangeNotificationCollectionDto) {
-    this.logger.log(
-      {
-        notificationCount: event.value.length,
-        eventSource: 'microsoft_graph',
-        webhookType: 'change',
-      },
-      'Received change notification webhook from Microsoft Graph',
-    );
+    this.logger.log({
+      msg: 'Received change notification webhook from Microsoft Graph',
+      notificationCount: event.value.length,
+      eventSource: 'microsoft_graph',
+      webhookType: 'change',
+    });
 
     const [notificationsToIgnore, notificationsToProcess] = partition(
       event.value,
@@ -148,8 +143,8 @@ export class MailSubscriptionController {
     );
 
     traceAttrs({
-      notifications_to_process_count: notificationsToProcess.length,
-      notifications_to_ignore_count: notificationsToIgnore.length,
+      notificationsToProcessCount: notificationsToProcess.length,
+      notificationsToIgnoreCount: notificationsToIgnore.length,
     });
 
     if (!notificationsToProcess.length) {
@@ -169,7 +164,7 @@ export class MailSubscriptionController {
           messageId: notification.resourceData.id,
         },
       });
-      this.logger.log(`published, ${JSON.stringify(payload)}`);
+      this.logger.log({ msg: 'published', payload });
       await this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload, {
         priority: IngestionPriority.High,
       });
@@ -188,11 +183,11 @@ export class MailSubscriptionController {
   })
   public async onLifecycleNotification(@RabbitPayload() payload: unknown) {
     const event = await LifecycleEventDto.parseAsync(payload);
-    this.logger.log({ event }, 'Processing lifecycle event from message queue');
+    this.logger.log({ event, msg: 'Processing lifecycle event from message queue' });
 
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created': {
-        return this.fullSyncCommand.run(event.subscriptionId);
+        return await this.fullSyncCommand.run(event.subscriptionId);
       }
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-removed': {
         return this.subscriptionRemove.remove(event.subscriptionId);
@@ -202,10 +197,10 @@ export class MailSubscriptionController {
       }
 
       default:
-        this.logger.warn(
-          { eventType: event.type },
-          'Received unsupported lifecycle event type and will ignore it',
-        );
+        this.logger.warn({
+          msg: 'Received unsupported lifecycle event type and will ignore it',
+          eventType: event.type,
+        });
         break;
     }
   }

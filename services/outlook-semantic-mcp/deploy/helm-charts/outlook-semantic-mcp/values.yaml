@@ -32,7 +32,7 @@ server:
     - outlook-semantic-mcp-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/outlook-semantic-mcp
-    tag: 0.2.5 # x-release-please-version
+    tag: 0.2.9 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
@@ -139,6 +139,9 @@ mcpConfig:
     # example: https://outlook.mcp.unique.app
     selfUrl: unset_default_value
 
+  logs:
+    diagnosticsDataPolicy: conceal
+
   # -- Microsoft Graph API configuration
   microsoft:
     # -- The client ID of the Microsoft App Registration
@@ -181,6 +184,9 @@ mcpConfig:
         clientId: unset_default_value
         oauthTokenUrl: unset_default_value
         projectId: unset_default_value
+
+  # -- Default mail filters applied when syncing emails (JSON string)
+  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
 
   # -- Authentication configuration for the MCP server
   auth:

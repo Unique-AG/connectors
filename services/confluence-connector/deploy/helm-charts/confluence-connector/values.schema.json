@@ -133,7 +133,7 @@
           "description": "List of tenant configurations",
           "items": {
             "type": "object",
-            "required": ["name", "confluence", "unique", "processing"],
+            "required": ["name", "confluence", "unique", "processing", "ingestion"],
             "properties": {
               "name": {
                 "type": "string",
@@ -180,9 +180,13 @@
                           "clientId": {
                             "type": "string",
                             "description": "OAuth 2.0 (2LO) application client ID"
+                          },
+                          "clientSecret": {
+                            "type": "string",
+                            "description": "OAuth 2.0 client secret. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
                           }
                         },
-                        "required": ["mode", "clientId"],
+                        "required": ["mode", "clientId", "clientSecret"],
                         "additionalProperties": false
                       },
                       {
@@ -191,9 +195,13 @@
                             "type": "string",
                             "enum": ["pat"],
                             "description": "Personal Access Token (Data Center only)"
+                          },
+                          "token": {
+                            "type": "string",
+                            "description": "Personal Access Token. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
                           }
                         },
-                        "required": ["mode"],
+                        "required": ["mode", "token"],
                         "additionalProperties": false
                       }
                     ]
@@ -334,10 +342,6 @@
                 "type": "object",
                 "description": "Page processing configuration",
                 "properties": {
-                  "stepTimeoutSeconds": {
-                    "type": "integer",
-                    "description": "Timeout in seconds for page processing steps"
-                  },
                   "concurrency": {
                     "type": "integer",
                     "description": "Number of concurrent page processing operations"
@@ -350,6 +354,35 @@
                   "maxPagesToScan": {
                     "type": ["integer", "null"],
                     "description": "Maximum number of pages to scan (for testing). Unlimited if not set"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "ingestion": {
+                "type": "object",
+                "description": "Ingestion configuration",
+                "required": ["ingestionMode", "scopeId"],
+                "properties": {
+                  "ingestionMode": {
+                    "type": "string",
+                    "enum": ["flat"],
+                    "description": "Ingestion traversal mode"
+                  },
+                  "scopeId": {
+                    "type": "string",
+                    "description": "Root scope ID for ingestion"
+                  },
+                  "storeInternally": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
+                    "description": "Whether to store content internally in Unique",
+                    "default": "enabled"
+                  },
+                  "useV1KeyFormat": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
+                    "description": "Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix",
+                    "default": "disabled"
                   }
                 },
                 "additionalProperties": false

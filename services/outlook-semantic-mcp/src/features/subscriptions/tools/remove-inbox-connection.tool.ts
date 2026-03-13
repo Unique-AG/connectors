@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { RemoveRootScopeAndDirectoriesCommand } from '~/features/directories-sync/remove-root-scope-and-directories.command';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SubscriptionRemoveService } from '../subscription-remove.service';
+import { META } from './remove-inbox-connection-tool.meta';
 
 const RemoveInboxConnectionInputSchema = z.object({});
 
@@ -43,11 +44,7 @@ export class RemoveInboxConnectionTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'stop',
-      'unique.app/system-prompt':
-        'Removes the inbox connection for outlook emails. After removing, new emails will no longer be ingested. Use verify_inbox_connection first to check if it is running.',
-    },
+    _meta: META,
   })
   @Span()
   public async removeInboxConnection(
@@ -58,7 +55,7 @@ export class RemoveInboxConnectionTool {
     const userProfileTypeid = extractUserProfileId(request);
     const userProfileId = userProfileTypeid.toString();
 
-    this.logger.log({ userProfileId }, 'Removing inbox connection for user');
+    this.logger.log({ userProfileId, msg: 'Removing inbox connection for user' });
 
     await this.removeRootScopeAndDirectoriesCommand.run(userProfileTypeid);
     const result = await this.subscriptionRemove.removeByUserProfileId(userProfileTypeid);
@@ -69,10 +66,12 @@ export class RemoveInboxConnectionTool {
       not_found: 'No active inbox connection found. Nothing to remove.',
     };
 
-    this.logger.log(
-      { userProfileId, subscriptionId: subscription?.id, status },
-      'Inbox connection removal operation completed',
-    );
+    this.logger.log({
+      msg: 'Inbox connection removal operation completed',
+      userProfileId,
+      subscriptionId: subscription?.id,
+      status,
+    });
 
     return {
       success: true,

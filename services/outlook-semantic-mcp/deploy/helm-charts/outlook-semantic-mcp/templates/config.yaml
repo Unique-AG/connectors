@@ -14,6 +14,8 @@ data:
   MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
   {{- end }}
 
+  LOGS_DIAGNOSTICS_DATA_POLICY: {{ .Values.mcpConfig.logs.diagnosticsDataPolicy | quote }}
+
   # Unique auth config
   UNIQUE_SERVICE_AUTH_MODE: {{ .Values.mcpConfig.unique.serviceAuthMode | quote }}
   UNIQUE_INGESTION_SERVICE_BASE_URL: {{ include "chart.ensureNoTrailingSlash" (dict "url" .Values.mcpConfig.unique.ingestionServiceBaseUrl) | quote }}
@@ -25,6 +27,10 @@ data:
   UNIQUE_ZITADEL_CLIENT_ID: {{ .Values.mcpConfig.unique.zitadel.clientId | quote }}
   UNIQUE_ZITADEL_OAUTH_TOKEN_URL: {{ .Values.mcpConfig.unique.zitadel.oauthTokenUrl | quote }}
   UNIQUE_ZITADEL_PROJECT_ID: {{ .Values.mcpConfig.unique.zitadel.projectId | quote }}
+  {{- end }}
+
+  {{- if .Values.mcpConfig.defaultMailFilters }}
+  DEFAULT_MAIL_FILTERS: {{ .Values.mcpConfig.defaultMailFilters | quote }}
   {{- end }}
 
   # Auth token expiration

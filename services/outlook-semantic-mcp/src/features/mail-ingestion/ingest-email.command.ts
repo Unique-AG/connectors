@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
+import { createSmeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -8,6 +9,7 @@ import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish, omit } from 'remeda';
 import { UniqueConfigNamespaced } from '~/config';
 import { DirectoryType, DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/db';
+import { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
@@ -19,10 +21,12 @@ import { GraphMessage } from './dtos/microsoft-graph.dtos';
 import { GetMessageDetailsQuery } from './get-message-details.query';
 import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
 import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
+import { shouldSkipEmail } from './utils/should-skip-email';
 
 type LogContext = Partial<{
   messageId: string;
   userProfileId: string;
+  userEmail: string;
   uniqueFileId: string;
   key: string;
   parentDirectoryId: string;
@@ -50,11 +54,13 @@ export class IngestEmailCommand {
   public async run({
     userProfileId,
     messageId,
+    filters,
   }: {
     userProfileId: string;
     messageId: string;
+    filters?: InboxConfigurationMailFilters;
   }): Promise<void> {
-    traceAttrs({ user_profile_id: userProfileId, message_id: messageId });
+    traceAttrs({ userProfileId: userProfileId, messageId: messageId });
     const userProfile = await this.db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });
@@ -64,6 +70,22 @@ export class IngestEmailCommand {
       userProfileId: userProfile.id,
       messageId,
     });
+
+    if (filters) {
+      const skipResult = shouldSkipEmail(graphMessage, filters, { userProfileId });
+      if (skipResult.skip) {
+        const { reason, matchedPattern } = skipResult;
+        traceEvent('email skipped by filter', { reason, matchedPattern, userProfileId });
+        this.logger.log({
+          messageId,
+          userProfileId,
+          reason,
+          matchedPattern,
+          msg: 'Email skipped by filter',
+        });
+        return;
+      }
+    }
 
     const metadata = getMetadataFromMessage(graphMessage);
     const fileKey = getUniqueKeyForMessage(userProfile.email, graphMessage);
@@ -76,6 +98,7 @@ export class IngestEmailCommand {
     const logContext: LogContext = {
       messageId,
       userProfileId,
+      userEmail: createSmeared(userProfile.email).toString(),
       key: fileKey,
       uniqueFileId: file?.id,
       parentDirectoryId: graphMessage.parentFolderId,
@@ -167,7 +190,7 @@ export class IngestEmailCommand {
     traceEvent(`File Ingestion Started`);
     const createContentRequest = {
       key: fileKey,
-      title: `${graphMessage.subject} - ${graphMessage.id}.eml`,
+      title: `${graphMessage.subject ?? '__empty-title__'} - ${graphMessage.id}.eml`,
       mimeType: `message/rfc822`,
       // We pass byteSize as 1 because if we do not pass it the register content request will
       // create the content but the content will not be visible in Knowledge base.

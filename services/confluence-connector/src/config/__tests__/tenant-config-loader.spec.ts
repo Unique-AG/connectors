@@ -21,9 +21,14 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 });
 
 const baseProcessingConfig = {
-  stepTimeoutSeconds: 300,
   concurrency: 1,
   scanIntervalCron: '*/15 * * * *',
+};
+
+const baseIngestionConfig = {
+  ingestionMode: 'flat',
+  scopeId: 'test-scope-id',
+  storeInternally: 'enabled',
 };
 
 const clusterLocalUniqueConfig = {
@@ -55,13 +60,13 @@ const baseConfluenceFields = {
 };
 
 const oauth2loAuth = {
-  mode: AuthMode.OAUTH_2LO,
+  mode: AuthMode.OAuth2Lo,
   clientId: 'test-client-id',
   clientSecret: 'os.environ/CONFLUENCE_CLIENT_SECRET',
 };
 
 const patAuth = {
-  mode: AuthMode.PAT,
+  mode: AuthMode.Pat,
   token: 'os.environ/CONFLUENCE_PAT',
 };
 
@@ -117,7 +122,7 @@ describe('tenant-config-loader', () => {
     globSync.mockReturnValue(configs.map((c) => c.path));
     readFileSync.mockImplementation((filePath: unknown) => {
       const match = configs.find((c) => c.path === filePath);
-      if (!match) throw new Error(`Unexpected file path: ${filePath}`);
+      assert.ok(match, `Unexpected file path: ${filePath}`);
       return dump(match.config);
     });
   }
@@ -142,6 +147,7 @@ describe('tenant-config-loader', () => {
       },
       unique: clusterLocalUniqueConfig,
       processing: baseProcessingConfig,
+      ingestion: baseIngestionConfig,
       ...overrides,
     };
   }
@@ -156,6 +162,7 @@ describe('tenant-config-loader', () => {
       },
       unique: clusterLocalUniqueConfig,
       processing: baseProcessingConfig,
+      ingestion: baseIngestionConfig,
       ...overrides,
     };
   }
@@ -356,10 +363,10 @@ describe('tenant-config-loader', () => {
       expect(name).toBe('acme');
       expect(config.confluence.instanceType).toBe('cloud');
       expect(config.confluence.baseUrl).toBe('https://acme.atlassian.net');
-      expect(config.confluence.auth.mode).toBe(AuthMode.OAUTH_2LO);
+      expect(config.confluence.auth.mode).toBe(AuthMode.OAuth2Lo);
       const auth = config.confluence.auth as Extract<
         typeof config.confluence.auth,
-        { mode: typeof AuthMode.OAUTH_2LO }
+        { mode: typeof AuthMode.OAuth2Lo }
       >;
       expect(auth.clientId).toBe('test-client-id');
       expect(auth.clientSecret.value).toBe('env-client-secret');
@@ -377,10 +384,10 @@ describe('tenant-config-loader', () => {
       expect(result).toHaveLength(1);
       const { config } = assertFirstElement(result);
       expect(config.confluence.instanceType).toBe('data-center');
-      expect(config.confluence.auth.mode).toBe(AuthMode.PAT);
+      expect(config.confluence.auth.mode).toBe(AuthMode.Pat);
       const auth = config.confluence.auth as Extract<
         typeof config.confluence.auth,
-        { mode: typeof AuthMode.PAT }
+        { mode: typeof AuthMode.Pat }
       >;
       expect(auth.token.value).toBe('env-pat-token');
     });
@@ -400,6 +407,7 @@ describe('tenant-config-loader', () => {
         },
         unique: clusterLocalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
 
       const tenant2Config = {
@@ -411,6 +419,7 @@ describe('tenant-config-loader', () => {
         },
         unique: clusterLocalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
 
       setupFsMocks(globSync, readFileSync, [
@@ -422,9 +431,9 @@ describe('tenant-config-loader', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0]?.name).toBe('tenant1');
-      expect(result[0]?.config.confluence.auth.mode).toBe(AuthMode.OAUTH_2LO);
+      expect(result[0]?.config.confluence.auth.mode).toBe(AuthMode.OAuth2Lo);
       expect(result[1]?.name).toBe('tenant2');
-      expect(result[1]?.config.confluence.auth.mode).toBe(AuthMode.PAT);
+      expect(result[1]?.config.confluence.auth.mode).toBe(AuthMode.Pat);
     });
   });
 
@@ -437,7 +446,7 @@ describe('tenant-config-loader', () => {
       const { config } = assertFirstElement(getTenantConfigs());
       const auth = config.confluence.auth as Extract<
         typeof config.confluence.auth,
-        { mode: typeof AuthMode.OAUTH_2LO }
+        { mode: typeof AuthMode.OAuth2Lo }
       >;
       expect(auth.clientSecret.value).toBe('env-client-secret');
     });
@@ -450,7 +459,7 @@ describe('tenant-config-loader', () => {
       const { config } = assertFirstElement(getTenantConfigs());
       const auth = config.confluence.auth as Extract<
         typeof config.confluence.auth,
-        { mode: typeof AuthMode.PAT }
+        { mode: typeof AuthMode.Pat }
       >;
       expect(auth.token.value).toBe('env-pat-token');
     });
@@ -469,6 +478,7 @@ describe('tenant-config-loader', () => {
         },
         unique: externalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
       setupSingleConfig(globSync, readFileSync, config);
 
@@ -508,6 +518,7 @@ describe('tenant-config-loader', () => {
         },
         unique: externalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
       setupSingleConfig(globSync, readFileSync, config);
 
@@ -562,12 +573,14 @@ describe('tenant-config-loader', () => {
       const config = {
         confluence: {
           instanceType: 'cloud',
+          cloudId: 'test-cloud-id',
           baseUrl: 'https://acme.atlassian.net',
           auth: patAuth,
           ...baseConfluenceFields,
         },
         unique: clusterLocalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupSingleConfig(globSync, readFileSync, config);
@@ -579,15 +592,31 @@ describe('tenant-config-loader', () => {
       const config = {
         confluence: {
           instanceType: 'cloud',
+          cloudId: 'test-cloud-id',
           baseUrl: 'https://acme.atlassian.net',
           auth: { mode: 'unknown_mode' },
           ...baseConfluenceFields,
         },
         unique: clusterLocalUniqueConfig,
         processing: baseProcessingConfig,
+        ingestion: baseIngestionConfig,
       };
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupSingleConfig(globSync, readFileSync, config);
+
+      expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
+    });
+
+    it('throws when ingestionMode is recursive', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupSingleConfig(
+        globSync,
+        readFileSync,
+        makeCloudOauth2loConfig({
+          ingestion: { ...baseIngestionConfig, ingestionMode: 'recursive' },
+        }),
+      );
 
       expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
     });

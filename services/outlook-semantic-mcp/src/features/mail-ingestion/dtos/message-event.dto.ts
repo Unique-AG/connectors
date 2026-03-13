@@ -10,6 +10,7 @@ const FullSyncMessageChanged = z.object({
   payload: z.object({
     userProfileId: z.string(),
     messageId: z.string(),
+    fullSyncVersion: z.string(),
   }),
 });
 

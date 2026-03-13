@@ -42,10 +42,10 @@ export async function processInBatches<TInput, TOutput>({
       allResults.push(...results);
     } catch (error) {
       logger.error({
-        msg: `${logPrefix} Failed to process batch ${index + 1}`,
         batchIndex: index,
         batchSize: batch.length,
-        error,
+        err: error,
+        msg: `${logPrefix} Failed to process batch ${index + 1}`,
       });
       throw error;
     }

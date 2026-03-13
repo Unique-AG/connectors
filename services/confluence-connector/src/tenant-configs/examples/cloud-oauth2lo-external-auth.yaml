@@ -33,7 +33,11 @@ unique:
   #   uniqueIngestionMode: SKIP_INGESTION
 
 processing:
-  stepTimeoutSeconds: 300
   concurrency: 1
   scanIntervalCron: "*/15 * * * *"
   # maxPagesToScan: 100 # Uncomment to limit pages scanned (useful for testing)
+
+ingestion:
+  ingestionMode: flat
+  scopeId: your-scope-id
+  storeInternally: enabled

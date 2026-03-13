@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.2.9](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.8...outlook-semantic-mcp@0.2.9) (2026-03-12)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** address bugbot comment regarding parameter labels ([#351](https://github.com/Unique-AG/connectors/issues/351)) ([e7e91ca](https://github.com/Unique-AG/connectors/commit/e7e91ca1523fd008935d2a7dd3ced941d2f22cf1))
+
+## [0.2.8](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.7...outlook-semantic-mcp@0.2.8) (2026-03-12)
+
+
+### Features
+
+* **outlook-semantic-mcp,unique-api,deps,mcp-server-module,aes-gcm-encryption:** add support for inbox filtering, add inbox sync progress ([#343](https://github.com/Unique-AG/connectors/issues/343)) ([0591a3a](https://github.com/Unique-AG/connectors/commit/0591a3a7ec7afff5847964482eb132d7c94d57b1))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** fix equals operator, describe search fields better for the llm ([#349](https://github.com/Unique-AG/connectors/issues/349)) ([29702ce](https://github.com/Unique-AG/connectors/commit/29702ce5a485ecb8d09c2c2d8ea45cb87f4f24e6))
+
+## [0.2.7](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.6...outlook-semantic-mcp@0.2.7) (2026-03-06)
+
+
+### Features
+
+* **confluence-connector,unique-api,utils,deps:** implement ingestion pipeline ([#305](https://github.com/Unique-AG/connectors/issues/305)) ([7d2c64c](https://github.com/Unique-AG/connectors/commit/7d2c64c1f4248e06a822a7d827715c4ae001eeec))
+
+## [0.2.6](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.5...outlook-semantic-mcp@0.2.6) (2026-03-06)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** Cleanup logging, add email to logs using smeared ([#331](https://github.com/Unique-AG/connectors/issues/331)) ([6ce957d](https://github.com/Unique-AG/connectors/commit/6ce957dd83b0611445efdf44d3529d7f7afacdf8))
+
 ## [0.2.5](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.4...outlook-semantic-mcp@0.2.5) (2026-03-05)
 
 

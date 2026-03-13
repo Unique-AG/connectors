@@ -1,6 +1,7 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-import { enabledDisabledBoolean, stringToURL } from '~/utils/zod';
+import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import { enabledDisabledBoolean, json, stringToURL } from '~/utils/zod';
 
 const ConfigSchema = z
   .object({
@@ -21,6 +22,9 @@ const ConfigSchema = z
       .prefault('info')
       .describe('The log level at which the services outputs (pino).'),
     selfUrl: stringToURL().describe('The URL of the MCP Server. Used for OAuth callbacks.'),
+    defaultMailFilters: json(inboxConfigurationMailFilters).describe(
+      'Default mail filters applied when syncing emails (e.g. {"ignoredBefore":"2024-01-01", "ignoredSenders": [], "ignoredContents": [] }). ',
+    ),
   })
   .transform((c) => ({
     ...c,
@@ -29,7 +33,7 @@ const ConfigSchema = z
   }));
 
 export const appConfig = registerConfig('app', ConfigSchema, {
-  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'SELF_URL']),
+  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'SELF_URL', 'DEFAULT_MAIL_FILTERS']),
 });
 
 export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;

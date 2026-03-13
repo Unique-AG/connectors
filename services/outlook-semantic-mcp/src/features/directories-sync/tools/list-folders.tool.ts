@@ -7,6 +7,7 @@ import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscri
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { ListDirectoriesQuery, type UserDirectory } from '../list-directories.query';
 import { SyncDirectoriesCommand } from '../sync-directories.command';
+import { META } from './list-folders-tool.meta';
 
 const InputSchema = z.object({});
 
@@ -39,7 +40,7 @@ export class ListFoldersTool {
     name: 'list_folders',
     title: 'List Folders',
     description:
-      'List all Outlook mail folders available for the user. Returns a hierarchical tree of folders (e.g. Inbox, Sent, custom folders). Each folder has an id that can be passed to the search tool to filter emails by folder.',
+      'List all Outlook mail folders available for the user. Returns a hierarchical tree of folders (e.g. Inbox, Sent, custom folders). Each folder has an id that can be passed to the `folderId` filter in `search_emails`.',
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {
@@ -49,11 +50,7 @@ export class ListFoldersTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'folder',
-      'unique.app/system-prompt':
-        'Returns a hierarchical tree of Outlook mail folders. Each folder has an id and displayName. Use folder ids when calling the email search tool to filter results to a specific folder. Call this tool first when the user wants to search emails in a specific folder or asks which folders are available.',
-    },
+    _meta: META,
   })
   @Span()
   public async listFolders(

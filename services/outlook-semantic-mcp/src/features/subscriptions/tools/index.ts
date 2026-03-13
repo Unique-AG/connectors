@@ -1,3 +1,3 @@
-export { ConnectInboxTool } from './connect-inbox.tool';
+export { ReconnectInboxTool } from './reconnect-inbox.tool';
 export { RemoveInboxConnectionTool } from './remove-inbox-connection.tool';
 export { VerifyInboxConnectionTool } from './verify-inbox-connection.tool';

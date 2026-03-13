@@ -6,13 +6,13 @@ import type { UniqueIngestionFacade } from '../ingestion/unique-ingestion.facade
 import type { UniqueApiScopesFacade } from '../scopes/unique-scopes.facade';
 import type { UniqueUsersFacade } from '../users/unique-users.facade';
 
-export interface UniqueApiClient {
-  auth: UniqueAuthFacade;
-  scopes: UniqueApiScopesFacade;
-  files: UniqueFilesFacade;
-  users: UniqueUsersFacade;
-  groups: UniqueGroupsFacade;
-  ingestion: UniqueIngestionFacade;
-  content: UniqueContentFacade;
-  close?(): Promise<void>;
+export abstract class UniqueApiClient {
+  public abstract readonly auth: UniqueAuthFacade;
+  public abstract readonly scopes: UniqueApiScopesFacade;
+  public abstract readonly files: UniqueFilesFacade;
+  public abstract readonly users: UniqueUsersFacade;
+  public abstract readonly groups: UniqueGroupsFacade;
+  public abstract readonly ingestion: UniqueIngestionFacade;
+  public abstract readonly content: UniqueContentFacade;
+  public close?(): Promise<void>;
 }

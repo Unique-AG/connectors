@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Span } from 'nestjs-otel';
 import {
   getRootScopeExternalId,
   getRootScopeExternalIdForUser,
@@ -8,17 +9,17 @@ import {
   getRootScopePathForUser,
 } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { traceAttrs } from '../tracing.utils';
 
 @Injectable()
 export class CreateRootScopeCommand {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(@InjectUniqueApi() private readonly uniqueApi: UniqueApiClient) {}
 
-  public async run({
-    userProviderUserId,
-  }: {
-    userProviderUserId: string;
-    userProfileEmail: string;
-  }): Promise<void> {
+  @Span()
+  public async run({ userProviderUserId }: { userProviderUserId: string }): Promise<void> {
+    traceAttrs({ userProviderUserId: userProviderUserId });
     await this.createScopeOnPath({
       scopePath: getRootScopePath(),
       externalId: getRootScopeExternalId(),
@@ -42,9 +43,11 @@ export class CreateRootScopeCommand {
   }): Promise<void> {
     const scopeExists = await this.uniqueApi.scopes.getByExternalId(externalId);
     if (scopeExists) {
+      this.logger.debug(`Scope: ${scopePath} already exists.`);
       return;
     }
 
+    this.logger.debug(`Create Scope: ${scopePath}`);
     const [scope] = await this.uniqueApi.scopes.createFromPaths([scopePath], {
       includePermissions: true,
       inheritAccess: true,
@@ -52,6 +55,7 @@ export class CreateRootScopeCommand {
     });
     assert.ok(scope, `Could not create scope on path: ${scopePath}`);
     if (scope.externalId !== externalId) {
+      this.logger.debug(`Update scope with external id: ${scopePath}`);
       await this.uniqueApi.scopes.updateExternalId(scope.id, externalId);
     }
   }

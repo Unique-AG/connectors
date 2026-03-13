@@ -61,25 +61,21 @@ export class TokenRefreshMiddleware implements Middleware {
     const isExpired = await this.isTokenExpiredError(context.response);
     if (!isExpired) return;
 
-    this.logger.debug(
-      {
-        userProfileId: this.userProfileId,
-        tokenStatus: 'expired',
-        action: 'refresh_attempt',
-      },
-      'Microsoft Graph access token has expired for user, attempting refresh',
-    );
+    this.logger.debug({
+      msg: 'Microsoft Graph access token has expired for user, attempting refresh',
+      userProfileId: this.userProfileId,
+      tokenStatus: 'expired',
+      action: 'refresh_attempt',
+    });
 
     try {
       const newAccessToken = await this.tokenProvider.refreshAccessToken(this.userProfileId);
-      this.logger.debug(
-        {
-          userProfileId: this.userProfileId,
-          tokenStatus: 'refreshed',
-          action: 'refresh_success',
-        },
-        'Successfully refreshed expired Microsoft Graph access token for user',
-      );
+      this.logger.debug({
+        msg: 'Successfully refreshed expired Microsoft Graph access token for user',
+        userProfileId: this.userProfileId,
+        tokenStatus: 'refreshed',
+        action: 'refresh_success',
+      });
 
       const clonedRequest = this.cloneRequest(context.request, context.options);
       const updatedOptions = this.updateAuthorizationHeader(context.options, newAccessToken);
@@ -91,36 +87,30 @@ export class TokenRefreshMiddleware implements Middleware {
         customHosts: context.customHosts,
       };
 
-      this.logger.debug(
-        {
-          userProfileId: this.userProfileId,
-          action: 'retry_request',
-          tokenStatus: 'fresh',
-        },
-        'Retrying Microsoft Graph request with newly refreshed access token',
-      );
+      this.logger.debug({
+        msg: 'Retrying Microsoft Graph request with newly refreshed access token',
+        userProfileId: this.userProfileId,
+        action: 'retry_request',
+        tokenStatus: 'fresh',
+      });
       await this.nextMiddleware.execute(retryContext);
 
       context.response = retryContext.response;
 
       if (context.response?.ok) {
-        this.logger.debug(
-          {
-            userProfileId: this.userProfileId,
-            retryResult: 'success',
-            tokenRefreshWorked: true,
-          },
-          'Microsoft Graph request succeeded after token refresh was completed',
-        );
+        this.logger.debug({
+          msg: 'Microsoft Graph request succeeded after token refresh was completed',
+          userProfileId: this.userProfileId,
+          retryResult: 'success',
+          tokenRefreshWorked: true,
+        });
       } else {
-        this.logger.warn(
-          {
-            userProfileId: this.userProfileId,
-            retryResult: 'failed',
-            tokenRefreshWorked: false,
-          },
-          'Microsoft Graph request failed even after successful token refresh',
-        );
+        this.logger.warn({
+          msg: 'Microsoft Graph request failed even after successful token refresh',
+          userProfileId: this.userProfileId,
+          retryResult: 'failed',
+          tokenRefreshWorked: false,
+        });
       }
     } catch (err) {
       this.logger.error({

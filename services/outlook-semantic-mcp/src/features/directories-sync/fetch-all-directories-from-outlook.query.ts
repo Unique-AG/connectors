@@ -1,7 +1,8 @@
+import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { sumBy } from 'remeda';
+import { clone, sumBy, unique } from 'remeda';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
 import {
@@ -18,7 +19,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
 
   @Span()
   public async run(userProfileId: string): Promise<GraphOutlookDirectory[]> {
-    traceAttrs({ user_profile_id: userProfileId });
+    traceAttrs({ userProfileId: userProfileId });
     this.logger.log({ userProfileId, msg: `Fetching all directories from Outlook` });
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
@@ -33,6 +34,11 @@ export class FetchAllDirectoriesFromOutlookQuery {
       userProfileId,
       rootDirectoryCount: rootDirectories.length,
       msg: `Root directories fetched`,
+    });
+    this.logFullDirectoriesStructure({
+      userProfileId,
+      directories: rootDirectories,
+      msg: `Directories from microsoft before expansion`,
     });
 
     const shouldExpandDirectory = (directory: GraphOutlookDirectory) =>
@@ -70,16 +76,25 @@ export class FetchAllDirectoriesFromOutlookQuery {
     });
 
     await Promise.all(allPromisses);
+    this.logFullDirectoriesStructure({
+      userProfileId,
+      directories: rootDirectories,
+      msg: `Directories from microsoft after expansion`,
+    });
 
     const totalCount = this.countDirectories(rootDirectories);
+    const pathsFetched = this.getPaths(rootDirectories, []);
+    const directoriesTree = pathsFetched.map((item) => smearPath(createSmeared(item))).join('\r\n');
     traceEvent('all directories fetched', {
-      total_count: totalCount,
-      root_count: rootDirectories.length,
+      totalCount: totalCount,
+      rootDirectoriesCount: rootDirectories.length,
+      directoriesTree,
     });
     this.logger.log({
       userProfileId,
       totalCount,
-      rootDirectoryCount: rootDirectories.length,
+      rootDirectoriesCount: rootDirectories.length,
+      directoriesTree,
       msg: `All directories fetched including children`,
     });
 
@@ -95,6 +110,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
   }): Promise<GraphOutlookDirectory[]> {
     let graphResponse = await client
       .api(apiUrl)
+      .query({ includeHiddenFolders: 'true' })
       .top(500)
       .expand('childFolders')
       .header(`Prefer`, `IdType="ImmutableId"`)
@@ -111,7 +127,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
         .get();
       parsedResult = graphOutlookDirectoriesResponse.parse(graphResponse);
       output.push(...parsedResult.value);
-      traceEvent('directories page fetched', { page: pageCount, running_total: output.length });
+      traceEvent('directories page fetched', { page: pageCount, runningTotal: output.length });
     }
 
     return output;
@@ -124,6 +140,41 @@ export class FetchAllDirectoriesFromOutlookQuery {
     );
   }
 
+  private getPaths(directories: GraphOutlookDirectory[], parent: string[]): string[] {
+    return unique(
+      directories.flatMap((directory) => {
+        const currentPath = [...parent, directory.displayName];
+        return [currentPath.join('/'), ...this.getPaths(directory.childFolders ?? [], currentPath)];
+      }),
+    );
+  }
+
+  private logFullDirectoriesStructure({
+    msg,
+    userProfileId,
+    directories,
+  }: {
+    userProfileId: string;
+    directories: GraphOutlookDirectory[];
+    msg: string;
+  }): void {
+    const frozenValue = clone(directories);
+
+    const mapRecursive = (items: GraphOutlookDirectory[]): GraphOutlookDirectory[] => {
+      return items.map((item) => ({
+        ...item,
+        displayName: createSmeared(item.displayName).toString(),
+        childFolders: mapRecursive(item.childFolders ?? []),
+      }));
+    };
+
+    this.logger.debug({
+      msg,
+      userProfileId,
+      directoriesStructure: mapRecursive(frozenValue),
+    });
+  }
+
   private async expandDirectory({
     parentDirectoryId,
     client,
@@ -133,6 +184,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
   }): Promise<GraphOutlookDirectory> {
     const response = await client
       .api(`me/mailFolders/${parentDirectoryId}`)
+      .query({ includeHiddenFolders: 'true' })
       .top(500)
       .expand('childFolders')
       .header(`Prefer`, `IdType="ImmutableId"`)

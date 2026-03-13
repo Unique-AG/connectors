@@ -102,3 +102,19 @@ export interface ContentUpdateMetadataResponse {
 export interface ContentUpdateMetadataMutationResponse {
   contentUpdateMetadata: ContentUpdateMetadataResponse;
 }
+
+export interface StatisticsIngestionQueryInput {
+  ownerId: string;
+}
+
+export interface StatisticsIngestionQueryOutput {
+  statisticsIngestion: { counts: Record<IngestionState, number> };
+}
+
+export const STATISTICS_INGESTION_QUERY = gql`
+  query StatisticsIngestion($ownerId: String!) {
+    statisticsIngestion(where: { ownerId: { equals: $ownerId }, ownerType: { equals: SCOPE } }) {
+      counts
+    }
+  }
+`;

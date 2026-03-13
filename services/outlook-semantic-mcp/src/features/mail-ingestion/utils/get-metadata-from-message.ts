@@ -25,6 +25,7 @@ export interface MessageMetadata extends Record<string, ContentMetadataValue> {
   hasAttachments: boolean;
   importance: string;
   inferenceClassification: string;
+  webLink: string;
   'flag.flagStatus': string;
 }
 
@@ -44,16 +45,17 @@ const filterOutNilOrEmptyValues = (
 };
 
 interface EmailAddress {
-  address?: string | undefined;
-  name?: string | undefined;
+  address?: string | undefined | null;
+  name?: string | undefined | null;
 }
 
 const extractFromEmailArray = (
   input:
     | {
-        emailAddress?: EmailAddress | undefined;
+        emailAddress?: EmailAddress | undefined | null;
       }[]
-    | undefined,
+    | undefined
+    | null,
   prop: keyof EmailAddress,
 ): string[] => {
   return filterOutNilOrEmptyValues(input?.map((item) => item.emailAddress?.[prop]));
@@ -80,6 +82,7 @@ export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata =
     categories: filterOutNilOrEmptyValues(message.categories),
     isRead: message.isRead ?? false,
     isDraft: message.isDraft ?? false,
+    webLink: message.webLink ?? '',
     hasAttachments: message.hasAttachments ?? false,
     importance: message.importance ?? '',
     inferenceClassification: message.inferenceClassification ?? '',

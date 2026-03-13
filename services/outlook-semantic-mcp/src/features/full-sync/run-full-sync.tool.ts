@@ -8,6 +8,7 @@ import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { FullSyncCommand, FullSyncRunStatus } from '~/features/full-sync/full-sync.command';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { META } from './run-full-sync-tool.meta';
 
 const InputSchema = z.object({});
 
@@ -28,7 +29,8 @@ export class RunFullSyncTool {
   @Tool({
     name: 'run_full_sync',
     title: 'Run Full Sync',
-    description: 'Run Full Sync',
+    description:
+      'Trigger a full re-sync of the Outlook mailbox into the knowledge base. Skips if a sync was run recently. Use `sync_progress` to monitor ingestion status after triggering.',
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {
@@ -38,10 +40,7 @@ export class RunFullSyncTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'play',
-      'unique.app/system-prompt': 'Starts full sync',
-    },
+    _meta: META,
   })
   @Span()
   public async startKbIntegration(
@@ -52,7 +51,7 @@ export class RunFullSyncTool {
     const userProfileTypeid = extractUserProfileId(request);
     const userProfileId = userProfileTypeid.toString();
 
-    this.logger.log({ userProfileId }, 'Starting directory sync');
+    this.logger.log({ userProfileId, msg: 'Starting directory sync' });
     const subscription = await this.drizzle.query.subscriptions.findFirst({
       where: eq(subscriptions.userProfileId, userProfileId),
     });

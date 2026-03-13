@@ -69,6 +69,7 @@ flowchart TB
 - **Streaming transfers**: Files streamed, not stored locally
 - **In-memory processing**: Data processed in memory
 - **No persistent storage**: No local file storage of SharePoint content
+- **Tenant-wide principals**: SharePoint permissions granted to tenant-wide principals (e.g., `Everyone`, `Everyone except external users`) are **not** expanded or synced to Unique. Content accessible to all tenant users in SharePoint may not have corresponding visibility in Unique permissions
 
 ## Compliance Considerations
 

@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { createSmeared } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes } from '@opentelemetry/api';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -26,17 +27,18 @@ export class SyncDirectoriesCommand {
 
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
-    traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
+    traceAttrs({ userProfileTypeId: userProfileTypeId.toString() });
     this.logger.log({
-      userProfileTypeId: userProfileTypeId.toString(),
+      userProfileId: userProfileTypeId.toString(),
       msg: `Starting directories sync`,
     });
 
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
-    traceAttrs({ user_profile_id: userProfile.id });
+    traceAttrs({ userProfileId: userProfile.id });
+    const userEmail = createSmeared(userProfile.email);
     this.logger.log({
-      userProfileTypeId: userProfileTypeId.toString(),
       userProfileId: userProfile.id,
+      userEmail,
       msg: `Resolved user profile`,
     });
 
@@ -52,9 +54,10 @@ export class SyncDirectoriesCommand {
     // if we find one we force a directory sync to ensure we sync only the necesary folders. Normaly delta query should
     // detect the new directory but as a failback we run the sync anyway using this logic.
     const shouldForceDirectoriesSync = await this.shouldForceDirectoriesSyncForUser(userProfile.id);
-    traceAttrs({ should_force_directories_sync: shouldForceDirectoriesSync });
+    traceAttrs({ shouldForceDirectoriesSync: shouldForceDirectoriesSync });
     this.logger.log({
       userProfileId: userProfile.id,
+      userEmail,
       shouldForceDirectoriesSync,
       msg: `Checked force sync condition`,
     });
@@ -63,17 +66,17 @@ export class SyncDirectoriesCommand {
       userProfile.id,
     );
     traceEvent('delta sync completed', {
-      should_sync_directories: shouldSyncDirectories,
-      delta_link_present: isNonNullish(deltaLink),
+      shouldSyncDirectories: shouldSyncDirectories,
+      deltaLinkPresent: isNonNullish(deltaLink),
     });
     const logContext: Attributes = {
-      userProfileTypeId: userProfileTypeId.toString(),
       userProfileId: userProfile.id,
+      userEmail: userEmail.toString(),
       shouldSyncDirectories,
       shouldForceDirectoriesSync,
       syncStatsId,
     };
-    traceAttrs({ ...logContext, delta_link_present: isNonNullish(deltaLink) });
+    traceAttrs({ ...logContext, deltaLinkPresent: isNonNullish(deltaLink) });
     if (shouldSyncDirectories || shouldForceDirectoriesSync) {
       traceEvent(`Run directories sync`);
       this.logger.log({ ...logContext, msg: `Run directories sync` });
@@ -107,7 +110,7 @@ export class SyncDirectoriesCommand {
   }> {
     const syncStats = await this.findOrCreateStats(userProfileId);
     const isInitialSync = !syncStats.deltaLink;
-    traceAttrs({ delta_query_is_initial_sync: isInitialSync, sync_stats_id: syncStats.id });
+    traceAttrs({ deltaQueryIsInitialSync: isInitialSync, syncStatsId: syncStats.id });
     this.logger.log({
       userProfileId,
       syncStatsId: syncStats.id,
@@ -117,9 +120,11 @@ export class SyncDirectoriesCommand {
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
-    let directoriesDeltaResult = await client
-      .api(syncStats.deltaLink || `/me/mailFolders/delta`)
-      .get();
+    const deltaApi = syncStats.deltaLink
+      ? client.api(syncStats.deltaLink)
+      : client.api(`/me/mailFolders/delta`).query({ includeHiddenFolders: 'true' });
+
+    let directoriesDeltaResult = await deltaApi.get();
 
     let directroriesResponse = graphOutlookDirectoriesDeltaResponse.parse(directoriesDeltaResult);
     let shouldSyncDirectories = false;
@@ -129,7 +134,7 @@ export class SyncDirectoriesCommand {
       shouldSyncDirectories = true;
       traceEvent('delta changes detected', {
         page: pageCount,
-        change_count: directroriesResponse.value.length,
+        changeCount: directroriesResponse.value.length,
       });
       this.logger.log({
         userProfileId,
@@ -151,7 +156,7 @@ export class SyncDirectoriesCommand {
       directroriesResponse = graphOutlookDirectoriesDeltaResponse.parse(directoriesDeltaResult);
       traceEvent('delta query page fetched', {
         page: pageCount,
-        change_count: directroriesResponse.value.length,
+        changeCount: directroriesResponse.value.length,
       });
 
       if (directroriesResponse['@odata.nextLink']) {
@@ -168,8 +173,8 @@ export class SyncDirectoriesCommand {
     }
 
     traceAttrs({
-      delta_query_page_count: pageCount,
-      delta_query_should_sync: shouldSyncDirectories,
+      deltaQueryPageCount: pageCount,
+      deltaQueryShouldSync: shouldSyncDirectories,
     });
     this.logger.log({
       userProfileId,

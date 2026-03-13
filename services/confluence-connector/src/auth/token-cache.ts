@@ -39,7 +39,9 @@ export class TokenCache {
   }
 
   private isTokenValid(token: TokenResult): boolean {
-    if (!token.expiresAt) return true;
+    if (!token.expiresAt) {
+      return true;
+    }
     return token.expiresAt.getTime() > Date.now() + this.bufferTimeMs;
   }
 }
