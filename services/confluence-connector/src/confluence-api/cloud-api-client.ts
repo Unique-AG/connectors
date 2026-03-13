@@ -117,8 +117,9 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
   }
 
-  // The expand=children.attachment still provides the first 25 for free
-  // v2 is only called for pages with more.
+  // Confluence Cloud inlines up to 25 attachments per page via expand=children.attachment.
+  // The v1 pagination endpoint (_links.next) was removed (410 Gone), so pages with more
+  // than 25 attachments use the v2 API to fetch the full list.
   protected override async fetchMoreAttachments(pages: ConfluencePage[]): Promise<void> {
     for (const page of pages) {
       const attachment = page.children?.attachment;
