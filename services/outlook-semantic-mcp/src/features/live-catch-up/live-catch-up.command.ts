@@ -1,6 +1,6 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq, SQL, sql, SQLChunk, StringChunk } from 'drizzle-orm';
+import { eq, SQL, SQLChunk, StringChunk, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
