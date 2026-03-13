@@ -161,6 +161,10 @@ export class LiveCatchUpCommand {
 
       if (!inboxConfig.newestLastModifiedDateTime) {
         // We buffer the messages to ensure we do not lose any message, and next live update will ensure it included this messages.
+        // This case should can only happen if a live update catches the lock before the full sync basically the following case.
+        // We subscribe to microsoft + trigger event for full sync.
+        // Microsoft triggers live update:
+        // Live update catches the lock before full sync catches the lock.
         await addMessagesToPendingMessages();
         this.logger.log({
           userProfileId,
