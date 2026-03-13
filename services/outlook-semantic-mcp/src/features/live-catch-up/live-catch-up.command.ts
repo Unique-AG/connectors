@@ -180,7 +180,7 @@ export class LiveCatchUpCommand {
 
       await tx
         .update(inboxConfiguration)
-        .set({ liveCatchUpState: 'running' })
+        .set({ liveCatchUpState: 'running', liveCatchUpHeartbeatAt: sql`NOW()` })
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
         .execute();
 
@@ -389,6 +389,7 @@ export class LiveCatchUpCommand {
         oldestCreatedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestCreatedDateTime}, 'infinity'::timestamptz), ${batchOldestCreated})`,
         newestLastModifiedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestLastModifiedDateTime}, '-infinity'::timestamptz), ${batchNewestModified})`,
         oldestLastModifiedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestLastModifiedDateTime}, 'infinity'::timestamptz), ${batchOldestModified})`,
+        liveCatchUpHeartbeatAt: sql`NOW()`,
       })
       .where(eq(inboxConfiguration.userProfileId, userProfileId))
       .execute();
