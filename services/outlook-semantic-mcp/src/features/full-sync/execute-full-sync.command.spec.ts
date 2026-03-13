@@ -372,5 +372,4 @@ describe('ExecuteFullSyncCommand', () => {
       expect.objectContaining({ fullSyncState: 'ready', fullSyncNextLink: null }),
     );
   });
-
 });
