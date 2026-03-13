@@ -161,13 +161,14 @@ unique:
 
 The connector supports HTTP/HTTPS proxy for environments where internet access is only available through a proxy. Proxy settings are configured via environment variables (managed by the Helm chart's `proxyConfig` section).
 
-| Mode                | Description                  |
-| ------------------- | ---------------------------- |
-| `none`              | Proxy disabled (default)     |
-| `username_password` | Basic authentication proxy   |
-| `ssl_tls`           | TLS client certificate proxy |
+| Mode                | Description                          |
+| ------------------- | ------------------------------------ |
+| `none`              | Proxy disabled (default)             |
+| `no_auth`           | Proxy enabled without authentication |
+| `username_password` | Basic authentication proxy           |
+| `ssl_tls`           | TLS client certificate proxy         |
 
-**Common options** (required for `username_password` and `ssl_tls` modes):
+**Common options** (required for `no_auth`, `username_password`, and `ssl_tls` modes):
 
 | Variable                   | Description                                                      |
 | -------------------------- | ---------------------------------------------------------------- |

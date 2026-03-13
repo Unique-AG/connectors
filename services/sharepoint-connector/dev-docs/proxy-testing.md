@@ -1,8 +1,9 @@
 # Sharepoint Connector Proxy Testing (Local)
 
 This guide documents the local proxy testing flow used for `sharepoint-connector`.
-It covers both proxy authentication modes:
+It covers all three proxy authentication modes:
 
+- `no_auth` (no authentication)
 - `username_password` (Basic auth)
 - `ssl_tls` (mTLS client cert)
 
@@ -28,23 +29,21 @@ Change it to whatever location you're using.
 
 ---
 
-## 1) Basic Auth Proxy (username_password)
+## 1) No-Auth Proxy (no_auth)
 
-### 1.1 Start mitmproxy with a fixed username/password
+### 1.1 Start mitmproxy without authentication
 
 ```
-mitmproxy --mode regular --listen-host 127.0.0.1 --listen-port 8888 --proxyauth user:pass
+mitmproxy --mode regular --listen-host 127.0.0.1 --listen-port 8888
 ```
 
 ### 1.2 Configure sharepoint-connector (.env)
 
 ```
-PROXY_AUTH_MODE=username_password
+PROXY_AUTH_MODE=no_auth
 PROXY_PROTOCOL=http
 PROXY_HOST=127.0.0.1
 PROXY_PORT=8888
-PROXY_USERNAME=user
-PROXY_PASSWORD=pass
 ```
 
 ### 1.3 Trust mitmproxy CA (required for HTTPS MITM)
@@ -77,11 +76,60 @@ In mitmproxy you should see CONNECT + HTTPS traffic to:
 
 ---
 
-## 2) TLS Client Cert Proxy (ssl_tls)
+## 2) Basic Auth Proxy (username_password)
+
+### 2.1 Start mitmproxy with a fixed username/password
+
+```
+mitmproxy --mode regular --listen-host 127.0.0.1 --listen-port 8888 --proxyauth user:pass
+```
+
+### 2.2 Configure sharepoint-connector (.env)
+
+```
+PROXY_AUTH_MODE=username_password
+PROXY_PROTOCOL=http
+PROXY_HOST=127.0.0.1
+PROXY_PORT=8888
+PROXY_USERNAME=user
+PROXY_PASSWORD=pass
+```
+
+### 2.3 Trust mitmproxy CA (required for HTTPS MITM)
+
+Mitmproxy intercepts HTTPS, so Node must trust its CA:
+
+```
+export NODE_EXTRA_CA_CERTS=~/.mitmproxy/mitmproxy-ca-cert.pem
+```
+
+You can add this env to the dev command in `package.json` for testing simplicity:
+
+```
+    "dev": "NODE_EXTRA_CA_CERTS=~/.mitmproxy/mitmproxy-ca-cert.pem nest start",
+```
+
+### 2.4 Start the service
+
+```
+pnpm dev --filter=@unique-ag/sharepoint-connector
+```
+
+### 2.5 Validate traffic
+
+In mitmproxy you should see CONNECT + HTTPS traffic to:
+- `login.microsoftonline.com`
+- `graph.microsoft.com`
+- SharePoint host(s)
+- Unique API endpoints (if in external mode)
+
+---
+
+## 3) TLS Client Cert Proxy (ssl_tls)
 
 This uses mitmproxy as the proxy, and **stunnel** as a TLS/mTLS front door.
 
-### 2.1 Generate CA + certs (one-time)
+### 3.1 Generate CA + certs (one-time)
 
 ```
 mkdir -p /Users/your-user/code/proxy-test && cd /Users/your-user/code/proxy-test
@@ -103,13 +151,13 @@ openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
   -out client.pem -days 365
 ```
 
-### 2.2 Start mitmproxy (upstream proxy)
+### 3.2 Start mitmproxy (upstream proxy)
 
 ```
 mitmproxy --mode regular --listen-host 127.0.0.1 --listen-port 8888
 ```
 
-### 2.3 Start stunnel (TLS front door)
+### 3.3 Start stunnel (TLS front door)
 
 Create `/Users/your-user/code/proxy-test/stunnel.conf`:
 
@@ -132,7 +180,7 @@ Run:
 stunnel /Users/your-user/code/proxy-test/stunnel.conf
 ```
 
-### 2.4 Configure sharepoint-connector (.env)
+### 3.4 Configure sharepoint-connector (.env)
 
 ```
 PROXY_AUTH_MODE=ssl_tls
@@ -144,7 +192,7 @@ PROXY_SSL_KEY_PATH=/Users/your-user/code/proxy-test/client.key
 PROXY_SSL_CA_BUNDLE_PATH=/Users/your-user/code/proxy-test/ca.pem
 ```
 
-### 2.5 Trust mitmproxy CA (still required)
+### 3.5 Trust mitmproxy CA (still required)
 
 Mitmproxy still intercepts HTTPS after the CONNECT tunnel:
 
@@ -158,7 +206,7 @@ You can add this env to the dev command in `package.json` for testing simplicity
     "dev": "NODE_EXTRA_CA_CERTS=~/.mitmproxy/mitmproxy-ca-cert.pem nest start",
 ```
 
-### 2.6 Start the service
+### 3.6 Start the service
 
 ```
 pnpm dev --filter=@unique-ag/sharepoint-connector
@@ -166,12 +214,20 @@ pnpm dev --filter=@unique-ag/sharepoint-connector
 
 ---
 
-## 3) Curl-based Verification
+## 4) Curl-based Verification
 
 If you see errors in the app and no traffic in mitmproxy, you can validate proxy setup with curl
 command and check if traffic shows up in mitmproxy UI.
 
-### 3.1 Basic auth proxy
+### 4.1 No-auth proxy
+
+```
+curl -v -x http://127.0.0.1:8888 \
+  --cacert ~/.mitmproxy/mitmproxy-ca-cert.pem \
+  https://login.microsoftonline.com/
+```
+
+### 4.2 Basic auth proxy
 
 ```
 curl -v -x http://user:pass@127.0.0.1:8888 \
@@ -179,7 +235,7 @@ curl -v -x http://user:pass@127.0.0.1:8888 \
   https://login.microsoftonline.com/
 ```
 
-### 3.2 mTLS proxy
+### 4.3 mTLS proxy
 
 ```
 curl -v -x https://localhost:8443 \
@@ -192,29 +248,29 @@ curl -v -x https://localhost:8443 \
 
 ---
 
-## 4) Troubleshooting
+## 5) Troubleshooting
 
-### 4.1 mitmproxy shows no traffic
+### 5.1 mitmproxy shows no traffic
 - Proxy not being used or TLS handshake is failing early.
 - Verify `PROXY_AUTH_MODE` and host/port.
 - Verify `ProxyService initialized` / `Created ProxyAgent` logs.
 - Use curl with proxy to confirm the proxy is reachable.
 
-### 4.2 `SSL certificate problem: unable to get local issuer certificate`
+### 5.2 `SSL certificate problem: unable to get local issuer certificate`
 - This means the client does not trust mitmproxy's CA.
 - Fix: set `NODE_EXTRA_CA_CERTS=~/.mitmproxy/mitmproxy-ca-cert.pem`
 
-### 4.3 stunnel logs: `peer did not return a certificate`
+### 5.3 stunnel logs: `peer did not return a certificate`
 - The client did not send a client certificate.
 - Ensure `PROXY_AUTH_MODE=ssl_tls` and `PROXY_SSL_CERT_PATH/PROXY_SSL_KEY_PATH` are set.
 - Ensure proxy TLS settings are on the proxy connection (not target connection).
 
-### 4.4 `SSL: certificate subject name 'localhost' does not match target host name '127.0.0.1'`
+### 5.4 `SSL: certificate subject name 'localhost' does not match target host name '127.0.0.1'`
 - Use `localhost` for the proxy host, or regenerate server cert with SAN for `127.0.0.1`.
 
 ---
 
-## 5) Notes
+## 6) Notes
 
 - Proxy env vars align with the [Unique Python
   implementation](https://github.com/Unique-AG/ai/blob/5fe47d97b79baad60d53f65f068874320baa14c2/tool_packages/unique_web_search/src/unique_web_search/services/client/proxy_config.py)
