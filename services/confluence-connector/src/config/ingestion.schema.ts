@@ -7,7 +7,6 @@ import { EnabledDisabledMode, IngestionMode } from '../constants/ingestion.const
 
 const IngestionModeSchema = z.enum([IngestionMode.Flat]).prefault(IngestionMode.Flat);
 
-
 const AttachmentConfigSchema = z.object({
   mode: z
     .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
@@ -17,6 +16,7 @@ const AttachmentConfigSchema = z.object({
   allowedExtensions: z
     .array(z.string().min(1))
     .prefault([...DEFAULT_ALLOWED_EXTENSIONS])
+    .transform((exts) => exts.map((ext) => ext.toLowerCase()))
     .describe('File extensions to include when ingesting attachments'),
   maxFileSizeMb: z
     .number()

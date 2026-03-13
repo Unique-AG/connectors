@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
 import { createSmeared } from '@unique-ag/utils';
+import { Logger } from '@nestjs/common';
 import type { ConfluenceConfig } from '../config';
 import type { ConfluenceApiClient, ConfluencePage } from '../confluence-api';
 import type { DiscoveredPage, FetchedPage } from './sync.types';
@@ -37,14 +37,22 @@ export class ConfluenceContentFetcher {
 
     const body = fullPage.body?.storage?.value || '';
     if (!body) {
-      this.logger.log({ pageId: page.id, title: createSmeared(page.title), msg: 'Page has no body, skipping' });
+      this.logger.log({
+        pageId: page.id,
+        title: createSmeared(page.title),
+        msg: 'Page has no body, skipping',
+      });
       return null;
     }
 
     const confluenceLabels = this.extractLabels(fullPage.metadata.labels.results);
     const metadata = confluenceLabels.length > 0 ? { confluenceLabels } : undefined;
 
-    this.logger.debug({ pageId: page.id, title: createSmeared(page.title), msg: 'Page content fetched' });
+    this.logger.debug({
+      pageId: page.id,
+      title: createSmeared(page.title),
+      msg: 'Page content fetched',
+    });
 
     return {
       id: page.id,

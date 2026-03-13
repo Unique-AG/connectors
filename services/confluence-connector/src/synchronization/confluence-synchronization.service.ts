@@ -65,9 +65,7 @@ export class ConfluenceSynchronizationService {
       }
 
       if (diffResult.deletedItems.length > 0) {
-        const contentKeys = diffResult.deletedItems.map(
-          (item) => `${item.partialKey}/${item.id}`,
-        );
+        const contentKeys = diffResult.deletedItems.map((item) => `${item.partialKey}/${item.id}`);
         await this.ingestionService.deleteContentByKeys(contentKeys);
         this.logger.log({
           count: diffResult.deletedItems.length,
@@ -110,11 +108,7 @@ export class ConfluenceSynchronizationService {
       ),
     );
 
-    for (const result of results) {
-      if (result.status === 'rejected') {
-        this.logger.error({ err: result.reason, msg: 'Page ingestion failed' });
-      }
-    }
+    this.logSettledResults(results, 'Page ingestion summary');
   }
 
   private async ingestAttachments(
@@ -138,12 +132,19 @@ export class ConfluenceSynchronizationService {
       ),
     );
 
+    this.logSettledResults(results, 'Attachment ingestion summary');
+  }
+
+  private logSettledResults(results: PromiseSettledResult<void>[], msg: string): void {
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+
     for (const result of results) {
       if (result.status === 'rejected') {
-        this.logger.error({ err: result.reason, msg: 'Attachment ingestion failed' });
+        this.logger.error({ err: result.reason, msg });
       }
     }
 
-    this.logger.log({ count: attachments.length, msg: 'Attachment ingestion completed' });
+    this.logger.log({ total: results.length, succeeded, failed, msg });
   }
 }

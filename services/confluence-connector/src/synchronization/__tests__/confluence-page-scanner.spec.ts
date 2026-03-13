@@ -7,6 +7,7 @@ vi.mock('@unique-ag/utils', async (importOriginal) => {
     createSmeared: (value: string) => new actual.Smeared(value, false),
   };
 });
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig, ProcessingConfig } from '../../config';
 import type { AttachmentConfig } from '../../config/ingestion.schema';
@@ -100,9 +101,7 @@ function makePage(
         results: (options.labels ?? []).map((name) => ({ name })),
       },
     },
-    children: options.attachments
-      ? { attachment: { results: options.attachments } }
-      : undefined,
+    children: options.attachments ? { attachment: { results: options.attachments } } : undefined,
   };
 }
 
@@ -604,7 +603,10 @@ describe('ConfluencePageScanner', () => {
       const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
       await scanner.discoverPages();
 
-      expect(mockLogger.log).toHaveBeenCalledWith({ count: 2, msg: 'Attachments discovered' });
+      expect(mockLogger.log).toHaveBeenCalledWith({
+        count: 2,
+        msg: 'Attachment discovery completed',
+      });
     });
   });
 });

@@ -339,7 +339,7 @@ describe('FileDiffService', () => {
       expect(result.deletedItems).toEqual([{ id: 'p-old', partialKey: 'test-tenant/space-1_SP' }]);
     });
 
-    it('logs error but continues when all submitted items would be deleted with no new or updated files', async () => {
+    it('aborts when all submitted items would be deleted with no new or updated files', async () => {
       const { service } = makeService(async () => ({
         newFiles: [],
         updatedFiles: [],
@@ -347,12 +347,12 @@ describe('FileDiffService', () => {
         movedFiles: [],
       }));
 
-      const result = await service.computeDiff([basePage]);
-
-      expect(result.deletedItems).toEqual([{ id: 'p-1', partialKey: 'test-tenant/space-1_SP' }]);
+      await expect(service.computeDiff([basePage])).rejects.toThrow(
+        'File diff would delete 1 files with zero new or updated items. Aborting sync.',
+      );
     });
 
-    it('logs error but continues when more items would be deleted than submitted with no new or updated files', async () => {
+    it('aborts when more items would be deleted than submitted with no new or updated files', async () => {
       const { service } = makeService(async () => ({
         newFiles: [],
         updatedFiles: [],
@@ -360,13 +360,9 @@ describe('FileDiffService', () => {
         movedFiles: [],
       }));
 
-      const result = await service.computeDiff([basePage]);
-
-      expect(result.deletedItems).toEqual([
-        { id: 'p-1', partialKey: 'test-tenant/space-1_SP' },
-        { id: 'p-1_att.pdf', partialKey: 'test-tenant/space-1_SP' },
-        { id: 'p-orphan', partialKey: 'test-tenant/space-1_SP' },
-      ]);
+      await expect(service.computeDiff([basePage])).rejects.toThrow(
+        'File diff would delete 3 files with zero new or updated items. Aborting sync.',
+      );
     });
 
     it('allows partial deletion with no new or updated files when fewer items deleted than submitted', async () => {

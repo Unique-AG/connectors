@@ -40,7 +40,10 @@ function createService(
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
   contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>,
   fileDiffService: Pick<FileDiffService, 'computeDiff'>,
-  ingestionService: Pick<IngestionService, 'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'>,
+  ingestionService: Pick<
+    IngestionService,
+    'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'
+  >,
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
     scanner as ConfluencePageScanner,
@@ -56,7 +59,10 @@ describe('ConfluenceSynchronizationService', () => {
   let mockScanner: Pick<ConfluencePageScanner, 'discoverPages'>;
   let mockContentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>;
   let mockFileDiffService: Pick<FileDiffService, 'computeDiff'>;
-  let mockIngestionService: Pick<IngestionService, 'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'>;
+  let mockIngestionService: Pick<
+    IngestionService,
+    'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'
+  >;
   let service: ConfluenceSynchronizationService;
 
   beforeEach(() => {
@@ -158,7 +164,7 @@ describe('ConfluenceSynchronizationService', () => {
 
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.any(Error), msg: 'Page ingestion failed' }),
+        expect.objectContaining({ err: expect.any(Error), msg: 'Page ingestion summary' }),
       );
     });
 
@@ -353,11 +359,61 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockScopeManagementService.ensureSpaceScopes).toHaveBeenCalledWith(
-        '/Confluence',
-        ['SP2'],
-      );
+      expect(mockScopeManagementService.ensureSpaceScopes).toHaveBeenCalledWith('/Confluence', [
+        'SP2',
+      ]);
       expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(attachment, 'scope-2');
+    });
+
+    it('skips ingestion when fetchPageContent returns null', async () => {
+      vi.mocked(mockContentFetcher.fetchPageContent).mockResolvedValue(null);
+
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(mockIngestionService.ingestPage).not.toHaveBeenCalled();
+    });
+
+    it('logs individual attachment ingestion failures without aborting sync', async () => {
+      const attachment: DiscoveredAttachment = {
+        id: 'att-fail',
+        title: 'broken.pdf',
+        mediaType: 'application/pdf',
+        fileSize: 1024,
+        downloadPath: '/download/attachments/1/broken.pdf',
+        versionTimestamp: '2026-02-01T00:00:00.000Z',
+        pageId: '1',
+        spaceId: 'space-1',
+        spaceKey: 'SP',
+        spaceName: 'Space',
+        webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/att-fail`,
+      };
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: [],
+        attachments: [attachment],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['att-fail'],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+      vi.mocked(mockIngestionService.ingestAttachment).mockRejectedValue(
+        new Error('attachment ingestion boom'),
+      );
+
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(tenant.isScanning).toBe(false);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), msg: 'Attachment ingestion summary' }),
+      );
+      expect(mockLogger.log).toHaveBeenCalledWith({
+        total: 1,
+        succeeded: 0,
+        failed: 1,
+        msg: 'Attachment ingestion summary',
+      });
+      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Sync work done' });
     });
   });
 });

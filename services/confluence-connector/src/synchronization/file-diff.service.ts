@@ -68,9 +68,7 @@ export class FileDiffService {
 
       result.newItemIds.push(...diffResponse.newFiles);
       result.updatedItemIds.push(...diffResponse.updatedFiles);
-      result.deletedItems.push(
-        ...diffResponse.deletedFiles.map((id) => ({ id, partialKey })),
-      );
+      result.deletedItems.push(...diffResponse.deletedFiles.map((id) => ({ id, partialKey })));
       result.movedItemIds.push(...diffResponse.movedFiles);
     }
 
@@ -129,9 +127,9 @@ export class FileDiffService {
         deletedCount: diffResponse.deletedFiles.length,
         msg: 'File diff would delete all files with zero new or updated items. Aborting to prevent accidental full deletion.',
       });
-      // assert.fail(
-      //   `File diff would delete ${diffResponse.deletedFiles.length} files with zero new or updated items. Aborting sync.`,
-      // );
+      assert.fail(
+        `File diff would delete ${diffResponse.deletedFiles.length} files with zero new or updated items. Aborting sync.`,
+      );
     }
   }
 }

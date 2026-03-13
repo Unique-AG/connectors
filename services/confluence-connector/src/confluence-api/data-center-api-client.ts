@@ -5,12 +5,7 @@ import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import { type ApiClientOptions, ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
-import {
-  type ConfluenceAttachment,
-  type ConfluencePage,
-  confluenceAttachmentSchema,
-  confluencePageSchema,
-} from './types/confluence-api.types';
+import { type ConfluencePage, confluencePageSchema } from './types/confluence-api.types';
 
 const SEARCH_PAGE_SIZE = 100;
 const ANCESTOR_BATCH_SIZE = 100;
@@ -18,6 +13,7 @@ const ATTACHMENT_EXPAND =
   ',children.attachment,children.attachment.version,children.attachment.extensions';
 
 export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
+  protected readonly paginationBaseUrl: string;
   private readonly attachmentExpand: string;
 
   public constructor(
@@ -27,6 +23,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     private readonly options: ApiClientOptions = { attachmentsEnabled: false },
   ) {
     super();
+    this.paginationBaseUrl = config.baseUrl;
     this.attachmentExpand = options.attachmentsEnabled ? ATTACHMENT_EXPAND : '';
   }
 
@@ -44,7 +41,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     );
 
     if (this.options.attachmentsEnabled) {
-      await this.fetchRemainingAttachments(pages);
+      await this.fetchAttachments(pages);
     }
 
     return pages;
@@ -58,7 +55,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     const page = result.success ? result.data : null;
 
     if (page && this.options.attachmentsEnabled) {
-      await this.fetchRemainingAttachments([page]);
+      await this.fetchAttachments([page]);
     }
 
     return page;
@@ -89,7 +86,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     const uniqueResults = uniqueBy(results, (page) => page.id);
 
     if (this.options.attachmentsEnabled) {
-      await this.fetchRemainingAttachments(uniqueResults);
+      await this.fetchAttachments(uniqueResults);
     }
 
     return uniqueResults;
@@ -109,34 +106,8 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
   }
 
-  private async makeAuthenticatedRequest(url: string): Promise<unknown> {
+  protected async makeAuthenticatedRequest(url: string): Promise<unknown> {
     const token = await this.confluenceAuth.acquireToken();
     return this.httpClient.rateLimitedRequest(url, { Authorization: `Bearer ${token}` });
-  }
-
-  private async fetchRemainingAttachments(pages: ConfluencePage[]): Promise<void> {
-    for (const page of pages) {
-      const attachment = page.children?.attachment;
-      if (!attachment) {
-        continue;
-      }
-
-      const { size, limit, _links } = attachment;
-      if (size === undefined || limit === undefined || size < limit || !_links?.next) {
-        continue;
-      }
-
-      const remaining = await this.fetchPaginatedAttachments(_links.next);
-      attachment.results.push(...remaining);
-    }
-  }
-
-  private async fetchPaginatedAttachments(nextPath: string): Promise<ConfluenceAttachment[]> {
-    return fetchAllPaginated(
-      `${this.config.baseUrl}${nextPath}`,
-      this.config.baseUrl,
-      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
-      confluenceAttachmentSchema,
-    );
   }
 }

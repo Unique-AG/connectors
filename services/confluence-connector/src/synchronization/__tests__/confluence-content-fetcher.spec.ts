@@ -7,6 +7,7 @@ vi.mock('@unique-ag/utils', async (importOriginal) => {
     createSmeared: (value: string) => new actual.Smeared(value, false),
   };
 });
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import type { ConfluencePage } from '../../confluence-api';

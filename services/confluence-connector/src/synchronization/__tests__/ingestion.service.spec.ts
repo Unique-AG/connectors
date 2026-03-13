@@ -9,9 +9,10 @@ vi.mock('@unique-ag/utils', async (importOriginal) => {
     createSmeared: (value: string) => new actual.Smeared(value, false),
   };
 });
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConfluenceApiClient } from '../../confluence-api';
 import type { TenantConfig } from '../../config';
+import type { ConfluenceApiClient } from '../../confluence-api';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { IngestionService } from '../ingestion.service';
 import type { DiscoveredAttachment, FetchedPage } from '../sync.types';
@@ -283,7 +284,12 @@ describe('IngestionService', () => {
       getAttachmentDownloadStream: vi.fn(),
     } as unknown as ConfluenceApiClient;
 
-    const service = new IngestionService(clusterLocalConfig, TENANT_NAME, uniqueApiClient, confluenceApiClient);
+    const service = new IngestionService(
+      clusterLocalConfig,
+      TENANT_NAME,
+      uniqueApiClient,
+      confluenceApiClient,
+    );
     mockRequest.mockResolvedValueOnce({ statusCode: 201 });
 
     await service.ingestPage(pageFixture, 'space-scope-1');
@@ -460,7 +466,12 @@ describe('IngestionService', () => {
         getAttachmentDownloadStream: vi.fn().mockResolvedValue(makeMockStream()),
       } as unknown as ConfluenceApiClient;
 
-      const service = new IngestionService(clusterLocalConfig, TENANT_NAME, uniqueApiClient, confluenceApiClient);
+      const service = new IngestionService(
+        clusterLocalConfig,
+        TENANT_NAME,
+        uniqueApiClient,
+        confluenceApiClient,
+      );
       mockRequest.mockResolvedValueOnce({ statusCode: 201 });
 
       await service.ingestAttachment(attachmentFixture, 'space-scope-1');

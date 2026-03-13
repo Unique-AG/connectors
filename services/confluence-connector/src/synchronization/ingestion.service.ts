@@ -5,11 +5,11 @@ import type {
   IngestionFinalizationRequest,
   UniqueApiClient,
 } from '@unique-ag/unique-api';
-import { Logger } from '@nestjs/common';
 import { createSmeared } from '@unique-ag/utils';
+import { Logger } from '@nestjs/common';
 import { request } from 'undici';
-import type { ConfluenceApiClient } from '../confluence-api';
 import type { TenantConfig } from '../config';
+import type { ConfluenceApiClient } from '../confluence-api';
 import {
   getSourceKind,
   INGESTION_MIME_TYPE,
@@ -35,7 +35,11 @@ export class IngestionService {
 
   public async ingestPage(page: FetchedPage, scopeId: string): Promise<void> {
     if (!page.body) {
-      this.logger.log({ pageId: page.id, title: createSmeared(page.title), msg: 'Skipping page with empty body' });
+      this.logger.log({
+        pageId: page.id,
+        title: createSmeared(page.title),
+        msg: 'Skipping page with empty body',
+      });
       return;
     }
 
@@ -62,7 +66,11 @@ export class IngestionService {
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
 
-      this.logger.debug({ pageId: page.id, title: createSmeared(page.title), msg: 'Page sent for ingestion' });
+      this.logger.debug({
+        pageId: page.id,
+        title: createSmeared(page.title),
+        msg: 'Page sent for ingestion',
+      });
     } catch (error) {
       this.logger.error({
         pageId: page.id,
@@ -83,20 +91,17 @@ export class IngestionService {
       return;
     }
 
+    let stream: Readable | undefined;
     try {
       const baseKey = `${attachment.spaceId}_${attachment.spaceKey}/${attachment.id}`;
       const key = this.config.ingestion.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
 
-      const registrationRequest = this.buildAttachmentRegistrationRequest(
-        attachment,
-        key,
-        scopeId,
-      );
+      const registrationRequest = this.buildAttachmentRegistrationRequest(attachment, key, scopeId);
       const registrationResponse =
         await this.uniqueApiClient.ingestion.registerContent(registrationRequest);
 
       const uploadUrl = this.correctWriteUrl(registrationResponse.writeUrl);
-      const stream = await this.confluenceApiClient.getAttachmentDownloadStream(
+      stream = await this.confluenceApiClient.getAttachmentDownloadStream(
         attachment.id,
         attachment.pageId,
         attachment.downloadPath,
@@ -115,6 +120,7 @@ export class IngestionService {
         msg: 'Attachment sent for ingestion',
       });
     } catch (error) {
+      stream?.destroy();
       this.logger.error({
         attachmentId: attachment.id,
         title: createSmeared(attachment.title),

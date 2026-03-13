@@ -1,7 +1,7 @@
-import { Logger } from '@nestjs/common';
 import { createSmeared } from '@unique-ag/utils';
+import { Logger } from '@nestjs/common';
 import type { ConfluenceConfig, ProcessingConfig } from '../config';
-import { BYTES_PER_MB, type AttachmentConfig } from '../config/ingestion.schema';
+import { type AttachmentConfig, BYTES_PER_MB } from '../config/ingestion.schema';
 import type { ConfluenceAttachment, ConfluencePage } from '../confluence-api';
 import { type ConfluenceApiClient, ContentType } from '../confluence-api';
 import type { DiscoveredAttachment, DiscoveredPage, DiscoveryResult } from './sync.types';
@@ -36,14 +36,16 @@ export class ConfluencePageScanner {
     if (ingestAllRootPageIds.length > 0) {
       // we are fetching descendants on content marked with ai-ingest-all label regardless of the content type
       const descendants = await this.apiClient.getDescendantPages(ingestAllRootPageIds);
-      const mappedDescendantPages = this.mapToDiscoveredPages(descendants, seenPageIds, allAttachments);
+      const mappedDescendantPages = this.mapToDiscoveredPages(
+        descendants,
+        seenPageIds,
+        allAttachments,
+      );
       discoveredPages.push(...mappedDescendantPages);
     }
 
     this.logger.log({ count: discoveredPages.length, msg: 'Page discovery completed' });
-    if (allAttachments.length > 0) {
-      this.logger.log({ count: allAttachments.length, msg: 'Attachments discovered' });
-    }
+    this.logger.log({ count: allAttachments.length, msg: 'Attachment discovery completed' });
     return { pages: discoveredPages, attachments: allAttachments };
   }
 
