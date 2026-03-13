@@ -22,13 +22,7 @@ export class CreateRootScopeCommand {
   ) {}
 
   @Span()
-  public async run({
-    userProviderUserId,
-    userEmail,
-  }: {
-    userProviderUserId: string;
-    userEmail: string | null;
-  }): Promise<void> {
+  public async run({ userProviderUserId }: { userProviderUserId: string }): Promise<void> {
     traceAttrs({ userProviderUserId: userProviderUserId });
     const { id: parentScopeId } = await this.createScopeOnPath({
       scopePath: getRootScopePath(),
@@ -61,6 +55,16 @@ export class CreateRootScopeCommand {
         this.uniqueApi.scopes.createAccesses(scopeId, [
           {
             type: 'MANAGE',
+            entityId: globalScopeAccess.entityId,
+            entityType: globalScopeAccess.entityType,
+          },
+          {
+            type: 'READ',
+            entityId: globalScopeAccess.entityId,
+            entityType: globalScopeAccess.entityType,
+          },
+          {
+            type: 'WRITE',
             entityId: globalScopeAccess.entityId,
             entityType: globalScopeAccess.entityType,
           },

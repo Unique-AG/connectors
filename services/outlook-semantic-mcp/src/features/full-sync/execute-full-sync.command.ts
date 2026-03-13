@@ -51,7 +51,7 @@ export class ExecuteFullSyncCommand {
         fullSyncState: inboxConfiguration.fullSyncState,
         fullSyncVersion: inboxConfiguration.fullSyncVersion,
         filters: inboxConfiguration.filters,
-        oldestLastModifiedDateTime: inboxConfiguration.oldestLastModifiedDateTime,
+        oldestCreatedDateTime: inboxConfiguration.oldestCreatedDateTime,
         fullSyncNextLink: inboxConfiguration.fullSyncNextLink,
       })
       .from(inboxConfiguration)
@@ -77,7 +77,7 @@ export class ExecuteFullSyncCommand {
       return;
     }
 
-    const isResume = isNonNullish(inboxConfig.oldestLastModifiedDateTime);
+    const isResume = isNonNullish(inboxConfig.oldestCreatedDateTime);
     const filters = inboxConfigurationMailFilters.parse(inboxConfig.filters);
 
     try {
@@ -96,7 +96,7 @@ export class ExecuteFullSyncCommand {
         filters,
         version,
         isResume,
-        oldestLastModifiedDateTime: inboxConfig.oldestLastModifiedDateTime,
+        oldestCreatedDateTime: inboxConfig.oldestCreatedDateTime,
         nextLink: inboxConfig.fullSyncNextLink,
       });
 
@@ -125,14 +125,14 @@ export class ExecuteFullSyncCommand {
     filters,
     version,
     isResume,
-    oldestLastModifiedDateTime,
+    oldestCreatedDateTime,
     nextLink,
   }: {
     userProfileId: string;
     filters: InboxConfigurationMailFilters;
     version: string;
     isResume: boolean;
-    oldestLastModifiedDateTime: Date | null;
+    oldestCreatedDateTime: Date | null;
     nextLink: string | null;
   }): Promise<void> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
@@ -160,9 +160,14 @@ export class ExecuteFullSyncCommand {
     }
 
     if (!nextLink) {
+      // We filter by createdDateTime (not lastModifiedDateTime) because the intent is to exclude
+      // emails created before ignoredBefore — we do not want to sync old emails regardless of
+      // whether they were recently modified. Microsoft Graph does not support combining a
+      // createdDateTime filter with an orderby on lastModifiedDateTime efficiently
+      // (InefficientFilter error), so we sort by createdDateTime as well.
       let filterExpression = `createdDateTime gt ${filters.ignoredBefore.toISOString()}`;
-      if (isResume && oldestLastModifiedDateTime) {
-        filterExpression += ` and lastModifiedDateTime lte ${oldestLastModifiedDateTime.toISOString()}`;
+      if (isResume && oldestCreatedDateTime) {
+        filterExpression += ` and createdDateTime lte ${oldestCreatedDateTime.toISOString()}`;
       }
 
       emailsRaw = await client
@@ -170,7 +175,7 @@ export class ExecuteFullSyncCommand {
         .header('Prefer', 'IdType="ImmutableId"')
         .select(FullSyncGraphMessageFields)
         .filter(filterExpression)
-        .orderby(`lastModifiedDateTime desc`)
+        .orderby(`createdDateTime desc`)
         .top(200)
         .get();
     }

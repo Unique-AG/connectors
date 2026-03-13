@@ -1,13 +1,9 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq, sql } from 'drizzle-orm';
+import { eq, SQL, sql, SQLChunk, StringChunk } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
-import {
-  InboxConfigurationMailFilters,
-  inboxConfigurationMailFilters,
-} from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { MessageEventDto } from '../mail-ingestion/dtos/message-event.dto';
@@ -61,7 +57,7 @@ export class LiveCatchUpCommand {
       return;
     }
 
-    const { watermark, filters, pendingLiveMessageIds } = lockResult;
+    const { watermark, pendingLiveMessageIds } = lockResult;
     const pendingMessageIds = new Set(pendingLiveMessageIds);
 
     try {
@@ -69,7 +65,6 @@ export class LiveCatchUpCommand {
         userProfileId,
         subscriptionId,
         watermark,
-        filters,
         pendingMessageIds,
       });
 
@@ -119,16 +114,12 @@ export class LiveCatchUpCommand {
   private async acquireLock(
     userProfileId: string,
     messageIds: string[],
-  ): Promise<
-    | { watermark: Date; filters: InboxConfigurationMailFilters; pendingLiveMessageIds: string[] }
-    | undefined
-  > {
+  ): Promise<{ watermark: Date; pendingLiveMessageIds: string[] } | undefined> {
     return this.db.transaction(async (tx) => {
       const inboxConfig = await tx
         .select({
           liveCatchUpState: inboxConfiguration.liveCatchUpState,
           newestLastModifiedDateTime: inboxConfiguration.newestLastModifiedDateTime,
-          filters: inboxConfiguration.filters,
           pendingLiveMessageIds: inboxConfiguration.pendingLiveMessageIds,
         })
         .from(inboxConfiguration)
@@ -150,7 +141,7 @@ export class LiveCatchUpCommand {
         await tx
           .update(inboxConfiguration)
           .set({
-            pendingLiveMessageIds: sql`array_cat(${inboxConfiguration.pendingLiveMessageIds}, ${messageIds})`,
+            pendingLiveMessageIds: sql`array_cat(${inboxConfiguration.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
           })
           .where(eq(inboxConfiguration.userProfileId, userProfileId))
           .execute();
@@ -178,7 +169,6 @@ export class LiveCatchUpCommand {
 
       return {
         watermark: inboxConfig.newestLastModifiedDateTime,
-        filters: inboxConfigurationMailFilters.parse(inboxConfig.filters),
         pendingLiveMessageIds: inboxConfig.pendingLiveMessageIds,
       };
     });
@@ -188,12 +178,10 @@ export class LiveCatchUpCommand {
     userProfileId,
     subscriptionId,
     watermark,
-    filters,
     pendingMessageIds,
   }: {
     userProfileId: string;
     subscriptionId: string;
-    filters: InboxConfigurationMailFilters;
     watermark: Date;
     pendingMessageIds: Set<string>;
   }): Promise<{ totalScheduled: number; scheduledIds: Set<string> }> {
@@ -202,7 +190,9 @@ export class LiveCatchUpCommand {
     const scheduledIds = new Set<string>();
     let batchNumber = 0;
 
-    const filterExpression = `createdDateTime gt ${filters.ignoredBefore.toISOString()} and lastModifiedDateTime ge ${watermark.toISOString()}`;
+    // We cannot combine a createdDateTime filter with orderby on lastModifiedDateTime on the
+    // Microsoft side (InefficientFilter). The ignoredBefore check is applied in-memory below.
+    const filterExpression = `lastModifiedDateTime ge ${watermark.toISOString()}`;
 
     let emailsRaw = await client
       .api('me/messages')
@@ -375,4 +365,14 @@ export class LiveCatchUpCommand {
       .where(eq(inboxConfiguration.userProfileId, userProfileId))
       .execute();
   }
+}
+
+function sqlArray(arr: SQLChunk[]): SQL {
+  const chunks: SQLChunk[] = [new StringChunk('ARRAY[')];
+  arr.forEach((item, index) => {
+    if (index > 0) chunks.push(new StringChunk(', '));
+    chunks.push(item);
+  });
+  chunks.push(new StringChunk(']'));
+  return new SQL(chunks);
 }
