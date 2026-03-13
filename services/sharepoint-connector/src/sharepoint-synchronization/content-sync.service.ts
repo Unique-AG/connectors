@@ -14,7 +14,7 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
-import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
+import { SUBSITE_KEY_SEPARATOR, buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
 import type { Smeared } from '../utils/smeared';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
@@ -275,6 +275,6 @@ export class ContentSyncService {
  * E.g. "subsiteId::itemId" → "itemId", "itemId" → "itemId".
  */
 function extractItemId(key: string): string {
-  const separatorIndex = key.indexOf('::');
-  return separatorIndex >= 0 ? key.slice(separatorIndex + 2) : key;
+  const separatorIndex = key.indexOf(SUBSITE_KEY_SEPARATOR);
+  return separatorIndex >= 0 ? key.slice(separatorIndex + SUBSITE_KEY_SEPARATOR.length) : key;
 }
