@@ -1,19 +1,12 @@
 import type { Readable } from 'node:stream';
 import { isNullish } from 'remeda';
-import { fetchAllPaginated } from './confluence-fetch-paginated';
-import {
-  type ConfluenceAttachment,
-  type ConfluencePage,
-  confluenceAttachmentSchema,
-} from './types/confluence-api.types';
+import type { ConfluenceAttachment, ConfluencePage } from './types/confluence-api.types';
 
 export interface ApiClientOptions {
   attachmentsEnabled: boolean;
 }
 
 export abstract class ConfluenceApiClient {
-  protected abstract readonly paginationBaseUrl: string;
-
   public abstract searchPagesByLabel(): Promise<ConfluencePage[]>;
 
   public abstract getPageById(pageId: string): Promise<ConfluencePage | null>;
@@ -54,12 +47,5 @@ export abstract class ConfluenceApiClient {
     }
   }
 
-  protected async fetchPaginatedAttachments(nextPath: string): Promise<ConfluenceAttachment[]> {
-    return fetchAllPaginated(
-      `${this.paginationBaseUrl}${nextPath}`,
-      this.paginationBaseUrl,
-      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
-      confluenceAttachmentSchema,
-    );
-  }
+  protected abstract fetchPaginatedAttachments(nextPath: string): Promise<ConfluenceAttachment[]>;
 }

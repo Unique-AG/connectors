@@ -5,7 +5,12 @@ import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import { type ApiClientOptions, ConfluenceApiClient } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
-import { type ConfluencePage, confluencePageSchema } from './types/confluence-api.types';
+import {
+  type ConfluenceAttachment,
+  type ConfluencePage,
+  confluenceAttachmentSchema,
+  confluencePageSchema,
+} from './types/confluence-api.types';
 
 const SEARCH_PAGE_SIZE = 100;
 const ANCESTOR_BATCH_SIZE = 100;
@@ -13,7 +18,6 @@ const ATTACHMENT_EXPAND =
   ',children.attachment,children.attachment.version,children.attachment.extensions';
 
 export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
-  protected readonly paginationBaseUrl: string;
   private readonly attachmentExpand: string;
 
   public constructor(
@@ -23,7 +27,6 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     private readonly options: ApiClientOptions = { attachmentsEnabled: false },
   ) {
     super();
-    this.paginationBaseUrl = config.baseUrl;
     this.attachmentExpand = options.attachmentsEnabled ? ATTACHMENT_EXPAND : '';
   }
 
@@ -102,6 +105,15 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     const url = `${this.config.baseUrl}${downloadPath}`;
     const token = await this.confluenceAuth.acquireToken();
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
+  }
+
+  protected async fetchPaginatedAttachments(nextPath: string): Promise<ConfluenceAttachment[]> {
+    return fetchAllPaginated(
+      `${this.config.baseUrl}${nextPath}`,
+      this.config.baseUrl,
+      (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
+      confluenceAttachmentSchema,
+    );
   }
 
   protected async makeAuthenticatedRequest(url: string): Promise<unknown> {

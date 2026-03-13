@@ -22,7 +22,7 @@ const ATTACHMENT_EXPAND =
 type CloudConfig = Extract<ConfluenceConfig, { instanceType: 'cloud' }>;
 
 export class CloudConfluenceApiClient extends ConfluenceApiClient {
-  protected readonly paginationBaseUrl: string;
+  private readonly apiBaseUrl: string;
   private readonly attachmentExpand: string;
 
   public constructor(
@@ -32,7 +32,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     private readonly options: ApiClientOptions = { attachmentsEnabled: false },
   ) {
     super();
-    this.paginationBaseUrl = `${ATLASSIAN_API_BASE}/${config.cloudId}`;
+    this.apiBaseUrl = `${ATLASSIAN_API_BASE}/${config.cloudId}`;
     this.attachmentExpand = options.attachmentsEnabled ? ATTACHMENT_EXPAND : '';
   }
 
@@ -42,11 +42,11 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     // We exclude them because we already get attachments via the expand=children.attachment parameter.
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
     const expand = `metadata.labels,version,space${this.attachmentExpand}`;
-    const url = `${this.paginationBaseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=${expand}&limit=${SEARCH_PAGE_SIZE}&start=0`;
+    const url = `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=${expand}&limit=${SEARCH_PAGE_SIZE}&start=0`;
 
     const pages = await fetchAllPaginated(
       url,
-      this.paginationBaseUrl,
+      this.apiBaseUrl,
       (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
       confluencePageSchema,
     );
@@ -61,7 +61,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
 
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
     const expand = 'body.storage,version,space,metadata.labels';
-    const url = `${this.paginationBaseUrl}/wiki/rest/api/content/search?cql=id%3D${pageId}&expand=${expand}`;
+    const url = `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=id%3D${pageId}&expand=${expand}`;
     const raw = await this.makeAuthenticatedRequest(url);
 
     const response = paginatedResponseSchema(confluencePageSchema).parse(raw);
@@ -82,11 +82,11 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
       // Attachments are child content in Confluence and would appear as top-level results here.
       // We exclude them because we already get attachments via the expand=children.attachment parameter.
       const cql = `ancestor IN (${batch.join(',')}) AND type != attachment`;
-      const url = `${this.paginationBaseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=${expand}&limit=${SEARCH_PAGE_SIZE}`;
+      const url = `${this.apiBaseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=${expand}&limit=${SEARCH_PAGE_SIZE}`;
 
       const pages = await fetchAllPaginated(
         url,
-        this.paginationBaseUrl,
+        this.apiBaseUrl,
         (requestUrl) => this.makeAuthenticatedRequest(requestUrl),
         confluencePageSchema,
       );
@@ -112,17 +112,13 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     pageId: string,
     _downloadPath: string,
   ): Promise<Readable> {
-    const url = `${this.paginationBaseUrl}/wiki/rest/api/content/${pageId}/child/attachment/${attachmentId}/download`;
+    const url = `${this.apiBaseUrl}/wiki/rest/api/content/${pageId}/child/attachment/${attachmentId}/download`;
     const token = await this.confluenceAuth.acquireToken();
     return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
   }
 
-  // Cloud's expanded attachment _links.next omits the /wiki/ prefix,
-  // so we use a base URL that includes it for all attachment pagination requests.
-  protected override async fetchPaginatedAttachments(
-    nextPath: string,
-  ): Promise<ConfluenceAttachment[]> {
-    const baseUrl = `${this.paginationBaseUrl}/wiki`;
+  protected async fetchPaginatedAttachments(nextPath: string): Promise<ConfluenceAttachment[]> {
+    const baseUrl = `${this.apiBaseUrl}/wiki`;
     return fetchAllPaginated(
       `${baseUrl}${nextPath}`,
       baseUrl,
