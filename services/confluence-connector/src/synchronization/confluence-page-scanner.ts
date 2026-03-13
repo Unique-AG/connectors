@@ -54,7 +54,7 @@ export class ConfluencePageScanner {
   ): DiscoveredPage[] {
     const discoveredPages: DiscoveredPage[] = [];
     for (const page of pages) {
-      if (this.isLimitReached(seenPageIds.size)) {
+      if (this.isLimitReached(seenPageIds.size + allAttachments.length)) {
         break;
       }
 
@@ -89,7 +89,8 @@ export class ConfluencePageScanner {
       });
 
       if (this.attachmentConfig.mode && page.children?.attachment) {
-        const attachments = this.extractAttachments(page, webUrl);
+        const remainingCapacity = this.remainingCapacity(seenPageIds.size + allAttachments.length);
+        const attachments = this.extractAttachments(page, webUrl, remainingCapacity);
         allAttachments.push(...attachments);
       }
     }
@@ -97,7 +98,11 @@ export class ConfluencePageScanner {
     return discoveredPages;
   }
 
-  private extractAttachments(page: ConfluencePage, pageWebUrl: string): DiscoveredAttachment[] {
+  private extractAttachments(
+    page: ConfluencePage,
+    pageWebUrl: string,
+    remainingCapacity: number | undefined,
+  ): DiscoveredAttachment[] {
     const results = page.children?.attachment?.results;
     if (!results || results.length === 0) {
       return [];
@@ -105,6 +110,10 @@ export class ConfluencePageScanner {
 
     const attachments: DiscoveredAttachment[] = [];
     for (const attachment of results) {
+      if (remainingCapacity !== undefined && attachments.length >= remainingCapacity) {
+        break;
+      }
+
       if (!this.isAttachmentAllowed(attachment)) {
         continue;
       }
@@ -115,7 +124,7 @@ export class ConfluencePageScanner {
         mediaType: attachment.extensions.mediaType,
         fileSize: attachment.extensions.fileSize,
         downloadPath: attachment._links.download,
-        versionTimestamp: attachment.version?.when,
+        versionTimestamp: attachment.version?.when ?? page.version.when,
         pageId: page.id,
         spaceId: page.space.id,
         spaceKey: page.space.key,
@@ -169,14 +178,22 @@ export class ConfluencePageScanner {
   }
 
   private isLimitReached(currentCount: number): boolean {
-    const limit = this.processingConfig.maxPagesToScan;
+    const limit = this.processingConfig.maxItemsToScan;
     if (limit === undefined) {
       return false;
     }
     if (currentCount >= limit) {
-      this.logger.log({ limit, msg: 'maxPagesToScan limit reached' });
+      this.logger.log({ limit, msg: 'maxItemsToScan limit reached' });
       return true;
     }
     return false;
+  }
+
+  private remainingCapacity(currentCount: number): number | undefined {
+    const limit = this.processingConfig.maxItemsToScan;
+    if (limit === undefined) {
+      return undefined;
+    }
+    return Math.max(0, limit - currentCount);
   }
 }

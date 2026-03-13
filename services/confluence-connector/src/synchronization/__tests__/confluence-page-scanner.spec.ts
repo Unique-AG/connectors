@@ -191,12 +191,12 @@ describe('ConfluencePageScanner', () => {
     expect(apiClient.getDescendantPages).toHaveBeenCalledWith(['db-root']);
   });
 
-  it('respects maxPagesToScan limit', async () => {
+  it('respects maxItemsToScan limit', async () => {
     const first = makePage('first', { labels: ['ai-ingest'] });
     const second = makePage('second', { labels: ['ai-ingest'] });
     const limitedConfig: ProcessingConfig = {
       ...baseProcessingConfig,
-      maxPagesToScan: 1,
+      maxItemsToScan: 1,
     };
 
     const apiClient = {
@@ -211,7 +211,7 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.pages.map((item) => item.id)).toEqual(['first']);
-    expect(mockLogger.log).toHaveBeenCalledWith({ limit: 1, msg: 'maxPagesToScan limit reached' });
+    expect(mockLogger.log).toHaveBeenCalledWith({ limit: 1, msg: 'maxItemsToScan limit reached' });
   });
 
   it('returns empty pages and attachments when searchPagesByLabel returns no pages', async () => {
@@ -274,13 +274,13 @@ describe('ConfluencePageScanner', () => {
     });
   });
 
-  it('honors maxPagesToScan limit during descendant expansion', async () => {
+  it('honors maxItemsToScan limit during descendant expansion', async () => {
     const parent = makePage('parent', { labels: ['ai-ingest-all'] });
     const child = makePage('child', { labels: ['engineering'] });
     const grandchild = makePage('grandchild', { labels: ['engineering'] });
     const limitedConfig: ProcessingConfig = {
       ...baseProcessingConfig,
-      maxPagesToScan: 2,
+      maxItemsToScan: 2,
     };
 
     const apiClient = {
@@ -295,7 +295,7 @@ describe('ConfluencePageScanner', () => {
     const result = await scanner.discoverPages();
 
     expect(result.pages.map((page) => page.id)).toEqual(['parent', 'child']);
-    expect(mockLogger.log).toHaveBeenCalledWith({ limit: 2, msg: 'maxPagesToScan limit reached' });
+    expect(mockLogger.log).toHaveBeenCalledWith({ limit: 2, msg: 'maxItemsToScan limit reached' });
   });
 
   it('deduplicates pages that appear in both the CQL scan and descendant expansion', async () => {
@@ -478,7 +478,7 @@ describe('ConfluencePageScanner', () => {
       const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
       const result = await scanner.discoverPages();
 
-      expect(result.attachments[0]?.versionTimestamp).toBeUndefined();
+      expect(result.attachments[0]?.versionTimestamp).toBe('2026-02-01T00:00:00.000Z');
     });
 
     it('extracts attachments from descendant pages', async () => {
@@ -523,6 +523,66 @@ describe('ConfluencePageScanner', () => {
       const result = await scanner.discoverPages();
 
       expect(result.attachments.map((a) => a.id)).toEqual(['att-1']);
+    });
+
+    it('counts attachments toward maxItemsToScan limit', async () => {
+      const att1 = makeAttachment('att-1', 'a.pdf');
+      const att2 = makeAttachment('att-2', 'b.pdf');
+      const page1 = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [att1, att2],
+      });
+      const page2 = makePage('page-2', { labels: ['ai-ingest'] });
+      const page3 = makePage('page-3', { labels: ['ai-ingest'] });
+
+      const limitedConfig: ProcessingConfig = {
+        ...baseProcessingConfig,
+        maxItemsToScan: 4,
+      };
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page1, page2, page3]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, limitedConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      // page-1 (1) + 2 attachments (3) + page-2 (4) = limit reached, page-3 excluded
+      expect(result.pages.map((p) => p.id)).toEqual(['page-1', 'page-2']);
+      expect(result.attachments.map((a) => a.id)).toEqual(['att-1', 'att-2']);
+    });
+
+    it('truncates attachments mid-page when limit is reached', async () => {
+      const att1 = makeAttachment('att-1', 'a.pdf');
+      const att2 = makeAttachment('att-2', 'b.pdf');
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [att1, att2],
+      });
+
+      const limitedConfig: ProcessingConfig = {
+        ...baseProcessingConfig,
+        maxItemsToScan: 2,
+      };
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, limitedConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.pages).toHaveLength(1);
+      expect(result.attachments).toHaveLength(1);
+      expect(result.attachments[0]?.id).toBe('att-1');
     });
 
     it('logs attachment count when attachments are discovered', async () => {

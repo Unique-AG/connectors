@@ -173,8 +173,8 @@ connectorConfig:
         concurrency: 1
         # -- cron expression for the scheduled Confluence scan interval default: every 15 minutes
         scanIntervalCron: "*/15 * * * *"
-        # -- maximum number of pages to scan per run (null/empty for unlimited, useful for testing)
-        # maxPagesToScan: 100
+        # -- maximum number of items (pages + attachments) to scan per run (null/empty for unlimited, useful for testing)
+        # maxItemsToScan: 100
 
       ingestion:
         # -- Ingestion traversal mode
