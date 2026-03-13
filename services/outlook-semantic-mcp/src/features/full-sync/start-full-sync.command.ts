@@ -125,9 +125,9 @@ export class StartFullSyncCommand {
         lastFullSyncStartedAt: now,
       };
 
-      const isResume = isNullish(inboxConfig.fullSyncNextLink);
+      const isFreshStart = isNullish(inboxConfig.fullSyncNextLink);
 
-      if (isResume) {
+      if (isFreshStart) {
         updateSet.newestCreatedDateTime = null;
         updateSet.oldestCreatedDateTime = null;
         updateSet.newestLastModifiedDateTime = inboxConfig.newestLastModifiedDateTime ?? now;

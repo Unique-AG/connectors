@@ -8,7 +8,8 @@ import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 import { traceEvent } from '~/features/tracing.utils';
 import { FullSyncEventDto } from './dtos/full-sync-event.dto';
 
-const STUCK_SYNC_THRESHOLD_MINUTES = 15;
+const STUCK_FULL_SYNC_THRESHOLD_MINUTES = 15;
+const STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
 const RECOVERY_CRON_SCHEDULE = '* * * * *';
 
 @Injectable()
@@ -75,7 +76,7 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
             notInArray(inboxConfiguration.fullSyncState, ['ready']),
             lt(
               sql`GREATEST(COALESCE(${inboxConfiguration.lastFullSyncStartedAt}, '-infinity'::timestamptz), ${inboxConfiguration.updatedAt})`,
-              sql`NOW() - ${STUCK_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
+              sql`NOW() - ${STUCK_FULL_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
             ),
           ),
         ),
@@ -109,7 +110,7 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
           notInArray(inboxConfiguration.liveCatchUpState, ['ready']),
           lt(
             sql`COALESCE(${inboxConfiguration.liveCatchUpHeartbeatAt}, ${inboxConfiguration.updatedAt})`,
-            sql`NOW() - ${STUCK_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
+            sql`NOW() - ${STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
           ),
         ),
       );
