@@ -29,6 +29,7 @@ outlook-mcp = services/outlook-mcp/**
 outlook-semantic-mcp = services/outlook-semantic-mcp/**
 sharepoint-connector = services/sharepoint-connector/**
 confluence-connector = services/confluence-connector/**
+onenote-mcp = services/onenote-mcp/**
 teams-mcp = services/teams-mcp/**
 
 # Packages
